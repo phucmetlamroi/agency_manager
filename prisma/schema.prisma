@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  plainPassword String? // For Admin visibility
+  role      String   @default("USER") // "ADMIN" or "USER"
+  createdAt DateTime @default(now())
+  
+  tasks     Task[]
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  deadline    DateTime?
+  value       Float    @default(0)
+  status      String   @default("Đang thực hiện") // "Đang thực hiện", "Revision", "Hoàn tất", "Tạm ngưng", "Sửa frame"
+  type        String   @default("Short form") // "Trial", "Short form", "Long form"
+  
+  references  String?
+  resources   String?  // Raw footage, B-roll
+  notes       String?  // Detailed instructions
+  fileLink    String?  // Keep for backward compatibility or alias to resources
+  
+  assignee    User?    @relation(fields: [assigneeId], references: [id])
+  assigneeId  String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

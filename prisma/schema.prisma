@@ -29,7 +29,8 @@ model Task {
   references  String?
   resources   String?  // Raw footage, B-roll
   notes       String?  // Detailed instructions
-  fileLink    String?  // Keep for backward compatibility or alias to resources
+  fileLink    String?  // Backward compatibility
+  productLink String?  // User submission link (Thành phẩm)
   
   assignee    User?    @relation(fields: [assigneeId], references: [id])
   assigneeId  String?

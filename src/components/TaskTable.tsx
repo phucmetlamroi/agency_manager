@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { deleteTask } from '@/actions/admin-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
-import { useRouter } from 'next/navigation'
 
 export type TaskWithUser = {
     id: string
@@ -16,6 +15,7 @@ export type TaskWithUser = {
     references: string | null
     resources: string | null
     fileLink: string | null
+    productLink: string | null
     notes: string | null
     assignee: { username: string } | null
 }
@@ -41,14 +41,15 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
 
     // Edit State
     const [isEditing, setIsEditing] = useState(false)
-    const [editForm, setEditForm] = useState({ resources: '', references: '', notes: '' })
+    const [editForm, setEditForm] = useState({ resources: '', references: '', notes: '', productLink: '' })
 
     const openTask = (task: TaskWithUser) => {
         setSelectedTask(task)
         setEditForm({
             resources: task.resources || task.fileLink || '',
             references: task.references || '',
-            notes: task.notes || ''
+            notes: task.notes || '',
+            productLink: task.productLink || ''
         })
         setIsEditing(false)
     }
@@ -63,22 +64,32 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
         const res = await updateTaskDetails(selectedTask.id, {
             resources: editForm.resources,
             references: editForm.references,
-            notes: editForm.notes
+            notes: editForm.notes,
+            productLink: editForm.productLink
         })
 
         if (res?.success) {
-            // Update local state to reflect changes immediately
             setSelectedTask({
                 ...selectedTask,
                 resources: editForm.resources,
                 references: editForm.references,
-                notes: editForm.notes
+                notes: editForm.notes,
+                productLink: editForm.productLink
             })
             setIsEditing(false)
-            // router.refresh() happens via server action revalidatePath
         } else {
             alert('Failed to update')
         }
+    }
+
+    // Filter options based on role
+    const getStatusOptions = () => {
+        const options = ["Đang thực hiện", "Revision", "Sửa frame", "Tạm ngưng", "Hoàn tất"]
+        if (!isAdmin) {
+            // Keep "Hoàn tất" only if it is already set (so user can see it), but cannot select it
+            return options.filter(o => o !== "Hoàn tất")
+        }
+        return options
     }
 
     return (
@@ -120,14 +131,21 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                                 <span style={{ color: 'var(--secondary)' }}>
                                     @{task.assignee?.username || '?'}
                                 </span>
+
+                                {/* Product Indicator */}
+                                {task.productLink && (
+                                    <span style={{ marginLeft: 'auto', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                        ✔ Đã nộp
+                                    </span>
+                                )}
                             </div>
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            {/* Quick Status Dropdown */}
                             <select
                                 value={task.status}
                                 onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                disabled={!isAdmin && task.status === 'Hoàn tất'} // Lock if already done
                                 style={{
                                     padding: '0.4rem 0.8rem',
                                     borderRadius: '20px',
@@ -136,17 +154,18 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                                     color: statusColors[task.status] || 'white',
                                     fontWeight: '600',
                                     fontSize: '0.8rem',
-                                    cursor: 'pointer',
+                                    cursor: isAdmin ? 'pointer' : (task.status === 'Hoàn tất' ? 'default' : 'pointer'),
                                     outline: 'none',
                                     textAlign: 'center'
                                 }}
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                <option value="Đang thực hiện">Đang thực hiện</option>
-                                <option value="Revision">Revision</option>
-                                <option value="Sửa frame">Sửa frame</option>
-                                <option value="Tạm ngưng">Tạm ngưng</option>
-                                <option value="Hoàn tất">Hoàn tất</option>
+                                {/* Render allowed options */}
+                                {getStatusOptions().map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                                {/* Ensure current status is always visible even if restricted */}
+                                {!isAdmin && task.status === 'Hoàn tất' && <option value="Hoàn tất">Hoàn tất</option>}
                             </select>
 
                             {isAdmin && (
@@ -184,12 +203,13 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                         boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
                         position: 'relative',
                         display: 'flex', flexDirection: 'column', gap: '1.5rem',
-                        animation: 'fadeIn 0.2s ease-out'
+                        animation: 'fadeIn 0.2s ease-out',
+                        maxHeight: '90vh', overflowY: 'auto'
                     }} onClick={(e) => e.stopPropagation()}>
 
                         {/* HEADER Buttons */}
                         <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', gap: '0.5rem' }}>
-                            {isAdmin && (
+                            {(isAdmin || !isEditing) && (
                                 <button
                                     onClick={() => setIsEditing(!isEditing)}
                                     style={{
@@ -203,7 +223,7 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                                         fontWeight: 600
                                     }}
                                 >
-                                    {isEditing ? 'Cancel' : 'Edit'}
+                                    {isEditing ? 'Cancel' : (isAdmin ? 'Edit All' : 'Nộp bài / Ghi chú')}
                                 </button>
                             )}
                             <button onClick={() => setSelectedTask(null)}
@@ -231,12 +251,45 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
+                            {/* PRODUCT DELIVERY SECTION (Moved Top for User Visibility) */}
+                            <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50">
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#3b82f6', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+                                    🎯 THÀNH PHẨM (Delivery)
+                                </label>
+
+                                {isEditing || (!selectedTask.productLink && !isAdmin) ? (
+                                    <div>
+                                        <input
+                                            value={editForm.productLink}
+                                            onChange={(e) => setEditForm({ ...editForm, productLink: e.target.value })}
+                                            placeholder="Dán link sản phẩm (Drive/Youtube)..."
+                                            style={{ width: '100%', padding: '0.6rem', border: '1px solid #93c5fd', borderRadius: '6px', fontSize: '0.9rem' }}
+                                        />
+                                        {(!isEditing && !isAdmin) && (
+                                            <button onClick={handleSaveDetails} style={{ marginTop: '0.5rem', width: '100%', padding: '0.5rem', background: '#3b82f6', color: 'white', borderRadius: '6px', fontWeight: 'bold' }}>
+                                                Xác nhận nộp bài
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    selectedTask.productLink ? (
+                                        <a href={selectedTask.productLink} target="_blank" style={{
+                                            display: 'block', padding: '0.8rem', background: 'white', borderRadius: '8px',
+                                            color: '#2563eb', fontWeight: '600', textDecoration: 'none', border: '1px solid #bfdbfe',
+                                            textAlign: 'center'
+                                        }}>
+                                            🔗 Mở link sản phẩm
+                                        </a>
+                                    ) : <span className="text-gray-400 italic text-sm">Chưa có link thành phẩm.</span>
+                                )}
+                            </div>
+
                             {/* RESOURCES */}
                             <div className="p-3 rounded-xl border border-gray-100">
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
                                     RESOURCES (RAW/B-ROLL)
                                 </label>
-                                {isEditing ? (
+                                {isEditing && isAdmin ? (
                                     <input
                                         value={editForm.resources}
                                         onChange={(e) => setEditForm({ ...editForm, resources: e.target.value })}
@@ -257,7 +310,7 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
                                     REFERENCES / SAMPLES
                                 </label>
-                                {isEditing ? (
+                                {isEditing && isAdmin ? (
                                     <input
                                         value={editForm.references}
                                         onChange={(e) => setEditForm({ ...editForm, references: e.target.value })}
@@ -284,6 +337,7 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                                         onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                                         placeholder="Enter notes..."
                                         rows={4}
+                                        disabled={!isAdmin} // Users can edit notes if needed? Maybe better restricted to Admin for instructions.
                                         style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px', fontFamily: 'inherit' }}
                                     />
                                 ) : (

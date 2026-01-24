@@ -8,6 +8,7 @@ export async function updateTaskDetails(id: string, data: {
     references?: string
     notes?: string
     title?: string
+    productLink?: string
 }) {
     try {
         await prisma.task.update({
@@ -16,7 +17,8 @@ export async function updateTaskDetails(id: string, data: {
                 resources: data.resources,
                 references: data.references,
                 notes: data.notes,
-                title: data.title
+                title: data.title,
+                productLink: data.productLink
             }
         })
         revalidatePath('/admin')

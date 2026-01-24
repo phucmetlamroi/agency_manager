@@ -26,7 +26,10 @@ export default async function UserLayout({
         select: { role: true }
     })
 
-    if (!user) redirect('/login')
+    if (!user) {
+        await logout()
+        redirect('/login')
+    }
 
     if (user.role === 'ADMIN') {
         redirect('/admin') // Admin should go to Admin Dashboard

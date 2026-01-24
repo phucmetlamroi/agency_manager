@@ -6,6 +6,7 @@ import { cookies } from 'next/headers'
 import { decrypt } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import RoleWatcher from '@/components/RoleWatcher'
+import NotificationBell from '@/components/NotificationBell'
 
 export default async function AdminLayout({
     children,

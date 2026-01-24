@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { createUser } from '@/actions/create-user'
 import RoleSwitcher from '@/components/RoleSwitcher'
+import ResetPasswordButton from '@/components/ResetPasswordButton'
 import DeleteUserButton from '@/components/DeleteUserButton'
 
 import { getSession } from '@/lib/auth'
@@ -85,7 +86,12 @@ export default async function AdminUsersPage() {
                                     </td>
                                     <td style={{ padding: '0.8rem', color: '#666', fontSize: '0.9rem' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
                                     <td style={{ padding: '0.8rem', textAlign: 'center' }}>
-                                        {!isSuperAdminRow && <DeleteUserButton userId={u.id} />}
+                                        {!isSuperAdminRow && (
+                                            <>
+                                                <ResetPasswordButton userId={u.id} username={u.username} />
+                                                <DeleteUserButton userId={u.id} />
+                                            </>
+                                        )}
                                     </td>
                                 </tr>
                             )

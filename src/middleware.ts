@@ -19,23 +19,9 @@ export async function middleware(request: NextRequest) {
         const session = await decrypt(sessionCookie.value)
         const { role } = session.user
 
-        // 3. Role-based protection
-
-        // Protect Admin routes
-        if (request.nextUrl.pathname.startsWith('/admin') && role !== 'ADMIN') {
-            return NextResponse.redirect(new URL('/dashboard', request.url))
-        }
-
-        // Protect User routes (Admin can also access dashboard? Reqs said Admin has Dashboard Tong. User has Dashboard Rieng. 
-        // Usually Admin shouldn't see My Dashboard of user, but Admin Dashboard.
-        // Let's restrict /dashboard to Users? Or allow Admin?
-        // Requirement 1: "User: Only access and see their own info/task. Absolutely cannot see others."
-        // Requirement 2: "Admin: Access 'Dashboard Tong'".
-
-        // If Admin goes to /dashboard, maybe redirect to /admin?
-        if (request.nextUrl.pathname.startsWith('/dashboard') && role === 'ADMIN') {
-            return NextResponse.redirect(new URL('/admin', request.url))
-        }
+        // 3. Role-based protection - DELEGATED TO LAYOUTS
+        // We do NOT check roles here because cookies can be stale. 
+        // Layouts will check fresh DB data and redirect if needed.
 
         // Redirect logged in user away from login page
         if (request.nextUrl.pathname === '/login') {

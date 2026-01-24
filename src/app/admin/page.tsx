@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
-import { createTask, deleteTask } from '@/actions/admin-actions'
+import { createTask } from '@/actions/admin-actions'
+import { deleteTask } from '@/actions/task-management-actions'
 import { revalidatePath } from 'next/cache'
 import TaskTable from '@/components/TaskTable'
 

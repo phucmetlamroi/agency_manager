@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { deleteTask } from '@/actions/admin-actions'
+import { deleteTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
 

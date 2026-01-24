@@ -77,23 +77,5 @@ export async function createTask(formData: FormData) {
     }
 }
 
-export async function deleteTask(id: string) {
-    try {
-        await prisma.task.delete({ where: { id } })
-        revalidatePath('/admin')
-        return { success: true }
-    } catch (e) {
-        return { error: 'Error deleting task' }
-    }
-}
-
-// Just for changing status or re-assigning
-export async function updateTask(id: string, data: any) {
-    try {
-        await prisma.task.update({ where: { id }, data })
-        revalidatePath('/admin')
-        return { success: true }
-    } catch (e) {
-        return { error: 'Failed to update' }
-    }
-}
+// Task management actions moved to task-management-actions.ts to avoid client bundle leakage
+// because this file imports 'bcryptjs' which is server-only.

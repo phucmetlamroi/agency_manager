@@ -2,14 +2,37 @@ import { logout } from '@/lib/auth'
 import Link from 'next/link'
 import '@/app/globals.css'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { decrypt } from '@/lib/auth'
+import { prisma } from '@/lib/db'
+import RoleWatcher from '@/components/RoleWatcher'
 
-export default function AdminLayout({
+export default async function AdminLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get('session')
+
+    if (!sessionCookie) redirect('/login')
+
+    const session = await decrypt(sessionCookie.value)
+    if (!session?.user?.id) redirect('/login')
+
+    // Fetch fresh role from DB
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { role: true }
+    })
+
+    if (!user || user.role !== 'ADMIN') {
+        redirect('/dashboard') // Not an admin? Go to dashboard
+    }
+
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+            <RoleWatcher currentRole="ADMIN" />
             <header className="glass-panel" style={{
                 height: 'var(--header-height)',
                 display: 'flex',

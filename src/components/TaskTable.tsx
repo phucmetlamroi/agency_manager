@@ -189,7 +189,6 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                                 )
                                             })()}
                                         </div>
-                                            })()}
                             </div>
                                     ) : 'No Deadline'}
                             {isAdmin && (

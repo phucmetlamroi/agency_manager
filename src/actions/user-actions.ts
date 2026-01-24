@@ -71,3 +71,32 @@ export async function deleteUser(userId: string) {
         return { success: false, error: 'Failed to delete user' }
     }
 }
+
+export async function adminResetPassword(userId: string, newPassword: string) {
+    try {
+        const session = await getSession()
+        const currentUser = await prisma.user.findUnique({ where: { id: session?.user?.id } })
+
+        if (currentUser?.role !== 'ADMIN') return { success: false, error: 'Unauthorized' }
+
+        // Super Admin Protection
+        const targetUser = await prisma.user.findUnique({ where: { id: userId } })
+        if (targetUser?.username === 'admin') {
+            return { success: false, error: 'KHÔNG THỂ ĐỔI MẬT KHẨU CỦA SUPER ADMIN!' }
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                password: hashedPassword,
+                plainPassword: newPassword
+            }
+        })
+        revalidatePath('/admin/users')
+        return { success: true }
+    } catch (error) {
+        return { success: false, error: 'Failed' }
+    }
+}

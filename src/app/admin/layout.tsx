@@ -27,8 +27,8 @@ export default async function AdminLayout({
     })
 
     if (!user) {
-        await logout()
-        redirect('/login')
+        // Cannot set cookies (logout) in Server Component. Redirect to Route Handler instead.
+        redirect('/api/auth/logout')
     }
 
     if (user.role !== 'ADMIN') {

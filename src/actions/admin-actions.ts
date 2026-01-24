@@ -51,6 +51,3 @@ export async function createTask(formData: FormData) {
         return { error: 'Error creating task' }
     }
 }
-
-// Task management actions moved to task-management-actions.ts to avoid client bundle leakage
-// because this file imports 'bcryptjs' which is server-only.

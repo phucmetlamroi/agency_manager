@@ -5,7 +5,7 @@ import { deleteTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
 
-import { TaskWithUser } from '@/types'
+import { TaskWithUser } from '@/types/admin'
 
 const statusColors: Record<string, string> = {
     "Đang thực hiện": "#fbbf24", // Amber/Yellow

@@ -23,7 +23,7 @@ export default async function UserLayout({
     // Fetch fresh role from DB
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { role: true }
+        select: { role: true, username: true }
     })
 
     if (!user) {

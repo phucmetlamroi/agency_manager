@@ -90,25 +90,8 @@ export default async function AdminDashboard() {
                 </form>
             </div>
 
-            {/* Task Queues */}
+            {/* Task Lists */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-
-                {/* KHO TASK ĐỢI */}
-                <div className="glass-panel" style={{ padding: '1.5rem', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                        <h3 className="title-gradient" style={{ margin: 0 }}>📦 Kho Task Đợi ({unassignedTasks.length})</h3>
-                        <span style={{ fontSize: '0.8rem', color: '#888', fontStyle: 'italic' }}>
-                            Các task chưa có Editor. Chọn nhân viên để giao việc.
-                        </span>
-                    </div>
-                    {unassignedTasks.length > 0 ? (
-                        <TaskTable tasks={unassignedTasks as any} isAdmin={true} users={users} />
-                    ) : (
-                        <p style={{ textAlign: 'center', padding: '2rem', color: '#666', border: '1px dashed #444', borderRadius: '12px' }}>
-                            Không có task nào trong hàng đợi.
-                        </p>
-                    )}
-                </div>
 
                 {/* ACTIVE TASKS */}
                 <div>

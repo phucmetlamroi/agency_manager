@@ -7,7 +7,21 @@ import { updateTaskDetails } from '@/actions/update-task-details'
 
 import { TaskWithUser } from '@/types/admin'
 
-// ... statusColors and statusBg remain same ...
+const statusColors: Record<string, string> = {
+    "Đang thực hiện": "#fbbf24", // Amber/Yellow
+    "Revision": "#ef4444",       // Red
+    "Hoàn tất": "#10b981",       // Green
+    "Tạm ngưng": "#9ca3af",      // Gray
+    "Sửa frame": "#f472b6"       // Pink
+}
+
+const statusBg: Record<string, string> = {
+    "Đang thực hiện": "rgba(251, 191, 36, 0.2)",
+    "Revision": "rgba(239, 68, 68, 0.2)",
+    "Hoàn tất": "rgba(16, 185, 129, 0.2)",
+    "Tạm ngưng": "rgba(156, 163, 175, 0.2)",
+    "Sửa frame": "rgba(244, 114, 182, 0.2)"
+}
 
 export default function TaskTable({ tasks, isAdmin = false, users = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string }[] }) {
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)

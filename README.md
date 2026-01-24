@@ -1,9 +1,10 @@
 # Agency Manager
 
 ## Deploy Status
-Current Build: Fixed statusColors issue.
+Current Build: Fix deleteUser export issues.
 
 ## Features
 - Task Queue (Kho Task Đợi)
 - Real-time RBAC
 - Admin Dashboard
+- Payroll System & Deletion

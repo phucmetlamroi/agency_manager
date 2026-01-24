@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
+import DeleteTaskButton from './DeleteTaskButton'
 
 import { TaskWithUser } from '@/types/admin'
 

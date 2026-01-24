@@ -12,7 +12,13 @@ const statusColors: Record<string, string> = {
     "Revision": "#ef4444",       // Red
     "Hoàn tất": "#10b981",       // Green
     "Tạm ngưng": "#9ca3af",      // Gray
-    "Sửa frame": "#f472b6"       // Pink
+    "Sửa frame": "#f472b6",      // Pink
+
+    // Requested mappings
+    "OPEN": "#7c3aed",      // Mau tim
+    "PENDING": "#f59e0b",   // Mau cam
+    "COMPLETED": "#10b981", // Mau xanh la
+    "UNASSIGNED": "#6b7280" // Mau xam
 }
 
 const statusBg: Record<string, string> = {

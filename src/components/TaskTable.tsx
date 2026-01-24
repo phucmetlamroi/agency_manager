@@ -441,6 +441,21 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                     )}
                                 </div>
 
+                                {/* DEADLINE INPUT (Admin Only) */}
+                                {isEditing && isAdmin && (
+                                    <div className="p-3 rounded-xl border border-red-100 bg-red-50/30">
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#ef4444', marginBottom: '0.5rem' }}>
+                                            ⚠️ DEADLINE (Thay đổi sẽ reset bộ đo giờ!)
+                                        </label>
+                                        <input
+                                            type="datetime-local"
+                                            value={editForm.deadline}
+                                            onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
+                                            style={{ width: '100%', padding: '0.5rem', border: '1px solid #fca5a5', borderRadius: '6px', color: '#b91c1c', fontWeight: 'bold' }}
+                                        />
+                                    </div>
+                                )}
+
                                 {/* NOTES */}
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>

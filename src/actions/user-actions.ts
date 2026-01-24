@@ -33,3 +33,29 @@ export async function changePassword(formData: FormData) {
         return { error: 'Đổi mật khẩu thất bại' }
     }
 }
+
+export async function updateUserRole(userId: string, newRole: string) {
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: { role: newRole }
+        })
+        revalidatePath('/admin/users')
+        return { success: true }
+    } catch (error) {
+        return { success: false, error: 'Failed to update role' }
+    }
+}
+
+export async function deleteUser(userId: string) {
+    try {
+        await prisma.user.delete({
+            where: { id: userId }
+        })
+        revalidatePath('/admin/users')
+        return { success: true }
+    } catch (error) {
+        console.error(error)
+        return { success: false, error: 'Failed to delete user' }
+    }
+}

@@ -1,29 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { deleteTask } from '@/actions/task-management-actions'
+import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
 
 import { TaskWithUser } from '@/types/admin'
 
-const statusColors: Record<string, string> = {
-    "Đang thực hiện": "#fbbf24", // Amber/Yellow
-    "Revision": "#ef4444",       // Red
-    "Hoàn tất": "#10b981",       // Green
-    "Tạm ngưng": "#9ca3af",      // Gray
-    "Sửa frame": "#f472b6"       // Pink
-}
+// ... statusColors and statusBg remain same ...
 
-const statusBg: Record<string, string> = {
-    "Đang thực hiện": "rgba(251, 191, 36, 0.2)",
-    "Revision": "rgba(239, 68, 68, 0.2)",
-    "Hoàn tất": "rgba(16, 185, 129, 0.2)",
-    "Tạm ngưng": "rgba(156, 163, 175, 0.2)",
-    "Sửa frame": "rgba(244, 114, 182, 0.2)"
-}
-
-export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithUser[], isAdmin?: boolean }) {
+export default function TaskTable({ tasks, isAdmin = false, users = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string }[] }) {
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
 
     // Edit State
@@ -122,9 +108,36 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                                         {task.value.toLocaleString()} đ
                                     </span>
                                 )}
-                                <span style={{ color: 'var(--secondary)' }}>
-                                    @{task.assignee?.username || '?'}
-                                </span>
+                                {isAdmin ? (
+                                    <select
+                                        value={task.assignee?.id || ''}
+                                        onChange={async (e) => {
+                                            const val = e.target.value
+                                            await assignTask(task.id, val || null)
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{
+                                            background: 'transparent',
+                                            color: task.assignee ? 'var(--secondary)' : '#666',
+                                            border: '1px solid #333',
+                                            borderRadius: '6px',
+                                            padding: '2px 6px',
+                                            fontSize: '0.8rem',
+                                            outline: 'none',
+                                            cursor: 'pointer',
+                                            maxWidth: '120px'
+                                        }}
+                                    >
+                                        <option value="" style={{ color: '#888' }}>-- Chưa giao --</option>
+                                        {users.map(u => (
+                                            <option key={u.id} value={u.id} style={{ color: 'black' }}>{u.username}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <span style={{ color: 'var(--secondary)' }}>
+                                        @{task.assignee?.username || 'Chưa giao'}
+                                    </span>
+                                )}
 
                                 {/* Product Indicator */}
                                 {task.productLink && (

@@ -23,3 +23,16 @@ export async function updateTask(id: string, data: any) {
         return { error: 'Failed to update' }
     }
 }
+
+export async function assignTask(taskId: string, userId: string | null) {
+    try {
+        await prisma.task.update({
+            where: { id: taskId },
+            data: { assigneeId: userId || null }
+        })
+        revalidatePath('/admin')
+        return { success: true }
+    } catch (e) {
+        return { error: 'Failed to assign task' }
+    }
+}

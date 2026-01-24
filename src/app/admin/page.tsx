@@ -14,8 +14,11 @@ export default async function AdminDashboard() {
         orderBy: { username: 'asc' }
     })
 
+    const unassignedTasks = tasks.filter(t => !t.assigneeId)
+    const assignedTasks = tasks.filter(t => t.assigneeId)
+
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '2rem', alignItems: 'start' }}>
 
             {/* Create Task Form */}
             <div className="glass-panel" style={{ padding: '1.5rem', height: 'fit-content' }}>
@@ -74,9 +77,9 @@ export default async function AdminDashboard() {
 
                     <div>
                         <label style={{ fontSize: '0.8rem', color: '#888' }}>Giao cho nhân viên</label>
-                        <select name="assigneeId" required
+                        <select name="assigneeId"
                             style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}>
-                            <option value="">-- Chọn nhân viên --</option>
+                            <option value="">-- Để trống (Vào Kho Task Đợi) --</option>
                             {users.map(u => (
                                 <option key={u.id} value={u.id}>{u.username}</option>
                             ))}
@@ -87,10 +90,31 @@ export default async function AdminDashboard() {
                 </form>
             </div>
 
-            {/* Task List */}
-            <div>
-                <h3 style={{ marginBottom: '1rem' }}>Danh sách công việc ({tasks.length})</h3>
-                <TaskTable tasks={tasks as any} isAdmin={true} />
+            {/* Task Queues */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+
+                {/* KHO TASK ĐỢI */}
+                <div className="glass-panel" style={{ padding: '1.5rem', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                        <h3 className="title-gradient" style={{ margin: 0 }}>📦 Kho Task Đợi ({unassignedTasks.length})</h3>
+                        <span style={{ fontSize: '0.8rem', color: '#888', fontStyle: 'italic' }}>
+                            Các task chưa có Editor. Chọn nhân viên để giao việc.
+                        </span>
+                    </div>
+                    {unassignedTasks.length > 0 ? (
+                        <TaskTable tasks={unassignedTasks as any} isAdmin={true} users={users} />
+                    ) : (
+                        <p style={{ textAlign: 'center', padding: '2rem', color: '#666', border: '1px dashed #444', borderRadius: '12px' }}>
+                            Không có task nào trong hàng đợi.
+                        </p>
+                    )}
+                </div>
+
+                {/* ACTIVE TASKS */}
+                <div>
+                    <h3 style={{ marginBottom: '1rem', color: '#ccc' }}>🔥 Đang Thực Hiện ({assignedTasks.length})</h3>
+                    <TaskTable tasks={assignedTasks as any} isAdmin={true} users={users} />
+                </div>
             </div>
 
         </div>

@@ -5,20 +5,7 @@ import { deleteTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
 
-export type TaskWithUser = {
-    id: string
-    title: string
-    value: number
-    status: string
-    type: string
-    deadline: Date | null
-    references: string | null
-    resources: string | null
-    fileLink: string | null
-    productLink: string | null
-    notes: string | null
-    assignee: { username: string } | null
-}
+import { TaskWithUser } from '@/types'
 
 const statusColors: Record<string, string> = {
     "Đang thực hiện": "#fbbf24", // Amber/Yellow

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { createUser } from '@/actions/create-user'
 import RoleSwitcher from '@/components/RoleSwitcher'
+import DeleteUserButton from '@/components/DeleteUserButton'
 
 export default async function AdminUsersPage() {
     const users = await prisma.user.findMany({
@@ -45,6 +46,7 @@ export default async function AdminUsersPage() {
                             <th style={{ padding: '0.8rem', color: '#888' }}>Password</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Role</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Created At</th>
+                            <th style={{ padding: '0.8rem', color: '#888' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -57,6 +59,9 @@ export default async function AdminUsersPage() {
                                     <RoleSwitcher userId={u.id} initialRole={u.role} />
                                 </td>
                                 <td style={{ padding: '0.8rem', color: '#666', fontSize: '0.9rem' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
+                                <td style={{ padding: '0.8rem', textAlign: 'center' }}>
+                                    <DeleteUserButton userId={u.id} />
+                                </td>
                             </tr>
                         ))}
                     </tbody>

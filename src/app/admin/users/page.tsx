@@ -1,3 +1,5 @@
+import { prisma } from '@/lib/db'
+import { createUser } from '@/actions/create-user'
 import RoleSwitcher from '@/components/RoleSwitcher'
 
 export default async function AdminUsersPage() {

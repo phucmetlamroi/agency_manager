@@ -12,7 +12,10 @@ export default async function AdminUsersPage() {
 
             <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
                 <h3 style={{ marginBottom: '1rem' }}>Thêm tài khoản mới</h3>
-                <form action={createUser} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <form action={async (formData) => {
+                    'use server'
+                    await createUser(formData)
+                }} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                     <div>
                         <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Username</label>
                         <input name="username" required style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white' }} />

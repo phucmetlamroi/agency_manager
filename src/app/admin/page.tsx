@@ -19,7 +19,10 @@ export default async function AdminDashboard() {
             {/* Create Task Form */}
             <div className="glass-panel" style={{ padding: '1.5rem', height: 'fit-content' }}>
                 <h3 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>Giao Việc Mới</h3>
-                <form action={createTask} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <form action={async (formData) => {
+                    'use server'
+                    await createTask(formData)
+                }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div>
                         <label style={{ fontSize: '0.8rem', color: '#888' }}>Tên công việc</label>
                         <input name="title" required placeholder="Nhập tên task..."
@@ -36,7 +39,7 @@ export default async function AdminDashboard() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
                             <label style={{ fontSize: '0.8rem', color: '#888' }}>Loại Task</label>
-                            <select name="type"
+                            <select name="type" required
                                 style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}>
                                 <option value="Short form">Short form</option>
                                 <option value="Long form">Long form</option>

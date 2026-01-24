@@ -1,5 +1,4 @@
-import { prisma } from '@/lib/db'
-import { createUser } from '@/actions/admin-actions'
+import RoleSwitcher from '@/components/RoleSwitcher'
 
 export default async function AdminUsersPage() {
     const users = await prisma.user.findMany({
@@ -53,15 +52,7 @@ export default async function AdminUsersPage() {
                                 <td style={{ padding: '0.8rem' }}>{u.username}</td>
                                 <td style={{ padding: '0.8rem', fontFamily: 'monospace', color: '#aaa' }}>{u.plainPassword || 'N/A'}</td>
                                 <td style={{ padding: '0.8rem' }}>
-                                    <span style={{
-                                        padding: '0.2rem 0.6rem',
-                                        borderRadius: '20px',
-                                        fontSize: '0.75rem',
-                                        background: u.role === 'ADMIN' ? 'rgba(109, 40, 217, 0.3)' : 'rgba(3, 218, 198, 0.2)',
-                                        color: u.role === 'ADMIN' ? 'var(--primary-glow)' : 'var(--secondary)'
-                                    }}>
-                                        {u.role}
-                                    </span>
+                                    <RoleSwitcher userId={u.id} initialRole={u.role} />
                                 </td>
                                 <td style={{ padding: '0.8rem', color: '#666', fontSize: '0.9rem' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
                             </tr>

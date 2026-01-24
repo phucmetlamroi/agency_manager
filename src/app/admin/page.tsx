@@ -10,7 +10,7 @@ export default async function AdminDashboard() {
     })
 
     const users = await prisma.user.findMany({
-        where: { role: 'USER' }
+        orderBy: { username: 'asc' }
     })
 
     return (

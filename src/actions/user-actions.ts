@@ -36,6 +36,12 @@ export async function changePassword(formData: FormData) {
 
 export async function updateUserRole(userId: string, newRole: string) {
     try {
+        // Super Admin Protection
+        const targetUser = await prisma.user.findUnique({ where: { id: userId } })
+        if (targetUser?.username === 'admin') {
+            return { success: false, error: 'KHÔNG THỂ THAY ĐỔI QUYỀN CỦA SUPER ADMIN!' }
+        }
+
         await prisma.user.update({
             where: { id: userId },
             data: { role: newRole }
@@ -49,6 +55,12 @@ export async function updateUserRole(userId: string, newRole: string) {
 
 export async function deleteUser(userId: string) {
     try {
+        // Super Admin Protection
+        const targetUser = await prisma.user.findUnique({ where: { id: userId } })
+        if (targetUser?.username === 'admin') {
+            return { success: false, error: 'KHÔNG THỂ XÓA SUPER ADMIN!' }
+        }
+
         await prisma.user.delete({
             where: { id: userId }
         })

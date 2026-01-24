@@ -3,7 +3,15 @@ import { createUser } from '@/actions/create-user'
 import RoleSwitcher from '@/components/RoleSwitcher'
 import DeleteUserButton from '@/components/DeleteUserButton'
 
+import { getSession } from '@/lib/auth'
+
 export default async function AdminUsersPage() {
+    const session = await getSession()
+    const currentUser = await prisma.user.findUnique({
+        where: { id: session?.user?.id },
+        select: { username: true }
+    })
+
     const users = await prisma.user.findMany({
         orderBy: { username: 'asc' }
     })
@@ -50,20 +58,38 @@ export default async function AdminUsersPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {users.map(u => (
-                            <tr key={u.id} style={{ borderBottom: '1px solid #222' }}>
-                                <td style={{ padding: '0.8rem', fontFamily: 'monospace', fontSize: '0.8rem', color: '#555' }}>{u.id.substring(0, 8)}...</td>
-                                <td style={{ padding: '0.8rem' }}>{u.username}</td>
-                                <td style={{ padding: '0.8rem', fontFamily: 'monospace', color: '#aaa' }}>{u.plainPassword || 'N/A'}</td>
-                                <td style={{ padding: '0.8rem' }}>
-                                    <RoleSwitcher userId={u.id} initialRole={u.role} />
-                                </td>
-                                <td style={{ padding: '0.8rem', color: '#666', fontSize: '0.9rem' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
-                                <td style={{ padding: '0.8rem', textAlign: 'center' }}>
-                                    <DeleteUserButton userId={u.id} />
-                                </td>
-                            </tr>
-                        ))}
+                        {users.map(u => {
+                            const isSuperAdminRow = u.username === 'admin'
+                            // Only real "admin" can see passwords.
+                            // Note: We need to get current user session to strictly enforce this in UI, 
+                            // but for now we mask it everywhere? No, requirement says "admin" can see.
+                            // Since this component is Server Component, we CAN request session here.
+
+                            return (
+                                <tr key={u.id} style={{ borderBottom: '1px solid #222' }}>
+                                    <td style={{ padding: '0.8rem', fontFamily: 'monospace', fontSize: '0.8rem', color: '#555' }}>{u.id.substring(0, 8)}...</td>
+                                    <td style={{ padding: '0.8rem' }}>
+                                        {u.username}
+                                        {isSuperAdminRow && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px' }}>SUPER</span>}
+                                    </td>
+                                    <td style={{ padding: '0.8rem', fontFamily: 'monospace', color: '#aaa' }}>
+                                        {/* Logic: We need to check if viewer is 'admin' to show this. 
+                                            Since I'm in map, I need 'currentUser'. 
+                                            I'll assume I fetched currentUser above. */}
+                                        {currentUser?.username === 'admin' ? (u.plainPassword || 'N/A') : '••••••••'}
+                                    </td>
+                                    <td style={{ padding: '0.8rem' }}>
+                                        {!isSuperAdminRow ? (
+                                            <RoleSwitcher userId={u.id} initialRole={u.role} />
+                                        ) : <span style={{ color: '#666', fontSize: '0.8rem' }}>Locked</span>}
+                                    </td>
+                                    <td style={{ padding: '0.8rem', color: '#666', fontSize: '0.9rem' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
+                                    <td style={{ padding: '0.8rem', textAlign: 'center' }}>
+                                        {!isSuperAdminRow && <DeleteUserButton userId={u.id} />}
+                                    </td>
+                                </tr>
+                            )
+                        })}
                     </tbody>
                 </table>
             </div>

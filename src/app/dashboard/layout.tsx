@@ -23,7 +23,7 @@ export default async function UserLayout({
     // Fetch fresh role from DB
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { role: true, username: true }
+        select: { role: true, username: true, reputation: true }
     })
 
     if (!user) {
@@ -56,6 +56,15 @@ export default async function UserLayout({
                         borderRight: '1px solid #444', paddingRight: '1rem',
                         display: 'flex', alignItems: 'center', gap: '0.5rem'
                     }}>
+                        <div style={{ marginRight: '0.5rem', textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#888' }}>Uy tín</div>
+                            <div style={{
+                                fontWeight: 'bold',
+                                color: (user.reputation || 100) >= 90 ? '#a855f7' : (user.reputation || 100) < 50 ? '#eab308' : '#fff'
+                            }}>
+                                {user.reputation ?? 100}đ
+                            </div>
+                        </div>
                         <span style={{ fontSize: '1.2rem' }}>👋</span>
                         {user.username}
                     </div>

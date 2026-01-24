@@ -242,6 +242,15 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                 ) : (
                                     <span style={{ color: 'var(--secondary)' }}>
                                         @{task.assignee?.username || 'Chưa giao'}
+                                        {task.assignee && (
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                marginLeft: '4px',
+                                                color: (task.assignee.reputation || 100) >= 90 ? '#a855f7' : (task.assignee.reputation || 100) < 50 ? '#eab308' : '#fff'
+                                            }}>
+                                                ({task.assignee.reputation ?? 100}đ)
+                                            </span>
+                                        )}
                                     </span>
                                 )}
 

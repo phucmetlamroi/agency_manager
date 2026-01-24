@@ -40,3 +40,14 @@ model Task {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model Notification {
+  id        String   @id @default(uuid())
+  message   String
+  type      String   @default("INFO") // INFO, WARNING, ERROR
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  // Optional: Link to User or Task for context
+  userId    String?  // If null, it's a broadcast to all Admins
+}

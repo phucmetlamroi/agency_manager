@@ -40,7 +40,18 @@ export async function checkOverdueTasks() {
                 statusMsg = 'Cảnh báo'
             }
 
-            // 3. Update User & Task
+            // 3. Auto-Recall Logic (Return to Queue)
+            // Reset assignee and status so it appears in "Kho Task" (Queue)
+            // But we keep "isPenalized: true" to avoid double punishment if picked up again? 
+            // Actually, if picked up again, it's a new cycle. But 'isPenalized' triggers logic.
+            // If we reset Assignee, the task is now "Free". 
+            // The penalty was for the *Previous* user. 
+            // We should probably log this event or just reset 'isPenalized' to false for the NEXT user?
+            // If we reset 'isPenalized' to false, next user might deal with short deadline?
+            // Usually Admin will reset deadline or logic handles it.
+            // Let's keep isPenalized=true on this task to mark it as "tainted" or just for history.
+            // Requirement: "về mục Kho task" -> assigneeId = null.
+
             await prisma.$transaction([
                 prisma.user.update({
                     where: { id: task.assignee.id },
@@ -51,15 +62,26 @@ export async function checkOverdueTasks() {
                 }),
                 prisma.task.update({
                     where: { id: task.id },
-                    data: { isPenalized: true }
+                    data: {
+                        isPenalized: true,
+                        assigneeId: null, // Kick user
+                        status: 'Đã nhận task' // Reset status to standard "Open" state
+                    }
+                }),
+                prisma.notification.create({
+                    data: {
+                        message: `THU HỒI TASK: "${task.title}" từ @${task.assignee.username} do quá hạn. (Đã trừ 10đ)`,
+                        type: 'WARNING',
+                        userId: null // Broadcast to Admin
+                    }
                 })
             ])
 
-            // 4. Prepare Notification
+            // 4. Prepare Notification (Legacy return, keeping for compatibility if utilized elsewhere)
             notifications.push({
                 editor: task.assignee.username,
                 score: `${newRep}/100 (-10)`,
-                reason: `Trễ Task [${task.title}]`,
+                reason: `Trễ Task [${task.title}] - ĐÃ THU HỒI`,
                 status: statusMsg,
                 taskId: task.id
             })

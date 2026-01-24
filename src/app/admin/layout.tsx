@@ -57,6 +57,8 @@ export default async function AdminLayout({
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <NotificationBell />
+
                     <div style={{
                         fontSize: '0.9rem', color: '#ccc',
                         borderRight: '1px solid #444', paddingRight: '1rem',

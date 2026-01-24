@@ -22,6 +22,7 @@ export async function createUser(formData: FormData) {
             }
         })
         revalidatePath('/admin/users')
+        revalidatePath('/admin') // Update Dashboard dropdown
         return { success: true }
     } catch (e) {
         return { error: 'Error creating user' }

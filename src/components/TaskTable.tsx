@@ -9,6 +9,7 @@ import DeleteTaskButton from './DeleteTaskButton'
 import { TaskWithUser } from '@/types/admin'
 
 const statusColors: Record<string, string> = {
+    "Đã nhận task": "#60a5fa",   // Blue
     "Đang thực hiện": "#fbbf24", // Amber/Yellow
     "Revision": "#ef4444",       // Red
     "Hoàn tất": "#10b981",       // Green
@@ -23,6 +24,7 @@ const statusColors: Record<string, string> = {
 }
 
 const statusBg: Record<string, string> = {
+    "Đã nhận task": "rgba(96, 165, 250, 0.2)",
     "Đang thực hiện": "rgba(251, 191, 36, 0.2)",
     "Revision": "rgba(239, 68, 68, 0.2)",
     "Hoàn tất": "rgba(16, 185, 129, 0.2)",
@@ -35,15 +37,31 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
 
     // Edit State
     const [isEditing, setIsEditing] = useState(false)
-    const [editForm, setEditForm] = useState({ resources: '', references: '', notes: '', productLink: '' })
+    const [editForm, setEditForm] = useState({ resources: '', references: '', notes: '', productLink: '', deadline: '' })
 
     const openTask = (task: TaskWithUser) => {
         setSelectedTask(task)
+        // Format date for datetime-local input (YYYY-MM-DDTHH:mm)
+        // Need to convert to Vietnam Time (+7) representation or just use ISO string slice if already handling timezone?
+        // We stored it as UTC but displayed as VN.
+        // For input value, we need local string.
+        let deadlineStr = ''
+        if (task.deadline) {
+            const d = new Date(task.deadline)
+            // Manually format to YYYY-MM-DDTHH:mm in local time (which is system time)
+            // or simply use the value if we assume browser is in VN.
+            // Be safe: use offset if needed, but for now simple toISOString slice might be off.
+            // Let's use 3rd party or manual formatting.
+            const pad = (n: number) => n < 10 ? '0' + n : n
+            deadlineStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+        }
+
         setEditForm({
             resources: task.resources || task.fileLink || '',
             references: task.references || '',
             notes: task.notes || '',
-            productLink: task.productLink || ''
+            productLink: task.productLink || '',
+            deadline: deadlineStr
         })
         setIsEditing(false)
     }
@@ -66,18 +84,25 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
             resources: editForm.resources,
             references: editForm.references,
             notes: editForm.notes,
-            productLink: editForm.productLink
+            title: selectedTask.title, // Keep existing title
+            productLink: editForm.productLink,
+            deadline: editForm.deadline || undefined // Pass deadline string
         })
 
         if (res?.success) {
+            // Optimistic update difficult for deadline reset, relying on refresh/re-fetch mostly.
+            // But we can update local state to reflect text changes.
             setSelectedTask({
                 ...selectedTask,
                 resources: editForm.resources,
                 references: editForm.references,
                 notes: editForm.notes,
-                productLink: editForm.productLink
+                productLink: editForm.productLink,
+                // We don't easily know parsed date here without server response, 
+                // but page will refresh via revalidatePath anyway.
             })
             setIsEditing(false)
+            // Close modal to see updates potentially? Or just keep open.
         } else {
             alert('Failed to update')
         }
@@ -85,12 +110,14 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
 
     // Filter options based on role
     const getStatusOptions = () => {
-        const options = ["Đang thực hiện", "Revision", "Sửa frame", "Tạm ngưng", "Hoàn tất"]
         if (!isAdmin) {
-            // Keep "Hoàn tất" only if it is already set (so user can see it), but cannot select it
-            return options.filter(o => o !== "Hoàn tất")
+            // User can only switch between: "Đã nhận task" and "Đang thực hiện"
+            // Exception: If current status is something else (e.g. "Revision"), they should see it but maybe not change away from it?
+            // Req: "user chỉ có quyền tick 2 lựa chọn: đã nhận task và đang thực hiện"
+            return ["Đã nhận task", "Đang thực hiện"]
         }
-        return options
+        // Admin sees all
+        return ["Đã nhận task", "Đang thực hiện", "Revision", "Sửa frame", "Tạm ngưng", "Hoàn tất"]
     }
 
     return (

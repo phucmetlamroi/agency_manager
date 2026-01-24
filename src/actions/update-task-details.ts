@@ -9,17 +9,30 @@ export async function updateTaskDetails(id: string, data: {
     notes?: string
     title?: string
     productLink?: string
+    deadline?: string
 }) {
     try {
+        const updateData: any = {
+            resources: data.resources,
+            references: data.references,
+            notes: data.notes,
+            title: data.title,
+            productLink: data.productLink
+        }
+
+        // Handle Deadline Update + Timer Reset
+        if (data.deadline) {
+            // Force Vietnam parsing
+            updateData.deadline = new Date(data.deadline + ':00+07:00')
+            // Reset createdAt to "restart" the Smart Reminder timer
+            updateData.createdAt = new Date()
+            // Also ensure status is NOT "Hoàn tất" if we are setting a deadline? 
+            // Maybe not needed, Admin controls status separately.
+        }
+
         await prisma.task.update({
             where: { id },
-            data: {
-                resources: data.resources,
-                references: data.references,
-                notes: data.notes,
-                title: data.title,
-                productLink: data.productLink
-            }
+            data: updateData
         })
         revalidatePath('/admin')
         revalidatePath('/dashboard')

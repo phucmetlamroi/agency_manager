@@ -29,9 +29,16 @@ export async function updateTaskStatus(id: string, newStatus: string) {
             }
         }
 
+        // Logic: Clear deadline if 'Revision', 'Sửa frame', 'Tạm ngưng'
+        const restrictedStatuses = ['Revision', 'Sửa frame', 'Tạm ngưng']
+        const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}
+
         await prisma.task.update({
             where: { id },
-            data: { status: newStatus }
+            data: {
+                status: newStatus,
+                ...deadlineUpdate
+            }
         })
         revalidatePath('/admin')
         revalidatePath('/dashboard')

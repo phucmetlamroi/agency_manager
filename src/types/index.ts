@@ -11,4 +11,5 @@ export type TaskWithUser = {
     productLink: string | null
     notes: string | null
     assignee: { username: string } | null
+    createdAt: Date
 }

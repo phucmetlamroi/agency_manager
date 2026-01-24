@@ -36,7 +36,8 @@ export async function createTask(formData: FormData) {
                 title,
                 value,
                 assigneeId: assigneeId || null,
-                deadline: deadline ? new Date(deadline) : null,
+                // Appending :00+07:00 to force parsing as Vietnam Timezone
+                deadline: deadline ? new Date(deadline + ':00+07:00') : null,
                 references: references || null,
                 fileLink: fileLink || null,
                 resources: resources || null,

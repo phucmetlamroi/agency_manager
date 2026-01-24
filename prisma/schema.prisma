@@ -13,6 +13,7 @@ model User {
   password  String
   plainPassword String? // For Admin visibility
   role      String   @default("USER") // "ADMIN" or "USER"
+  reputation Int     @default(100)
   createdAt DateTime @default(now())
   
   tasks     Task[]

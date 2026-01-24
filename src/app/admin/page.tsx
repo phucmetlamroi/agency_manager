@@ -51,8 +51,8 @@ export default async function AdminDashboard() {
                             </select>
                         </div>
                         <div>
-                            <label style={{ fontSize: '0.8rem', color: '#888' }}>Deadline</label>
-                            <input name="deadline" type="date"
+                            <label style={{ fontSize: '0.8rem', color: '#888' }}>Deadline (Giờ + Ngày)</label>
+                            <input name="deadline" type="datetime-local"
                                 style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }} />
                         </div>
                     </div>
@@ -80,9 +80,18 @@ export default async function AdminDashboard() {
                         <select name="assigneeId"
                             style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}>
                             <option value="">-- Để trống (Vào Kho Task Đợi) --</option>
-                            {users.map(u => (
-                                <option key={u.id} value={u.id}>{u.username}</option>
-                            ))}
+                            {users.sort((a: any, b: any) => (b.reputation || 0) - (a.reputation || 0)).map((u: any) => {
+                                const score = u.reputation ?? 100
+                                let badge = ''
+                                if (score >= 90) badge = '⭐ Top Rated'
+                                else if (score < 50) badge = '⚠️ Cần giám sát'
+
+                                return (
+                                    <option key={u.id} value={u.id}>
+                                        {u.username} ({score}đ) {badge}
+                                    </option>
+                                )
+                            })}
                         </select>
                     </div>
 

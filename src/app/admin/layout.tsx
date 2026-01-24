@@ -56,15 +56,27 @@ export default async function AdminLayout({
                     </nav>
                 </div>
 
-                <form action={async () => {
-                    'use server'
-                    await logout()
-                    redirect('/login')
-                }}>
-                    <button type="submit" className="btn" style={{ border: '1px solid var(--error)', color: 'var(--error)' }}>
-                        Đăng xuất
-                    </button>
-                </form>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                        fontSize: '0.9rem', color: '#ccc',
+                        borderRight: '1px solid #444', paddingRight: '1rem',
+                        display: 'flex', alignItems: 'center', gap: '0.5rem'
+                    }}>
+                        <span style={{ fontSize: '1.2rem' }}>👤</span>
+                        {user.username}
+                        <span style={{ fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>Admin</span>
+                    </div>
+
+                    <form action={async () => {
+                        'use server'
+                        await logout()
+                        redirect('/login')
+                    }}>
+                        <button type="submit" className="btn" style={{ border: '1px solid var(--error)', color: 'var(--error)' }}>
+                            Đăng xuất
+                        </button>
+                    </form>
+                </div>
             </header>
 
             <main style={{ flex: 1, padding: '0 1rem 1rem 1rem' }}>

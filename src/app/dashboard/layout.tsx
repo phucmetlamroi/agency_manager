@@ -50,15 +50,26 @@ export default async function UserLayout({
                     <h2 className="title-gradient" style={{ fontSize: '1.5rem' }}>My Dashboard</h2>
                 </div>
 
-                <form action={async () => {
-                    'use server'
-                    await logout()
-                    redirect('/login')
-                }}>
-                    <button type="submit" className="btn" style={{ border: '1px solid var(--error)', color: 'var(--error)' }}>
-                        Đăng xuất
-                    </button>
-                </form>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                        fontSize: '0.9rem', color: '#ccc',
+                        borderRight: '1px solid #444', paddingRight: '1rem',
+                        display: 'flex', alignItems: 'center', gap: '0.5rem'
+                    }}>
+                        <span style={{ fontSize: '1.2rem' }}>👋</span>
+                        {user.username}
+                    </div>
+
+                    <form action={async () => {
+                        'use server'
+                        await logout()
+                        redirect('/login')
+                    }}>
+                        <button type="submit" className="btn" style={{ border: '1px solid var(--error)', color: 'var(--error)' }}>
+                            Đăng xuất
+                        </button>
+                    </form>
+                </div>
             </header>
 
             <main style={{ flex: 1, padding: '0 1rem 1rem 1rem' }}>

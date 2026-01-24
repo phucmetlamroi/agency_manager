@@ -4,7 +4,13 @@ import { deleteTask } from '@/actions/task-management-actions'
 import { revalidatePath } from 'next/cache'
 import TaskTable from '@/components/TaskTable'
 
+import { checkOverdueTasks } from '@/actions/reputation-actions'
+
 export default async function AdminDashboard() {
+    // 1. Run Logic to Deduct Points for Overdue Tasks
+    const checkResult = await checkOverdueTasks()
+    // In a real app we might show a toast with checkResult.notifications
+
     const tasks = await prisma.task.findMany({
         include: { assignee: true },
         orderBy: { createdAt: 'desc' }
@@ -83,12 +89,16 @@ export default async function AdminDashboard() {
                             {users.sort((a: any, b: any) => (b.reputation || 0) - (a.reputation || 0)).map((u: any) => {
                                 const score = u.reputation ?? 100
                                 let badge = ''
-                                if (score >= 90) badge = '⭐ Top Rated'
+                                // New Badge Logic
+                                if (score >= 90) badge = '🟣 Chuyên gia tin cậy'
                                 else if (score < 50) badge = '⚠️ Cần giám sát'
+                                else badge = '⚪ Thành viên tích cực'
+
+                                if (u.role === 'LOCKED') badge = '❌ ĐÃ KHÓA'
 
                                 return (
-                                    <option key={u.id} value={u.id}>
-                                        {u.username} ({score}đ) {badge}
+                                    <option key={u.id} value={u.id} disabled={u.role === 'LOCKED'}>
+                                        {u.username} ({score}đ) - {badge}
                                     </option>
                                 )
                             })}

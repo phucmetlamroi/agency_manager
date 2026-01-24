@@ -3,6 +3,7 @@ import { createUser } from '@/actions/create-user'
 import RoleSwitcher from '@/components/RoleSwitcher'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import DeleteUserButton from '@/components/DeleteUserButton'
+import ReputationManager from '@/components/ReputationManager'
 
 import { getSession } from '@/lib/auth'
 
@@ -52,6 +53,7 @@ export default async function AdminUsersPage() {
                         <tr style={{ textAlign: 'left', borderBottom: '1px solid #333' }}>
                             <th style={{ padding: '0.8rem', color: '#888' }}>ID</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Username</th>
+                            <th style={{ padding: '0.8rem', color: '#888' }}>Reputation</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Password</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Role</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Created At</th>
@@ -72,6 +74,11 @@ export default async function AdminUsersPage() {
                                     <td style={{ padding: '0.8rem' }}>
                                         {u.username}
                                         {isSuperAdminRow && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px' }}>SUPER</span>}
+                                    </td>
+                                    <td style={{ padding: '0.8rem' }}>
+                                        {!isSuperAdminRow ? (
+                                            <ReputationManager userId={u.id} initialReputation={u.reputation ?? 100} />
+                                        ) : <span className="text-purple-400 font-bold">MAX</span>}
                                     </td>
                                     <td style={{ padding: '0.8rem', fontFamily: 'monospace', color: '#aaa' }}>
                                         {/* Logic: We need to check if viewer is 'admin' to show this. 

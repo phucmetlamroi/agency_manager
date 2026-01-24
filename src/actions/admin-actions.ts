@@ -17,6 +17,37 @@ export async function updateUserRole(userId: string, newRole: string) {
     }
 }
 
+export async function updateUserReputation(userId: string, change: number) {
+    try {
+        // Fetch current to check bounds
+        const user = await prisma.user.findUnique({ where: { id: userId } })
+        if (!user) return { error: 'User not found' }
+
+        let newRep = (user.reputation || 100) + change
+        if (newRep > 100) newRep = 100
+        // We allow manual override below 0? Maybe not automatically lock here, leave that to the auto-checker 
+        // or strictly follow rule "Points <= 0 => Lock".
+        // Let's enforce the lock if score drops <= 0
+
+        let newRole = user.role
+        if (newRep <= 0 && user.role !== 'ADMIN') {
+            newRole = 'LOCKED'
+        }
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                reputation: newRep,
+                role: newRole
+            }
+        })
+        revalidatePath('/admin/users')
+        return { success: true }
+    } catch (e) {
+        return { error: 'Failed to update reputation' }
+    }
+}
+
 export async function createTask(formData: FormData) {
     const title = formData.get('title') as string
     const value = parseFloat(formData.get('value') as string) || 0

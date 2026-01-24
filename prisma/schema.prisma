@@ -24,6 +24,7 @@ model Task {
   title       String
   deadline    DateTime?
   value       Float    @default(0)
+  isPenalized Boolean  @default(false)
   status      String   @default("Đang thực hiện") // "Đang thực hiện", "Revision", "Hoàn tất", "Tạm ngưng", "Sửa frame"
   type        String   @default("Short form") // "Trial", "Short form", "Long form"
   

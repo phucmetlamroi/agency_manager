@@ -10,5 +10,5 @@ export type TaskWithUser = {
     fileLink: string | null
     productLink: string | null
     notes: string | null
-    assignee: { username: string } | null
+    assignee: { id: string; username: string } | null
 }

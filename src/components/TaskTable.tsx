@@ -54,6 +54,13 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
         setIsEditing(false)
     }
 
+    // Helper to ensure external links work
+    const formatLink = (link: string | null) => {
+        if (!link) return '#'
+        if (link.startsWith('http://') || link.startsWith('https://')) return link
+        return `https://${link}`
+    }
+
     const handleStatusChange = async (taskId: string, newStatus: string) => {
         await updateTaskStatus(taskId, newStatus)
     }
@@ -273,7 +280,7 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                                     </div>
                                 ) : (
                                     selectedTask.productLink ? (
-                                        <a href={selectedTask.productLink} target="_blank" style={{
+                                        <a href={formatLink(selectedTask.productLink)} target="_blank" style={{
                                             display: 'block', padding: '0.8rem', background: 'white', borderRadius: '8px',
                                             color: '#2563eb', fontWeight: '600', textDecoration: 'none', border: '1px solid #bfdbfe',
                                             textAlign: 'center'
@@ -298,7 +305,7 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                                     />
                                 ) : (
                                     (selectedTask.resources || selectedTask.fileLink) ? (
-                                        <a href={selectedTask.resources || selectedTask.fileLink || '#'} target="_blank" className="text-blue-600 font-semibold hover:underline">
+                                        <a href={formatLink(selectedTask.resources || selectedTask.fileLink)} target="_blank" className="text-blue-600 font-semibold hover:underline">
                                             📂 Open Resource Folder ↗
                                         </a>
                                     ) : <span className="text-gray-400 italic">No resources linked.</span>
@@ -319,7 +326,7 @@ export default function TaskTable({ tasks, isAdmin = false }: { tasks: TaskWithU
                                     />
                                 ) : (
                                     selectedTask.references ? (
-                                        <a href={selectedTask.references} target="_blank" className="text-purple-600 font-semibold hover:underline">
+                                        <a href={formatLink(selectedTask.references)} target="_blank" className="text-purple-600 font-semibold hover:underline">
                                             📺 Watch Reference Video ↗
                                         </a>
                                     ) : <span className="text-gray-400 italic">No references provided.</span>

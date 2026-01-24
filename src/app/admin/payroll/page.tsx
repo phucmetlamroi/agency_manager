@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/db'
-import TaskTable from '@/components/TaskTable'
 
 export default async function PayrollPage() {
     // 1. Determine Current Month Range
@@ -70,15 +69,40 @@ export default async function PayrollPage() {
                                 </div>
                             </div>
 
-                            {/* Task List */}
+                            {/* Simple Task List Table */}
                             <div>
                                 {user.tasks.length > 0 ? (
-                                    <>
-                                        <h4 style={{ marginBottom: '1rem', color: '#ccc', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                            Danh sách công việc ({user.tasks.length})
-                                        </h4>
-                                        <TaskTable tasks={user.tasks as any} isAdmin={true} />
-                                    </>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '1px solid #333', color: '#888', textAlign: 'left' }}>
+                                                <th style={{ padding: '0.75rem 0.5rem', fontWeight: '500' }}>Tên Công Việc / Khách Hàng</th>
+                                                <th style={{ padding: '0.75rem 0.5rem', fontWeight: '500', textAlign: 'right' }}>Thành Tiền</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {user.tasks.map(task => (
+                                                <tr key={task.id} style={{ borderBottom: '1px solid #222', color: '#e5e5e5' }}>
+                                                    <td style={{ padding: '0.75rem 0.5rem' }}>
+                                                        <div style={{ fontWeight: '500' }}>{task.title}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                                                            {new Date(task.updatedAt).toLocaleDateString()}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '1rem', color: '#10b981' }}>
+                                                        {task.value.toLocaleString()} đ
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            <tr style={{ background: 'rgba(16, 185, 129, 0.05)' }}>
+                                                <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 'bold', color: '#ccc' }}>
+                                                    Tổng cộng:
+                                                </td>
+                                                <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 'bold', color: '#10b981', fontSize: '1.1rem' }}>
+                                                    {totalIncome.toLocaleString()} đ
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 ) : (
                                     <div style={{ padding: '1rem', textAlign: 'center', color: '#666', fontStyle: 'italic', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
                                         Chưa có task hoàn tất trong tháng này.

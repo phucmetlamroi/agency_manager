@@ -46,7 +46,7 @@ export default async function AdminLayout({
                     <nav style={{ display: 'flex', gap: '1rem' }}>
                         <Link href="/admin" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Dashboard</Link>
                         <Link href="/admin/queue" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Kho Task</Link>
-                        <Link href="/admin/payroll" className="btn" style={{ color: '#ccc', background: 'transparent', borderBottom: '2px solid #8b5cf6' }}>Bảng Lương</Link>
+                        <Link href="/admin/payroll" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Bảng Lương</Link>
                         <Link href="/admin/users" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Nhân sự</Link>
                     </nav>
                 </div>

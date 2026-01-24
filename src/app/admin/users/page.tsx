@@ -86,12 +86,12 @@ export default async function AdminUsersPage() {
                                     </td>
                                     <td style={{ padding: '0.8rem', color: '#666', fontSize: '0.9rem' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
                                     <td style={{ padding: '0.8rem', textAlign: 'center' }}>
-                                        {!isSuperAdminRow && (
-                                            <>
-                                                <ResetPasswordButton userId={u.id} username={u.username} />
-                                                <DeleteUserButton userId={u.id} />
-                                            </>
+                                        {/* Reset Password: Show for everyone EXCEPT 'admin' row, UNLESS viewer is 'admin' */}
+                                        {(!isSuperAdminRow || currentUser?.username === 'admin') && (
+                                            <ResetPasswordButton userId={u.id} username={u.username} />
                                         )}
+                                        {/* Delete: NEVER show for 'admin' row */}
+                                        {!isSuperAdminRow && <DeleteUserButton userId={u.id} />}
                                     </td>
                                 </tr>
                             )

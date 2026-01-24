@@ -82,7 +82,11 @@ export async function adminResetPassword(userId: string, newPassword: string) {
         // Super Admin Protection
         const targetUser = await prisma.user.findUnique({ where: { id: userId } })
         if (targetUser?.username === 'admin') {
-            return { success: false, error: 'KHÔNG THỂ ĐỔI MẬT KHẨU CỦA SUPER ADMIN!' }
+            // Allow ONLY if currentUser is also 'admin'
+            // Note: currentUser was fetched above at line 78
+            if (currentUser?.username !== 'admin') {
+                return { success: false, error: 'KHÔNG THỂ ĐỔI MẬT KHẨU CỦA SUPER ADMIN!' }
+            }
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10)

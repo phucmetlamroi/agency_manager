@@ -88,6 +88,7 @@ export async function checkOverdueTasks() {
 
         if (notifications.length > 0) {
             revalidatePath('/admin')
+            revalidatePath('/admin/queue')
             revalidatePath('/dashboard')
         }
 

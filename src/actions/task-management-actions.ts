@@ -31,7 +31,9 @@ export async function assignTask(taskId: string, userId: string | null) {
             data: {
                 assigneeId: userId || null,
                 status: userId ? 'Đã nhận task' : 'Đang đợi giao',
-                isPenalized: false // Reset penalty state for new assignee
+                isPenalized: false, // Reset penalty state for new assignee
+                // If unassigning (userId is null), also clear the deadline
+                ...(userId ? {} : { deadline: null })
             }
         })
         revalidatePath('/admin')

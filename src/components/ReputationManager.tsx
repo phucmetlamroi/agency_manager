@@ -12,9 +12,9 @@ export default function ReputationManager({ userId, initialReputation }: { userI
 
         // Optimistic update
         const newRep = reputation + change
-        if (newRep > 100) return // Cap at 100
+        // Removed early return to allow clamping on server side (and here)
 
-        setReputation(newRep)
+        setReputation(Math.min(newRep, 100))
         setLoading(true)
 
         const res = await updateUserReputation(userId, change)

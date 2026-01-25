@@ -13,7 +13,8 @@ export default function RoleWatcher({ currentRole, isTreasurer }: { currentRole:
     useEffect(() => {
         const checkRole = async () => {
             try {
-                const res = await fetch('/api/auth/role')
+                // Prevent caching to ensure we get the latest role/status
+                const res = await fetch('/api/auth/role', { cache: 'no-store' })
                 if (!res.ok) return // Should handle auth error?
 
                 const data = await res.json()

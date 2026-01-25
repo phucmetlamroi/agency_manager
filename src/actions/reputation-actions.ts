@@ -65,7 +65,7 @@ export async function checkOverdueTasks() {
                     data: {
                         isPenalized: true,
                         assigneeId: null, // Kick user
-                        status: 'Đã nhận task' // Reset status to standard "Open" state
+                        status: 'Đang đợi giao' // Reset status to specific "Waiting" state
                     }
                 }),
                 prisma.notification.create({

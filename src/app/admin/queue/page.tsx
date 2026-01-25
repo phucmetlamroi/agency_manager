@@ -1,7 +1,10 @@
 import { prisma } from '@/lib/db'
 import TaskTable from '@/components/TaskTable'
+import { checkOverdueTasks } from '@/actions/reputation-actions'
 
 export default async function TaskQueuePage() {
+    await checkOverdueTasks() // Ensure queue is fresh
+
     const tasks = await prisma.task.findMany({
         include: { assignee: true },
         orderBy: { createdAt: 'desc' }

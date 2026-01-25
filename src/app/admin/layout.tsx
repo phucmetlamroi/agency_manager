@@ -53,7 +53,12 @@ export default async function AdminLayout({
                         <Link href="/admin" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Dashboard</Link>
                         <Link href="/admin/queue" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Kho Task</Link>
                         <Link href="/admin/payroll" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Bảng Lương</Link>
-                        <Link href="/admin/finance" className="btn" style={{ color: '#f59e0b', background: 'transparent' }}>Tài Chính</Link>
+
+                        {/* Only Super Admin or Treasurer can see Finance */}
+                        {(user.username === 'admin' || user.isTreasurer) && (
+                            <Link href="/admin/finance" className="btn" style={{ color: '#f59e0b', background: 'transparent' }}>Tài Chính</Link>
+                        )}
+
                         <Link href="/admin/users" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Nhân sự</Link>
                     </nav>
                 </div>

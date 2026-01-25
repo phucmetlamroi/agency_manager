@@ -16,12 +16,12 @@ export default async function AdminUsersPage() {
     })
 
     const users = await prisma.user.findMany({
-        where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
-        orderBy: { username: 'asc' }
+        orderBy: { username: 'asc' },
+        include: { _count: { select: { tasks: true } } }
     })
 
     return (
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
             <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Quản lý nhân viên</h2>
 
             <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
@@ -93,8 +93,8 @@ export default async function AdminUsersPage() {
                                         {!isSuperAdminRow ? (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <RoleSwitcher userId={u.id} initialRole={u.role} />
-                                                {/* Only Admins can be Treasurers usually, but let's allow any for flexibility */}
-                                                {u.role === 'ADMIN' && (
+                                                {/* Only SUPER ADMIN can grant Treasurer role */}
+                                                {currentUser?.username === 'admin' && u.role === 'ADMIN' && (
                                                     <TreasurerToggle userId={u.id} isTreasurer={u.isTreasurer} />
                                                 )}
                                             </div>

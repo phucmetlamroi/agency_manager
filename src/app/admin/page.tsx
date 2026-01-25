@@ -6,7 +6,15 @@ import TaskTable from '@/components/TaskTable'
 
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 
+import { getSession } from '@/lib/auth'
+
 export default async function AdminDashboard() {
+    const session = await getSession()
+    const currentUser = await prisma.user.findUnique({
+        where: { id: session?.user?.id },
+        select: { username: true }
+    })
+
     // 1. Run Logic to Deduct Points for Overdue Tasks
     const checkResult = await checkOverdueTasks()
     // In a real app we might show a toast with checkResult.notifications
@@ -17,6 +25,7 @@ export default async function AdminDashboard() {
     })
 
     const users = await prisma.user.findMany({
+        where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
         orderBy: { username: 'asc' }
     })
 

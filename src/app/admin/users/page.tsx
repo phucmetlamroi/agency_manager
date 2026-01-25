@@ -15,6 +15,7 @@ export default async function AdminUsersPage() {
     })
 
     const users = await prisma.user.findMany({
+        where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
         orderBy: { username: 'asc' }
     })
 

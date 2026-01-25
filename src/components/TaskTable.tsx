@@ -221,7 +221,13 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                         value={task.assignee?.id || ''}
                                         onChange={async (e) => {
                                             const val = e.target.value
-                                            await assignTask(task.id, val || null)
+                                            const res = await assignTask(task.id, val || null)
+                                            if (res?.success) {
+                                                // Force UI refresh to remove from queue/update list
+                                                window.location.reload() // Or router.refresh(), but reload is safer for queue removal visual
+                                            } else {
+                                                alert('Lỗi: Không thể giao task. Vui lòng thử lại.')
+                                            }
                                         }}
                                         onClick={(e) => e.stopPropagation()}
                                         style={{

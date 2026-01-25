@@ -13,7 +13,9 @@ export async function checkOverdueTasks() {
             where: {
                 deadline: { lt: now }, // Deadline has passed
                 status: { notIn: ['Hoàn tất'] }, // Not done
-                assigneeId: { not: null } // Must be assigned
+                assigneeId: { not: null }, // Must be assigned
+                // Safety: Do not penalize tasks created in the last 15 minutes (grace period for wrong entry)
+                createdAt: { lt: new Date(now.getTime() - 15 * 60 * 1000) }
             },
             include: {
                 assignee: true

@@ -52,7 +52,12 @@ export async function createTask(formData: FormData) {
     try {
         const title = formData.get('title') as string
         const value = parseFloat(formData.get('value') as string) || 0
-        const assigneeId = formData.get('assigneeId') as string
+
+        let assigneeId: string | null = formData.get('assigneeId') as string
+        if (!assigneeId || assigneeId === '' || assigneeId === 'null') {
+            assigneeId = null
+        }
+
         const deadline = formData.get('deadline') as string
         const references = formData.get('references') as string
         const fileLink = formData.get('fileLink') as string

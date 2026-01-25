@@ -26,6 +26,9 @@ export default async function PayrollPage() {
         orderBy: { username: 'asc' }
     })
 
+    // Filter out users with 0 income (no completed tasks in this period)
+    const activeUsers = users.filter(user => user.tasks.length > 0)
+
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
             <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -41,7 +44,7 @@ export default async function PayrollPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                {users.map(user => {
+                {activeUsers.map(user => {
                     // Calculate Total
                     const totalIncome = user.tasks.reduce((sum, task) => sum + task.value, 0)
 
@@ -114,8 +117,10 @@ export default async function PayrollPage() {
                     )
                 })}
 
-                {users.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>Không tìm thấy nhân viên nào.</div>
+                {activeUsers.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
+                        Không có số liệu lương trong tháng này.
+                    </div>
                 )}
             </div>
         </div>

@@ -37,7 +37,7 @@ export default async function UserLayout({
 
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <RoleWatcher currentRole={user.role} />
+            <RoleWatcher currentRole={user.role} isTreasurer={user.isTreasurer ?? false} />
             <header className="glass-panel" style={{
                 height: 'var(--header-height)',
                 display: 'flex',

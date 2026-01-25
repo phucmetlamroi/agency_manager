@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
  * Polls the server to check if the user's role has changed.
  * If changed, refreshes the page to trigger Server Component redirects.
  */
-export default function RoleWatcher({ currentRole }: { currentRole: string }) {
+export default function RoleWatcher({ currentRole, isTreasurer }: { currentRole: string, isTreasurer: boolean }) {
     const router = useRouter()
 
     useEffect(() => {
@@ -18,11 +18,11 @@ export default function RoleWatcher({ currentRole }: { currentRole: string }) {
 
                 const data = await res.json()
                 const newRole = data.role
+                const newIsTreasurer = data.isTreasurer
 
-                // If role changed (e.g. USER -> ADMIN or ADMIN -> USER)
-                // Or if role became null (User deleted/banned)
-                if (newRole && newRole !== currentRole) {
-                    console.log('Role changed! Refreshing...')
+                // Check for Role Change OR Treasurer Status Change
+                if ((newRole && newRole !== currentRole) || (newIsTreasurer !== isTreasurer)) {
+                    console.log('Permission changed! Refreshing...')
                     router.refresh()
                 }
             } catch (e) {
@@ -30,8 +30,8 @@ export default function RoleWatcher({ currentRole }: { currentRole: string }) {
             }
         }
 
-        // Check every 30 seconds
-        const interval = setInterval(checkRole, 30000)
+        // Check every 5 seconds for instant feedback
+        const interval = setInterval(checkRole, 5000)
 
         // Check on window focus (tab switch)
         const onFocus = () => checkRole()
@@ -41,7 +41,7 @@ export default function RoleWatcher({ currentRole }: { currentRole: string }) {
             clearInterval(interval)
             window.removeEventListener('focus', onFocus)
         }
-    }, [currentRole, router])
+    }, [currentRole, isTreasurer, router])
 
     return null // Invisible component
 }

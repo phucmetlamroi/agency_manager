@@ -38,7 +38,7 @@ export default async function AdminLayout({
 
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <RoleWatcher currentRole="ADMIN" />
+            <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
             <header className="glass-panel" style={{
                 height: 'var(--header-height)',
                 display: 'flex',

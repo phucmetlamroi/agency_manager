@@ -19,14 +19,14 @@ export async function GET() {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: { role: true }
+            select: { role: true, isTreasurer: true }
         })
 
         if (!user) {
             return NextResponse.json({ role: null }, { status: 404 })
         }
 
-        return NextResponse.json({ role: user.role })
+        return NextResponse.json({ role: user.role, isTreasurer: user.isTreasurer })
     } catch (e) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }

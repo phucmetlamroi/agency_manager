@@ -53,6 +53,7 @@ export default async function AdminLayout({
                         <Link href="/admin" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Dashboard</Link>
                         <Link href="/admin/queue" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Kho Task</Link>
                         <Link href="/admin/payroll" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Bảng Lương</Link>
+                        <Link href="/admin/finance" className="btn" style={{ color: '#f59e0b', background: 'transparent' }}>Tài Chính</Link>
                         <Link href="/admin/users" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Nhân sự</Link>
                     </nav>
                 </div>
@@ -75,7 +76,11 @@ export default async function AdminLayout({
                             </div>
                         </div>
                         <span style={{ fontSize: '1.2rem' }}>👤</span>
-                        {user.username}
+                        <span>{user.username}</span>
+                        {/* Gold Badge for Treasurer */}
+                        {user.isTreasurer && (
+                            <span title="Thủ Quỹ (Treasurer)" style={{ cursor: 'help' }}>🥇</span>
+                        )}
                         <span style={{ fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>Admin</span>
                     </div>
 

@@ -49,32 +49,43 @@ export async function updateUserReputation(userId: string, change: number) {
 }
 
 export async function createTask(formData: FormData) {
-    const title = formData.get('title') as string
-    const value = parseFloat(formData.get('value') as string) || 0
-    const assigneeId = formData.get('assigneeId') as string
-    const deadline = formData.get('deadline') as string
-    const references = formData.get('references') as string
-    const fileLink = formData.get('fileLink') as string // Backward/Alias
-
-    // New fields
-    const type = formData.get('type') as string || 'Short form'
-    const resources = formData.get('resources') as string
-    const notes = formData.get('notes') as string
-
     try {
+        const title = formData.get('title') as string
+        const value = parseFloat(formData.get('value') as string) || 0
+        const assigneeId = formData.get('assigneeId') as string
+        const deadline = formData.get('deadline') as string
+        const references = formData.get('references') as string
+        const fileLink = formData.get('fileLink') as string
+        const type = formData.get('type') as string || 'Short form'
+        const resources = formData.get('resources') as string
+        const notes = formData.get('notes') as string
+
+        const jobPriceUSD = parseFloat(formData.get('jobPriceUSD') as string) || 0
+        const exchangeRate = parseFloat(formData.get('exchangeRate') as string) || 25300
+        const wageVND = parseFloat(formData.get('value') as string) || 0
+
+        // Server-side calculation to ensure data integrity
+        const revenueVND = jobPriceUSD * exchangeRate
+        const profitVND = revenueVND - wageVND
+
         await prisma.task.create({
             data: {
                 title,
                 value,
-                assigneeId: assigneeId || null,
-                // Appending :00+07:00 to force parsing as Vietnam Timezone
-                deadline: deadline ? new Date(deadline + ':00+07:00') : null,
-                references: references || null,
-                fileLink: fileLink || null,
-                resources: resources || null,
-                notes: notes || null,
                 type,
-                status: 'Đang thực hiện'
+                deadline: deadline ? new Date(deadline + ':00+07:00') : null,
+                resources: resources || null,
+                references: references || null,
+                notes: notes || null,
+                assigneeId: assigneeId || null,
+                fileLink: fileLink || null,
+                status: assigneeId ? 'Đã nhận task' : 'Đang đợi giao',
+
+                // Financials
+                jobPriceUSD,
+                wageVND,
+                exchangeRate,
+                profitVND
             }
         })
         revalidatePath('/admin')

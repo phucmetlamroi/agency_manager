@@ -14,6 +14,7 @@ model User {
   plainPassword String? // For Admin visibility
   role      String   @default("USER") // "ADMIN" or "USER"
   reputation Int     @default(100)
+  isTreasurer Boolean @default(false) // Admin Role: Treasurer (Thủ quỹ)
   createdAt DateTime @default(now())
   
   tasks     Task[]
@@ -33,6 +34,12 @@ model Task {
   notes       String?  // Detailed instructions
   fileLink    String?  // Backward compatibility
   productLink String?  // User submission link (Thành phẩm)
+  
+  // Financial Fields
+  jobPriceUSD    Float?   @default(0) // Input: Revenue from Client (USD)
+  wageVND        Float?   @default(0) // Input: Payment to Staff (VND)
+  exchangeRate   Float?   @default(25300) // Stored rate at creation
+  profitVND      Float?   @default(0) // Calculated: (job * rate) - wage
   
   assignee    User?    @relation(fields: [assigneeId], references: [id])
   assigneeId  String?

@@ -4,6 +4,7 @@ import RoleSwitcher from '@/components/RoleSwitcher'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import DeleteUserButton from '@/components/DeleteUserButton'
 import ReputationManager from '@/components/ReputationManager'
+import TreasurerToggle from '@/components/TreasurerToggle'
 
 import { getSession } from '@/lib/auth'
 
@@ -74,6 +75,7 @@ export default async function AdminUsersPage() {
                                     <td style={{ padding: '0.8rem', fontFamily: 'monospace', fontSize: '0.8rem', color: '#555' }}>{u.id.substring(0, 8)}...</td>
                                     <td style={{ padding: '0.8rem' }}>
                                         {u.username}
+                                        {u.isTreasurer && <span title="Thủ Quỹ" style={{ marginLeft: '0.5rem' }}>🥇</span>}
                                         {isSuperAdminRow && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px' }}>SUPER</span>}
                                     </td>
                                     <td style={{ padding: '0.8rem' }}>
@@ -89,7 +91,13 @@ export default async function AdminUsersPage() {
                                     </td>
                                     <td style={{ padding: '0.8rem' }}>
                                         {!isSuperAdminRow ? (
-                                            <RoleSwitcher userId={u.id} initialRole={u.role} />
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <RoleSwitcher userId={u.id} initialRole={u.role} />
+                                                {/* Only Admins can be Treasurers usually, but let's allow any for flexibility */}
+                                                {u.role === 'ADMIN' && (
+                                                    <TreasurerToggle userId={u.id} isTreasurer={u.isTreasurer} />
+                                                )}
+                                            </div>
                                         ) : <span style={{ color: '#666', fontSize: '0.8rem' }}>Locked</span>}
                                     </td>
                                     <td style={{ padding: '0.8rem', color: '#666', fontSize: '0.9rem' }}>{new Date(u.createdAt).toLocaleDateString()}</td>

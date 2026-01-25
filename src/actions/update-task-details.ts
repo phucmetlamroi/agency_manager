@@ -26,6 +26,10 @@ export async function updateTaskDetails(id: string, data: {
             updateData.deadline = new Date(data.deadline + ':00+07:00')
             // Reset createdAt to "restart" the Smart Reminder timer
             updateData.createdAt = new Date()
+
+            // Critical: Reset penalty flag so if they miss this NEW deadline, they get penalized again.
+            updateData.isPenalized = false
+
             // Also ensure status is NOT "Hoàn tất" if we are setting a deadline? 
             // Maybe not needed, Admin controls status separately.
         }

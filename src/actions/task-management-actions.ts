@@ -28,7 +28,10 @@ export async function assignTask(taskId: string, userId: string | null) {
     try {
         await prisma.task.update({
             where: { id: taskId },
-            data: { assigneeId: userId || null }
+            data: {
+                assigneeId: userId || null,
+                isPenalized: false // Reset penalty state for new assignee
+            }
         })
         revalidatePath('/admin')
         return { success: true }

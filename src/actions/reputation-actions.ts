@@ -7,12 +7,12 @@ export async function checkOverdueTasks() {
     try {
         const now = new Date()
 
-        // Find tasks that are overdue, not completed, and haven't been penalized yet
+        // Find tasks that are overdue, not completed, and are STILL assigned
+        // Note: We removed 'isPenalized: false' to catch "stuck" tasks that were penalized but not successfully recalled.
         const overdueTasks = await prisma.task.findMany({
             where: {
                 deadline: { lt: now }, // Deadline has passed
                 status: { notIn: ['Hoàn tất'] }, // Not done
-                isPenalized: false, // Not yet penalized
                 assigneeId: { not: null } // Must be assigned
             },
             include: {
@@ -25,62 +25,60 @@ export async function checkOverdueTasks() {
         for (const task of overdueTasks) {
             if (!task.assignee) continue
 
-            // 1. Deduct 10 points
-            const currentRep = task.assignee.reputation || 100
-            const newRep = currentRep - 10
+            // Determine if valid for penalty
+            const isRecycle = task.isPenalized // If already true, it's a "stuck" task or double-check.
 
-            // 2. Check Lock Condition
-            let newRole = task.assignee.role
+            let newRep = task.assignee.reputation || 100
             let statusMsg = 'Bình thường'
+            let notifMessage = ''
 
-            if (newRep <= 0) {
-                newRole = 'LOCKED' // You might need to handle this role in your Auth/Guard
-                statusMsg = 'Đã xóa (LOCKED)'
-            } else if (newRep < 50) {
-                statusMsg = 'Cảnh báo'
+            if (!isRecycle) {
+                // FRESH PENALTY
+                newRep = newRep - 10
+
+                // Check Lock
+                let newRole = task.assignee.role
+                if (newRep <= 0) {
+                    newRole = 'LOCKED'
+                    statusMsg = 'Đã xóa (LOCKED)'
+                } else if (newRep < 50) {
+                    statusMsg = 'Cảnh báo'
+                }
+
+                await prisma.user.update({
+                    where: { id: task.assignee.id },
+                    data: { reputation: newRep, role: newRole }
+                })
+
+                notifMessage = `THU HỒI TASK: "${task.title}" từ @${task.assignee.username} do quá hạn. (Đã trừ 10đ)`
+            } else {
+                // ALREADY PENALIZED BUT STILL ASSIGNED (Stuck state cleanup)
+                // Just recall, no double penalty.
+                notifMessage = `THU HỒI LẠI TASK: "${task.title}" từ @${task.assignee.username} (Đã phạt trước đó)`
             }
 
-            // 3. Auto-Recall Logic (Return to Queue)
-            // Reset assignee and status so it appears in "Kho Task" (Queue)
-            // But we keep "isPenalized: true" to avoid double punishment if picked up again? 
-            // Actually, if picked up again, it's a new cycle. But 'isPenalized' triggers logic.
-            // If we reset Assignee, the task is now "Free". 
-            // The penalty was for the *Previous* user. 
-            // We should probably log this event or just reset 'isPenalized' to false for the NEXT user?
-            // If we reset 'isPenalized' to false, next user might deal with short deadline?
-            // Usually Admin will reset deadline or logic handles it.
-            // Let's keep isPenalized=true on this task to mark it as "tainted" or just for history.
-            // Requirement: "về mục Kho task" -> assigneeId = null.
-
+            // Common Recall Logic
             await prisma.$transaction([
-                prisma.user.update({
-                    where: { id: task.assignee.id },
-                    data: {
-                        reputation: newRep,
-                        role: newRole
-                    }
-                }),
                 prisma.task.update({
                     where: { id: task.id },
                     data: {
-                        isPenalized: true,
+                        isPenalized: true, // Ensure it's marked
                         assigneeId: null, // Kick user
-                        status: 'Đang đợi giao' // Reset status to specific "Waiting" state
+                        status: 'Đang đợi giao'
                     }
                 }),
                 prisma.notification.create({
                     data: {
-                        message: `THU HỒI TASK: "${task.title}" từ @${task.assignee.username} do quá hạn. (Đã trừ 10đ)`,
+                        message: notifMessage,
                         type: 'WARNING',
-                        userId: null // Broadcast to Admin
+                        userId: null
                     }
                 })
             ])
 
-            // 4. Prepare Notification (Legacy return, keeping for compatibility if utilized elsewhere)
             notifications.push({
                 editor: task.assignee.username,
-                score: `${newRep}/100 (-10)`,
+                score: isRecycle ? 'No Change' : `${newRep}/100 (-10)`,
                 reason: `Trễ Task [${task.title}] - ĐÃ THU HỒI`,
                 status: statusMsg,
                 taskId: task.id

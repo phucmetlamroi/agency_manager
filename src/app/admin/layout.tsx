@@ -23,8 +23,8 @@ export default async function AdminLayout({
 
     // Fetch fresh role from DB
     const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { role: true, username: true, reputation: true }
+        where: { id: session?.user?.id },
+        select: { username: true, role: true, reputation: true, isTreasurer: true }
     })
 
     if (!user) {

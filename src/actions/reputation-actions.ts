@@ -64,9 +64,10 @@ export async function checkOverdueTasks() {
                 prisma.task.update({
                     where: { id: task.id },
                     data: {
-                        isPenalized: true, // Ensure it's marked
+                        isPenalized: true, // Mark as "failed" history
                         assigneeId: null, // Kick user
-                        status: 'Đang đợi giao'
+                        status: 'Đang đợi giao',
+                        deadline: null // Reset deadline so it's fresh for next assignee
                     }
                 }),
                 prisma.notification.create({

@@ -30,10 +30,13 @@ export async function assignTask(taskId: string, userId: string | null) {
             where: { id: taskId },
             data: {
                 assigneeId: userId || null,
+                status: userId ? 'Đã nhận task' : 'Đang đợi giao',
                 isPenalized: false // Reset penalty state for new assignee
             }
         })
         revalidatePath('/admin')
+        revalidatePath('/admin/queue')
+        revalidatePath('/dashboard')
         return { success: true }
     } catch (e) {
         return { error: 'Failed to assign task' }

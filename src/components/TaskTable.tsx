@@ -111,16 +111,33 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
         <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                 {tasks.map(task => (
-                    <div key={task.id} className="glass-panel" style={{
+                    <div key={task.id} className="glass-panel group relative" style={{
                         padding: '1rem',
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
+                        // Responsive Layout: Column on Mobile, Row on Desktop
+                        flexDirection: 'column', // Mobile First (default)
+                        alignItems: 'stretch',   // Stretch on mobile
+                        gap: '0.8rem',
                         transition: 'transform 0.2s',
                         borderLeft: `4px solid ${statusColors[task.status] || '#ccc'}`
                     }}>
+                        {/* Desktop override style via media query manually or inline style hack? 
+                            Better to use Tailwind classes if possible, but file uses inline styles heavily. 
+                            I'll switch to standard flex-col md:flex-row if strict inline styles allow.
+                            Existing code heavily relies on inline styles. Use Tailwind `md:` prefix where className is available.
+                        */}
+                        <style jsx>{`
+                            @media (min-width: 768px) {
+                                .glass-panel {
+                                    flex-direction: row !important;
+                                    align-items: center !important;
+                                    justify-content: space-between;
+                                }
+                            }
+                        `}</style>
+
                         <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => openTask(task)}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.2rem', flexWrap: 'wrap' }}>
                                 <span style={{
                                     fontSize: '0.7rem',
                                     background: '#333',
@@ -131,7 +148,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                 }}>
                                     {task.type || 'Review'}
                                 </span>
-                                <h4 style={{ fontWeight: '600', fontSize: '1.05rem', margin: 0 }}>{task.title}</h4>
+                                <h4 style={{ fontWeight: '600', fontSize: '1.05rem', margin: 0, wordBreak: 'break-word' }}>{task.title}</h4>
                             </div>
 
                             <div style={{ fontSize: '0.85rem', color: '#888', display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -293,7 +310,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                             {/* Render Action Buttons for User based on Status Matrix */}
                             {!isAdmin ? (
                                 <>

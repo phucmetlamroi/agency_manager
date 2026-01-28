@@ -34,7 +34,7 @@ const statusBg: Record<string, string> = {
     "Sửa frame": "rgba(244, 114, 182, 0.2)"
 }
 
-export default function TaskTable({ tasks, isAdmin = false, users = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string }[] }) {
+export default function TaskTable({ tasks, isAdmin = false, users = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[] }) {
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
 
     // Edit State
@@ -244,7 +244,9 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                     >
                                         <option value="" style={{ color: '#888' }}>-- Chưa giao --</option>
                                         {users.map(u => (
-                                            <option key={u.id} value={u.id} style={{ color: 'black' }}>{u.username}</option>
+                                            <option key={u.id} value={u.id} style={{ color: 'black' }}>
+                                                {u.username} ({u.reputation ?? 100}đ)
+                                            </option>
                                         ))}
                                     </select>
                                 ) : (

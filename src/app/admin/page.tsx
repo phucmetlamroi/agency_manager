@@ -27,7 +27,10 @@ export default async function AdminDashboard() {
 
     const users = await prisma.user.findMany({
         where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
-        orderBy: { username: 'asc' }
+        orderBy: [
+            { reputation: 'desc' },
+            { username: 'asc' }
+        ]
     })
 
     const unassignedTasks = tasks.filter(t => !t.assigneeId)

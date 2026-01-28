@@ -111,9 +111,10 @@ export async function updateTaskStatus(id: string, newStatus: string) {
 
         // RUNNING: 'Đã nhận task', 'Đang thực hiện'
         // PAUSED: 'Revision' (Feedbacking), 'Sửa frame', 'Tạm ngưng', 'Đang đợi giao'
-        // STOPPED: 'Hoàn tất'
+        // STOPPED: 'Hoàn tất' (Stop and Finalize)
+        // RESET: 'Đã nhận task' (Revert to start)
 
-        const isRunningState = ['Đã nhận task', 'Đang thực hiện'].includes(newStatus)
+        const isRunningState = ['Đang thực hiện'].includes(newStatus)
         const isStoppedState = newStatus === 'Hoàn tất'
         // const isPaused = ['Tạm ngưng', 'Đang đợi giao'].includes(newStatus)
 
@@ -121,8 +122,16 @@ export async function updateTaskStatus(id: string, newStatus: string) {
         const currentTimerStatus = task.timerStatus
         const nowTime = new Date()
 
-        if (isStoppedState) {
-            // STOP Logic
+        // 1. RESET LOGIC (User Request)
+        if (newStatus === 'Đã nhận task') {
+            timerUpdate = {
+                timerStatus: 'STOPPED',
+                timerStartedAt: null, // Reset start time
+                accumulatedSeconds: 0 // Reset accumulated time
+            }
+        }
+        // 2. STOP LOGIC
+        else if (isStoppedState) {
             if (currentTimerStatus === 'RUNNING' && task.timerStartedAt) {
                 const elapsed = Math.floor((nowTime.getTime() - task.timerStartedAt.getTime()) / 1000)
                 timerUpdate = {
@@ -136,16 +145,18 @@ export async function updateTaskStatus(id: string, newStatus: string) {
                     timerStartedAt: null
                 }
             }
-        } else if (isRunningState) {
-            // START / RESUME Logic
+        }
+        // 3. START / RESUME LOGIC
+        else if (isRunningState) {
             if (currentTimerStatus !== 'RUNNING') {
                 timerUpdate = {
                     timerStatus: 'RUNNING',
                     timerStartedAt: nowTime
                 }
             }
-        } else {
-            // PAUSE Logic (Tạm ngưng, Đangợi giao)
+        }
+        // 4. PAUSE LOGIC
+        else {
             if (currentTimerStatus === 'RUNNING' && task.timerStartedAt) {
                 const elapsed = Math.floor((nowTime.getTime() - task.timerStartedAt.getTime()) / 1000)
                 timerUpdate = {

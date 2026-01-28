@@ -111,7 +111,7 @@ export default function MobileLayoutShell({
                         </form>
 
                         <div className="text-center text-xs text-gray-600 mt-4">
-                            Version 1.2.0 (Mobile)
+                            Version 1.3.0 (Live - 17:45)
                         </div>
                     </div>
                 </div>

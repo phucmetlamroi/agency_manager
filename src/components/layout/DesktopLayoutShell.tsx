@@ -79,6 +79,7 @@ export default function DesktopLayoutShell({
                             <button className="w-full py-2 bg-gray-800 text-gray-400 text-xs rounded-lg hover:bg-gray-700 transition-all">
                                 📱 Test Mobile View
                             </button>
+                            <div className="text-center text-[10px] text-gray-700 mt-1">v1.3.0</div>
                         </form>
                     </div>
                 </div>

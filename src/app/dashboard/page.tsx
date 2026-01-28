@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import TaskTable from '@/components/TaskTable'
+import { isMobileDevice } from '@/lib/device'
 
 export default async function UserDashboard() {
     const session = await getSession()
@@ -130,7 +131,7 @@ export default async function UserDashboard() {
             <h3 className="title-gradient" style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Danh sách Task của tôi</h3>
 
             {/* Using the new TaskTable for User too, but restrict Admin controls */}
-            <TaskTable tasks={tasks as any} isAdmin={false} />
+            <TaskTable tasks={tasks as any} isAdmin={false} isMobile={await isMobileDevice()} />
 
             {/* Change Password Section */}
             <div style={{ marginTop: '4rem', padding: '2rem', borderTop: '1px solid #333' }}>

@@ -325,27 +325,13 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                         </button>
                                     )}
 
-                                    {/* Status: Revision (Running) -> Action: Fixed (Pause) */}
-                                    {task.status === 'Revision' && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Sửa frame') }}
-                                            style={{
-                                                padding: '0.4rem 1rem', borderRadius: '8px', border: 'none',
-                                                background: '#f472b6', color: 'white', fontWeight: 'bold', cursor: 'pointer',
-                                                boxShadow: '0 2px 5px rgba(244, 114, 182, 0.3)'
-                                            }}
-                                        >
-                                            ✅ Đã sửa xong
-                                        </button>
-                                    )}
-
                                     {/* Status: Waiting (Paused) -> No Action, just display */}
-                                    {(task.status === 'Tạm ngưng' || task.status === 'Sửa frame' || task.status === 'Đang đợi giao') && (
+                                    {(task.status === 'Tạm ngưng' || task.status === 'Sửa frame' || task.status === 'Đang đợi giao' || task.status === 'Revision') && (
                                         <span style={{
                                             padding: '0.4rem 0.8rem', borderRadius: '8px', background: '#333', color: '#888',
                                             fontSize: '0.8rem', fontStyle: 'italic', border: '1px solid #444'
                                         }}>
-                                            ⏳ Đang chờ duyệt...
+                                            ⏳ Đang chờ Admin phản hồi...
                                         </span>
                                     )}
 

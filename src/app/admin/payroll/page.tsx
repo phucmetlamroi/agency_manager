@@ -6,14 +6,14 @@ export default async function PayrollPage() {
     // 1. Determine Current Month Range
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
 
     // 2. Fetch Users and their COMPLETED tasks for this month
     const users = await prisma.user.findMany({
         where: {
-            role: 'USER',
+            // role: 'USER', // Allow Admins/Treasurers to be paid too if they do tasks
             username: { not: 'admin' }
         },
         include: {

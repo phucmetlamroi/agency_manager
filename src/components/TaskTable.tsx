@@ -159,50 +159,50 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                                 {new Date(task.deadline).toLocaleDateString('vi-VN')} {' '}
                                                 {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                             </span>
-
-                                            {/* Smart Stopwatch */}
-                                            <div style={{ marginTop: '0.4rem' }}>
-                                                <Stopwatch
-                                                    accumulatedSeconds={task.accumulatedSeconds || 0}
-                                                    timerStartedAt={task.timerStartedAt ?? null}
-                                                    status={task.timerStatus || 'PAUSED'}
-                                                />
-                                            </div>
-
-                                            {/* Smart Reminder Calculation */}
-                                            {(() => {
-                                                if (task.status === 'Hoàn tất' || !task.deadline) return null
-
-                                                const start = task.createdAt ? new Date(task.createdAt).getTime() : new Date().getTime()
-                                                const end = new Date(task.deadline).getTime()
-                                                const now = new Date().getTime()
-
-                                                const total = end - start
-                                                const elapsed = now - start
-                                                const percent = total > 0 ? (elapsed / total) * 100 : 100
-
-                                                let msg = ''
-                                                let color = '#888'
-                                                let fontWeight = 'normal'
-
-                                                if (percent > 100) { msg = 'GẤP: Đã quá hạn! 100%'; color = '#ef4444'; fontWeight = 'bold' }
-                                                else if (percent >= 90) { msg = 'CẢNH BÁO: Sắp hết giờ (90%)'; color = '#f97316'; fontWeight = 'bold' }
-                                                else if (percent >= 70) { msg = 'Nếu có khó khăn báo Admin ngay (70%)'; color = '#eab308' }
-                                                else if (percent >= 50) { msg = 'Hơn một nửa rồi, khẩn trương!'; color = '#eab308' }
-                                                else if (percent >= 30) { msg = 'Tranh thủ làm nhé (30%)'; color = '#3b82f6' }
-                                                else if (percent >= 10) { msg = 'Bạn đã bắt đầu chưa? (10%)'; color = '#9ca3af' }
-                                                else { msg = 'Mới giao - Lên kế hoạch ngay đi! (0%)'; color = '#10b981' }
-
-                                                if (!msg) return null
-
-                                                return (
-                                                    <span style={{ fontSize: '0.75rem', color: color, fontWeight: fontWeight, fontStyle: 'italic', marginTop: '4px', display: 'block' }}>
-                                                        {msg}
-                                                    </span>
-                                                )
-                                            })()}
                                         </div>
                                     ) : 'No Deadline'}
+
+                                    {/* Smart Stopwatch - Make it ALWAYS visible */}
+                                    <div style={{ marginTop: '0.4rem', borderTop: '1px dashed #333', paddingTop: '4px' }}>
+                                        <Stopwatch
+                                            accumulatedSeconds={task.accumulatedSeconds || 0}
+                                            timerStartedAt={task.timerStartedAt ?? null}
+                                            status={task.timerStatus || 'PAUSED'}
+                                        />
+                                    </div>
+
+                                    {/* Smart Reminder Calculation - Only if Deadline exists */}
+                                    {task.deadline && (() => {
+                                        if (task.status === 'Hoàn tất') return null
+
+                                        const start = task.createdAt ? new Date(task.createdAt).getTime() : new Date().getTime()
+                                        const end = new Date(task.deadline).getTime()
+                                        const now = new Date().getTime()
+
+                                        const total = end - start
+                                        const elapsed = now - start
+                                        const percent = total > 0 ? (elapsed / total) * 100 : 100
+
+                                        let msg = ''
+                                        let color = '#888'
+                                        let fontWeight = 'normal'
+
+                                        if (percent > 100) { msg = 'GẤP: Đã quá hạn! 100%'; color = '#ef4444'; fontWeight = 'bold' }
+                                        else if (percent >= 90) { msg = 'CẢNH BÁO: Sắp hết giờ (90%)'; color = '#f97316'; fontWeight = 'bold' }
+                                        else if (percent >= 70) { msg = 'Nếu có khó khăn báo Admin ngay (70%)'; color = '#eab308' }
+                                        else if (percent >= 50) { msg = 'Hơn một nửa rồi, khẩn trương!'; color = '#eab308' }
+                                        else if (percent >= 30) { msg = 'Tranh thủ làm nhé (30%)'; color = '#3b82f6' }
+                                        else if (percent >= 10) { msg = 'Bạn đã bắt đầu chưa? (10%)'; color = '#9ca3af' }
+                                        else { msg = 'Mới giao - Lên kế hoạch ngay đi! (0%)'; color = '#10b981' }
+
+                                        if (!msg) return null
+
+                                        return (
+                                            <span style={{ fontSize: '0.75rem', color: color, fontWeight: fontWeight, fontStyle: 'italic', marginTop: '4px', display: 'block' }}>
+                                                {msg}
+                                            </span>
+                                        )
+                                    })()}
                                     {isAdmin && (
                                         <button
                                             onClick={(e) => {

@@ -18,6 +18,7 @@ model User {
   createdAt DateTime @default(now())
   
   tasks     Task[]
+  bonuses   MonthlyBonus[]
 }
 
 model Task {
@@ -57,4 +58,20 @@ model Notification {
   
   // Optional: Link to User or Task for context
   userId    String?  // If null, it's a broadcast to all Admins
+}
+
+model MonthlyBonus {
+  id                  String   @id @default(uuid())
+  userId              String
+  month               Int      // 1-12
+  year                Int
+  rank                Int      // 1, 2, or 3
+  revenue             Float    // Snapshot of total revenue at calculation time
+  executionTimeHours  Float    // Total hours spent on tasks (tie-breaker)
+  bonusAmount         Float    // Calculated bonus amount (15%, 10%, or 5% of salary)
+  calculatedAt        DateTime @default(now())
+  
+  user                User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, month, year])
 }

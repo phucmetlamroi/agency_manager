@@ -58,6 +58,10 @@ export default function DesktopLayoutShell({
                         <div>
                             <p className="font-bold text-sm">{user?.username}</p>
                             <p className="text-xs text-gray-500">{user?.role}</p>
+                            <div className="flex items-center gap-1 bg-gray-800 rounded px-2 py-0.5 mt-1 border border-gray-700">
+                                <span className="text-yellow-400 text-[10px]">★</span>
+                                <span className="text-xs font-bold text-gray-300">{user?.reputation ?? 100}đ</span>
+                            </div>
                         </div>
                     </div>
 

@@ -83,6 +83,31 @@ export default function MobileTaskView({ tasks, isAdmin, users }: { tasks: TaskW
                 onDelete={handleDelete}
                 isAdmin={isAdmin}
             />
+
+            {/* FLOATING ACTION BUTTON (FAB) */}
+            <button
+                onClick={() => {
+                    // Trigger create modal or navigation
+                    // Ideally this should open a Full Screen "Create Task" form.
+                    // For now, we reuse the action logic or redirect?
+                    // Simplest: If Admin, redirect to /admin (which is this page) but trigger modal?
+                    // Let's just show an alert or open a Create Drawer if implemented.
+
+                    if (isAdmin) {
+                        // Scroll to top or trigger Create Form?
+                        // The Create Form is currently at the top of Admin Page. 
+                        // Maybe scroll to top?
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                        // Or alert "Use form at top"
+                    } else {
+                        // User Request?
+                        alert("Create Request feature coming soon!")
+                    }
+                }}
+                className="fixed bottom-24 right-4 w-14 h-14 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center text-2xl font-bold text-white z-40 active:scale-90 transition-transform"
+            >
+                +
+            </button>
         </div>
     )
 }

@@ -170,9 +170,18 @@ export async function updateTaskStatus(id: string, newStatus: string) {
                 ...timerUpdate
             }
         })
+        // Return final accumulated seconds (plus current elapsed if it was running) for the UI Log
+        let finalSeconds = task.accumulatedSeconds
+        if (task.timerStatus === 'RUNNING' && task.timerStartedAt) {
+            const elapsed = Math.floor((nowTime.getTime() - task.timerStartedAt.getTime()) / 1000)
+            finalSeconds += elapsed
+        }
+
         revalidatePath('/admin')
         revalidatePath('/dashboard')
-        return { success: true }
+        revalidatePath('/admin/payroll') // Update payroll too since bonus depends on it
+
+        return { success: true, finalSeconds }
     } catch (e) {
         return { error: 'Failed' }
     }

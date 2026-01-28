@@ -77,7 +77,27 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
     }
 
     const handleStatusChange = async (taskId: string, newStatus: string) => {
-        await updateTaskStatus(taskId, newStatus)
+        const res = await updateTaskStatus(taskId, newStatus)
+        if (res?.success && newStatus === 'Hoàn tất' && res.finalSeconds !== undefined) {
+            const seconds = res.finalSeconds
+
+            // Format logic:
+            // < 24h: HH giờ MM phút SS giây
+            // >= 24h: DD ngày, HH giờ MM phút
+            const days = Math.floor(seconds / (3600 * 24))
+            const hours = Math.floor((seconds % (3600 * 24)) / 3600)
+            const minutes = Math.floor((seconds % 3600) / 60)
+            const secs = seconds % 60
+
+            let timeString = ''
+            if (days > 0) {
+                timeString = `${days} ngày, ${hours.toString().padStart(2, '0')} giờ ${minutes.toString().padStart(2, '0')} phút`
+            } else {
+                timeString = `${hours.toString().padStart(2, '0')} giờ ${minutes.toString().padStart(2, '0')} phút ${secs.toString().padStart(2, '0')} giây`
+            }
+
+            alert(`🎉 TASK COMPLETED!\n\nTask này bạn đã tốn tổng số: ${timeString} để hoàn thành.\n(Active Working Time)`)
+        }
     }
 
     const handleSaveDetails = async () => {

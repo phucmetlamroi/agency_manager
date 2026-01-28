@@ -109,11 +109,11 @@ export async function updateTaskStatus(id: string, newStatus: string) {
         // Maybe "Tạm ngưng" is used for "Reviewing"? Or they flip back to "Đã nhận task"?
         // Let's make "Tạm ngưng" PAUSED.
 
-        // RUNNING: 'Đã nhận task', 'Đang thực hiện', 'Revision'
-        // PAUSED: 'Sửa frame' (Fixed), 'Tạm ngưng', 'Đang đợi giao'
+        // RUNNING: 'Đã nhận task', 'Đang thực hiện'
+        // PAUSED: 'Revision' (Feedbacking), 'Sửa frame', 'Tạm ngưng', 'Đang đợi giao'
         // STOPPED: 'Hoàn tất'
 
-        const isRunningState = ['Đã nhận task', 'Đang thực hiện', 'Revision'].includes(newStatus)
+        const isRunningState = ['Đã nhận task', 'Đang thực hiện'].includes(newStatus)
         const isStoppedState = newStatus === 'Hoàn tất'
         // const isPaused = ['Tạm ngưng', 'Đang đợi giao'].includes(newStatus)
 

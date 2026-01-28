@@ -360,28 +360,58 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                     )}
                                 </>
                             ) : (
-                                /* Admin still sees Dropdown for full control */
-                                <select
-                                    value={task.status}
-                                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                                    style={{
-                                        padding: '0.4rem 0.8rem',
-                                        borderRadius: '20px',
-                                        border: 'none',
-                                        background: statusBg[task.status] || '#333',
-                                        color: statusColors[task.status] || 'white',
-                                        fontWeight: '600',
-                                        fontSize: '0.8rem',
-                                        cursor: 'pointer',
-                                        outline: 'none',
-                                        textAlign: 'center'
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    {getStatusOptions().map(opt => (
-                                        <option key={opt} value={opt}>{opt}</option>
-                                    ))}
-                                </select>
+                                /* Admin still sees Dropdown for full control, PLUS explicit Revision controls */
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+                                    <select
+                                        value={task.status}
+                                        onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                        style={{
+                                            padding: '0.4rem 0.8rem',
+                                            borderRadius: '20px',
+                                            border: 'none',
+                                            background: statusBg[task.status] || '#333',
+                                            color: statusColors[task.status] || 'white',
+                                            fontWeight: '600',
+                                            fontSize: '0.8rem',
+                                            cursor: 'pointer',
+                                            outline: 'none',
+                                            textAlign: 'center',
+                                            minWidth: '120px'
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {getStatusOptions().map(opt => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
+
+                                    {/* Admin Revision Controls - Show only during 'Revision' */}
+                                    {isAdmin && task.status === 'Revision' && (
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                            <button
+                                                disabled
+                                                style={{
+                                                    padding: '2px 8px', fontSize: '0.7rem',
+                                                    background: '#ef4444', color: 'white', opacity: 0.6,
+                                                    borderRadius: '4px', border: 'none', cursor: 'not-allowed'
+                                                }}
+                                            >
+                                                Chưa FB
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Đang thực hiện') }}
+                                                style={{
+                                                    padding: '2px 8px', fontSize: '0.7rem',
+                                                    background: '#22c55e', color: 'white', fontWeight: 'bold',
+                                                    borderRadius: '4px', border: 'none', cursor: 'pointer',
+                                                    boxShadow: '0 2px 4px rgba(34, 197, 94, 0.3)'
+                                                }}
+                                            >
+                                                ✔ Đã FB
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             )}
 
                             {isAdmin && (

@@ -101,6 +101,15 @@ export default function MobileLayoutShell({
                             Đăng xuất
                         </button>
 
+                        <form action={async () => {
+                            const { toggleMobileView } = await import('@/actions/ui-actions')
+                            await toggleMobileView(false)
+                        }}>
+                            <button className="w-full mt-4 py-2 bg-gray-800 text-gray-400 text-xs rounded-lg border border-gray-700">
+                                🖥️ Switch to PC View
+                            </button>
+                        </form>
+
                         <div className="text-center text-xs text-gray-600 mt-4">
                             Version 1.2.0 (Mobile)
                         </div>

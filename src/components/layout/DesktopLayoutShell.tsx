@@ -60,12 +60,23 @@ export default function DesktopLayoutShell({
                             <p className="text-xs text-gray-500">{user?.role}</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-bold transition-all"
-                    >
-                        Đăng xuất
-                    </button>
+
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                        <button
+                            onClick={handleLogout}
+                            className="col-span-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-bold transition-all"
+                        >
+                            Đăng xuất
+                        </button>
+                        <form action={async () => {
+                            const { toggleMobileView } = await import('@/actions/ui-actions')
+                            await toggleMobileView(true)
+                        }} className="col-span-2">
+                            <button className="w-full py-2 bg-gray-800 text-gray-400 text-xs rounded-lg hover:bg-gray-700 transition-all">
+                                📱 Test Mobile View
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </aside>
 

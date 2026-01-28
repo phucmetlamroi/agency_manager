@@ -4,6 +4,70 @@ import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 
+export async function getPayrollLockStatus() {
+    const now = new Date()
+    const currentMonth = now.getMonth() + 1
+    const currentYear = now.getFullYear()
+
+    try {
+        const lock = await prisma.payrollLock.findUnique({
+            where: {
+                month_year: {
+                    month: currentMonth,
+                    year: currentYear
+                }
+            }
+        })
+        return { isLocked: lock?.isLocked ?? false }
+    } catch (error) {
+        return { isLocked: false }
+    }
+}
+
+export async function revertMonthlyBonus() {
+    try {
+        // 1. Permission Check
+        const session = await getSession()
+        if (!session) return { success: false, error: 'Unauthorized' }
+
+        const currentUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true, isTreasurer: true }
+        })
+
+        if (currentUser?.role !== 'ADMIN' && !currentUser?.isTreasurer) {
+            return { success: false, error: 'Permission denied.' }
+        }
+
+        const now = new Date()
+        const currentMonth = now.getMonth() + 1
+        const currentYear = now.getFullYear()
+
+        // 2. Delete all bonuses for this month
+        await prisma.monthlyBonus.deleteMany({
+            where: {
+                month: currentMonth,
+                year: currentYear
+            }
+        })
+
+        // 3. Delete Lock (Unlock)
+        await prisma.payrollLock.deleteMany({
+            where: {
+                month: currentMonth,
+                year: currentYear
+            }
+        })
+
+        revalidatePath('/admin/payroll')
+        return { success: true, message: 'Đã hoàn tác và mở khóa kỳ lương.' }
+
+    } catch (error) {
+        console.error('Error reverting bonus:', error)
+        return { success: false, error: 'Failed to revert.' }
+    }
+}
+
 /**
  * Calculate and award monthly bonuses based on revenue and efficiency ranking.
  * 
@@ -38,6 +102,20 @@ export async function calculateMonthlyBonus() {
         const currentMonth = now.getMonth() + 1 // 1-12
         const currentYear = now.getFullYear()
 
+        // Check if already locked
+        const existingLock = await prisma.payrollLock.findUnique({
+            where: {
+                month_year: {
+                    month: currentMonth,
+                    year: currentYear
+                }
+            }
+        })
+
+        if (existingLock?.isLocked) {
+            return { success: false, error: 'Kỳ lương này ĐÃ BỊ KHÓA (Đã tính thưởng). Vui lòng Hoàn tác trước nếu muốn tính lại.' }
+        }
+
         const startOfMonth = new Date(currentYear, currentMonth - 1, 1)
         const endOfMonth = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999)
 
@@ -59,6 +137,16 @@ export async function calculateMonthlyBonus() {
                 }
             }
         })
+
+        // Validation: Check if there is data to calculate
+        if (!users || users.length === 0) {
+            return { success: false, error: 'Không tìm thấy nhân viên nào có hoạt động trong hệ thống.' }
+        }
+
+        const totalTasksFound = users.reduce((acc, u) => acc + u.tasks.length, 0)
+        if (totalTasksFound === 0) {
+            return { success: false, error: 'Không có dữ liệu Task hoặc Doanh thu nào trong tháng này để tính toán.' }
+        }
 
         // 4. Calculate revenue and execution time for each user
         interface UserRanking {
@@ -127,7 +215,7 @@ export async function calculateMonthlyBonus() {
             })
 
             // 8. Save to MonthlyBonus table
-            const bonus = await prisma.monthlyBonus.create({
+            await prisma.monthlyBonus.create({
                 data: {
                     userId: user.userId,
                     month: currentMonth,
@@ -150,7 +238,24 @@ export async function calculateMonthlyBonus() {
             })
         }
 
-        // 9. Revalidate payroll page to show updated bonuses
+        // 9. Create Lock Record
+        await prisma.payrollLock.upsert({
+            where: {
+                month_year: {
+                    month: currentMonth,
+                    year: currentYear
+                }
+            },
+            update: { isLocked: true, lockedAt: new Date(), lockedBy: session.user.id },
+            create: {
+                month: currentMonth,
+                year: currentYear,
+                isLocked: true,
+                lockedBy: session.user.id
+            }
+        })
+
+        // 10. Revalidate payroll page to show updated bonuses
         revalidatePath('/admin/payroll')
 
         return {

@@ -75,3 +75,14 @@ model MonthlyBonus {
   
   @@unique([userId, month, year])
 }
+
+model PayrollLock {
+  id        String   @id @default(uuid())
+  month     Int
+  year      Int
+  isLocked  Boolean  @default(false)
+  lockedAt  DateTime @default(now())
+  lockedBy  String   // User ID
+
+  @@unique([month, year])
+}

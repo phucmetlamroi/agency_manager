@@ -311,18 +311,19 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                         </button>
                                     )}
 
-                                    {/* Status: Working -> Action: Submit (Pause) */}
+                                    {/* Status: Working -> No Action Button in List (Submission via Modal or Admin only?) 
+                                        User requested to remove "Nộp bài" to avoid cheating */ }
                                     {task.status === 'Đang thực hiện' && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Tạm ngưng') }}
-                                            style={{
-                                                padding: '0.4rem 1rem', borderRadius: '8px', border: 'none',
-                                                background: '#38bdf8', color: 'white', fontWeight: 'bold', cursor: 'pointer',
-                                                boxShadow: '0 2px 5px rgba(56, 189, 248, 0.3)'
-                                            }}
-                                        >
-                                            ⏸ Nộp bài
-                                        </button>
+                                        // Empty for now, or just status badge?
+                                        // The status badge is already displayed on the left border/background.
+                                        // Maybe show a "Working..." indicator?
+                                        <span style={{
+                                            padding: '0.4rem 0.8rem', borderRadius: '8px', background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24',
+                                            fontSize: '0.8rem', fontWeight: 'bold', border: '1px solid rgba(251, 191, 36, 0.3)',
+                                            display: 'flex', alignItems: 'center', gap: '6px'
+                                        }}>
+                                            <span className="animate-pulse">●</span> Đang thực hiện...
+                                        </span>
                                     )}
 
                                     {/* Status: Waiting (Paused) -> No Action, just display */}

@@ -12,4 +12,8 @@ export type TaskWithUser = {
     notes: string | null
     assignee: { id: string; username: string; reputation?: number } | null
     createdAt: Date
+    // Stopwatch
+    accumulatedSeconds?: number
+    timerStartedAt?: Date | null
+    timerStatus?: string
 }

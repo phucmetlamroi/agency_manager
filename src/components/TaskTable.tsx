@@ -5,6 +5,7 @@ import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
 import DeleteTaskButton from './DeleteTaskButton'
+import Stopwatch from './Stopwatch'
 
 import { TaskWithUser } from '@/types/admin'
 
@@ -158,6 +159,16 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                                 {new Date(task.deadline).toLocaleDateString('vi-VN')} {' '}
                                                 {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                             </span>
+
+                                            {/* Smart Stopwatch */}
+                                            <div style={{ marginTop: '0.4rem' }}>
+                                                <Stopwatch
+                                                    accumulatedSeconds={task.accumulatedSeconds || 0}
+                                                    timerStartedAt={task.timerStartedAt ?? null}
+                                                    status={task.timerStatus || 'PAUSED'}
+                                                />
+                                            </div>
+
                                             {/* Smart Reminder Calculation */}
                                             {(() => {
                                                 if (task.status === 'Hoàn tất' || !task.deadline) return null

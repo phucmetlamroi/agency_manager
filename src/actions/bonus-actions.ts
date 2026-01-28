@@ -166,13 +166,15 @@ export async function calculateMonthlyBonus() {
             // Calculate total revenue (sum of task values)
             const revenue = user.tasks.reduce((sum, task) => sum + task.value, 0)
 
-            // Calculate total execution time in hours
+            // Calculate total execution time in hours using Smart Stopwatch (accumulatedSeconds)
             let totalExecutionMs = 0
             for (const task of user.tasks) {
-                // Execution time = completedAt (updatedAt) - assignedAt (createdAt)
-                const completedAt = task.updatedAt.getTime()
-                const assignedAt = task.createdAt.getTime()
-                totalExecutionMs += (completedAt - assignedAt)
+                // Use the new accumulatedSeconds field derived from Stopwatch
+                // If the task is somehow still RUNNING when calculating (unlikely if Hoàn tất stops it, but safe to check),
+                // we should add the pending duration. 
+                // But generally only Completed tasks are queried here.
+                const activeSeconds = task.accumulatedSeconds || 0
+                totalExecutionMs += (activeSeconds * 1000)
             }
             const executionTimeHours = totalExecutionMs / (1000 * 60 * 60) // Convert ms to hours
 

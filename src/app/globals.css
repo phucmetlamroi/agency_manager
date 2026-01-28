@@ -1,24 +1,28 @@
+@import "tailwindcss";
+
 :root {
   /* Color Palette - Premium Dark Theme */
   --background: #0a0a0c;
   --foreground: #ededed;
-  
-  --primary: #6d28d9; /* Deep Purple */
+
+  --primary: #6d28d9;
+  /* Deep Purple */
   --primary-glow: #7c3aed;
-  --secondary: #03dac6; /* Teal accent */
-  
+  --secondary: #03dac6;
+  /* Teal accent */
+
   --surface: #121214;
   --surface-hover: #1c1c1f;
-  
+
   --glass: rgba(255, 255, 255, 0.05);
   --glass-border: rgba(255, 255, 255, 0.1);
-  
+
   --success: #00c853;
   --error: #ff3d00;
-  
+
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  
+
   /* Spacing */
   --radius: 12px;
   --header-height: 70px;
@@ -86,8 +90,15 @@ a {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {

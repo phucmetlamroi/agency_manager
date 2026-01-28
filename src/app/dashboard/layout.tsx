@@ -42,61 +42,109 @@ export default async function UserLayout({
     // We handle visibility via CSS (md:flex, hidden etc)
 
     return (
-        <div className="flex min-h-screen flex-col md:flex-row bg-[#111111] text-white">
+        <div style={{ display: 'flex', minHeight: '100vh', flexDirection: 'column', backgroundColor: '#111111', color: 'white' }}>
+            {/* Desktop: Use media query logic? Inline styles are hard for media queries.
+                We have to force a layout that works. 
+                Let's use a standard Sidebar approach but with CSS Module or Global CSS if possible.
+                Or just use the Admin style layout which is proven to work.
+            */}
             <RoleWatcher currentRole={user.role} isTreasurer={user.isTreasurer ?? false} />
 
-            {/* Desktop Sidebar - HIDDEN ON MOBILE (block md:flex) */}
-            <aside className="w-64 bg-black/40 backdrop-blur-xl border-r border-white/10 p-6 hidden md:flex flex-col fixed h-full z-10 top-0 left-0">
-                <div className="mb-8">
-                    <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                        Agency<span className="text-white">Manager</span>
+            {/* HEADER (Mobile Logic) - Inline Style doesn't support media queries directly in JSX. 
+               We will use a <style> tag or stick to classes if we can fix Tailwind.
+               
+               WAIT: If Tailwind is broken, 'hidden md:flex' won't work.
+               Use specific style blocks.
+            */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                @media (min-width: 768px) {
+                    .desktop-sidebar { display: flex !important; }
+                    .mobile-header { display: none !important; }
+                    .main-content { margin-left: 256px; }
+                }
+                @media (max-width: 767px) {
+                    .desktop-sidebar { display: none !important; }
+                    .mobile-header { display: flex !important; }
+                    .main-content { margin-left: 0; }
+                }
+            `}} />
+
+            {/* Desktop Sidebar */}
+            <aside className="desktop-sidebar" style={{
+                width: '256px',
+                backgroundColor: 'rgba(0,0,0,0.4)',
+                backdropFilter: 'blur(10px)',
+                borderRight: '1px solid rgba(255,255,255,0.1)',
+                padding: '1.5rem',
+                flexDirection: 'column',
+                position: 'fixed',
+                height: '100%',
+                zIndex: 10,
+                top: 0,
+                left: 0,
+                display: 'none' // Default hidden, shown by media query
+            }}>
+                <div style={{ marginBottom: '2rem' }}>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', background: 'linear-gradient(to right, #60a5fa, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                        Agency<span style={{ WebkitTextFillColor: 'white' }}>Manager</span>
                     </h1>
                     <div style={{ fontSize: '0.8rem', color: '#888' }}>User Dashboard</div>
                 </div>
 
-                <div className="flex-1 space-y-4">
-                    {/* User Info Card */}
-                    <div className="p-4 rounded-xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-white/5">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg bg-gray-700 text-white`}>
+                <div style={{ flex: 1 }}>
+                    <div style={{ padding: '1rem', borderRadius: '0.75rem', background: 'linear-gradient(to bottom right, rgba(31,41,55,0.5), rgba(17,24,39,0.5))', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                            <div style={{ width: '2.5rem', height: '2.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', backgroundColor: '#374151', color: 'white' }}>
                                 {user.username?.[0]?.toUpperCase()}
                             </div>
                             <div>
-                                <div className="font-bold">{user.username}</div>
-                                <div className="text-xs text-gray-400">{user.role}</div>
+                                <div style={{ fontWeight: 'bold' }}>{user.username}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{user.role}</div>
                             </div>
                         </div>
-                        <div className="flex justify-between items-center text-sm pt-2 border-t border-white/10">
-                            <span className="text-gray-400">Reputation</span>
-                            <span className={`font-bold ${(user.reputation || 100) >= 90 ? 'text-purple-400' : 'text-yellow-400'}`}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                            <span style={{ color: '#9ca3af' }}>Reputation</span>
+                            <span style={{ fontWeight: 'bold', color: (user.reputation || 100) >= 90 ? '#c084fc' : '#facc15' }}>
                                 {user.reputation ?? 100}đ
                             </span>
                         </div>
                     </div>
                 </div>
 
-                <div className="pt-6 border-t border-white/10">
+                <div style={{ paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                     <form action={async () => {
                         'use server'
                         await logout()
                         redirect('/login')
                     }}>
-                        <button className="w-full py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 text-sm font-bold border border-red-500/20 transition-all">
+                        <button style={{ width: '100%', padding: '0.5rem', backgroundColor: 'rgba(239,68,68,0.1)', color: '#f87171', borderRadius: '0.5rem', fontWeight: 'bold', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer' }}>
                             Log out
                         </button>
                     </form>
                 </div>
             </aside>
 
-            {/* Mobile Header - VISIBLE ON MOBILE ONLY (md:hidden) */}
-            <header className="md:hidden flex items-center justify-between p-4 bg-black/60 backdrop-blur-md sticky top-0 z-20 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                    <h1 className="font-bold text-lg bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            {/* Mobile Header */}
+            <header className="mobile-header" style={{
+                display: 'none', // Default hidden, shown by media query
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem',
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(10px)',
+                position: 'sticky',
+                top: 0,
+                zIndex: 20,
+                borderBottom: '1px solid rgba(255,255,255,0.1)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h1 style={{ fontWeight: 'bold', fontSize: '1.125rem', background: 'linear-gradient(to right, #60a5fa, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                         AgencyManager
                     </h1>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold ${(user.reputation || 100) >= 90 ? 'text-purple-400' : 'text-yellow-400'}`}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 'bold', color: (user.reputation || 100) >= 90 ? '#c084fc' : '#facc15' }}>
                         {user.reputation ?? 100}đ
                     </span>
                     <form action={async () => {
@@ -104,17 +152,17 @@ export default async function UserLayout({
                         await logout()
                         redirect('/login')
                     }}>
-                        <button className="text-xs text-red-400 border border-red-500/30 px-2 py-1 rounded">Logout</button>
+                        <button style={{ fontSize: '0.75rem', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem', background: 'transparent' }}>Logout</button>
                     </form>
                 </div>
             </header>
 
             {/* Main Content Area */}
-            <main className="flex-1 md:ml-64 p-4 pb-24 md:p-8 transition-all duration-300">
+            <main className="main-content" style={{ flex: 1, padding: '1rem', paddingBottom: '6rem', transition: 'all 0.3s' }}>
                 {children}
             </main>
 
-            {/* Bottom Navigation - MOBILE ONLY */}
+            {/* Bottom Navigation */}
             <BottomNav role={user.role || 'USER'} />
         </div>
     )

@@ -1,6 +1,6 @@
 import { logout } from '@/lib/auth'
 import Link from 'next/link'
-import '@/app/globals.css'
+// Removed duplicate globals.css import
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { decrypt } from '@/lib/auth'

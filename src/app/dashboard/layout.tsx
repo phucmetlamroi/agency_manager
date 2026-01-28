@@ -1,6 +1,6 @@
 import { logout } from '@/lib/auth'
 import Link from 'next/link'
-import '@/app/globals.css'
+// Removed duplicate globals.css import (already in Root Layout)
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { decrypt } from '@/lib/auth'
@@ -71,10 +71,9 @@ export default async function UserLayout({
             `}} />
 
             {/* Desktop Sidebar */}
-            <aside className="desktop-sidebar" style={{
+            <aside className="desktop-sidebar glass-panel" style={{
                 width: '256px',
-                backgroundColor: 'rgba(0,0,0,0.4)',
-                backdropFilter: 'blur(10px)',
+                backgroundColor: 'rgba(0,0,0,0.4)', // Fallback if glass-panel fails
                 borderRight: '1px solid rgba(255,255,255,0.1)',
                 padding: '1.5rem',
                 flexDirection: 'column',
@@ -83,7 +82,8 @@ export default async function UserLayout({
                 zIndex: 10,
                 top: 0,
                 left: 0,
-                display: 'none' // Default hidden, shown by media query
+                display: 'none', // Default hidden, shown by media query
+                borderRadius: '0' // Override glass radius
             }}>
                 <div style={{ marginBottom: '2rem' }}>
                     <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', background: 'linear-gradient(to right, #60a5fa, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
@@ -126,17 +126,17 @@ export default async function UserLayout({
             </aside>
 
             {/* Mobile Header */}
-            <header className="mobile-header" style={{
+            <header className="mobile-header glass-panel" style={{
                 display: 'none', // Default hidden, shown by media query
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '1rem',
                 backgroundColor: 'rgba(0,0,0,0.6)',
-                backdropFilter: 'blur(10px)',
                 position: 'sticky',
                 top: 0,
                 zIndex: 20,
-                borderBottom: '1px solid rgba(255,255,255,0.1)'
+                borderBottom: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '0'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <h1 style={{ fontWeight: 'bold', fontSize: '1.125rem', background: 'linear-gradient(to right, #60a5fa, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>

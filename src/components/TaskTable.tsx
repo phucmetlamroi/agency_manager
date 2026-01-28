@@ -305,31 +305,95 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <select
-                                value={task.status}
-                                onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                                disabled={!isAdmin && task.status === 'Hoàn tất'} // Lock if already done
-                                style={{
-                                    padding: '0.4rem 0.8rem',
-                                    borderRadius: '20px',
-                                    border: 'none',
-                                    background: statusBg[task.status] || '#333',
-                                    color: statusColors[task.status] || 'white',
-                                    fontWeight: '600',
-                                    fontSize: '0.8rem',
-                                    cursor: isAdmin ? 'pointer' : (task.status === 'Hoàn tất' ? 'default' : 'pointer'),
-                                    outline: 'none',
-                                    textAlign: 'center'
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                {/* Render allowed options */}
-                                {getStatusOptions().map(opt => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                                {/* Ensure current status is always visible even if restricted */}
-                                {!isAdmin && task.status === 'Hoàn tất' && <option value="Hoàn tất">Hoàn tất</option>}
-                            </select>
+                            {/* Render Action Buttons for User based on Status Matrix */}
+                            {!isAdmin ? (
+                                <>
+                                    {/* Status: Assigned (Idle) -> Action: Start Working */}
+                                    {task.status === 'Đã nhận task' && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Đang thực hiện') }}
+                                            style={{
+                                                padding: '0.4rem 1rem', borderRadius: '8px', border: 'none',
+                                                background: '#fbbf24', color: 'black', fontWeight: 'bold', cursor: 'pointer',
+                                                boxShadow: '0 2px 5px rgba(251, 191, 36, 0.3)'
+                                            }}
+                                        >
+                                            ▶ Bắt đầu làm
+                                        </button>
+                                    )}
+
+                                    {/* Status: Working -> Action: Submit (Pause) */}
+                                    {task.status === 'Đang thực hiện' && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Tạm ngưng') }}
+                                            style={{
+                                                padding: '0.4rem 1rem', borderRadius: '8px', border: 'none',
+                                                background: '#38bdf8', color: 'white', fontWeight: 'bold', cursor: 'pointer',
+                                                boxShadow: '0 2px 5px rgba(56, 189, 248, 0.3)'
+                                            }}
+                                        >
+                                            ⏸ Nộp bài
+                                        </button>
+                                    )}
+
+                                    {/* Status: Revision (Running) -> Action: Fixed (Pause) */}
+                                    {task.status === 'Revision' && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Sửa frame') }}
+                                            style={{
+                                                padding: '0.4rem 1rem', borderRadius: '8px', border: 'none',
+                                                background: '#f472b6', color: 'white', fontWeight: 'bold', cursor: 'pointer',
+                                                boxShadow: '0 2px 5px rgba(244, 114, 182, 0.3)'
+                                            }}
+                                        >
+                                            ✅ Đã sửa xong
+                                        </button>
+                                    )}
+
+                                    {/* Status: Waiting (Paused) -> No Action, just display */}
+                                    {(task.status === 'Tạm ngưng' || task.status === 'Sửa frame' || task.status === 'Đang đợi giao') && (
+                                        <span style={{
+                                            padding: '0.4rem 0.8rem', borderRadius: '8px', background: '#333', color: '#888',
+                                            fontSize: '0.8rem', fontStyle: 'italic', border: '1px solid #444'
+                                        }}>
+                                            ⏳ Đang chờ duyệt...
+                                        </span>
+                                    )}
+
+                                    {/* Status: Done */}
+                                    {task.status === 'Hoàn tất' && (
+                                        <span style={{
+                                            padding: '0.4rem 0.8rem', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981',
+                                            fontWeight: 'bold', border: '1px solid rgba(16, 185, 129, 0.3)'
+                                        }}>
+                                            🏆 Hoàn tất
+                                        </span>
+                                    )}
+                                </>
+                            ) : (
+                                /* Admin still sees Dropdown for full control */
+                                <select
+                                    value={task.status}
+                                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                    style={{
+                                        padding: '0.4rem 0.8rem',
+                                        borderRadius: '20px',
+                                        border: 'none',
+                                        background: statusBg[task.status] || '#333',
+                                        color: statusColors[task.status] || 'white',
+                                        fontWeight: '600',
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer',
+                                        outline: 'none',
+                                        textAlign: 'center'
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {getStatusOptions().map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            )}
 
                             {isAdmin && (
                                 <button

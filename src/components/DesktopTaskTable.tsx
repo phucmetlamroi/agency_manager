@@ -366,129 +366,129 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                             style={{ width: '100%', padding: '0.6rem', border: '1px solid #93c5fd', borderRadius: '6px', fontSize: '0.9rem' }}
                                         />
                                         {(!isEditing && !isAdmin) && (
-                                            <button
-                                                onClick={async () => {
-                                                    await handleSaveDetails(); // Save link
-                                                    await handleStatusChange(selectedTask.id, 'Review'); // Trigger status & email
+                                            onClick = { async() => {
+                                            await handleSaveDetails(); // Save link
+                                        await handleStatusChange(selectedTask.id, 'Revision'); // Trigger status & email
                                                 }}
-                                                style={{ marginTop: '0.5rem', width: '100%', padding: '0.5rem', background: '#3b82f6', color: 'white', borderRadius: '6px', fontWeight: 'bold' }}
+                                        style={{ marginTop: '0.5rem', width: '100%', padding: '0.5rem', background: '#3b82f6', color: 'white', borderRadius: '6px', fontWeight: 'bold' }}
                                             >
-                                                Xác nhận nộp bài
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    selectedTask.productLink ? (
-                                        <a href={formatLink(selectedTask.productLink)} target="_blank" style={{
-                                            display: 'block', padding: '0.8rem', background: 'white', borderRadius: '8px',
-                                            color: '#2563eb', fontWeight: '600', textDecoration: 'none', border: '1px solid #bfdbfe',
-                                            textAlign: 'center'
-                                        }}>
-                                            🔗 Mở link sản phẩm
-                                        </a>
-                                    ) : <span className="text-gray-400 italic text-sm">Chưa có link thành phẩm.</span>
+                                        Xác nhận nộp bài
+                                    </button>
                                 )}
                             </div>
-
-                            {/* RESOURCES */}
-                            <div className="p-3 rounded-xl border border-gray-100">
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                                    RESOURCES (RAW/B-ROLL)
-                                </label>
-                                {isEditing && isAdmin ? (
-                                    <input
-                                        value={editForm.resources}
-                                        onChange={(e) => setEditForm({ ...editForm, resources: e.target.value })}
-                                        placeholder="https://..."
-                                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px' }}
-                                    />
-                                ) : (
-                                    (selectedTask.resources || selectedTask.fileLink) ? (
-                                        <a href={formatLink(selectedTask.resources || selectedTask.fileLink)} target="_blank" className="text-blue-600 font-semibold hover:underline">
-                                            📂 Open Resource Folder ↗
-                                        </a>
-                                    ) : <span className="text-gray-400 italic">No resources linked.</span>
+                            ) : (
+                            selectedTask.productLink ? (
+                            <a href={formatLink(selectedTask.productLink)} target="_blank" style={{
+                                display: 'block', padding: '0.8rem', background: 'white', borderRadius: '8px',
+                                color: '#2563eb', fontWeight: '600', textDecoration: 'none', border: '1px solid #bfdbfe',
+                                textAlign: 'center'
+                            }}>
+                                🔗 Mở link sản phẩm
+                            </a>
+                            ) : <span className="text-gray-400 italic text-sm">Chưa có link thành phẩm.</span>
                                 )}
-                            </div>
-
-                            {/* REFERENCES */}
-                            <div className="p-3 rounded-xl border border-gray-100">
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                                    REFERENCES / SAMPLES
-                                </label>
-                                {isEditing && isAdmin ? (
-                                    <input
-                                        value={editForm.references}
-                                        onChange={(e) => setEditForm({ ...editForm, references: e.target.value })}
-                                        placeholder="https://..."
-                                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px' }}
-                                    />
-                                ) : (
-                                    selectedTask.references ? (
-                                        <a href={formatLink(selectedTask.references)} target="_blank" className="text-purple-600 font-semibold hover:underline">
-                                            📺 Watch Reference Video ↗
-                                        </a>
-                                    ) : <span className="text-gray-400 italic">No references provided.</span>
-                                )}
-                            </div>
-
-                            {/* DEADLINE INPUT (Admin Only) */}
-                            {isEditing && isAdmin && (
-                                <div className="p-3 rounded-xl border border-red-100 bg-red-50/30">
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#ef4444', marginBottom: '0.5rem' }}>
-                                        ⚠️ DEADLINE (Thay đổi sẽ reset bộ đo giờ!)
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        value={editForm.deadline}
-                                        onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
-                                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #fca5a5', borderRadius: '6px', color: '#b91c1c', fontWeight: 'bold' }}
-                                    />
-                                </div>
-                            )}
-
-                            {/* NOTES */}
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                                    NOTES / INSTRUCTIONS
-                                </label>
-                                {isEditing ? (
-                                    <textarea
-                                        value={editForm.notes}
-                                        onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                                        placeholder="Enter notes..."
-                                        rows={4}
-                                        disabled={!isAdmin} // Users can edit notes if needed? Maybe better restricted to Admin for instructions.
-                                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px', fontFamily: 'inherit' }}
-                                    />
-                                ) : (
-                                    <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '12px', color: '#92400e', fontSize: '0.95rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                                        {selectedTask.notes || "No specific instructions."}
-                                    </div>
-                                )}
-                            </div>
-
                         </div>
 
-                        {isEditing && (
-                            <button
-                                onClick={handleSaveDetails}
-                                className="btn btn-primary"
-                                style={{ background: '#000', color: 'white', alignSelf: 'center', width: '100%', borderRadius: '12px' }}
-                            >
-                                Save Changes
-                            </button>
-                        )}
+                        {/* RESOURCES */}
+                        <div className="p-3 rounded-xl border border-gray-100">
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
+                                RESOURCES (RAW/B-ROLL)
+                            </label>
+                            {isEditing && isAdmin ? (
+                                <input
+                                    value={editForm.resources}
+                                    onChange={(e) => setEditForm({ ...editForm, resources: e.target.value })}
+                                    placeholder="https://..."
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px' }}
+                                />
+                            ) : (
+                                (selectedTask.resources || selectedTask.fileLink) ? (
+                                    <a href={formatLink(selectedTask.resources || selectedTask.fileLink)} target="_blank" className="text-blue-600 font-semibold hover:underline">
+                                        📂 Open Resource Folder ↗
+                                    </a>
+                                ) : <span className="text-gray-400 italic">No resources linked.</span>
+                            )}
+                        </div>
 
-                        {!isEditing && isAdmin && (
-                            <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #eee', fontSize: '0.8rem', color: '#666', textAlign: 'center' }}>
-                                Value: <span className="font-bold text-green-600">{selectedTask.value.toLocaleString()} đ</span>
+                        {/* REFERENCES */}
+                        <div className="p-3 rounded-xl border border-gray-100">
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
+                                REFERENCES / SAMPLES
+                            </label>
+                            {isEditing && isAdmin ? (
+                                <input
+                                    value={editForm.references}
+                                    onChange={(e) => setEditForm({ ...editForm, references: e.target.value })}
+                                    placeholder="https://..."
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px' }}
+                                />
+                            ) : (
+                                selectedTask.references ? (
+                                    <a href={formatLink(selectedTask.references)} target="_blank" className="text-purple-600 font-semibold hover:underline">
+                                        📺 Watch Reference Video ↗
+                                    </a>
+                                ) : <span className="text-gray-400 italic">No references provided.</span>
+                            )}
+                        </div>
+
+                        {/* DEADLINE INPUT (Admin Only) */}
+                        {isEditing && isAdmin && (
+                            <div className="p-3 rounded-xl border border-red-100 bg-red-50/30">
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#ef4444', marginBottom: '0.5rem' }}>
+                                    ⚠️ DEADLINE (Thay đổi sẽ reset bộ đo giờ!)
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    value={editForm.deadline}
+                                    onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #fca5a5', borderRadius: '6px', color: '#b91c1c', fontWeight: 'bold' }}
+                                />
                             </div>
                         )}
 
+                        {/* NOTES */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
+                                NOTES / INSTRUCTIONS
+                            </label>
+                            {isEditing ? (
+                                <textarea
+                                    value={editForm.notes}
+                                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                    placeholder="Enter notes..."
+                                    rows={4}
+                                    disabled={!isAdmin} // Users can edit notes if needed? Maybe better restricted to Admin for instructions.
+                                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px', fontFamily: 'inherit' }}
+                                />
+                            ) : (
+                                <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '12px', color: '#92400e', fontSize: '0.95rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                                    {selectedTask.notes || "No specific instructions."}
+                                </div>
+                            )}
+                        </div>
+
                     </div>
+
+                    {isEditing && (
+                        <button
+                            onClick={handleSaveDetails}
+                            className="btn btn-primary"
+                            style={{ background: '#000', color: 'white', alignSelf: 'center', width: '100%', borderRadius: '12px' }}
+                        >
+                            Save Changes
+                        </button>
+                    )}
+
+                    {!isEditing && isAdmin && (
+                        <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #eee', fontSize: '0.8rem', color: '#666', textAlign: 'center' }}>
+                            Value: <span className="font-bold text-green-600">{selectedTask.value.toLocaleString()} đ</span>
+                        </div>
+                    )}
+
                 </div>
-            )}
+                </div >
+            )
+}
         </>
     )
 }

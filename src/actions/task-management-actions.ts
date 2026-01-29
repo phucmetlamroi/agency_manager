@@ -53,8 +53,8 @@ export async function assignTask(taskId: string, userId: string | null) {
                 const { sendEmail } = await import('@/lib/email')
                 const { emailTemplates } = await import('@/lib/email-templates')
 
-                // Fire and forget (don't await)
-                void sendEmail({
+                // MUST await sending to ensure it happens before serverless function exits
+                await sendEmail({
                     to: updatedTask.assignee.email,
                     subject: `[New Task] Bạn được giao công việc mới: ${updatedTask.title}`,
                     html: emailTemplates.taskAssigned(

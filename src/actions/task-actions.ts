@@ -199,7 +199,7 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
                     // Notify User that they can continue
                     if (updatedTaskResult.assignee.email) {
                         console.log(`[Email Debug] Triggering 'Feedback Resolved' email to ${updatedTaskResult.assignee.email}`)
-                        void sendEmail({
+                        await sendEmail({
                             to: updatedTaskResult.assignee.email,
                             subject: `[Update] Admin đã phản hồi task: ${updatedTaskResult.title}`,
                             html: emailTemplates.taskFeedback(
@@ -217,7 +217,8 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
 
                     for (const admin of admins) {
                         if (admin.email) {
-                            void sendEmail({
+                            // Await loop to ensure delivery
+                            await sendEmail({
                                 to: admin.email,
                                 subject: `[Started] ${updatedTaskResult.assignee.username} đã bắt đầu làm task: ${updatedTaskResult.title}`,
                                 html: emailTemplates.taskStarted(
@@ -236,7 +237,7 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
             if (newStatus === 'Review') {
                 if (updatedTaskResult.assignee?.email) {
                     console.log(`[Email Debug] Triggering SUBMISSION email to ${updatedTaskResult.assignee.email}`)
-                    void sendEmail({
+                    await sendEmail({
                         to: updatedTaskResult.assignee.email,
                         subject: `[Submission] Task "${updatedTaskResult.title}" đang chờ Admin phản hồi`,
                         html: emailTemplates.taskSubmitted(
@@ -260,7 +261,7 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
             if (newStatus === 'Revision') {
                 if (updatedTaskResult.assignee?.email) {
                     console.log(`[Email Debug] Triggering Feedback email to ${updatedTaskResult.assignee.email}`)
-                    void sendEmail({
+                    await sendEmail({
                         to: updatedTaskResult.assignee.email,
                         subject: `[Action Required] Admin đã gửi Feedback cho task: ${updatedTaskResult.title}`,
                         html: emailTemplates.taskFeedback(
@@ -279,7 +280,7 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
                 if (updatedTaskResult.assignee?.email) {
                     console.log(`[Email Debug] Triggering Completed email to ${updatedTaskResult.assignee.email}`)
                     // NOTE: Removed [Approved] prefix as per User Request "Tiêu đề: [Success]..."
-                    void sendEmail({
+                    await sendEmail({
                         to: updatedTaskResult.assignee.email,
                         subject: `[Success] Chúc mừng! Task "${updatedTaskResult.title}" đã hoàn thành 🎉`,
                         html: emailTemplates.taskCompleted(

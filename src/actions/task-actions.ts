@@ -211,22 +211,29 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
                     }
                 } else {
                     // Normal Start (Notify Admin Fixed Email)
-                    console.log('[Email Debug] Triggering Task Started email to Admin...')
-                    const adminEmail = process.env.SENDGRID_FROM_EMAIL
+                    // FALLBACK: If env is missing, use hardcoded email to ensure delivery for testing
+                    const adminEmail = process.env.SENDGRID_FROM_EMAIL || 'mullerjohannes762@gmail.com'
+
+                    console.log(`[Email Debug] START TASK DETECTED. Target Admin: ${adminEmail}`)
 
                     if (adminEmail) {
-                        await sendEmail({
-                            to: adminEmail,
-                            subject: `[STARTED] ${updatedTaskResult.assignee.username} đã bắt đầu task: ${updatedTaskResult.title}`,
-                            html: emailTemplates.taskStarted(
-                                updatedTaskResult.assignee.nickname || updatedTaskResult.assignee.username, // Use Nickname as requested
-                                updatedTaskResult.title,
-                                new Date(),
-                                updatedTaskResult.id
-                            )
-                        })
+                        try {
+                            await sendEmail({
+                                to: adminEmail,
+                                subject: `[STARTED] ${updatedTaskResult.assignee.username} đã bắt đầu task: ${updatedTaskResult.title}`,
+                                html: emailTemplates.taskStarted(
+                                    updatedTaskResult.assignee.nickname || updatedTaskResult.assignee.username, // Use Nickname
+                                    updatedTaskResult.title,
+                                    new Date(),
+                                    updatedTaskResult.id
+                                )
+                            })
+                            console.log('[Email Debug] Start Email SENT successfully.')
+                        } catch (err) {
+                            console.error('[Email Debug] FAILED to send Start Email:', err)
+                        }
                     } else {
-                        console.error('[Email Debug] SENDGRID_FROM_EMAIL is missing. Cannot send Admin notification.')
+                        console.error('[Email Debug] Critical: No Admin Email found.')
                     }
                 }
             }

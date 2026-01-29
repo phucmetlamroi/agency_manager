@@ -133,25 +133,6 @@ export default async function UserDashboard() {
             {/* Using the new TaskTable for User too, but restrict Admin controls */}
             <TaskTable tasks={tasks as any} isAdmin={false} isMobile={await isMobileDevice()} />
 
-            {/* Change Password Section */}
-            <div style={{ marginTop: '4rem', padding: '2rem', borderTop: '1px solid #333' }}>
-                <h3 className="title-gradient" style={{ marginBottom: '1.5rem', fontSize: '1.2rem' }}>Đổi Mật Khẩu</h3>
-                <form action={async (formData) => {
-                    'use server'
-                    const { changePassword } = await import('@/actions/user-actions')
-                    await changePassword(formData)
-                }} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <input
-                        name="newPassword"
-                        type="password"
-                        placeholder="Mật khẩu mới..."
-                        required
-                        minLength={6}
-                        style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #333', background: '#222', color: 'white' }}
-                    />
-                    <button className="btn btn-primary" type="submit">Cập nhật</button>
-                </form>
-            </div>
 
         </div>
     )

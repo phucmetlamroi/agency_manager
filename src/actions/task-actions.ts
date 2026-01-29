@@ -184,66 +184,72 @@ export async function updateTaskStatus(id: string, newStatus: string) {
         })
 
         // --- EMAIL TRIGGERS ---
-        const { sendEmail } = await import('@/lib/email')
-        const { emailTemplates } = await import('@/lib/email-templates')
+        console.log(`[Email Debug] Status changed to: ${newStatus}`)
 
-        // TRIGGER 2: Employee Started Task (To Admin)
-        // Condition: Status changed to 'Đang thực hiện' (or 'Đã nhận task' if that counts as start, but 'Đang thực hiện' is more explicit work start)
-        if (newStatus === 'Đang thực hiện' && updatedTaskResult.assignee) {
-            // Find Admin(s) to notify
-            const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true, username: true } })
+        try {
+            const { sendEmail } = await import('@/lib/email')
+            const { emailTemplates } = await import('@/lib/email-templates')
 
-            for (const admin of admins) {
-                if (admin.email) {
-                    void sendEmail({
-                        to: admin.email,
-                        subject: `[Started] ${updatedTaskResult.assignee.username} đã bắt đầu làm task: ${updatedTaskResult.title}`,
-                        html: emailTemplates.taskStarted(
-                            admin.username || 'Admin',
-                            updatedTaskResult.assignee.username || 'Staff',
-                            updatedTaskResult.title,
-                            new Date()
-                        )
-                    })
+            // TRIGGER 2: Employee Started Task (To Admin)
+            if (newStatus === 'Đang thực hiện' && updatedTaskResult.assignee) {
+                console.log('[Email Debug] Triggering Task Started email...')
+                // Find Admin(s) to notify
+                const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true, username: true } })
+                console.log(`[Email Debug] Found ${admins.length} admins.`)
+
+                for (const admin of admins) {
+                    if (admin.email) {
+                        void sendEmail({
+                            to: admin.email,
+                            subject: `[Started] ${updatedTaskResult.assignee.username} đã bắt đầu làm task: ${updatedTaskResult.title}`,
+                            html: emailTemplates.taskStarted(
+                                admin.username || 'Admin',
+                                updatedTaskResult.assignee.username || 'Staff',
+                                updatedTaskResult.title,
+                                new Date()
+                            )
+                        })
+                    }
                 }
             }
-        }
 
-        // TRIGGER 3: Feedback / Revision (To User)
-        if (newStatus === 'Revision' && updatedTaskResult.assignee?.email) {
-            // We don't have the "Feedback Content" passed in this simple status update function yet.
-            // If the user wants specific feedback content, they usually update the 'notes' or a separate 'feedback' field.
-            // For now, we will send a generic "Check feedback" email or look at the most recent note if we had logic for it.
-            // The prompt says: "Trích dẫn nội dung Feedback...".
-            // Limitation: `updateTaskStatus` only takes params (id, newStatus). 
-            // Ideally we should update the function signature, but to avoid breaking changes, we'll check if notes were updated recently or just send a generic link.
-            // NOTE: The user requested "Action Required: Feedback".
-            // We will assume the Admin put feedback in the "Notes" or communicated it. 
-            // Let's assume for now we just link them to the task. 
-            // Improving: We can fetch the task's `notes` and include it if not null.
+            // TRIGGER 3: Feedback / Revision (To User)
+            if (newStatus === 'Revision') {
+                if (updatedTaskResult.assignee?.email) {
+                    console.log(`[Email Debug] Triggering Feedback email to ${updatedTaskResult.assignee.email}`)
+                    void sendEmail({
+                        to: updatedTaskResult.assignee.email,
+                        subject: `[Action Required] Yêu cầu chỉnh sửa cho task: ${updatedTaskResult.title}`,
+                        html: emailTemplates.taskFeedback(
+                            updatedTaskResult.assignee.username || 'User',
+                            updatedTaskResult.title,
+                            updatedTaskResult.notes || 'Vui lòng kiểm tra chi tiết trên hệ thống.'
+                        )
+                    })
+                } else {
+                    console.log('[Email Debug] Skipped Feedback email: Assignee has no email.')
+                }
+            }
 
-            void sendEmail({
-                to: updatedTaskResult.assignee.email,
-                subject: `[Action Required] Yêu cầu chỉnh sửa cho task: ${updatedTaskResult.title}`,
-                html: emailTemplates.taskFeedback(
-                    updatedTaskResult.assignee.username || 'User',
-                    updatedTaskResult.title,
-                    updatedTaskResult.notes || 'Vui lòng kiểm tra chi tiết trên hệ thống.'
-                )
-            })
-        }
-
-        // TRIGGER 4: Completed (To User)
-        if (newStatus === 'Hoàn tất' && updatedTaskResult.assignee?.email) {
-            void sendEmail({
-                to: updatedTaskResult.assignee.email,
-                subject: `[Approved] Chúc mừng! Task ${updatedTaskResult.title} đã hoàn thành`,
-                html: emailTemplates.taskCompleted(
-                    updatedTaskResult.assignee.username || 'User',
-                    updatedTaskResult.title,
-                    updatedTaskResult.wageVND || 0
-                )
-            })
+            // TRIGGER 4: Completed (To User)
+            if (newStatus === 'Hoàn tất') {
+                if (updatedTaskResult.assignee?.email) {
+                    console.log(`[Email Debug] Triggering Completed email to ${updatedTaskResult.assignee.email}`)
+                    void sendEmail({
+                        to: updatedTaskResult.assignee.email,
+                        subject: `[Approved] Chúc mừng! Task ${updatedTaskResult.title} đã hoàn thành`,
+                        html: emailTemplates.taskCompleted(
+                            updatedTaskResult.assignee.username || 'User',
+                            updatedTaskResult.title,
+                            updatedTaskResult.wageVND || 0
+                        )
+                    })
+                } else {
+                    console.log('[Email Debug] Skipped Completed email: Assignee has no email.')
+                }
+            }
+        } catch (emailErr) {
+            console.error('[Email Debug] Error in email logic:', emailErr)
         }
         // -----------------------
 
@@ -260,6 +266,7 @@ export async function updateTaskStatus(id: string, newStatus: string) {
 
         return { success: true, finalSeconds }
     } catch (e) {
+        console.error('Update Task Status Error:', e)
         return { error: 'Failed' }
     }
 }

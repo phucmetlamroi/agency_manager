@@ -85,15 +85,22 @@ export default async function AdminUsersPage() {
                                         </div>
                                     </td>
 
-                                    {/* Contact Column */}
+                                    {/* Contact Column (NEW: Audit Audit Data) */}
                                     <td style={{ padding: '0.8rem', fontSize: '0.85rem' }}>
                                         {u.email ? (
-                                            <div style={{ color: '#9ca3af', marginBottom: '2px' }}>✉️ {u.email}</div>
-                                        ) : <div style={{ color: '#4b5563', fontStyle: 'italic' }}>No email</div>}
-
-                                        {u.phoneNumber && (
-                                            <div style={{ color: '#9ca3af' }}>iphone: {u.phoneNumber}</div>
+                                            <div style={{ color: '#9ca3af', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <span>✉️</span>
+                                                <span style={{ color: '#d1d5db' }}>{u.email}</span>
+                                            </div>
+                                        ) : (
+                                            <div style={{ color: '#ef4444', fontWeight: 'bold', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                                                ⚠️ Chưa có Email
+                                            </div>
                                         )}
+
+                                        {u.phoneNumber ? (
+                                            <div style={{ color: '#6b7280', fontSize: '0.8rem', marginTop: '2px' }}>📞 {u.phoneNumber}</div>
+                                        ) : <div style={{ color: '#4b5563', fontSize: '0.8rem', fontStyle: 'italic' }}>Chưa có SĐT</div>}
                                     </td>
 
                                     <td style={{ padding: '0.8rem' }}>

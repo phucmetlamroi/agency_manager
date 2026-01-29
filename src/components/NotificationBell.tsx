@@ -98,33 +98,47 @@ export default function NotificationBell() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                             {notifications.map(n => (
-                                <div key={n.id} style={{
-                                    padding: '0.8rem',
-                                    borderBottom: '1px solid #222',
-                                    background: n.type === 'WARNING' ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
-                                    display: 'flex',
-                                    gap: '0.5rem'
-                                }}>
+                                <div key={n.id}
+                                    onClick={() => handleMarkRead(n.id)}
+                                    style={{
+                                        padding: '0.8rem',
+                                        borderBottom: '1px solid #222',
+                                        // UNREAD: Reddish tint. READ: Gray/Transparent & Dimmed
+                                        background: !n.isRead
+                                            ? 'rgba(185, 28, 28, 0.15)' // Red tint for unread
+                                            : 'rgba(255, 255, 255, 0.02)', // Gray/translucent for read
+                                        opacity: !n.isRead ? 1 : 0.6,
+                                        display: 'flex',
+                                        gap: '0.5rem',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = !n.isRead ? 'rgba(185, 28, 28, 0.25)' : 'rgba(255, 255, 255, 0.05)'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = !n.isRead ? 'rgba(185, 28, 28, 0.15)' : 'rgba(255, 255, 255, 0.02)'
+                                    }}
+                                >
                                     <span style={{ fontSize: '1rem' }}>
                                         {n.type === 'WARNING' ? '⚠️' : 'ℹ️'}
                                     </span>
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '0.85rem', color: '#ddd', marginBottom: '0.3rem' }}>
+                                        <div style={{
+                                            fontSize: '0.85rem',
+                                            color: !n.isRead ? '#fff' : '#9ca3af', // White if unread, gray if read
+                                            fontWeight: !n.isRead ? '600' : '400',
+                                            marginBottom: '0.3rem'
+                                        }}>
                                             {n.message}
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontSize: '0.7rem', color: '#666' }}>
                                                 {new Date(n.createdAt).toLocaleString('vi-VN')}
                                             </span>
-                                            <button
-                                                onClick={() => handleMarkRead(n.id)}
-                                                style={{
-                                                    background: 'none', border: 'none', color: '#60a5fa',
-                                                    fontSize: '0.75rem', cursor: 'pointer'
-                                                }}
-                                            >
-                                                Đã xem
-                                            </button>
+                                            {!n.isRead && (
+                                                <span style={{ fontSize: '0.7rem', color: '#f87171' }}>● Mới</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

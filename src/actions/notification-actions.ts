@@ -21,7 +21,6 @@ export async function getNotifications() {
                 { userId: null }, // Broadcast
                 { userId: session.user.id } // Specific
             ],
-            isRead: false
         },
         orderBy: { createdAt: 'desc' },
         take: 20

@@ -1,3 +1,4 @@
+
 import { logout } from '@/lib/auth'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -6,7 +7,9 @@ import { decrypt } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import RoleWatcher from '@/components/RoleWatcher'
 import BottomNav from '@/components/BottomNav'
-import styles from './dashboard.module.css'
+
+// Standardized User Layout (Top Navigation)
+// Matches specific stability of Admin Layout
 
 export default async function UserLayout({
     children,
@@ -36,75 +39,86 @@ export default async function UserLayout({
     }
 
     return (
-        <div className={styles.dashboardContainer}>
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <RoleWatcher currentRole={user.role} isTreasurer={user.isTreasurer ?? false} />
 
-            {/* --- DESKTOP SIDEBAR --- */}
-            <aside className={styles.desktopSidebar}>
-                <div style={{ marginBottom: '2rem' }}>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', background: 'linear-gradient(to right, #60a5fa, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            {/* --- TOP NAVIGATION BAR (Matches Admin) --- */}
+            <header className="glass-panel" style={{
+                height: 'var(--header-height)',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 1rem', // Smaller padding for mobile friendliness
+                margin: '1rem',
+                justifyContent: 'space-between'
+            }}>
+                {/* LEFT: Branding */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <h1 style={{
+                        fontSize: '1.25rem',
+                        fontWeight: 'bold',
+                        background: 'linear-gradient(to right, #60a5fa, #c084fc)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent'
+                    }}>
                         Agency<span style={{ WebkitTextFillColor: 'white' }}>Manager</span>
                     </h1>
-                    <div style={{ fontSize: '0.8rem', color: '#888' }}>User Dashboard</div>
+
+                    {/* Desktop Menu - Hidden on Mobile */}
+                    <nav className="desktop-menu" style={{ display: 'none', gap: '1rem', marginLeft: '2rem' }}>
+                        <style dangerouslySetInnerHTML={{
+                            __html: `
+                            @media (min-width: 768px) {
+                                .desktop-menu { display: flex !important; }
+                            }
+                        `}} />
+                        <Link href="/dashboard" className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Tổng quan</Link>
+                    </nav>
                 </div>
 
-                <div style={{ flex: 1 }}>
-                    {/* User Info Card */}
-                    <div className={styles.userCard}>
-                        <div className={styles.avatar}>
+                {/* RIGHT: User Info & Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    {/* User Info Badge */}
+                    <div style={{
+                        fontSize: '0.85rem', color: '#ccc',
+                        display: 'flex', alignItems: 'center', gap: '0.5rem',
+                        background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                        <div style={{ width: '24px', height: '24px', background: '#6d28d9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '10px' }}>
                             {user.username?.[0]?.toUpperCase()}
                         </div>
-                        <div className={styles.userInfo}>
-                            <h3>{user.username}</h3>
-                            <p className={styles.userRole}>{user.role}</p>
-                        </div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-                        <span style={{ color: '#888', fontSize: '0.9rem' }}>Uy tín:</span>
-                        <span className={styles.reputationBadge}>
+                        <span style={{ fontWeight: 600 }}>{user.username}</span>
+                        <span style={{ color: '#444' }}>|</span>
+                        <span style={{
+                            fontWeight: 'bold',
+                            color: (user.reputation || 100) >= 90 ? '#a855f7' : '#facc15'
+                        }}>
                             {user.reputation ?? 100}đ
                         </span>
                     </div>
-                </div>
 
-                <div style={{ paddingTop: '1.5rem', borderTop: '1px solid #333' }}>
                     <form action={async () => {
                         'use server'
                         await logout()
                         redirect('/login')
                     }}>
-                        <button className={styles.logoutButton}>
-                            Đăng xuất
-                        </button>
-                    </form>
-                </div>
-            </aside>
-
-            {/* --- MOBILE HEADER --- */}
-            <header className={styles.mobileHeader}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <h1 style={{ fontWeight: 'bold', fontSize: '1.125rem', background: 'linear-gradient(to right, #60a5fa, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                        AgencyManager
-                    </h1>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <span className={styles.reputationBadge}>
-                        {user.reputation ?? 100}đ
-                    </span>
-                    <form action={async () => {
-                        'use server'
-                        await logout()
-                        redirect('/login')
-                    }}>
-                        <button style={{ color: '#f87171', background: 'transparent', border: 'none', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                            Đăng xuất
+                        <button style={{
+                            color: '#f87171',
+                            background: 'transparent',
+                            border: '1px solid rgba(239,68,68,0.3)',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                        }}>
+                            Logout
                         </button>
                     </form>
                 </div>
             </header>
 
             {/* --- MAIN CONTENT --- */}
-            <main className={styles.mainContent}>
+            <main style={{ flex: 1, padding: '0 1rem 1rem 1rem', paddingBottom: '6rem' }}>
                 {children}
             </main>
 

@@ -190,25 +190,42 @@ export async function updateTaskStatus(id: string, newStatus: string) {
             const { sendEmail } = await import('@/lib/email')
             const { emailTemplates } = await import('@/lib/email-templates')
 
-            // TRIGGER 2: Employee Started Task (To Admin)
+            // TRIGGER 2 & 2b: Employee Started Task OR Admin Resumed form Revision
             if (newStatus === 'Đang thực hiện' && updatedTaskResult.assignee) {
-                console.log('[Email Debug] Triggering Task Started email...')
-                // Find Admin(s) to notify
-                const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true, username: true } })
-                console.log(`[Email Debug] Found ${admins.length} admins.`)
-
-                for (const admin of admins) {
-                    if (admin.email) {
+                // Check if we are resuming from Revision (Admin action "Đã FB")
+                if (task.status === 'Revision') {
+                    // Notify User that they can continue
+                    if (updatedTaskResult.assignee.email) {
+                        console.log(`[Email Debug] Triggering 'Feedback Resolved' email to ${updatedTaskResult.assignee.email}`)
                         void sendEmail({
-                            to: admin.email,
-                            subject: `[Started] ${updatedTaskResult.assignee.username} đã bắt đầu làm task: ${updatedTaskResult.title}`,
-                            html: emailTemplates.taskStarted(
-                                admin.username || 'Admin',
-                                updatedTaskResult.assignee.username || 'Staff',
+                            to: updatedTaskResult.assignee.email,
+                            subject: `[Update] Admin đã phản hồi task: ${updatedTaskResult.title}`,
+                            html: emailTemplates.taskFeedback(
+                                updatedTaskResult.assignee.username || 'User',
                                 updatedTaskResult.title,
-                                new Date()
+                                "Admin đã hoàn tất feedback/check frame. Bạn có thể tiếp tục công việc." // Generic message since we don't have input
                             )
                         })
+                    }
+                } else {
+                    // Normal Start (Notify Admin)
+                    console.log('[Email Debug] Triggering Task Started email...')
+                    const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true, username: true } })
+                    console.log(`[Email Debug] Found ${admins.length} admins.`)
+
+                    for (const admin of admins) {
+                        if (admin.email) {
+                            void sendEmail({
+                                to: admin.email,
+                                subject: `[Started] ${updatedTaskResult.assignee.username} đã bắt đầu làm task: ${updatedTaskResult.title}`,
+                                html: emailTemplates.taskStarted(
+                                    admin.username || 'Admin',
+                                    updatedTaskResult.assignee.username || 'Staff',
+                                    updatedTaskResult.title,
+                                    new Date()
+                                )
+                            })
+                        }
                     }
                 }
             }

@@ -46,21 +46,27 @@ export async function assignTask(taskId: string, userId: string | null) {
         })
 
         // TRIGGER EMAIL 1: Task Assigned
-        if (userId && updatedTask.assignee && updatedTask.assignee.email) {
-            const { sendEmail } = await import('@/lib/email')
-            const { emailTemplates } = await import('@/lib/email-templates')
+        // TRIGGER EMAIL 1: Task Assigned
+        if (userId && updatedTask.assignee) {
+            if (updatedTask.assignee.email) {
+                console.log(`[Email Debug] Sending Assignment email to ${updatedTask.assignee.email}`)
+                const { sendEmail } = await import('@/lib/email')
+                const { emailTemplates } = await import('@/lib/email-templates')
 
-            // Fire and forget (don't await)
-            void sendEmail({
-                to: updatedTask.assignee.email,
-                subject: `[New Task] Bạn được giao công việc mới: ${updatedTask.title}`,
-                html: emailTemplates.taskAssigned(
-                    updatedTask.assignee.username || 'User',
-                    updatedTask.title,
-                    updatedTask.deadline,
-                    updatedTask.id
-                )
-            })
+                // Fire and forget (don't await)
+                void sendEmail({
+                    to: updatedTask.assignee.email,
+                    subject: `[New Task] Bạn được giao công việc mới: ${updatedTask.title}`,
+                    html: emailTemplates.taskAssigned(
+                        updatedTask.assignee.username || 'User',
+                        updatedTask.title,
+                        updatedTask.deadline,
+                        updatedTask.id
+                    )
+                })
+            } else {
+                console.log(`[Email Debug] Assignment email skipped. User ${updatedTask.assignee.username} has no email.`)
+            }
         }
 
         revalidatePath('/admin')

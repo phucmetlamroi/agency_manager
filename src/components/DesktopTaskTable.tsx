@@ -158,7 +158,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                 {/* Mobile-Optimized Status/Assignee info */}
                                 <div className="flex items-center gap-4 mt-1 md:mt-0">
                                     {/* Assignee */}
-                                    {isAdmin ? (
+                                    {isAdmin && (
                                         <div onClick={(e) => e.stopPropagation()}>
                                             <select
                                                 value={task.assignee?.id || ''}
@@ -176,11 +176,6 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                                     </option>
                                                 ))}
                                             </select>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center text-gray-300">
-                                            <span className="opacity-50 text-xs mr-1">Assignee:</span>
-                                            <span>@{task.assignee?.username || 'Unassigned'}</span>
                                         </div>
                                     )}
 

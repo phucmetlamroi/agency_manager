@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
-export async function updateTaskStatus(id: string, newStatus: string) {
+export async function updateTaskStatus(id: string, newStatus: string, newNotes?: string) {
     try {
         // Fetch task to check deadline and assignee
         const task = await prisma.task.findUnique({
@@ -177,6 +177,7 @@ export async function updateTaskStatus(id: string, newStatus: string) {
             where: { id },
             data: {
                 status: newStatus,
+                ...(newNotes ? { notes: newNotes } : {}), // Update notes if provided
                 ...deadlineUpdate,
                 ...timerUpdate
             },
@@ -203,7 +204,7 @@ export async function updateTaskStatus(id: string, newStatus: string) {
                             html: emailTemplates.taskFeedback(
                                 updatedTaskResult.assignee.username || 'User',
                                 updatedTaskResult.title,
-                                "Admin đã hoàn tất feedback/check frame. Bạn có thể tiếp tục công việc." // Generic message since we don't have input
+                                newNotes || "Admin đã hoàn tất feedback/check frame. Bạn có thể tiếp tục công việc." // Generic message since we don't have input
                             )
                         })
                     }
@@ -240,7 +241,7 @@ export async function updateTaskStatus(id: string, newStatus: string) {
                         html: emailTemplates.taskFeedback(
                             updatedTaskResult.assignee.username || 'User',
                             updatedTaskResult.title,
-                            updatedTaskResult.notes || 'Vui lòng kiểm tra chi tiết trên hệ thống.'
+                            newNotes || updatedTaskResult.notes || 'Vui lòng kiểm tra chi tiết trên hệ thống.'
                         )
                     })
                 } else {

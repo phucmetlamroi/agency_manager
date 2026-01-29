@@ -67,8 +67,16 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
     }
 
     const handleStatusChange = async (taskId: string, newStatus: string) => {
-        const res = await updateTaskStatus(taskId, newStatus)
-        // Alert removed. Logic Moved to Render.
+        let notes: string | undefined = undefined
+
+        // Prompt for Feedback only on specific statuses
+        if (newStatus === 'Revision' || newStatus === 'Sửa frame') {
+            const input = prompt("Nhập nội dung Feedback / Ghi chú cho nhân viên:")
+            if (input === null) return // Cancel action
+            notes = input.trim() || "Vui lòng xem chi tiết trên hệ thống."
+        }
+
+        const res = await updateTaskStatus(taskId, newStatus, notes)
     }
 
     const handleSaveDetails = async () => {

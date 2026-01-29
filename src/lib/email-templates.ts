@@ -64,17 +64,21 @@ export const emailTemplates = {
     // 2. Task Started (To Admin) -- Keeping existing logic as user didn't explicitly ask to change this one's text, but implied "Kịch bản 2" is Reviewing. 
     // Wait, User Request Kich Ban 2 is "REVIEWING". Kich Ban 1 is Assign.
     // User DID NOT mention "Start Task" email content in this request, but I should keep it functional.
-    taskStarted: (adminName: string, userName: string, taskTitle: string, startTime: Date) => {
+    // 2. Task Started (To Admin)
+    taskStarted: (userName: string, taskTitle: string, startTime: Date, taskId: string) => {
         const timeStr = new Date(startTime).toLocaleString('vi-VN')
+        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`
+        
         const content = `
-            <p>Xin chào Admin,</p>
-            <p>Nhân viên <span class="highlight">${userName}</span> đã bắt đầu làm việc.</p>
+            <p>Admin lưu ý,</p>
+            <p>Nhân viên <strong>${userName}</strong> vừa bấm bắt đầu làm việc vào lúc ${timeStr}.</p>
+            
             <div class="card">
                 <p><strong>Task:</strong> ${taskTitle}</p>
-                <p><strong>Thời gian bắt đầu:</strong> ${timeStr}</p>
+                <p><strong>Link:</strong> <a href="${link}">${link}</a></p>
             </div>
         `
-        return wrapTemplate(content, '▶️ Work Started')
+        return wrapTemplate(content, `[STARTED] ${userName} đã bắt đầu task: ${taskTitle}`)
     },
 
     // 2. Task Submitted / Reviewing (To User & Admin) - NEW

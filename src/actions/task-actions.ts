@@ -210,25 +210,23 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
                         })
                     }
                 } else {
-                    // Normal Start (Notify Admin)
-                    console.log('[Email Debug] Triggering Task Started email...')
-                    const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true, username: true } })
-                    console.log(`[Email Debug] Found ${admins.length} admins.`)
+                    // Normal Start (Notify Admin Fixed Email)
+                    console.log('[Email Debug] Triggering Task Started email to Admin...')
+                    const adminEmail = process.env.SENDGRID_FROM_EMAIL
 
-                    for (const admin of admins) {
-                        if (admin.email) {
-                            // Await loop to ensure delivery
-                            await sendEmail({
-                                to: admin.email,
-                                subject: `[Started] ${updatedTaskResult.assignee.username} đã bắt đầu làm task: ${updatedTaskResult.title}`,
-                                html: emailTemplates.taskStarted(
-                                    admin.username || 'Admin',
-                                    updatedTaskResult.assignee.username || 'Staff',
-                                    updatedTaskResult.title,
-                                    new Date()
-                                )
-                            })
-                        }
+                    if (adminEmail) {
+                        await sendEmail({
+                            to: adminEmail,
+                            subject: `[STARTED] ${updatedTaskResult.assignee.username} đã bắt đầu task: ${updatedTaskResult.title}`,
+                            html: emailTemplates.taskStarted(
+                                updatedTaskResult.assignee.nickname || updatedTaskResult.assignee.username, // Use Nickname as requested
+                                updatedTaskResult.title,
+                                new Date(),
+                                updatedTaskResult.id
+                            )
+                        })
+                    } else {
+                        console.error('[Email Debug] SENDGRID_FROM_EMAIL is missing. Cannot send Admin notification.')
                     }
                 }
             }

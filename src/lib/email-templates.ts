@@ -41,77 +41,79 @@ export const emailTemplates = {
     // 1. Task Assigned (To User)
     taskAssigned: (userName: string, taskTitle: string, deadline: Date | null, taskId: string) => {
         const deadlineStr = deadline ? new Date(deadline).toLocaleString('vi-VN') : 'Không có hạn chót'
-        const link = \`\${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard\`
-        
+        // FIX: Removed unnecessary backslash escape before template literal
+        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`
+
         const content = `
-            < p > Xin chào < strong > ${ userName } </strong>,</p >
-                <p>Bạn vừa được giao một công việc mới trên hệ thống.</p>
+            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p>Bạn vừa được giao một công việc mới trên hệ thống.</p>
+            
+            <div class="card">
+                <p><strong>Dự án/Task:</strong> ${taskTitle}</p>
+                <p><strong>Deadline:</strong> ${deadlineStr}</p>
+            </div>
 
-                    < div class="card" >
-                        <p><strong>Dự án / Task: </strong> ${taskTitle}</p >
-                            <p><strong>Deadline: </strong> ${deadlineStr}</p >
-                                </div>
-
-                                < p > Vui lòng kiểm tra và bắt đầu công việc sớm nhất có thể.</p>
-
-                                    < div style = "text-align: center;" >
-                                        <a href="${link}" class="btn" > Xem chi tiết Task </a>
-                                            </div>
-                                                `
+            <p>Vui lòng kiểm tra và bắt đầu công việc sớm nhất có thể.</p>
+            
+            <div style="text-align: center;">
+                <a href="${link}" class="btn">Xem chi tiết Task</a>
+            </div>
+        `
         return wrapTemplate(content, '🚀 New Task Assigned')
     },
 
     // 2. Task Started (To Admin)
     taskStarted: (adminName: string, userName: string, taskTitle: string, startTime: Date) => {
         const timeStr = new Date(startTime).toLocaleString('vi-VN')
-        
-        const content = `
-                                            < p > Xin chào Admin, </p>
-                                                < p > Nhân viên < span class="highlight" > ${ userName } </span> đã bắt đầu làm việc.</p >
 
-                                                    <div class="card" >
-                                                        <p><strong>Task: </strong> ${taskTitle}</p >
-                                                            <p><strong>Thời gian bắt đầu: </strong> ${timeStr}</p >
-                                                                </div>
-                                                                    `
+        const content = `
+            <p>Xin chào Admin,</p>
+            <p>Nhân viên <span class="highlight">${userName}</span> đã bắt đầu làm việc.</p>
+            
+            <div class="card">
+                <p><strong>Task:</strong> ${taskTitle}</p>
+                <p><strong>Thời gian bắt đầu:</strong> ${timeStr}</p>
+            </div>
+        `
         return wrapTemplate(content, '▶️ Work Started')
     },
 
     // 3. Admin Feedback (To User)
     taskFeedback: (userName: string, taskTitle: string, feedback: string) => {
-         const link = \`\${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard\`
-         
-         const content = `
-                                                                < p > Xin chào < strong > ${ userName } </strong>,</p >
-                                                                    <p>Admin vừa gửi yêu cầu chỉnh sửa(Feedback) cho task < span class="highlight" > ${ taskTitle } </span>.</p >
+        // FIX: Removed unnecessary backslash escape before template literal
+        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`
 
-                                                                        <div class="card" style = "border-left-color: #f59e0b; background-color: #fffbeb;" >
-                                                                            <p><strong>Nội dung Feedback: </strong></p >
-                                                                                <p style="font-style: italic;" > "${feedback}" </p>
-                                                                                    </div>
+        const content = `
+            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p>Admin vừa gửi yêu cầu chỉnh sửa (Feedback) cho task <span class="highlight">${taskTitle}</span>.</p>
+            
+            <div class="card" style="border-left-color: #f59e0b; background-color: #fffbeb;">
+                <p><strong>Nội dung Feedback:</strong></p>
+                <p style="font-style: italic;">"${feedback}"</p>
+            </div>
 
-                                                                                    < p > Vui lòng sửa lại theo yêu cầu.</p>
-
-                                                                                        < div style = "text-align: center;" >
-                                                                                            <a href="${link}" class="btn" style = "background-color: #f59e0b;" > Vào sửa ngay </a>
-                                                                                                </div>
-                                                                                                    `
-         return wrapTemplate(content, '⚠️ Action Required: Feedback')
+            <p>Vui lòng sửa lại theo yêu cầu.</p>
+            
+            <div style="text-align: center;">
+                <a href="${link}" class="btn" style="background-color: #f59e0b;">Vào sửa ngay</a>
+            </div>
+         `
+        return wrapTemplate(content, '⚠️ Action Required: Feedback')
     },
 
     // 4. Task Completed / Approved (To User)
     taskCompleted: (userName: string, taskTitle: string, revenue: number) => {
         const content = `
-                                                                                                < p > Xin chào < strong > ${ userName } </strong>,</p >
-                                                                                                    <p>Chúc mừng! Task < span class="highlight" > ${ taskTitle } </span> đã được duyệt hoàn tất.</p >
+            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p>Chúc mừng! Task <span class="highlight">${taskTitle}</span> đã được duyệt hoàn tất.</p>
+            
+            <div class="card" style="border-left-color: #10b981; background-color: #ecfdf5;">
+                <p><strong>Trạng thái:</strong> ✅ Hoàn thành</p>
+                ${revenue > 0 ? `<p><strong>Ghi nhận doanh thu:</strong> ${formatCurrency(revenue)}</p>` : ''}
+            </div>
 
-                                                                                                        <div class="card" style = "border-left-color: #10b981; background-color: #ecfdf5;" >
-                                                                                                            <p><strong>Trạng thái: </strong> ✅ Hoàn thành</p >
-                                                                                                                ${ revenue > 0 ? `<p><strong>Ghi nhận doanh thu:</strong> ${formatCurrency(revenue)}</p>` : '' }
-        </div>
-
-            < p > Làm tốt lắm! Hệ thống đã ghi nhận kết quả của bạn.</p>
-                `
+            <p>Làm tốt lắm! Hệ thống đã ghi nhận kết quả của bạn.</p>
+        `
         return wrapTemplate(content, '✅ Task Approved')
     }
 }

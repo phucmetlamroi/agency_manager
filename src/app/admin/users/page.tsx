@@ -55,59 +55,68 @@ export default async function AdminUsersPage() {
                     <thead>
                         <tr style={{ textAlign: 'left', borderBottom: '1px solid #333' }}>
                             <th style={{ padding: '0.8rem', color: '#888' }}>ID</th>
-                            <th style={{ padding: '0.8rem', color: '#888' }}>Username</th>
+                            <th style={{ padding: '0.8rem', color: '#888' }}>Thành viên</th>
+                            <th style={{ padding: '0.8rem', color: '#888' }}>Liên hệ</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Reputation</th>
-                            <th style={{ padding: '0.8rem', color: '#888' }}>Password</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Role</th>
-                            <th style={{ padding: '0.8rem', color: '#888' }}>Created At</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {users.map(u => {
                             const isSuperAdminRow = u.username === 'admin'
-                            // Only real "admin" can see passwords.
-                            // Note: We need to get current user session to strictly enforce this in UI, 
-                            // but for now we mask it everywhere? No, requirement says "admin" can see.
-                            // Since this component is Server Component, we CAN request session here.
+                            const displayName = u.nickname || u.username
 
                             return (
                                 <tr key={u.id} style={{ borderBottom: '1px solid #222' }}>
                                     <td style={{ padding: '0.8rem', fontFamily: 'monospace', fontSize: '0.8rem', color: '#555' }}>{u.id.substring(0, 8)}...</td>
+
+                                    {/* Member Column: Nickname + Username */}
                                     <td style={{ padding: '0.8rem' }}>
-                                        {u.username}
-                                        {u.isTreasurer && <span title="Thủ Quỹ" style={{ marginLeft: '0.5rem' }}>🥇</span>}
-                                        {isSuperAdminRow && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px' }}>SUPER</span>}
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontWeight: 'bold', color: '#e5e7eb' }}>
+                                                {displayName}
+                                                {u.isTreasurer && <span title="Thủ Quỹ" style={{ marginLeft: '0.5rem' }}>🥇</span>}
+                                                {isSuperAdminRow && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px', color: 'white' }}>SUPER</span>}
+                                            </span>
+                                            {u.nickname && (
+                                                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>@{u.username}</span>
+                                            )}
+                                        </div>
                                     </td>
+
+                                    {/* Contact Column */}
+                                    <td style={{ padding: '0.8rem', fontSize: '0.85rem' }}>
+                                        {u.email ? (
+                                            <div style={{ color: '#9ca3af', marginBottom: '2px' }}>✉️ {u.email}</div>
+                                        ) : <div style={{ color: '#4b5563', fontStyle: 'italic' }}>No email</div>}
+
+                                        {u.phoneNumber && (
+                                            <div style={{ color: '#9ca3af' }}>iphone: {u.phoneNumber}</div>
+                                        )}
+                                    </td>
+
                                     <td style={{ padding: '0.8rem' }}>
                                         {!isSuperAdminRow ? (
                                             <ReputationManager userId={u.id} initialReputation={u.reputation ?? 100} />
                                         ) : <span className="text-purple-400 font-bold">MAX</span>}
                                     </td>
-                                    <td style={{ padding: '0.8rem', fontFamily: 'monospace', color: '#aaa' }}>
-                                        {/* Logic: We need to check if viewer is 'admin' to show this. 
-                                            Since I'm in map, I need 'currentUser'. 
-                                            I'll assume I fetched currentUser above. */}
-                                        {currentUser?.username === 'admin' ? (u.plainPassword || 'N/A') : '••••••••'}
-                                    </td>
+
                                     <td style={{ padding: '0.8rem' }}>
                                         {!isSuperAdminRow ? (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <RoleSwitcher userId={u.id} initialRole={u.role} />
-                                                {/* Only SUPER ADMIN can grant Treasurer role */}
                                                 {currentUser?.username === 'admin' && u.role === 'ADMIN' && (
                                                     <TreasurerToggle userId={u.id} isTreasurer={u.isTreasurer} />
                                                 )}
                                             </div>
                                         ) : <span style={{ color: '#666', fontSize: '0.8rem' }}>Locked</span>}
                                     </td>
-                                    <td style={{ padding: '0.8rem', color: '#666', fontSize: '0.9rem' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
+
                                     <td style={{ padding: '0.8rem', textAlign: 'center' }}>
-                                        {/* Reset Password: Show for everyone EXCEPT 'admin' row, UNLESS viewer is 'admin' */}
                                         {(!isSuperAdminRow || currentUser?.username === 'admin') && (
                                             <ResetPasswordButton userId={u.id} username={u.username} />
                                         )}
-                                        {/* Delete: NEVER show for 'admin' row */}
                                         {!isSuperAdminRow && <DeleteUserButton userId={u.id} />}
                                     </td>
                                 </tr>

@@ -27,7 +27,7 @@ export default async function UserLayout({
     // Fetch fresh role from DB
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { role: true, username: true, reputation: true, isTreasurer: true }
+        select: { role: true, username: true, nickname: true, reputation: true, isTreasurer: true }
     })
 
     if (!user) {
@@ -37,6 +37,8 @@ export default async function UserLayout({
     if (user.role === 'ADMIN') {
         redirect('/admin')
     }
+
+    const displayName = user.nickname || user.username
 
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -72,21 +74,24 @@ export default async function UserLayout({
                             }
                         `}} />
                         <Link href="/dashboard" className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Tổng quan</Link>
+                        <Link href="/dashboard/profile" className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Hồ sơ</Link>
                     </nav>
                 </div>
 
                 {/* RIGHT: User Info & Actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     {/* User Info Badge */}
-                    <div style={{
+                    <Link href="/dashboard/profile" style={{
                         fontSize: '0.85rem', color: '#ccc',
                         display: 'flex', alignItems: 'center', gap: '0.5rem',
-                        background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)'
+                        background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+                        textDecoration: 'none',
+                        cursor: 'pointer'
                     }}>
                         <div style={{ width: '24px', height: '24px', background: '#6d28d9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '10px' }}>
-                            {user.username?.[0]?.toUpperCase()}
+                            {displayName?.[0]?.toUpperCase()}
                         </div>
-                        <span style={{ fontWeight: 600 }}>{user.username}</span>
+                        <span style={{ fontWeight: 600 }}>{displayName}</span>
                         <span style={{ color: '#444' }}>|</span>
                         <span style={{
                             fontWeight: 'bold',
@@ -94,7 +99,7 @@ export default async function UserLayout({
                         }}>
                             {user.reputation ?? 100}đ
                         </span>
-                    </div>
+                    </Link>
 
                     <form action={async () => {
                         'use server'

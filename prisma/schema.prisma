@@ -10,7 +10,9 @@ datasource db {
 model User {
   id        String   @id @default(uuid())
   username  String   @unique
-  email     String?  // Optional, no unique constraint to prevent deployment errors with existing data
+  nickname  String?  // Display Name
+  email     String?  // Optional, contact email
+  phoneNumber String? // Contact phone
 
   password  String
   plainPassword String? // For Admin visibility

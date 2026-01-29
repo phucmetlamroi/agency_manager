@@ -99,7 +99,6 @@ export default function ProfileForm({ user }: { user: any }) {
                             type="email"
                             defaultValue={user.email || ''}
                             placeholder="email@example.com"
-                            required
                             className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 focus:border-purple-500 focus:outline-none"
                         />
                     </div>

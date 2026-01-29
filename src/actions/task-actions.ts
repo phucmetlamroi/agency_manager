@@ -172,14 +172,81 @@ export async function updateTaskStatus(id: string, newStatus: string) {
             }
         }
 
-        await prisma.task.update({
+        // ... (Update DB call)
+        const updatedTaskResult = await prisma.task.update({
             where: { id },
             data: {
                 status: newStatus,
                 ...deadlineUpdate,
                 ...timerUpdate
-            }
+            },
+            include: { assignee: true } // Need assignee for emails
         })
+
+        // --- EMAIL TRIGGERS ---
+        const { sendEmail } = await import('@/lib/email')
+        const { emailTemplates } = await import('@/lib/email-templates')
+
+        // TRIGGER 2: Employee Started Task (To Admin)
+        // Condition: Status changed to 'Đang thực hiện' (or 'Đã nhận task' if that counts as start, but 'Đang thực hiện' is more explicit work start)
+        if (newStatus === 'Đang thực hiện' && updatedTaskResult.assignee) {
+            // Find Admin(s) to notify
+            const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true, username: true } })
+
+            for (const admin of admins) {
+                if (admin.email) {
+                    void sendEmail({
+                        to: admin.email,
+                        subject: `[Started] ${updatedTaskResult.assignee.username} đã bắt đầu làm task: ${updatedTaskResult.title}`,
+                        html: emailTemplates.taskStarted(
+                            admin.username || 'Admin',
+                            updatedTaskResult.assignee.username || 'Staff',
+                            updatedTaskResult.title,
+                            new Date()
+                        )
+                    })
+                }
+            }
+        }
+
+        // TRIGGER 3: Feedback / Revision (To User)
+        if (newStatus === 'Revision' && updatedTaskResult.assignee?.email) {
+            // We don't have the "Feedback Content" passed in this simple status update function yet.
+            // If the user wants specific feedback content, they usually update the 'notes' or a separate 'feedback' field.
+            // For now, we will send a generic "Check feedback" email or look at the most recent note if we had logic for it.
+            // The prompt says: "Trích dẫn nội dung Feedback...".
+            // Limitation: `updateTaskStatus` only takes params (id, newStatus). 
+            // Ideally we should update the function signature, but to avoid breaking changes, we'll check if notes were updated recently or just send a generic link.
+            // NOTE: The user requested "Action Required: Feedback".
+            // We will assume the Admin put feedback in the "Notes" or communicated it. 
+            // Let's assume for now we just link them to the task. 
+            // Improving: We can fetch the task's `notes` and include it if not null.
+
+            void sendEmail({
+                to: updatedTaskResult.assignee.email,
+                subject: `[Action Required] Yêu cầu chỉnh sửa cho task: ${updatedTaskResult.title}`,
+                html: emailTemplates.taskFeedback(
+                    updatedTaskResult.assignee.username || 'User',
+                    updatedTaskResult.title,
+                    updatedTaskResult.notes || 'Vui lòng kiểm tra chi tiết trên hệ thống.'
+                )
+            })
+        }
+
+        // TRIGGER 4: Completed (To User)
+        if (newStatus === 'Hoàn tất' && updatedTaskResult.assignee?.email) {
+            void sendEmail({
+                to: updatedTaskResult.assignee.email,
+                subject: `[Approved] Chúc mừng! Task ${updatedTaskResult.title} đã hoàn thành`,
+                html: emailTemplates.taskCompleted(
+                    updatedTaskResult.assignee.username || 'User',
+                    updatedTaskResult.title,
+                    updatedTaskResult.wageVND || 0
+                )
+            })
+        }
+        // -----------------------
+
         // Return final accumulated seconds (plus current elapsed if it was running) for the UI Log
         let finalSeconds = task.accumulatedSeconds
         if (task.timerStatus === 'RUNNING' && task.timerStartedAt) {
@@ -189,7 +256,7 @@ export async function updateTaskStatus(id: string, newStatus: string) {
 
         revalidatePath('/admin')
         revalidatePath('/dashboard')
-        revalidatePath('/admin/payroll') // Update payroll too since bonus depends on it
+        revalidatePath('/admin/payroll')
 
         return { success: true, finalSeconds }
     } catch (e) {

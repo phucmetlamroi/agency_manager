@@ -26,13 +26,12 @@ export async function updateTask(id: string, data: any) {
 
 export async function assignTask(taskId: string, userId: string | null) {
     try {
-        await prisma.task.update({
+        const updatedTask = await prisma.task.update({
             where: { id: taskId },
             data: {
                 assigneeId: userId || null,
                 status: userId ? 'Đã nhận task' : 'Đang đợi giao',
                 isPenalized: false, // Reset penalty state for new assignee
-                // If unassigning (userId is null), also clear the deadline
                 // If unassigning (userId is null), also clear the deadline and PAUSE timer
                 ...(userId ? {
                     timerStatus: 'RUNNING',
@@ -42,8 +41,28 @@ export async function assignTask(taskId: string, userId: string | null) {
                     timerStatus: 'PAUSED',
                     timerStartedAt: null
                 })
-            }
+            },
+            include: { assignee: true } // Fetch assignee to get email
         })
+
+        // TRIGGER EMAIL 1: Task Assigned
+        if (userId && updatedTask.assignee && updatedTask.assignee.email) {
+            const { sendEmail } = await import('@/lib/email')
+            const { emailTemplates } = await import('@/lib/email-templates')
+
+            // Fire and forget (don't await)
+            void sendEmail({
+                to: updatedTask.assignee.email,
+                subject: `[New Task] Bạn được giao công việc mới: ${updatedTask.title}`,
+                html: emailTemplates.taskAssigned(
+                    updatedTask.assignee.username || 'User',
+                    updatedTask.title,
+                    updatedTask.deadline,
+                    updatedTask.id
+                )
+            })
+        }
+
         revalidatePath('/admin')
         revalidatePath('/admin/queue')
         revalidatePath('/dashboard')

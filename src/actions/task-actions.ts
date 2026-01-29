@@ -110,12 +110,13 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
         // Let's make "Tạm ngưng" PAUSED.
 
         // RUNNING: 'Đã nhận task', 'Đang thực hiện'
-        // PAUSED: 'Revision' (Feedbacking), 'Sửa frame', 'Tạm ngưng', 'Đang đợi giao'
+        // PAUSED: 'Revision' (Feedbacking), 'Sửa frame', 'Tạm ngưng', 'Đang đợi giao', 'Review'
         // STOPPED: 'Hoàn tất' (Stop and Finalize)
         // RESET: 'Đã nhận task' (Revert to start)
 
         const isRunningState = ['Đang thực hiện'].includes(newStatus)
         const isStoppedState = newStatus === 'Hoàn tất'
+        // Review is PAUSED (implicit fallback in else block below)
         // const isPaused = ['Tạm ngưng', 'Đang đợi giao'].includes(newStatus)
 
         let timerUpdate = {}
@@ -231,13 +232,37 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
                 }
             }
 
+            // TRIGGER 2: Submission / Review (To User & Admin)
+            if (newStatus === 'Review') {
+                if (updatedTaskResult.assignee?.email) {
+                    console.log(`[Email Debug] Triggering SUBMISSION email to ${updatedTaskResult.assignee.email}`)
+                    void sendEmail({
+                        to: updatedTaskResult.assignee.email,
+                        subject: `[Submission] Task "${updatedTaskResult.title}" đang chờ Admin phản hồi`,
+                        html: emailTemplates.taskSubmitted(
+                            updatedTaskResult.assignee.username || 'User',
+                            updatedTaskResult.title
+                        )
+                    })
+                }
+
+                // Also notify Admins
+                const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } })
+                for (const admin of admins) {
+                    if (admin.email) {
+                        // Optional: Separate Admin Notification Template
+                        // For now we just assume Admin checks dashboard, but good to have.
+                    }
+                }
+            }
+
             // TRIGGER 3: Feedback / Revision (To User)
             if (newStatus === 'Revision') {
                 if (updatedTaskResult.assignee?.email) {
                     console.log(`[Email Debug] Triggering Feedback email to ${updatedTaskResult.assignee.email}`)
                     void sendEmail({
                         to: updatedTaskResult.assignee.email,
-                        subject: `[Action Required] Yêu cầu chỉnh sửa cho task: ${updatedTaskResult.title}`,
+                        subject: `[Action Required] Admin đã gửi Feedback cho task: ${updatedTaskResult.title}`,
                         html: emailTemplates.taskFeedback(
                             updatedTaskResult.assignee.username || 'User',
                             updatedTaskResult.title,
@@ -253,9 +278,10 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
             if (newStatus === 'Hoàn tất') {
                 if (updatedTaskResult.assignee?.email) {
                     console.log(`[Email Debug] Triggering Completed email to ${updatedTaskResult.assignee.email}`)
+                    // NOTE: Removed [Approved] prefix as per User Request "Tiêu đề: [Success]..."
                     void sendEmail({
                         to: updatedTaskResult.assignee.email,
-                        subject: `[Approved] Chúc mừng! Task ${updatedTaskResult.title} đã hoàn thành`,
+                        subject: `[Success] Chúc mừng! Task "${updatedTaskResult.title}" đã hoàn thành 🎉`,
                         html: emailTemplates.taskCompleted(
                             updatedTaskResult.assignee.username || 'User',
                             updatedTaskResult.title,

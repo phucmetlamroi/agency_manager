@@ -226,7 +226,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                             <span className="animate-pulse">●</span> Working...
                                         </span>
                                     )}
-                                    {(task.status === 'Tạm ngưng' || task.status === 'Sửa frame' || task.status === 'Đang đợi giao' || task.status === 'Revision') && (
+                                    {(task.status === 'Tạm ngưng' || task.status === 'Sửa frame' || task.status === 'Đang đợi giao' || task.status === 'Revision' || task.status === 'Review') && (
                                         <span className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 text-xs italic border border-gray-700">
                                             ⏳ Waiting...
                                         </span>
@@ -376,7 +376,13 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                             style={{ width: '100%', padding: '0.6rem', border: '1px solid #93c5fd', borderRadius: '6px', fontSize: '0.9rem' }}
                                         />
                                         {(!isEditing && !isAdmin) && (
-                                            <button onClick={handleSaveDetails} style={{ marginTop: '0.5rem', width: '100%', padding: '0.5rem', background: '#3b82f6', color: 'white', borderRadius: '6px', fontWeight: 'bold' }}>
+                                            <button
+                                                onClick={async () => {
+                                                    await handleSaveDetails(); // Save link
+                                                    await handleStatusChange(selectedTask.id, 'Review'); // Trigger status & email
+                                                }}
+                                                style={{ marginTop: '0.5rem', width: '100%', padding: '0.5rem', background: '#3b82f6', color: 'white', borderRadius: '6px', fontWeight: 'bold' }}
+                                            >
                                                 Xác nhận nộp bài
                                             </button>
                                         )}

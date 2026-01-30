@@ -43,7 +43,7 @@ export default function ClientSelector({ onSelect }: { onSelect: (id: number | n
         // If partner has no subsidiaries, selecting partner is final
         if (partner && partner.subsidiaries.length === 0) {
             onSelect(partner.id)
-        } else {
+        } else if (partner) {
             // If has subs, wait for sub selection? Or default to partner?
             // Usually if Client has sub-clients (e.g. Agency), tasks belong to sub-clients.
             // But sometimes the Agency itself has a general task.

@@ -10,7 +10,7 @@ type Project = {
 }
 
 type Task = {
-    id: string
+    id: string | number
     title: string
     status: string
     value?: number

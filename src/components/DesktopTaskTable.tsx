@@ -1,6 +1,34 @@
-'use client'
+import { calculateRiskLevel, getRiskColor, getRiskLabel } from '@/lib/risk-utils'
 
-import { useState } from 'react'
+// ... existing imports
+
+// Inside TaskRow component or where Task data is rendered
+// finding the Stopwatch section...
+
+{/* STOPWATCH & RISK */ }
+<div className="flex flex-col gap-2">
+    <Stopwatch
+        taskId={task.id}
+        initialSeconds={task.accumulatedSeconds}
+        initialState={task.timerStatus}
+        isPaused={task.status === 'Hoàn tất' || task.status === 'Sửa frame' || task.status === 'Tạm ngưng'}
+    />
+
+    {/* Risk Indicator (Only show if work has started) */}
+    {task.accumulatedSeconds > 0 && task.status === 'Đang thực hiện' && (
+        (() => {
+            const risk = calculateRiskLevel(task.accumulatedSeconds, 0) // TODO: Pass user avg time if available
+            if (risk !== 'LOW') {
+                return (
+                    <div className={`text-[10px] px-2 py-0.5 rounded border text-center ${getRiskColor(risk)}`}>
+                        ⚠️ {getRiskLabel(risk)}
+                    </div>
+                )
+            }
+            return null
+        })()
+    )}
+</div>
 import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
@@ -186,6 +214,20 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                         timerStartedAt={task.timerStartedAt ?? null}
                                         status={task.timerStatus || 'PAUSED'}
                                     />
+                                    {/* Risk Indicator */}
+                                    {task.accumulatedSeconds > 0 && task.status === 'Đang thực hiện' && (
+                                        (() => {
+                                            const risk = calculateRiskLevel(task.accumulatedSeconds, 0)
+                                            if (risk !== 'LOW') {
+                                                return (
+                                                    <div className={`mt-1 text-[10px] px-2 py-0.5 rounded border text-center font-bold animate-pulse ${getRiskColor(risk)}`}>
+                                                        ⚠️ {getRiskLabel(risk)}
+                                                    </div>
+                                                )
+                                            }
+                                            return null
+                                        })()
+                                    )}
                                 </div>
 
                                 {/* Mobile-Optimized Status/Assignee info */}

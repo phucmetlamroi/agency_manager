@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import ClientAnalytics from '@/components/crm/ClientAnalytics'
+import CreateSubClientButton from '@/components/crm/CreateSubClientButton'
 import { notFound } from 'next/navigation'
 
 export default async function ClientDetailPage({ params }: { params: { id: string } }) {
@@ -44,6 +45,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
     return (
         <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold text-white">Chi tiết Hồ sơ Khách hàng</h1>
+                {/* Only show Add Button if this is a Partner (has no parent) - simplified logic for now */}
+                {!client.parentId && (
+                    <CreateSubClientButton parentId={client.id} parentName={client.name} />
+                )}
+            </div>
             <ClientAnalytics client={client} distribution={distribution} />
         </div>
     )

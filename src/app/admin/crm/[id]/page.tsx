@@ -3,8 +3,9 @@ import ClientAnalytics from '@/components/crm/ClientAnalytics'
 import CreateSubClientButton from '@/components/crm/CreateSubClientButton'
 import { notFound } from 'next/navigation'
 
-export default async function ClientDetailPage({ params }: { params: { id: string } }) {
-    const id = parseInt(params.id)
+export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id: paramId } = await params
+    const id = parseInt(paramId)
     if (isNaN(id)) return notFound()
 
     // Fetch Client with Subsidiaries and Tasks

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 
 type Project = {
     id: number
@@ -54,13 +55,13 @@ function ClientItem({ client }: { client: Client }) {
                     <div>
                         <div className="font-semibold text-white flex items-center gap-2">
                             {client.name}
-                            <a
+                            <Link
                                 href={`/admin/crm/${client.id}`}
                                 onClick={(e) => e.stopPropagation()} // Prevent expand
                                 className="text-xs bg-purple-600/30 text-purple-400 px-2 py-0.5 rounded hover:bg-purple-600 hover:text-white transition-colors border border-purple-500/50"
                             >
                                 ↗ Xem chi tiết
-                            </a>
+                            </Link>
                         </div>
                         <div className="text-xs text-gray-500">
                             {client.subsidiaries?.length || 0} Brands • {client.projects.length} Projects

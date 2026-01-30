@@ -11,9 +11,13 @@ export async function getClients() {
             where: { parentId: null }, // Only fetch top-level to start tree
             include: {
                 subsidiaries: {
-                    include: { projects: true }
+                    include: {
+                        projects: true,
+                        tasks: true
+                    }
                 },
-                projects: true
+                projects: true,
+                tasks: true
             },
             orderBy: { createdAt: 'desc' }
         })

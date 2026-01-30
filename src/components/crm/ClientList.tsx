@@ -9,12 +9,20 @@ type Project = {
     code: string | null
 }
 
+type Task = {
+    id: number
+    title: string
+    status: string
+    value?: number
+}
+
 type Client = {
     id: number
     name: string
     aiScore: number
     subsidiaries?: Client[]
     projects: Project[]
+    tasks: Task[]
 }
 
 export default function ClientList({ clients }: { clients: Client[] }) {
@@ -45,10 +53,16 @@ function ClientItem({ client }: { client: Client }) {
         return 'text-red-400'
     }
 
+    // Calculate total videos (direct + sub-brands) for display if needed? 
+    // For now, let's show direct tasks count or maybe all?
+    // User requested "show ra ngoài luôn".
+    const taskCount = client.tasks?.length || 0
+
     return (
         <div className="border border-white/10 rounded-lg overflow-hidden bg-white/5">
             <div
                 onClick={() => setIsExpanded(!isExpanded)}
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
             >
                 <div className="flex items-center gap-3">
                     <span className="text-gray-400 text-sm">{isExpanded ? '▼' : '▶'}</span>
@@ -64,7 +78,7 @@ function ClientItem({ client }: { client: Client }) {
                             </Link>
                         </div>
                         <div className="text-xs text-gray-500">
-                            {client.subsidiaries?.length || 0} Brands • {client.projects.length} Projects
+                            {client.subsidiaries?.length || 0} Brands • {taskCount} Videos
                         </div>
                     </div>
                 </div>
@@ -81,17 +95,27 @@ function ClientItem({ client }: { client: Client }) {
 
             {isExpanded && (
                 <div className="bg-black/20 p-4 pl-12 border-t border-white/10 space-y-3">
-                    {/* Projects List */}
-                    {client.projects.length > 0 && (
+                    {/* Tasks/Videos List */}
+                    {client.tasks && client.tasks.length > 0 && (
                         <div className="mb-4">
-                            <div className="text-xs text-purple-400 font-bold uppercase mb-2">Projects</div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {client.projects.map(p => (
-                                    <div key={p.id} className="bg-white/5 p-2 rounded text-sm flex justify-between items-center hover:bg-white/10">
-                                        <span>{p.name}</span>
-                                        <span className="text-xs bg-gray-700 px-1 rounded">{p.code || 'N/A'}</span>
+                            <div className="text-xs text-purple-400 font-bold uppercase mb-2">Recent Videos</div>
+                            <div className="space-y-1">
+                                {client.tasks.slice(0, 5).map(t => (
+                                    <div key={t.id} className="bg-white/5 p-2 rounded text-sm flex justify-between items-center hover:bg-white/10">
+                                        <span className="truncate max-w-[200px]">{t.title}</span>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${t.status === 'Hoàn tất'
+                                                ? 'border-green-500 text-green-400 bg-green-900/20'
+                                                : 'border-yellow-500 text-yellow-500 bg-yellow-900/20'
+                                            }`}>
+                                            {t.status}
+                                        </span>
                                     </div>
                                 ))}
+                                {client.tasks.length > 5 && (
+                                    <div className="text-xs text-center text-gray-500 pt-1">
+                                        ...còn {client.tasks.length - 5} video nữa
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -108,7 +132,7 @@ function ClientItem({ client }: { client: Client }) {
                         </div>
                     )}
 
-                    {client.projects.length === 0 && (!client.subsidiaries || client.subsidiaries.length === 0) && (
+                    {(!client.tasks || client.tasks.length === 0) && (!client.subsidiaries || client.subsidiaries.length === 0) && (
                         <div className="text-sm text-gray-600 italic">Trống</div>
                     )}
                 </div>

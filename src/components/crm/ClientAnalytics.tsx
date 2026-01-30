@@ -184,6 +184,6 @@ export default function ClientAnalytics({ client, distribution }: { client: Clie
                     </table>
                 </div>
             </div>
-        </div >
+        </div>
     )
 }

@@ -92,7 +92,6 @@ export async function createTask(formData: FormData) {
                 jobPriceUSD,
                 wageVND,
                 exchangeRate,
-                exchangeRate,
                 profitVND,
                 clientId
             }

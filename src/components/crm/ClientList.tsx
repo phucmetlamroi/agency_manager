@@ -47,13 +47,21 @@ function ClientItem({ client }: { client: Client }) {
     return (
         <div className="border border-white/10 rounded-lg overflow-hidden bg-white/5">
             <div
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center gap-3">
                     <span className="text-gray-400 text-sm">{isExpanded ? '▼' : '▶'}</span>
                     <div>
-                        <div className="font-semibold text-white">{client.name}</div>
+                        <div className="font-semibold text-white flex items-center gap-2">
+                            {client.name}
+                            <a
+                                href={`/admin/crm/${client.id}`}
+                                onClick={(e) => e.stopPropagation()} // Prevent expand
+                                className="text-xs bg-purple-600/30 text-purple-400 px-2 py-0.5 rounded hover:bg-purple-600 hover:text-white transition-colors border border-purple-500/50"
+                            >
+                                ↗ Xem chi tiết
+                            </a>
+                        </div>
                         <div className="text-xs text-gray-500">
                             {client.subsidiaries?.length || 0} Brands • {client.projects.length} Projects
                         </div>

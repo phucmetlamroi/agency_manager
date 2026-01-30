@@ -98,6 +98,7 @@ export async function createTask(formData: FormData) {
         })
         revalidatePath('/admin')
         revalidatePath('/admin/queue')
+        revalidatePath('/admin/crm') // Revalidate CRM to show new tasks
         return { success: true }
     } catch (e) {
         return { error: 'Error creating task' }

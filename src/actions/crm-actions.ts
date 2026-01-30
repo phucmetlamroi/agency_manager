@@ -75,7 +75,17 @@ export async function createFeedback(data: { projectId: number, content: string,
         })
         revalidatePath('/admin/crm')
         return { success: true }
-    } catch (error) {
-        return { success: false, error: 'Failed to create feedback' }
-    }
-}
+        // --- DELETE ACTION ---
+
+        export async function deleteClient(id: number) {
+            try {
+                await prisma.client.delete({
+                    where: { id }
+                })
+                revalidatePath('/admin/crm')
+                return { success: true }
+            } catch (error) {
+                console.error('Delete failed:', error)
+                return { success: false, error: 'Không thể xóa khách hàng này (có thể do đang chứa Task/Project/Brand con).' }
+            }
+        }

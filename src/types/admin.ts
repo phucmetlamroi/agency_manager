@@ -1,4 +1,4 @@
-export type TaskWithUser = {
+export type TaskWithUser = { // Updated with Client Info
     id: string
     title: string
     value: number
@@ -16,4 +16,11 @@ export type TaskWithUser = {
     accumulatedSeconds?: number
     timerStartedAt?: Date | null
     timerStatus?: string
+    client?: {
+        id: number
+        name: string
+        parent?: {
+            name: string
+        } | null
+    } | null
 }

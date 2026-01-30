@@ -139,5 +139,52 @@ export default function ClientAnalytics({ client, distribution }: { client: Clie
                 </div>
             </div>
         </div>
+
+            {/* RECENT TASKS LIST */ }
+    <div className="glass-panel p-6">
+        <h3 className="text-lg font-bold mb-4 text-white">🎬 Video / Task Gần đây</h3>
+        <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+                <thead>
+                    <tr className="text-xs text-gray-400 border-b border-gray-700">
+                        <th className="py-2">Tên Task</th>
+                        <th className="py-2">Trạng thái</th>
+                        <th className="py-2">Brand / Dự án</th>
+                        <th className="py-2">Ngày giao</th>
+                        <th className="py-2 text-right">Giá trị</th>
+                    </tr>
+                </thead>
+                <tbody className="text-sm text-gray-300">
+                    {(() => {
+                        const allTasks = [
+                            ...client.tasks.map(t => ({ ...t, brand: 'Trực tiếp' })),
+                            ...(client.subsidiaries?.flatMap(sub => sub.tasks.map((t: any) => ({ ...t, brand: sub.name }))) || [])
+                        ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10)
+
+                        if (allTasks.length === 0) return (
+                            <tr>
+                                <td colSpan={5} className="py-4 text-center text-gray-500 italic">Chưa có dữ liệu.</td>
+                            </tr>
+                        )
+
+                        return allTasks.map((task: any) => (
+                            <tr key={task.id} className="border-b border-gray-800 hover:bg-white/5">
+                                <td className="py-3 font-medium text-white">{task.title}</td>
+                                <td className="py-3">
+                                    <span className={`text-xs px-2 py-1 rounded border ${task.status === 'Hoàn tất' ? 'border-green-500 text-green-400 bg-green-500/10' : 'border-gray-600'}`}>
+                                        {task.status}
+                                    </span>
+                                </td>
+                                <td className="py-3 text-gray-400">{task.brand}</td>
+                                <td className="py-3 text-gray-500">{new Date(task.createdAt).toLocaleDateString('vi-VN')}</td>
+                                <td className="py-3 text-right font-mono text-green-500">{(task.value || 0).toLocaleString()} ₫</td>
+                            </tr>
+                        ))
+                    })()}
+                </tbody>
+            </table>
+        </div>
+    </div>
+        </div >
     )
 }

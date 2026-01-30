@@ -1,0 +1,15 @@
+{
+    "functions": {
+        "python-services/*.py": {
+            "memory": 1024,
+            "maxDuration": 10,
+            "runtime": "@vercel/python"
+        }
+    },
+    "rewrites": [
+        {
+            "source": "/api/cron/scoring",
+            "destination": "/python-services/score_calculator.py"
+        }
+    ]
+}

@@ -33,27 +33,45 @@ const statusBg: Record<string, string> = {
     "Sửa frame": "rgba(244, 114, 182, 0.2)"
 }
 
-export default function TaskTable({ tasks, isAdmin = false, users = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[] }) {
+import useSWR from 'swr'
+
+// Fetcher for SWR
+const fetcher = (url: string) => fetch(url).then(res => res.json())
+
+export default function TaskTable({ tasks: initialTasks, isAdmin = false, users = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[] }) {
+    // SWR Hook for Real-time Data
+    const { data: tasks, mutate } = useSWR('/api/tasks', fetcher, {
+        fallbackData: initialTasks,
+        refreshInterval: 3000, // Poll every 3 seconds
+        revalidateOnFocus: false
+    })
+
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
+
+    // Sync selectedTask with real-time data if it's open
+    // (Optional: can be done via effect, but let's keep it simple)
 
     // Edit State
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState({ resources: '', references: '', notes: '', productLink: '', deadline: '' })
 
     const openTask = (task: TaskWithUser) => {
-        setSelectedTask(task)
+        // Always try to find the latest version of the task from 'tasks' list
+        const latestTask = tasks.find(t => t.id === task.id) || task
+        setSelectedTask(latestTask)
+
         let deadlineStr = ''
-        if (task.deadline) {
-            const d = new Date(task.deadline)
+        if (latestTask.deadline) {
+            const d = new Date(latestTask.deadline)
             const pad = (n: number) => n < 10 ? '0' + n : n
             deadlineStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
         }
 
         setEditForm({
-            resources: task.resources || task.fileLink || '',
-            references: task.references || '',
-            notes: task.notes || '',
-            productLink: task.productLink || '',
+            resources: latestTask.resources || latestTask.fileLink || '',
+            references: latestTask.references || '',
+            notes: latestTask.notes || '',
+            productLink: latestTask.productLink || '',
             deadline: deadlineStr
         })
         setIsEditing(false)
@@ -69,9 +87,28 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
     const handleStatusChange = async (taskId: string, newStatus: string) => {
         let notes: string | undefined = undefined
 
-        // Prompt removed as per user request
+        // Optimistic UI Update
+        const optimisticTasks = tasks.map(t =>
+            t.id === taskId ? { ...t, status: newStatus } : t
+        )
 
-        const res = await updateTaskStatus(taskId, newStatus, notes)
+        // Update local SWR cache immediately (No revalidation yet)
+        mutate(optimisticTasks, false)
+
+        // Update selectedTask if it's the one being changed
+        if (selectedTask?.id === taskId) {
+            setSelectedTask({ ...selectedTask, status: newStatus })
+        }
+
+        try {
+            await updateTaskStatus(taskId, newStatus, notes)
+            // Trigger actual revalidation to ensure sync with server
+            mutate()
+        } catch (error) {
+            console.error("Optimistic update failed:", error)
+            mutate(tasks, false) // Revert
+            alert("Cập nhật thất bại. Vui lòng thử lại.")
+        }
     }
 
     const handleSaveDetails = async () => {

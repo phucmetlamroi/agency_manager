@@ -70,14 +70,14 @@ export async function createFeedback(data: { projectId: number, content: string,
                 projectId: data.projectId,
                 content: data.content,
                 type: data.type,
-                severity: data.severity
+            } catch(error) {
+                return { success: false, error: 'Failed to create feedback' }
             }
-        })
-        revalidatePath('/admin/crm')
-        return { success: true }
-        // --- DELETE ACTION ---
+        }
 
-        export async function deleteClient(id: number) {
+// --- DELETE ACTION ---
+
+export async function deleteClient(id: number) {
             try {
                 await prisma.client.delete({
                     where: { id }

@@ -13,9 +13,9 @@ export default async function CRMDashboard() {
         <div className="p-6">
             <header className="mb-8">
                 <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
-                    CRM & Client Intelligence
+                    Quản lý Khách hàng
                 </h1>
-                <p className="text-gray-400 mt-2">Quản lý Khách hàng, Dự án và Chỉ số Hiệu suất (AI Scoring)</p>
+                <p className="text-gray-400 mt-2">Hệ thống quản lý Đối tác, Brand con và Chỉ số Hiệu suất.</p>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -24,7 +24,7 @@ export default async function CRMDashboard() {
                     <section className="glass-panel p-6">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-semibold text-white">Danh sách Khách hàng</h2>
-                            {/* Add Button Placeholder - Componentize later */}
+                            <CreateClientButton partners={typedClients} />
                         </div>
 
                         <ClientList clients={clients} />

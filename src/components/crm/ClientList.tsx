@@ -12,7 +12,7 @@ type Client = {
     id: number
     name: string
     aiScore: number
-    subsidiaries: Client[]
+    subsidiaries?: Client[]
     projects: Project[]
 }
 
@@ -51,7 +51,7 @@ function ClientItem({ client }: { client: Client }) {
                     <div>
                         <div className="font-semibold text-white">{client.name}</div>
                         <div className="text-xs text-gray-500">
-                            {client.subsidiaries.length} Brands • {client.projects.length} Projects
+                            {client.subsidiaries?.length || 0} Brands • {client.projects.length} Projects
                         </div>
                     </div>
                 </div>
@@ -84,7 +84,7 @@ function ClientItem({ client }: { client: Client }) {
                     )}
 
                     {/* Subsidiaries (Recursive) */}
-                    {client.subsidiaries.length > 0 && (
+                    {client.subsidiaries && client.subsidiaries.length > 0 && (
                         <div>
                             <div className="text-xs text-blue-400 font-bold uppercase mb-2">Brands / Subsidiaries</div>
                             <div className="space-y-2">
@@ -95,7 +95,7 @@ function ClientItem({ client }: { client: Client }) {
                         </div>
                     )}
 
-                    {client.projects.length === 0 && client.subsidiaries.length === 0 && (
+                    {client.projects.length === 0 && (!client.subsidiaries || client.subsidiaries.length === 0) && (
                         <div className="text-sm text-gray-600 italic">Trống</div>
                     )}
                 </div>

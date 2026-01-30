@@ -10,6 +10,8 @@ type User = {
     role: string
 }
 
+import ClientSelector from '@/components/crm/ClientSelector'
+
 export default function CreateTaskForm({ users }: { users: User[] }) {
     const [rate, setRate] = useState<number>(25300)
     const [usd, setUsd] = useState<number>(0)
@@ -20,6 +22,8 @@ export default function CreateTaskForm({ users }: { users: User[] }) {
 
     const [profitShare, setProfitShare] = useState<number>(0)
     const [revenueVnd, setRevenueVnd] = useState<number>(0)
+
+    const [clientId, setClientId] = useState<number | null>(null)
 
     useEffect(() => {
         // Fetch Exchange Rate
@@ -129,8 +133,12 @@ export default function CreateTaskForm({ users }: { users: User[] }) {
 
     return (
         <form action={clientAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Hidden Input for Rate */}
+            {/* Hidden Input for Rate & ClientId */}
             <input type="hidden" name="exchangeRate" value={rate} />
+            <input type="hidden" name="clientId" value={clientId || ''} />
+
+            {/* NEW: Client Selector */}
+            <ClientSelector onSelect={setClientId} />
 
             <div>
                 <label style={{ fontSize: '0.8rem', color: '#888' }}>Tên công việc</label>

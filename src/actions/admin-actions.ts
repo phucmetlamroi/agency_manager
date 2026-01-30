@@ -73,6 +73,8 @@ export async function createTask(formData: FormData) {
         const revenueVND = jobPriceUSD * exchangeRate
         const profitVND = revenueVND - wageVND
 
+        const clientId = formData.get('clientId') ? parseInt(formData.get('clientId') as string) : null
+
         await prisma.task.create({
             data: {
                 title,
@@ -90,7 +92,9 @@ export async function createTask(formData: FormData) {
                 jobPriceUSD,
                 wageVND,
                 exchangeRate,
-                profitVND
+                exchangeRate,
+                profitVND,
+                clientId
             }
         })
         revalidatePath('/admin')

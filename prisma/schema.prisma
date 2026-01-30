@@ -73,10 +73,8 @@ model Notification {
   id        String   @id @default(uuid())
   message   String
   type      String   @default("INFO") // INFO, WARNING, ERROR
-  tier          ClientTier @default(standard)
-  tasks         Task[]
-  
-  createdAt     DateTime  @default(now())
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
   
   // Optional: Link to User or Task for context
   userId    String?  // If null, it's a broadcast to all Admins
@@ -123,10 +121,16 @@ model Client {
   subsidiaries  Client[]  @relation("ClientHierarchy")
   
   projects      Project[]
+  tasks         Task[]
   
   // Scoring Fields (Computed by Python Cron Job)
   aiScore       Float     @default(0) // 0-100 Performance Score
   frictionIndex Float     @default(0) // How "difficult" the client is
+  
+  // Manual Ratings & AI Classification
+  inputQuality  Int       @default(3) // 1-5
+  paymentRating Int       @default(3) // 1-5
+  tier          ClientTier @default(standard)
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

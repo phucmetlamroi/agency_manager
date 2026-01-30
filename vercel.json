@@ -2,8 +2,7 @@
     "functions": {
         "python-services/*.py": {
             "memory": 1024,
-            "maxDuration": 10,
-            "runtime": "@vercel/python"
+            "maxDuration": 10
         }
     },
     "rewrites": [

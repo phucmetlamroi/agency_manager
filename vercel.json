@@ -1,14 +1,8 @@
 {
     "functions": {
-        "python-services/*.py": {
+        "api/*.py": {
             "memory": 1024,
             "maxDuration": 10
         }
-    },
-    "rewrites": [
-        {
-            "source": "/api/cron/scoring",
-            "destination": "/python-services/score_calculator.py"
-        }
-    ]
+    }
 }

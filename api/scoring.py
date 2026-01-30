@@ -2,8 +2,11 @@ from http.server import BaseHTTPRequestHandler
 import os
 import json
 import math
+# pg8000 is still required. 
+# Note: Vercel needs dependencies installed. It looks at requirements.txt in root.
 import pg8000.native
 import ssl
+from urllib.parse import urlparse
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -11,7 +14,6 @@ class handler(BaseHTTPRequestHandler):
         auth_header = self.headers.get('Authorization')
         cron_secret = os.environ.get('CRON_SECRET')
         
-        # Determine if we are in dev mode (allow bypass if secret not set, or STRICT if set)
         if cron_secret and auth_header != f"Bearer {cron_secret}":
             self.send_response(401)
             self.end_headers()
@@ -20,30 +22,20 @@ class handler(BaseHTTPRequestHandler):
 
         try:
             # 2. Database Connection
-            # Parse DATABASE_URL manually or use env vars if provided separately
-            # Neon usually provides a full Postgres URL. pg8000 prefers broken down params.
-            # Ideally, we rely on standard PG* env vars if Vercel injects them, 
-            # OR parse the string. For safety with Neon, let's assume standard PGHOST, PGUSER, etc. are set,
-            # or we parse the URL. Vercel usually sets POSTGRES_URL.
-            
-            # Simple URL parser for Vercel's POSTGRES_URL
             db_url = os.environ.get('POSTGRES_URL') or os.environ.get('DATABASE_URL')
             if not db_url:
                 raise Exception("DATABASE_URL not found")
 
-            # Basic parsing (Robust parsing would use urllib.parse)
-            from urllib.parse import urlparse
             result = urlparse(db_url)
             
             username = result.username
             password = result.password
             host = result.hostname
             port = result.port or 5432
-            database = result.path[1:] # remove leading /
+            database = result.path[1:]
 
             ssl_context = ssl.create_default_context()
             
-            # Connect via TCP (not WebSocket context needed for pg8000 native unless specified)
             con = pg8000.native.Connection(
                 user=username,
                 password=password,
@@ -53,8 +45,7 @@ class handler(BaseHTTPRequestHandler):
                 ssl_context=ssl_context
             )
 
-            # 3. Calculation Logic (Logarithmic Scoring)
-            # Query: Revenue per Client + Feedback stats
+            # 3. Logic
             query = """
                 SELECT c.id, 
                        COALESCE(SUM(t.value), 0) as revenue,
@@ -75,18 +66,14 @@ class handler(BaseHTTPRequestHandler):
                 revenue = float(row[1])
                 issues = int(row[2])
                 
-                # Formula: Score = log(Revenue + 1) * 10 - (Issues * 5)
-                # Normalized to 0-100 range roughly
-                
                 if revenue <= 0:
                     score = 0
                 else:
                     score = (math.log(revenue + 1, 10) * 20) - (issues * 5)
-                    score = max(0, min(100, score)) # Clamp 0-100
+                    score = max(0, min(100, score)) 
                     
                 updates.append((score, client_id))
             
-            # 4. Batch Update
             for score, cid in updates:
                 con.run("UPDATE \"Client\" SET \"aiScore\" = :s WHERE id = :id", s=score, id=cid)
                 

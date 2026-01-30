@@ -50,6 +50,10 @@ model Task {
   assignee    User?    @relation(fields: [assigneeId], references: [id])
   assigneeId  String?
 
+  // CRM Relation
+  project     Project? @relation(fields: [projectId], references: [id])
+  projectId   Int?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -95,4 +99,55 @@ model PayrollLock {
   lockedBy  String   // User ID
 
   @@unique([month, year])
+}
+
+// ============================================
+// CRM MODULE (Additive)
+// ============================================
+
+model Client {
+  id            Int       @id @default(autoincrement())
+  name          String
+  
+  // Hierarchical Relation (Parent Corporation -> Subsidiaries/Brands)
+  parentId      Int?
+  parent        Client?   @relation("ClientHierarchy", fields: [parentId], references: [id])
+  subsidiaries  Client[]  @relation("ClientHierarchy")
+  
+  projects      Project[]
+  
+  // Scoring Fields (Computed by Python Cron Job)
+  aiScore       Float     @default(0) // 0-100 Performance Score
+  frictionIndex Float     @default(0) // How "difficult" the client is
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Project {
+  id          Int       @id @default(autoincrement())
+  name        String
+  code        String?   // Internal Code e.g. "PRJ-001"
+  
+  client      Client    @relation(fields: [clientId], references: [id])
+  clientId    Int
+  
+  tasks       Task[]
+  feedbacks   Feedback[]
+  
+  createdAt   DateTime  @default(now())
+}
+
+model Feedback {
+  id          Int          @id @default(autoincrement())
+  content     String
+  
+  project     Project      @relation(fields: [projectId], references: [id])
+  projectId   Int
+  
+  // Type: CLIENT (External Feedback), INTERNAL (Team Review)
+  type        String       @default("CLIENT") 
+  severity    Int          @default(1) // 1 (Minor) -> 5 (Critical)
+  
+  createdAt   DateTime     @default(now())
 }

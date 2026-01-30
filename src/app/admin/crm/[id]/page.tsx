@@ -13,10 +13,16 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         include: {
             subsidiaries: {
                 include: {
-                    tasks: { where: { status: 'Hoàn tất' } }
+                    tasks: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 5 // Get recent tasks for sub-clients
+                    }
                 }
             },
-            tasks: { where: { status: 'Hoàn tất' } }, // Direct tasks
+            tasks: {
+                orderBy: { createdAt: 'desc' },
+                take: 20 // Get recent direct tasks
+            },
             projects: true
         }
     })

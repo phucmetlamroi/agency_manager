@@ -51,6 +51,7 @@ export default async function AdminLayout({
                     <h2 className="title-gradient" style={{ fontSize: '1.5rem' }}>Admin Portal</h2>
                     <nav style={{ display: 'flex', gap: '1rem' }}>
                         <Link href="/admin" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Dashboard</Link>
+                        <Link href="/admin/crm" className="btn" style={{ color: '#ccc', background: 'transparent' }}>CRM</Link>
                         <Link href="/admin/queue" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Kho Task</Link>
                         <Link href="/admin/payroll" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Bảng Lương</Link>
 

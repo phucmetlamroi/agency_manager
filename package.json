@@ -22,7 +22,6 @@
     "prisma": "^5.22.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "swr": "^2.3.8",
     "ws": "^8.19.0"
   },
   "devDependencies": {

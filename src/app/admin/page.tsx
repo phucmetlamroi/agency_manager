@@ -22,7 +22,12 @@ export default async function AdminDashboard() {
     // In a real app we might show a toast with checkResult.notifications
 
     const tasks = await prisma.task.findMany({
-        include: { assignee: true },
+        include: {
+            assignee: true,
+            client: {
+                include: { parent: true }
+            }
+        },
         orderBy: { createdAt: 'desc' }
     })
 

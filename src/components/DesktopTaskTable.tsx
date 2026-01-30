@@ -143,13 +143,28 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                     >
                         <div className="flex-1 cursor-pointer" onClick={() => openTask(task)}>
                             {/* Header: Type + Title */}
-                            <div className="flex items-start md:items-center gap-3 mb-2">
-                                <span className="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 mt-1 md:mt-0">
-                                    {task.type || 'Review'}
-                                </span>
-                                <h4 className="font-semibold text-lg leading-tight text-white mb-0 break-words w-full">
-                                    {task.title}
-                                </h4>
+                            <div className="flex flex-col gap-1 mb-2">
+                                {/* Client Badge */}
+                                {task.client && (
+                                    <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-blue-400">
+                                        <span>🏢 {task.client.parent ? task.client.parent.name : task.client.name}</span>
+                                        {task.client.parent && (
+                                            <>
+                                                <span className="text-gray-600">➤</span>
+                                                <span className="text-purple-400">{task.client.name}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="flex items-start md:items-center gap-3">
+                                    <span className="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 mt-1 md:mt-0">
+                                        {task.type || 'Review'}
+                                    </span>
+                                    <h4 className="font-semibold text-lg leading-tight text-white mb-0 break-words w-full">
+                                        {task.title}
+                                    </h4>
+                                </div>
                             </div>
 
                             {/* Metadata Grid/Row */}

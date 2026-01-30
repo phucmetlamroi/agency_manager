@@ -6,7 +6,12 @@ export default async function TaskQueuePage() {
     await checkOverdueTasks() // Ensure queue is fresh
 
     const tasks = await prisma.task.findMany({
-        include: { assignee: true },
+        include: {
+            assignee: true,
+            client: {
+                include: { parent: true }
+            }
+        },
         orderBy: { createdAt: 'desc' }
     })
 

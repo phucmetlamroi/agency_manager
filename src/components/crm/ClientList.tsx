@@ -28,6 +28,12 @@ export default function ClientList({ clients }: { clients: Client[] }) {
     )
 }
 
+function renderClient(client: Client, level: number) {
+    return (
+        <ClientItem key={client.id} client={client} />
+    )
+}
+
 function ClientItem({ client }: { client: Client }) {
     const [isExpanded, setIsExpanded] = useState(false)
 

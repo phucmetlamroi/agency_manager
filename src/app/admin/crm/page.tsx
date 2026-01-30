@@ -1,9 +1,13 @@
 import { getClients } from '@/actions/crm-actions'
 import ClientList from '@/components/crm/ClientList'
+import CreateClientButton from '@/components/crm/CreateClientButton'
 
 export default async function CRMDashboard() {
     const res = await getClients()
     const clients = res.data || []
+
+    // Type casting for UI component
+    const typedClients = clients as any[]
 
     return (
         <div className="p-6">

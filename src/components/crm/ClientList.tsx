@@ -23,9 +23,7 @@ export default function ClientList({ clients }: { clients: Client[] }) {
                 <div className="text-center py-8 text-gray-500">Chưa có dữ liệu khách hàng.</div>
             )}
 
-            {clients.map(client => (
-                <ClientItem key={client.id} client={client} />
-            ))}
+            {clients.map(client => renderClient(client, 0))}
         </div>
     )
 }

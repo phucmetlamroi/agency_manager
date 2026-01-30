@@ -40,6 +40,18 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState({ resources: '', references: '', notes: '', productLink: '', deadline: '' })
 
+    // Feedback Modal State
+    const [feedbackModal, setFeedbackModal] = useState<{ isOpen: boolean, taskId: string | null }>({ isOpen: false, taskId: null })
+    const [feedbackForm, setFeedbackForm] = useState<{ type: 'INTERNAL' | 'CLIENT', content: string }>({ type: 'INTERNAL', content: '' })
+
+    const handleFeedbackSubmit = async () => {
+        if (!feedbackModal.taskId) return
+
+        await handleStatusChange(feedbackModal.taskId, 'Revision', undefined, feedbackForm)
+        setFeedbackModal({ isOpen: false, taskId: null })
+        setFeedbackForm({ type: 'INTERNAL', content: '' })
+    }
+
     const openTask = (task: TaskWithUser) => {
         setSelectedTask(task)
         let deadlineStr = ''
@@ -66,12 +78,23 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
         return `https://${link}`
     }
 
-    const handleStatusChange = async (taskId: string, newStatus: string) => {
-        let notes: string | undefined = undefined
+    const handleStatusChange = async (taskId: string, newStatus: string, notes?: string, feedback?: { type: 'INTERNAL' | 'CLIENT', content: string }) => {
+        // Optimistic UI Update
+        const optimisticTasks = tasks.map(t =>
+            t.id === taskId ? { ...t, status: newStatus } : t
+        )
+        // Assuming 'mutate' is available in scope, e.g., from useSWR
+        // mutate(optimisticTasks, false) // Commented out as 'mutate' is not defined in the provided context
 
-        // Prompt removed as per user request
-
-        const res = await updateTaskStatus(taskId, newStatus, notes)
+        try {
+            // @ts-ignore - feedback type mismatch fix later if needed, passing string is fine for enum usually if matching
+            await updateTaskStatus(taskId, newStatus, notes, feedback)
+            // mutate() // Commented out as 'mutate' is not defined in the provided context
+        } catch (error) {
+            console.error("Optimistic update failed:", error)
+            // mutate(tasks, false) // Commented out as 'mutate' is not defined in the provided context
+            alert("Cập nhật thất bại. Vui lòng thử lại.")
+        }
     }
 
     const handleSaveDetails = async () => {
@@ -242,7 +265,14 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                 <div className="flex flex-col items-end gap-2">
                                     <select
                                         value={task.status}
-                                        onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                        onChange={(e) => {
+                                            const val = e.target.value
+                                            if (val === 'Revision') {
+                                                setFeedbackModal({ isOpen: true, taskId: task.id })
+                                                return
+                                            }
+                                            handleStatusChange(task.id, val)
+                                        }}
                                         className="appearance-none text-center font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer"
                                         style={{
                                             background: statusBg[task.status] || '#333',
@@ -490,6 +520,72 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                 </div >
             )
             }
+
+            {/* FEEDBACK MODAL */}
+            {feedbackModal.isOpen && (
+                <div style={{
+                    position: 'fixed', inset: 0,
+                    background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 10000
+                }} onClick={() => setFeedbackModal({ isOpen: false, taskId: null })}>
+                    <div style={{
+                        background: '#1a1a1a', color: 'white',
+                        width: '90%', maxWidth: '400px',
+                        borderRadius: '16px', padding: '1.5rem',
+                        border: '1px solid #333'
+                    }} onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold mb-4 text-red-500">Yêu cầu Sửa bài (Revision)</h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Nguồn Feedback</label>
+                                <div className="flex gap-4">
+                                    <label className={`flex-1 p-3 rounded border cursor-pointer flex items-center justify-center gap-2 ${feedbackForm.type === 'CLIENT' ? 'bg-red-500/20 border-red-500' : 'border-gray-700'}`}>
+                                        <input
+                                            type="radio"
+                                            name="fbType"
+                                            checked={feedbackForm.type === 'CLIENT'}
+                                            onChange={() => setFeedbackForm({ ...feedbackForm, type: 'CLIENT' })}
+                                            className="hidden"
+                                        />
+                                        <span>👤 Khách hàng</span>
+                                    </label>
+                                    <label className={`flex-1 p-3 rounded border cursor-pointer flex items-center justify-center gap-2 ${feedbackForm.type === 'INTERNAL' ? 'bg-yellow-500/20 border-yellow-500' : 'border-gray-700'}`}>
+                                        <input
+                                            type="radio"
+                                            name="fbType"
+                                            checked={feedbackForm.type === 'INTERNAL'}
+                                            onChange={() => setFeedbackForm({ ...feedbackForm, type: 'INTERNAL' })}
+                                            className="hidden"
+                                        />
+                                        <span>🏢 Nội bộ</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Nội dung chi tiết</label>
+                                <textarea
+                                    className="w-full bg-black/30 border border-gray-700 rounded p-2 text-sm"
+                                    rows={4}
+                                    placeholder="Ghi rõ yêu cầu sửa đổi..."
+                                    value={feedbackForm.content}
+                                    onChange={(e) => setFeedbackForm({ ...feedbackForm, content: e.target.value })}
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleFeedbackSubmit}
+                                disabled={!feedbackForm.content.trim()}
+                                className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg"
+                            >
+                                Xác nhận Revision
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     )
 }

@@ -2,8 +2,9 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { FeedbackSource } from '@prisma/client'
 
-export async function updateTaskStatus(id: string, newStatus: string, newNotes?: string) {
+export async function updateTaskStatus(id: string, newStatus: string, newNotes?: string, feedbackData?: { type: FeedbackSource, content: string }) {
     try {
         // Fetch task to check deadline and assignee
         const task = await prisma.task.findUnique({
@@ -171,6 +172,19 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
                     timerStartedAt: null
                 }
             }
+        }
+
+        // --- NEW: FEEDBACK LOGIC ---
+        if (newStatus === 'Revision' && feedbackData) {
+            await prisma.feedback.create({
+                data: {
+                    content: feedbackData.content,
+                    type: feedbackData.type,
+                    taskId: id,
+                    projectId: task.projectId // Link to project if exists
+                }
+            })
+            // If internal feedback, track for user penalty? (Logic handled in Performance module later)
         }
 
         // ... (Update DB call)

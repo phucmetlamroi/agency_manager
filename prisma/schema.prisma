@@ -24,6 +24,7 @@ model User {
   
   tasks     Task[]
   bonuses   MonthlyBonus[]
+  metrics   PerformanceMetric[]
 }
 
 model Task {
@@ -53,6 +54,8 @@ model Task {
   // CRM Relation
   project     Project? @relation(fields: [projectId], references: [id])
   projectId   Int?
+  
+  feedbacks   Feedback[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -142,12 +145,45 @@ model Feedback {
   id          Int          @id @default(autoincrement())
   content     String
   
-  project     Project      @relation(fields: [projectId], references: [id])
-  projectId   Int
+  project     Project?     @relation(fields: [projectId], references: [id])
+  projectId   Int?
+  
+  task        Task?        @relation(fields: [taskId], references: [id])
+  taskId      String?
   
   // Type: CLIENT (External Feedback), INTERNAL (Team Review)
-  type        String       @default("CLIENT") 
+  type        FeedbackSource @default(CLIENT)
   severity    Int          @default(1) // 1 (Minor) -> 5 (Critical)
   
   createdAt   DateTime     @default(now())
+}
+
+enum FeedbackSource {
+  INTERNAL
+  CLIENT
+}
+
+model PerformanceMetric {
+  id                    String   @id @default(uuid())
+  userId                String
+  month                 Int
+  year                  Int
+  
+  // Metrics
+  revenue               Float    @default(0)
+  avgCompletionTime     Int      @default(0) // Seconds
+  onTimeRate            Float    @default(100) // Percentage
+  
+  internalRevisionCount Int      @default(0)
+  clientRevisionCount   Int      @default(0)
+  
+  // Classification
+  score                 Float    @default(0) // 0-100
+  classification        String   @default("NORMAL") // POTENTIAL, NORMAL, UNDERPERFORM
+  
+  measuredAt            DateTime @default(now())
+  
+  user                  User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, month, year])
 }

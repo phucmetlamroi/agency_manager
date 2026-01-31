@@ -61,8 +61,8 @@ export async function createBatchTasks(data: BatchTaskInput) {
                     await tx.notification.create({
                         data: {
                             userId: data.assigneeId,
-                            content: `Bạn được giao task mới: "${title.trim()}"`,
-                            link: '/admin', // Navigate to dashboard/inventory
+                            message: `Bạn được giao task mới: "${title.trim()}"`,
+                            // Schema verification: uses 'message', not 'content'. No 'link' field.
                             isRead: false
                         }
                     })

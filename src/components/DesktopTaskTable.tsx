@@ -11,6 +11,8 @@ import DeleteTaskButton from './DeleteTaskButton'
 import Stopwatch from './Stopwatch'
 
 import { TaskWithUser } from '@/types/admin'
+import { useConfirm } from '@/components/ui/ConfirmModal'
+import { toast } from 'sonner'
 
 const statusColors: Record<string, string> = {
     "Đã nhận task": "#60a5fa",   // Blue
@@ -37,6 +39,7 @@ const statusBg: Record<string, string> = {
 }
 
 export default function TaskTable({ tasks, isAdmin = false, users = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[] }) {
+    const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
 
     // Edit State
@@ -96,7 +99,10 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
         } catch (error) {
             console.error("Optimistic update failed:", error)
             // mutate(tasks, false) // Commented out as 'mutate' is not defined in the provided context
-            alert("Cập nhật thất bại. Vui lòng thử lại.")
+        } catch (error) {
+            console.error("Optimistic update failed:", error)
+            // mutate(tasks, false) // Commented out as 'mutate' is not defined in the provided context
+            toast.error("Cập nhật thất bại. Vui lòng thử lại.")
         }
     }
 
@@ -121,8 +127,9 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                 productLink: editForm.productLink,
             })
             setIsEditing(false)
+            toast.success('Đã cập nhật chi tiết task')
         } else {
-            alert('Failed to update')
+            toast.error('Failed to update')
         }
     }
 
@@ -336,7 +343,16 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                 <button
                                     onClick={async (e) => {
                                         e.stopPropagation()
-                                        if (confirm('Xóa task này?')) await deleteTask(task.id)
+                                        if (await confirm({
+                                            title: 'Xóa Task?',
+                                            message: `Bạn có chắc chắn muốn xóa task "${task.title}" không? Hành động này không thể hoàn tác.`,
+                                            type: 'danger',
+                                            confirmText: 'Xóa luôn',
+                                            cancelText: 'Thôi'
+                                        })) {
+                                            await deleteTask(task.id)
+                                            toast.success('Đã xóa task thành công')
+                                        }
                                     }}
                                     className="text-gray-500 hover:text-red-500 p-2 text-xl"
                                 >

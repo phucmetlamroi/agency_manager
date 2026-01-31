@@ -299,10 +299,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                         value={task.status}
                                         onChange={(e) => {
                                             const val = e.target.value
-                                            if (val === 'Revision') {
-                                                setFeedbackModal({ isOpen: true, taskId: task.id })
-                                                return
-                                            }
+                                            // Bypass feedback modal, assume tracking on Frame.io
                                             handleStatusChange(task.id, val)
                                         }}
                                         className="appearance-none text-center font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer"
@@ -554,70 +551,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
             }
 
             {/* FEEDBACK MODAL */}
-            {feedbackModal.isOpen && (
-                <div style={{
-                    position: 'fixed', inset: 0,
-                    background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    zIndex: 10000
-                }} onClick={() => setFeedbackModal({ isOpen: false, taskId: null })}>
-                    <div style={{
-                        background: '#1a1a1a', color: 'white',
-                        width: '90%', maxWidth: '400px',
-                        borderRadius: '16px', padding: '1.5rem',
-                        border: '1px solid #333'
-                    }} onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold mb-4 text-red-500">Yêu cầu Sửa bài (Revision)</h3>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm text-gray-400 mb-2">Nguồn Feedback</label>
-                                <div className="flex gap-4">
-                                    <label className={`flex-1 p-3 rounded border cursor-pointer flex items-center justify-center gap-2 ${feedbackForm.type === 'CLIENT' ? 'bg-red-500/20 border-red-500' : 'border-gray-700'}`}>
-                                        <input
-                                            type="radio"
-                                            name="fbType"
-                                            checked={feedbackForm.type === 'CLIENT'}
-                                            onChange={() => setFeedbackForm({ ...feedbackForm, type: 'CLIENT' })}
-                                            className="hidden"
-                                        />
-                                        <span>👤 Khách hàng</span>
-                                    </label>
-                                    <label className={`flex-1 p-3 rounded border cursor-pointer flex items-center justify-center gap-2 ${feedbackForm.type === 'INTERNAL' ? 'bg-yellow-500/20 border-yellow-500' : 'border-gray-700'}`}>
-                                        <input
-                                            type="radio"
-                                            name="fbType"
-                                            checked={feedbackForm.type === 'INTERNAL'}
-                                            onChange={() => setFeedbackForm({ ...feedbackForm, type: 'INTERNAL' })}
-                                            className="hidden"
-                                        />
-                                        <span>🏢 Nội bộ</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm text-gray-400 mb-2">Nội dung chi tiết</label>
-                                <textarea
-                                    className="w-full bg-black/30 border border-gray-700 rounded p-2 text-sm"
-                                    rows={4}
-                                    placeholder="Ghi rõ yêu cầu sửa đổi..."
-                                    value={feedbackForm.content}
-                                    onChange={(e) => setFeedbackForm({ ...feedbackForm, content: e.target.value })}
-                                />
-                            </div>
-
-                            <button
-                                onClick={handleFeedbackSubmit}
-                                disabled={!feedbackForm.content.trim()}
-                                className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg"
-                            >
-                                Xác nhận Revision
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* FEEDBACK MODAL REMOVED - using Frame.io */}
         </>
     )
 }

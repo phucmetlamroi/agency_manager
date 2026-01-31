@@ -45,6 +45,7 @@ export default async function AdminDashboard() {
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '2rem', alignItems: 'start' }}>
+            <AutoRefresh />
 
 
             {/* Create Task Form Area */}

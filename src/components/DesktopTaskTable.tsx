@@ -1,3 +1,6 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import { calculateRiskLevel, getRiskColor, getRiskLabel } from '@/lib/risk-utils'
 
 // ... existing imports

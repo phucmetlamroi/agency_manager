@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createBatchTasks } from '@/actions/bulk-task-actions'
 import ClientSelector from '@/components/crm/ClientSelector'
+import { toast } from 'sonner'
 
 type User = {
     id: string
@@ -84,8 +85,8 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
     }
 
     const handleSubmit = async () => {
-        if (parsedTitles.length === 0) return alert('Vui lòng nhập ít nhất 1 tên task')
-        if (!clientId) return alert('Vui lòng chọn khách hàng')
+        if (parsedTitles.length === 0) return toast.error('Vui lòng nhập ít nhất 1 tên task')
+        if (!clientId) return toast.error('Vui lòng chọn khách hàng')
 
         setIsSubmitting(true)
         const res = await createBatchTasks({
@@ -103,9 +104,9 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
         })
 
         if (res.error) {
-            alert(res.error)
+            toast.error(res.error)
         } else {
-            alert(`✅ Đã tạo thành công ${res.count} task!`)
+            toast.success(`✅ Đã tạo thành công ${res.count} task!`)
             setRawTitles('')
             if (onSuccess) onSuccess()
         }

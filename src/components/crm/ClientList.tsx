@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { deleteClient } from '@/actions/crm-actions'
+import { useConfirm } from '@/components/ui/ConfirmModal'
+import { toast } from 'sonner'
 
 type Project = {
     id: number
@@ -45,15 +47,24 @@ function renderClient(client: Client, level: number) {
 }
 
 function ClientItem({ client }: { client: Client }) {
+    const { confirm } = useConfirm()
     const [isExpanded, setIsExpanded] = useState(false)
 
     const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation()
-        if (!confirm(`Bạn có chắc muốn xóa khách hàng "${client.name}"?\nHành động này không thể hoàn tác!`)) return
+        if (!(await confirm({
+            title: 'Xóa Khách hàng?',
+            message: `Bạn có chắc muốn xóa khách hàng "${client.name}"?\nHành động này không thể hoàn tác!`,
+            type: 'danger',
+            confirmText: 'Xóa luôn',
+            cancelText: 'Hủy'
+        }))) return
 
         const res = await deleteClient(client.id)
         if (!res.success) {
-            alert(res.error)
+            toast.error(res.error)
+        } else {
+            toast.success('Đã xóa khách hàng')
         }
     }
 
@@ -121,8 +132,8 @@ function ClientItem({ client }: { client: Client }) {
                                     <div key={t.id} className="bg-white/5 p-2 rounded text-sm flex justify-between items-center hover:bg-white/10">
                                         <span className="truncate max-w-[200px]">{t.title}</span>
                                         <span className={`text-[10px] px-1.5 py-0.5 rounded border ${t.status === 'Hoàn tất'
-                                                ? 'border-green-500 text-green-400 bg-green-900/20'
-                                                : 'border-yellow-500 text-yellow-500 bg-yellow-900/20'
+                                            ? 'border-green-500 text-green-400 bg-green-900/20'
+                                            : 'border-yellow-500 text-yellow-500 bg-yellow-900/20'
                                             }`}>
                                             {t.status}
                                         </span>

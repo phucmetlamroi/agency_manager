@@ -190,9 +190,9 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                         status={task.timerStatus || 'PAUSED'}
                                     />
                                     {/* Risk Indicator */}
-                                    {task.accumulatedSeconds > 0 && task.status === 'Đang thực hiện' && (
+                                    {(task.accumulatedSeconds || 0) > 0 && task.status === 'Đang thực hiện' && (
                                         (() => {
-                                            const risk = calculateRiskLevel(task.accumulatedSeconds, 0)
+                                            const risk = calculateRiskLevel(task.accumulatedSeconds || 0, 0)
                                             if (risk !== 'LOW') {
                                                 return (
                                                     <div className={`mt-1 text-[10px] px-2 py-0.5 rounded border text-center font-bold animate-pulse ${getRiskColor(risk)}`}>

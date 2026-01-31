@@ -299,7 +299,10 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                         value={task.status}
                                         onChange={(e) => {
                                             const val = e.target.value
-                                            // Bypass feedback modal, assume tracking on Frame.io
+                                            if (val === 'Revision') {
+                                                setFeedbackModal({ isOpen: true, taskId: task.id })
+                                                return
+                                            }
                                             handleStatusChange(task.id, val)
                                         }}
                                         className="appearance-none text-center font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer"
@@ -551,7 +554,63 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
             }
 
             {/* FEEDBACK MODAL */}
-            {/* FEEDBACK MODAL REMOVED - using Frame.io */}
+            {/* FEEDBACK MODAL */}
+            {feedbackModal.isOpen && (
+                <div style={{
+                    position: 'fixed', inset: 0,
+                    background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 10000
+                }} onClick={() => setFeedbackModal({ isOpen: false, taskId: null })}>
+                    <div style={{
+                        background: '#1a1a1a', color: 'white',
+                        width: '90%', maxWidth: '400px',
+                        borderRadius: '16px', padding: '1.5rem',
+                        border: '1px solid #333'
+                    }} onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold mb-4 text-red-500">Phân loại Revision</h3>
+
+                        <p className="text-sm text-gray-400 mb-4">
+                            Vui lòng chọn nguồn yêu cầu sửa đổi để tính điểm CRM & KPI.
+                        </p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Nguồn Feedback</label>
+                                <div className="flex gap-4">
+                                    <label className={`flex-1 p-3 rounded border cursor-pointer flex items-center justify-center gap-2 ${feedbackForm.type === 'CLIENT' ? 'bg-red-500/20 border-red-500' : 'border-gray-700'}`}>
+                                        <input
+                                            type="radio"
+                                            name="fbType"
+                                            checked={feedbackForm.type === 'CLIENT'}
+                                            onChange={() => setFeedbackForm({ ...feedbackForm, type: 'CLIENT' })}
+                                            className="hidden"
+                                        />
+                                        <span>👤 Khách hàng</span>
+                                    </label>
+                                    <label className={`flex-1 p-3 rounded border cursor-pointer flex items-center justify-center gap-2 ${feedbackForm.type === 'INTERNAL' ? 'bg-yellow-500/20 border-yellow-500' : 'border-gray-700'}`}>
+                                        <input
+                                            type="radio"
+                                            name="fbType"
+                                            checked={feedbackForm.type === 'INTERNAL'}
+                                            onChange={() => setFeedbackForm({ ...feedbackForm, type: 'INTERNAL' })}
+                                            className="hidden"
+                                        />
+                                        <span>🏢 Nội bộ</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleFeedbackSubmit}
+                                className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg"
+                            >
+                                Xác nhận Revision
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     )
 }

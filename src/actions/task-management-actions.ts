@@ -34,8 +34,8 @@ export async function assignTask(taskId: string, userId: string | null) {
                 isPenalized: false, // Reset penalty state for new assignee
                 // If unassigning (userId is null), also clear the deadline and PAUSE timer
                 ...(userId ? {
-                    timerStatus: 'RUNNING',
-                    timerStartedAt: new Date()
+                    timerStatus: 'PAUSED',
+                    timerStartedAt: null
                 } : {
                     deadline: null,
                     timerStatus: 'PAUSED',

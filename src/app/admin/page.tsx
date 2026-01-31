@@ -58,9 +58,6 @@ export default async function AdminDashboard() {
                 {/* Bottleneck Alert */}
                 <BottleneckAlert tasks={tasks as any} />
 
-                import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
-
-                // ... (inside component return)
 
                 {/* Task Lists */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>

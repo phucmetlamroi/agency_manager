@@ -55,10 +55,25 @@ export default async function AdminDashboard() {
                 {/* Bottleneck Alert */}
                 <BottleneckAlert tasks={tasks as any} />
 
-                {/* ACTIVE TASKS */}
-                <div>
-                    <h3 style={{ marginBottom: '1rem', color: '#ccc' }}>🔥 Đang Thực Hiện ({assignedTasks.length})</h3>
-                    <TaskTable tasks={assignedTasks as any} isAdmin={true} users={users} isMobile={await isMobileDevice()} />
+                import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
+
+                // ... (inside component return)
+
+                {/* Task Lists */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+
+                    {/* Bottleneck Alert */}
+                    <BottleneckAlert tasks={tasks as any} />
+
+                    {/* WORKFLOW TABS (Replaces old Active Tasks list) */}
+                    <div>
+                        <h3 style={{ marginBottom: '1rem', color: '#ccc' }}>🔥 Tiến Độ Công Việc</h3>
+                        <TaskWorkflowTabs
+                            tasks={assignedTasks.concat(unassignedTasks) as any}
+                            users={users}
+                            isMobile={await isMobileDevice()}
+                        />
+                    </div>
                 </div>
             </div>
 

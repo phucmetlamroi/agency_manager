@@ -8,6 +8,7 @@ import { isMobileDevice } from '@/lib/device'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { getSession } from '@/lib/auth'
 import BottleneckAlert from '@/components/BottleneckAlert'
+import TaskCreationManager from '@/components/TaskCreationManager'
 
 export default async function AdminDashboard() {
     const session = await getSession()
@@ -44,9 +45,6 @@ export default async function AdminDashboard() {
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '2rem', alignItems: 'start' }}>
 
-            import TaskCreationManager from '@/components/TaskCreationManager'
-
-            // ...
 
             {/* Create Task Form Area */}
             <TaskCreationManager users={users} />

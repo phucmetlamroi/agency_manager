@@ -8,6 +8,7 @@ import { isMobileDevice } from '@/lib/device'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { getSession } from '@/lib/auth'
 import BottleneckAlert from '@/components/BottleneckAlert'
+import AutoRefresh from '@/components/AutoRefresh'
 import TaskCreationManager from '@/components/TaskCreationManager'
 import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 

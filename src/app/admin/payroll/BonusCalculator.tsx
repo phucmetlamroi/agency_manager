@@ -3,8 +3,11 @@
 import { calculateMonthlyBonus, revertMonthlyBonus, getPayrollLockStatus } from '@/actions/bonus-actions'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useConfirm } from '@/components/ui/ConfirmModal'
+import { toast } from 'sonner'
 
 export default function BonusCalculator() {
+    const { confirm } = useConfirm()
     const [isLoading, setIsLoading] = useState(false)
     const [isLocked, setIsLocked] = useState(false)
     const router = useRouter()
@@ -19,46 +22,53 @@ export default function BonusCalculator() {
     }
 
     const handleCalculate = async () => {
-        if (!confirm('Bạn có chắc chắn muốn TÍNH THƯỞNG THÁNG NÀY?\n\nHệ thống sẽ chốt số liệu doanh thu tại thời điểm hiện tại và xếp hạng nhân viên.')) {
-            return
-        }
+        if (!(await confirm({
+            title: 'Tính thưởng tháng này?',
+            message: 'Bạn có chắc chắn muốn TÍNH THƯỞNG THÁNG NÀY?\n\nHệ thống sẽ chốt số liệu doanh thu tại thời điểm hiện tại và xếp hạng nhân viên.',
+            confirmText: 'Tính ngay',
+            cancelText: 'Hủy'
+        }))) return
 
         setIsLoading(true)
         try {
             const res = await calculateMonthlyBonus()
             if (res.success) {
-                alert(`Đã tính xong thưởng tháng ${res.month}/${res.year}!\n\nTop 1, 2, 3 đã được cập nhật thưởng. Kỳ lương ĐÃ KHÓA.`)
+                toast.success(`Đã tính xong thưởng tháng ${res.month}/${res.year}! Top 1, 2, 3 đã được cập nhật thưởng. Kỳ lương ĐÃ KHÓA.`)
                 setIsLocked(true)
                 router.refresh()
             } else {
-                alert('Lỗi: ' + res.error)
+                toast.error('Lỗi: ' + res.error)
             }
         } catch (error) {
             console.error(error)
-            alert('Có lỗi xảy ra khi tính thưởng.')
+            toast.error('Có lỗi xảy ra khi tính thưởng.')
         } finally {
             setIsLoading(false)
         }
     }
 
     const handleRevert = async () => {
-        if (!confirm('CẢNH BÁO: Hành động này sẽ XÓA toàn bộ thưởng đã tính và MỞ KHÓA kỳ lương.\n\nBạn có chắc chắn muốn làm lại từ đầu không?')) {
-            return
-        }
+        if (!(await confirm({
+            title: 'Hoàn tác & Tính lại?',
+            message: 'CẢNH BÁO: Hành động này sẽ XÓA toàn bộ thưởng đã tính và MỞ KHÓA kỳ lương.\n\nBạn có chắc chắn muốn làm lại từ đầu không?',
+            type: 'danger',
+            confirmText: 'Xóa & Tính lại',
+            cancelText: 'Hủy'
+        }))) return
 
         setIsLoading(true)
         try {
             const res = await revertMonthlyBonus()
             if (res.success) {
-                alert(res.message)
+                toast.success(res.message)
                 setIsLocked(false)
                 router.refresh()
             } else {
-                alert('Lỗi: ' + res.error)
+                toast.error('Lỗi: ' + res.error)
             }
         } catch (error) {
             console.error(error)
-            alert('Có lỗi xảy ra khi hoàn tác.')
+            toast.error('Có lỗi xảy ra khi hoàn tác.')
         } finally {
             setIsLoading(false)
         }

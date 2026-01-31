@@ -44,11 +44,12 @@ export default async function AdminDashboard() {
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '2rem', alignItems: 'start' }}>
 
-            {/* Create Task Form */}
-            <div className="glass-panel" style={{ padding: '1.5rem', height: 'fit-content' }}>
-                <h3 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>Giao Việc Mới</h3>
-                <CreateTaskForm users={users} />
-            </div>
+            import TaskCreationManager from '@/components/TaskCreationManager'
+
+            // ...
+
+            {/* Create Task Form Area */}
+            <TaskCreationManager users={users} />
 
             {/* Task Lists */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>

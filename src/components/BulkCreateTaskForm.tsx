@@ -49,6 +49,20 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
         setParsedTitles(lines)
     }, [rawTitles])
 
+    const [profitShare, setProfitShare] = useState<number>(0)
+    const [revenueVnd, setRevenueVnd] = useState<number>(0)
+
+    // Calculate Profit Share
+    useEffect(() => {
+        const rev = usd * rate
+        setRevenueVnd(rev)
+        if (rev > 0 && wage > 0) {
+            setProfitShare((wage / rev) * 100)
+        } else {
+            setProfitShare(0)
+        }
+    }, [usd, wage, rate])
+
     const handleUsdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value.replace(/\D/g, '')
         const num = parseFloat(raw)
@@ -157,7 +171,7 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
                 </div>
             </div>
 
-            {/* 2. Batch Titles Section */}
+            {/* 2. Task List Section */}
             <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
                 <h4 className="text-sm uppercase tracking-widest text-blue-400 mb-2 font-bold">2. Danh sách Task ({parsedTitles.length})</h4>
                 <p className="text-xs text-gray-500 mb-2">Paste danh sách tên video vào đây (Mỗi dòng 1 video)</p>

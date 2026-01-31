@@ -98,10 +98,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
             // mutate() // Commented out as 'mutate' is not defined in the provided context
         } catch (error) {
             console.error("Optimistic update failed:", error)
-            // mutate(tasks, false) // Commented out as 'mutate' is not defined in the provided context
-        } catch (error) {
-            console.error("Optimistic update failed:", error)
-            // mutate(tasks, false) // Commented out as 'mutate' is not defined in the provided context
+            // mutate(tasks, false)
             toast.error("Cập nhật thất bại. Vui lòng thử lại.")
         }
     }

@@ -9,6 +9,7 @@ import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { getSession } from '@/lib/auth'
 import BottleneckAlert from '@/components/BottleneckAlert'
 import TaskCreationManager from '@/components/TaskCreationManager'
+import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 
 export default async function AdminDashboard() {
     const session = await getSession()

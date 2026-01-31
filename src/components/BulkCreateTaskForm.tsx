@@ -149,53 +149,79 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
                         <input value={wageDisplay} onChange={handleWageChange} placeholder="0"
                             className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
                     </div>
-                    <div className="mt-4">
-                        <label className="text-xs text-gray-400">References (Link mẫu)</label>
-                        <input value={references} onChange={e => setReferences(e.target.value)} placeholder="https://..."
-                            className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
-                    </div>
-
-                    <div className="mt-4">
-                        <label className="text-xs text-gray-400">Giao cho nhân viên</label>
-                        <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)}
-                            className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm">
-                            <option value="">-- Để trống (Kho Task) --</option>
-                            {users.map((u) => (
-                                <option key={u.id} value={u.id} disabled={u.role === 'LOCKED'}>
-                                    {u.username} ({u.reputation ?? 100}đ)
-                                </option>
-                            ))}
-                        </select>
-                    </div>
                 </div>
 
-                {/* 2. Task List Section */}
-                <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
-                    <h4 className="text-sm uppercase tracking-widest text-blue-400 mb-2 font-bold">2. Danh sách Task ({parsedTitles.length})</h4>
-                    <p className="text-xs text-gray-500 mb-2">Paste danh sách tên video vào đây (Mỗi dòng 1 video)</p>
-
-                    <textarea
-                        value={rawTitles}
-                        onChange={e => setRawTitles(e.target.value)}
-                        placeholder={`Video Intro\nVideo Review 1\nVideo Review 2`}
-                        rows={8}
-                        className="w-full p-3 bg-[#111] border border-blue-500/30 rounded-lg text-white font-mono text-sm leading-relaxed focus:outline-none focus:border-blue-500"
-                    />
-
-                    {parsedTitles.length > 0 && (
-                        <div className="mt-2 text-xs text-gray-400 flex justify-between items-center">
-                            <span>Đang chuẩn bị tạo <strong className="text-white">{parsedTitles.length}</strong> task</span>
+                {/* Financial Info */}
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.8rem', borderRadius: '6px', fontSize: '0.85rem', marginTop: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', color: '#aaa' }}>
+                        <span>ℹ️ Tỷ giá: 1 USD = {rate.toLocaleString()} VND</span>
+                        <span>Doanh thu: {revenueVnd.toLocaleString()} ₫</span>
+                    </div>
+                    {usd > 0 && wage > 0 && (
+                        <div style={{
+                            color: profitShare > 50 ? '#4ade80' : (profitShare < 30 ? '#ef4444' : '#fbbf24'),
+                            fontWeight: 'bold'
+                        }}>
+                            💰 User nhận được {profitShare.toFixed(1)}% so với doanh thu tổng.
+                            {profitShare < 30 && <span style={{ marginLeft: '0.5rem' }}>⚠️ Thấp!</span>}
+                            {profitShare > 50 && <span style={{ marginLeft: '0.5rem' }}>✅ Cao!</span>}
                         </div>
                     )}
                 </div>
 
-                <button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting || parsedTitles.length === 0}
-                    className="btn btn-primary w-full py-3 font-bold text-lg shadow-lg hover:shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all"
-                >
-                    {isSubmitting ? 'Đang xử lý...' : `🚀 Tạo ${parsedTitles.length > 0 ? parsedTitles.length : ''} Task Ngay`}
-                </button>
+                <div className="mt-4">
+                    <label className="text-xs text-gray-400">Link Tài nguyên (Folder Drive/Dropbox)</label>
+                    <input value={resources} onChange={e => setResources(e.target.value)} placeholder="https://..."
+                        className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
+                </div>
+
+                <div className="mt-4">
+                    <label className="text-xs text-gray-400">References (Link mẫu)</label>
+                    <input value={references} onChange={e => setReferences(e.target.value)} placeholder="https://..."
+                        className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
+                </div>
+
+                <div className="mt-4">
+                    <label className="text-xs text-gray-400">Giao cho nhân viên</label>
+                    <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)}
+                        className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm">
+                        <option value="">-- Để trống (Kho Task) --</option>
+                        {users.map((u) => (
+                            <option key={u.id} value={u.id} disabled={u.role === 'LOCKED'}>
+                                {u.username} ({u.reputation ?? 100}đ)
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </div>
-            )
+
+            {/* 2. Task List Section */}
+            <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                <h4 className="text-sm uppercase tracking-widest text-blue-400 mb-2 font-bold">2. Danh sách Task ({parsedTitles.length})</h4>
+                <p className="text-xs text-gray-500 mb-2">Paste danh sách tên video vào đây (Mỗi dòng 1 video)</p>
+
+                <textarea
+                    value={rawTitles}
+                    onChange={e => setRawTitles(e.target.value)}
+                    placeholder={`Video Intro\nVideo Review 1\nVideo Review 2`}
+                    rows={8}
+                    className="w-full p-3 bg-[#111] border border-blue-500/30 rounded-lg text-white font-mono text-sm leading-relaxed focus:outline-none focus:border-blue-500"
+                />
+
+                {parsedTitles.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-400 flex justify-between items-center">
+                        <span>Đang chuẩn bị tạo <strong className="text-white">{parsedTitles.length}</strong> task</span>
+                    </div>
+                )}
+            </div>
+
+            <button
+                onClick={handleSubmit}
+                disabled={isSubmitting || parsedTitles.length === 0}
+                className="btn btn-primary w-full py-3 font-bold text-lg shadow-lg hover:shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all"
+            >
+                {isSubmitting ? 'Đang xử lý...' : `🚀 Tạo ${parsedTitles.length > 0 ? parsedTitles.length : ''} Task Ngay`}
+            </button>
+        </div>
+    )
 }

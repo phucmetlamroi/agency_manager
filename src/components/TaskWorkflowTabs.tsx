@@ -18,13 +18,12 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile }: { tasks: Ta
 
     // Filter Logic
     const assignedTasks = tasks.filter(t =>
-        t.status === 'Đã nhận task' || t.status === 'Đang đợi giao' || !t.timerStartedAt
+        t.status === 'Đã nhận task' || t.status === 'Đang đợi giao' || t.status === 'UNASSIGNED'
     )
 
-    // In Progress: Timer started OR explicitly 'Đang thực hiện' AND NOT finished/revision
+    // In Progress: Explicit 'In Progress' status OR Timer is running (and not finished/revision)
     const inProgressTasks = tasks.filter(t =>
-        (t.status === 'Đang thực hiện' || (t.timerStartedAt && t.status !== 'Hoàn tất' && t.status !== 'Revision'))
-        && t.status !== 'Đã nhận task'
+        t.status === 'Đang thực hiện'
     )
 
     const revisionTasks = tasks.filter(t => t.status === 'Revision' || t.status === 'Sửa frame')

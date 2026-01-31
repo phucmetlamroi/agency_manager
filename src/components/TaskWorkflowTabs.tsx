@@ -18,7 +18,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile }: { tasks: Ta
 
     // Filter Logic
     const assignedTasks = tasks.filter(t =>
-        (t.status === 'Đã nhận task' || t.status === 'Đang đợi giao') && t.assigneeId
+        (t.status === 'Đã nhận task' || t.status === 'Đang đợi giao') && t.assignee
     )
 
     // In Progress: Explicit 'In Progress' status OR Timer is running (and not finished/revision)

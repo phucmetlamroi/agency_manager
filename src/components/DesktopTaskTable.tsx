@@ -179,12 +179,12 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                     const isLocked = !isAdmin && task.status === 'Đã nhận task';
                     return (
                         <div key={task.id}
-                            className={`glass-panel group relative p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-transform border-l-4 ${isLocked ? 'grayscale opacity-70 cursor-not-allowed' : ''}`}
+                            className="glass-panel group relative p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-transform border-l-4"
                             style={{
                                 borderLeftColor: statusColors[task.status] || '#ccc'
                             }}
                         >
-                            <div className="flex-1 cursor-pointer" onClick={() => openTask(task)}>
+                            <div className={`flex-1 ${isLocked ? 'opacity-50 grayscale pointer-events-none' : 'cursor-pointer'}`} onClick={() => openTask(task)}>
                                 {/* Header: Type + Title */}
                                 <div className="flex flex-col gap-1 mb-2">
                                     {/* Client Badge */}

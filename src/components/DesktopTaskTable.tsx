@@ -44,7 +44,15 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
 
     // Edit State
     const [isEditing, setIsEditing] = useState(false)
-    const [editForm, setEditForm] = useState({ resources: '', references: '', notes: '', productLink: '', deadline: '' })
+    const [editForm, setEditForm] = useState({
+        resources: '', // Kept for backward compatibility or direct access
+        linkRaw: '',
+        linkBroll: '',
+        references: '',
+        notes: '',
+        productLink: '',
+        deadline: ''
+    })
 
     // Feedback Modal State
     const [feedbackModal, setFeedbackModal] = useState<{ isOpen: boolean, taskId: string | null }>({ isOpen: false, taskId: null })
@@ -67,8 +75,24 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
             deadlineStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
         }
 
+        // Parse Resources for RAW/BROLL
+        let raw = ''
+        let broll = ''
+        const resString = task.resources || task.fileLink || ''
+
+        if (resString.includes('RAW:') && resString.includes('| BROLL:')) {
+            const parts = resString.split('| BROLL:')
+            raw = parts[0].replace('RAW:', '').trim()
+            broll = parts[1].trim()
+        } else {
+            // Fallback for old links -> treat as RAW or Generic
+            raw = resString
+        }
+
         setEditForm({
-            resources: task.resources || task.fileLink || '',
+            resources: resString,
+            linkRaw: raw,
+            linkBroll: broll,
             references: task.references || '',
             notes: task.notes || '',
             productLink: task.productLink || '',
@@ -106,8 +130,12 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
     const handleSaveDetails = async () => {
         if (!selectedTask) return
 
+        const combinedResources = (editForm.linkRaw || editForm.linkBroll)
+            ? `RAW: ${editForm.linkRaw.trim()} | BROLL: ${editForm.linkBroll.trim()}`
+            : editForm.resources
+
         const res = await updateTaskDetails(selectedTask.id, {
-            resources: editForm.resources,
+            resources: combinedResources,
             references: editForm.references,
             notes: editForm.notes,
             title: selectedTask.title, // Keep existing title
@@ -118,7 +146,8 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
         if (res?.success) {
             setSelectedTask({
                 ...selectedTask,
-                resources: editForm.resources,
+                ...selectedTask,
+                resources: combinedResources,
                 references: editForm.references,
                 notes: editForm.notes,
                 productLink: editForm.productLink,
@@ -468,21 +497,54 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                             {/* RESOURCES */}
                             <div className="p-3 rounded-xl border border-gray-100">
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                                    RESOURCES (RAW/B-ROLL)
+                                    RESOURCES (RAW / B-ROLL)
                                 </label>
                                 {isEditing && isAdmin ? (
-                                    <input
-                                        value={editForm.resources}
-                                        onChange={(e) => setEditForm({ ...editForm, resources: e.target.value })}
-                                        placeholder="https://..."
-                                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px' }}
-                                    />
+                                    <div className="flex flex-col gap-2">
+                                        <input
+                                            value={editForm.linkRaw}
+                                            onChange={(e) => setEditForm({ ...editForm, linkRaw: e.target.value })}
+                                            placeholder="Link RAW (Source)..."
+                                            className="w-full p-2 border border-gray-200 rounded text-sm"
+                                        />
+                                        <input
+                                            value={editForm.linkBroll}
+                                            onChange={(e) => setEditForm({ ...editForm, linkBroll: e.target.value })}
+                                            placeholder="Link B-Roll (Tài nguyên)..."
+                                            className="w-full p-2 border border-gray-200 rounded text-sm"
+                                        />
+                                    </div>
                                 ) : (
-                                    (selectedTask.resources || selectedTask.fileLink) ? (
-                                        <a href={formatLink(selectedTask.resources || selectedTask.fileLink)} target="_blank" className="text-blue-600 font-semibold hover:underline">
-                                            📂 Open Resource Folder ↗
-                                        </a>
-                                    ) : <span className="text-gray-400 italic">No resources linked.</span>
+                                    (() => {
+                                        const resString = selectedTask.resources || selectedTask.fileLink
+                                        if (!resString) return <span className="text-gray-400 italic">No resources linked.</span>
+
+                                        if (resString.includes('RAW:') && resString.includes('| BROLL:')) {
+                                            const parts = resString.split('| BROLL:')
+                                            const raw = parts[0].replace('RAW:', '').trim()
+                                            const broll = parts[1].trim()
+                                            return (
+                                                <div className="flex flex-col gap-2">
+                                                    {raw && (
+                                                        <a href={formatLink(raw)} target="_blank" className="text-blue-600 font-semibold hover:underline flex items-center gap-1">
+                                                            📁 RAW Link ↗
+                                                        </a>
+                                                    )}
+                                                    {broll && (
+                                                        <a href={formatLink(broll)} target="_blank" className="text-purple-600 font-semibold hover:underline flex items-center gap-1">
+                                                            🎨 B-Roll Link ↗
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            )
+                                        }
+
+                                        return (
+                                            <a href={formatLink(resString)} target="_blank" className="text-blue-600 font-semibold hover:underline">
+                                                📂 Open Resource Folder ↗
+                                            </a>
+                                        )
+                                    })()
                                 )}
                             </div>
 

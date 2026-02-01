@@ -23,7 +23,8 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
     const [assigneeId, setAssigneeId] = useState<string>('')
     const [type, setType] = useState<string>('Short form')
     const [deadline, setDeadline] = useState<string>('')
-    const [resources, setResources] = useState<string>('')
+    const [linkRaw, setLinkRaw] = useState<string>('')
+    const [linkBroll, setLinkBroll] = useState<string>('')
     const [references, setReferences] = useState<string>('')
     const [notes, setNotes] = useState<string>('')
 
@@ -97,7 +98,7 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
             jobPriceUSD: usd,
             exchangeRate: rate,
             wageVND: wage,
-            resources: resources || null,
+            resources: (linkRaw || linkBroll) ? `RAW: ${linkRaw.trim()} | BROLL: ${linkBroll.trim()}` : null,
             references: references || null,
             notes: notes || null,
             type
@@ -170,10 +171,17 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
                     )}
                 </div>
 
-                <div className="mt-4">
-                    <label className="text-xs text-gray-400">Link Tài nguyên (Folder Drive/Dropbox)</label>
-                    <input value={resources} onChange={e => setResources(e.target.value)} placeholder="https://..."
-                        className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs text-gray-400">Link Source (Raw Footage)</label>
+                        <input value={linkRaw} onChange={e => setLinkRaw(e.target.value)} placeholder="https://..."
+                            className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-400">Link B-Roll (Tài nguyên)</label>
+                        <input value={linkBroll} onChange={e => setLinkBroll(e.target.value)} placeholder="https://..."
+                            className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
+                    </div>
                 </div>
 
                 <div className="mt-4">

@@ -175,224 +175,230 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
     return (
         <>
             <div className="flex flex-col gap-4">
-                {tasks.map(task => (
-                    <div key={task.id}
-                        className="glass-panel group relative p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-transform border-l-4"
-                        style={{
-                            borderLeftColor: statusColors[task.status] || '#ccc'
-                        }}
-                    >
-                        <div className="flex-1 cursor-pointer" onClick={() => openTask(task)}>
-                            {/* Header: Type + Title */}
-                            <div className="flex flex-col gap-1 mb-2">
-                                {/* Client Badge */}
-                                {task.client && (
-                                    <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-blue-400">
-                                        <span>🏢 {task.client.parent ? task.client.parent.name : task.client.name}</span>
-                                        {task.client.parent && (
-                                            <>
-                                                <span className="text-gray-600">➤</span>
-                                                <span className="text-purple-400">{task.client.name}</span>
-                                            </>
+                {tasks.map(task => {
+                    const isLocked = !isAdmin && task.status === 'Đã nhận task';
+                    return (
+                        <div key={task.id}
+                            className={`glass-panel group relative p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-transform border-l-4 ${isLocked ? 'grayscale opacity-70 cursor-not-allowed' : ''}`}
+                            style={{
+                                borderLeftColor: statusColors[task.status] || '#ccc'
+                            }}
+                        >
+                            <div className="flex-1 cursor-pointer" onClick={() => openTask(task)}>
+                                {/* Header: Type + Title */}
+                                <div className="flex flex-col gap-1 mb-2">
+                                    {/* Client Badge */}
+                                    {task.client && (
+                                        <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-blue-400">
+                                            <span>🏢 {task.client.parent ? task.client.parent.name : task.client.name}</span>
+                                            {task.client.parent && (
+                                                <>
+                                                    <span className="text-gray-600">➤</span>
+                                                    <span className="text-purple-400">{task.client.name}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-start md:items-center gap-3 relative">
+                                        {isLocked && (
+                                            <span className="absolute -left-8 top-1 text-xl" title="Locked until Started">🔒</span>
+                                        )}
+                                        <span className="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 mt-1 md:mt-0">
+                                            {task.type || 'Review'}
+                                        </span>
+                                        <h4 className="font-semibold text-lg leading-tight text-white mb-0 break-words w-full">
+                                            {task.title}
+                                        </h4>
+                                    </div>
+                                </div>
+
+                                {/* Metadata Grid/Row */}
+                                <div className="text-sm text-gray-400 flex flex-col md:flex-row md:items-center gap-2 md:gap-6">
+                                    {/* Deadline */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="opacity-60 text-xs uppercase">Deadline:</span>
+                                        {task.deadline ? (
+                                            <span className={new Date() > new Date(task.deadline) && task.status !== 'Hoàn tất' ? 'text-red-400 font-bold' : 'text-gray-300'}>
+                                                {new Date(task.deadline).toLocaleDateString('vi-VN')} {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        ) : <span className="italic text-gray-600">No Deadline</span>}
+                                    </div>
+
+                                    {/* Timer - Always Visible */}
+                                    <div className="border-t border-dashed border-gray-700 pt-1 md:border-0 md:pt-0">
+                                        <Stopwatch
+                                            accumulatedSeconds={task.accumulatedSeconds || 0}
+                                            timerStartedAt={task.timerStartedAt ?? null}
+                                            status={task.timerStatus || 'PAUSED'}
+                                        />
+                                        {/* Risk Indicator */}
+                                        {(task.accumulatedSeconds || 0) > 0 && task.status === 'Đang thực hiện' && (
+                                            (() => {
+                                                const risk = calculateRiskLevel(task.accumulatedSeconds || 0, 0)
+                                                if (risk !== 'LOW') {
+                                                    return (
+                                                        <div className={`mt-1 text-[10px] px-2 py-0.5 rounded border text-center font-bold animate-pulse ${getRiskColor(risk)}`}>
+                                                            ⚠️ {getRiskLabel(risk)}
+                                                        </div>
+                                                    )
+                                                }
+                                                return null
+                                            })()
+                                        )}
+                                    </div>
+
+                                    {/* Mobile-Optimized Status/Assignee info */}
+                                    <div className="flex items-center gap-4 mt-1 md:mt-0">
+                                        {/* Assignee */}
+                                        {isAdmin && (
+                                            <div onClick={(e) => e.stopPropagation()}>
+                                                <select
+                                                    value={task.assignee?.id || ''}
+                                                    onChange={async (e) => {
+                                                        const val = e.target.value
+                                                        const res = await assignTask(task.id, val || null)
+                                                        if (res?.success) window.location.reload()
+                                                    }}
+                                                    className="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-blue-500 max-w-[120px]"
+                                                >
+                                                    <option value="" className="text-gray-500">-- Assign --</option>
+                                                    {users.map(u => (
+                                                        <option key={u.id} value={u.id} className="text-black">
+                                                            {u.username} ({u.reputation ?? 100}đ)
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        {/* Money (Admin Only) */}
+                                        {isAdmin && (
+                                            <span className="font-mono text-green-400 font-bold">
+                                                {task.value.toLocaleString()} đ
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Warning Messages */}
+                                {task.deadline && task.status !== 'Hoàn tất' && (
+                                    (() => {
+                                        const start = task.createdAt ? new Date(task.createdAt).getTime() : new Date().getTime()
+                                        const end = new Date(task.deadline).getTime()
+                                        const now = new Date().getTime()
+                                        const percent = (end - start) > 0 ? ((now - start) / (end - start)) * 100 : 100
+
+                                        if (percent > 100) return <div className="text-red-500 text-xs font-bold mt-1">GẤP: Đã quá hạn! (100%)</div>
+                                        if (percent >= 90) return <div className="text-orange-500 text-xs font-bold mt-1">CẢNH BÁO: Sắp hết giờ (90%)</div>
+                                        return null
+                                    })()
+                                )}
+                            </div>
+
+                            {/* Actions Row */}
+                            <div className="flex items-center justify-end gap-2 flex-wrap border-t border-gray-800 pt-3 md:border-0 md:pt-0 mt-2 md:mt-0">
+                                {/* Status Selector (Admin) or Buttons (User) */}
+                                {!isAdmin ? (
+                                    <>
+                                        {task.status === 'Đã nhận task' && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Đang thực hiện') }}
+                                                className="px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg shadow-lg hover:bg-yellow-400 text-sm whitespace-nowrap"
+                                            >
+                                                ▶ Bắt đầu
+                                            </button>
+                                        )}
+                                        {task.status === 'Đang thực hiện' && (
+                                            <span className="px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-500 text-xs font-bold border border-yellow-500/30 flex items-center gap-2">
+                                                <span className="animate-pulse">●</span> Working...
+                                            </span>
+                                        )}
+                                        {(task.status === 'Tạm ngưng' || task.status === 'Sửa frame' || task.status === 'Đang đợi giao' || task.status === 'Revision' || task.status === 'Review') && (
+                                            <span className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 text-xs italic border border-gray-700">
+                                                ⏳ Waiting...
+                                            </span>
+                                        )}
+                                        {task.status === 'Hoàn tất' && (
+                                            <div className="flex flex-col gap-1 items-end">
+                                                <span className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/30">
+                                                    🏆 Done
+                                                </span>
+                                                {/* Calculate and show Total Time for Finished tasks safely */}
+                                                <span className="text-[10px] text-gray-500 font-mono">
+                                                    {(() => {
+                                                        const s = task.accumulatedSeconds || 0
+                                                        const h = Math.floor(s / 3600)
+                                                        const m = Math.floor((s % 3600) / 60)
+                                                        return `${h}h ${m}m`
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-end gap-2">
+                                        <select
+                                            value={task.status}
+                                            onChange={(e) => {
+                                                const val = e.target.value
+                                                if (val === 'Revision') {
+                                                    setFeedbackModal({ isOpen: true, taskId: task.id })
+                                                    return
+                                                }
+                                                handleStatusChange(task.id, val)
+                                            }}
+                                            className="appearance-none text-center font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer"
+                                            style={{
+                                                background: statusBg[task.status] || '#333',
+                                                color: statusColors[task.status] || 'white',
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            {getStatusOptions().map(opt => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                        </select>
+
+                                        {/* Admin Revision Controls */}
+                                        {isAdmin && task.status === 'Revision' && (
+                                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                                <button disabled className="px-2 py-1 text-[10px] bg-red-500/50 text-white rounded cursor-not-allowed">Chưa FB</button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Đang thực hiện') }}
+                                                    className="px-2 py-1 text-[10px] bg-green-500 text-white font-bold rounded hover:bg-green-400"
+                                                >
+                                                    ✔ Đã FB
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 )}
 
-                                <div className="flex items-start md:items-center gap-3">
-                                    <span className="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 mt-1 md:mt-0">
-                                        {task.type || 'Review'}
-                                    </span>
-                                    <h4 className="font-semibold text-lg leading-tight text-white mb-0 break-words w-full">
-                                        {task.title}
-                                    </h4>
-                                </div>
-                            </div>
-
-                            {/* Metadata Grid/Row */}
-                            <div className="text-sm text-gray-400 flex flex-col md:flex-row md:items-center gap-2 md:gap-6">
-                                {/* Deadline */}
-                                <div className="flex items-center gap-2">
-                                    <span className="opacity-60 text-xs uppercase">Deadline:</span>
-                                    {task.deadline ? (
-                                        <span className={new Date() > new Date(task.deadline) && task.status !== 'Hoàn tất' ? 'text-red-400 font-bold' : 'text-gray-300'}>
-                                            {new Date(task.deadline).toLocaleDateString('vi-VN')} {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
-                                    ) : <span className="italic text-gray-600">No Deadline</span>}
-                                </div>
-
-                                {/* Timer - Always Visible */}
-                                <div className="border-t border-dashed border-gray-700 pt-1 md:border-0 md:pt-0">
-                                    <Stopwatch
-                                        accumulatedSeconds={task.accumulatedSeconds || 0}
-                                        timerStartedAt={task.timerStartedAt ?? null}
-                                        status={task.timerStatus || 'PAUSED'}
-                                    />
-                                    {/* Risk Indicator */}
-                                    {(task.accumulatedSeconds || 0) > 0 && task.status === 'Đang thực hiện' && (
-                                        (() => {
-                                            const risk = calculateRiskLevel(task.accumulatedSeconds || 0, 0)
-                                            if (risk !== 'LOW') {
-                                                return (
-                                                    <div className={`mt-1 text-[10px] px-2 py-0.5 rounded border text-center font-bold animate-pulse ${getRiskColor(risk)}`}>
-                                                        ⚠️ {getRiskLabel(risk)}
-                                                    </div>
-                                                )
+                                {isAdmin && (
+                                    <button
+                                        onClick={async (e) => {
+                                            e.stopPropagation()
+                                            if (await confirm({
+                                                title: 'Xóa Task?',
+                                                message: `Bạn có chắc chắn muốn xóa task "${task.title}" không? Hành động này không thể hoàn tác.`,
+                                                type: 'danger',
+                                                confirmText: 'Xóa luôn',
+                                                cancelText: 'Thôi'
+                                            })) {
+                                                await deleteTask(task.id)
+                                                toast.success('Đã xóa task thành công')
                                             }
-                                            return null
-                                        })()
-                                    )}
-                                </div>
-
-                                {/* Mobile-Optimized Status/Assignee info */}
-                                <div className="flex items-center gap-4 mt-1 md:mt-0">
-                                    {/* Assignee */}
-                                    {isAdmin && (
-                                        <div onClick={(e) => e.stopPropagation()}>
-                                            <select
-                                                value={task.assignee?.id || ''}
-                                                onChange={async (e) => {
-                                                    const val = e.target.value
-                                                    const res = await assignTask(task.id, val || null)
-                                                    if (res?.success) window.location.reload()
-                                                }}
-                                                className="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-blue-500 max-w-[120px]"
-                                            >
-                                                <option value="" className="text-gray-500">-- Assign --</option>
-                                                {users.map(u => (
-                                                    <option key={u.id} value={u.id} className="text-black">
-                                                        {u.username} ({u.reputation ?? 100}đ)
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
-
-                                    {/* Money (Admin Only) */}
-                                    {isAdmin && (
-                                        <span className="font-mono text-green-400 font-bold">
-                                            {task.value.toLocaleString()} đ
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Warning Messages */}
-                            {task.deadline && task.status !== 'Hoàn tất' && (
-                                (() => {
-                                    const start = task.createdAt ? new Date(task.createdAt).getTime() : new Date().getTime()
-                                    const end = new Date(task.deadline).getTime()
-                                    const now = new Date().getTime()
-                                    const percent = (end - start) > 0 ? ((now - start) / (end - start)) * 100 : 100
-
-                                    if (percent > 100) return <div className="text-red-500 text-xs font-bold mt-1">GẤP: Đã quá hạn! (100%)</div>
-                                    if (percent >= 90) return <div className="text-orange-500 text-xs font-bold mt-1">CẢNH BÁO: Sắp hết giờ (90%)</div>
-                                    return null
-                                })()
-                            )}
-                        </div>
-
-                        {/* Actions Row */}
-                        <div className="flex items-center justify-end gap-2 flex-wrap border-t border-gray-800 pt-3 md:border-0 md:pt-0 mt-2 md:mt-0">
-                            {/* Status Selector (Admin) or Buttons (User) */}
-                            {!isAdmin ? (
-                                <>
-                                    {task.status === 'Đã nhận task' && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Đang thực hiện') }}
-                                            className="px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg shadow-lg hover:bg-yellow-400 text-sm whitespace-nowrap"
-                                        >
-                                            ▶ Bắt đầu
-                                        </button>
-                                    )}
-                                    {task.status === 'Đang thực hiện' && (
-                                        <span className="px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-500 text-xs font-bold border border-yellow-500/30 flex items-center gap-2">
-                                            <span className="animate-pulse">●</span> Working...
-                                        </span>
-                                    )}
-                                    {(task.status === 'Tạm ngưng' || task.status === 'Sửa frame' || task.status === 'Đang đợi giao' || task.status === 'Revision' || task.status === 'Review') && (
-                                        <span className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 text-xs italic border border-gray-700">
-                                            ⏳ Waiting...
-                                        </span>
-                                    )}
-                                    {task.status === 'Hoàn tất' && (
-                                        <div className="flex flex-col gap-1 items-end">
-                                            <span className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/30">
-                                                🏆 Done
-                                            </span>
-                                            {/* Calculate and show Total Time for Finished tasks safely */}
-                                            <span className="text-[10px] text-gray-500 font-mono">
-                                                {(() => {
-                                                    const s = task.accumulatedSeconds || 0
-                                                    const h = Math.floor(s / 3600)
-                                                    const m = Math.floor((s % 3600) / 60)
-                                                    return `${h}h ${m}m`
-                                                })()}
-                                            </span>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <div className="flex flex-col items-end gap-2">
-                                    <select
-                                        value={task.status}
-                                        onChange={(e) => {
-                                            const val = e.target.value
-                                            if (val === 'Revision') {
-                                                setFeedbackModal({ isOpen: true, taskId: task.id })
-                                                return
-                                            }
-                                            handleStatusChange(task.id, val)
                                         }}
-                                        className="appearance-none text-center font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer"
-                                        style={{
-                                            background: statusBg[task.status] || '#333',
-                                            color: statusColors[task.status] || 'white',
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-gray-500 hover:text-red-500 p-2 text-xl"
                                     >
-                                        {getStatusOptions().map(opt => (
-                                            <option key={opt} value={opt}>{opt}</option>
-                                        ))}
-                                    </select>
-
-                                    {/* Admin Revision Controls */}
-                                    {isAdmin && task.status === 'Revision' && (
-                                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                                            <button disabled className="px-2 py-1 text-[10px] bg-red-500/50 text-white rounded cursor-not-allowed">Chưa FB</button>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Đang thực hiện') }}
-                                                className="px-2 py-1 text-[10px] bg-green-500 text-white font-bold rounded hover:bg-green-400"
-                                            >
-                                                ✔ Đã FB
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {isAdmin && (
-                                <button
-                                    onClick={async (e) => {
-                                        e.stopPropagation()
-                                        if (await confirm({
-                                            title: 'Xóa Task?',
-                                            message: `Bạn có chắc chắn muốn xóa task "${task.title}" không? Hành động này không thể hoàn tác.`,
-                                            type: 'danger',
-                                            confirmText: 'Xóa luôn',
-                                            cancelText: 'Thôi'
-                                        })) {
-                                            await deleteTask(task.id)
-                                            toast.success('Đã xóa task thành công')
-                                        }
-                                    }}
-                                    className="text-gray-500 hover:text-red-500 p-2 text-xl"
-                                >
-                                    ×
-                                </button>
-                            )}
-                        </div>
-                    </div >
-                ))}
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+                        </div >
+                    )
+                })}
                 {tasks.length === 0 && <p className="text-gray-500 italic text-center py-8">No tasks found.</p>}
             </div >
 

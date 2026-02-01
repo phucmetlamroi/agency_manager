@@ -44,6 +44,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
 
     // Edit State
     const [isEditing, setIsEditing] = useState(false)
+    const [isEditingLink, setIsEditingLink] = useState(false) // Local state for Product Link editing
     const [editForm, setEditForm] = useState({
         resources: '', // Kept for backward compatibility or direct access
         linkRaw: '',
@@ -104,6 +105,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
             deadline: deadlineStr
         })
         setIsEditing(false)
+        setIsEditingLink(false)
     }
 
     // Helper to ensure external links work
@@ -466,41 +468,63 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-                            {/* PRODUCT DELIVERY SECTION (Moved Top for User Visibility) */}
+                            {/* PRODUCT DELIVERY SECTION (Refined for Inline Editing) */}
                             <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50">
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#3b82f6', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
                                     🎯 THÀNH PHẨM (Delivery)
                                 </label>
 
-                                {isEditing || (!selectedTask.productLink && !isAdmin) ? (
-                                    <div>
+                                {(!selectedTask.productLink && !isAdmin) || isEditingLink ? (
+                                    /* EDIT MODE (No link OR editing) */
+                                    <div className="flex bg-white rounded-md border border-blue-200 overflow-hidden">
                                         <input
                                             value={editForm.productLink}
                                             onChange={(e) => setEditForm({ ...editForm, productLink: e.target.value })}
                                             placeholder="Dán link sản phẩm (Drive/Youtube)..."
-                                            style={{ width: '100%', padding: '0.6rem', border: '1px solid #93c5fd', borderRadius: '6px', fontSize: '0.9rem' }}
+                                            className="flex-1 p-2 text-sm outline-none text-blue-900"
                                         />
-                                        {(!isEditing && !isAdmin) && (
+                                        <div className="flex border-l border-blue-100">
                                             <button
                                                 onClick={async () => {
-                                                    await handleSaveDetails();
-                                                    await handleStatusChange(selectedTask.id, 'Revision');
+                                                    await handleSaveDetails(); // Saves everything, effectively saving the link
+                                                    if (!isAdmin) await handleStatusChange(selectedTask.id, 'Revision'); // Only set Revision if user submits
+                                                    setIsEditingLink(false);
                                                 }}
-                                                style={{ marginTop: '0.5rem', width: '100%', padding: '0.5rem', background: '#3b82f6', color: 'white', borderRadius: '6px', fontWeight: 'bold' }}
+                                                className="px-3 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1 transition-colors"
+                                                title="Lưu & Xác nhận"
                                             >
-                                                Xác nhận nộp bài
+                                                <span>✓ Xác nhận</span>
                                             </button>
-                                        )}
+                                            {selectedTask.productLink && (
+                                                <button
+                                                    onClick={() => {
+                                                        setEditForm({ ...editForm, productLink: selectedTask.productLink || '' });
+                                                        setIsEditingLink(false);
+                                                    }}
+                                                    className="px-3 bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold text-xs transition-colors"
+                                                    title="Hủy bỏ"
+                                                >
+                                                    ✕ Cancel
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 ) : (
+                                    /* VIEW MODE (Has Link) */
                                     selectedTask.productLink ? (
-                                        <a href={formatLink(selectedTask.productLink)} target="_blank" style={{
-                                            display: 'block', padding: '0.8rem', background: 'white', borderRadius: '8px',
-                                            color: '#2563eb', fontWeight: '600', textDecoration: 'none', border: '1px solid #bfdbfe',
-                                            textAlign: 'center'
-                                        }}>
-                                            🔗 Mở link sản phẩm
-                                        </a>
+                                        <div className="flex flex-col gap-2">
+                                            <a href={formatLink(selectedTask.productLink)} target="_blank" className="block p-3 bg-white rounded-lg border border-blue-200 text-blue-600 font-bold hover:shadow-md transition-shadow text-center">
+                                                🔗 Mở link sản phẩm
+                                            </a>
+                                            <div className="flex justify-end gap-2 text-xs">
+                                                <button
+                                                    onClick={() => setIsEditingLink(true)}
+                                                    className="text-gray-400 hover:text-blue-500 underline"
+                                                >
+                                                    Sửa link (Edit)
+                                                </button>
+                                            </div>
+                                        </div>
                                     ) : <span className="text-gray-400 italic text-sm">Chưa có link thành phẩm.</span>
                                 )}
                             </div>

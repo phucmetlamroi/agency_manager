@@ -6,8 +6,11 @@ import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import MobileTaskCard from './MobileTaskCard'
 import MobileActionSheet from './MobileActionSheet'
+import { useConfirm } from '@/components/ui/ConfirmModal'
+import { toast } from 'sonner'
 
 export default function MobileTaskView({ tasks, isAdmin, users }: { tasks: TaskWithUser[], isAdmin: boolean, users: any[] }) {
+    const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
     const [actionSheetOpen, setActionSheetOpen] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
@@ -34,9 +37,16 @@ export default function MobileTaskView({ tasks, isAdmin, users }: { tasks: TaskW
 
     const handleDelete = async () => {
         if (!selectedTask) return
-        if (confirm('Delete task?')) {
+        if (await confirm({
+            title: 'Delete Task?',
+            message: 'Are you sure you want to delete this task? This cannot be undone.',
+            type: 'danger',
+            confirmText: 'Delete',
+            cancelText: 'Cancel'
+        })) {
             await deleteTask(selectedTask.id)
             setActionSheetOpen(false)
+            toast.success('Task deleted successfully')
         }
     }
 
@@ -77,7 +87,7 @@ export default function MobileTaskView({ tasks, isAdmin, users }: { tasks: TaskW
                 onClose={() => setActionSheetOpen(false)}
                 onStatusChange={handleStatusChange}
                 onEdit={() => {
-                    alert("Edit feature coming to Mobile View soon! Please use Desktop for full editing.")
+                    toast.info("Edit feature coming to Mobile View soon! Please use Desktop for full editing.")
                     // Future: Open <MobileEditModal />
                 }}
                 onDelete={handleDelete}
@@ -101,7 +111,7 @@ export default function MobileTaskView({ tasks, isAdmin, users }: { tasks: TaskW
                         // Or alert "Use form at top"
                     } else {
                         // User Request?
-                        alert("Create Request feature coming soon!")
+                        toast.info("Create Request feature coming soon!")
                     }
                 }}
                 className="fixed bottom-24 right-4 w-14 h-14 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center text-2xl font-bold text-white z-40 active:scale-90 transition-transform"

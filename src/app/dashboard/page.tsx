@@ -29,6 +29,7 @@ export default async function UserDashboard() {
 
     const tasks = await prisma.task.findMany({
         where: { assigneeId: userId },
+        include: { client: { include: { parent: true } } },
         orderBy: { createdAt: 'desc' }
     })
 

@@ -229,6 +229,7 @@ model UserSchedule {
 
 enum ScheduleType {
   BUSY     // User sets: Bận, không nhận việc
-  OVERTIME // User sets: Có thể nhận thêm
+  OVERTIME // User sets: Có thể nhận thêm (Yellow)
+  AVAILABLE // User sets: Sẵn sàng nhận việc (Green)
   TASK     // System sets: Đang làm task
 }

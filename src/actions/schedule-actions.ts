@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
-export type ScheduleType = 'BUSY' | 'OVERTIME' | 'TASK'
+export type ScheduleType = 'BUSY' | 'OVERTIME' | 'AVAILABLE' | 'TASK'
 
 export async function getUserSchedule(userId: string, startDate: Date, endDate: Date) {
     try {

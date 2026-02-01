@@ -27,6 +27,11 @@ export default function BottomNav({ role }: { role: string }) {
                 </Link>
             )}
 
+            <Link href={role === 'ADMIN' ? '/admin/schedule' : '/dashboard/schedule'} className={`flex flex-col items-center gap-1 ${isActive('/dashboard/schedule') ? 'text-blue-400' : 'text-gray-400'}`}>
+                <span className="text-xl">📅</span>
+                <span className="text-[10px] font-bold">Lịch</span>
+            </Link>
+
             <Link href={role === 'ADMIN' ? '/admin/payroll' : '/dashboard'} className={`flex flex-col items-center gap-1 ${isActive('/admin/payroll') ? 'text-blue-400' : 'text-gray-400'}`}>
                 <span className="text-xl">💰</span>
                 <span className="text-[10px] font-bold">{role === 'ADMIN' ? 'Payroll' : 'Income'}</span>

@@ -25,6 +25,7 @@ model User {
   tasks     Task[]
   bonuses   MonthlyBonus[]
   metrics   PerformanceMetric[]
+  schedules UserSchedule[]
 }
 
 model Task {
@@ -203,4 +204,31 @@ model PerformanceMetric {
   user                  User     @relation(fields: [userId], references: [id])
   
   @@unique([userId, month, year])
+}
+
+// ============================================
+// RESOURCE SCHEDULER (Module Lịch)
+// ============================================
+
+model UserSchedule {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  startTime DateTime
+  endTime   DateTime
+  
+  type      ScheduleType @default(BUSY)
+  note      String?      // e.g., "Đi học", "Ngủ bù"
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, startTime]) // Fast lookup
+}
+
+enum ScheduleType {
+  BUSY     // User sets: Bận, không nhận việc
+  OVERTIME // User sets: Có thể nhận thêm
+  TASK     // System sets: Đang làm task
 }

@@ -75,6 +75,11 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
             deadlineStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
         }
 
+        if (!isAdmin && task.status === 'Đã nhận task') {
+            toast.warning('Vui lòng bấm nút "Bắt đầu" để xem chi tiết task!')
+            return
+        }
+
         // Parse Resources for RAW/BROLL
         let raw = ''
         let broll = ''

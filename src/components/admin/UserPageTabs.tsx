@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import UserList from '@/components/admin/UserList'
 import TimelineBoard from '@/components/admin/TimelineBoard'

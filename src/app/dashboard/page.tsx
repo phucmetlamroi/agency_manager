@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import TaskTable from '@/components/TaskTable'
 import { isMobileDevice } from '@/lib/device'
+import DraggableFocusWidget from '@/components/DraggableFocusWidget'
 
 export default async function UserDashboard() {
     const session = await getSession()
@@ -134,7 +135,8 @@ export default async function UserDashboard() {
             {/* Using the new TaskTable for User too, but restrict Admin controls */}
             <TaskTable tasks={tasks as any} isAdmin={false} isMobile={await isMobileDevice()} />
 
-
+            {/* Draggable Focus Widget */}
+            <DraggableFocusWidget userId={userId} />
         </div>
     )
 }

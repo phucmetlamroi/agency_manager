@@ -83,12 +83,15 @@ export async function publishFocusTasks(userId: string) {
 
 export async function completeFocusTask(id: string) {
     try {
+        const task = await prisma.focusTask.findUnique({ where: { id } })
+        if (!task) return { error: 'Not found' }
+
         await prisma.focusTask.update({
             where: { id },
-            data: { isDone: true }
+            data: { isDone: !task.isDone }
         })
         revalidatePath('/dashboard')
-        revalidatePath('/dashboard/focus')
+        // revalidatePath('/dashboard/focus') // Page removed
         return { success: true }
     } catch (e) {
         return { error: 'Failed' }

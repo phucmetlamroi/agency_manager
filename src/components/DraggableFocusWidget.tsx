@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getFocusTasks, completeFocusTask } from '@/actions/focus-actions'
 import confetti from 'canvas-confetti'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Minus, Maximize2, Check, GripHorizontal } from 'lucide-react' // Using lucide icons if available, or SVG fallback
+
 
 // SVG Icons fallback if lucide-react not present (safest)
 const Icons = {

@@ -538,10 +538,10 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                 )}
                             </div>
 
-                            {/* RESOURCES */}
+                            {/* RESOURCES SECTION */}
                             <div className="p-3 rounded-xl border border-gray-100">
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                                    RESOURCES (RAW / B-ROLL)
+                                    RESOURCES (RAW / B-ROLL / COLLECT FILES)
                                 </label>
                                 {isEditing && isAdmin ? (
                                     <div className="flex flex-col gap-2">
@@ -549,48 +549,112 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                             value={editForm.linkRaw}
                                             onChange={(e) => setEditForm({ ...editForm, linkRaw: e.target.value })}
                                             placeholder="Link RAW (Source)..."
-                                            className="w-full p-2 border border-gray-200 rounded text-sm"
+                                            className="w-full p-2 border border-gray-200 rounded text-sm text-black"
                                         />
                                         <input
                                             value={editForm.linkBroll}
                                             onChange={(e) => setEditForm({ ...editForm, linkBroll: e.target.value })}
                                             placeholder="Link B-Roll (Tài nguyên)..."
-                                            className="w-full p-2 border border-gray-200 rounded text-sm"
+                                            className="w-full p-2 border border-blue-200 rounded text-sm text-black"
+                                        />
+                                        <input
+                                            value={editForm.collectFilesLink || ''}
+                                            onChange={(e) => setEditForm({ ...editForm, collectFilesLink: e.target.value })}
+                                            placeholder="Link Collect Files (Project mẫu)..."
+                                            className="w-full p-2 border border-yellow-200 rounded text-sm text-black bg-yellow-50"
                                         />
                                     </div>
                                 ) : (
-                                    (() => {
-                                        const resString = selectedTask.resources || selectedTask.fileLink
-                                        if (!resString) return <span className="text-gray-400 italic">No resources linked.</span>
+                                    <div className="flex flex-col gap-2">
+                                        {(() => {
+                                            const resString = selectedTask.resources || selectedTask.fileLink
 
-                                        if (resString.includes('RAW:') && resString.includes('| BROLL:')) {
-                                            const parts = resString.split('| BROLL:')
-                                            const raw = parts[0].replace('RAW:', '').trim()
-                                            const broll = parts[1].trim()
-                                            return (
-                                                <div className="flex flex-col gap-2">
-                                                    {raw && (
-                                                        <a href={formatLink(raw)} target="_blank" className="text-blue-600 font-semibold hover:underline flex items-center gap-1">
-                                                            📁 RAW Link ↗
-                                                        </a>
-                                                    )}
-                                                    {broll && (
-                                                        <a href={formatLink(broll)} target="_blank" className="text-purple-600 font-semibold hover:underline flex items-center gap-1">
-                                                            🎨 B-Roll Link ↗
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            )
-                                        }
+                                            // RAW & BROLL
+                                            if (resString && resString.includes('RAW:') && resString.includes('| BROLL:')) {
+                                                const parts = resString.split('| BROLL:')
+                                                const raw = parts[0].replace('RAW:', '').trim()
+                                                const broll = parts[1].trim()
+                                                return (
+                                                    <>
+                                                        {raw && (
+                                                            <a href={formatLink(raw)} target="_blank" className="text-blue-600 font-semibold hover:underline flex items-center gap-1">
+                                                                📁 RAW Link ↗
+                                                            </a>
+                                                        )}
+                                                        {broll && (
+                                                            <a href={formatLink(broll)} target="_blank" className="text-purple-600 font-semibold hover:underline flex items-center gap-1">
+                                                                🎨 B-Roll Link ↗
+                                                            </a>
+                                                        )}
+                                                    </>
+                                                )
+                                            } else if (resString) {
+                                                return (
+                                                    <a href={formatLink(resString)} target="_blank" className="text-blue-600 font-semibold hover:underline">
+                                                        📂 Open Resource Folder ↗
+                                                    </a>
+                                                )
+                                            }
+                                            return null
+                                        })()}
 
-                                        return (
-                                            <a href={formatLink(resString)} target="_blank" className="text-blue-600 font-semibold hover:underline">
-                                                📂 Open Resource Folder ↗
+                                        {/* COLLECT FILES LINK (Project Mẫu) */}
+                                        {selectedTask.collectFilesLink ? (
+                                            <a href={formatLink(selectedTask.collectFilesLink)} target="_blank" className="text-yellow-600 font-bold hover:underline flex items-center gap-2 mt-1">
+                                                🌼 Collect Files (Project Mẫu) ↗
                                             </a>
-                                        )
-                                    })()
+                                        ) : null}
+
+                                        {!selectedTask.resources && !selectedTask.fileLink && !selectedTask.collectFilesLink && (
+                                            <span className="text-gray-400 italic">No resources linked.</span>
+                                        )}
+                                    </div>
                                 )}
                             </div>
+
+                            {/* PRICE EDITING (Admin Only) */}
+                            {isAdmin && (
+                                <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 mt-2">
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#374151', marginBottom: '0.5rem' }}>
+                                        💵 FINANCIALS (Edit)
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Giá Job ($)</label>
+                                            <div className="relative">
+                                                <span className="absolute left-2 top-1.5 text-green-600 font-bold">$</span>
+                                                {isEditing ? (
+                                                    <input
+                                                        type="number"
+                                                        value={editForm.jobPriceUSD}
+                                                        onChange={(e) => setEditForm(prev => ({ ...prev, jobPriceUSD: parseFloat(e.target.value) || 0 }))}
+                                                        className="w-full pl-6 p-1 border border-gray-300 rounded text-sm bg-white text-black font-mono"
+                                                    />
+                                                ) : (
+                                                    <span className="font-mono font-bold text-green-600 pl-6 block py-1">{selectedTask.jobPriceUSD || 0}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-gray-500 block mb-1">Lương Staff (VND)</label>
+                                            <div className="relative">
+                                                <span className="absolute left-2 top-1.5 text-yellow-600 font-bold">₫</span>
+                                                {isEditing ? (
+                                                    <input
+                                                        type="number"
+                                                        step={1000}
+                                                        value={editForm.value}
+                                                        onChange={(e) => setEditForm(prev => ({ ...prev, value: parseFloat(e.target.value) || 0 }))}
+                                                        className="w-full pl-6 p-1 border border-gray-300 rounded text-sm bg-white text-black font-mono"
+                                                    />
+                                                ) : (
+                                                    <span className="font-mono font-bold text-yellow-600 pl-6 block py-1">{(selectedTask.value || 0).toLocaleString()}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* REFERENCES */}
                             <div className="p-3 rounded-xl border border-gray-100">

@@ -4,13 +4,19 @@ import { useState, useEffect, useRef } from 'react'
 import { getFocusTasks, completeFocusTask } from '@/actions/focus-actions'
 import confetti from 'canvas-confetti'
 import { motion, AnimatePresence } from 'framer-motion'
+import { X, Minus, Maximize2, Check, GripHorizontal } from 'lucide-react' // Using lucide icons if available, or SVG fallback
+
+// SVG Icons fallback if lucide-react not present (safest)
+const Icons = {
+    Minimize: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+    Maximize: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>,
+    Grip: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+}
 
 export default function DraggableFocusWidget({ userId }: { userId: string }) {
     const [tasks, setTasks] = useState<any[]>([])
     const [minimized, setMinimized] = useState(false)
     const [isLoaded, setIsLoaded] = useState(false)
-
-    const constraintsRef = useRef(null)
 
     useEffect(() => {
         loadTasks()
@@ -21,8 +27,6 @@ export default function DraggableFocusWidget({ userId }: { userId: string }) {
     async function loadTasks() {
         const res = await getFocusTasks(userId)
         // Show PUBLISHED only.
-        // We DO display DONE tasks as Green, as per user request.
-        // Order by `order` field.
         const active = res.filter((t: any) => t.status === 'PUBLISHED')
         setTasks(active)
         setIsLoaded(true)
@@ -35,141 +39,194 @@ export default function DraggableFocusWidget({ userId }: { userId: string }) {
         )
         setTasks(newTasks)
 
-        // If ticking DONE (not unticking)
+        // Celebrate if ticking DONE
         if (!task.isDone) {
-            // Check if all done
             const allDone = newTasks.every(t => t.isDone)
             if (allDone && newTasks.length > 0) {
                 confetti({
                     particleCount: 100,
                     spread: 70,
-                    origin: { y: 0.6 }
+                    origin: { y: 0.6 },
+                    colors: ['#a855f7', '#ec4899', '#3b82f6'] // Cyberpunk colors
                 })
             }
         }
-
         await completeFocusTask(task.id)
-        if (task.isDone) {
-            // If we are un-completing, we might need a separate action or just reuse complete toggle?
-            // The action is `completeFocusTask` which sets `isDone: true`.
-            // User might want to untick.
-            // I should double check `active/focus-actions.ts`.
-            // It currently sets `isDone: true`.
-            // I will need to update the action to TOGGLE if I want full interaction.
-            // For now, let's assume one-way tick or I'll quickly update the action in next step.
-            // PROMPT: "user bấm tick vào rồi thì task đó sẽ hiện xanh lá lên".
-        }
     }
 
     if (!isLoaded || tasks.length === 0) return null
 
-    // Determine Hero Task (First Undone Task)
-    const heroTask = tasks.find(t => !t.isDone)
     const pendingCount = tasks.filter(t => !t.isDone).length
     const doneCount = tasks.filter(t => t.isDone).length
 
+    // Sort: Undone first, then Done
+    // Hero task is first undone
+    const sortedTasks = [...tasks].sort((a, b) => {
+        if (a.isDone === b.isDone) return a.order - b.order
+        return a.isDone ? 1 : -1
+    })
+
     return (
-        <div className="fixed bottom-4 right-4 z-50 pointer-events-none w-full h-full max-w-[100vw] max-h-[100vh] overflow-hidden flex items-end justify-end p-4">
-            {/* Draggable Constraint Area is the screen basically */}
+        <div className="fixed bottom-6 right-6 z-50 pointer-events-none w-full h-full max-w-[100vw] max-h-[100vh] overflow-hidden flex items-end justify-end p-4">
 
             <motion.div
                 drag
                 dragMomentum={false}
-                initial={{ x: 0, y: 0 }}
-                className="pointer-events-auto bg-white shadow-2xl border border-gray-200 rounded-xl overflow-hidden flex flex-col w-[320px]"
+                initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className="pointer-events-auto flex flex-col w-[340px]"
                 style={{
-                    fontFamily: '"Patrick Hand", sans-serif, system-ui',
-                    boxShadow: '0 10px 40px -10px rgba(0,0,0,0.2)'
+                    fontFamily: '"Outfit", sans-serif', // Modern font
                 }}
             >
-                {/* Header / Drag Handle */}
-                <div
-                    className={`
-                        p-3 flex items-center justify-between cursor-move select-none
-                        ${pendingCount === 0 && tasks.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-800 text-white'}
-                    `}
-                    onDoubleClick={() => setMinimized(!minimized)}
-                >
-                    <div className="flex items-center gap-2">
-                        <span className="text-lg">📝 Sổ Việc Focus</span>
-                        <span className="text-xs bg-white/20 px-1.5 rounded-full">{pendingCount}</span>
-                    </div>
-                    <button
-                        onClick={() => setMinimized(!minimized)}
-                        className="opacity-70 hover:opacity-100"
+                {/* Main Card */}
+                <div className="bg-white/80 backdrop-blur-xl border border-white/40 shadow-2xl rounded-2xl overflow-hidden ring-1 ring-black/5 dark:bg-black/80 dark:border-white/10">
+
+                    {/* Header with Gradient */}
+                    <div
+                        className={`
+                            h-12 px-4 flex items-center justify-between cursor-move select-none transition-colors
+                            ${pendingCount === 0
+                                ? 'bg-gradient-to-r from-green-400 to-emerald-600' // Success
+                                : 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500' // Default Fancy
+                            }
+                        `}
+                        onDoubleClick={() => setMinimized(!minimized)}
                     >
-                        {minimized ? 'Maximize ▲' : 'Minimize ▼'}
-                    </button>
+                        <div className="flex items-center gap-2 text-white font-bold tracking-wide text-sm">
+                            <Icons.Grip />
+                            <span className="drop-shadow-sm">FOCUS MODE</span>
+                            {pendingCount > 0 && (
+                                <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px] backdrop-blur-sm">
+                                    {pendingCount} LEFT
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => setMinimized(!minimized)}
+                                className="text-white/80 hover:text-white p-1 hover:bg-white/10 rounded-md transition-colors"
+                            >
+                                {minimized ? <Icons.Maximize /> : <Icons.Minimize />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <AnimatePresence>
+                        {!minimized && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                            >
+                                <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-1 bg-gradient-to-b from-white/50 to-white/20 leading-relaxed">
+
+                                    {/* Task List */}
+                                    <div className="space-y-1 p-2">
+                                        {sortedTasks.map((task, i) => {
+                                            const isHero = !task.isDone && i === 0
+                                            return (
+                                                <motion.div
+                                                    key={task.id}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className={`
+                                                        relative group rounded-xl p-3 transition-all duration-200 border
+                                                        ${task.isDone
+                                                            ? 'bg-gray-50/50 border-transparent opacity-60 hover:opacity-100'
+                                                            : isHero
+                                                                ? 'bg-white border-purple-100 shadow-lg shadow-purple-500/10 scale-[1.02] z-10 my-2'
+                                                                : 'bg-white/40 border-transparent hover:bg-white hover:shadow-sm'
+                                                        }
+                                                    `}
+                                                >
+                                                    {/* Hero Glow */}
+                                                    {isHero && <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 rounded-xl pointer-events-none" />}
+
+                                                    {/* Priority Badge */}
+                                                    {task.isPriority && !task.isDone && (
+                                                        <div className="absolute -top-1.5 -right-1.5 z-20">
+                                                            <span className="relative flex h-3 w-3">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex items-start gap-3 relative z-10">
+                                                        {/* Custom Checkbox */}
+                                                        <div className="pt-1">
+                                                            <button
+                                                                onClick={() => handleComplete(task)}
+                                                                className={`
+                                                                    w-5 h-5 rounded-md border flex items-center justify-center transition-all duration-300
+                                                                    ${task.isDone
+                                                                        ? 'bg-green-500 border-green-500 text-white'
+                                                                        : isHero
+                                                                            ? 'border-purple-400 bg-white hover:border-purple-600'
+                                                                            : 'border-gray-300 bg-white/50 hover:border-gray-400'
+                                                                    }
+                                                                `}
+                                                            >
+                                                                {task.isDone && (
+                                                                    <motion.svg
+                                                                        initial={{ scale: 0 }}
+                                                                        animate={{ scale: 1 }}
+                                                                        width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"
+                                                                    >
+                                                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                                                    </motion.svg>
+                                                                )}
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className={`
+                                                                text-sm font-medium transition-all duration-300 break-words
+                                                                ${task.isDone
+                                                                    ? 'text-gray-400 line-through decoration-gray-300'
+                                                                    : isHero
+                                                                        ? 'text-gray-900 text-base font-semibold leading-snug'
+                                                                        : 'text-gray-700'
+                                                                }
+                                                            `}>
+                                                                {task.content}
+                                                            </p>
+                                                            {isHero && !task.isDone && (
+                                                                <p className="text-[10px] uppercase font-bold text-purple-600/70 mt-1 tracking-wider">
+                                                                    High Priority • Doing Now
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            )
+                                        })}
+
+                                        {tasks.length === 0 && (
+                                            <div className="text-center py-8 text-gray-400 text-sm">
+                                                All clear! Relax & Chill. ☕
+                                            </div>
+                                        )}
+
+                                        {pendingCount === 0 && tasks.length > 0 && (
+                                            <div className="mt-2 p-3 rounded-xl bg-green-50/50 border border-green-100 flex flex-col items-center">
+                                                <span className="text-2xl animate-bounce">🎉</span>
+                                                <span className="text-xs font-bold text-green-700 uppercase tracking-widest mt-1">Completion 100%</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
-                {/* Content */}
-                <AnimatePresence>
-                    {!minimized && (
-                        <motion.div
-                            initial={{ height: 0 }}
-                            animate={{ height: 'auto' }}
-                            exit={{ height: 0 }}
-                            className="bg-[#fff9e6] max-h-[400px] overflow-y-auto"
-                        >
-                            {/* Rule Lines Background */}
-                            <div className="p-0 relative min-h-[200px]">
-                                <div className="absolute inset-0 pointer-events-none opacity-10"
-                                    style={{
-                                        backgroundImage: 'linear-gradient(#999 1px, transparent 1px)',
-                                        backgroundSize: '100% 2rem',
-                                        marginTop: '1.9rem'
-                                    }}
-                                />
-                                <div className="absolute top-0 bottom-0 left-8 w-px bg-red-200/50 pointer-events-none" />
-
-                                {/* Task List */}
-                                <div className="relative z-10 pt-2 pb-4">
-                                    {tasks.map((task, i) => (
-                                        <div
-                                            key={task.id}
-                                            className={`
-                                                px-3 py-2 pl-10 hover:bg-black/5 transition-colors flex items-start gap-3
-                                                ${task.isDone ? 'opacity-50' : 'opacity-100'}
-                                                ${task.id === heroTask?.id ? 'bg-yellow-100/50' : ''}
-                                            `}
-                                        >
-                                            <div className="mt-1.5 flex-shrink-0">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={task.isDone}
-                                                    onChange={() => handleComplete(task)}
-                                                    className="w-5 h-5 cursor-pointer accent-green-600 rounded"
-                                                />
-                                            </div>
-                                            <span
-                                                className={`
-                                                    text-lg leading-7
-                                                    ${task.isDone ? 'text-green-700 line-through decoration-wavy decoration-green-300' : 'text-gray-800'}
-                                                    ${task.isPriority && !task.isDone ? 'font-bold text-red-600' : ''}
-                                                `}
-                                            >
-                                                {task.content}
-                                                {task.isPriority && !task.isDone && " 🔥"}
-                                            </span>
-                                        </div>
-                                    ))}
-
-                                    {tasks.length === 0 && (
-                                        <div className="p-8 text-center text-gray-400 italic">
-                                            Chưa có việc nào.
-                                        </div>
-                                    )}
-
-                                    {pendingCount === 0 && tasks.length > 0 && (
-                                        <div className="m-4 p-3 bg-green-100 text-green-800 rounded-lg text-center text-sm font-bold animate-pulse">
-                                            🎉 Xuất sắc! Hết việc rồi!
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                {/* Shadow/Reflection fake */}
+                <div className="h-4 mx-4 bg-black/5 blurred-lg rounded-[100%] blur-md -mt-2 z-[-1]" />
             </motion.div>
         </div>
     )

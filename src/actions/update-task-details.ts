@@ -10,6 +10,9 @@ export async function updateTaskDetails(id: string, data: {
     title?: string
     productLink?: string
     deadline?: string
+    jobPriceUSD?: number
+    value?: number
+    collectFilesLink?: string
 }) {
     try {
         const updateData: any = {
@@ -17,7 +20,30 @@ export async function updateTaskDetails(id: string, data: {
             references: data.references,
             notes: data.notes,
             title: data.title,
-            productLink: data.productLink
+            productLink: data.productLink,
+            collectFilesLink: data.collectFilesLink
+        }
+
+        // Handle Price Updates (Financials) - FIXED
+        if (data.jobPriceUSD !== undefined || data.value !== undefined) {
+            // Fetch current to merge
+            const currentTask = await prisma.task.findUnique({
+                where: { id },
+                select: { jobPriceUSD: true, value: true, exchangeRate: true }
+            })
+
+            if (currentTask) {
+                const newJobPriceUSD = data.jobPriceUSD !== undefined ? data.jobPriceUSD : (currentTask.jobPriceUSD || 0)
+                const newValue = data.value !== undefined ? data.value : (currentTask.value || 0) // This is Wage VND
+                const rate = currentTask.exchangeRate || 25300
+
+                updateData.jobPriceUSD = newJobPriceUSD
+                updateData.value = newValue
+                updateData.wageVND = newValue // Sync wageVND with value
+
+                // Recalculate Profit
+                updateData.profitVND = (newJobPriceUSD * rate) - newValue
+            }
         }
 
         // Handle Deadline Update + Timer Reset

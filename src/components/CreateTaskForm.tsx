@@ -227,6 +227,12 @@ export default function CreateTaskForm({ users }: { users: User[] }) {
             </div>
 
             <div>
+                <label style={{ fontSize: '0.8rem', color: '#888' }}>Collect Files Link (Nơi nộp file)</label>
+                <input name="collectFilesLink" placeholder="Link Drive/Folder nộp file..."
+                    style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }} />
+            </div>
+
+            <div>
                 <label style={{ fontSize: '0.8rem', color: '#888' }}>References (Sample Video)</label>
                 <input name="references" placeholder="Link video mẫu..."
                     style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }} />

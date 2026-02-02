@@ -42,6 +42,8 @@ model Task {
   notes       String?  // Detailed instructions
   fileLink    String?  // Backward compatibility
   productLink String?  // User submission link (Thành phẩm)
+  collectFilesLink String? // New: Link to collect files
+  
   
   // Financial Fields
   jobPriceUSD    Float?   @default(0) // Input: Revenue from Client (USD)

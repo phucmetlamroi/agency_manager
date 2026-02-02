@@ -52,7 +52,10 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
         references: '',
         notes: '',
         productLink: '',
-        deadline: ''
+        deadline: '',
+        jobPriceUSD: 0,
+        value: 0,
+        collectFilesLink: ''
     })
 
     // Feedback Modal State
@@ -102,7 +105,10 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
             references: task.references || '',
             notes: task.notes || '',
             productLink: task.productLink || '',
-            deadline: deadlineStr
+            deadline: deadlineStr,
+            jobPriceUSD: task.jobPriceUSD || 0,
+            value: task.value || 0,
+            collectFilesLink: task.collectFilesLink || ''
         })
         setIsEditing(false)
         setIsEditingLink(false)
@@ -147,7 +153,10 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
             notes: editForm.notes,
             title: selectedTask.title, // Keep existing title
             productLink: editForm.productLink,
-            deadline: editForm.deadline || undefined // Pass deadline string
+            deadline: editForm.deadline || undefined, // Pass deadline string
+            jobPriceUSD: isAdmin ? Number(editForm.jobPriceUSD) : undefined,
+            value: isAdmin ? Number(editForm.value) : undefined,
+            collectFilesLink: editForm.collectFilesLink
         })
 
         if (res?.success) {

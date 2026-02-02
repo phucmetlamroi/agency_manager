@@ -64,6 +64,7 @@ export async function createTask(formData: FormData) {
         const type = formData.get('type') as string || 'Short form'
         const resources = formData.get('resources') as string
         const notes = formData.get('notes') as string
+        const collectFilesLink = formData.get('collectFilesLink') as string
 
         const jobPriceUSD = parseFloat(formData.get('jobPriceUSD') as string) || 0
         const exchangeRate = parseFloat(formData.get('exchangeRate') as string) || 25300
@@ -86,6 +87,7 @@ export async function createTask(formData: FormData) {
                 notes: notes || null,
                 assigneeId: assigneeId || null,
                 fileLink: fileLink || null,
+                collectFilesLink: collectFilesLink || null,
                 status: assigneeId ? 'Đã nhận task' : 'Đang đợi giao',
 
                 // Financials

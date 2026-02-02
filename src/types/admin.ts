@@ -9,6 +9,7 @@ export type TaskWithUser = { // Updated with Client Info
     resources: string | null
     fileLink: string | null
     productLink: string | null
+    collectFilesLink?: string | null
     notes: string | null
     assignee: { id: string; username: string; reputation?: number } | null
     createdAt: Date
@@ -23,4 +24,8 @@ export type TaskWithUser = { // Updated with Client Info
             name: string
         } | null
     } | null
+    // Financials
+    jobPriceUSD?: number | null
+    wageVND?: number | null
+    profitVND?: number | null
 }

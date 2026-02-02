@@ -75,6 +75,7 @@ export default async function UserLayout({
                         `}} />
                         <Link href="/dashboard" className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Tổng quan</Link>
                         <Link href="/dashboard/schedule" className="btn" style={{ color: '#c084fc', background: 'transparent', padding: '0.5rem 1rem' }}>Lịch làm việc</Link>
+                        <Link href="/dashboard/focus" className="btn" style={{ color: '#f97316', background: 'transparent', padding: '0.5rem 1rem' }}>Sổ Việc Focus</Link>
                         <Link href="/dashboard/profile" className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Hồ sơ</Link>
                     </nav>
                 </div>

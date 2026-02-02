@@ -26,6 +26,7 @@ model User {
   bonuses   MonthlyBonus[]
   metrics   PerformanceMetric[]
   schedules UserSchedule[]
+  focusTasks FocusTask[]
 }
 
 model Task {
@@ -234,4 +235,24 @@ enum ScheduleType {
   OVERTIME // User sets: Có thể nhận thêm (Yellow)
   AVAILABLE // User sets: Sẵn sàng nhận việc (Green)
   TASK     // System sets: Đang làm task
+}
+
+// Focus Note Module
+model FocusTask {
+  id          String   @id @default(uuid())
+  content     String
+  
+  userId      String   
+  user        User     @relation(fields: [userId], references: [id])
+  
+  isPriority  Boolean  @default(false)
+  isDone      Boolean  @default(false)
+  
+  order       Int      @default(0)
+  status      String   @default("DRAFT") // DRAFT, PUBLISHED
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
 }

@@ -9,10 +9,29 @@ export default async function AdminUsersPage() {
         select: { username: true }
     })
 
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    const month = now.getMonth() + 1
+    const year = now.getFullYear()
+
     const users = await prisma.user.findMany({
         where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
         orderBy: { username: 'asc' },
-        include: { _count: { select: { tasks: true } } }
+        include: {
+            _count: { select: { tasks: true } },
+            // For Payroll
+            tasks: {
+                where: {
+                    status: 'Hoàn tất',
+                    updatedAt: { gte: startOfMonth, lte: endOfMonth }
+                },
+                select: { wageVND: true, value: true, status: true }
+            },
+            payrolls: {
+                where: { month, year }
+            }
+        }
     })
 
     return (

@@ -4,9 +4,10 @@ import { useState } from 'react'
 import UserList from '@/components/admin/UserList'
 import TimelineBoard from '@/components/admin/TimelineBoard'
 import FocusBoard from '@/components/admin/FocusBoard'
+import PayrollTable from '@/components/admin/PayrollTable'
 
 export default function UserPageTabs({ users, currentUser }: { users: any[], currentUser: any }) {
-    const [activeTab, setActiveTab] = useState<'users' | 'schedule' | 'focus'>('users')
+    const [activeTab, setActiveTab] = useState<'users' | 'schedule' | 'focus' | 'payroll'>('users')
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
     return (
@@ -41,6 +42,10 @@ export default function UserPageTabs({ users, currentUser }: { users: any[], cur
 
                 {activeTab === 'schedule' && (
                     <TimelineBoard users={users} />
+                )}
+
+                {activeTab === 'payroll' && (
+                    <PayrollTable users={users} />
                 )}
 
                 {activeTab === 'focus' && (

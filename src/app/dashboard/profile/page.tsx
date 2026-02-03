@@ -4,6 +4,7 @@ import { decrypt } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import ProfileForm from '@/components/ProfileForm'
+import PaymentQrUpload from '@/components/profile/PaymentQrUpload'
 
 export default async function ProfilePage() {
     const cookieStore = await cookies()
@@ -29,6 +30,10 @@ export default async function ProfilePage() {
             <div className="glass-panel p-6 mb-8">
                 <h2 className="text-xl font-semibold mb-4 text-purple-300">Cài đặt chung</h2>
                 <ProfileForm user={user} />
+            </div>
+
+            <div className="glass-panel p-6">
+                <PaymentQrUpload user={user} />
             </div>
         </div>
     )

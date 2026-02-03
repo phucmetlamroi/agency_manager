@@ -37,7 +37,9 @@ export default function PaymentQrUpload({ user }: { user: any }) {
             setPreview(objectUrl)
 
             if (croppedFile !== file) {
-                toast.success('Đã tự động cắt ảnh QR!')
+                toast.success('Đã tìm thấy & Cắt QR thành công! ✨')
+            } else {
+                toast.info('Không tìm thấy QR trong ảnh. Đã giữ nguyên ảnh gốc.')
             }
         } catch (error) {
             console.error('Smart crop failed', error)

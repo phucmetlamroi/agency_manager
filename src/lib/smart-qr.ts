@@ -1,79 +1,107 @@
+```
 import jsQR from 'jsqr'
 
 export async function smartCropQr(file: File): Promise<File> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const reader = new FileReader()
+        
         reader.onload = (e) => {
             const img = new Image()
             img.onload = () => {
-                // 1. Create Canvas & Draw Image
+                // 1. Setup Canvas for Processing
                 const canvas = document.createElement('canvas')
-                const ctx = canvas.getContext('2d')
+                const MAX_DIM = 1200
+                let width = img.width
+                let height = img.height
+                
+                // Scale down if too big (Simulates "reading" like a camera, improved performance)
+                if (width > MAX_DIM || height > MAX_DIM) {
+                    const ratio = Math.min(MAX_DIM / width, MAX_DIM / height)
+                    width = Math.floor(width * ratio)
+                    height = Math.floor(height * ratio)
+                }
+
+                canvas.width = width
+                canvas.height = height
+                const ctx = canvas.getContext('2d', { willReadFrequently: true })
+                
                 if (!ctx) {
-                    resolve(file) // Fallback
+                    resolve(file)
                     return
                 }
 
-                canvas.width = img.width
-                canvas.height = img.height
-                ctx.drawImage(img, 0, 0)
+                // Draw image (scaled)
+                ctx.drawImage(img, 0, 0, width, height)
 
-                // 2. Scan for QR
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+                // 2. Scan
+                const imageData = ctx.getImageData(0, 0, width, height)
                 const code = jsQR(imageData.data, imageData.width, imageData.height, {
                     inversionAttempts: "dontInvert",
                 })
 
-                // 3. Logic: Hit or Miss
+                // 3. Logic
                 if (code) {
-                    // Found QR! Calculate Bounding Box
+                    // Logic: Coordinate mapping back to Original Image Size if we scaled?
+                    // Actually, let's just crop from the *scaled* canvas. 
+                    // It's usually high enough res for a QR code unless user prints it huge.
+                    // But for "Payment QR", we want high quality.
+                    // Better approach: Calculate relative coordinates, then crop from ORIGINAL image.
+                    
                     const loc = code.location
-
-                    // Get extrema
                     const xCoords = [loc.topLeftCorner.x, loc.topRightCorner.x, loc.bottomRightCorner.x, loc.bottomLeftCorner.x]
                     const yCoords = [loc.topLeftCorner.y, loc.topRightCorner.y, loc.bottomRightCorner.y, loc.bottomLeftCorner.y]
-
+                    
                     const minX = Math.min(...xCoords)
                     const maxX = Math.max(...xCoords)
                     const minY = Math.min(...yCoords)
                     const maxY = Math.max(...yCoords)
 
-                    // Add Padding (Quiet Zone) - ~10% of QR size or min 30px
-                    const qrWidth = maxX - minX
-                    const qrHeight = maxY - minY
-                    const padding = Math.max(30, Math.min(qrWidth, qrHeight) * 0.15)
+                    // Bounding Box on SCALED image
+                    const qrW_scaled = maxX - minX
+                    const qrH_scaled = maxY - minY
+                    
+                    // Padding: Tighter (User request "vừa khít")
+                    // Use 20px or 5% whatever is larger
+                    const padding = Math.max(20, Math.min(qrW_scaled, qrH_scaled) * 0.05)
+                    
+                    // Relative coordinates (0 to 1)
+                    const relX = (minX - padding) / width
+                    const relY = (minY - padding) / height
+                    const relW = (qrW_scaled + padding * 2) / width
+                    const relH = (qrH_scaled + padding * 2) / height
 
-                    // Calculate Crop Region (Clamped to image bounds)
-                    const cropX = Math.max(0, Math.floor(minX - padding))
-                    const cropY = Math.max(0, Math.floor(minY - padding))
-                    const cropW = Math.min(canvas.width - cropX, Math.ceil(qrWidth + padding * 2))
-                    const cropH = Math.min(canvas.height - cropY, Math.ceil(qrHeight + padding * 2))
-
-                    // 4. Crop
+                    // Map to Original Image Coordinates
+                    const origX = Math.max(0, Math.floor(relX * img.width))
+                    const origY = Math.max(0, Math.floor(relY * img.height))
+                    const origW = Math.min(img.width - origX, Math.ceil(relW * img.width))
+                    const origH = Math.min(img.height - origY, Math.ceil(relH * img.height))
+                    
+                    // 4. Crop from ORIGINAL high-res image
                     const cropCanvas = document.createElement('canvas')
-                    cropCanvas.width = cropW
-                    cropCanvas.height = cropH
+                    cropCanvas.width = origW
+                    cropCanvas.height = origH
                     const cropCtx = cropCanvas.getContext('2d')
-
+                    
                     if (cropCtx) {
-                        cropCtx.fillStyle = '#FFFFFF' // White background rule
-                        cropCtx.fillRect(0, 0, cropW, cropH)
+                        // White background for safety
+                        cropCtx.fillStyle = '#FFFFFF'
+                        cropCtx.fillRect(0, 0, origW, origH)
+                        
                         cropCtx.drawImage(
-                            canvas,
-                            cropX, cropY, cropW, cropH, // Source
-                            0, 0, cropW, cropH          // Destination
+                            img,
+                            origX, origY, origW, origH, // Source (Original)
+                            0, 0, origW, origH          // Dest
                         )
 
-                        // 5. Convert back to File
                         cropCanvas.toBlob((blob) => {
                             if (blob) {
-                                const croppedFile = new File([blob], file.name, {
-                                    type: 'image/webp', // Optimize format
+                                const croppedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_cropped.webp", {
+                                    type: 'image/webp',
                                     lastModified: Date.now()
                                 })
                                 resolve(croppedFile)
                             } else {
-                                resolve(file) // Fallback
+                                resolve(file)
                             }
                         }, 'image/webp', 0.95)
                     } else {
@@ -81,11 +109,12 @@ export async function smartCropQr(file: File): Promise<File> {
                     }
 
                 } else {
-                    // No QR found, return original
+                    console.log('SmartQR: No QR found, returning original.')
                     resolve(file)
                 }
             }
             img.onerror = () => resolve(file)
+            
             if (typeof e.target?.result === 'string') {
                 img.src = e.target.result
             } else {

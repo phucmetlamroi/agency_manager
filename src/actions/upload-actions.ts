@@ -55,8 +55,9 @@ export async function uploadPaymentQr(userId: string, formData: FormData) {
         revalidatePath('/dashboard/profile')
         return { success: true, url: blob.url }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Upload error:', error)
-        return { error: 'Failed to upload image' }
+        // Return specific error for debugging
+        return { error: error.message || 'Failed to upload image' }
     }
 }

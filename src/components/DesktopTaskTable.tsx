@@ -283,12 +283,10 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                             </div>
                                         )}
 
-                                        {/* Money (Admin Only) */}
-                                        {isAdmin && (
-                                            <span className="font-mono text-green-400 font-bold">
-                                                {task.value.toLocaleString()} đ
-                                            </span>
-                                        )}
+                                        {/* Money (Visible to All) */}
+                                        <span className="font-mono text-green-400 font-bold">
+                                            {task.value.toLocaleString()} đ
+                                        </span>
                                     </div>
                                 </div>
 

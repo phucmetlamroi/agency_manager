@@ -67,3 +67,23 @@ export async function getPayrollData(month: number, year: number) {
 
     return { success: true, data: users }
 }
+
+export async function revertPayment(userId: string, month: number, year: number) {
+    try {
+        await prisma.payroll.delete({
+            where: {
+                userId_month_year: {
+                    userId,
+                    month,
+                    year
+                }
+            }
+        })
+
+        revalidatePath('/admin/users')
+        return { success: true }
+    } catch (error) {
+        console.error('Revert payment error:', error)
+        return { error: 'Failed to revert payment' }
+    }
+}

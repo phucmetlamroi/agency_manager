@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import PaymentModal from './PaymentModal'
-import { CheckCircle2, CircleDashed } from 'lucide-react'
+import { CheckCircle2, CircleDashed, RotateCcw } from 'lucide-react'
+import { revertPayment } from '@/actions/payroll-actions'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 
 type PayrollCardProps = {
     user: any
@@ -78,11 +81,46 @@ export default function PayrollCard({ user, currentMonth, currentYear }: Payroll
                         {totalIncome.toLocaleString()} VNĐ
                     </div>
 
+                    import {revertPayment} from '@/actions/payroll-actions'
+                    import {toast} from 'sonner'
+                    import {Button} from '@/components/ui/button'
+                    import {CheckCircle2, CircleDashed, RotateCcw} from 'lucide-react'
+                    import {useTransition} from 'react'
+
+                    // ... (inside component)
+                    const [isPending, startTransition] = useTransition()
+
+    const handleRevert = () => {
+        if (!confirm('Bạn có chắc chắn muốn hoàn tác (hủy) trạng thái thanh toán này?')) return
+        
+        startTransition(async () => {
+             const res = await revertPayment(user.id, currentMonth, currentYear)
+                    if (res.error) {
+                        toast.error(res.error)
+                    } else {
+                        toast.success('Đã hủy trạng thái thanh toán')
+                    }
+        })
+    }
+
+                    // ... (rendering)
                     {/* Payment Button / Status */}
                     {isPaid ? (
-                        <div className="flex items-center justify-end gap-2 text-green-400 font-bold bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 w-fit ml-auto">
-                            <CheckCircle2 className="w-4 h-4" />
-                            ĐÃ THANH TOÁN
+                        <div className="flex items-center gap-3 ml-auto">
+                            <div className="flex items-center gap-2 text-green-400 font-bold bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
+                                <CheckCircle2 className="w-4 h-4" />
+                                ĐÃ THANH TOÁN
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleRevert}
+                                disabled={isPending}
+                                className="h-8 w-8 text-gray-500 hover:text-red-400 hover:bg-red-500/10"
+                                title="Hoàn tác thanh toán (Reset)"
+                            >
+                                <RotateCcw className={`w-4 h-4 ${isPending ? 'animate-spin' : ''}`} />
+                            </Button>
                         </div>
                     ) : (
                         <button

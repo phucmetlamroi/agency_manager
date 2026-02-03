@@ -35,43 +35,52 @@ export async function createUserSchedule(userId: string, data: {
     note?: string
 }) {
     try {
-        // Basic validation: End > Start
         if (data.endTime <= data.startTime) {
             return { success: false, error: 'End time must be after start time' }
         }
 
-        // Prevent overlapping with existing BUSY blocks? 
-        // For now, let's allow overlapping for flexible adjustment, or we can check.
-        // Simple overlap check:
-        const overlaps = await prisma.userSchedule.count({
-            where: {
-                userId: userId,
-                // Existing start < New end AND Existing end > New start
-                startTime: { lt: data.endTime },
-                endTime: { gt: data.startTime }
-            }
-        })
+        const blocks = []
+        let current = new Date(data.startTime)
 
-        if (overlaps > 0) {
-            // Option: Allow logic to proceed or warn. 
-            // For now, let's just return success but maybe we should warn?
-            // The user requested "smart interaction", maybe we just stack them or warn.
-            // Let's NOT block for now to keep it snappy, but ideally we should merge.
+        // Loop hour by hour
+        while (current < data.endTime) {
+            const next = new Date(current)
+            next.setHours(next.getHours() + 1)
+
+            // If next is beyond endTime (partial hour?), clamp it?
+            // The grid enforces setMinutes(0), so usually this is exact.
+            // But let's be safe: min(next, endTime).
+            const blockEnd = next > data.endTime ? data.endTime : next
+
+            blocks.push({
+                userId,
+                startTime: new Date(current),
+                endTime: new Date(blockEnd),
+                type: data.type,
+                note: data.note,
+                // Add default createdAt/updatedAt if needed by schema, usually auto
+            })
+            current = next
         }
 
-        const newSchedule = await prisma.userSchedule.create({
-            data: {
-                userId,
-                startTime: data.startTime,
-                endTime: data.endTime,
-                type: data.type,
-                note: data.note
-            }
-        })
+        // Use transaction or createMany (createMany doesn't return created records in all DBs/Prisma versions well for returning data to UI?)
+        // Postgres returns count.
+        // To return data to UI for optimistic update, we might need transaction + findMany or just loop create.
+        // Loop create is slower but returns IDs.
+        // Given typically < 10 blocks, loop is fine.
+
+        const createdSchedules = []
+
+        // Use transaction to ensure all or nothing
+        const results = await prisma.$transaction(
+            blocks.map(block => prisma.userSchedule.create({ data: block }))
+        )
 
         revalidatePath('/dashboard/schedule')
         revalidatePath('/admin/schedule')
-        return { success: true, data: newSchedule }
+
+        // Return array of created items
+        return { success: true, data: results }
     } catch (error) {
         console.error('Error creating schedule:', error)
         return { success: false, error: 'Failed to create schedule' }

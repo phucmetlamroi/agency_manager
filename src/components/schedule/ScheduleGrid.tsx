@@ -90,17 +90,28 @@ export default function ScheduleGrid({ userId, initialSchedule }: Props) {
         const startTime = setMinutes(setHours(contextMenu.day, contextMenu.startHour), 0)
         const endTime = setMinutes(setHours(contextMenu.day, contextMenu.endHour), 0)
 
-        // Optimistic UI could be added here, but let's wait for server for safety first
         toast.promise(
             createUserSchedule(userId, { startTime, endTime, type }),
             {
                 loading: 'Đang lưu lịch...',
                 success: (res) => {
-                    if (res.success && res.data) {
-                        // @ts-ignore - Date serialization fix if needed, but keeping it simple
-                        setSchedules([...schedules, { ...res.data, startTime: new Date(res.data.startTime), endTime: new Date(res.data.endTime) }])
+                    if (res.success && Array.isArray(res.data)) {
+                        // Handle array of created blocks
+                        const newBlocks = res.data.map(d => ({
+                            ...d,
+                            startTime: new Date(d.startTime),
+                            endTime: new Date(d.endTime)
+                        }))
+                        setSchedules([...schedules, ...newBlocks])
                         setContextMenu(null)
                         return `Đã báo ${type === 'BUSY' ? 'Bận' : 'Nhận việc'} (${contextMenu.startHour}h-${contextMenu.endHour}h)`
+                    } else if (res.success && res.data) {
+                        // Fallback for single object if type mismatch
+                        // @ts-ignore
+                        const d = res.data
+                        setSchedules([...schedules, { ...d, startTime: new Date(d.startTime), endTime: new Date(d.endTime) }])
+                        setContextMenu(null)
+                        return 'Đã lưu'
                     } else {
                         throw new Error(res.error)
                     }

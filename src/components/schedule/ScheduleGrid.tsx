@@ -105,13 +105,6 @@ export default function ScheduleGrid({ userId, initialSchedule }: Props) {
                         setSchedules([...schedules, ...newBlocks])
                         setContextMenu(null)
                         return `Đã báo ${type === 'BUSY' ? 'Bận' : 'Nhận việc'} (${contextMenu.startHour}h-${contextMenu.endHour}h)`
-                    } else if (res.success && res.data) {
-                        // Fallback for single object if type mismatch
-                        // @ts-ignore
-                        const d = res.data
-                        setSchedules([...schedules, { ...d, startTime: new Date(d.startTime), endTime: new Date(d.endTime) }])
-                        setContextMenu(null)
-                        return 'Đã lưu'
                     } else {
                         throw new Error(res.error)
                     }

@@ -1,10 +1,9 @@
-```
 import jsQR from 'jsqr'
 
 export async function smartCropQr(file: File): Promise<File> {
     return new Promise((resolve) => {
         const reader = new FileReader()
-        
+
         reader.onload = (e) => {
             const img = new Image()
             img.onload = () => {
@@ -13,7 +12,7 @@ export async function smartCropQr(file: File): Promise<File> {
                 const MAX_DIM = 1200
                 let width = img.width
                 let height = img.height
-                
+
                 // Scale down if too big (Simulates "reading" like a camera, improved performance)
                 if (width > MAX_DIM || height > MAX_DIM) {
                     const ratio = Math.min(MAX_DIM / width, MAX_DIM / height)
@@ -24,7 +23,7 @@ export async function smartCropQr(file: File): Promise<File> {
                 canvas.width = width
                 canvas.height = height
                 const ctx = canvas.getContext('2d', { willReadFrequently: true })
-                
+
                 if (!ctx) {
                     resolve(file)
                     return
@@ -46,11 +45,11 @@ export async function smartCropQr(file: File): Promise<File> {
                     // It's usually high enough res for a QR code unless user prints it huge.
                     // But for "Payment QR", we want high quality.
                     // Better approach: Calculate relative coordinates, then crop from ORIGINAL image.
-                    
+
                     const loc = code.location
                     const xCoords = [loc.topLeftCorner.x, loc.topRightCorner.x, loc.bottomRightCorner.x, loc.bottomLeftCorner.x]
                     const yCoords = [loc.topLeftCorner.y, loc.topRightCorner.y, loc.bottomRightCorner.y, loc.bottomLeftCorner.y]
-                    
+
                     const minX = Math.min(...xCoords)
                     const maxX = Math.max(...xCoords)
                     const minY = Math.min(...yCoords)
@@ -59,11 +58,11 @@ export async function smartCropQr(file: File): Promise<File> {
                     // Bounding Box on SCALED image
                     const qrW_scaled = maxX - minX
                     const qrH_scaled = maxY - minY
-                    
+
                     // Padding: Tighter (User request "vừa khít")
                     // Use 20px or 5% whatever is larger
                     const padding = Math.max(20, Math.min(qrW_scaled, qrH_scaled) * 0.05)
-                    
+
                     // Relative coordinates (0 to 1)
                     const relX = (minX - padding) / width
                     const relY = (minY - padding) / height
@@ -75,18 +74,18 @@ export async function smartCropQr(file: File): Promise<File> {
                     const origY = Math.max(0, Math.floor(relY * img.height))
                     const origW = Math.min(img.width - origX, Math.ceil(relW * img.width))
                     const origH = Math.min(img.height - origY, Math.ceil(relH * img.height))
-                    
+
                     // 4. Crop from ORIGINAL high-res image
                     const cropCanvas = document.createElement('canvas')
                     cropCanvas.width = origW
                     cropCanvas.height = origH
                     const cropCtx = cropCanvas.getContext('2d')
-                    
+
                     if (cropCtx) {
                         // White background for safety
                         cropCtx.fillStyle = '#FFFFFF'
                         cropCtx.fillRect(0, 0, origW, origH)
-                        
+
                         cropCtx.drawImage(
                             img,
                             origX, origY, origW, origH, // Source (Original)
@@ -114,7 +113,7 @@ export async function smartCropQr(file: File): Promise<File> {
                 }
             }
             img.onerror = () => resolve(file)
-            
+
             if (typeof e.target?.result === 'string') {
                 img.src = e.target.result
             } else {

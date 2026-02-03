@@ -191,6 +191,13 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
                 </div>
 
                 <div className="mt-4">
+                    <label className="text-xs text-gray-400">Ghi chú (Note)</label>
+                    <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Ghi chú thêm cho Editor..."
+                        rows={3}
+                        className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm focus:outline-none focus:border-blue-500" />
+                </div>
+
+                <div className="mt-4">
                     <label className="text-xs text-gray-400">Giao cho nhân viên</label>
                     <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)}
                         className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm">

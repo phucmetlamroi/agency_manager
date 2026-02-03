@@ -19,7 +19,7 @@ type ScheduleBlock = {
     startTime: Date
     endTime: Date
     type: ScheduleType
-    note?: string
+    note?: string | null
 }
 
 type Props = {

@@ -1,180 +1,104 @@
-import jsQR from 'jsqr'
-
-// Helper: Convert to Grayscale
-function toGrayscale(imageData: ImageData): ImageData {
-    const d = imageData.data
-    for (let i = 0; i < d.length; i += 4) {
-        const r = d[i]
-        const g = d[i + 1]
-        const b = d[i + 2]
-        // Standard Luminance
-        const v = 0.2126 * r + 0.7152 * g + 0.0722 * b
-        d[i] = d[i + 1] = d[i + 2] = v
-    }
-    return imageData
-}
-
-// Helper: Red Channel Filter (For "Red" background QRs like VietQR Tet theme)
-function toRedChannel(imageData: ImageData): ImageData {
-    const d = imageData.data
-    for (let i = 0; i < d.length; i += 4) {
-        const r = d[i]
-        // Use Red channel as intensity
-        // Red (255,0,0) -> 255 (White). Black (0,0,0) -> 0 (Black).
-        d[i] = d[i + 1] = d[i + 2] = r
-    }
-    return imageData
-}
-
-// Helper: Binarize (Black & White)
-function toBinary(imageData: ImageData, threshold = 128): ImageData {
-    const d = imageData.data
-    for (let i = 0; i < d.length; i += 4) {
-        const v = d[i] // Assumes already grayscale
-        const bin = v >= threshold ? 255 : 0
-        d[i] = d[i + 1] = d[i + 2] = bin
-    }
-    return imageData
-}
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/browser'
+import { Result } from '@zxing/library'
 
 export async function smartCropQr(file: File): Promise<File> {
-    return new Promise((resolve) => {
-        const reader = new FileReader()
-
-        reader.onload = (e) => {
+    return new Promise(async (resolve) => {
+        try {
+            const reader = new BrowserMultiFormatReader()
+            const imageUrl = URL.createObjectURL(file)
             const img = new Image()
-            img.onload = () => {
-                // 1. Setup Canvas
-                const canvas = document.createElement('canvas')
-                const MAX_DIM = 2000 // Increased resolution for better detection
-                let width = img.width
-                let height = img.height
 
-                if (width > MAX_DIM || height > MAX_DIM) {
-                    const ratio = Math.min(MAX_DIM / width, MAX_DIM / height)
-                    width = Math.floor(width * ratio)
-                    height = Math.floor(height * ratio)
-                }
-
-                canvas.width = width
-                canvas.height = height
-                const ctx = canvas.getContext('2d', { willReadFrequently: true })
-
-                if (!ctx) {
-                    resolve(file)
-                    return
-                }
-
-                ctx.drawImage(img, 0, 0, width, height)
-
-                let code = null
-
-                // --- PASS 1: Dry Run (Clean QR) ---
+            img.onload = async () => {
                 try {
-                    const data = ctx.getImageData(0, 0, width, height)
-                    code = jsQR(data.data, width, height, { inversionAttempts: "attemptBoth" })
-                    if (code) console.log('QR Found: Pass 1 (Normal)')
-                } catch (e) { }
+                    // ZXing is powerful but needs clean input
+                    // It scans the image element directly
+                    const result = await reader.decodeFromImageElement(img)
 
-                // --- PASS 2: Red Filter (Excellent for Tet/Red Backgrounds) ---
-                if (!code) {
-                    try {
-                        ctx.drawImage(img, 0, 0, width, height)
-                        const data = toRedChannel(ctx.getImageData(0, 0, width, height))
-                        code = jsQR(data.data, width, height, { inversionAttempts: "attemptBoth" })
-                        if (code) console.log('QR Found: Pass 2 (Red Filter)')
-                    } catch (e) { }
-                }
+                    if (result && result.getResultPoints().length > 0) {
+                        const points = result.getResultPoints()
 
-                // --- PASS 3: Grayscale ---
-                if (!code) {
-                    try {
-                        ctx.drawImage(img, 0, 0, width, height)
-                        const data = toGrayscale(ctx.getImageData(0, 0, width, height))
-                        code = jsQR(data.data, width, height, { inversionAttempts: "attemptBoth" })
-                        if (code) console.log('QR Found: Pass 3 (Grayscale)')
-                    } catch (e) { }
-                }
+                        // Calculate Bounds from ResultPoints
+                        // usually 3 points (finder patterns) or 4
+                        const xCoords = points.map(p => p.getX())
+                        const yCoords = points.map(p => p.getY())
 
-                // --- PASS 4: Aggressive Binarization ---
-                if (!code) {
-                    const thresholds = [100, 160, 60] // Try Mid, High, Low
-                    for (const t of thresholds) {
-                        if (code) break
-                        try {
-                            // Try Binarizing the Red Channel first (often best signal)
-                            ctx.drawImage(img, 0, 0, width, height)
-                            const redData = toRedChannel(ctx.getImageData(0, 0, width, height))
-                            const binData = toBinary(redData, t)
-                            code = jsQR(binData.data, width, height, { inversionAttempts: "attemptBoth" })
-                            if (code) console.log(`QR Found: Pass 4 (Red Binary T=${t})`)
-                        } catch (e) { }
-                    }
-                }
+                        let minX = Math.min(...xCoords)
+                        let maxX = Math.max(...xCoords)
+                        let minY = Math.min(...yCoords)
+                        let maxY = Math.max(...yCoords)
 
-                // Found?
-                if (code) {
-                    const loc = code.location
-                    const xCoords = [loc.topLeftCorner.x, loc.topRightCorner.x, loc.bottomRightCorner.x, loc.bottomLeftCorner.x]
-                    const yCoords = [loc.topLeftCorner.y, loc.topRightCorner.y, loc.bottomRightCorner.y, loc.bottomLeftCorner.y]
+                        // ZXing often finds the "centers" of the corner markers.
+                        // We need to expand slightly to include the full marker + quiet zone.
+                        // Estimate module size?
+                        // Simple heuristic: The QR is likely slightly larger than the points bounding box.
+                        const qrWidthEst = maxX - minX
+                        const qrHeightEst = maxY - minY
 
-                    const minX = Math.min(...xCoords)
-                    const maxX = Math.max(...xCoords)
-                    const minY = Math.min(...yCoords)
-                    const maxY = Math.max(...yCoords)
+                        // Expansion factor: 
+                        // The points are usually top-left, top-right, bottom-left.
+                        // So the "bottom-right" is missing in the bounds.
+                        // We need to project the missing corner or just expand.
 
-                    const qrW_scaled = maxX - minX
-                    const qrH_scaled = maxY - minY
+                        // Heuristic: Expand by ~20% ensures we cover the edges + quiet zone
+                        const expansion = Math.max(40, Math.max(qrWidthEst, qrHeightEst) * 0.25)
 
-                    // Padding: 20px relative to scaled image
-                    const padding = Math.max(30, Math.min(qrW_scaled, qrH_scaled) * 0.1)
+                        minX = Math.max(0, minX - expansion)
+                        minY = Math.max(0, minY - expansion)
+                        maxX = Math.min(img.width, maxX + expansion)
+                        maxY = Math.min(img.height, maxY + expansion)
 
-                    const relX = (minX - padding) / width
-                    const relY = (minY - padding) / height
-                    const relW = (qrW_scaled + padding * 2) / width
-                    const relH = (qrH_scaled + padding * 2) / height
+                        // Crop
+                        const cropW = maxX - minX
+                        const cropH = maxY - minY
 
-                    // Map to ORIGINAL
-                    const origX = Math.max(0, Math.floor(relX * img.width))
-                    const origY = Math.max(0, Math.floor(relY * img.height))
-                    const origW = Math.min(img.width - origX, Math.ceil(relW * img.width))
-                    const origH = Math.min(img.height - origY, Math.ceil(relH * img.height))
+                        const canvas = document.createElement('canvas')
+                        canvas.width = cropW
+                        canvas.height = cropH
+                        const ctx = canvas.getContext('2d')
 
-                    const cropCanvas = document.createElement('canvas')
-                    // Ensure sensible dimensions
-                    cropCanvas.width = origW
-                    cropCanvas.height = origH
-                    const cropCtx = cropCanvas.getContext('2d')
+                        if (ctx) {
+                            ctx.fillStyle = '#FFFFFF'
+                            ctx.fillRect(0, 0, cropW, cropH)
+                            ctx.drawImage(
+                                img,
+                                minX, minY, cropW, cropH,
+                                0, 0, cropW, cropH
+                            )
 
-                    if (cropCtx) {
-                        cropCtx.fillStyle = '#FFFFFF'
-                        cropCtx.fillRect(0, 0, origW, origH)
-                        cropCtx.drawImage(img, origX, origY, origW, origH, 0, 0, origW, origH)
-
-                        cropCanvas.toBlob((blob) => {
-                            if (blob) {
-                                const croppedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_smartcrop.webp", {
-                                    type: 'image/webp',
-                                    lastModified: Date.now()
-                                })
-                                resolve(croppedFile)
-                            } else {
-                                resolve(file)
-                            }
-                        }, 'image/webp', 1.0)
+                            canvas.toBlob((blob) => {
+                                if (blob) {
+                                    resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_zxing.webp", {
+                                        type: 'image/webp',
+                                        lastModified: Date.now()
+                                    }))
+                                } else {
+                                    resolve(file)
+                                }
+                            }, 'image/webp', 1.0)
+                        } else {
+                            resolve(file)
+                        }
                     } else {
+                        console.log('ZXing: No points found')
                         resolve(file)
                     }
-                } else {
-                    console.log('SmartQR: No QR found, returning original.')
+                } catch (err) {
+                    if (err instanceof NotFoundException) {
+                        console.log('ZXing: QR not found')
+                    } else {
+                        console.error('ZXing Error:', err)
+                    }
                     resolve(file)
+                } finally {
+                    URL.revokeObjectURL(imageUrl)
                 }
             }
             img.onerror = () => resolve(file)
-            if (typeof e.target?.result === 'string') img.src = e.target.result
-            else resolve(file)
+            img.src = imageUrl
+
+        } catch (error) {
+            console.error('Setup Error:', error)
+            resolve(file)
         }
-        reader.onerror = () => resolve(file)
-        reader.readAsDataURL(file)
     })
 }

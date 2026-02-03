@@ -33,9 +33,9 @@ export async function smartCropQr(file: File): Promise<File> {
                         const qrW = maxX - minX
                         const qrH = maxY - minY
 
-                        // Padding Strategy: 10% of QR size (Snug but safe)
-                        // This ensures "Quiet Zone" is preserved without wasting space.
-                        const padding = Math.max(20, Math.max(qrW, qrH) * 0.1) // 10%
+                        // Padding Strategy: INCREASED to 35% (Safe margin for any angle)
+                        // Min padding: 60px
+                        const padding = Math.max(60, Math.max(qrW, qrH) * 0.35)
 
                         // Apply Padding & Clamp to Image Bounds
                         minX = Math.max(0, minX - padding)

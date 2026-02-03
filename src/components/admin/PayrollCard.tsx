@@ -15,6 +15,7 @@ type PayrollCardProps = {
 
 export default function PayrollCard({ user, currentMonth, currentYear }: PayrollCardProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isPending, startTransition] = useTransition()
 
     // Calculate Financials
     const taskIncome = user.tasks.reduce((sum: number, task: any) => sum + task.value, 0)
@@ -23,12 +24,23 @@ export default function PayrollCard({ user, currentMonth, currentYear }: Payroll
     const totalIncome = taskIncome + bonusAmount
 
     // Check if PAID
-    // We need to fetch the 'Payroll' record status.
-    // The parent query should include 'payrolls' for this month to check status.
     const payrollRecord = user.payrolls?.[0]
     const isPaid = payrollRecord?.status === 'PAID'
 
     const rankEmoji = bonusData?.rank === 1 ? '🥇' : bonusData?.rank === 2 ? '🥈' : bonusData?.rank === 3 ? '🥉' : ''
+
+    const handleRevert = () => {
+        if (!confirm('Bạn có chắc chắn muốn hoàn tác (hủy) trạng thái thanh toán này?')) return
+
+        startTransition(async () => {
+            const res = await revertPayment(user.id, currentMonth, currentYear)
+            if (res.error) {
+                toast.error(res.error)
+            } else {
+                toast.success('Đã hủy trạng thái thanh toán')
+            }
+        })
+    }
 
     return (
         <div className="glass-panel" style={{ padding: '1.5rem', border: bonusData ? '1px solid #f59e0b' : '1px solid rgba(16, 185, 129, 0.2)', position: 'relative' }}>
@@ -81,32 +93,9 @@ export default function PayrollCard({ user, currentMonth, currentYear }: Payroll
                         {totalIncome.toLocaleString()} VNĐ
                     </div>
 
-                    import {revertPayment} from '@/actions/payroll-actions'
-                    import {toast} from 'sonner'
-                    import {Button} from '@/components/ui/button'
-                    import {CheckCircle2, CircleDashed, RotateCcw} from 'lucide-react'
-                    import {useTransition} from 'react'
-
-                    // ... (inside component)
-                    const [isPending, startTransition] = useTransition()
-
-    const handleRevert = () => {
-        if (!confirm('Bạn có chắc chắn muốn hoàn tác (hủy) trạng thái thanh toán này?')) return
-        
-        startTransition(async () => {
-             const res = await revertPayment(user.id, currentMonth, currentYear)
-                    if (res.error) {
-                        toast.error(res.error)
-                    } else {
-                        toast.success('Đã hủy trạng thái thanh toán')
-                    }
-        })
-    }
-
-                    // ... (rendering)
                     {/* Payment Button / Status */}
                     {isPaid ? (
-                        <div className="flex items-center gap-3 ml-auto">
+                        <div className="flex items-center gap-3 ml-auto justify-end">
                             <div className="flex items-center gap-2 text-green-400 font-bold bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
                                 <CheckCircle2 className="w-4 h-4" />
                                 ĐÃ THANH TOÁN

@@ -14,12 +14,23 @@ function toGrayscale(imageData: ImageData): ImageData {
     return imageData
 }
 
+// Helper: Red Channel Filter (For "Red" background QRs like VietQR Tet theme)
+function toRedChannel(imageData: ImageData): ImageData {
+    const d = imageData.data
+    for (let i = 0; i < d.length; i += 4) {
+        const r = d[i]
+        // Use Red channel as intensity
+        // Red (255,0,0) -> 255 (White). Black (0,0,0) -> 0 (Black).
+        d[i] = d[i + 1] = d[i + 2] = r
+    }
+    return imageData
+}
+
 // Helper: Binarize (Black & White)
 function toBinary(imageData: ImageData, threshold = 128): ImageData {
     const d = imageData.data
     for (let i = 0; i < d.length; i += 4) {
-        // Simple luminance
-        const v = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]
+        const v = d[i] // Assumes already grayscale
         const bin = v >= threshold ? 255 : 0
         d[i] = d[i + 1] = d[i + 2] = bin
     }
@@ -35,7 +46,7 @@ export async function smartCropQr(file: File): Promise<File> {
             img.onload = () => {
                 // 1. Setup Canvas
                 const canvas = document.createElement('canvas')
-                const MAX_DIM = 1200 // Keep high res for quality cropping
+                const MAX_DIM = 2000 // Increased resolution for better detection
                 let width = img.width
                 let height = img.height
 
@@ -54,41 +65,49 @@ export async function smartCropQr(file: File): Promise<File> {
                     return
                 }
 
-                // Draw Original
                 ctx.drawImage(img, 0, 0, width, height)
 
                 let code = null
-                let usedImageData = null
 
-                // --- PASS 1: Normal Scan (Result: usually works for clean QRs) ---
+                // --- PASS 1: Dry Run (Clean QR) ---
                 try {
-                    const originalData = ctx.getImageData(0, 0, width, height)
-                    code = jsQR(originalData.data, width, height, { inversionAttempts: "attemptBoth" })
-                    if (code) console.log('QR Found in Pass 1 (Normal)')
+                    const data = ctx.getImageData(0, 0, width, height)
+                    code = jsQR(data.data, width, height, { inversionAttempts: "attemptBoth" })
+                    if (code) console.log('QR Found: Pass 1 (Normal)')
                 } catch (e) { }
 
-                // --- PASS 2: Grayscale (Result: helps with colored QRs) ---
+                // --- PASS 2: Red Filter (Excellent for Tet/Red Backgrounds) ---
                 if (!code) {
                     try {
-                        // Refresh data
                         ctx.drawImage(img, 0, 0, width, height)
-                        const grayData = toGrayscale(ctx.getImageData(0, 0, width, height))
-                        code = jsQR(grayData.data, width, height, { inversionAttempts: "attemptBoth" })
-                        if (code) console.log('QR Found in Pass 2 (Grayscale)')
+                        const data = toRedChannel(ctx.getImageData(0, 0, width, height))
+                        code = jsQR(data.data, width, height, { inversionAttempts: "attemptBoth" })
+                        if (code) console.log('QR Found: Pass 2 (Red Filter)')
                     } catch (e) { }
                 }
 
-                // --- PASS 3: Binarization (Result: helps with low contrast/fancy backgrounds) ---
+                // --- PASS 3: Grayscale ---
                 if (!code) {
-                    // Try a few thresholds
-                    const thresholds = [100, 150]
+                    try {
+                        ctx.drawImage(img, 0, 0, width, height)
+                        const data = toGrayscale(ctx.getImageData(0, 0, width, height))
+                        code = jsQR(data.data, width, height, { inversionAttempts: "attemptBoth" })
+                        if (code) console.log('QR Found: Pass 3 (Grayscale)')
+                    } catch (e) { }
+                }
+
+                // --- PASS 4: Aggressive Binarization ---
+                if (!code) {
+                    const thresholds = [100, 160, 60] // Try Mid, High, Low
                     for (const t of thresholds) {
-                        if (code) break;
+                        if (code) break
                         try {
+                            // Try Binarizing the Red Channel first (often best signal)
                             ctx.drawImage(img, 0, 0, width, height)
-                            const binData = toBinary(ctx.getImageData(0, 0, width, height), t)
+                            const redData = toRedChannel(ctx.getImageData(0, 0, width, height))
+                            const binData = toBinary(redData, t)
                             code = jsQR(binData.data, width, height, { inversionAttempts: "attemptBoth" })
-                            if (code) console.log(`QR Found in Pass 3 (Binary T=${t})`)
+                            if (code) console.log(`QR Found: Pass 4 (Red Binary T=${t})`)
                         } catch (e) { }
                     }
                 }
@@ -108,7 +127,7 @@ export async function smartCropQr(file: File): Promise<File> {
                     const qrH_scaled = maxY - minY
 
                     // Padding: 20px relative to scaled image
-                    const padding = Math.max(20, Math.min(qrW_scaled, qrH_scaled) * 0.1)
+                    const padding = Math.max(30, Math.min(qrW_scaled, qrH_scaled) * 0.1)
 
                     const relX = (minX - padding) / width
                     const relY = (minY - padding) / height
@@ -122,6 +141,7 @@ export async function smartCropQr(file: File): Promise<File> {
                     const origH = Math.min(img.height - origY, Math.ceil(relH * img.height))
 
                     const cropCanvas = document.createElement('canvas')
+                    // Ensure sensible dimensions
                     cropCanvas.width = origW
                     cropCanvas.height = origH
                     const cropCtx = cropCanvas.getContext('2d')
@@ -146,7 +166,7 @@ export async function smartCropQr(file: File): Promise<File> {
                         resolve(file)
                     }
                 } else {
-                    console.log('SmartQR: Failed all passes.')
+                    console.log('SmartQR: No QR found, returning original.')
                     resolve(file)
                 }
             }

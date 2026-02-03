@@ -8,34 +8,53 @@ import { Loader2, UploadCloud, CreditCard } from 'lucide-react'
 
 export default function PaymentQrUpload({ user }: { user: any }) {
     const [isPending, startTransition] = useTransition()
+    const [isProcessing, setIsProcessing] = useState(false)
     const [preview, setPreview] = useState<string | null>(user.paymentQrUrl || null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    // We need to store the processed file to upload it later
+    const [processedFile, setProcessedFile] = useState<File | null>(null)
 
     async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]
         if (!file) return
 
         // 1. Client Validation
-        if (file.size > 4 * 1024 * 1024) {
-            toast.error('File quá lớn! Vui lòng chọn ảnh < 4MB')
-            return
-        }
-        if (!['image/jpeg', 'image/png', 'image/jpg', 'image/webp'].includes(file.type)) {
-            toast.error('Chỉ chấp nhận file ảnh (JPG, PNG)')
+        if (file.size > 10 * 1024 * 1024) { // Increased limit for raw screenshots handling
+            toast.error('File quá lớn! Vui lòng chọn ảnh < 10MB')
             return
         }
 
-        // Preview
-        const objectUrl = URL.createObjectURL(file)
-        setPreview(objectUrl)
+        // 2. Smart Crop Processing
+        setIsProcessing(true)
+        try {
+            const { smartCropQr } = await import('@/lib/smart-qr') // Dynamic import to save bundle size
+            const croppedFile = await smartCropQr(file)
 
-        // Upload Trigger manually or via Save button? 
-        // Let's do instant upload or form submit. 
-        // User request: "Thanh tiến trình... Tiến hành xử lý"
-        // Let's use a form submission approach for better UX (Bank info + File)
+            setProcessedFile(croppedFile)
+
+            // Preview
+            const objectUrl = URL.createObjectURL(croppedFile)
+            setPreview(objectUrl)
+
+            if (croppedFile !== file) {
+                toast.success('Đã tự động cắt ảnh QR!')
+            }
+        } catch (error) {
+            console.error('Smart crop failed', error)
+            // Fallback to original
+            setProcessedFile(file)
+            setPreview(URL.createObjectURL(file))
+        } finally {
+            setIsProcessing(false)
+        }
     }
 
     async function handleSubmit(formData: FormData) {
+        // If we have a processed file, we must use it instead of the form's default file
+        if (processedFile) {
+            formData.set('file', processedFile)
+        }
+
         startTransition(async () => {
             const res = await uploadPaymentQr(user.id, formData)
             if (res.error) {

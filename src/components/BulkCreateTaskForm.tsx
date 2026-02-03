@@ -25,6 +25,7 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
     const [deadline, setDeadline] = useState<string>('')
     const [linkRaw, setLinkRaw] = useState<string>('')
     const [linkBroll, setLinkBroll] = useState<string>('')
+    const [collectFilesLink, setCollectFilesLink] = useState<string>('')
     const [references, setReferences] = useState<string>('')
     const [notes, setNotes] = useState<string>('')
 
@@ -100,6 +101,7 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
             wageVND: wage,
             resources: (linkRaw || linkBroll) ? `RAW: ${linkRaw.trim()} | BROLL: ${linkBroll.trim()}` : null,
             references: references || null,
+            collectFilesLink: collectFilesLink || null,
             notes: notes || null,
             type
         })
@@ -180,6 +182,12 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
                     <div>
                         <label className="text-xs text-gray-400">Link B-Roll (Tài nguyên)</label>
                         <input value={linkBroll} onChange={e => setLinkBroll(e.target.value)} placeholder="https://..."
+                            className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
+                    </div>
+
+                    <div className="mt-4">
+                        <label className="text-xs text-gray-400">Collect Files Link (Nơi nộp file/Project mẫu)</label>
+                        <input value={collectFilesLink} onChange={e => setCollectFilesLink(e.target.value)} placeholder="https://..."
                             className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
                     </div>
                 </div>

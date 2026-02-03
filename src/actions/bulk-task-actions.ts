@@ -13,6 +13,7 @@ type BatchTaskInput = {
     wageVND: number
     resources: string | null
     references: string | null
+    collectFilesLink: string | null
     notes: string | null
     type: string
 }
@@ -43,6 +44,7 @@ export async function createBatchTasks(data: BatchTaskInput) {
                         deadline: deadlineDate,
                         resources: data.resources,
                         references: data.references,
+                        collectFilesLink: data.collectFilesLink,
                         notes: data.notes,
                         assigneeId: data.assigneeId,
                         status: data.assigneeId ? 'Đã nhận task' : 'Đang đợi giao',

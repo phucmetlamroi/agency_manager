@@ -1,5 +1,5 @@
-import { BrowserMultiFormatReader, NotFoundException } from '@zxing/browser'
-import { Result } from '@zxing/library'
+import { BrowserMultiFormatReader } from '@zxing/browser'
+import { Result, NotFoundException } from '@zxing/library'
 
 export async function smartCropQr(file: File): Promise<File> {
     return new Promise(async (resolve) => {

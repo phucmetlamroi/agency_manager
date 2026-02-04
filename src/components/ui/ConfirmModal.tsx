@@ -51,62 +51,49 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         <ConfirmContext.Provider value={{ confirm }}>
             {children}
             {isOpen && (
-                <div style={{
-                    position: 'fixed', inset: 0,
-                    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-                    zIndex: 99999,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    animation: 'fadeIn 0.2s ease-out'
-                }} onClick={handleCancel}>
-                    <div style={{
-                        background: '#1a1a1a',
-                        border: '1px solid #333',
-                        borderRadius: '16px',
-                        padding: '1.5rem',
-                        width: '90%', maxWidth: '400px',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                        transform: 'scale(1)',
-                        animation: 'scaleIn 0.2s ease-out'
-                    }} onClick={e => e.stopPropagation()}>
-                        <h3 style={{
-                            fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem',
-                            color: options.type === 'danger' ? '#ef4444' : 'white'
-                        }}>
-                            {options.title || 'Xác nhận?'}
-                        </h3>
-                        <p style={{ color: '#9ca3af', marginBottom: '1.5rem', lineHeight: '1.5' }}>
-                            {options.message}
-                        </p>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                            <button
-                                onClick={handleCancel}
-                                style={{
-                                    padding: '0.5rem 1rem',
-                                    borderRadius: '8px',
-                                    background: 'transparent',
-                                    border: '1px solid #444',
-                                    color: '#ccc',
-                                    cursor: 'pointer',
-                                    fontWeight: 500
-                                }}
+                <div
+                    className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+                    onClick={handleCancel}
+                >
+                    <div
+                        className="bg-[#1a1a1a]/90 border border-white/10 rounded-2xl p-6 w-[90%] max-w-md shadow-2xl transform scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Ambient Glow */}
+                        <div className={`absolute -top-20 -left-20 w-40 h-40 rounded-full blur-[80px] opacity-20 pointer-events-none
+                            ${options.type === 'danger' ? 'bg-red-500' : 'bg-blue-500'}`}
+                        />
+
+                        <div className="relative z-10">
+                            <h3 className={`text-xl font-bold mb-3 flex items-center gap-2
+                                ${options.type === 'danger' ? 'text-red-400' : 'text-blue-400'}`}
                             >
-                                {options.cancelText || 'Hủy bỏ'}
-                            </button>
-                            <button
-                                onClick={handleConfirm}
-                                style={{
-                                    padding: '0.5rem 1rem',
-                                    borderRadius: '8px',
-                                    background: options.type === 'danger' ? '#ef4444' : '#3b82f6',
-                                    border: 'none',
-                                    color: 'white',
-                                    cursor: 'pointer',
-                                    fontWeight: 'bold',
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                                }}
-                            >
-                                {options.confirmText || 'Xác nhận'}
-                            </button>
+                                {options.type === 'danger' && '⚠️'}
+                                {options.title || 'Xác nhận hành động'}
+                            </h3>
+
+                            <p className="text-gray-300 mb-6 leading-relaxed text-sm font-medium">
+                                {options.message}
+                            </p>
+
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={handleCancel}
+                                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 font-bold text-sm hover:bg-white/10 hover:text-white transition-colors"
+                                >
+                                    {options.cancelText || 'Hủy bỏ'}
+                                </button>
+                                <button
+                                    onClick={handleConfirm}
+                                    className={`px-5 py-2 rounded-xl font-bold text-sm shadow-lg transition-all transform hover:scale-105 active:scale-95
+                                        ${options.type === 'danger'
+                                            ? 'bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-red-500/20'
+                                            : 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-blue-500/20'
+                                        }`}
+                                >
+                                    {options.confirmText || 'Xác nhận'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

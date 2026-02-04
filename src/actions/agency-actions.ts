@@ -35,7 +35,7 @@ export async function getAllAgencies() {
     try {
         const agencies = await prisma.agency.findMany({
             include: {
-                owner: { select: { id: true, username: true, getNickName: false } }, // nickname not in schema yet? Wait, user has nickname.
+                owner: { select: { id: true, username: true, nickname: true } },
                 _count: { select: { members: true, tasks: true } }
             },
             orderBy: { createdAt: 'desc' }

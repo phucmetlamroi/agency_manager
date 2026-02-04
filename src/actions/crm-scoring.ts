@@ -17,15 +17,19 @@ export async function calculateAllClientScores() {
                     select: {
                         jobPriceUSD: true,
                         createdAt: true,
-                        status: true
+                        status: true,
+                        feedbacks: {
+                            select: { severity: true }
+                        }
                     }
                 },
-                feedbacks: {
-                    select: {
-                        severity: true
+                projects: {
+                    include: {
+                        feedbacks: {
+                            select: { severity: true }
+                        }
                     }
-                },
-                projects: true
+                }
             }
         })
 
@@ -67,15 +71,22 @@ export async function calculateAllClientScores() {
             // 5. Penalties (Friction)
             // Critical Feedback (severity >= 4): -10 pts
             // Minor Feedback (severity < 4): -2 pts
+
+            // Gather all feedbacks from Projects and Tasks
+            const allFeedbacks = [
+                ...client.projects.flatMap(p => p.feedbacks),
+                ...client.tasks.flatMap(t => t.feedbacks)
+            ]
+
             let penalty = 0
-            client.feedbacks.forEach(fb => {
+            allFeedbacks.forEach(fb => {
                 if (fb.severity >= 4) penalty += 10
                 else penalty += 2
             })
 
             // Calc Friction Index (0.0 - 1.0)
             // Ratio of Feedbacks / Tasks. If Tasks=0, Friction=0.
-            const frictionIndex = taskCount > 0 ? (client.feedbacks.length / taskCount) : 0
+            const frictionIndex = taskCount > 0 ? (allFeedbacks.length / taskCount) : 0
 
             // Final Calculation
             let finalScore = (revenueScore + volumeScore + recencyScore + qualityScore) - penalty

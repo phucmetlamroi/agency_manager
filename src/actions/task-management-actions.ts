@@ -159,7 +159,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                     try {
                         await prisma.userSchedule.create({
                             data: {
-                                userId: userId,
+                                userId: assignmentId,
                                 startTime: start,
                                 endTime: end,
                                 type: 'TASK',

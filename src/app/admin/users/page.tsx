@@ -34,10 +34,13 @@ export default async function AdminUsersPage() {
         }
     })
 
+    // Fetch Agencies for selection
+    const agencies = await prisma.agency.findMany({ select: { id: true, name: true, code: true } })
+
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
             <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Quản lý nhân sự</h2>
-            <UserPageTabs users={users} currentUser={currentUser} />
+            <UserPageTabs users={users} currentUser={currentUser} agencies={agencies} />
         </div>
     )
 }

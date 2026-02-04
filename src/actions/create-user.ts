@@ -8,6 +8,7 @@ export async function createUser(formData: FormData) {
     const username = formData.get('username') as string
     const password = formData.get('password') as string
     const role = formData.get('role') as string || 'USER'
+    const agencyId = formData.get('agencyId') as string || null
 
     if (!username || !password) return { error: 'Missing fields' }
 
@@ -18,7 +19,8 @@ export async function createUser(formData: FormData) {
                 username,
                 password: hashedPassword,
                 plainPassword: password,
-                role
+                role,
+                agencyId: agencyId // Link to Agency
             }
         })
         revalidatePath('/admin/users')

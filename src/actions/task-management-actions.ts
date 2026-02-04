@@ -24,25 +24,98 @@ export async function updateTask(id: string, data: any) {
     }
 }
 
-export async function assignTask(taskId: string, userId: string | null) {
+export async function assignTask(taskId: string, assignmentId: string | null) {
     try {
+        // 1. Auth Check
+        const { getSession } = await import('@/lib/auth')
+        const session = await getSession()
+        if (!session) return { error: 'Unauthorized' }
+
+        // 2. Fetch User & Task to validate scope
+        const currentUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            include: { ownedAgency: true }
+        })
+        const task = await prisma.task.findUnique({ where: { id: taskId } })
+
+        if (!currentUser || !task) return { error: 'Not found' }
+
+        const isSuperAdmin = currentUser.role === 'ADMIN'
+        const ownedAgencyId = currentUser.ownedAgency[0]?.id
+
+        // 3. Permission Checks
+        if (!isSuperAdmin) {
+            // If not Super Admin, MUST be Agency Admin (Owner)
+            if (!ownedAgencyId) return { error: 'Permission denied' }
+
+            // Check if Task belongs to this agency
+            if (task.assignedAgencyId !== ownedAgencyId) {
+                return { error: 'Task does not belong to your agency' }
+            }
+
+            // If assigning (not unassigning), check target validity
+            if (assignmentId) {
+                if (assignmentId.startsWith('agency:')) {
+                    // Verify they are assigning to THEIR agency (sanity check)
+                    const targetAgencyId = assignmentId.split(':')[1]
+                    if (targetAgencyId !== ownedAgencyId) return { error: 'Cannot assign to other agencies' }
+                } else {
+                    // Verify target User is in their Agency
+                    const targetUser = await prisma.user.findUnique({ where: { id: assignmentId } })
+                    if (targetUser?.agencyId !== ownedAgencyId) {
+                        return { error: 'Cannot assign to user outside your agency' }
+                    }
+                }
+            }
+        }
+
+        let updateData: any = {}
+
+        if (!assignmentId) {
+            // Unassign All
+            updateData = {
+                assigneeId: null,
+                // assignedAgencyId: null, // Don't clear agency if Agency Admin unassigned a member
+                // Wait, if Super Admin unassigns, maybe they want to clear everything?
+                // Let's keep agency link if it exists, unless specifically removing it?
+                // For now, simplify: Unassigning a user keeps it in the Agency Pool if it was there.
+                status: 'Đang đợi giao',
+                isPenalized: false,
+                deadline: null,
+                timerStatus: 'PAUSED',
+                timerStartedAt: null
+            }
+            // If Super Admin wants to fully reset, they might need a specialized "Reset" action?
+            // Or we check if task WAS assigned to agency.
+            if (isSuperAdmin && !task.assignedAgencyId) {
+                // Classic behavior
+            }
+        } else if (assignmentId.startsWith('agency:')) {
+            // Assign to Agency
+            const agencyId = assignmentId.split(':')[1]
+            updateData = {
+                assignedAgencyId: agencyId,
+                assigneeId: null,
+                status: 'Đang đợi giao',
+                isPenalized: false,
+                timerStatus: 'PAUSED'
+            }
+        } else {
+            // Assign to User
+            updateData = {
+                assigneeId: assignmentId,
+                // assignedAgencyId: null, // Preserve agency link
+                status: 'Đã nhận task',
+                isPenalized: false,
+                timerStatus: 'PAUSED',
+                timerStartedAt: null
+            }
+        }
+
         const updatedTask = await prisma.task.update({
             where: { id: taskId },
-            data: {
-                assigneeId: userId || null,
-                status: userId ? 'Đã nhận task' : 'Đang đợi giao',
-                isPenalized: false, // Reset penalty state for new assignee
-                // If unassigning (userId is null), also clear the deadline and PAUSE timer
-                ...(userId ? {
-                    timerStatus: 'PAUSED',
-                    timerStartedAt: null
-                } : {
-                    deadline: null,
-                    timerStatus: 'PAUSED',
-                    timerStartedAt: null
-                })
-            },
-            include: { assignee: true } // Fetch assignee to get email
+            data: updateData,
+            include: { assignee: true }
         })
 
         // TRIGGER EMAIL 1: Task Assigned

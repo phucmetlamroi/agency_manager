@@ -6,7 +6,7 @@ import TimelineBoard from '@/components/admin/TimelineBoard'
 import FocusBoard from '@/components/admin/FocusBoard'
 import PayrollTable from '@/components/admin/PayrollTable'
 
-export default function UserPageTabs({ users, currentUser }: { users: any[], currentUser: any }) {
+export default function UserPageTabs({ users, currentUser, agencies }: { users: any[], currentUser: any, agencies?: any[] }) {
     const [activeTab, setActiveTab] = useState<'users' | 'schedule' | 'focus' | 'payroll'>('users')
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
@@ -37,7 +37,7 @@ export default function UserPageTabs({ users, currentUser }: { users: any[], cur
             {/* CONTENT */}
             <div className="min-h-[600px]">
                 {activeTab === 'users' && (
-                    <UserList users={users} currentUser={currentUser} />
+                    <UserList users={users} currentUser={currentUser} agencies={agencies} />
                 )}
 
                 {activeTab === 'schedule' && (

@@ -49,6 +49,9 @@ export default function DesktopLayoutShell({
                             <Link href="/admin/schedule" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/admin/schedule' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>📅</span> Lịch trình
                             </Link>
+                            <Link href="/admin/agencies" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/admin/agencies' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                                <span>🏢</span> Agencies
+                            </Link>
                         </>
                     )}
                 </nav>

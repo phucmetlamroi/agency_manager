@@ -39,18 +39,28 @@ export default async function AdminDashboard() {
             { reputation: 'desc' },
             { username: 'asc' }
         ]
-    })
+        ]
+})
 
-    const unassignedTasks = tasks.filter(t => !t.assigneeId)
-    const assignedTasks = tasks.filter(t => t.assigneeId)
+const agencies = await prisma.agency.findMany({ select: { id: true, name: true, code: true } })
 
-    return (
-        <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '2rem', alignItems: 'start' }}>
-            <AutoRefresh />
+const unassignedTasks = tasks.filter(t => !t.assigneeId)
+const assignedTasks = tasks.filter(t => t.assigneeId)
+
+return (
+    <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '2rem', alignItems: 'start' }}>
+        <AutoRefresh />
 
 
-            {/* Create Task Form Area */}
-            <TaskCreationManager users={users} />
+        {/* Create Task Form Area */}
+        <TaskCreationManager users={users} />
+
+        {/* Task Lists */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+
+            {/* Bottleneck Alert */}
+            <BottleneckAlert tasks={tasks as any} />
+
 
             {/* Task Lists */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
@@ -58,25 +68,19 @@ export default async function AdminDashboard() {
                 {/* Bottleneck Alert */}
                 <BottleneckAlert tasks={tasks as any} />
 
-
-                {/* Task Lists */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-
-                    {/* Bottleneck Alert */}
-                    <BottleneckAlert tasks={tasks as any} />
-
-                    {/* WORKFLOW TABS (Replaces old Active Tasks list) */}
-                    <div>
-                        <h3 style={{ marginBottom: '1rem', color: '#ccc' }}>🔥 Tiến Độ Công Việc</h3>
-                        <TaskWorkflowTabs
-                            tasks={assignedTasks.concat(unassignedTasks) as any}
-                            users={users}
-                            isMobile={await isMobileDevice()}
-                        />
-                    </div>
+                {/* WORKFLOW TABS (Replaces old Active Tasks list) */}
+                <div>
+                    <h3 style={{ marginBottom: '1rem', color: '#ccc' }}>🔥 Tiến Độ Công Việc</h3>
+                    <TaskWorkflowTabs
+                        tasks={assignedTasks.concat(unassignedTasks) as any}
+                        users={users}
+                        agencies={agencies}
+                        isMobile={await isMobileDevice()}
+                    />
                 </div>
             </div>
-
         </div>
-    )
+
+    </div>
+)
 }

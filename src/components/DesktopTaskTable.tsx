@@ -39,7 +39,7 @@ const statusBg: Record<string, string> = {
     "Sửa frame": "rgba(244, 114, 182, 0.2)"
 }
 
-export default function TaskTable({ tasks, isAdmin = false, users = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[] }) {
+export default function TaskTable({ tasks, isAdmin = false, users = [], agencies = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[], agencies?: { id: string, name: string, code: string }[] }) {
     const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
 
@@ -290,11 +290,22 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                                     className="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-blue-500 max-w-[120px]"
                                                 >
                                                     <option value="" className="text-gray-500">-- Assign --</option>
-                                                    {users.map(u => (
-                                                        <option key={u.id} value={u.id} className="text-black">
-                                                            {u.username} ({u.reputation ?? 100}đ)
-                                                        </option>
-                                                    ))}
+                                                    {agencies && agencies.length > 0 && (
+                                                        <optgroup label="Đại Lý (Agencies)">
+                                                            {agencies.map(a => (
+                                                                <option key={a.id} value={`agency:${a.id}`} className="text-purple-600 font-bold">
+                                                                    🏢 {a.code} - {a.name}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    )}
+                                                    <optgroup label="Nhân viên">
+                                                        {users.map(u => (
+                                                            <option key={u.id} value={u.id} className="text-black">
+                                                                {u.username} ({u.reputation ?? 100}đ)
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
                                                 </select>
                                             </div>
                                         )}

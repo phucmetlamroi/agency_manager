@@ -29,6 +29,11 @@ model User {
   focusTasks FocusTask[]
   payrolls   Payroll[]
   
+  // Agency Relations
+  agencyId    String?
+  agency      Agency?  @relation("AgencyMembers", fields: [agencyId], references: [id])
+  ownedAgency Agency[] @relation("AgencyOwner")
+  
   // Payment Info
   paymentQrUrl      String?
   paymentBankName   String?
@@ -81,6 +86,10 @@ model Task {
   
   assignee    User?    @relation(fields: [assigneeId], references: [id])
   assigneeId  String?
+
+  // Agency Assignment
+  assignedAgencyId String?
+  assignedAgency   Agency? @relation(fields: [assignedAgencyId], references: [id])
 
   // CRM Relation
   project     Project? @relation(fields: [projectId], references: [id])
@@ -263,8 +272,29 @@ enum ScheduleType {
   AVAILABLE // User sets: Sẵn sàng nhận việc (Green)
   TASK     // System sets: Đang làm task
 }
+// ============================================
+// AGENCY MANAGEMENT MODULE
+// ============================================
 
-// Focus Note Module
+model Agency {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique // Short code e.g., "AGC01"
+  
+  ownerId   String?  // Agency Admin ID
+  owner     User?    @relation("AgencyOwner", fields: [ownerId], references: [id])
+  
+  members   User[]   @relation("AgencyMembers")
+  
+  // Tasks assigned to this agency
+  tasks     Task[]
+  
+  status    String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ... existing code ...
 model FocusTask {
   id          String   @id @default(uuid())
   content     String

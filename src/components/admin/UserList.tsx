@@ -10,9 +10,10 @@ import { createUser } from '@/actions/create-user'
 type Props = {
     users: any[]
     currentUser: any
+    agencies?: any[]
 }
 
-export default function UserList({ users, currentUser }: Props) {
+export default function UserList({ users, currentUser, agencies }: Props) {
     return (
         <div>
             <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
@@ -35,6 +36,17 @@ export default function UserList({ users, currentUser }: Props) {
                             <option value="ADMIN">Admin</option>
                         </select>
                     </div>
+                    {agencies && agencies.length > 0 && (
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Agency (Optional)</label>
+                            <select name="agencyId" style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white', maxWidth: '150px' }}>
+                                <option value="">-- None --</option>
+                                {agencies.map(a => (
+                                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <button className="btn btn-primary" type="submit">Thêm User</button>
                 </form>
             </div>

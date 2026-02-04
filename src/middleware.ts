@@ -33,7 +33,16 @@ export async function middleware(request: NextRequest) {
 
     } catch (error) {
         // Session invalid
-        return NextResponse.redirect(new URL('/login', request.url))
+        // If already on login, don't redirect, just let them see the page (and maybe clear cookie in response)
+        if (request.nextUrl.pathname === '/login') {
+            const response = NextResponse.next()
+            response.cookies.delete('session')
+            return response
+        }
+
+        const response = NextResponse.redirect(new URL('/login', request.url))
+        response.cookies.delete('session')
+        return response
     }
 }
 

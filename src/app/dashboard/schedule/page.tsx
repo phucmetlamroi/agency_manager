@@ -2,6 +2,8 @@ import { getMySchedule } from '@/actions/schedule-actions'
 import WeeklyScheduler from '@/components/schedule/WeeklyScheduler'
 import { startOfWeek, endOfWeek, addDays } from 'date-fns'
 
+export const dynamic = 'force-dynamic'
+
 export default async function SchedulePage() {
     // Default fetch: Current week + Next week? 
     // Or just fetch specific range. For now, let's fetch -1 month to +1 month to be safe for navigation.

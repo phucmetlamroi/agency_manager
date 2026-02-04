@@ -2,6 +2,8 @@ import { getCompanySchedule } from '@/actions/schedule-actions'
 import ResourceTimeline from '@/components/schedule/ResourceTimeline'
 import { addDays } from 'date-fns'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminSchedulePage() {
     // Fetch wide range to allow client-side navigation without re-fetching too often?
     // Or fetch a reasonable window.

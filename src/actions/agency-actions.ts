@@ -63,12 +63,20 @@ export async function createAgency(data: { name: string, code: string, ownerId?:
             }
         })
 
+
         // If ownerId provided, update that user's agencyId? 
         // Usually Owner is also a member, but let's keep it flexible.
         if (data.ownerId) {
             await prisma.user.update({
                 where: { id: data.ownerId },
                 data: { agencyId: agency.id } // Owner belongs to their agency
+            })
+
+            // MIGRATE TASKS: Automatically assign user's existing tasks to this Agency
+            // Keep assigneeId (so they keep doing it), but add assignedAgencyId
+            await prisma.task.updateMany({
+                where: { assigneeId: data.ownerId },
+                data: { assignedAgencyId: agency.id }
             })
         }
 
@@ -178,6 +186,12 @@ export async function deleteAgency(id: string) {
         await prisma.user.updateMany({
             where: { agencyId: id },
             data: { agencyId: null }
+        })
+
+        // 2. Release all tasks (Keep assignee, just remove agency link)
+        await prisma.task.updateMany({
+            where: { assignedAgencyId: id },
+            data: { assignedAgencyId: null }
         })
 
         // 2. Delete Agency

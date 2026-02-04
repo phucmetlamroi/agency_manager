@@ -33,7 +33,7 @@ export default async function AgencyTasksPage() {
     // Fetch Agency Members for assignment
     const members = await prisma.user.findMany({
         where: { agencyId: agency.id },
-        select: { id: true, username: true, getNickName: false, reputation: true }
+        select: { id: true, username: true, nickname: true, reputation: true }
     })
 
     return (

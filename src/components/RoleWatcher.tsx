@@ -31,8 +31,8 @@ export default function RoleWatcher({ currentRole, isTreasurer }: { currentRole:
             }
         }
 
-        // Check every 5 seconds for instant feedback
-        const interval = setInterval(checkRole, 5000)
+        // Check every 60 seconds (optimized from 5s)
+        const interval = setInterval(checkRole, 60000)
 
         // Check on window focus (tab switch)
         const onFocus = () => checkRole()

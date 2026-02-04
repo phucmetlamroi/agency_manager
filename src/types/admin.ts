@@ -24,6 +24,10 @@ export type TaskWithUser = { // Updated with Client Info
             name: string
         } | null
     } | null
+    project?: {
+        id: number
+        name: string
+    } | null
     // Financials
     jobPriceUSD?: number | null
     wageVND?: number | null

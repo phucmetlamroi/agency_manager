@@ -85,10 +85,9 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                 timerStatus: 'PAUSED',
                 timerStartedAt: null
             }
-            // If Super Admin wants to fully reset, they might need a specialized "Reset" action?
-            // Or we check if task WAS assigned to agency.
-            if (isSuperAdmin && !task.assignedAgencyId) {
-                // Classic behavior
+            if (isSuperAdmin) {
+                // Super Admin unassigning means releasing to Global Pool
+                updateData.assignedAgencyId = null
             }
         } else if (assignmentId.startsWith('agency:')) {
             // Assign to Agency

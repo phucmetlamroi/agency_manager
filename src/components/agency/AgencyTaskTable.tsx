@@ -15,24 +15,60 @@ export default function AgencyTaskTable({ tasks, members }: { tasks: TaskWithUse
 
                     {/* Task Info */}
                     <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded border border-blue-500/20">
-                                {task.project?.name || task.client?.name || 'No Client'}
-                            </span>
-                            <span className="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded">
-                                {task.type}
-                            </span>
-                            {task.status === 'Đang đợi giao' && (
-                                <span className="text-[10px] bg-purple-500 text-white font-bold px-2 py-0.5 rounded animate-pulse">
-                                    NEW ASSIGNMENT
+                        <div className="flex flex-col gap-2 mb-1">
+                            {/* Client Hierarchy */}
+                            {task.client && (
+                                <div className="flex items-center gap-1 text-[11px] uppercase font-bold tracking-wider text-blue-400">
+                                    <span>🏢 {task.client.parent ? task.client.parent.name : task.client.name}</span>
+                                    {task.client.parent && (
+                                        <>
+                                            <span className="text-gray-600">➤</span>
+                                            <span className="text-purple-400">{task.client.name}</span>
+                                        </>
+                                    )}
+                                    {task.project && (
+                                        <>
+                                            <span className="text-gray-600">|</span>
+                                            <span className="text-gray-400">Project: {task.project.name}</span>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded uppercase">
+                                    {task.type}
                                 </span>
+                                {task.status === 'Đang đợi giao' && (
+                                    <span className="text-[10px] bg-purple-500 text-white font-bold px-2 py-0.5 rounded animate-pulse">
+                                        NEW ASSIGNMENT
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <h3 className="text-xl font-bold text-white leading-tight">{task.title}</h3>
+
+                        {/* Info Grid */}
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3 text-sm text-gray-400">
+                            <span className="font-mono text-green-400 font-bold">💰 {task.value.toLocaleString()} đ</span>
+                            <span className="flex items-center gap-1">
+                                📅 {task.deadline ? new Date(task.deadline).toLocaleDateString('vi-VN') : 'No Deadline'}
+                            </span>
+
+                            {/* Resources Link */}
+                            {(task.resources || task.fileLink) && (
+                                <a href={task.resources || task.fileLink || '#'} target="_blank" className="text-blue-400 hover:text-blue-300 underline text-xs flex items-center gap-1">
+                                    🔗 Tài nguyên / File
+                                </a>
                             )}
                         </div>
-                        <h3 className="text-lg font-bold text-white">{task.title}</h3>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
-                            <span>💰 {task.value.toLocaleString()} đ</span>
-                            <span>📅 {task.deadline ? new Date(task.deadline).toLocaleDateString('vi-VN') : 'No Deadline'}</span>
-                        </div>
+
+                        {/* Notes Preview */}
+                        {task.notes && (
+                            <div className="mt-2 text-xs text-gray-500 bg-white/5 p-2 rounded max-w-2xl line-clamp-2">
+                                📝 {task.notes}
+                            </div>
+                        )}
                     </div>
 
                     {/* Assignment Control */}

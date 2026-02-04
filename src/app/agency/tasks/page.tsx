@@ -25,7 +25,10 @@ export default async function AgencyTasksPage() {
         },
         include: {
             assignee: true,
-            client: true
+            client: {
+                include: { parent: true }
+            },
+            project: true
         },
         orderBy: { createdAt: 'desc' }
     })

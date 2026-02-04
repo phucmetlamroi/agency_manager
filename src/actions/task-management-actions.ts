@@ -120,7 +120,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
 
         // TRIGGER EMAIL 1: Task Assigned
         // TRIGGER EMAIL 1: Task Assigned
-        if (assigneeId && updatedTask.assignee) {
+        if (assignmentId && updatedTask.assignee) {
             if (updatedTask.assignee.email) {
                 console.log(`[Email Debug] Sending Assignment email to ${updatedTask.assignee.email}`)
                 const { sendEmail } = await import('@/lib/email')

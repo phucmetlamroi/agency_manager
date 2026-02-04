@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/db'
 import CreateAgencyForm from '@/components/agencies/CreateAgencyForm'
+import DeleteAgencyButton from '@/components/agencies/DeleteAgencyButton'
 
 export default async function AgenciesPage() {
     const res = await getAllAgencies()
@@ -32,6 +33,9 @@ export default async function AgenciesPage() {
                                     <div className="inline-flex items-center gap-2 mt-1 px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-mono">{agency.code}</div>
                                 </div>
                                 <div className={`px-2 py-1 rounded text-xs font-bold ${agency.status === 'ACTIVE' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>{agency.status}</div>
+                                <div className="ml-2">
+                                    <DeleteAgencyButton id={agency.id} name={agency.name} />
+                                </div>
                             </div>
                             <div className="space-y-3 py-4 border-t border-white/5">
                                 <div className="flex justify-between items-center text-sm"><span className="text-gray-500">Chủ sở hữu</span><span className="text-white font-medium">{agency.owner ? (agency.owner.nickname || agency.owner.username) : <span className="text-gray-600 italic">Chưa có</span>}</span></div>

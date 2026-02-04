@@ -74,6 +74,10 @@ export async function createAgency(data: { name: string, code: string, ownerId?:
 
         revalidatePath('/admin/agencies')
         revalidatePath('/admin/users')
+        revalidatePath('/dashboard')
+        revalidatePath('/admin/users')
+        revalidatePath('/dashboard')
+        revalidatePath('/admin/users')
         revalidatePath('/dashboard') // Trigger redirect logic for the user
         return { success: true, data: agency }
     } catch (e: any) {
@@ -159,5 +163,34 @@ export async function getAgencyMembers() {
 
     } catch (e) {
         return { success: false, error: 'Failed' }
+    }
+}
+
+/**
+ * Delete Agency
+ */
+export async function deleteAgency(id: string) {
+    const admin = await checkSuperAdmin()
+    if (!admin) return { success: false, error: 'Unauthorized' }
+
+    try {
+        // 1. Reset all members
+        await prisma.user.updateMany({
+            where: { agencyId: id },
+            data: { agencyId: null }
+        })
+
+        // 2. Delete Agency
+        await prisma.agency.delete({
+            where: { id }
+        })
+
+        revalidatePath('/admin/agencies')
+        revalidatePath('/admin/users')
+        revalidatePath('/dashboard') // Critical for redirect logic
+
+        return { success: true }
+    } catch (e) {
+        return { success: false, error: 'Failed to delete agency' }
     }
 }

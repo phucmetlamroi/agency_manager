@@ -28,6 +28,11 @@ export default async function UserDashboard() {
         }
     })
 
+    // Redirect Agency Admin to Agency Portal
+    if (userWithBonus?.role === 'AGENCY_ADMIN') {
+        redirect('/agency')
+    }
+
     const tasks = await prisma.task.findMany({
         where: { assigneeId: userId },
         include: { client: { include: { parent: true } } },

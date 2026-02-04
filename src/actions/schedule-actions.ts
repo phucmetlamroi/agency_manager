@@ -2,132 +2,166 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
+import { decrypt } from '@/lib/auth'
 
-export type ScheduleType = 'BUSY' | 'OVERTIME' | 'AVAILABLE' | 'TASK'
-
-export async function getUserSchedule(userId: string, startDate: Date, endDate: Date) {
+/**
+ * Fetch schedule for the current user within a date range
+ */
+export async function getMySchedule(start: Date, end: Date) {
     try {
+        const cookieStore = await cookies()
+        const sessionCookie = cookieStore.get('session')
+        if (!sessionCookie) return { success: false, error: 'Unauthorized' }
+        const session = await decrypt(sessionCookie.value)
+        const userId = session.user.id
+
         const schedules = await prisma.userSchedule.findMany({
             where: {
                 userId: userId,
-                startTime: {
-                    gte: startDate,
-                },
-                endTime: {
-                    lte: endDate,
-                }
+                startTime: { gte: start },
+                endTime: { lte: end }
             },
-            orderBy: {
-                startTime: 'asc'
-            }
+            orderBy: { startTime: 'asc' }
         })
+
         return { success: true, data: schedules }
-    } catch (error) {
-        console.error('Error fetching schedule:', error)
-        return { success: false, error: 'Failed to fetch schedule' }
+    } catch (e) {
+        console.error('Failed to get schedule', e)
+        return { success: false, error: 'Failed' }
     }
 }
 
-export async function createUserSchedule(userId: string, data: {
-    startTime: Date,
-    endTime: Date,
-    type: ScheduleType,
-    note?: string
-}) {
+/**
+ * Fetch schedule for ALL users (Admin View)
+ */
+export async function getCompanySchedule(start: Date, end: Date) {
     try {
-        if (data.endTime <= data.startTime) {
-            return { success: false, error: 'End time must be after start time' }
-        }
+        // Need middleware to protect this, but checking role here is safe too
+        const cookieStore = await cookies()
+        const sessionCookie = cookieStore.get('session')
+        if (!sessionCookie) return { success: false, error: 'Unauthorized' }
+        const session = await decrypt(sessionCookie.value)
+        if (session.user.role !== 'ADMIN') return { success: false, error: 'Forbidden' }
 
-        const blocks = []
-        let current = new Date(data.startTime)
-
-        // Loop hour by hour
-        while (current < data.endTime) {
-            const next = new Date(current)
-            next.setHours(next.getHours() + 1)
-
-            // If next is beyond endTime (partial hour?), clamp it?
-            // The grid enforces setMinutes(0), so usually this is exact.
-            // But let's be safe: min(next, endTime).
-            const blockEnd = next > data.endTime ? data.endTime : next
-
-            blocks.push({
-                userId,
-                startTime: new Date(current),
-                endTime: new Date(blockEnd),
-                type: data.type,
-                note: data.note,
-                // Add default createdAt/updatedAt if needed by schema, usually auto
-            })
-            current = next
-        }
-
-        // Use transaction or createMany (createMany doesn't return created records in all DBs/Prisma versions well for returning data to UI?)
-        // Postgres returns count.
-        // To return data to UI for optimistic update, we might need transaction + findMany or just loop create.
-        // Loop create is slower but returns IDs.
-        // Given typically < 10 blocks, loop is fine.
-
-        const createdSchedules = []
-
-        // Use transaction to ensure all or nothing
-        const results = await prisma.$transaction(
-            blocks.map(block => prisma.userSchedule.create({ data: block }))
-        )
-
-        revalidatePath('/dashboard/schedule')
-        revalidatePath('/admin/schedule')
-
-        // Return array of created items
-        return { success: true, data: results }
-    } catch (error) {
-        console.error('Error creating schedule:', error)
-        return { success: false, error: 'Failed to create schedule' }
-    }
-}
-
-export async function deleteUserSchedule(id: string, userId: string) {
-    try {
-        // Ensure user owns the schedule or is admin (logic handles ownership via userId check usually)
-        await prisma.userSchedule.delete({
-            where: {
-                id: id,
-                userId: userId // Security: Only delete own
-            }
-        })
-        revalidatePath('/dashboard/schedule')
-        revalidatePath('/admin/schedule')
-        return { success: true }
-    } catch (error) {
-        console.error('Error deleting schedule:', error)
-        return { success: false, error: 'Failed to delete schedule' }
-    }
-}
-
-// Admin Action
-export async function getAllSchedules(startDate: Date, endDate: Date) {
-    try {
         const schedules = await prisma.userSchedule.findMany({
             where: {
-                startTime: { gte: startDate },
-                endTime: { lte: endDate }
+                startTime: { gte: start },
+                endTime: { lte: end }
             },
             include: {
                 user: {
-                    select: {
-                        id: true,
-                        username: true,
-                        nickname: true,
-                        // avatar?
-                    }
+                    select: { id: true, username: true, nickname: true, role: true }
                 }
             },
             orderBy: { startTime: 'asc' }
         })
+
         return { success: true, data: schedules }
-    } catch (error) {
-        console.error('Error fetching all schedules:', error)
-        return { success: false, error: 'Failed to fetch schedules' }
+    } catch (e) {
+        return { success: false, error: 'Failed' }
+    }
+}
+
+/**
+ * Create a schedule block
+ */
+export async function createScheduleBlock(data: {
+    startTime: Date,
+    endTime: Date,
+    type: 'BUSY' | 'OVERTIME' | 'AVAILABLE',
+    note?: string
+}) {
+    try {
+        const cookieStore = await cookies()
+        const sessionCookie = cookieStore.get('session')
+        if (!sessionCookie) return { success: false, error: 'Unauthorized' }
+        const session = await decrypt(sessionCookie.value)
+        const userId = session.user.id
+
+        if (new Date(data.startTime) >= new Date(data.endTime)) {
+            return { success: false, error: 'Thời gian kết thúc phải sau thời gian bắt đầu' }
+        }
+
+        await prisma.userSchedule.create({
+            data: {
+                userId,
+                startTime: data.startTime,
+                endTime: data.endTime,
+                type: data.type,
+                note: data.note
+            }
+        })
+
+        revalidatePath('/dashboard/schedule')
+        return { success: true }
+    } catch (e) {
+        console.error('Create block failed', e)
+        return { success: false, error: 'Lỗi tạo lịch' }
+    }
+}
+
+/**
+ * Delete a schedule block (Owner or Admin)
+ */
+export async function deleteScheduleBlock(id: string) {
+    try {
+        const cookieStore = await cookies()
+        const sessionCookie = cookieStore.get('session')
+        if (!sessionCookie) return { success: false, error: 'Unauthorized' }
+        const session = await decrypt(sessionCookie.value)
+        const userId = session.user.id
+
+        const block = await prisma.userSchedule.findUnique({ where: { id } })
+        if (!block) return { success: false, error: 'Not found' }
+
+        // Allow deletion if owner OR admin
+        if (block.userId !== userId && session.user.role !== 'ADMIN') {
+            return { success: false, error: 'Forbidden' }
+        }
+
+        await prisma.userSchedule.delete({ where: { id } })
+        revalidatePath('/dashboard/schedule')
+        return { success: true }
+    } catch (e) {
+        return { success: false, error: 'Failed to delete' }
+    }
+}
+
+/**
+ * Check availability for a specific user on a specific date (or just check if they are BUSY now)
+ * Returns true if available (or OVERTIME), false if BUSY.
+ */
+export async function checkUserAvailability(userId: string, date: Date) {
+    try {
+        const start = new Date(date)
+        start.setMinutes(start.getMinutes() - 30) // Check buffer?
+        const end = new Date(date)
+        end.setMinutes(end.getMinutes() + 30)
+
+        // Find any overlapping BUSY blocks
+        const conflicts = await prisma.userSchedule.findMany({
+            where: {
+                userId: userId,
+                type: 'BUSY',
+                OR: [
+                    {
+                        startTime: { lte: start },
+                        endTime: { gte: start }
+                    },
+                    {
+                        startTime: { lte: end },
+                        endTime: { gte: end }
+                    }
+                ]
+            }
+        })
+
+        return {
+            available: conflicts.length === 0,
+            conflicts: conflicts
+        }
+    } catch (e) {
+        return { available: true } // Fail safe
     }
 }

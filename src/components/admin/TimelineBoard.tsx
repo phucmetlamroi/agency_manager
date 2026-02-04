@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { format, addDays, startOfDay, getHours, setHours, isSameDay } from 'date-fns'
 import { vi } from 'date-fns/locale'
-import { getAllSchedules, ScheduleType } from '@/actions/schedule-actions'
+import { getCompanySchedule } from '@/actions/schedule-actions'
+import { ScheduleType } from '@prisma/client'
 
 type ScheduleWithUser = {
     id: string
@@ -62,7 +63,7 @@ export default function TimelineBoard({ users }: { users: any[] }) {
         end.setMinutes(59)
         end.setSeconds(59)
 
-        const res = await getAllSchedules(start, end)
+        const res = await getCompanySchedule(start, end)
 
         if (res.success && res.data) {
             // @ts-ignore

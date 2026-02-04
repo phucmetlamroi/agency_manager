@@ -13,6 +13,7 @@ import Stopwatch from './Stopwatch'
 import { TaskWithUser } from '@/types/admin'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
+import { checkUserAvailability } from '@/actions/schedule-actions'
 
 const statusColors: Record<string, string> = {
     "Đã nhận task": "#60a5fa",   // Blue
@@ -268,8 +269,23 @@ export default function TaskTable({ tasks, isAdmin = false, users = [] }: { task
                                                     value={task.assignee?.id || ''}
                                                     onChange={async (e) => {
                                                         const val = e.target.value
-                                                        const res = await assignTask(task.id, val || null)
-                                                        if (res?.success) window.location.reload()
+                                                        if (val) {
+                                                            // Check availability
+                                                            const res = await checkUserAvailability(val, new Date()) // Check NOW
+                                                            if (!res.available) {
+                                                                if (!await confirm({
+                                                                    title: '⚠️ CẢNH BÁO LỊCH TRÌNH',
+                                                                    message: `Nhân sự này đang có lịch BẬN (Busy) trong khoảng thời gian này. Bạn có chắc chắn muốn giao việc không?`,
+                                                                    type: 'danger',
+                                                                    confirmText: 'Vẫn giao',
+                                                                    cancelText: 'Chọn người khác'
+                                                                })) {
+                                                                    return // Cancel assignment
+                                                                }
+                                                            }
+                                                        }
+                                                        const resAssign = await assignTask(task.id, val || null)
+                                                        if (resAssign?.success) window.location.reload()
                                                     }}
                                                     className="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-blue-500 max-w-[120px]"
                                                 >

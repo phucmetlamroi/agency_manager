@@ -9,25 +9,35 @@ type TabState = 'ASSIGNED' | 'IN_PROGRESS' | 'REVISION' | 'COMPLETED'
 const TAB_CONFIG = [
     { id: 'ASSIGNED', label: '🔵 Nhận Task', color: 'text-blue-400 border-blue-500' },
     { id: 'IN_PROGRESS', label: '🟡 Đang làm', color: 'text-yellow-400 border-yellow-500' },
-    { id: 'REVISION', label: '🔴 Revision', color: 'text-red-400 border-red-500' },
+    { id: 'REVISION', label: '🔴 Revise / Review', color: 'text-red-400 border-red-500' },
     { id: 'COMPLETED', label: '🟢 Hoàn tất', color: 'text-green-400 border-green-500' },
 ]
 
 export default function TaskWorkflowTabs({ tasks, users, isMobile }: { tasks: TaskWithUser[], users: any[], isMobile: boolean }) {
     const [activeTab, setActiveTab] = useState<TabState>('IN_PROGRESS')
 
-    // Filter Logic
-    const assignedTasks = tasks.filter(t =>
-        (t.status === 'Đã nhận task' || t.status === 'Đang đợi giao') && t.assignee
-    )
-
-    // In Progress: Explicit 'In Progress' status OR Timer is running (and not finished/revision)
+    // In Progress: User is working
     const inProgressTasks = tasks.filter(t =>
         t.status === 'Đang thực hiện'
     )
 
-    const revisionTasks = tasks.filter(t => t.status === 'Revision' || t.status === 'Sửa frame')
+    // Revision / Review: Admin attention needed OR User fixing
+    // Review: User submitted, Admin needs to check.
+    // Revision: Admin writing feedback (Paused).
+    // Sửa frame: Specific type.
+    const revisionTasks = tasks.filter(t =>
+        t.status === 'Revision' ||
+        t.status === 'Sửa frame' ||
+        t.status === 'Review' // Include Review here so Admin sees it
+    )
+
     const completedTasks = tasks.filter(t => t.status === 'Hoàn tất')
+
+    // Tạm ngưng -> Maybe put in Assigned (Waiting) or a separate bucket?
+    // Let's put 'Tạm ngưng' in Assigned for now as it's "On Hold"
+    const assignedTasks = tasks.filter(t =>
+        (t.status === 'Đã nhận task' || t.status === 'Đang đợi giao' || t.status === 'Tạm ngưng') && t.assignee
+    )
 
     const getTasksByTab = (tab: TabState) => {
         switch (tab) {

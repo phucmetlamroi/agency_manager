@@ -1,43 +1,27 @@
-import { getSession } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { startOfWeek, endOfWeek } from "date-fns";
-import ScheduleGrid from "@/components/schedule/ScheduleGrid";
+import { getMySchedule } from '@/actions/schedule-actions'
+import WeeklyScheduler from '@/components/schedule/WeeklyScheduler'
+import { startOfWeek, endOfWeek, addDays } from 'date-fns'
 
 export default async function SchedulePage() {
-    const session = await getSession();
-    if (!session) redirect("/login");
+    // Default fetch: Current week + Next week? 
+    // Or just fetch specific range. For now, let's fetch -1 month to +1 month to be safe for navigation.
+    const now = new Date()
+    const start = addDays(now, -30)
+    const end = addDays(now, 30)
 
-    const userId = session.user.id;
-
-    // Initial Load: Get Current Week Schedule
-    const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-
-    const schedules = await prisma.userSchedule.findMany({
-        where: {
-            userId,
-            startTime: { gte: weekStart },
-            endTime: { lte: weekEnd }
-        }
-    });
+    const res = await getMySchedule(start, end)
+    const schedules = res.data || []
 
     return (
-        <div className="p-6 max-w-6xl mx-auto">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2">Quản lý Lịch Trình 📅</h1>
-                <p className="text-gray-400">
-                    Hãy cập nhật thời gian rảnh/bận của bạn để Admin giao việc hợp lý nhất.
-                    <br />
-                    Kéo chuột trên lưới để chọn giờ.
-                </p>
-            </div>
+        <div className="h-[calc(100vh-100px)] flex flex-col p-4 md:p-6 gap-4">
+            <header>
+                <h1 className="text-2xl font-bold text-white">Lịch làm việc</h1>
+                <p className="text-gray-400 text-sm">Đăng ký lịch bận/rảnh để Admin sắp xếp công việc hợp lý.</p>
+            </header>
 
-            <ScheduleGrid
-                userId={userId}
-                initialSchedule={schedules as any} // Cast safely as dates match
-            />
+            <div className="flex-1 min-h-0">
+                <WeeklyScheduler initialSchedule={schedules} />
+            </div>
         </div>
     )
 }

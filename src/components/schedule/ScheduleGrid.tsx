@@ -7,7 +7,8 @@ import { vi } from 'date-fns/locale'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { toast } from 'sonner'
-import { createUserSchedule, deleteUserSchedule, ScheduleType } from '@/actions/schedule-actions'
+import { createScheduleBlock, deleteScheduleBlock } from '@/actions/schedule-actions'
+import { ScheduleType } from '@prisma/client'
 
 // CN Helper
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -91,20 +92,20 @@ export default function ScheduleGrid({ userId, initialSchedule }: Props) {
         const endTime = setMinutes(setHours(contextMenu.day, contextMenu.endHour), 0)
 
         toast.promise(
-            createUserSchedule(userId, { startTime, endTime, type }),
+            createScheduleBlock({ startTime, endTime, type: type as any }),
             {
                 loading: 'Đang lưu lịch...',
                 success: (res) => {
-                    if (res.success && Array.isArray(res.data)) {
-                        // Handle array of created blocks
-                        const newBlocks = res.data.map(d => ({
-                            ...d,
-                            startTime: new Date(d.startTime),
-                            endTime: new Date(d.endTime)
-                        }))
-                        setSchedules([...schedules, ...newBlocks])
+                    if (res.success) {
+                        // Handle success
+                        // We need to re-fetch or optimistically add. 
+                        // The action revalidates path, so router.refresh() might be needed or manual state update.
+                        // For now trust the action result or simple reload?
+                        // Actually the action returns success: true, but not the created block?
+                        // Let's check schedule-actions.ts
+                        window.location.reload() // Simplest for now
                         setContextMenu(null)
-                        return `Đã báo ${type === 'BUSY' ? 'Bận' : 'Nhận việc'} (${contextMenu.startHour}h-${contextMenu.endHour}h)`
+                        return `Đã báo ${type === 'BUSY' ? 'Bận' : 'Nhận việc'}`
                     } else {
                         throw new Error(res.error)
                     }
@@ -119,7 +120,7 @@ export default function ScheduleGrid({ userId, initialSchedule }: Props) {
         // Confirm?
         if (!confirm('Xóa lịch này?')) return
 
-        const res = await deleteUserSchedule(id, userId)
+        const res = await deleteScheduleBlock(id)
         if (res.success) {
             setSchedules(prev => prev.filter(s => s.id !== id))
             toast.success('Đã xóa')

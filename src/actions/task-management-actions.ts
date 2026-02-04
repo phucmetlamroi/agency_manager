@@ -69,9 +69,42 @@ export async function assignTask(taskId: string, userId: string | null) {
             }
         }
 
+        if (userId && updatedTask.assignee) {
+            // ... (Email Logic)
+
+            // TRIGGER 2: Auto-create Schedule Block 'TASK'
+            if (updatedTask.deadline) {
+                // If deadline exists, assume task takes e.g. 2 hours before deadline?
+                // Or just create a 1-hour block at the deadline?
+                // Let's create a block from (Deadline - 2h) to Deadline
+                // BUT only if that time is in the future.
+                const end = new Date(updatedTask.deadline)
+                const start = new Date(end)
+                start.setHours(start.getHours() - 2) // Default 2 hours estimate
+
+                if (end > new Date()) {
+                    try {
+                        await prisma.userSchedule.create({
+                            data: {
+                                userId: userId,
+                                startTime: start,
+                                endTime: end,
+                                type: 'TASK',
+                                note: `Task: ${updatedTask.title}`
+                            }
+                        })
+                    } catch (err) {
+                        console.error("Failed to auto-schedule task", err)
+                        // Don't fail the whole assignment if schedule fails
+                    }
+                }
+            }
+        }
+
         revalidatePath('/admin')
         revalidatePath('/admin/queue')
         revalidatePath('/dashboard')
+        revalidatePath('/dashboard/schedule') // Update schedule view
         return { success: true }
     } catch (e) {
         return { error: 'Failed to assign task' }

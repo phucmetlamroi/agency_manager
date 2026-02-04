@@ -2,6 +2,37 @@
 
 import { useState, useEffect } from 'react'
 import { createTask } from '@/actions/admin-actions'
+import { checkUserAvailability } from '@/actions/schedule-actions'
+
+function AvailabilityWarning({ users }: { users: User[] }) {
+    // This is a "hack" to listen to the select change without controlling the whole form state
+    // Ideally we should control the form state, but to avoid refactoring the whole form:
+    const [selectedUser, setSelectedUser] = useState<string>('')
+    const [isBusy, setIsBusy] = useState(false)
+
+    useEffect(() => {
+        const select = document.querySelector('select[name="assigneeId"]') as HTMLSelectElement
+        if (!select) return
+
+        const handler = async () => {
+            const userId = select.value
+            setSelectedUser(userId)
+            if (!userId) { setIsBusy(false); return }
+
+            // Check availability for NOW (assuming task starts now)
+            const res = await checkUserAvailability(userId, new Date())
+            setIsBusy(!res.available)
+        }
+        select.addEventListener('change', handler)
+        return () => select.removeEventListener('change', handler)
+    }, [])
+
+    if (isBusy) {
+        return <div className="text-xs text-red-500 font-bold mt-1">⚠️ Cảnh báo: Nhân sự này đang có lịch BẬN (Busy) trong thời gian này!</div>
+    }
+    return null
+}
+
 
 type User = {
     id: string
@@ -247,6 +278,14 @@ export default function CreateTaskForm({ users }: { users: User[] }) {
             <div>
                 <label style={{ fontSize: '0.8rem', color: '#888' }}>Giao cho nhân viên</label>
                 <select name="assigneeId"
+                    onChange={(e) => {
+                        // Check availability if date is selected
+                        // But we don't need real-time check here necessarily, or we can add a "Check" badge.
+                        // Let's just create a quick client-side check if we had the data.
+                        // Since we don't want to over-fetch, let's keep it simple:
+                        // Just show a warning if their reputation is low or if they are "BUSY" (fetched via separate component/async?)
+                        // For now, let's leave as is, and implement the conflict warning in the *Table* dropdown which is more interactive.
+                    }}
                     style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}>
                     <option value="">-- Để trống (Vào Kho Task Đợi) --</option>
                     {users.map((u: any) => {
@@ -265,6 +304,8 @@ export default function CreateTaskForm({ users }: { users: User[] }) {
                         )
                     })}
                 </select>
+                {/* Conflict Warning Hook */}
+                <AvailabilityWarning users={users} />
             </div>
 
             <button className="btn btn-primary" type="submit">Tạo Task</button>

@@ -28,6 +28,26 @@ export async function getClients() {
     }
 }
 
+export async function getTopClients(limit = 5) {
+    try {
+        const topClients = await prisma.client.findMany({
+            orderBy: { aiScore: 'desc' },
+            take: limit,
+            where: {
+                aiScore: { gt: 0 } // Only show scored clients
+            },
+            include: {
+                _count: {
+                    select: { tasks: true }
+                }
+            }
+        })
+        return { success: true, data: topClients }
+    } catch (error) {
+        return { success: false, error: 'Failed to fetch top clients' }
+    }
+}
+
 export async function createClient(data: { name: string, parentId?: number }) {
     try {
         await prisma.client.create({

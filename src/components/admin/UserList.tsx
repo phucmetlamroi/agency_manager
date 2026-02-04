@@ -75,10 +75,41 @@ export default function UserList({ users, currentUser, agencies }: Props) {
                                     {/* Member Column: Nickname + Username */}
                                     <td style={{ padding: '0.8rem' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontWeight: 'bold', color: '#e5e7eb' }}>
+                                            <span style={{ fontWeight: 'bold', color: '#e5e7eb', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                                                 {displayName}
-                                                {u.isTreasurer && <span title="Thủ Quỹ" style={{ marginLeft: '0.5rem' }}>🥇</span>}
-                                                {isSuperAdminRow && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px', color: 'white' }}>SUPER</span>}
+                                                {u.isTreasurer && <span title="Thủ Quỹ" style={{ cursor: 'help' }}>🥇</span>}
+                                                {isSuperAdminRow && <span style={{ fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px', color: 'white' }}>SUPER</span>}
+
+                                                {/* Agency Owner Badge (Crystal Blue) */}
+                                                {u.ownedAgency && u.ownedAgency.length > 0 && (
+                                                    <span style={{
+                                                        fontSize: '0.7rem',
+                                                        background: 'rgba(6, 182, 212, 0.2)', // Cyan-500/20
+                                                        border: '1px solid rgba(6, 182, 212, 0.5)',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        color: '#22d3ee', // Cyan-400
+                                                        fontWeight: 'bold',
+                                                        textTransform: 'uppercase'
+                                                    }}>
+                                                        ĐẠI LÝ
+                                                    </span>
+                                                )}
+
+                                                {/* Agency Member Badge */}
+                                                {!isSuperAdminRow && !u.ownedAgency?.length && u.agency && (
+                                                    <span style={{
+                                                        fontSize: '0.7rem',
+                                                        background: 'rgba(56, 189, 248, 0.15)', // Sky-400/15
+                                                        border: '1px dashed rgba(56, 189, 248, 0.4)',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        color: '#38bdf8', // Sky-400
+                                                        fontWeight: 'bold'
+                                                    }}>
+                                                        {u.agency.code}
+                                                    </span>
+                                                )}
                                             </span>
                                             {u.nickname && (
                                                 <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>@{u.username}</span>

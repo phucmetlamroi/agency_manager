@@ -30,7 +30,9 @@ export default async function AdminUsersPage() {
             },
             payrolls: {
                 where: { month, year }
-            }
+            },
+            ownedAgency: true, // Fetch owned agencies
+            agency: true // Fetch assigned agency
         }
     })
 

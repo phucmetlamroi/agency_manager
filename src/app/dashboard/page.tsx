@@ -24,9 +24,16 @@ export default async function UserDashboard() {
                     month: currentMonth,
                     year: currentYear
                 }
-            }
+            },
+            ownedAgency: true // Check if they own any agency
         }
     })
+
+    // Redirect Agency Admin (Owner) to Agency Portal
+    // Check if they own an agency OR have the explicit role
+    if (userWithBonus?.ownedAgency && userWithBonus.ownedAgency.length > 0 || userWithBonus?.role === 'AGENCY_ADMIN') {
+        redirect('/agency')
+    }
 
     // Redirect Agency Admin to Agency Portal
     if (userWithBonus?.role === 'AGENCY_ADMIN') {

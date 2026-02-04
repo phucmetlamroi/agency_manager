@@ -73,6 +73,8 @@ export async function createAgency(data: { name: string, code: string, ownerId?:
         }
 
         revalidatePath('/admin/agencies')
+        revalidatePath('/admin/users')
+        revalidatePath('/dashboard') // Trigger redirect logic for the user
         return { success: true, data: agency }
     } catch (e: any) {
         if (e.code === 'P2002') return { success: false, error: 'Agency code already exists' }

@@ -114,12 +114,19 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
             // STRICT SCHEDULING CHECK
             if (!isSuperAdmin) {
                 const { checkUserAvailability } = await import('@/actions/schedule-actions')
-                // Check availability for NOW (or Task Deadline if passed? Ideally checking the whole duration is hard without start/end)
-                // Let's check NOW as a proxy for "Is he free to take this?"
+                // Check availability for NOW
                 const availability = await checkUserAvailability(assignmentId, new Date())
                 if (!availability.available) {
                     return { error: 'Nhân sự đang BẬN (Busy) trong lịch trình. Chỉ Super Admin mới có thể ghi đè.' }
                 }
+            }
+
+            // Calculate elapsed time if it was running (Fix Timer Loss Bug)
+            let newAccumulated = task.accumulatedSeconds || 0
+            if (task.timerStatus === 'RUNNING' && task.timerStartedAt) {
+                const now = new Date()
+                const elapsed = Math.floor((now.getTime() - task.timerStartedAt.getTime()) / 1000)
+                newAccumulated += elapsed
             }
 
             updateData = {
@@ -128,7 +135,8 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                 status: 'Đã nhận task',
                 isPenalized: false,
                 timerStatus: 'PAUSED',
-                timerStartedAt: null
+                timerStartedAt: null,
+                accumulatedSeconds: newAccumulated
             }
         }
 
@@ -199,6 +207,8 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
         revalidatePath('/admin/queue')
         revalidatePath('/dashboard')
         revalidatePath('/dashboard/schedule') // Update schedule view
+        revalidatePath('/agency') // Update agency dashboard
+        revalidatePath('/agency/tasks') // Update agency task list
         return { success: true }
     } catch (e) {
         return { error: 'Failed to assign task' }

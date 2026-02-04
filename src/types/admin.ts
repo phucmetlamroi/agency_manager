@@ -12,6 +12,7 @@ export type TaskWithUser = { // Updated with Client Info
     collectFilesLink?: string | null
     notes: string | null
     assigneeId?: string | null
+    assignedAgencyId?: string | null // For tasks assigned to agency queue
     assignee: { id: string; username: string; reputation?: number } | null
     createdAt: Date
     // Stopwatch

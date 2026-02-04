@@ -11,6 +11,7 @@ export type TaskWithUser = { // Updated with Client Info
     productLink: string | null
     collectFilesLink?: string | null
     notes: string | null
+    assigneeId?: string | null
     assignee: { id: string; username: string; reputation?: number } | null
     createdAt: Date
     // Stopwatch

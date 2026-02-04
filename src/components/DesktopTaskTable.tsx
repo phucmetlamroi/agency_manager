@@ -266,7 +266,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                         {isAdmin && (
                                             <div onClick={(e) => e.stopPropagation()}>
                                                 <select
-                                                    value={task.assignee?.id || ''}
+                                                    value={task.assignee?.id || (task.assignedAgencyId ? `agency:${task.assignedAgencyId}` : '')}
                                                     onChange={async (e) => {
                                                         const val = e.target.value
                                                         if (val) {

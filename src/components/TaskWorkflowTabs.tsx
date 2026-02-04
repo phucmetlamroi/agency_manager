@@ -36,7 +36,7 @@ export default function TaskWorkflowTabs({ tasks, users, agencies, isMobile, isA
     // Tạm ngưng -> Maybe put in Assigned (Waiting) or a separate bucket?
     // Let's put 'Tạm ngưng' in Assigned for now as it's "On Hold"
     const assignedTasks = tasks.filter(t =>
-        (t.status === 'Đã nhận task' || t.status === 'Đang đợi giao' || t.status === 'Tạm ngưng') && t.assignee
+        (t.status === 'Đã nhận task' || t.status === 'Đang đợi giao' || t.status === 'Tạm ngưng') && (t.assignee || t.assignedAgencyId)
     )
 
     const getTasksByTab = (tab: TabState) => {

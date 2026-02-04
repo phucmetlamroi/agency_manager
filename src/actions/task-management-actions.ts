@@ -142,7 +142,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
             }
         }
 
-        if (userId && updatedTask.assignee) {
+        if (assignmentId && updatedTask.assignee) {
             // ... (Email Logic)
 
             // TRIGGER 2: Auto-create Schedule Block 'TASK'

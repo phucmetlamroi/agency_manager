@@ -92,12 +92,22 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
         } else if (assignmentId.startsWith('agency:')) {
             // Assign to Agency
             const agencyId = assignmentId.split(':')[1]
+            // Calculate elapsed time if it was running
+            let newAccumulated = task.accumulatedSeconds || 0
+            if (task.timerStatus === 'RUNNING' && task.timerStartedAt) {
+                const now = new Date()
+                const elapsed = Math.floor((now.getTime() - task.timerStartedAt.getTime()) / 1000)
+                newAccumulated += elapsed
+            }
+
             updateData = {
                 assignedAgencyId: agencyId,
                 assigneeId: null,
                 status: 'Đang đợi giao',
                 isPenalized: false,
-                timerStatus: 'PAUSED'
+                timerStatus: 'PAUSED',
+                timerStartedAt: null,
+                accumulatedSeconds: newAccumulated
             }
         } else {
             // Assign to User

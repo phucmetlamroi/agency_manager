@@ -19,7 +19,7 @@ export default async function TaskQueuePage() {
         orderBy: { username: 'asc' }
     })
 
-    const unassignedTasks = tasks.filter(t => !t.assigneeId)
+    const unassignedTasks = tasks.filter(t => !t.assigneeId && !t.assignedAgencyId)
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>

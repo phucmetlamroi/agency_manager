@@ -61,6 +61,7 @@ export default async function AdminLayout({
                         )}
 
                         <Link href="/admin/users" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Nhân sự</Link>
+                        <Link href="/admin/agencies" className="btn" style={{ color: '#ec4899', background: 'transparent' }}>Đại lý</Link>
                     </nav>
                 </div>
 

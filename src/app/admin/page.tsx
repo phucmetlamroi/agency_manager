@@ -38,7 +38,8 @@ export default async function AdminDashboard() {
         orderBy: [
             { reputation: 'desc' },
             { username: 'asc' }
-        ]
+        ],
+        include: { ownedAgency: true }
     })
 
     const agencies = await prisma.agency.findMany({ select: { id: true, name: true, code: true } })

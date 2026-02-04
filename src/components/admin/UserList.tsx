@@ -76,7 +76,15 @@ export default function UserList({ users, currentUser, agencies }: Props) {
                                     <td style={{ padding: '0.8rem' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                                             <span style={{ fontWeight: 'bold', color: '#e5e7eb', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                {displayName}
+                                                {/* If Agency Owner, show Agency Name instead of User Name if preferred, OR show both? 
+                                                   User requested "Display as Agency Name". 
+                                                   Let's show [Agency Code] - [Agency Name] as primary name if owner. */}
+                                                {u.ownedAgency && u.ownedAgency.length > 0 ? (
+                                                    <span className="text-cyan-400 font-bold flex items-center gap-1">
+                                                        🏢 {u.ownedAgency[0].code} - {u.ownedAgency[0].name}
+                                                    </span>
+                                                ) : displayName}
+
                                                 {u.isTreasurer && <span title="Thủ Quỹ" style={{ cursor: 'help' }}>🥇</span>}
                                                 {isSuperAdminRow && <span style={{ fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px', color: 'white' }}>SUPER</span>}
 

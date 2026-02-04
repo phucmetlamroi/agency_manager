@@ -29,10 +29,30 @@ export async function updateTaskDetails(id: string, data: {
             // Fetch current to merge
             const currentTask = await prisma.task.findUnique({
                 where: { id },
-                select: { jobPriceUSD: true, value: true, exchangeRate: true }
+                select: { jobPriceUSD: true, value: true, exchangeRate: true, createdAt: true, assigneeId: true }
             })
 
             if (currentTask) {
+                // FINANCIAL LOCK CHECK
+                if (currentTask.assigneeId) {
+                    const month = currentTask.createdAt.getMonth() + 1
+                    const year = currentTask.createdAt.getFullYear()
+
+                    const payroll = await prisma.payroll.findUnique({
+                        where: {
+                            userId_month_year: {
+                                userId: currentTask.assigneeId,
+                                month,
+                                year
+                            }
+                        }
+                    })
+
+                    if (payroll && payroll.status === 'PAID') {
+                        return { error: 'BLOCK: Kỳ lương này đã chốt (PAID). Không thể sửa đổi tài chính!' }
+                    }
+                }
+
                 const newJobPriceUSD = data.jobPriceUSD !== undefined ? data.jobPriceUSD : (currentTask.jobPriceUSD || 0)
                 const newValue = data.value !== undefined ? data.value : (currentTask.value || 0) // This is Wage VND
                 const rate = currentTask.exchangeRate || 25300

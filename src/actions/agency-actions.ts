@@ -54,6 +54,18 @@ export async function createAgency(data: { name: string, code: string, ownerId?:
     if (!admin) return { success: false, error: 'Unauthorized' }
 
     try {
+        // VALIDATION: Single Role Policy
+        if (data.ownerId) {
+            const existingUser = await prisma.user.findUnique({
+                where: { id: data.ownerId },
+                include: { ownedAgency: true }
+            })
+            if (existingUser) {
+                if (existingUser.ownedAgency.length > 0) throw new Error('User is already an Agency Owner')
+                if (existingUser.agencyId) throw new Error('User is currently a Member of another Agency')
+            }
+        }
+
         const agency = await prisma.agency.create({
             data: {
                 name: data.name,
@@ -62,6 +74,26 @@ export async function createAgency(data: { name: string, code: string, ownerId?:
                 status: 'ACTIVE'
             }
         })
+
+        // VALIDATION: Check if Owner is already compromised (Double Role)
+        if (data.ownerId) {
+            const existingUser = await prisma.user.findUnique({
+                where: { id: data.ownerId },
+                include: { ownedAgency: true }
+            })
+
+            if (existingUser) {
+                if (existingUser.ownedAgency.length > 0) {
+                    // Rollback? Or just error? 
+                    // Since we already created agency, we should fail earlier.
+                    // But replacing code inside the `try` block before create is better.
+                    // Let's do it right.
+                }
+            }
+        }
+
+        // RE-PLAN: Move validation UP before creation.
+
 
 
         // If ownerId provided, update that user's agencyId? 

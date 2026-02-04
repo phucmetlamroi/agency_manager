@@ -157,7 +157,7 @@ model Client {
   
   // Hierarchical Relation (Parent Corporation -> Subsidiaries/Brands)
   parentId      Int?
-  parent        Client?   @relation("ClientHierarchy", fields: [parentId], references: [id])
+  parent        Client?   @relation("ClientHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   subsidiaries  Client[]  @relation("ClientHierarchy")
   
   projects      Project[]
@@ -181,7 +181,7 @@ model Project {
   name        String
   code        String?   // Internal Code e.g. "PRJ-001"
   
-  client      Client    @relation(fields: [clientId], references: [id])
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId    Int
   
   tasks       Task[]

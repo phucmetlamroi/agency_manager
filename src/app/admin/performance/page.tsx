@@ -1,4 +1,5 @@
 import { getPerformanceReport } from '@/actions/performance-actions'
+import { serializeDecimal } from '@/lib/serialization'
 import PerformanceDashboardClient from '@/components/performance/PerformanceDashboardClient'
 
 export default async function PerformancePage() {
@@ -23,7 +24,7 @@ export default async function PerformancePage() {
             </header>
 
             <PerformanceDashboardClient
-                initialData={res.data || []}
+                initialData={serializeDecimal(res.data || []) as any}
                 month={month}
                 year={year}
             />

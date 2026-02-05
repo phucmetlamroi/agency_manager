@@ -1,4 +1,5 @@
 import { getClients, getTopClients } from '@/actions/crm-actions'
+import { serializeDecimal } from '@/lib/serialization'
 import CRMClientList from '@/components/crm/CRMClientList'
 import CreateClientButton from '@/components/crm/CreateClientButton'
 import UpdateScoresButton from '@/components/crm/UpdateScoresButton'
@@ -33,7 +34,7 @@ export default async function CRMDashboard() {
                             <CreateClientButton partners={typedClients} />
                         </div>
 
-                        <CRMClientList clients={clients} />
+                        <CRMClientList clients={serializeDecimal(clients) as any} />
                     </section>
                 </div>
 

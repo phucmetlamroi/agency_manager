@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import TaskTable from '@/components/TaskTable'
 import { isMobileDevice } from '@/lib/device'
 import DraggableFocusWidget from '@/components/DraggableFocusWidget'
+import { serializeDecimal } from '@/lib/serialization'
 
 export default async function UserDashboard() {
     const session = await getSession()
@@ -56,12 +57,12 @@ export default async function UserDashboard() {
     const thisMonthTasks = completedTasks.filter(t => t.updatedAt >= thisMonthStart)
     const lastMonthTasks = completedTasks.filter(t => t.updatedAt >= lastMonthStart && t.updatedAt < thisMonthStart)
 
-    const baseSalary = thisMonthTasks.reduce((acc, t) => acc + t.value, 0)
-    const lastMonthSalary = lastMonthTasks.reduce((acc, t) => acc + t.value, 0)
+    const baseSalary = thisMonthTasks.reduce((acc, t) => acc + Number(t.value || 0), 0)
+    const lastMonthSalary = lastMonthTasks.reduce((acc, t) => acc + Number(t.value || 0), 0)
 
     // Add Bonus to this month
     const bonusData = userWithBonus?.bonuses[0]
-    const bonusAmount = bonusData ? bonusData.bonusAmount : 0
+    const bonusAmount = bonusData ? Number(bonusData.bonusAmount) : 0
     const totalThisMonthSalary = baseSalary + bonusAmount
 
     let comparisonMsg = ''
@@ -145,7 +146,7 @@ export default async function UserDashboard() {
             <h3 className="title-gradient" style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Danh sách Task của tôi</h3>
 
             {/* Using the new TaskTable for User too, but restrict Admin controls */}
-            <TaskTable tasks={tasks as any} isAdmin={false} isMobile={await isMobileDevice()} />
+            <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={false} isMobile={await isMobileDevice()} />
 
             {/* Draggable Focus Widget */}
             <DraggableFocusWidget userId={userId} />

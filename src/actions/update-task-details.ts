@@ -62,7 +62,7 @@ export async function updateTaskDetails(id: string, data: {
                 updateData.wageVND = newValue // Sync wageVND with value
 
                 // Recalculate Profit
-                updateData.profitVND = (newJobPriceUSD * rate) - newValue
+                updateData.profitVND = (Number(newJobPriceUSD) * Number(rate)) - Number(newValue)
             }
         }
 

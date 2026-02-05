@@ -40,7 +40,7 @@ export async function calculateAllClientScores() {
             // Goal: $4000 total revenue = 40 points. So 1 point per $100.
             const totalRevenue = client.tasks
                 .filter(t => t.status === 'Hoàn tất')
-                .reduce((sum, t) => sum + (t.jobPriceUSD || 0), 0)
+                .reduce((sum, t) => sum + Number(t.jobPriceUSD || 0), 0)
 
             const revenueScore = Math.min(W_REVENUE, totalRevenue / 100)
 

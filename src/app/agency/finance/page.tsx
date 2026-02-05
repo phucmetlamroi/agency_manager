@@ -34,7 +34,7 @@ export default async function AgencyFinancePage() {
         take: 100 // Limit for now
     })
 
-    const totalRevenueVND = tasks.reduce((acc, t) => acc + (t.value || 0), 0) // "Value" field is usually payment to staff? 
+    const totalRevenueVND = tasks.reduce((acc, t) => acc + Number(t.value || 0), 0) // "Value" field is usually payment to staff? 
     // Wait, in Task model:
     // jobPriceUSD = Revenue from Client
     // value (wageVND) = Payment to Staff
@@ -46,7 +46,7 @@ export default async function AgencyFinancePage() {
     // Current Model: Super Admin sets 'wageVND' (value).
     // Let's display 'Total Value Assigned' as Revenue for now.
 
-    const totalTaskValue = tasks.reduce((acc, t) => acc + (t.value || 0), 0)
+    const totalTaskValue = tasks.reduce((acc, t) => acc + Number(t.value || 0), 0)
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -83,7 +83,7 @@ export default async function AgencyFinancePage() {
                                 <td className="p-3 text-gray-500">{new Date(t.updatedAt).toLocaleDateString('vi-VN')}</td>
                                 <td className="p-3 text-blue-400">{t.assignee?.username || 'Agency'}</td>
                                 <td className="p-3 text-right font-mono text-green-400 font-bold">
-                                    +{t.value?.toLocaleString()}
+                                    +{Number(t.value || 0).toLocaleString()}
                                 </td>
                             </tr>
                         ))}

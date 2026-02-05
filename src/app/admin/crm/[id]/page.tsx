@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { serializeDecimal } from '@/lib/serialization'
 import ClientAnalytics from '@/components/crm/ClientAnalytics'
 import CreateSubClientButton from '@/components/crm/CreateSubClientButton'
 import { notFound } from 'next/navigation'
@@ -59,7 +60,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                     <CreateSubClientButton parentId={client.id} parentName={client.name} />
                 )}
             </div>
-            <ClientAnalytics client={client} distribution={distribution} />
+            <ClientAnalytics client={serializeDecimal(client) as any} distribution={distribution} />
         </div>
     )
 }

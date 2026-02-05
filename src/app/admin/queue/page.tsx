@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import TaskTable from '@/components/TaskTable'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 
-import { checkOverdueTasks } from '@/actions/reputation-actions'
+
 import { serializeDecimal } from '@/lib/serialization'
 
 export default async function TaskQueuePage() {

@@ -353,7 +353,7 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
                         html: emailTemplates.taskCompleted(
                             updatedTaskResult.assignee.username || 'User',
                             updatedTaskResult.title,
-                            updatedTaskResult.wageVND || 0
+                            Number(updatedTaskResult.wageVND || 0)
                         )
                     })
                 } else {

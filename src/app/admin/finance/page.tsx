@@ -36,8 +36,8 @@ export default async function FinanceDashboard() {
     })
 
     // Calculate Stats
-    const totalRevenueVND = tasks.reduce((sum, t) => sum + ((t.jobPriceUSD || 0) * (t.exchangeRate || 25300)), 0)
-    const totalWageVND = tasks.reduce((sum, t) => sum + (t.wageVND || t.value || 0), 0)
+    const totalRevenueVND = tasks.reduce((sum, t) => sum + (Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || 25300)), 0)
+    const totalWageVND = tasks.reduce((sum, t) => sum + Number(t.wageVND || t.value || 0), 0)
     const netProfit = totalRevenueVND - totalWageVND
 
     const profitMargin = totalRevenueVND > 0 ? (netProfit / totalRevenueVND) * 100 : 0
@@ -96,8 +96,8 @@ export default async function FinanceDashboard() {
                     </thead>
                     <tbody>
                         {tasks.slice(0, 20).map(t => {
-                            const rev = (t.jobPriceUSD || 0) * (t.exchangeRate || 25300)
-                            const wage = t.wageVND || t.value || 0
+                            const rev = Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || 25300)
+                            const wage = Number(t.wageVND || t.value || 0)
                             const prof = rev - wage
 
                             return (

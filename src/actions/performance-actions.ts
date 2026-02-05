@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { serializeDecimal } from '@/lib/serialization'
 
 export async function getPerformanceReport(month: number, year: number) {
     try {
@@ -14,7 +15,7 @@ export async function getPerformanceReport(month: number, year: number) {
 
         // If data exists, return it (Fast Load)
         if (metrics.length > 0) {
-            return { success: true, data: metrics, source: 'snapshot' }
+            return { success: true, data: serializeDecimal(metrics), source: 'snapshot' }
         }
 
         // If no data, calculate from scratch (First run for this month)
@@ -58,7 +59,7 @@ export async function calculatePerformance(month: number, year: number) {
 
             for (const task of user.tasks) {
                 // Revenue
-                totalRevenue += (task.value || 0)
+                totalRevenue += Number(task.value || 0)
 
                 // On Time Check (deadline >= completedAt) (Approx using updatedAt as completedAt)
                 if (task.deadline) {
@@ -150,7 +151,7 @@ export async function calculatePerformance(month: number, year: number) {
             orderBy: { revenue: 'desc' }
         })
 
-        return { success: true, data: freshData, source: 'calculated' }
+        return { success: true, data: serializeDecimal(freshData), source: 'calculated' }
 
     } catch (error) {
         console.error('Calculation Error:', error)

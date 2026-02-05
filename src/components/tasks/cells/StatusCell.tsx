@@ -49,7 +49,7 @@ export function StatusCell({ task, isAdmin }: StatusCellProps) {
         }
 
         try {
-            await updateTaskStatus(task.id, newStatus)
+            await updateTaskStatus(task.id, newStatus, undefined, undefined, task.version)
             toast.success(`Status updated to ${newStatus}`)
             // window.location.reload() // Optimistic UI preferred, but reload ensures consistency
         } catch (error) {

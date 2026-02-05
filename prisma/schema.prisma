@@ -46,9 +46,9 @@ model Payroll {
   month       Int
   year        Int
   
-  baseSalary  Float    @default(0)
-  bonus       Float    @default(0)
-  totalAmount Float
+  baseSalary  Decimal  @default(0)
+  bonus       Decimal  @default(0)
+  totalAmount Decimal
   
   status      String   @default("UNPAID") // UNPAID, PAID
   paidAt      DateTime?
@@ -65,7 +65,7 @@ model Task {
   id          String   @id @default(uuid())
   title       String
   deadline    DateTime?
-  value       Float    @default(0)
+  value       Decimal  @default(0)
   isPenalized Boolean  @default(false)
   status      String   @default("Đang thực hiện") // "Đang thực hiện", "Revision", "Hoàn tất", "Tạm ngưng", "Sửa frame"
   type        String   @default("Short form") // "Trial", "Short form", "Long form"
@@ -79,10 +79,13 @@ model Task {
   
   
   // Financial Fields
-  jobPriceUSD    Float?   @default(0) // Input: Revenue from Client (USD)
-  wageVND        Float?   @default(0) // Input: Payment to Staff (VND)
-  exchangeRate   Float?   @default(25300) // Stored rate at creation
-  profitVND      Float?   @default(0) // Calculated: (job * rate) - wage
+  jobPriceUSD    Decimal? @default(0) // Input: Revenue from Client (USD)
+  wageVND        Decimal? @default(0) // Input: Payment to Staff (VND)
+  exchangeRate   Decimal? @default(25300) // Stored rate at creation
+  profitVND      Decimal? @default(0) // Calculated: (job * rate) - wage
+
+  // Concurrency Control
+  version        Int      @default(0)
   
   assignee    User?    @relation(fields: [assigneeId], references: [id])
   assigneeId  String?
@@ -126,9 +129,9 @@ model MonthlyBonus {
   month               Int      // 1-12
   year                Int
   rank                Int      // 1, 2, or 3
-  revenue             Float    // Snapshot of total revenue at calculation time
-  executionTimeHours  Float    // Total hours spent on tasks (tie-breaker)
-  bonusAmount         Float    // Calculated bonus amount (15%, 10%, or 5% of salary)
+  revenue             Decimal  // Snapshot of total revenue at calculation time
+  executionTimeHours  Float    // Total hours spent on tasks (tie-breaker) - Keep Float for time
+  bonusAmount         Decimal  // Calculated bonus amount (15%, 10%, or 5% of salary)
   calculatedAt        DateTime @default(now())
   
   user                User     @relation(fields: [userId], references: [id])
@@ -164,8 +167,8 @@ model Client {
   tasks         Task[]
   
   // Scoring Fields (Computed by Python Cron Job)
-  aiScore       Float     @default(0) // 0-100 Performance Score
-  frictionIndex Float     @default(0) // How "difficult" the client is
+  aiScore       Decimal   @default(0) // 0-100 Performance Score
+  frictionIndex Decimal   @default(0) // How "difficult" the client is
   
   // Manual Ratings & AI Classification
   inputQuality  Int       @default(3) // 1-5
@@ -227,7 +230,7 @@ model PerformanceMetric {
   year                  Int
   
   // Metrics
-  revenue               Float    @default(0)
+  revenue               Decimal  @default(0)
   avgCompletionTime     Int      @default(0) // Seconds
   onTimeRate            Float    @default(100) // Percentage
   

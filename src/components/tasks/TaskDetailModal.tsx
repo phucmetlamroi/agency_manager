@@ -187,8 +187,14 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin }: TaskDetailMo
                                         onClick={async () => {
                                             await handleSave();
                                             if (!isAdmin) {
-                                                await updateTaskStatus(localTask.id, 'Revision')
-                                                toast.success('Đã nộp bài (Sent to Revision)')
+                                                // FSM: Submit -> Review (Waiting for check)
+                                                // Pass current version for OL
+                                                const res = await updateTaskStatus(localTask.id, 'Review', undefined, undefined, localTask.version)
+                                                if (res?.error) {
+                                                    toast.error(res.error)
+                                                } else {
+                                                    toast.success('Đã nộp bài (Sent to Review)')
+                                                }
                                             }
                                             setIsEditingLink(false);
                                         }}

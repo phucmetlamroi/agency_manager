@@ -119,7 +119,17 @@ export default function AgencyTaskTable({ tasks, members }: { tasks: TaskWithUse
 
     const handleStatusChange = async (taskId: string, newStatus: string, notes?: string, feedback?: { type: 'INTERNAL' | 'CLIENT', content: string }) => {
         try {
-            await updateTaskStatus(taskId, newStatus, notes, feedback)
+            // Find current task version for OL
+            const task = tasks.find(t => t.id === taskId)
+            const version = task?.version
+
+            const result = await updateTaskStatus(taskId, newStatus, notes, feedback, version)
+
+            if (result?.error) {
+                toast.error(result.error)
+                return
+            }
+
             // Ideally revalidate or optimistic update
             // For now, let standard revalidation handling work or page reload
             toast.success("Trạng thái đã được cập nhật")

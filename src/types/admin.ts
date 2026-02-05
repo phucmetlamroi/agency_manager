@@ -33,5 +33,9 @@ export type TaskWithUser = { // Updated with Client Info
     // Financials
     jobPriceUSD?: number | null
     wageVND?: number | null
+    wageVND?: number | null
     profitVND?: number | null
+
+    // Concurrency Control
+    version: number
 }

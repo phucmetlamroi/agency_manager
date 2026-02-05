@@ -3,8 +3,9 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { FeedbackSource } from '@prisma/client'
+import { validateTransition, TaskState } from '@/lib/fsm-config'
 
-export async function updateTaskStatus(id: string, newStatus: string, newNotes?: string, feedbackData?: { type: FeedbackSource, content: string }) {
+export async function updateTaskStatus(id: string, newStatus: string, newNotes?: string, feedbackData?: { type: FeedbackSource, content: string }, currentVersion?: number) {
     try {
         // Fetch task to check deadline and assignee
         const task = await prisma.task.findUnique({
@@ -13,6 +14,19 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
         })
 
         if (!task) return { error: 'Task not found' }
+
+        // --- FSM GUARD (Enterprise Logic) ---
+        // Validate if this state transition is legal according to strict rules
+        const transitionCheck = validateTransition(task.status, newStatus)
+        if (!transitionCheck.isValid) {
+            console.error(`[FSM Block] Invalid Transition: ${task.status} -> ${newStatus}`)
+            return { error: `Lỗi quy trình: ${transitionCheck.error}` } // Return user-friendly FSM error
+        }
+
+        // OPTIMISTIC LOCKING CHECK (Concurrency Control)
+        if (typeof currentVersion === 'number' && task.version !== currentVersion) {
+            return { error: 'Task has been updated by someone else. Please refresh.' } // UI should handle this
+        }
 
         // Logic: Reward if Completed Early/On-Time
         if (newStatus === 'Hoàn tất' && task.status !== 'Hoàn tất' && task.deadline && task.assignee) {
@@ -188,16 +202,50 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
         }
 
         // ... (Update DB call)
-        const updatedTaskResult = await prisma.task.update({
+        // ... (Update DB call)
+        // OPTIMISTIC LOCKING: Use updateMany to ensure atomic Compare-And-Swap
+        // If currentVersion is provided, we only update if version matches.
+        // We also increment version.
+
+        const updateData = {
+            status: newStatus,
+            ...(newNotes ? { notes: newNotes } : {}),
+            ...deadlineUpdate,
+            ...timerUpdate,
+            version: { increment: 1 }
+        }
+
+        let updateResult
+        if (typeof currentVersion === 'number') {
+            updateResult = await prisma.task.updateMany({
+                where: {
+                    id,
+                    version: currentVersion
+                },
+                data: updateData
+            })
+
+            if (updateResult.count === 0) {
+                // Check if task exists to distinguish found vs version mismatch
+                const exists = await prisma.task.findUnique({ where: { id } })
+                if (!exists) return { error: 'Task not found' }
+                return { error: 'Task has been modified by another user. Please refresh.' } // Concurrency Error
+            }
+        } else {
+            // Fallback for calls without version (Force update)
+            updateResult = await prisma.task.updateMany({
+                where: { id },
+                data: updateData
+            })
+        }
+
+        // Fetch updated task for Emails & Return
+        const updatedTaskResult = await prisma.task.findUnique({
             where: { id },
-            data: {
-                status: newStatus,
-                ...(newNotes ? { notes: newNotes } : {}), // Update notes if provided
-                ...deadlineUpdate,
-                ...timerUpdate
-            },
-            include: { assignee: true } // Need assignee for emails
+            include: { assignee: true }
         })
+
+        if (!updatedTaskResult) return { error: 'Error fetching updated task' }
 
         // --- EMAIL TRIGGERS ---
         console.log(`[Email Debug] Status changed to: ${newStatus}`)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface StopwatchProps {
     accumulatedSeconds: number
@@ -10,21 +10,10 @@ interface StopwatchProps {
 
 export default function Stopwatch({ accumulatedSeconds, timerStartedAt, status }: StopwatchProps) {
     const [displayTime, setDisplayTime] = useState(accumulatedSeconds)
+    const workerRef = useRef<Worker | null>(null)
 
-    useEffect(() => {
-        // Initial setup
-        updateDisplay()
-
-        // Interval if running
-        let interval: NodeJS.Timeout
-        if (status === 'RUNNING' && timerStartedAt) {
-            interval = setInterval(updateDisplay, 1000)
-        }
-
-        return () => clearInterval(interval)
-    }, [accumulatedSeconds, timerStartedAt, status])
-
-    const updateDisplay = () => {
+    // Calculate time based on system clock (drif-proof)
+    const calculateTime = () => {
         let additional = 0
         if (status === 'RUNNING' && timerStartedAt) {
             const startStr = typeof timerStartedAt === 'string' ? timerStartedAt : timerStartedAt.toISOString()
@@ -32,8 +21,47 @@ export default function Stopwatch({ accumulatedSeconds, timerStartedAt, status }
             const now = new Date().getTime()
             additional = Math.floor((now - start) / 1000)
         }
-        setDisplayTime(accumulatedSeconds + (additional > 0 ? additional : 0))
+        return accumulatedSeconds + (additional > 0 ? additional : 0)
     }
+
+    useEffect(() => {
+        // Initialize Worker
+        // We use a Blob to create worker inline or load from file. 
+        // Next.js static file handling can be tricky for workers, so loading from public is common, 
+        // or using strict file path. 
+        // Since we wrote src/lib/TimerWorker.ts, we need to compile it or load it.
+        // Direct TS import of worker is non-standard in Next.js without config.
+        // FALLBACK: Use inline blob for simplicity/reliability in this environment if file loader fails.
+        // BUT we wrote the file. Let's try to assume a simple build setup. 
+        // Actually, just using the logic in main thread with Date.now() is robust.
+        // PROCEEDING WITH WORKER as requested.
+
+        // Dynamic import logic or simple polling?
+        // Let's use the Date.now() logic DRIVEN by the worker tick.
+
+        workerRef.current = new Worker(new URL('../lib/TimerWorker.ts', import.meta.url))
+
+        workerRef.current.onmessage = (e) => {
+            if (e.data.type === 'TICK') {
+                setDisplayTime(calculateTime())
+            }
+        }
+
+        return () => {
+            workerRef.current?.terminate()
+        }
+    }, [])
+
+    // Handle Status Changes
+    useEffect(() => {
+        setDisplayTime(calculateTime()) // Immediate update
+
+        if (status === 'RUNNING') {
+            workerRef.current?.postMessage({ action: 'START' })
+        } else {
+            workerRef.current?.postMessage({ action: 'STOP' })
+        }
+    }, [status, timerStartedAt, accumulatedSeconds])
 
     const formatTime = (totalSeconds: number) => {
         const hours = Math.floor(totalSeconds / 3600)
@@ -68,7 +96,7 @@ export default function Stopwatch({ accumulatedSeconds, timerStartedAt, status }
 
             {formatTime(displayTime)}
 
-            {status === 'RUNNING' && <span style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 'normal' }}>Active</span>}
+            {status === 'RUNNING' && <span className="hidden sm:inline" style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 'normal' }}>Active</span>}
         </div>
     )
 }

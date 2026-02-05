@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import BonusCalculator from './BonusCalculator'
 import PayrollCard from '@/components/admin/PayrollCard'
+import { serializeDecimal } from '@/lib/serialization'
 
 export default async function PayrollPage() {
     // 1. Determine Current Month Range
@@ -49,6 +50,9 @@ export default async function PayrollPage() {
     // Filter out users with 0 income AND no bonus (active users only)
     const activeUsers = users.filter(user => user.tasks.length > 0 || user.bonuses.length > 0)
 
+    // SERIALIZE DECIMAL FIELDS
+    const serializedUsers = serializeDecimal(activeUsers)
+
     // Check permission for "Calculate Bonus" button
     const session = await getSession()
     const currentUser = await prisma.user.findUnique({
@@ -82,7 +86,7 @@ export default async function PayrollPage() {
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                {activeUsers.map(user => (
+                {serializedUsers.map((user: any) => (
                     <PayrollCard
                         key={user.id}
                         user={user}
@@ -91,7 +95,7 @@ export default async function PayrollPage() {
                     />
                 ))}
 
-                {activeUsers.length === 0 && (
+                {serializedUsers.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
                         Không có số liệu lương trong tháng này.
                     </div>

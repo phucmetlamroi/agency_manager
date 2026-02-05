@@ -164,19 +164,21 @@ export async function calculateMonthlyBonus() {
             if (user.tasks.length === 0) continue
 
             // Calculate total revenue (sum of task values)
-            const revenue = user.tasks.reduce((sum, task) => sum + task.value, 0)
+            // FIX: Handle Decimal type safely
+            const revenue = user.tasks.reduce((sum, task) => {
+                const val = task.value ? Number(task.value) : 0
+                return sum + val
+            }, 0)
 
             // Calculate total execution time in hours using Smart Stopwatch (accumulatedSeconds)
             let totalExecutionMs = 0
             for (const task of user.tasks) {
-                // Use the new accumulatedSeconds field derived from Stopwatch
-                // If the task is somehow still RUNNING when calculating (unlikely if Hoàn tất stops it, but safe to check),
-                // we should add the pending duration. 
-                // But generally only Completed tasks are queried here.
                 const activeSeconds = task.accumulatedSeconds || 0
                 totalExecutionMs += (activeSeconds * 1000)
             }
-            const executionTimeHours = totalExecutionMs / (1000 * 60 * 60) // Convert ms to hours
+
+            // Avoid division by zero
+            const executionTimeHours = totalExecutionMs > 0 ? totalExecutionMs / (1000 * 60 * 60) : 0.001
 
             rankings.push({
                 userId: user.id,
@@ -187,14 +189,18 @@ export async function calculateMonthlyBonus() {
             })
         }
 
-        // 5. Rank by revenue DESC, then executionTime ASC (faster wins)
+        // 5. Rank by revenue DESC, then Efficiency (Revenue/Time) DESC
         rankings.sort((a, b) => {
             // Primary: Revenue (higher is better)
-            if (b.revenue !== a.revenue) {
+            if (Math.abs(b.revenue - a.revenue) > 0.01) {
                 return b.revenue - a.revenue
             }
-            // Tie-breaker: Execution time (lower is better - faster completion)
-            return a.executionTimeHours - b.executionTimeHours
+
+            // Tie-breaker: Efficiency (Revenue / Time)
+            const efficiencyA = a.revenue / a.executionTimeHours
+            const efficiencyB = b.revenue / b.executionTimeHours
+
+            return efficiencyB - efficiencyA // Higher efficiency wins
         })
 
         // 6. Award Top 1-3 with bonuses

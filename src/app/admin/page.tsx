@@ -12,6 +12,7 @@ import AutoRefresh from '@/components/AutoRefresh'
 import TaskCreationManager from '@/components/TaskCreationManager'
 import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import { KPIStats } from '@/components/dashboard/KPIStats'
+import { serializeDecimal } from '@/lib/serialization'
 
 export default async function AdminDashboard() {
     const session = await getSession()
@@ -58,7 +59,7 @@ export default async function AdminDashboard() {
             </div>
 
             {/* KPI Section */}
-            <KPIStats tasks={tasks} />
+            <KPIStats tasks={serializeDecimal(tasks)} />
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -66,12 +67,12 @@ export default async function AdminDashboard() {
                 {/* Left Column: Task Workflow (3/4 width) */}
                 <div className="xl:col-span-3 space-y-6">
                     {/* Bottleneck Alert */}
-                    <BottleneckAlert tasks={tasks as any} />
+                    <BottleneckAlert tasks={serializeDecimal(tasks) as any} />
 
                     {/* Tabs */}
                     <div className="glass-panel p-6 min-h-[500px]">
                         <TaskWorkflowTabs
-                            tasks={assignedTasks.concat(unassignedTasks) as any}
+                            tasks={serializeDecimal(assignedTasks.concat(unassignedTasks)) as any}
                             users={users}
                             agencies={agencies}
                             isMobile={await isMobileDevice()}

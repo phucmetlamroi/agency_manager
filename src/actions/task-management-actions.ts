@@ -129,9 +129,17 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                 newAccumulated += elapsed
             }
 
+            // FIX: Sync assignedAgencyId with Target User's Agency
+            // If assigning to Internal User (no agency), wait... we need to fetch the user first if not fetched.
+            // (The non-admin block fetched it, but admin block didn't).
+            const targetUserForUpdate = await prisma.user.findUnique({
+                where: { id: assignmentId },
+                select: { agencyId: true }
+            })
+
             updateData = {
                 assigneeId: assignmentId,
-                // assignedAgencyId: null, // Preserve agency link
+                assignedAgencyId: targetUserForUpdate?.agencyId || null, // Sync Agency ID (Clear if Internal User)
                 status: 'Đã nhận task',
                 isPenalized: false,
                 timerStatus: 'PAUSED',

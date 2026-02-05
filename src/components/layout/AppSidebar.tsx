@@ -54,6 +54,7 @@ const NAV_ITEMS = [
     { label: "Task Queue", href: "/admin/queue", icon: ListTodo },
     { label: "CRM & Clients", href: "/admin/crm", icon: Smile },
     { label: "Payroll", href: "/admin/payroll", icon: Wallet },
+    { label: "Finance", href: "/admin/finance", icon: Building2 }, // Re-added Finance
     { label: "Staff", href: "/admin/users", icon: Users },
     { label: "Agencies", href: "/admin/agencies", icon: Building2 },
     // { label: "Settings", href: "/admin/settings", icon: Settings },
@@ -98,7 +99,10 @@ export function AppSidebar({ user, onCollapsedChange }: SidebarProps) {
                                 <p className="text-sm text-muted-foreground">Mobile Dashboard</p>
                             </div>
                             <nav className="flex-1 space-y-1">
-                                {NAV_ITEMS.map((item) => {
+                                {NAV_ITEMS.filter(item => {
+                                    if (item.href === '/admin/finance') return user.role === 'ADMIN' || user.isTreasurer
+                                    return true
+                                }).map((item) => {
                                     const isActive = pathname === item.href
                                     return (
                                         <Link
@@ -203,7 +207,10 @@ export function AppSidebar({ user, onCollapsedChange }: SidebarProps) {
                         )}
                     </div>
 
-                    {NAV_ITEMS.map((item) => {
+                    {NAV_ITEMS.filter(item => {
+                        if (item.href === '/admin/finance') return user.role === 'ADMIN' || user.isTreasurer
+                        return true
+                    }).map((item) => {
                         const isActive = pathname === item.href
                         if (collapsed) {
                             return (

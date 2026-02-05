@@ -46,6 +46,7 @@ interface SidebarProps {
         reputation?: number
         isTreasurer?: boolean
     }
+    onCollapsedChange?: (collapsed: boolean) => void
 }
 
 const NAV_ITEMS = [
@@ -58,7 +59,7 @@ const NAV_ITEMS = [
     // { label: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
-export function AppSidebar({ user }: SidebarProps) {
+export function AppSidebar({ user, onCollapsedChange }: SidebarProps) {
     const pathname = usePathname()
     const [collapsed, setCollapsed] = React.useState(false)
     const [isMobile, setIsMobile] = React.useState(false)
@@ -70,6 +71,13 @@ export function AppSidebar({ user }: SidebarProps) {
         window.addEventListener("resize", checkMobile)
         return () => window.removeEventListener("resize", checkMobile)
     }, [])
+
+    // Notify parent of collapse changes
+    const handleToggleCollapse = () => {
+        const newCollapsed = !collapsed
+        setCollapsed(newCollapsed)
+        onCollapsedChange?.(newCollapsed)
+    }
 
     if (isMobile) {
         return (
@@ -140,7 +148,7 @@ export function AppSidebar({ user }: SidebarProps) {
         <TooltipProvider delayDuration={0}>
             <div
                 className={cn(
-                    "relative flex flex-col h-screen border-r bg-card/50 backdrop-blur-sm transition-all duration-300 ease-in-out z-40",
+                    "fixed left-0 top-0 flex flex-col h-screen border-r bg-card/50 backdrop-blur-sm transition-all duration-300 ease-in-out z-40",
                     collapsed ? "w-[80px]" : "w-[280px]"
                 )}
             >
@@ -166,7 +174,7 @@ export function AppSidebar({ user }: SidebarProps) {
                     variant="ghost"
                     size="icon"
                     className="absolute -right-4 top-20 h-8 w-8 rounded-full border bg-background shadow-md z-50 text-muted-foreground hover:text-foreground"
-                    onClick={() => setCollapsed(!collapsed)}
+                    onClick={handleToggleCollapse}
                 >
                     {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                 </Button>

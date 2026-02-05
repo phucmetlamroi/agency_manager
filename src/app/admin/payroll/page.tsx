@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import BonusCalculator from './BonusCalculator'
 import PayrollCard from '@/components/admin/PayrollCard'
 import { serializeDecimal } from '@/lib/serialization'
@@ -55,8 +56,10 @@ export default async function PayrollPage() {
 
     // Check permission for "Calculate Bonus" button
     const session = await getSession()
+    if (!session) redirect('/login')
+
     const currentUser = await prisma.user.findUnique({
-        where: { id: session?.user?.id },
+        where: { id: session.user.id },
         select: { role: true, isTreasurer: true }
     })
 

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { createTask } from '@/actions/admin-actions'
 import { deleteTask } from '@/actions/task-management-actions'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import TaskTable from '@/components/TaskTable'
 import CreateTaskForm from '@/components/CreateTaskForm'
 import { isMobileDevice } from '@/lib/device'
@@ -16,8 +17,10 @@ import { serializeDecimal } from '@/lib/serialization'
 
 export default async function AdminDashboard() {
     const session = await getSession()
+    if (!session) redirect('/login')
+
     const currentUser = await prisma.user.findUnique({
-        where: { id: session?.user?.id },
+        where: { id: session.user.id },
         select: { username: true }
     })
 

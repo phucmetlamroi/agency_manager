@@ -1,11 +1,14 @@
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import UserPageTabs from '@/components/admin/UserPageTabs'
 
 export default async function AdminUsersPage() {
     const session = await getSession()
+    if (!session) redirect('/login')
+
     const currentUser = await prisma.user.findUnique({
-        where: { id: session?.user?.id },
+        where: { id: session.user.id },
         select: { username: true }
     })
 

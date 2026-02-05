@@ -248,7 +248,7 @@ export default function ScheduleGrid({ userId, initialSchedule }: Props) {
                     <div className="absolute inset-0 grid grid-cols-[60px_repeat(7,1fr)] pointer-events-none">
                         <div /> {/* Skip Time Col */}
                         {weekDays.map((day, i) => (
-                            <div key={i} className="relative h-full border-r border-transparent">
+                            <div key={i} className="relative h-full border-r border-transparent pointer-events-none">
                                 {schedules.filter(s => isSameDay(s.startTime, day)).map(block => {
                                     const startH = getHours(block.startTime) + (block.startTime.getMinutes() / 60)
                                     const endH = getHours(block.endTime) + (block.endTime.getMinutes() / 60)

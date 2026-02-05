@@ -1,5 +1,5 @@
 import { getMySchedule } from '@/actions/schedule-actions'
-import WeeklyScheduler from '@/components/schedule/WeeklyScheduler'
+import ScheduleGrid from '@/components/schedule/ScheduleGrid'
 import { startOfWeek, endOfWeek, addDays } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +22,7 @@ export default async function SchedulePage() {
             </header>
 
             <div className="flex-1 min-h-0">
-                <WeeklyScheduler initialSchedule={schedules} />
+                <ScheduleGrid userId="" initialSchedule={schedules} />
             </div>
         </div>
     )

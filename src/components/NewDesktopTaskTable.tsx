@@ -1,8 +1,13 @@
 "use client"
 
+import { useState } from 'react'
 import { TaskWithUser } from '@/types/admin'
 import { TasksDataTable } from './tasks/TasksDataTable'
-import { columns } from './tasks/columns'
+import { getColumns } from './tasks/columns'
+import { TaskDetailModal } from './tasks/TaskDetailModal'
+import { deleteTask } from '@/actions/task-management-actions'
+import { useConfirm } from '@/components/ui/ConfirmModal'
+import { toast } from 'sonner'
 
 interface DesktopTaskTableProps {
     tasks: TaskWithUser[]
@@ -11,15 +16,40 @@ interface DesktopTaskTableProps {
     agencies?: any[]
 }
 
-export default function DesktopTaskTable({ tasks, isAdmin, users, agencies }: DesktopTaskTableProps) {
-    // We can extend columns here if we need specific access to props,
-    // or we just use the default columns. 
-    // The default columns 'actions' might need to know about 'isAdmin'.
-    // For now, let's use the standard columns.
+export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], agencies = [] }: DesktopTaskTableProps) {
+    const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
+    const { confirm } = useConfirm()
+
+    const handleDelete = async (id: string) => {
+        if (await confirm({
+            title: 'Delete Task',
+            message: 'Are you sure you want to delete this task?',
+            type: 'danger'
+        })) {
+            await deleteTask(id)
+            toast.success('Task deleted')
+            window.location.reload()
+        }
+    }
+
+    const columns = getColumns(
+        users,
+        agencies,
+        isAdmin,
+        (task) => setSelectedTask(task), // onTaskClick
+        handleDelete // onDelete
+    )
 
     return (
         <div className="glass-panel p-1">
             <TasksDataTable columns={columns} data={tasks} />
+
+            <TaskDetailModal
+                task={selectedTask}
+                isOpen={!!selectedTask}
+                onClose={() => setSelectedTask(null)}
+                isAdmin={isAdmin}
+            />
         </div>
     )
 }

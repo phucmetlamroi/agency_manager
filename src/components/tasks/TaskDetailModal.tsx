@@ -264,6 +264,60 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin }: TaskDetailMo
                         )}
                     </div>
 
+                    {/* FINANCIALS (Admin Only) */}
+                    {isAdmin && (
+                        <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/50">
+                            <label className="block text-xs font-bold text-gray-500 mb-2">
+                                FINANCE & DEADLINE
+                            </label>
+                            <div className="grid grid-cols-2 gap-4 mb-2">
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold mb-1 block">GIÁ JOB ($)</label>
+                                    {isEditing ? (
+                                        <input
+                                            type="number"
+                                            value={form.jobPriceUSD}
+                                            onChange={(e) => setForm({ ...form, jobPriceUSD: parseFloat(e.target.value) || 0 })}
+                                            className="w-full p-1 border rounded text-sm font-mono text-green-600 font-bold"
+                                        />
+                                    ) : (
+                                        <span className="font-mono text-green-600 font-bold text-sm">${form.jobPriceUSD}</span>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold mb-1 block">LƯƠNG STAFF (VND)</label>
+                                    {isEditing ? (
+                                        <input
+                                            type="number"
+                                            value={form.value}
+                                            onChange={(e) => setForm({ ...form, value: parseFloat(e.target.value) || 0 })}
+                                            className="w-full p-1 border rounded text-sm font-mono text-yellow-600 font-bold"
+                                        />
+                                    ) : (
+                                        <span className="font-mono text-yellow-600 font-bold text-sm">{form.value.toLocaleString()} ₫</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* DEADLINE */}
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                                <label className="text-[10px] text-red-400 font-bold mb-1 block">DEADLINE</label>
+                                {isEditing ? (
+                                    <input
+                                        type="datetime-local"
+                                        value={form.deadline}
+                                        onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                                        className="w-full p-1 border border-red-200 rounded text-sm font-bold text-red-600"
+                                    />
+                                ) : (
+                                    <span className="text-red-500 font-bold text-sm">
+                                        {form.deadline ? new Date(form.deadline).toLocaleString('vi-VN') : 'No Deadline'}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* NOTES */}
                     <div>
                         <label className="block text-xs font-bold text-gray-400 mb-2">

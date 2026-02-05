@@ -1,54 +1,56 @@
-
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 async function main() {
-    console.log('--- STARTING AGENCY TASK FIX ---')
+    console.log('--- COMPREHENSIVE AGENCY TASK FIX ---')
+    console.log('Checking for ALL task assignment inconsistencies...\n')
 
-    // Find tasks that have an Assignee
+    // Find ALL tasks (assigned or not)
     const tasks = await prisma.task.findMany({
-        where: {
-            assigneeId: { not: null }
-        },
         include: {
             assignee: true
         }
     })
 
-    console.log(`Found ${tasks.length} assigned tasks. Checking for inconsistencies...`)
+    console.log(`Total tasks in database: ${tasks.length}`)
 
     let fixedCount = 0
+    let alreadyCorrect = 0
 
     for (const task of tasks) {
-        if (!task.assignee) continue
-
-        const assigneeAgencyId = task.assignee.agencyId
+        const assigneeAgencyId = task.assignee?.agencyId || null
         const taskAgencyId = task.assignedAgencyId
 
-        // Case 1: Internal User (assigneeAgencyId is null), but Task has Agency ID
-        if (!assigneeAgencyId && taskAgencyId) {
-            console.log(`[FIX] Task "${task.title}" assigned to Internal User "${task.assignee.username}" but linked to Agency ${taskAgencyId}. Removing Agency link.`)
-            await prisma.task.update({
-                where: { id: task.id },
-                data: { assignedAgencyId: null }
-            })
-            fixedCount++
+        // Expected: assignedAgencyId should match assignee's agencyId (or both null if no assignee)
+        const isCorrect = assigneeAgencyId === taskAgencyId
+
+        if (isCorrect) {
+            alreadyCorrect++
+            continue
         }
-        // Case 2: Agency User, but Task has Different Agency ID (or null)
-        else if (assigneeAgencyId && taskAgencyId !== assigneeAgencyId) {
-            console.log(`[FIX] Task "${task.title}" assigned to Agency User "${task.assignee.username}" (${assigneeAgencyId}) but linked to Agency ${taskAgencyId || 'NULL'}. Syncing Agency link.`)
-            await prisma.task.update({
-                where: { id: task.id },
-                data: { assignedAgencyId: assigneeAgencyId }
-            })
-            fixedCount++
-        }
+
+        // INCONSISTENCY FOUND
+        console.log(`\n[MISMATCH] Task: "${task.title}" (${task.id.substring(0, 8)}...)`)
+        console.log(`  Assignee: ${task.assignee?.username || 'NONE'}`)
+        console.log(`  Assignee's Agency: ${assigneeAgencyId || 'NONE (Internal)'}`)
+        console.log(`  Task's assignedAgencyId: ${taskAgencyId || 'NONE'}`)
+        console.log(`  Action: Setting assignedAgencyId = ${assigneeAgencyId || 'NULL'}`)
+
+        await prisma.task.update({
+            where: { id: task.id },
+            data: { assignedAgencyId: assigneeAgencyId }
+        })
+
+        fixedCount++
     }
 
-    console.log(`--- COMPLETE. Fixed ${fixedCount} tasks. ---`)
+    console.log(`\n--- COMPLETE ---`)
+    console.log(`Total Checked: ${tasks.length}`)
+    console.log(`Already Correct: ${alreadyCorrect}`)
+    console.log(`Fixed: ${fixedCount}`)
 }
 
 main()
-    .catch(e => console.error(e))
+    .catch(e => console.error('ERROR:', e))
     .finally(async () => await prisma.$disconnect())

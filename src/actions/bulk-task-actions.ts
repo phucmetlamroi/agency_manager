@@ -31,6 +31,16 @@ export async function createBatchTasks(data: BatchTaskInput) {
         // Prepare deadline date object
         const deadlineDate = data.deadline ? new Date(data.deadline + ':00+07:00') : null
 
+        // FIX: Fetch assignee's agencyId if being assigned
+        let assignedAgencyId: string | null = null
+        if (data.assigneeId) {
+            const assignee = await prisma.user.findUnique({
+                where: { id: data.assigneeId },
+                select: { agencyId: true }
+            })
+            assignedAgencyId = assignee?.agencyId || null
+        }
+
         // Use transaction to ensure all tasks are created or none
         await prisma.$transaction(async (tx) => {
             for (const title of data.titles) {
@@ -47,6 +57,7 @@ export async function createBatchTasks(data: BatchTaskInput) {
                         collectFilesLink: data.collectFilesLink,
                         notes: data.notes,
                         assigneeId: data.assigneeId,
+                        assignedAgencyId: assignedAgencyId, // FIX: Sync with assignee's agency
                         status: data.assigneeId ? 'Đã nhận task' : 'Đang đợi giao',
 
                         // Financials

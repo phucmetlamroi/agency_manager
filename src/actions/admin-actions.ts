@@ -76,6 +76,16 @@ export async function createTask(formData: FormData) {
 
         const clientId = formData.get('clientId') ? parseInt(formData.get('clientId') as string) : null
 
+        // FIX: Fetch assignee's agencyId if being assigned
+        let assignedAgencyId: string | null = null
+        if (assigneeId) {
+            const assignee = await prisma.user.findUnique({
+                where: { id: assigneeId },
+                select: { agencyId: true }
+            })
+            assignedAgencyId = assignee?.agencyId || null
+        }
+
         await prisma.task.create({
             data: {
                 title,
@@ -86,6 +96,7 @@ export async function createTask(formData: FormData) {
                 references: references || null,
                 notes: notes || null,
                 assigneeId: assigneeId || null,
+                assignedAgencyId: assignedAgencyId, // FIX: Sync with assignee's agency
                 fileLink: fileLink || null,
                 collectFilesLink: collectFilesLink || null,
                 status: assigneeId ? 'Đã nhận task' : 'Đang đợi giao',

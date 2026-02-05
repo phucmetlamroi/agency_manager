@@ -88,29 +88,29 @@ export default function ScheduleGrid({ userId, initialSchedule }: Props) {
     const handleCreateSchedule = async (type: ScheduleType) => {
         if (!contextMenu) return
 
-        const startTime = setMinutes(setHours(contextMenu.day, contextMenu.startHour), 0)
-        const endTime = setMinutes(setHours(contextMenu.day, contextMenu.endHour), 0)
+        // Split into 1-hour blocks
+        const promises = []
+        for (let h = contextMenu.startHour; h < contextMenu.endHour; h++) {
+            const startTime = setMinutes(setHours(contextMenu.day, h), 0)
+            const endTime = setMinutes(setHours(contextMenu.day, h + 1), 0)
+
+            promises.push(createScheduleBlock({ startTime, endTime, type: type as any }))
+        }
 
         toast.promise(
-            createScheduleBlock({ startTime, endTime, type: type as any }),
+            Promise.all(promises),
             {
                 loading: 'Đang lưu lịch...',
-                success: (res) => {
-                    if (res.success) {
-                        // Handle success
-                        // We need to re-fetch or optimistically add. 
-                        // The action revalidates path, so router.refresh() might be needed or manual state update.
-                        // For now trust the action result or simple reload?
-                        // Actually the action returns success: true, but not the created block?
-                        // Let's check schedule-actions.ts
-                        window.location.reload() // Simplest for now
-                        setContextMenu(null)
-                        return `Đã báo ${type === 'BUSY' ? 'Bận' : 'Nhận việc'}`
-                    } else {
-                        throw new Error(res.error)
+                success: (results) => {
+                    // Check if any failed?
+                    if (results.some(r => !r.success)) {
+                        throw new Error('Một số khung giờ bị lỗi')
                     }
+                    window.location.reload()
+                    setContextMenu(null)
+                    return `Đã báo ${type === 'BUSY' ? 'Bận' : 'Nhận việc'} (${promises.length} giờ)`
                 },
-                error: 'Lỗi khi lưu lịch'
+                error: (err) => `Lỗi: ${err.message}`
             }
         )
     }

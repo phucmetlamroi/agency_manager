@@ -29,7 +29,8 @@
     --muted-foreground: 240 5% 64.9%;
 
     /* Accent */
-    --accent: 263 94% 65%; /* Same as primary for now or lighter */
+    --accent: 263 94% 65%;
+    /* Same as primary for now or lighter */
     --accent-foreground: 210 40% 98%;
 
     /* Destructive */
@@ -63,6 +64,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -87,20 +89,128 @@
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #333;
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
 
 /* Animations */
 @keyframes aurora {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* --- UX HARDENING UTILITIES (PHASE 7) --- */
+
+/* 1. Mobile Touch Targets (Fat Finger Prevention) */
+@media (max-width: 768px) {
+
+  button,
+  input,
+  select,
+  textarea,
+  [role="button"] {
+    min-height: 44px;
+    /* iOS Standard */
+    min-width: 44px;
+    touch-action: manipulation;
+    /* Disable double-tap zoom */
+  }
+
+  /* Exception for small icon buttons inside dense UIs - use pseudo-element expansion instead */
+  .icon-btn-dense {
+    min-height: unset;
+    min-width: unset;
+    position: relative;
+  }
+
+  .icon-btn-dense::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    bottom: -10px;
+    left: -10px;
+    right: -10px;
+  }
+}
+
+/* 2. Dynamic Viewport Height (Keyboard Overlap Fix) */
+.h-dvh {
+  height: 100dvh;
+}
+
+.min-h-dvh {
+  min-height: 100dvh;
+}
+
+/* 3. Visual Hierarchy & Spacing (Phase 7 - Gestalt) */
+:root {
+  --spacing-section: 2.5rem;
+  /* 40px - Clear break between topics */
+  --spacing-group: 1.5rem;
+  /* 24px - Between independent fields */
+  --spacing-tight: 0.5rem;
+  /* 8px - Label to Input proximity */
+}
+
+/* Enforce Gestalt Proximity in Forms */
+.form-group {
+  margin-bottom: var(--spacing-group);
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: var(--spacing-tight);
+  /* Pull label closer to input */
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.form-section {
+  margin-bottom: var(--spacing-section);
+}
+
+/* Semantic Typography Hierarchy */
+h1.page-title {
+  font-size: 1.875rem;
+  /* 30px */
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(to right, #ffffff, #a1a1aa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+h2.section-title {
+  font-size: 1.25rem;
+  /* 20px */
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--foreground);
+}
+
+/* 4. Performance (Phase 7 - DOM Optimization) */
+.optimize-visibility {
+  content-visibility: auto;
+  contain-intrinsic-size: 1000px;
+  /* Estimate height to prevent scrollbar jumping */
 }

@@ -186,7 +186,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
 
     return (
         <>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 optimize-visibility">
                 {tasks.map(task => {
                     const isLocked = !isAdmin && task.status === 'Đã nhận task';
                     return (

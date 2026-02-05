@@ -41,7 +41,7 @@ export default async function UserLayout({
     const displayName = user.nickname || user.username
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
             <RoleWatcher currentRole={user.role} isTreasurer={user.isTreasurer ?? false} />
 
             {/* --- TOP NAVIGATION BAR (Matches Admin) --- */}

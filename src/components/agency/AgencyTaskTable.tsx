@@ -182,7 +182,7 @@ export default function AgencyTaskTable({ tasks, members }: { tasks: TaskWithUse
 
     return (
         <>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 optimize-visibility">
                 {tasks.map(task => {
                     return (
                         <div key={task.id}

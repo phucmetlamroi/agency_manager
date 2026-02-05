@@ -16,7 +16,12 @@ export default async function TaskQueuePage() {
     })
 
     const users = await prisma.user.findMany({
-        orderBy: { username: 'asc' }
+        orderBy: { username: 'asc' },
+        include: { ownedAgency: true }
+    })
+
+    const agencies = await prisma.agency.findMany({
+        select: { id: true, name: true, code: true }
     })
 
     const unassignedTasks = tasks.filter(t => !t.assigneeId && !t.assignedAgencyId)
@@ -40,7 +45,7 @@ export default async function TaskQueuePage() {
                 </div>
 
                 {unassignedTasks.length > 0 ? (
-                    <TaskTable tasks={unassignedTasks as any} isAdmin={true} users={users} />
+                    <TaskTable tasks={unassignedTasks as any} isAdmin={true} users={users} agencies={agencies} />
                 ) : (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#666', border: '1px dashed #444', borderRadius: '12px' }}>
                         <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Kho đang trống!</p>

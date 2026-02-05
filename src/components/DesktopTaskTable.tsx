@@ -301,17 +301,8 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                                     )}
                                                     <optgroup label="Nhân viên">
                                                         {users
-                                                            // Filter out Agency Owners from "Staff" list if they are already in "Agencies" list
-                                                            // BUT we don't know for sure here without `ownedAgency` on user object.
-                                                            // Let's assume passed users object MIGHT have it, or we rely on Agency optgroup being enough.
-                                                            // User request: "display as Agency Name".
-                                                            // If I can't filter, I should at least Rename them.
-                                                            // Let's safe filter:
+                                                            .filter(u => !((u as any).ownedAgency && (u as any).ownedAgency.length > 0)) // Filter out Agency Owners
                                                             .map(u => {
-                                                                // Check if this user corresponds to an agency in the `agencies` list?
-                                                                // We don't have ownerId in agencies list in this component props.
-                                                                // Best bet: Display them normally for now or try to pass more data.
-                                                                // Wait, I can update the Parent to pass `ownedAgency` info.
                                                                 return (
                                                                     <option key={u.id} value={u.id} className="text-black">
                                                                         {u.username} ({u.reputation ?? 100}đ)

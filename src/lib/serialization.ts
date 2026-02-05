@@ -15,6 +15,12 @@ export function serializeDecimal(obj: any): any {
             return obj.toNumber()
         }
 
+        // Handle Date (Preserve it for Next.js serialization or convert to string if needed)
+        // Next.js App Router handles Date objects in props well usually, but to be safe/consistent:
+        if (obj instanceof Date) {
+            return obj
+        }
+
         // Handle Array
         if (Array.isArray(obj)) {
             return obj.map(item => serializeDecimal(item))

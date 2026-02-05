@@ -2,10 +2,7 @@
 
 import { TaskWithUser } from "@/types/admin"
 import { Badge } from "@/components/ui/badge"
-import Stopwatch from "@/components/DesktopTaskTable" // We need to check where Stopwatch is exported, or move it
-// Actually Stopwatch was inside DesktopTaskTable in previous code, let's extract it or assume I need to create it.
-// I will create a simple display for now or check if src/components/Stopwatch exists.
-// Checking file view from before... Stopwatch was imported from './Stopwatch' in DesktopTaskTable.
+import Stopwatch from "@/components/Stopwatch"
 
 import { calculateRiskLevel, getRiskColor, getRiskLabel } from '@/lib/risk-utils'
 
@@ -18,26 +15,33 @@ interface TitleCellProps {
 export function TitleCell({ task, isAdmin, onClick }: TitleCellProps) {
     const isLocked = !isAdmin && task.status === 'Đã nhận task'
 
-    // Timer Logic Display (Simplified)
+    // Timer Logic Display (Using Stopwatch Component)
     const ShowTimer = () => {
-        if (!task.accumulatedSeconds && !task.timerStartedAt) return null
+        if ((!task.accumulatedSeconds && !task.timerStartedAt) && task.status !== 'Đang thực hiện') return null
 
-        // Simple formatter
-        const formatTime = (seconds: number) => {
-            const h = Math.floor(seconds / 3600)
-            const m = Math.floor((seconds % 3600) / 60)
-            const s = seconds % 60
-            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-        }
+        // Map Task Status to Stopwatch Status
+        // If task is 'Đang thực hiện' (IN_PROGRESS) or 'Sửa frame' (FIXING), the timer logic might differ.
+        // Based on previous logic: 
+        // - 'Đang thực hiện' = RUNNING
+        // - 'Sửa frame' = PAUSED? Or running? User said "Sửa frame is now PAUSED state" in task.md
+        // - 'Revision' = PAUSED
 
-        // Note: For a live ticking timer, we really need the Stopwatch component. 
-        // For now I will just display the accumulated static time + indicator if running.
-        const time = formatTime(task.accumulatedSeconds || 0)
+        // Let's rely on the task.timerStatus field if available, or fallback to mapped status
+        let stopwatchStatus = 'STOPPED'
+        if (task.status === 'Đang thực hiện') stopwatchStatus = 'RUNNING'
+        else if (task.status === 'Sửa frame') stopwatchStatus = 'PAUSED'
+        else if (task.status === 'Revision') stopwatchStatus = 'PAUSED'
+
+        // Specific override if backend provides timerStatus
+        if (task.timerStatus) stopwatchStatus = task.timerStatus
 
         return (
-            <div className="flex items-center gap-2 text-xs font-mono text-gray-400 mt-1">
-                <span>⏱ {time}</span>
-                {task.timerStatus === 'RUNNING' && <span className="animate-pulse text-green-500">● Running</span>}
+            <div className="mt-1">
+                <Stopwatch
+                    accumulatedSeconds={task.accumulatedSeconds || 0}
+                    timerStartedAt={task.timerStartedAt}
+                    status={stopwatchStatus}
+                />
             </div>
         )
     }

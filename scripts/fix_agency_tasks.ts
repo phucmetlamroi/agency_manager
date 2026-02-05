@@ -22,15 +22,30 @@ async function main() {
         const assigneeAgencyId = task.assignee?.agencyId || null
         const taskAgencyId = task.assignedAgencyId
 
-        // Expected: assignedAgencyId should match assignee's agencyId (or both null if no assignee)
-        const isCorrect = assigneeAgencyId === taskAgencyId
+        // FIXED VALIDATION LOGIC:
+        // Valid scenarios:
+        // 1. No assignee + no agency = Global pool ✓
+        // 2. No assignee + has agency = Agency pool (UNASSIGNED) ✓ <-- THIS WAS MISSING BEFORE
+        // 3. Has assignee (internal) + no agency ✓
+        // 4. Has assignee (agency user) + agencies match ✓
+
+        let isCorrect = false
+
+        if (!task.assigneeId) {
+            // Unassigned task - can be in global queue OR agency pool
+            // Both states are valid, no fix needed
+            isCorrect = true
+        } else {
+            // Assigned task - assignedAgencyId MUST match assignee's agency
+            isCorrect = assigneeAgencyId === taskAgencyId
+        }
 
         if (isCorrect) {
             alreadyCorrect++
             continue
         }
 
-        // INCONSISTENCY FOUND
+        // INCONSISTENCY FOUND (only for ASSIGNED tasks now)
         console.log(`\n[MISMATCH] Task: "${task.title}" (${task.id.substring(0, 8)}...)`)
         console.log(`  Assignee: ${task.assignee?.username || 'NONE'}`)
         console.log(`  Assignee's Agency: ${assigneeAgencyId || 'NONE (Internal)'}`)

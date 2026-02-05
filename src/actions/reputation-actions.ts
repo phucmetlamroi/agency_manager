@@ -64,6 +64,7 @@ export async function checkOverdueTasks() {
                     data: {
                         isPenalized: true, // Mark as "failed" history
                         assigneeId: null, // Kick user
+                        assignedAgencyId: null, // FIX: Also remove from agency pool
                         status: 'Đang đợi giao',
                         deadline: null // Reset deadline so it's fresh for next assignee
                     }

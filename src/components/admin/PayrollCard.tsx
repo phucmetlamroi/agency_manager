@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import PaymentModal from './PaymentModal'
 import { CheckCircle2, CircleDashed, RotateCcw } from 'lucide-react'
 import { revertPayment } from '@/actions/payroll-actions'
@@ -45,19 +46,22 @@ export default function PayrollCard({ user, currentMonth, currentYear }: Payroll
     return (
         <div className="glass-panel" style={{ padding: '1.5rem', border: bonusData ? '1px solid #f59e0b' : '1px solid rgba(16, 185, 129, 0.2)', position: 'relative' }}>
 
-            {/* Payment Modal */}
-            <PaymentModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                user={user}
-                payrollData={{
-                    month: currentMonth,
-                    year: currentYear,
-                    totalAmount: totalIncome,
-                    baseSalary: taskIncome,
-                    bonus: bonusAmount
-                }}
-            />
+            {/* Payment Modal - Rendered via Portal to avoid z-index issues */}
+            {typeof window !== 'undefined' && isModalOpen && createPortal(
+                <PaymentModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    user={user}
+                    payrollData={{
+                        month: currentMonth,
+                        year: currentYear,
+                        totalAmount: totalIncome,
+                        baseSalary: taskIncome,
+                        bonus: bonusAmount
+                    }}
+                />,
+                document.body
+            )}
 
             {/* Rank Badge */}
             {bonusData && (

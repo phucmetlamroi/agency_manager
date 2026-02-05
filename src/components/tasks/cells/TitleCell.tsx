@@ -39,7 +39,7 @@ export function TitleCell({ task, isAdmin, onClick }: TitleCellProps) {
             <div className="mt-1">
                 <Stopwatch
                     accumulatedSeconds={task.accumulatedSeconds || 0}
-                    timerStartedAt={task.timerStartedAt}
+                    timerStartedAt={task.timerStartedAt ?? null}
                     status={stopwatchStatus}
                 />
             </div>

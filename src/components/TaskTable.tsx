@@ -6,7 +6,8 @@ import dynamic from 'next/dynamic'
 // Import Desktop/Mobile views
 // Dynamic import to split bundles? Or just basic import?
 // For logic separation, simpler is better for now.
-import DesktopTaskTable from './DesktopTaskTable'
+import DesktopTaskTable from './DesktopTaskTable' // Keeping for reference if needed
+import NewDesktopTaskTable from './NewDesktopTaskTable'
 import MobileTaskView from './mobile/MobileTaskView'
 
 export default function TaskTable({
@@ -27,5 +28,5 @@ export default function TaskTable({
         return <MobileTaskView tasks={tasks} isAdmin={isAdmin} users={users} />
     }
 
-    return <DesktopTaskTable tasks={tasks} isAdmin={isAdmin} users={users} agencies={agencies} />
+    return <NewDesktopTaskTable tasks={tasks} isAdmin={isAdmin} users={users} agencies={agencies} />
 }

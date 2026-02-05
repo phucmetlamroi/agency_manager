@@ -11,6 +11,7 @@ import BottleneckAlert from '@/components/BottleneckAlert'
 import AutoRefresh from '@/components/AutoRefresh'
 import TaskCreationManager from '@/components/TaskCreationManager'
 import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
+import { KPIStats } from '@/components/dashboard/KPIStats'
 
 export default async function AdminDashboard() {
     const session = await getSession()
@@ -48,29 +49,27 @@ export default async function AdminDashboard() {
     const assignedTasks = tasks.filter(t => t.assigneeId)
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '2rem', alignItems: 'start' }}>
+        <div className="space-y-8">
             <AutoRefresh />
 
+            <div className="flex flex-col gap-2 mb-8">
+                <h1 className="text-3xl font-bold tracking-tight text-white title-gradient">Dashboard</h1>
+                <p className="text-muted-foreground">Welcome back, {currentUser?.username}. Here's what's happening today.</p>
+            </div>
 
-            {/* Create Task Form Area */}
-            <TaskCreationManager users={users} />
+            {/* KPI Section */}
+            <KPIStats tasks={tasks} />
 
-            {/* Task Lists */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
-                {/* Bottleneck Alert */}
-                <BottleneckAlert tasks={tasks as any} />
-
-
-                {/* Task Lists */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-
+                {/* Left Column: Task Workflow (3/4 width) */}
+                <div className="xl:col-span-3 space-y-6">
                     {/* Bottleneck Alert */}
                     <BottleneckAlert tasks={tasks as any} />
 
-                    {/* WORKFLOW TABS (Replaces old Active Tasks list) */}
-                    <div>
-                        <h3 style={{ marginBottom: '1rem', color: '#ccc' }}>🔥 Tiến Độ Công Việc</h3>
+                    {/* Tabs */}
+                    <div className="glass-panel p-6 min-h-[500px]">
                         <TaskWorkflowTabs
                             tasks={assignedTasks.concat(unassignedTasks) as any}
                             users={users}
@@ -79,8 +78,38 @@ export default async function AdminDashboard() {
                         />
                     </div>
                 </div>
-            </div>
 
+                {/* Right Column: Quick Actions & Forms (1/4 width) */}
+                <div className="space-y-6">
+                    {/* Quick Create Task */}
+                    <div className="glass-panel p-4">
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="text-xl">⚡</span>
+                            <h3 className="font-bold text-white">Quick Create</h3>
+                        </div>
+                        <TaskCreationManager users={users} />
+                    </div>
+
+                    {/* Pending Queue Summary */}
+                    <div className="glass-panel p-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-white">Queue</h3>
+                            <span className="text-xs bg-zinc-800 px-2 py-1 rounded text-gray-400">{unassignedTasks.length} pending</span>
+                        </div>
+                        {unassignedTasks.slice(0, 5).map(t => (
+                            <div key={t.id} className="mb-2 p-2 bg-zinc-900/50 rounded border border-white/5 text-sm">
+                                <div className="font-medium text-indigo-400 truncate">{t.title}</div>
+                                <div className="text-xs text-gray-500">{t.client?.name || 'No Client'}</div>
+                            </div>
+                        ))}
+                        {unassignedTasks.length > 5 && (
+                            <div className="text-center mt-2 text-xs text-indigo-500 cursor-pointer">
+                                View all in Queue
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }

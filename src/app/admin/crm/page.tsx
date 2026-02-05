@@ -1,5 +1,5 @@
 import { getClients, getTopClients } from '@/actions/crm-actions'
-import ClientList from '@/components/crm/ClientList'
+import CRMClientList from '@/components/crm/CRMClientList'
 import CreateClientButton from '@/components/crm/CreateClientButton'
 import UpdateScoresButton from '@/components/crm/UpdateScoresButton'
 
@@ -33,7 +33,7 @@ export default async function CRMDashboard() {
                             <CreateClientButton partners={typedClients} />
                         </div>
 
-                        <ClientList clients={clients} />
+                        <CRMClientList clients={clients} />
                     </section>
                 </div>
 

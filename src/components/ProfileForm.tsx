@@ -1,21 +1,32 @@
-'use client'
+"use client"
 
 import { useState } from 'react'
 import { updateProfile, changePassword } from '@/actions/profile-actions'
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 
 export default function ProfileForm({ user }: { user: any }) {
     const [isLoading, setIsLoading] = useState(false)
-    const [message, setMessage] = useState('')
 
     // Pass states
     const [currentPass, setCurrentPass] = useState('')
     const [newPass, setNewPass] = useState('')
     const [confirmPass, setConfirmPass] = useState('')
+    const [passLoading, setPassLoading] = useState(false)
 
     async function handleUpdateInfo(formData: FormData) {
         setIsLoading(true)
-        setMessage('')
-
         const data = {
             nickname: formData.get('nickname') as string,
             email: formData.get('email') as string,
@@ -26,33 +37,32 @@ export default function ProfileForm({ user }: { user: any }) {
         setIsLoading(false)
 
         if (res.error) {
-            setMessage('❌ ' + res.error)
+            toast.error(res.error)
         } else {
-            setMessage('✅ Cập nhật thông tin thành công!')
+            toast.success('Cập nhật thông tin thành công!')
         }
     }
 
     async function handleChangePass(e: React.FormEvent) {
         e.preventDefault()
         if (newPass !== confirmPass) {
-            setMessage('❌ Mật khẩu mới không khớp')
+            toast.error('Mật khẩu mới không khớp')
             return
         }
         if (newPass.length < 6) {
-            setMessage('❌ Mật khẩu phải từ 6 ký tự')
+            toast.error('Mật khẩu phải từ 6 ký tự')
             return
         }
 
-        setIsLoading(true)
-        setMessage('')
+        setPassLoading(true)
 
         const res = await changePassword(user.id, currentPass, newPass)
-        setIsLoading(false)
+        setPassLoading(false)
 
         if (res.error) {
-            setMessage('❌ ' + res.error)
+            toast.error(res.error)
         } else {
-            setMessage('✅ Đổi mật khẩu thành công!')
+            toast.success('Đổi mật khẩu thành công!')
             setCurrentPass('')
             setNewPass('')
             setConfirmPass('')
@@ -60,110 +70,111 @@ export default function ProfileForm({ user }: { user: any }) {
     }
 
     return (
-        <div className="space-y-8">
-            {message && (
-                <div className={`p-4 rounded-lg ${message.startsWith('✅') ? 'bg-green-900/50 text-green-200' : 'bg-red-900/50 text-red-200'}`}>
-                    {message}
-                </div>
-            )}
+        <div className="space-y-6">
+            <Card className="bg-[#1a1a1a] border-[#333]">
+                <CardHeader>
+                    <CardTitle className="text-white">Thông tin cá nhân</CardTitle>
+                    <CardDescription>Quản lý thông tin hiển thị và liên hệ của bạn.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form action={handleUpdateInfo} id="profile-form">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="username" className="text-gray-400">Username</Label>
+                                <Input id="username" value={user.username} disabled className="bg-gray-800/50 border-gray-700 text-gray-500" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="nickname" className="text-white">Nickname (Hiển thị)</Label>
+                                <Input
+                                    id="nickname"
+                                    name="nickname"
+                                    defaultValue={user.nickname || ''}
+                                    className="bg-[#2a2a2a] border-gray-700 text-white focus:ring-purple-500"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="email" className="text-white">Email</Label>
+                                <Input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    defaultValue={user.email || ''}
+                                    className="bg-[#2a2a2a] border-gray-700 text-white focus:ring-purple-500"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="phoneNumber" className="text-white">Số điện thoại</Label>
+                                <Input
+                                    id="phoneNumber"
+                                    name="phoneNumber"
+                                    type="tel"
+                                    defaultValue={user.phoneNumber || ''}
+                                    className="bg-[#2a2a2a] border-gray-700 text-white focus:ring-purple-500"
+                                />
+                            </div>
+                        </div>
+                    </form>
+                </CardContent>
+                <CardFooter className="flex justify-end">
+                    <Button type="submit" form="profile-form" disabled={isLoading} className="bg-purple-600 hover:bg-purple-500">
+                        {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Lưu thay đổi
+                    </Button>
+                </CardFooter>
+            </Card>
 
-            {/* General Info Form */}
-            <form action={handleUpdateInfo} className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm text-gray-400 mb-1">Username (Đăng nhập)</label>
-                        <input
-                            type="text"
-                            value={user.username}
-                            disabled
-                            className="w-full bg-gray-800/50 border border-gray-700 rounded p-2 text-gray-500 cursor-not-allowed"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Không thể thay đổi tên đăng nhập</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm text-gray-400 mb-1">Nickname (Tên hiển thị)</label>
-                        <input
-                            name="nickname"
-                            type="text"
-                            defaultValue={user.nickname || ''}
-                            placeholder="Ví dụ: Editor Pro"
-                            className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 focus:border-purple-500 focus:outline-none"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm text-gray-400 mb-1">Email (Nhận thông báo)</label>
-                        <input
-                            name="email"
-                            type="email"
-                            defaultValue={user.email || ''}
-                            placeholder="email@example.com"
-                            className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 focus:border-purple-500 focus:outline-none"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm text-gray-400 mb-1">Số điện thoại</label>
-                        <input
-                            name="phoneNumber"
-                            type="tel"
-                            defaultValue={user.phoneNumber || ''}
-                            placeholder="0912..."
-                            className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 focus:border-purple-500 focus:outline-none"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex justify-end">
-                    <button
-                        disabled={isLoading}
+            <Card className="bg-[#1a1a1a] border-[#333]">
+                <CardHeader>
+                    <CardTitle className="text-white">Đổi mật khẩu</CardTitle>
+                    <CardDescription>Cập nhật mật khẩu định kỳ để bảo vệ tài khoản.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleChangePass} id="password-form" className="max-w-md space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="currentPass" className="text-white">Mật khẩu hiện tại</Label>
+                            <Input
+                                id="currentPass"
+                                type="password"
+                                value={currentPass}
+                                onChange={(e) => setCurrentPass(e.target.value)}
+                                className="bg-[#2a2a2a] border-gray-700 text-white"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="newPass" className="text-white">Mật khẩu mới</Label>
+                            <Input
+                                id="newPass"
+                                type="password"
+                                value={newPass}
+                                onChange={(e) => setNewPass(e.target.value)}
+                                className="bg-[#2a2a2a] border-gray-700 text-white"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="confirmPass" className="text-white">Nhập lại mật khẩu mới</Label>
+                            <Input
+                                id="confirmPass"
+                                type="password"
+                                value={confirmPass}
+                                onChange={(e) => setConfirmPass(e.target.value)}
+                                className="bg-[#2a2a2a] border-gray-700 text-white"
+                            />
+                        </div>
+                    </form>
+                </CardContent>
+                <CardFooter className="flex justify-end">
+                    <Button
                         type="submit"
-                        className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50"
+                        form="password-form"
+                        disabled={passLoading || !currentPass || !newPass}
+                        variant="secondary"
+                        className="bg-gray-800 text-white hover:bg-gray-700"
                     >
-                        {isLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
-                    </button>
-                </div>
-            </form>
-
-            <div className="border-t border-gray-700 pt-6">
-                <h3 className="text-lg font-semibold text-purple-300 mb-4">Đổi mật khẩu</h3>
-                <form onSubmit={handleChangePass} className="space-y-4 max-w-md">
-                    <div>
-                        <input
-                            type="password"
-                            placeholder="Mật khẩu hiện tại"
-                            value={currentPass}
-                            onChange={(e) => setCurrentPass(e.target.value)}
-                            className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2"
-                        />
-                    </div>
-                    <div>
-                        <input
-                            type="password"
-                            placeholder="Mật khẩu mới (Min 6 ký tự)"
-                            value={newPass}
-                            onChange={(e) => setNewPass(e.target.value)}
-                            className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2"
-                        />
-                    </div>
-                    <div>
-                        <input
-                            type="password"
-                            placeholder="Nhập lại mật khẩu mới"
-                            value={confirmPass}
-                            onChange={(e) => setConfirmPass(e.target.value)}
-                            className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2"
-                        />
-                    </div>
-                    <button
-                        disabled={isLoading || !currentPass || !newPass}
-                        className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50 w-full md:w-auto"
-                    >
+                        {passLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         Đổi mật khẩu
-                    </button>
-                </form>
-            </div>
+                    </Button>
+                </CardFooter>
+            </Card>
         </div>
     )
 }

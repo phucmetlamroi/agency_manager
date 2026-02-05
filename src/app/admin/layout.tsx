@@ -7,6 +7,7 @@ import { decrypt } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import RoleWatcher from '@/components/RoleWatcher'
 import NotificationBell from '@/components/NotificationBell'
+import { AdminShell } from '@/components/layout/AdminShell'
 
 export default async function AdminLayout({
     children,
@@ -37,75 +38,9 @@ export default async function AdminLayout({
     }
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <AdminShell user={user}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
-            <header className="glass-panel" style={{
-                height: 'var(--header-height)',
-                display: 'flex',
-                alignItems: 'center',
-                padding: '0 2rem',
-                margin: '1rem',
-                justifyContent: 'space-between'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                    <h2 className="title-gradient" style={{ fontSize: '1.5rem' }}>Admin Portal</h2>
-                    <nav style={{ display: 'flex', gap: '1rem' }}>
-                        <Link href="/admin" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Dashboard</Link>
-                        <Link href="/admin/crm" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Khách hàng</Link>
-                        <Link href="/admin/queue" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Kho Task</Link>
-                        <Link href="/admin/payroll" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Bảng Lương</Link>
-
-                        {/* Only Super Admin or Treasurer can see Finance */}
-                        {(user.username === 'admin' || user.isTreasurer) && (
-                            <Link href="/admin/finance" className="btn" style={{ color: '#f59e0b', background: 'transparent' }}>Tài Chính</Link>
-                        )}
-
-                        <Link href="/admin/users" className="btn" style={{ color: '#ccc', background: 'transparent' }}>Nhân sự</Link>
-                        <Link href="/admin/agencies" className="btn" style={{ color: '#ec4899', background: 'transparent' }}>Đại lý</Link>
-                    </nav>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <NotificationBell />
-
-                    <div style={{
-                        fontSize: '0.9rem', color: '#ccc',
-                        borderRight: '1px solid #444', paddingRight: '1rem',
-                        display: 'flex', alignItems: 'center', gap: '0.5rem'
-                    }}>
-                        <div style={{ marginRight: '0.5rem', textAlign: 'right' }}>
-                            <div style={{ fontSize: '0.8rem', color: '#888' }}>Uy tín</div>
-                            <div style={{
-                                fontWeight: 'bold',
-                                color: (user.reputation || 100) >= 90 ? '#a855f7' : (user.reputation || 100) < 50 ? '#eab308' : '#fff'
-                            }}>
-                                {user.reputation ?? 100}đ
-                            </div>
-                        </div>
-                        <span style={{ fontSize: '1.2rem' }}>👤</span>
-                        <span>{user.username}</span>
-                        {/* Gold Badge for Treasurer */}
-                        {user.isTreasurer && (
-                            <span title="Thủ Quỹ (Treasurer)" style={{ cursor: 'help' }}>🥇</span>
-                        )}
-                        <span style={{ fontSize: '0.7rem', background: '#6d28d9', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>Admin</span>
-                    </div>
-
-                    <form action={async () => {
-                        'use server'
-                        await logout()
-                        redirect('/login')
-                    }}>
-                        <button type="submit" className="btn" style={{ border: '1px solid var(--error)', color: 'var(--error)' }}>
-                            Đăng xuất
-                        </button>
-                    </form>
-                </div>
-            </header>
-
-            <main style={{ flex: 1, padding: '0 1rem 1rem 1rem' }}>
-                {children}
-            </main>
-        </div>
+            {children}
+        </AdminShell>
     )
 }

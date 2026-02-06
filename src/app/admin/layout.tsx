@@ -2,7 +2,7 @@ import { logout } from '@/lib/auth'
 import Link from 'next/link'
 // Removed duplicate globals.css import
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { decrypt } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import RoleWatcher from '@/components/RoleWatcher'
@@ -35,6 +35,26 @@ export default async function AdminLayout({
 
     if (user.role !== 'ADMIN') {
         redirect('/dashboard')
+    }
+
+    const headersList = await headers()
+    const deviceType = headersList.get('x-device-type') || 'desktop'
+    const isMobile = deviceType === 'mobile'
+
+    const handleLogout = async () => {
+        'use server'
+        await logout()
+        redirect('/login')
+    }
+
+    if (isMobile) {
+        const { default: MobileLayoutShell } = await import('@/components/layout/MobileLayoutShell')
+        return (
+            <MobileLayoutShell user={user} handleLogout={handleLogout}>
+                <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
+                {children}
+            </MobileLayoutShell>
+        )
     }
 
     return (

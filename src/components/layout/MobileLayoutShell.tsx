@@ -19,7 +19,7 @@ export default function MobileLayoutShell({
     // User requested "Slim Header" with "Left: Logo/PageName" and "Right: Avatar -> Drawer"
 
     return (
-        <div className="flex min-h-screen bg-[#111111] text-white flex-col overflow-x-hidden">
+        <div className="flex min-h-dvh bg-[#111111] text-white flex-col overflow-x-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* SLIM HEADER */}
             <header className="flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-white/10">
                 <div className="flex items-center gap-2">

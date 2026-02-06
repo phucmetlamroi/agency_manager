@@ -2,7 +2,7 @@
 import { logout } from '@/lib/auth'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { decrypt } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import RoleWatcher from '@/components/RoleWatcher'
@@ -34,10 +34,28 @@ export default async function UserLayout({
         redirect('/api/auth/logout')
     }
 
-    if (user.role === 'ADMIN') {
-        redirect('/admin')
+    const headersList = await headers()
+    const deviceType = headersList.get('x-device-type') || 'desktop'
+    const isMobile = deviceType === 'mobile'
+
+    const handleLogout = async () => {
+        'use server'
+        await logout()
+        redirect('/login') // This redirect happens on server
     }
 
+    /* --- MOBILE LAYOUT --- */
+    if (isMobile) {
+        const { default: MobileLayoutShell } = await import('@/components/layout/MobileLayoutShell')
+        return (
+            <MobileLayoutShell user={user} handleLogout={handleLogout}>
+                <RoleWatcher currentRole={user.role} isTreasurer={user.isTreasurer ?? false} />
+                {children}
+            </MobileLayoutShell>
+        )
+    }
+
+    /* --- DESKTOP LAYOUT (Top Navigation) --- */
     const displayName = user.nickname || user.username
 
     return (
@@ -102,11 +120,7 @@ export default async function UserLayout({
                         </span>
                     </Link>
 
-                    <form action={async () => {
-                        'use server'
-                        await logout()
-                        redirect('/login')
-                    }}>
+                    <form action={handleLogout}>
                         <button style={{
                             color: '#f87171',
                             background: 'transparent',
@@ -128,7 +142,7 @@ export default async function UserLayout({
                 {children}
             </main>
 
-            {/* --- BOTTOM NAV (Mobile Only) --- */}
+            {/* --- BOTTOM NAV (Mobile Only - Fallback if not Shell) --- */}
             <BottomNav role={user.role || 'USER'} />
         </div>
     )

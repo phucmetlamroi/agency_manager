@@ -3,15 +3,46 @@ import type { NextRequest } from 'next/server'
 import { decrypt } from '@/lib/auth'
 
 export async function middleware(request: NextRequest) {
+    const response = NextResponse.next()
+
+    // --- DEVICE DETECTION LOGIC ---
+    const url = request.nextUrl
+
+    // Skip static files/api for detection optimization (already in matcher but good safety)
+    if (!url.pathname.startsWith('/api') && !url.pathname.startsWith('/_next')) {
+        let deviceType = 'desktop'
+
+        // 1. Check Cookie Override
+        const viewModeCookie = request.cookies.get('view-mode')
+
+        if (viewModeCookie?.value === 'desktop') {
+            deviceType = 'desktop'
+        } else if (viewModeCookie?.value === 'mobile') {
+            deviceType = 'mobile'
+        } else {
+            // 2. Check User-Agent
+            const userAgent = request.headers.get('user-agent') || ''
+            // Expanded Mobile Regex
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+            deviceType = isMobile ? 'mobile' : 'desktop'
+        }
+
+        // 3. Set Headers
+        response.headers.set('x-device-type', deviceType)
+        response.headers.set('Vary', 'User-Agent')
+    }
+    // -----------------------------
+
     const sessionCookie = request.cookies.get('session')
 
     // 1. Check if session exists
     if (!sessionCookie) {
         // If trying to access protected routes, redirect to login
-        if (request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname.startsWith('/dashboard')) {
+        if (request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname.startsWith('/dashboard') || request.nextUrl.pathname.startsWith('/agency')) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
-        return NextResponse.next()
+        // Return the response with device headers
+        return response
     }
 
     // 2. Validate session
@@ -19,30 +50,28 @@ export async function middleware(request: NextRequest) {
         const session = await decrypt(sessionCookie.value)
         const { role } = session.user
 
-        // 3. Role-based protection - DELEGATED TO LAYOUTS
-        // We do NOT check roles here because cookies can be stale. 
-        // Layouts will check fresh DB data and redirect if needed.
-
         // Redirect logged in user away from login page
         if (request.nextUrl.pathname === '/login') {
             if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin', request.url))
+            if (role === 'AGENCY_ADMIN') return NextResponse.redirect(new URL('/agency', request.url))
             return NextResponse.redirect(new URL('/dashboard', request.url))
         }
 
-        return NextResponse.next()
+        return response
 
     } catch (error) {
         // Session invalid
-        // If already on login, don't redirect, just let them see the page (and maybe clear cookie in response)
         if (request.nextUrl.pathname === '/login') {
-            const response = NextResponse.next()
-            response.cookies.delete('session')
-            return response
+            const logoutResponse = NextResponse.next()
+            logoutResponse.cookies.delete('session')
+            // Preserve device headers
+            logoutResponse.headers.set('x-device-type', response.headers.get('x-device-type') || 'desktop')
+            return logoutResponse
         }
 
-        const response = NextResponse.redirect(new URL('/login', request.url))
-        response.cookies.delete('session')
-        return response
+        const redirectResponse = NextResponse.redirect(new URL('/login', request.url))
+        redirectResponse.cookies.delete('session')
+        return redirectResponse
     }
 }
 

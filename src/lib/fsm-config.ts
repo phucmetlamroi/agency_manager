@@ -69,7 +69,7 @@ export const TRANSITIONS: Record<TaskEvent, TransitionRule> = {
         requiredRole: ['USER']
     },
     finish: {
-        from: [TaskState.REVIEW, TaskState.IN_PROGRESS, TaskState.FIXING_FRAME], // Can finish directly? Yes.
+        from: [TaskState.REVIEW, TaskState.IN_PROGRESS, TaskState.FIXING_FRAME, TaskState.REVISION], // Allow Revision -> Done
         to: TaskState.COMPLETED,
         requiredRole: ['ADMIN', 'SYSTEM'] // System auto-finish if configured? Usually Admin.
     },

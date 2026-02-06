@@ -49,7 +49,11 @@ export function StatusCell({ task, isAdmin }: StatusCellProps) {
         }
 
         try {
-            await updateTaskStatus(task.id, newStatus, undefined, undefined, task.version)
+            const result = await updateTaskStatus(task.id, newStatus, undefined, undefined, task.version)
+            if (result.error) {
+                toast.error(result.error)
+                return
+            }
             toast.success(`Status updated to ${newStatus}`)
             // window.location.reload() // Optimistic UI preferred, but reload ensures consistency
         } catch (error) {
@@ -59,7 +63,11 @@ export function StatusCell({ task, isAdmin }: StatusCellProps) {
 
     const submitFeedback = async () => {
         try {
-            await updateTaskStatus(task.id, 'Revision', undefined, feedback)
+            const result = await updateTaskStatus(task.id, 'Revision', undefined, feedback)
+            if (result.error) {
+                toast.error(result.error)
+                return
+            }
             setIsFeedbackOpen(false)
             setFeedback({ type: 'INTERNAL', content: '' })
             toast.success("Sent revision feedback")

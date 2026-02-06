@@ -5,6 +5,7 @@ import TaskTable from '@/components/TaskTable'
 import { isMobileDevice } from '@/lib/device'
 import DraggableFocusWidget from '@/components/DraggableFocusWidget'
 import { serializeDecimal } from '@/lib/serialization'
+import { UserRole } from '@prisma/client'
 
 export default async function UserDashboard() {
     const session = await getSession()
@@ -32,12 +33,12 @@ export default async function UserDashboard() {
 
     // Redirect Agency Admin (Owner) to Agency Portal
     // Check if they own an agency OR have the explicit role
-    if (userWithBonus?.ownedAgency && userWithBonus.ownedAgency.length > 0 || userWithBonus?.role === 'AGENCY_ADMIN') {
+    if (userWithBonus?.ownedAgency && userWithBonus.ownedAgency.length > 0 || (userWithBonus?.role as UserRole) === UserRole.AGENCY_ADMIN) {
         redirect('/agency')
     }
 
     // Redirect Agency Admin to Agency Portal
-    if (userWithBonus?.role === 'AGENCY_ADMIN') {
+    if ((userWithBonus?.role as UserRole) === UserRole.AGENCY_ADMIN) {
         redirect('/agency')
     }
 

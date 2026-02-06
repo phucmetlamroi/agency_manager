@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { calculateRiskLevel, getRiskColor, getRiskLabel } from '@/lib/risk-utils'
+import { validateTransition } from '@/lib/fsm-config'
 
 // ... existing imports
 import { deleteTask, assignTask } from '@/actions/task-management-actions'
@@ -176,12 +177,20 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
         }
     }
 
-    // Filter options based on role
-    const getStatusOptions = () => {
+    // Filter options based on role and FSM
+    const getStatusOptions = (currentStatus: string) => {
+        const allOptions = ["Đã nhận task", "Đang thực hiện", "Revision", "Sửa frame", "Tạm ngưng", "Hoàn tất", "Đang đợi giao"]
+
         if (!isAdmin) {
+            // User limited view (Legacy logic maintained for safety, though FSM handles this too)
             return ["Đã nhận task", "Đang thực hiện"]
         }
-        return ["Đã nhận task", "Đang thực hiện", "Revision", "Sửa frame", "Tạm ngưng", "Hoàn tất"]
+
+        // Admin: Filter by FSM validity
+        return allOptions.filter(target => {
+            if (target === currentStatus) return true
+            return validateTransition(currentStatus, target).isValid
+        })
     }
 
     return (
@@ -395,7 +404,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                             }}
                                             onClick={(e) => e.stopPropagation()}
                                         >
-                                            {getStatusOptions().map(opt => (
+                                            {getStatusOptions(task.status).map(opt => (
                                                 <option key={opt} value={opt}>{opt}</option>
                                             ))}
                                         </select>

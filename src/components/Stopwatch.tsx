@@ -10,35 +10,57 @@ interface StopwatchProps {
 
 export default function Stopwatch({ accumulatedSeconds, timerStartedAt, status }: StopwatchProps) {
     const [displayTime, setDisplayTime] = useState(accumulatedSeconds)
+    const [clockOffset, setClockOffset] = useState(0)
     const workerRef = useRef<Worker | null>(null)
 
-    // Calculate time based on system clock (drif-proof)
+    // 1. Calculate Clock Offset (Sync with Server)
+    useEffect(() => {
+        const syncTime = async () => {
+            try {
+                const response = await fetch('/api/time')
+                const data = await response.json()
+                const serverTime = data.time
+                const clientTime = Date.now()
+                // Offset = Server - Client
+                // If Server is ahead (future), offset is positive.
+                // If Server is behind (past), offset is negative.
+                setClockOffset(serverTime - clientTime)
+            } catch (err) {
+                console.error("Failed to sync time:", err)
+            }
+        }
+        syncTime()
+
+        // 2. Visibility Handler (Force update on tab focus)
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                setDisplayTime(calculateTime())
+            }
+        }
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }, [])
+
+    // Calculate time based on system clock + offset
     const calculateTime = () => {
         let additional = 0
         if (status === 'RUNNING' && timerStartedAt) {
             const startStr = typeof timerStartedAt === 'string' ? timerStartedAt : timerStartedAt.toISOString()
             const start = new Date(startStr).getTime()
-            const now = new Date().getTime()
-            additional = Math.floor((now - start) / 1000)
+
+            // Corrected Now = ClientNow + Offset
+            const now = Date.now() + clockOffset
+
+            // Avoid negative values if offset isn't ready or drifts slightly
+            if (now > start) {
+                additional = Math.floor((now - start) / 1000)
+            }
         }
         return accumulatedSeconds + (additional > 0 ? additional : 0)
     }
 
     useEffect(() => {
         // Initialize Worker
-        // We use a Blob to create worker inline or load from file. 
-        // Next.js static file handling can be tricky for workers, so loading from public is common, 
-        // or using strict file path. 
-        // Since we wrote src/lib/TimerWorker.ts, we need to compile it or load it.
-        // Direct TS import of worker is non-standard in Next.js without config.
-        // FALLBACK: Use inline blob for simplicity/reliability in this environment if file loader fails.
-        // BUT we wrote the file. Let's try to assume a simple build setup. 
-        // Actually, just using the logic in main thread with Date.now() is robust.
-        // PROCEEDING WITH WORKER as requested.
-
-        // Dynamic import logic or simple polling?
-        // Let's use the Date.now() logic DRIVEN by the worker tick.
-
         workerRef.current = new Worker(new URL('../lib/TimerWorker.ts', import.meta.url))
 
         workerRef.current.onmessage = (e) => {
@@ -50,18 +72,55 @@ export default function Stopwatch({ accumulatedSeconds, timerStartedAt, status }
         return () => {
             workerRef.current?.terminate()
         }
-    }, [])
+    }, [clockOffset]) // Re-init if offset changes? No, just the calc function uses it.
+    // Actually, calculateTime is a closure if not defined via useCallback, so it captures old offset?
+    // 'calculateTime' uses 'clockOffset' state. 
+    // To ensure Worker TICK uses latest offset, we rely on React state updates flushing.
+    // However, if calculateTime is called inside onmessage, it uses the closure scope.
+    // We should make calculateTime a ref or just rely on setDisplayTime triggering re-render?
+    // Wait, onmessage calls calculateTime(). If calculateTime is stale, it uses old offset.
+    // Better Strategy: Use a Ref for Offset.
 
-    // Handle Status Changes
+    // FIX: Use Ref for Offset to ensure availability in closure
+    const offsetRef = useRef(0)
     useEffect(() => {
-        setDisplayTime(calculateTime()) // Immediate update
+        offsetRef.current = clockOffset
+    }, [clockOffset])
+
+    const calculateTimeRef = () => {
+        let additional = 0
+        if (status === 'RUNNING' && timerStartedAt) {
+            const startStr = typeof timerStartedAt === 'string' ? timerStartedAt : timerStartedAt.toISOString()
+            const start = new Date(startStr).getTime()
+            const now = Date.now() + offsetRef.current
+            if (now > start) {
+                additional = Math.floor((now - start) / 1000)
+            }
+        }
+        return accumulatedSeconds + (additional > 0 ? additional : 0)
+    }
+
+    // Update worker listener to use the Ref-based calculator
+    useEffect(() => {
+        if (!workerRef.current) return;
+        workerRef.current.onmessage = (e) => {
+            if (e.data.type === 'TICK') {
+                setDisplayTime(calculateTimeRef())
+            }
+        }
+    }, [status, timerStartedAt, accumulatedSeconds]) // Re-bind if props change? 
+    // Actually, simpler to just let the effect below handle start/stop
+
+    // Handle Status Changes & Init
+    useEffect(() => {
+        setDisplayTime(calculateTimeRef()) // Immediate update
 
         if (status === 'RUNNING') {
             workerRef.current?.postMessage({ action: 'START' })
         } else {
             workerRef.current?.postMessage({ action: 'STOP' })
         }
-    }, [status, timerStartedAt, accumulatedSeconds])
+    }, [status, timerStartedAt, accumulatedSeconds, clockOffset])
 
     const formatTime = (totalSeconds: number) => {
         const hours = Math.floor(totalSeconds / 3600)

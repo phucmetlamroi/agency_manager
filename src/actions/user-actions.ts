@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
+import { UserRole } from '@prisma/client'
 
 export async function changePassword(formData: FormData) {
     const session = await getSession()
@@ -44,7 +45,7 @@ export async function updateUserRole(userId: string, newRole: string) {
 
         await prisma.user.update({
             where: { id: userId },
-            data: { role: newRole }
+            data: { role: newRole as UserRole }
         })
         revalidatePath('/admin/users')
         return { success: true }

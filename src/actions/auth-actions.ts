@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { login } from '@/lib/auth'
 import * as bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
+import { UserRole } from '@prisma/client'
 
 export async function loginAction(prevState: any, formData: FormData) {
     const username = formData.get('username') as string
@@ -43,7 +44,7 @@ export async function loginAction(prevState: any, formData: FormData) {
 
     // Re-fetch or rely on the fact we just had 'user'
     const user = await prisma.user.findUnique({ where: { username } })
-    if (user?.role === 'ADMIN') {
+    if (user?.role === UserRole.ADMIN) {
         redirect('/admin')
     } else {
         redirect('/dashboard')

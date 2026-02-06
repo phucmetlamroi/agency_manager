@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { UserRole } from '@prisma/client'
 
 // Call this route via Cron Job (e.g. Vercel Cron) every hour
 export async function GET(request: Request) {
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
             if (newRep <= 0) {
                 await prisma.user.update({
                     where: { id: task.assignee.id },
-                    data: { role: 'BANNED' } // Or lock
+                    data: { role: UserRole.LOCKED } // Or lock
                 })
                 results.push(`User ${task.assignee.username} BANNED (Rep: ${newRep})`)
             } else {

@@ -17,7 +17,7 @@ model User {
 
   password  String
   plainPassword String? // For Admin visibility
-  role      String   @default("USER") // "ADMIN" or "USER"
+  role      UserRole   @default(USER)
   reputation Int     @default(100)
   isTreasurer Boolean @default(false) // Admin Role: Treasurer (Thủ quỹ)
   createdAt DateTime @default(now())
@@ -110,6 +110,8 @@ model Task {
   accumulatedSeconds Int       @default(0)
   timerStartedAt     DateTime?
   timerStatus        String    @default("PAUSED") // "RUNNING", "PAUSED", "STOPPED"
+  
+  schedules          UserSchedule[]
 }
 
 model Notification {
@@ -263,6 +265,9 @@ model UserSchedule {
   type      ScheduleType @default(BUSY)
   note      String?      // e.g., "Đi học", "Ngủ bù"
   
+  taskId    String?
+  task      Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -315,4 +320,12 @@ model FocusTask {
   updatedAt   DateTime @updatedAt
   
   @@index([userId])
+}
+
+
+enum UserRole {
+  ADMIN
+  USER
+  AGENCY_ADMIN
+  LOCKED
 }

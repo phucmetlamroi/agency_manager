@@ -2,12 +2,13 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { UserRole } from '@prisma/client'
 
 export async function updateUserRole(userId: string, newRole: string) {
     try {
         await prisma.user.update({
             where: { id: userId },
-            data: { role: newRole }
+            data: { role: newRole as UserRole }
         })
         revalidatePath('/admin/users')
         revalidatePath('/admin')
@@ -31,7 +32,7 @@ export async function updateUserReputation(userId: string, change: number) {
 
         let newRole = user.role
         if (newRep <= 0 && user.role !== 'ADMIN') {
-            newRole = 'LOCKED'
+            newRole = 'LOCKED' as UserRole
         }
 
         await prisma.user.update({

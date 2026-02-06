@@ -27,6 +27,9 @@ export type TaskEvent =
     | 'resume'          // Resume from pause
     | 'unassign'        // Admin removes user
     | 'penalize'        // System auto-penalizes (Overdue)
+    | 'admin_fix'       // Admin forces Revision
+    | 'revision_loop'   // Update Revision details
+    | 'back_to_work'    // Resume work from Revision
 
 interface TransitionRule {
     from: TaskState[]
@@ -89,6 +92,22 @@ export const TRANSITIONS: Record<TaskEvent, TransitionRule> = {
         from: [TaskState.ASSIGNED, TaskState.IN_PROGRESS, TaskState.REVIEW, TaskState.REVISION], // Any active state
         to: TaskState.PENDING, // Returns to pool
         requiredRole: ['SYSTEM']
+    },
+    // ALLOW ADMIN/USER FLEXIBILITY
+    admin_fix: {
+        from: [TaskState.IN_PROGRESS, TaskState.REVISION, TaskState.FIXING_FRAME],
+        to: TaskState.REVISION, // Allow jumping to Revision from anywhere
+        requiredRole: ['ADMIN']
+    },
+    revision_loop: {
+        from: [TaskState.REVISION],
+        to: TaskState.REVISION, // Allow updating Revision details
+        requiredRole: ['ADMIN']
+    },
+    back_to_work: {
+        from: [TaskState.REVISION],
+        to: TaskState.IN_PROGRESS, // Allow going back to work
+        requiredRole: ['ADMIN', 'USER']
     }
 }
 

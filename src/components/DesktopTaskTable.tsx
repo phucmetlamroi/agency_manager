@@ -382,10 +382,10 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                             value={task.status}
                                             onChange={(e) => {
                                                 const val = e.target.value
-                                                if (val === 'Revision') {
-                                                    setFeedbackModal({ isOpen: true, taskId: task.id })
-                                                    return
-                                                }
+                                                // if (val === 'Revision') {
+                                                //     setFeedbackModal({ isOpen: true, taskId: task.id })
+                                                //     return
+                                                // }
                                                 handleStatusChange(task.id, val)
                                             }}
                                             className="appearance-none text-center font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer"

@@ -66,12 +66,23 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
         const currentTimerStatus = task.timerStatus
         const nowTime = new Date()
 
-        // 1. RESET LOGIC (User Request)
+        // 1. RESET LOGIC (User Request) OR UNASSIGN (Admin)
         if (newStatus === 'Đã nhận task') {
             timerUpdate = {
                 timerStatus: 'STOPPED',
                 timerStartedAt: null, // Reset start time
                 accumulatedSeconds: 0 // Reset accumulated time
+            }
+        }
+        else if (newStatus === 'Đang đợi giao') {
+            // UNASSIGN LOGIC: Clear Assignee and Reset everything
+            timerUpdate = {
+                status: 'Đang đợi giao',
+                assigneeId: null,
+                acceptedAt: null,
+                timerStatus: 'STOPPED',
+                timerStartedAt: null,
+                accumulatedSeconds: 0
             }
         }
         // 2. STOP LOGIC

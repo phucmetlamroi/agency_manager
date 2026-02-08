@@ -117,7 +117,7 @@ export function StatusCell({ task, isAdmin }: StatusCellProps) {
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        {["Đã nhận task", "Đang thực hiện", "Revision", "Sửa frame", "Tạm ngưng", "Hoàn tất"].map(opt => (
+                        {["Đang đợi giao", "Đã nhận task", "Đang thực hiện", "Revision", "Sửa frame", "Tạm ngưng", "Hoàn tất"].map(opt => (
                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                         ))}
                     </SelectContent>

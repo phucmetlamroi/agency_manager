@@ -79,7 +79,6 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
             timerUpdate = {
                 status: 'Đang đợi giao',
                 assigneeId: null,
-                acceptedAt: null,
                 timerStatus: 'STOPPED',
                 timerStartedAt: null,
                 accumulatedSeconds: 0
@@ -338,8 +337,8 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
         revalidatePath('/admin/payroll')
 
         return { success: true, finalSeconds }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Update Task Status Error:', e)
-        return { error: 'Failed' }
+        return { error: e.message || 'Failed' }
     }
 }

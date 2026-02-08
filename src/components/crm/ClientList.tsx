@@ -2,9 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { deleteClient } from '@/actions/crm-actions'
+import { deleteClient, updateClient } from '@/actions/crm-actions'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 
 type Project = {
     id: number
@@ -29,24 +33,66 @@ type Client = {
 }
 
 export default function ClientList({ clients }: { clients: Client[] }) {
+    const [editingClient, setEditingClient] = useState<Client | null>(null)
+    const [newName, setNewName] = useState('')
+
+    const handleEditClick = (client: Client) => {
+        setEditingClient(client)
+        setNewName(client.name)
+    }
+
+    const handleUpdate = async () => {
+        if (!editingClient) return
+        if (!newName.trim()) {
+            toast.error('Tên không được để trống')
+            return
+        }
+
+        const res = await updateClient(editingClient.id, { name: newName })
+        if (res.success) {
+            toast.success('Đã cập nhật tên khách hàng')
+            setEditingClient(null)
+        } else {
+            toast.error(res.error)
+        }
+    }
+
     return (
         <div className="space-y-4">
             {clients.length === 0 && (
                 <div className="text-center py-8 text-gray-500">Chưa có dữ liệu khách hàng.</div>
             )}
 
-            {clients.map(client => renderClient(client, 0))}
+            {clients.map(client => (
+                <ClientItem key={client.id} client={client} onEdit={handleEditClick} />
+            ))}
+
+            <Dialog open={!!editingClient} onOpenChange={(open) => !open && setEditingClient(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Đổi tên khách hàng</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Tên mới</Label>
+                            <Input
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                placeholder="Nhập tên khách hàng..."
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingClient(null)}>Hủy</Button>
+                        <Button onClick={handleUpdate}>Lưu thay đổi</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
 
-function renderClient(client: Client, level: number) {
-    return (
-        <ClientItem key={client.id} client={client} />
-    )
-}
-
-function ClientItem({ client }: { client: Client }) {
+function ClientItem({ client, onEdit }: { client: Client, onEdit: (c: Client) => void }) {
     const { confirm } = useConfirm()
     const [isExpanded, setIsExpanded] = useState(false)
 
@@ -75,9 +121,6 @@ function ClientItem({ client }: { client: Client }) {
         return 'text-red-400'
     }
 
-    // Calculate total videos (direct + sub-brands) for display if needed? 
-    // For now, let's show direct tasks count or maybe all?
-    // User requested "show ra ngoài luôn".
     const taskCount = client.tasks?.length || 0
 
     return (
@@ -91,12 +134,19 @@ function ClientItem({ client }: { client: Client }) {
                     <div>
                         <div className="font-semibold text-white flex items-center gap-2">
                             {client.name}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onEdit(client) }}
+                                className="text-gray-400 hover:text-white transition-colors"
+                                title="Sửa tên"
+                            >
+                                ✏️
+                            </button>
                             <Link
                                 href={`/admin/crm/${client.id}`}
                                 onClick={(e) => e.stopPropagation()} // Prevent expand
                                 className="text-xs bg-purple-600/30 text-purple-400 px-2 py-0.5 rounded hover:bg-purple-600 hover:text-white transition-colors border border-purple-500/50"
                             >
-                                ↗ Xem chi tiết
+                                ↗ Chi tiết
                             </Link>
                             <button
                                 onClick={handleDelete}
@@ -154,7 +204,7 @@ function ClientItem({ client }: { client: Client }) {
                             <div className="text-xs text-blue-400 font-bold uppercase mb-2">Brands / Subsidiaries</div>
                             <div className="space-y-2">
                                 {client.subsidiaries.map(sub => (
-                                    <ClientItem key={sub.id} client={sub} />
+                                    <ClientItem key={sub.id} client={sub} onEdit={onEdit} />
                                 ))}
                             </div>
                         </div>

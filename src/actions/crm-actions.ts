@@ -63,6 +63,19 @@ export async function createClient(data: { name: string, parentId?: number }) {
     }
 }
 
+export async function updateClient(id: number, data: { name: string }) {
+    try {
+        await prisma.client.update({
+            where: { id },
+            data: { name: data.name }
+        })
+        revalidatePath('/admin/crm')
+        return { success: true }
+    } catch (error) {
+        return { success: false, error: 'Failed to update client' }
+    }
+}
+
 // --- PROJECT ACTIONS ---
 
 export async function createProject(data: { name: string, clientId: number, code?: string }) {

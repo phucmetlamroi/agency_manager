@@ -52,7 +52,7 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
         }
 
         // Logic: Clear deadline if 'Tạm ngưng'. Revision shouldn't clear deadline unless explicitly asked.
-        const restrictedStatuses = ['Tạm ngưng']
+        const restrictedStatuses = ['Tạm ngưng', 'Revision']
         // Existing Deadline clear logic
         const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}
 

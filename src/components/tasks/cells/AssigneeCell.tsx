@@ -93,7 +93,8 @@ export function AssigneeCell({ task, users, agencies, isAdmin }: AssigneeCellPro
                 <SelectValue placeholder="Select assignee" />
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value="unassigned">-- Unassigned --</SelectItem>
+                <SelectItem value="sys:revoke" className="text-red-500 font-bold">⛔ Thu hồi về System</SelectItem>
+                <SelectItem value="unassigned">-- Hủy giao (Unassign User) --</SelectItem>
 
                 {agencies && agencies.length > 0 && (
                     <SelectGroup>

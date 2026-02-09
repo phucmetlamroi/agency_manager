@@ -300,7 +300,8 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                                     }}
                                                     className="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-blue-500 max-w-[120px]"
                                                 >
-                                                    <option value="" className="text-gray-500">-- Assign --</option>
+                                                    <option value="sys:revoke" className="text-red-500 font-bold">⛔ Thu hồi về System</option>
+                                                    <option value="" className="text-gray-500">-- Hủy giao (Unassign User) --</option>
                                                     {agencies && agencies.length > 0 && (
                                                         <optgroup label="Đại Lý (Agencies)">
                                                             {agencies.map(a => (

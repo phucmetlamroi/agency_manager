@@ -94,10 +94,11 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
             newAccumulated += elapsed
         }
 
-        if (!assignmentId) {
-            // CASE: UNASSIGN (Hủy giao)
+        if (!assignmentId || assignmentId === 'unassigned') {
+            // CASE: UNASSIGN MEMBER (Hủy giao User, giữ lại Agency)
             updateData = {
                 assigneeId: null,
+                // assignedAgencyId: NO CHANGE (Keep it with the agency)
                 status: 'Đang đợi giao',
                 isPenalized: false,
                 deadline: null,
@@ -105,7 +106,19 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                 timerStartedAt: null,
                 accumulatedSeconds: newAccumulated
             }
-            if (user.isSuperAdmin) updateData.assignedAgencyId = null;
+        }
+        else if (assignmentId === 'sys:revoke') {
+            // CASE: REVOKE TO SYSTEM (Thu hồi hoàn toàn)
+            updateData = {
+                assigneeId: null,
+                assignedAgencyId: null,
+                status: 'Đang đợi giao',
+                isPenalized: false,
+                deadline: null,
+                timerStatus: 'PAUSED',
+                timerStartedAt: null,
+                accumulatedSeconds: newAccumulated
+            }
         }
         else if (assignmentId.startsWith('agency:')) {
             // CASE: ASSIGN TO AGENCY

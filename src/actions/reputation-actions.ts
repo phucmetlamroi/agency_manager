@@ -66,6 +66,7 @@ export async function checkOverdueTasks() {
                         assigneeId: null, // Kick user
                         assignedAgencyId: null, // FIX: Also remove from agency pool
                         status: 'Đang đợi giao',
+                        notes: (task.notes || '') + `\n[System] Thu hồi do quá hạn (Deadline: ${task.deadline?.toLocaleString('vi-VN')})`,
                         deadline: null // Reset deadline so it's fresh for next assignee
                     }
                 }),

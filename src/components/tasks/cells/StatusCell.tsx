@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { TaskWithUser } from "@/types/admin"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -39,6 +40,8 @@ interface StatusCellProps {
 }
 
 export function StatusCell({ task, isAdmin }: StatusCellProps) {
+
+    const router = useRouter()
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
     const [feedback, setFeedback] = useState({ type: 'INTERNAL' as 'INTERNAL' | 'CLIENT', content: '' })
 
@@ -55,7 +58,7 @@ export function StatusCell({ task, isAdmin }: StatusCellProps) {
                 return
             }
             toast.success(`Status updated to ${newStatus}`)
-            // window.location.reload() // Optimistic UI preferred, but reload ensures consistency
+            router.refresh()
         } catch (error) {
             toast.error("Failed to update status")
         }
@@ -71,7 +74,7 @@ export function StatusCell({ task, isAdmin }: StatusCellProps) {
             setIsFeedbackOpen(false)
             setFeedback({ type: 'INTERNAL', content: '' })
             toast.success("Sent revision feedback")
-            window.location.reload()
+            router.refresh()
         } catch (error) {
             toast.error("Failed to submit feedback")
         }

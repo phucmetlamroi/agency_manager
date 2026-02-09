@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { TaskWithUser } from "@/types/admin"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -26,6 +27,7 @@ interface AssigneeCellProps {
 }
 
 export function AssigneeCell({ task, users, agencies, isAdmin }: AssigneeCellProps) {
+    const router = useRouter()
     const { confirm } = useConfirm()
 
     // Current Value Logic
@@ -52,7 +54,7 @@ export function AssigneeCell({ task, users, agencies, isAdmin }: AssigneeCellPro
         if (assignRes?.success) {
             toast.success("Assignment updated")
             // In a real app we might want to optimistically update or revalidate
-            window.location.reload()
+            router.refresh()
         } else {
             toast.error("Failed to assign task")
         }

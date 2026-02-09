@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { calculateRiskLevel, getRiskColor, getRiskLabel } from '@/lib/risk-utils'
 import { validateTransition } from '@/lib/fsm-config'
 
@@ -41,6 +42,7 @@ const statusBg: Record<string, string> = {
 }
 
 export default function TaskTable({ tasks, isAdmin = false, users = [], agencies = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[], agencies?: { id: string, name: string, code: string }[] }) {
+    const router = useRouter()
     const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
 
@@ -294,7 +296,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                                             }
                                                         }
                                                         const resAssign = await assignTask(task.id, val || null)
-                                                        if (resAssign?.success) window.location.reload()
+                                                        if (resAssign?.success) router.refresh()
                                                     }}
                                                     className="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-blue-500 max-w-[120px]"
                                                 >

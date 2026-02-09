@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format, addDays, startOfWeek, getHours, setHours, setMinutes, isSameDay, startOfDay } from 'date-fns'
 import { vi } from 'date-fns/locale'
@@ -31,6 +32,7 @@ type Props = {
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 8) // 8:00 - 22:00
 
 export default function ScheduleGrid({ userId, initialSchedule }: Props) {
+    const router = useRouter()
     const [schedules, setSchedules] = useState<ScheduleBlock[]>(initialSchedule)
     const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
 
@@ -106,7 +108,7 @@ export default function ScheduleGrid({ userId, initialSchedule }: Props) {
                     if (results.some(r => !r.success)) {
                         throw new Error('Một số khung giờ bị lỗi')
                     }
-                    window.location.reload()
+                    router.refresh()
                     setContextMenu(null)
                     return `Đã báo ${type === 'BUSY' ? 'Bận' : 'Nhận việc'} (${promises.length} giờ)`
                 },

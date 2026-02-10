@@ -86,7 +86,7 @@ export function StatusCell({ task, isAdmin }: StatusCellProps) {
             return (
                 <Button
                     size="sm"
-                    className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold h-7 animate-pulse"
+                    className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold h-8 px-4 shadow-lg shadow-yellow-500/20 ring-1 ring-yellow-400/50 transition-all hover:scale-105"
                     onClick={() => handleStatusChange('Đang thực hiện')}
                 >
                     ▶ Bắt đầu

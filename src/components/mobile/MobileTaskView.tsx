@@ -31,6 +31,10 @@ export default function MobileTaskView({ tasks, isAdmin, users }: { tasks: TaskW
     }, [tasks, activeTab])
 
     const handleTaskClick = (task: TaskWithUser) => {
+        if (!isAdmin && task.status === 'Đã nhận task') {
+            toast.warning('🔒 Vui lòng bấm "Bắt đầu" để mở khóa task!')
+            return
+        }
         setSelectedTask(task)
         setIsDrawerOpen(true)
     }

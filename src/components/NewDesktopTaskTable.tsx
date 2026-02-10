@@ -36,7 +36,13 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], a
         users,
         agencies,
         isAdmin,
-        (task) => setSelectedTask(task), // onTaskClick
+        (task) => {
+            if (!isAdmin && task.status === 'Đã nhận task') {
+                toast.warning('🔒 Vui lòng bấm "Bắt đầu" để mở khóa task!')
+                return
+            }
+            setSelectedTask(task)
+        }, // onTaskClick
         handleDelete // onDelete
     )
 

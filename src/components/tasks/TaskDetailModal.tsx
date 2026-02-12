@@ -270,6 +270,27 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin }: TaskDetailMo
                         )}
                     </div>
 
+                    {/* REFERENCES */}
+                    <div className="p-3 rounded-xl border border-purple-100 bg-purple-50/50">
+                        <label className="block text-xs font-bold text-purple-500 mb-2">
+                            REFERENCES / SAMPLES
+                        </label>
+                        {isEditing ? (
+                            <input
+                                value={form.references}
+                                onChange={(e) => setForm({ ...form, references: e.target.value })}
+                                placeholder="Link tham khảo (Youtube/Drive)..."
+                                className="w-full p-2 border border-purple-200 rounded text-sm text-black"
+                            />
+                        ) : (
+                            localTask.references ? (
+                                <a href={formatLink(localTask.references)} target="_blank" className="text-purple-600 font-bold hover:underline flex items-center gap-2">
+                                    📺 Xem Reference Video ↗
+                                </a>
+                            ) : <span className="text-gray-400 italic text-sm">No references provided.</span>
+                        )}
+                    </div>
+
                     {/* FINANCIALS (Admin Only) */}
                     {isAdmin && (
                         <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/50">

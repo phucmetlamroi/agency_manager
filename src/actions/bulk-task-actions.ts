@@ -94,3 +94,54 @@ export async function createBatchTasks(data: BatchTaskInput) {
         return { error: 'Lỗi khi tạo lô task. Vui lòng thử lại.' }
     }
 }
+
+// BULK DELETE
+export async function bulkDeleteTasks(taskIds: string[]) {
+    if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
+
+    try {
+        await prisma.task.deleteMany({
+            where: {
+                id: { in: taskIds }
+            }
+        })
+        revalidatePath('/admin/queue')
+        revalidatePath('/dashboard')
+        return { success: true, count: taskIds.length }
+    } catch (error) {
+        console.error("Bulk Delete Error:", error)
+        return { error: "Failed to delete tasks" }
+    }
+}
+
+// BULK UPDATE DETAILS
+export async function bulkUpdateTaskDetails(taskIds: string[], data: any) {
+    if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
+
+    try {
+        // Filter out undefined/null values
+        const updateData: any = {}
+        if (data.resources !== undefined) updateData.resources = data.resources
+        if (data.references !== undefined) updateData.references = data.references
+        if (data.notes !== undefined) updateData.notes = data.notes
+        if (data.productLink !== undefined) updateData.productLink = data.productLink
+        if (data.deadline !== undefined) updateData.deadline = data.deadline ? new Date(data.deadline) : null
+        if (data.jobPriceUSD !== undefined) updateData.jobPriceUSD = data.jobPriceUSD
+        if (data.value !== undefined) updateData.value = data.value
+        if (data.collectFilesLink !== undefined) updateData.collectFilesLink = data.collectFilesLink
+
+        await prisma.task.updateMany({
+            where: {
+                id: { in: taskIds }
+            },
+            data: updateData
+        })
+
+        revalidatePath('/admin/queue')
+        revalidatePath('/dashboard')
+        return { success: true, count: taskIds.length }
+    } catch (error) {
+        console.error("Bulk Update Error:", error)
+        return { error: "Failed to update tasks" }
+    }
+}

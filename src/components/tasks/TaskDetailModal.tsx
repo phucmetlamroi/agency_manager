@@ -11,14 +11,16 @@ import { Dialog, DialogContent } from "@/components/ui/dialog" // We can try usi
 // I will replicate the custom overlay to be safe, or port to Shadcn Sheet/Dialog if it fits better.
 // Given strict "keep style", I will reuse the custom styling but cleaner code.
 
+
 interface TaskDetailModalProps {
     task: TaskWithUser | null
     isOpen: boolean
     onClose: () => void
     isAdmin: boolean
+    bulkSelectedIds?: string[] // NEW PROP
 }
 
-export function TaskDetailModal({ task, isOpen, onClose, isAdmin }: TaskDetailModalProps) {
+export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedIds = [] }: TaskDetailModalProps) {
     // Edit State
     const [isEditing, setIsEditing] = useState(false)
     const [isEditingLink, setIsEditingLink] = useState(false)
@@ -35,6 +37,31 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin }: TaskDetailMo
         value: 0,
         collectFilesLink: ''
     })
+
+    // ... (rest of useEffect remains same, skipping for brevity in replacement if possible, but I need to include it or just target handleSave)
+    // Actually, I need to replace the interface and function signature, so I'll target the top part.
+    // And then separately target handleSave.
+
+    // Splitting into 2 chunks for safety/clarity? Or just one big chunk if I can match lines.
+    // The previous view_file shows lines 14-37 for interface and state init.
+    // Lines 79-116 for handleSave.
+
+    // I will use multi_replace.
+
+    // ... logic for handleSave ...
+    /*
+        const isBulk = bulkSelectedIds.length > 1 && bulkSelectedIds.includes(localTask?.id || '')
+        
+        if (isBulk) {
+             const { bulkUpdateTaskDetails } = await import('@/actions/bulk-task-actions')
+             // exclude title
+             const data = { ... }
+             await bulkUpdateTaskDetails(bulkSelectedIds, data)
+        } else {
+             // old logic
+        }
+    */
+
 
     useEffect(() => {
         if (task) {
@@ -80,6 +107,37 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin }: TaskDetailMo
         const combinedResources = (form.linkRaw || form.linkBroll)
             ? `RAW: ${form.linkRaw.trim()} | BROLL: ${form.linkBroll.trim()}`
             : form.resources
+
+        // Check for Bulk Mode
+        const isBulk = bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id)
+
+        if (isBulk) {
+            const { bulkUpdateTaskDetails } = await import('@/actions/bulk-task-actions')
+
+            // Prepare data (exclude title)
+            const bulkData = {
+                resources: combinedResources,
+                references: form.references,
+                notes: form.notes,
+                productLink: form.productLink,
+                deadline: form.deadline || undefined,
+                jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
+                value: isAdmin ? Number(form.value) : undefined,
+                collectFilesLink: form.collectFilesLink
+            }
+
+            const res = await bulkUpdateTaskDetails(bulkSelectedIds, bulkData)
+
+            if (res.error) {
+                toast.error(res.error)
+            } else {
+                toast.success(`Bulk updated ${res.count} tasks successfully`)
+                setIsEditing(false)
+                onClose()
+                window.location.reload()
+            }
+            return
+        }
 
         const res = await updateTaskDetails(localTask.id, {
             resources: combinedResources,
@@ -158,6 +216,15 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin }: TaskDetailMo
                 </div>
 
                 <div>
+                    {bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id) && (
+                        <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg flex items-center gap-2 text-yellow-800 animate-pulse">
+                            <span className="text-xl">⚠️</span>
+                            <div>
+                                <p className="font-bold text-sm">BULK EDITING MODE</p>
+                                <p className="text-xs">Changes will apply to {bulkSelectedIds.length} selected tasks.</p>
+                            </div>
+                        </div>
+                    )}
                     <span className="text-xs font-bold uppercase tracking-widest text-violet-500">
                         PROJECT DETAILS
                     </span>

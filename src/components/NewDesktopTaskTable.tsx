@@ -18,7 +18,10 @@ interface DesktopTaskTableProps {
 
 export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], agencies = [] }: DesktopTaskTableProps) {
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
+    const [rowSelection, setRowSelection] = useState({})
     const { confirm } = useConfirm()
+
+    const selectedIds = Object.keys(rowSelection)
 
     const handleDelete = async (id: string) => {
         if (await confirm({
@@ -29,6 +32,24 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], a
             await deleteTask(id)
             toast.success('Task deleted')
             window.location.reload()
+        }
+    }
+
+    const handleBulkDelete = async () => {
+        if (await confirm({
+            title: `Delete ${selectedIds.length} Tasks`,
+            message: `Are you sure you want to delete ${selectedIds.length} selected tasks? This cannot be undone.`,
+            type: 'danger'
+        })) {
+            const { bulkDeleteTasks } = await import('@/actions/bulk-task-actions')
+            const res = await bulkDeleteTasks(selectedIds)
+            if (res.error) {
+                toast.error(res.error)
+            } else {
+                toast.success(`Deleted ${res.count} tasks`)
+                setRowSelection({})
+                window.location.reload()
+            }
         }
     }
 
@@ -47,14 +68,40 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], a
     )
 
     return (
-        <div className="glass-panel p-1">
-            <TasksDataTable columns={columns} data={tasks} />
+        <div className="glass-panel p-1 relative">
+            {/* BULK ACTION BAR */}
+            {selectedIds.length > 0 && (
+                <div className="absolute top-[-50px] left-0 right-0 bg-zinc-900 border border-zinc-800 p-2 rounded-lg flex items-center justify-between shadow-2xl animate-in slide-in-from-top-2 z-50">
+                    <span className="text-white font-bold ml-2">
+                        {selectedIds.length} tasks selected
+                    </span>
+                    <div className="flex gap-2">
+                        {/* We can add more bulk actions here later */}
+                        {isAdmin && (
+                            <button
+                                onClick={handleBulkDelete}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md font-bold text-xs flex items-center gap-2"
+                            >
+                                🗑 Delete Selected
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            <TasksDataTable
+                columns={columns}
+                data={tasks}
+                rowSelection={rowSelection}
+                setRowSelection={setRowSelection}
+            />
 
             <TaskDetailModal
                 task={selectedTask}
                 isOpen={!!selectedTask}
                 onClose={() => setSelectedTask(null)}
                 isAdmin={isAdmin}
+                bulkSelectedIds={selectedIds} // Pass for Bulk Edit
             />
         </div>
     )

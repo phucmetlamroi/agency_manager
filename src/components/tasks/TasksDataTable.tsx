@@ -35,11 +35,15 @@ import {
 interface TasksDataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
+    rowSelection?: Record<string, boolean>
+    setRowSelection?: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
 }
 
 export function TasksDataTable<TData, TValue>({
     columns,
     data,
+    rowSelection: externalRowSelection,
+    setRowSelection: externalSetRowSelection,
 }: TasksDataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -47,11 +51,15 @@ export function TasksDataTable<TData, TValue>({
     )
     const [columnVisibility, setColumnVisibility] =
         React.useState<VisibilityState>({})
-    const [rowSelection, setRowSelection] = React.useState({})
+    const [internalRowSelection, setInternalRowSelection] = React.useState({})
+
+    const rowSelection = externalRowSelection ?? internalRowSelection
+    const setRowSelection = externalSetRowSelection ?? setInternalRowSelection
 
     const table = useReactTable({
         data,
         columns,
+        getRowId: (row: any) => row.id, // IMPORTANT: Use ID as key for selection
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),

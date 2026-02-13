@@ -37,9 +37,9 @@ export default async function UserDashboard() {
         redirect('/agency')
     }
 
-    // Redirect Agency Admin to Agency Portal
-    if ((userWithBonus?.role as UserRole) === UserRole.AGENCY_ADMIN) {
-        redirect('/agency')
+    // Redirect Super Admin to Admin Dashboard
+    if ((userWithBonus?.role as UserRole) === UserRole.ADMIN) {
+        redirect('/admin')
     }
 
     const tasks = await prisma.task.findMany({

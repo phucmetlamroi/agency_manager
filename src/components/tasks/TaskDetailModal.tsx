@@ -5,19 +5,18 @@ import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { updateTaskStatus } from "@/actions/task-actions"
 import { toast } from "sonner"
-import { Dialog, DialogContent } from "@/components/ui/dialog" // We can try using Shadcn Dialog, or stick to the custom overlay style if it was prefered.
-// The user said "giữ giao diện ux/ui theo phong cách này" (keep this UX/UI style).
-// The previous modal was a custom div overlay.
-// I will replicate the custom overlay to be safe, or port to Shadcn Sheet/Dialog if it fits better.
-// Given strict "keep style", I will reuse the custom styling but cleaner code.
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import dynamic from 'next/dynamic'
+import DOMPurify from 'isomorphic-dompurify'
 
+const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
 
 interface TaskDetailModalProps {
     task: TaskWithUser | null
     isOpen: boolean
     onClose: () => void
     isAdmin: boolean
-    bulkSelectedIds?: string[] // NEW PROP
+    bulkSelectedIds?: string[]
 }
 
 export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedIds = [] }: TaskDetailModalProps) {
@@ -38,30 +37,14 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         collectFilesLink: ''
     })
 
-    // ... (rest of useEffect remains same, skipping for brevity in replacement if possible, but I need to include it or just target handleSave)
-    // Actually, I need to replace the interface and function signature, so I'll target the top part.
-    // And then separately target handleSave.
-
-    // Splitting into 2 chunks for safety/clarity? Or just one big chunk if I can match lines.
-    // The previous view_file shows lines 14-37 for interface and state init.
-    // Lines 79-116 for handleSave.
-
-    // I will use multi_replace.
-
-    // ... logic for handleSave ...
-    /*
-        const isBulk = bulkSelectedIds.length > 1 && bulkSelectedIds.includes(localTask?.id || '')
-        
-        if (isBulk) {
-             const { bulkUpdateTaskDetails } = await import('@/actions/bulk-task-actions')
-             // exclude title
-             const data = { ... }
-             await bulkUpdateTaskDetails(bulkSelectedIds, data)
-        } else {
-             // old logic
-        }
-    */
-
+    // Helper: Parse content for Tiptap
+    const parseContent = (content: string | null) => {
+        if (!content) return ''
+        // Check if content looks like HTML
+        if (/<[a-z][\s\S]*>/i.test(content)) return content
+        // Legacy: Convert newlines to paragraphs for initial migration
+        return content.split('\n').filter(line => line.trim() !== '').map(line => `<p>${line}</p>`).join('')
+    }
 
     useEffect(() => {
         if (task) {
@@ -90,7 +73,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 linkRaw: raw,
                 linkBroll: broll,
                 references: task.references || '',
-                notes: task.notes || '',
+                notes: parseContent(task.notes), // Parse legacy content here
                 productLink: task.productLink || '',
                 deadline: deadlineStr,
                 jobPriceUSD: task.jobPriceUSD || 0,
@@ -108,6 +91,9 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             ? `RAW: ${form.linkRaw.trim()} | BROLL: ${form.linkBroll.trim()}`
             : form.resources
 
+        // Sanitize notes before saving
+        const cleanNotes = DOMPurify.sanitize(form.notes)
+
         // Check for Bulk Mode
         const isBulk = bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id)
 
@@ -118,7 +104,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             const bulkData = {
                 resources: combinedResources,
                 references: form.references,
-                notes: form.notes,
+                notes: cleanNotes,
                 productLink: form.productLink,
                 deadline: form.deadline || undefined,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
@@ -142,7 +128,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         const res = await updateTaskDetails(localTask.id, {
             resources: combinedResources,
             references: form.references,
-            notes: form.notes,
+            notes: cleanNotes,
             title: localTask.title,
             productLink: form.productLink,
             deadline: form.deadline || undefined,
@@ -156,7 +142,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 ...prev,
                 resources: combinedResources,
                 references: form.references,
-                notes: form.notes,
+                notes: cleanNotes,
                 productLink: form.productLink,
                 value: isAdmin ? Number(form.value) : prev.value,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : prev.jobPriceUSD,
@@ -165,9 +151,6 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
             setIsEditing(false)
             toast.success('Task updated')
-
-            // If user submitted link, maybe auto-revision?
-            // Keeping original logic: "if (!isAdmin) await handleStatusChange(selectedTask.id, 'Revision');"
         } else {
             toast.error('Failed to update')
         }
@@ -216,21 +199,19 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 </div>
 
                 <div>
-                    {bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id) && (
-                        <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg flex items-center gap-2 text-yellow-800 animate-pulse">
-                            <span className="text-xl">⚠️</span>
-                            <div>
-                                <p className="font-bold text-sm">BULK EDITING MODE</p>
-                                <p className="text-xs">Changes will apply to {bulkSelectedIds.length} selected tasks.</p>
-                            </div>
-                        </div>
-                    )}
                     <span className="text-xs font-bold uppercase tracking-widest text-violet-500">
                         PROJECT DETAILS
                     </span>
                     <h2 className="text-2xl font-extrabold mt-1 leading-tight">
                         {localTask.title}
                     </h2>
+                    {bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id) && (
+                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700 flex items-center gap-2 animate-pulse w-fit">
+                            <span>⚠️</span>
+                            <span className="font-bold">BULK MODE:</span>
+                            <span>Applying to {bulkSelectedIds.length} tasks.</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex flex-col gap-4">
@@ -254,8 +235,6 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                         onClick={async () => {
                                             await handleSave();
                                             if (!isAdmin) {
-                                                // FSM: Submit -> Review (Waiting for check)
-                                                // Pass current version for OL
                                                 const res = await updateTaskStatus(localTask.id, 'Review', undefined, undefined, localTask.version)
                                                 if (res?.error) {
                                                     toast.error(res.error)
@@ -418,17 +397,17 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             NOTES / INSTRUCTIONS
                         </label>
                         {isEditing ? (
-                            <textarea
-                                value={form.notes}
-                                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                                placeholder="Enter notes..."
-                                rows={4}
-                                className="w-full p-2 border border-gray-200 rounded text-sm text-black font-sans"
-                            />
-                        ) : (
-                            <div className="bg-amber-50 p-4 rounded-xl text-amber-900 text-sm leading-relaxed whitespace-pre-wrap">
-                                {localTask.notes || "No specific instructions."}
+                            <div className="h-64 border border-gray-200 rounded-lg overflow-hidden">
+                                <TiptapEditor
+                                    content={form.notes}
+                                    onChange={(html) => setForm({ ...form, notes: html })}
+                                />
                             </div>
+                        ) : (
+                            <div
+                                className="bg-amber-50 p-4 rounded-xl text-amber-900 text-sm leading-relaxed prose prose-sm max-w-none"
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(localTask.notes || "No specific instructions.") }}
+                            />
                         )}
                     </div>
                 </div>

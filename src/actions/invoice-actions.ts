@@ -97,7 +97,15 @@ export async function getUnbilledTasks(clientId: number) {
             },
             orderBy: { createdAt: 'desc' }
         })
-        return { success: true, data: tasks }
+        // Sanitize data for Client Component (Decimal -> Number, Date -> String)
+        const safeTasks = tasks.map(t => ({
+            ...t,
+            jobPriceUSD: Number(t.jobPriceUSD || 0),
+            value: Number(t.value || 0),
+            createdAt: t.createdAt.toISOString()
+        }))
+
+        return { success: true, data: safeTasks }
     } catch (error) {
         console.error('Error fetching unbilled tasks:', error)
         return { error: 'Failed to fetch unbilled tasks' }
@@ -257,7 +265,19 @@ export async function getClientInvoices(clientId: number) {
                 }
             }
         })
-        return { success: true, data: invoices }
+        // Sanitize
+        const safeInvoices = invoices.map(inv => ({
+            ...inv,
+            subtotalAmount: Number(inv.subtotalAmount),
+            taxAmount: Number(inv.taxAmount),
+            depositDeducted: Number(inv.depositDeducted),
+            totalDue: Number(inv.totalDue),
+            issueDate: inv.issueDate.toISOString(),
+            dueDate: inv.dueDate ? inv.dueDate.toISOString() : null,
+            createdAt: inv.createdAt.toISOString()
+        }))
+
+        return { success: true, data: safeInvoices }
     } catch (error) {
         return { error: 'Failed to fetch invoices' }
     }

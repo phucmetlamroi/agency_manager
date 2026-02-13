@@ -1,6 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { InvoiceModal } from '@/components/invoice/InvoiceModal'
+import { FileText } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { ClientInvoicesTable } from '@/components/invoice/ClientInvoicesTable'
 
 type ClientData = {
     id: number
@@ -10,13 +15,16 @@ type ClientData = {
     frictionIndex: number
     inputQuality: number
     paymentRating: number
+    depositBalance: number // Added field
     subsidiaries: any[]
     tasks: any[]
+    invoices: any[] // Added field
 }
 
 const COLORS = ['#60a5fa', '#a855f7', '#f472b6', '#34d399', '#fbbf24']
 
 export default function ClientAnalytics({ client, distribution }: { client: ClientData, distribution: any[] }) {
+    const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
 
     // Tier Badge Logic
     const getTierBadge = (tier: string) => {
@@ -31,24 +39,45 @@ export default function ClientAnalytics({ client, distribution }: { client: Clie
 
     return (
         <div className="space-y-6">
+            {/* INVOICE MODAL */}
+            <InvoiceModal
+                isOpen={isInvoiceModalOpen}
+                onClose={() => setIsInvoiceModalOpen(false)}
+                clientId={client.id}
+                clientName={client.name}
+                // address? We might need to fetch this or add to Client model if not exists
+                depositBalance={Number(client.depositBalance || 0)}
+            />
+
             {/* HEADER */}
             <div className="flex justify-between items-start glass-panel p-6">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-2">{client.name}</h1>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                         <span className={`px-3 py-1 rounded text-xs font-bold border ${getTierBadge(client.tier)}`}>
                             {client.tier} CLIENT
                         </span>
                         <span className="px-3 py-1 rounded text-xs font-bold border border-gray-700 bg-gray-800 text-gray-400">
                             ID: #{client.id}
                         </span>
+                        <span className="px-3 py-1 rounded text-xs font-bold border border-green-900 bg-green-950 text-green-400">
+                            Credit: ${Number(client.depositBalance || 0).toLocaleString()}
+                        </span>
                     </div>
                 </div>
 
-                <div className="text-right">
-                    <div className="text-sm text-gray-400 uppercase tracking-wider">AI Score</div>
-                    <div className="text-4xl font-mono font-bold text-white text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-500">
-                        {client.aiScore.toFixed(0)}
+                <div className="text-right flex flex-col items-end gap-2">
+                    <Button
+                        onClick={() => setIsInvoiceModalOpen(true)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                    >
+                        <FileText size={16} /> Create Invoice
+                    </Button>
+                    <div>
+                        <div className="text-sm text-gray-400 uppercase tracking-wider">AI Score</div>
+                        <div className="text-4xl font-mono font-bold text-white text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-500">
+                            {client.aiScore.toFixed(0)}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -139,6 +168,14 @@ export default function ClientAnalytics({ client, distribution }: { client: Clie
                 </div>
             </div>
 
+            {/* INVOICE HISTORY */}
+            <div className="glass-panel p-6">
+                <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+                    <span>🧾</span> Invoice History
+                </h3>
+                <ClientInvoicesTable invoices={client.invoices || []} clientId={client.id} />
+            </div>
+
             {/* RECENT TASKS LIST */}
             <div className="glass-panel p-6">
                 <h3 className="text-lg font-bold mb-4 text-white">🎬 Video / Task Gần đây</h3>
@@ -187,3 +224,4 @@ export default function ClientAnalytics({ client, distribution }: { client: Clie
         </div>
     )
 }
+

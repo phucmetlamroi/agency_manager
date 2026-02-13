@@ -68,7 +68,7 @@ export const emailTemplates = {
     taskStarted: (userName: string, taskTitle: string, startTime: Date, taskId: string) => {
         const timeStr = new Date(startTime).toLocaleString('vi-VN')
         const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`
-        
+
         const content = `
             <p>Admin lưu ý,</p>
             <p>Nhân viên <strong>${userName}</strong> vừa bấm bắt đầu làm việc vào lúc ${timeStr}.</p>
@@ -135,5 +135,26 @@ export const emailTemplates = {
             </div>
         `
         return wrapTemplate(content, `[Success] Chúc mừng! Task "${taskTitle}" đã hoàn thành 🎉`)
+    },
+    // 5. Invoice Created (To Admin/Treasurer)
+    invoiceCreated: (userName: string, invoiceNumber: string, clientName: string, amount: string, link: string) => {
+        const content = `
+            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p>Hệ thống xác nhận bạn vừa tạo thành công hóa đơn mới.</p>
+            
+            <div class="card" style="border-left-color: #3b82f6; background-color: #eff6ff;">
+                <p><strong>Mã hóa đơn:</strong> ${invoiceNumber}</p>
+                <p><strong>Khách hàng:</strong> ${clientName}</p>
+                <p><strong>Tổng tiền:</strong> ${amount}</p>
+            </div>
+
+            <p>Hóa đơn đã được lưu vào hệ thống và gửi yêu cầu thanh toán (nếu có cấu hình tự động).</p>
+            <p>Bạn có thể xem chi tiết tại đường dẫn bên dưới:</p>
+            
+            <div style="text-align: center;">
+                 <a href="${link}" class="btn">XEM CHI TIẾT KHÁCH HÀNG</a>
+            </div>
+        `
+        return wrapTemplate(content, `[Invoice] Đã tạo hóa đơn mới #${invoiceNumber}`)
     }
 }

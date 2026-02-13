@@ -10,8 +10,10 @@ export type AuthContext = {
     ownedAgencyId: string | null
     isSuperAdmin: boolean
     isAgencyOwner: boolean
+    isTreasurer: boolean // Added
     email: string | null
     username: string | null
+    nickname: string | null
 }
 
 /**
@@ -41,7 +43,9 @@ export const getCurrentUser = cache(async (): Promise<AuthContext> => {
         ownedAgencyId: user.ownedAgency[0]?.id || null,
         isSuperAdmin: user.role === 'ADMIN',
         isAgencyOwner: user.ownedAgency.length > 0,
+        isTreasurer: user.isTreasurer,
         email: user.email,
-        username: user.username
+        username: user.username,
+        nickname: user.nickname
     }
 })

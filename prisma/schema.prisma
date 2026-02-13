@@ -112,6 +112,13 @@ model Task {
   timerStatus        String    @default("PAUSED") // "RUNNING", "PAUSED", "STOPPED"
   
   schedules          UserSchedule[]
+
+  // Invoice Relation
+  invoice            Invoice?  @relation(fields: [invoiceId], references: [id])
+  invoiceId          String?
+  invoiceStatus      InvoiceTaskStatus @default(UNBILLED)
+  
+  invoiceItems       InvoiceItem[]
 }
 
 model Notification {
@@ -177,6 +184,10 @@ model Client {
   paymentRating Int       @default(3) // 1-5
   tier          ClientTier @default(standard)
   
+  depositBalance Decimal  @default(0) // Available credit
+  
+  invoices      Invoice[]
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -328,4 +339,87 @@ enum UserRole {
   USER
   AGENCY_ADMIN
   LOCKED
+}
+
+// ============================================
+// INVOICE & FINANCIAL MODULE (Mini-ERP)
+// ============================================
+
+model BillingProfile {
+  id              String   @id @default(uuid())
+  profileName     String   // e.g. "VCB USD", "Techcombank VND"
+  beneficiaryName String
+  bankName        String
+  accountNumber   String
+  swiftCode       String?
+  address         String?
+  isDefault       Boolean  @default(false)
+  
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+}
+
+model Invoice {
+  id              String   @id @default(uuid())
+  invoiceNumber   String   @unique // e.g. INV-2025-001
+  
+  client          Client   @relation(fields: [clientId], references: [id])
+  clientId        Int
+  
+  createdBy       String   // User ID of Admin
+  
+  issueDate       DateTime @default(now())
+  dueDate         DateTime?
+  
+  // Financials
+  subtotalAmount  Decimal  @default(0)
+  depositDeducted Decimal  @default(0)
+  taxPercent      Decimal  @default(0)
+  taxAmount       Decimal  @default(0)
+  totalDue        Decimal  @default(0)
+  
+  status          InvoiceStatus @default(DRAFT)
+  
+  // File Lifecycle
+  filePath        String?  // Logical path or key
+  fileCreatedAt   DateTime? // For 48h cleanup logic
+  
+  // Snapshot Data (Immutability)
+  billingSnapshot Json     // Stores the full BillingProfile at time of creation
+  clientSnapshot  Json?    // Stores Client info at time of creation
+  
+  items           InvoiceItem[]
+  tasks           Task[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   String
+  
+  // Link to Task (Optional - for manual items)
+  task        Task?    @relation(fields: [taskId], references: [id])
+  taskId      String?
+  
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @default(0)
+  amount      Decimal  @default(0) // quantity * unitPrice
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum InvoiceTaskStatus {
+  UNBILLED
+  INVOICED
 }

@@ -25,6 +25,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 orderBy: { createdAt: 'desc' },
                 take: 20 // Get recent direct tasks
             },
+            invoices: {
+                orderBy: { issueDate: 'desc' },
+                take: 20
+            },
             projects: true
         }
     })

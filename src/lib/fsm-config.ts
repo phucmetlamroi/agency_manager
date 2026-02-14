@@ -39,7 +39,7 @@ interface TransitionRule {
 
 export const TRANSITIONS: Record<TaskEvent, TransitionRule> = {
     assign: {
-        from: [TaskState.PENDING, TaskState.ASSIGNED], // Re-assign allowed
+        from: [TaskState.PENDING, TaskState.ASSIGNED, TaskState.PAUSED], // Re-assign allowed (including from Pause)
         to: TaskState.ASSIGNED,
         requiredRole: ['ADMIN', 'SYSTEM']
     },

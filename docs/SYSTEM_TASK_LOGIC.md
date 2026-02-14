@@ -77,7 +77,10 @@ flowchart LR
     *   Set `assigneeId` = `Staff X.id`.
     *   **GIỮ NGUYÊN** `assignedAgencyId` = `Agency B.id`. (Quan trọng: Task vẫn thuộc về Đại lý này).
     *   Set `status` = `"Đã nhận task"`.
+    *   Set `status` = `"Đã nhận task"`.
 3.  **Hệ quả**: Task chuyển từ Agency Pool sang Personal Queue của `Staff X`.
+
+> **Lưu ý**: Task đang ở trạng thái **Tạm ngưng (PAUSED)** cũng có thể được giao lại (Re-assign) về trạng thái **Đã nhận task (ASSIGNED)**.
 
 ```mermaid
 sequenceDiagram

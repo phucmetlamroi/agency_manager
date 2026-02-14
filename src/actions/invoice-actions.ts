@@ -6,6 +6,14 @@ import { getCurrentUser } from '@/lib/auth-guard'
 import { sendEmail } from '@/lib/email'
 import { emailTemplates } from '@/lib/email-templates'
 
+// Helper to safely convert Decimal/Number/String to Number
+const toSafeNumber = (val: any) => {
+    if (val === null || val === undefined) return 0
+    if (typeof val === 'number') return val
+    if (val.toNumber) return val.toNumber() // Handle Prisma Decimal
+    return Number(val) || 0
+}
+
 // ==========================
 // BILLING PROFILES
 // ==========================
@@ -55,7 +63,7 @@ export async function createBillingProfile(data: {
             }
         })
 
-        revalidatePath('/admin/finance') // Assuming future path
+        revalidatePath('/admin/finance')
         return { success: true, data: profile }
     } catch (error) {
         return { error: 'Failed to create billing profile' }
@@ -85,11 +93,7 @@ export async function getUnbilledTasks(clientId: number) {
         const tasks = await prisma.task.findMany({
             where: {
                 clientId: clientId,
-                // Status must be compatible with billing (e.g. Completed, or whatever 'Hoàn tất' maps to)
-                // For now, let's assume we fetch all non-invoiced tasks that have a value
                 invoiceStatus: 'UNBILLED',
-                // Optional: valid status check
-                // status: { in: ['Hoàn tất', 'Review'] } 
             },
             select: {
                 id: true,
@@ -102,11 +106,12 @@ export async function getUnbilledTasks(clientId: number) {
             },
             orderBy: { createdAt: 'desc' }
         })
-        // Sanitize data for Client Component (Decimal -> Number, Date -> String)
+
+        // Sanitize data for Client Component
         const safeTasks = tasks.map(t => ({
             ...t,
-            jobPriceUSD: Number(t.jobPriceUSD || 0),
-            value: Number(t.value || 0),
+            jobPriceUSD: toSafeNumber(t.jobPriceUSD),
+            value: toSafeNumber(t.value),
             createdAt: t.createdAt.toISOString()
         }))
 
@@ -128,11 +133,7 @@ export async function calculateInvoicePreview(taskIds: string[], taxRate: number
 
     const subtotal = tasks.reduce((sum, t) => sum + Number(t.jobPriceUSD || 0), 0)
     const taxAmount = subtotal * (taxRate / 100)
-    // Deposit deduction logic: cannot exceed subtotal+tax? Or can be negative due?
-    // Usually Total = (Sub+Tax) - Deposit.
-    // If Deposit > Sub+Tax, Total = 0 and Credit remains.
 
-    // Simple logic for now
     let totalDue = subtotal + taxAmount - depositCurrent
     if (totalDue < 0) totalDue = 0
 
@@ -163,7 +164,6 @@ export async function createInvoiceRecord(data: {
     try {
         const user = await getCurrentUser()
         // Determine if user has permission (Admin or Treasurer)
-        // Note: getCurrentUser now returns isTreasurer boolean
         if (!user || (!user.isSuperAdmin && !user.isTreasurer)) return { error: 'Unauthorized' }
 
         // 0. Verify Tasks are Unbilled (Prevent Double Billing)
@@ -254,11 +254,11 @@ export async function createInvoiceRecord(data: {
         // Sanitize Result (Decimal -> Number, Date -> String)
         const safeResult = {
             ...result,
-            subtotalAmount: Number(result.subtotalAmount),
-            depositDeducted: Number(result.depositDeducted),
-            taxPercent: Number(result.taxPercent),
-            taxAmount: Number(result.taxAmount),
-            totalDue: Number(result.totalDue),
+            subtotalAmount: toSafeNumber(result.subtotalAmount),
+            depositDeducted: toSafeNumber(result.depositDeducted),
+            taxPercent: toSafeNumber(result.taxPercent),
+            taxAmount: toSafeNumber(result.taxAmount),
+            totalDue: toSafeNumber(result.totalDue),
             issueDate: result.issueDate.toISOString(),
             dueDate: result.dueDate ? result.dueDate.toISOString() : null,
             createdAt: result.createdAt.toISOString(),
@@ -289,10 +289,10 @@ export async function getClientInvoices(clientId: number) {
         // Sanitize
         const safeInvoices = invoices.map(inv => ({
             ...inv,
-            subtotalAmount: Number(inv.subtotalAmount),
-            taxAmount: Number(inv.taxAmount),
-            depositDeducted: Number(inv.depositDeducted),
-            totalDue: Number(inv.totalDue),
+            subtotalAmount: toSafeNumber(inv.subtotalAmount),
+            taxAmount: toSafeNumber(inv.taxAmount),
+            depositDeducted: toSafeNumber(inv.depositDeducted),
+            totalDue: toSafeNumber(inv.totalDue),
             issueDate: inv.issueDate.toISOString(),
             dueDate: inv.dueDate ? inv.dueDate.toISOString() : null,
             createdAt: inv.createdAt.toISOString()

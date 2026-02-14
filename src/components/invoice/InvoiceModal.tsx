@@ -303,7 +303,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                     >
                                         <div className="flex justify-between items-start mb-1">
                                             <div className="text-sm font-bold text-gray-800 line-clamp-2">{task.title}</div>
-                                            <div className="text-xs font-mono font-bold text-green-600">${task.jobPriceUSD}</div>
+                                            <div className="text-xs font-mono font-bold text-green-600">{formatCurrency(task.jobPriceUSD)}</div>
                                         </div>
                                         <div className="flex justify-between items-center text-xs text-gray-400">
                                             <span>{new Date(task.createdAt).toLocaleDateString()}</span>

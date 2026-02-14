@@ -47,6 +47,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     const [dueDate, setDueDate] = useState('')
     const [taxPercent, setTaxPercent] = useState(0) // Default 0
     const [applyDeposit, setApplyDeposit] = useState(false)
+    const [groupByBrand, setGroupByBrand] = useState(true) // Default to Grouped View
 
     // Editing Item State
     const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -95,9 +96,12 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
         try {
             if (!Array.isArray(tasks)) return []
 
-            const taskItems: InvoiceItem[] = tasks
-                .filter(t => t && t.id && selectedTaskIds.includes(t.id))
-                .map(t => ({
+            // 1. Filter Selected
+            const selectedTasks = tasks.filter(t => t && t.id && selectedTaskIds.includes(t.id))
+
+            if (!groupByBrand) {
+                // FLAT LIST (Itemized)
+                const taskItems: InvoiceItem[] = selectedTasks.map(t => ({
                     id: t.id,
                     description: t.title || 'Untitled Task',
                     note: t.productLink ? `Ref: ${t.productLink}` : undefined,
@@ -107,12 +111,47 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     isManual: false,
                     taskId: t.id
                 }))
-            return [...taskItems, ...manualItems]
+                return [...taskItems, ...manualItems]
+            }
+
+            // 2. GROUPED LIST (Condensed)
+            const groupedItems: InvoiceItem[] = []
+
+            // Helper to find existing group
+            const findGroup = (clientName: string) => groupedItems.find(i => i.taskId === `group-${clientName}`)
+
+            selectedTasks.forEach(t => {
+                const clientName = t.originalClientName || 'General' // Use the new field
+                const amount = Number(t.jobPriceUSD) || 0
+
+                // Check if we should group
+                const existing = findGroup(clientName)
+
+                if (existing) {
+                    existing.quantity += 1
+                    existing.amount += amount
+                    // Average Unit Price
+                    existing.unitPrice = existing.amount / existing.quantity
+                } else {
+                    groupedItems.push({
+                        id: `group-${clientName}-${Date.now()}`, // Temp ID
+                        description: `Production Services [${clientName}]`, // Simplified Description
+                        note: `${selectedTasks.filter(st => (st.originalClientName || 'General') === clientName).length} tasks merged`,
+                        quantity: 1,
+                        unitPrice: amount,
+                        amount: amount,
+                        isManual: false,
+                        taskId: `group-${clientName}` // Marker ID
+                    })
+                }
+            })
+
+            return [...groupedItems, ...manualItems]
         } catch (error) {
             console.error('Error generating invoice items:', error)
             return []
         }
-    }, [tasks, selectedTaskIds, manualItems])
+    }, [tasks, selectedTaskIds, manualItems, groupByBrand])
 
     // CALCULATIONS
     // CALCULATIONS
@@ -210,7 +249,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     quantity: i.quantity,
                     unitPrice: i.unitPrice,
                     amount: i.amount,
-                    taskId: i.taskId
+                    // If taskId is a temp group or manual, set to undefined
+                    taskId: (i.taskId && (i.taskId.startsWith('group-') || i.taskId.startsWith('man-'))) ? undefined : i.taskId
                 })),
                 subtotalAmount: activeSubtotal,
                 taxPercent,
@@ -368,6 +408,17 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                     onChange={e => setTaxPercent(Number(e.target.value))}
                                 />
                                 <span className="text-xs">%</span>
+                            </div>
+                            <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded border border-blue-200">
+                                <input
+                                    type="checkbox"
+                                    checked={groupByBrand}
+                                    onChange={e => setGroupByBrand(e.target.checked)}
+                                    id="group-brand"
+                                />
+                                <label htmlFor="group-brand" className="text-xs font-bold text-blue-700 cursor-pointer">
+                                    Group by Brand
+                                </label>
                             </div>
                             {depositBalance > 0 && (
                                 <div className="flex items-center gap-2 bg-yellow-50 px-3 py-1 rounded border border-yellow-200">

@@ -122,6 +122,7 @@ export async function getUnbilledTasks(clientId: number) {
             ...t,
             // If task belongs to sub-client, append name to title for clarity
             title: t.client && t.client.name && t.client.name !== 'Unknown' ? `[${t.client.name}] ${t.title}` : t.title,
+            originalClientName: t.client?.name || 'Main',
             jobPriceUSD: toSafeNumber(t.jobPriceUSD),
             value: toSafeNumber(t.value),
             createdAt: t.createdAt.toISOString()

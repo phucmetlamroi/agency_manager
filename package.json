@@ -32,7 +32,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sendgrid/mail": "^8.1.6",
-    "@sparticuz/chromium-min": "^143.0.4",
+    "@sparticuz/chromium": "^133.0.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-table": "^8.21.3",
     "@tiptap/extension-link": "^3.19.0",

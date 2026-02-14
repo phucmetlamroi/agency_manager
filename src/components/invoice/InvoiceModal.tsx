@@ -329,7 +329,10 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 body: JSON.stringify(pdfPayload)
             })
 
-            if (!response.ok) throw new Error('Failed to generate')
+            if (!response.ok) {
+                const errorText = await response.text()
+                throw new Error(errorText || 'Failed to generate')
+            }
 
             // Download Blob
             const blob = await response.blob()
@@ -344,9 +347,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
             toast.success('Invoice generated & downloaded!')
             // TODO: Call Action to Save Invoice Record to DB
 
-        } catch (e) {
+        } catch (e: any) {
             console.error(e)
-            toast.error('Error generating PDF')
+            toast.error(`Error: ${e.message}`)
         } finally {
             setIsGenerating(false)
         }

@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
             },
         })
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Invoice Generation API Error:', error)
-        return new NextResponse('Internal Server Error', { status: 500 })
+        return new NextResponse(`PDF Generation Failed: ${error.message || 'Unknown Error'}`, { status: 500 })
     }
 }

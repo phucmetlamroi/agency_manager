@@ -181,11 +181,11 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         if (isVercel) {
             browser = await puppeteer.launch({
                 args: chromium.args,
-                defaultViewport: chromium.defaultViewport,
+                defaultViewport: { width: 1920, height: 1080 },
                 executablePath: await chromium.executablePath(),
-                headless: chromium.headless,
+                headless: (chromium as any).headless,
                 ignoreHTTPSErrors: true,
-            })
+            } as any)
         } else {
             // Local development or Local Production (Windows/Mac/Linux)
             const platform = process.platform

@@ -51,6 +51,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     // Editing Item State
     const [editingItemId, setEditingItemId] = useState<string | null>(null)
     const [editForm, setEditForm] = useState({ description: '', unitPrice: 0, quantity: 1 })
+    // We need 'overrides' state to handle edits to task items
+    const [overrides, setOverrides] = useState<Record<string, { description?: string, unitPrice?: number, quantity?: number, amount: number }>>({})
+
 
 
     // Fetch Data on Open
@@ -112,9 +115,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     }, [tasks, selectedTaskIds, manualItems])
 
     // CALCULATIONS
-    const subtotal = invoiceItems.reduce((sum, item) => sum + (Number(item.isManual ? item.amount : (overrides[item.id]?.amount ?? item.amount)) || 0), 0)
-    // We need 'overrides' state to handle edits to task items
-    const [overrides, setOverrides] = useState<Record<string, { description?: string, unitPrice?: number, quantity?: number, amount: number }>>({})
+    // CALCULATIONS
+    // Removed redundant 'subtotal' calculation which caused TDZ error
+
 
     const activeItems = useMemo(() => {
         return invoiceItems.map(item => {

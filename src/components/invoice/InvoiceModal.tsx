@@ -9,6 +9,7 @@ import { Loader2, Plus, Trash2, Edit2, FileDown, AlertTriangle } from 'lucide-re
 import { getUnbilledTasks, getBillingProfiles, createBillingProfile, createInvoiceRecord } from '@/actions/invoice-actions'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
+import BillingProfileManager from './BillingProfileManager'
 
 interface InvoiceModalProps {
     isOpen: boolean
@@ -58,35 +59,48 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
 
     // Fetch Data on Open
+    const fetchData = async () => {
+        setIsLoading(true)
+        try {
+            const [tasksRes, profilesRes] = await Promise.all([
+                getUnbilledTasks(clientId),
+                getBillingProfiles()
+            ])
+
+            if (tasksRes.success) setTasks(tasksRes.data)
+            if (profilesRes.success) {
+                setBillingProfiles(profilesRes.data)
+                // Select default
+                const def = profilesRes.data.find((p: any) => p.isDefault)
+                if (def) setBillingProfileId(def.id)
+                else if (profilesRes.data.length > 0) setBillingProfileId(profilesRes.data[0].id)
+            }
+
+            // Auto-gen invoice number (Simple logic for now)
+            const date = new Date()
+            setInvoiceNumber(`INV-${date.getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`)
+
+        } catch (e) {
+            toast.error('Failed to load data')
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const refreshProfiles = async () => {
+        const res = await getBillingProfiles()
+        if (res.success && res.data) {
+            setBillingProfiles(res.data)
+            // Keep current selection if valid, else select default
+            if (!res.data.find((p: any) => p.id === billingProfileId)) {
+                const def = res.data.find((p: any) => p.isDefault)
+                if (def) setBillingProfileId(def.id)
+            }
+        }
+    }
+
     useEffect(() => {
         if (isOpen) {
-            const fetchData = async () => {
-                setIsLoading(true)
-                try {
-                    const [tasksRes, profilesRes] = await Promise.all([
-                        getUnbilledTasks(clientId),
-                        getBillingProfiles()
-                    ])
-
-                    if (tasksRes.success) setTasks(tasksRes.data)
-                    if (profilesRes.success) {
-                        setBillingProfiles(profilesRes.data)
-                        // Select default
-                        const def = profilesRes.data.find((p: any) => p.isDefault)
-                        if (def) setBillingProfileId(def.id)
-                        else if (profilesRes.data.length > 0) setBillingProfileId(profilesRes.data[0].id)
-                    }
-
-                    // Auto-gen invoice number (Simple logic for now)
-                    const date = new Date()
-                    setInvoiceNumber(`INV-${date.getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`)
-
-                } catch (e) {
-                    toast.error('Failed to load data')
-                } finally {
-                    setIsLoading(false)
-                }
-            }
             fetchData()
         }
     }, [isOpen, clientId])
@@ -154,10 +168,6 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     }, [tasks, selectedTaskIds, manualItems, groupByBrand])
 
     // CALCULATIONS
-    // CALCULATIONS
-    // Removed redundant 'subtotal' calculation which caused TDZ error
-
-
     const activeItems = useMemo(() => {
         return invoiceItems.map(item => {
             if (overrides[item.id]) {
@@ -178,7 +188,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
     // Handlers
     const toggleTask = (taskId: string) => {
-        console.log('Toggling Task:', taskId)
+
         setSelectedTaskIds(prev =>
             prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
         )
@@ -289,7 +299,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     bankName: profile.bankName,
                     accountNumber: profile.accountNumber,
                     swiftCode: profile.swiftCode,
-                    address: profile.address
+                    address: profile.address,
+                    notes: profile.notes // Add notes to PDF payload
                 }
             }
 
@@ -375,18 +386,30 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     </div>
 
                     <div className="p-4 border-t border-gray-200 bg-white space-y-3">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 mb-1 block">Billing Profile</label>
-                            <select
-                                value={billingProfileId}
-                                onChange={e => setBillingProfileId(e.target.value)}
-                                className="w-full text-sm border rounded p-2"
-                            >
-                                {billingProfiles.map(p => (
-                                    <option key={p.id} value={p.id}>{p.profileName}</option>
-                                ))}
-                            </select>
+                        {/* BILLING PROFILE SELECTOR */}
+                        <div className="mb-6 flex flex-col gap-2">
+                            <label className="block text-xs font-bold text-gray-500 uppercase">Billing Profile</label>
+                            <div className="flex gap-2 items-center">
+                                <select
+                                    className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    value={billingProfileId}
+                                    onChange={e => setBillingProfileId(e.target.value)}
+                                >
+                                    <option value="">Select Profile...</option>
+                                    {billingProfiles.map(p => (
+                                        <option key={p.id} value={p.id}>{p.profileName} ({p.bankName})</option>
+                                    ))}
+                                </select>
+                                <BillingProfileManager
+                                    currentProfileId={billingProfileId}
+                                    onProfileSelect={(p) => {
+                                        refreshProfiles()
+                                        setBillingProfileId(p.id)
+                                    }}
+                                />
+                            </div>
                         </div>
+
                         <Button onClick={handleGenerate} disabled={isGenerating || activeItems.length === 0} className="w-full gap-2">
                             {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <FileDown size={16} />}
                             Generate & Save
@@ -587,12 +610,14 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                     <h4 className="font-bold uppercase text-gray-400 mb-2">Payment Information</h4>
                                     {(() => {
                                         const p = billingProfiles.find(p => p.id === billingProfileId)
+                                        if (!p) return null
                                         return (
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <span className="font-bold">Beneficiary:</span> {p.beneficiaryName} <br />
                                                     <span className="font-bold">Bank:</span> {p.bankName} <br />
-                                                    <span className="font-bold">Account:</span> {p.accountNumber}
+                                                    <span className="font-bold">Account:</span> {p.accountNumber} <br />
+                                                    {p.notes && <div className="mt-2 text-blue-600 whitespace-pre-line font-medium">{p.notes}</div>}
                                                 </div>
                                                 <div>
                                                     {p.swiftCode && <><span className="font-bold">SWIFT/BIC:</span> {p.swiftCode} <br /></>}

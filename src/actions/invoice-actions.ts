@@ -42,6 +42,7 @@ export async function createBillingProfile(data: {
     accountNumber: string
     swiftCode?: string
     address?: string
+    notes?: string // Added
     isDefault?: boolean
 }) {
     try {
@@ -58,7 +59,13 @@ export async function createBillingProfile(data: {
 
         const profile = await prisma.billingProfile.create({
             data: {
-                ...data,
+                profileName: data.profileName,
+                beneficiaryName: data.beneficiaryName,
+                bankName: data.bankName,
+                accountNumber: data.accountNumber,
+                swiftCode: data.swiftCode,
+                address: data.address,
+                notes: data.notes,
                 isDefault: data.isDefault || false
             }
         })
@@ -70,18 +77,63 @@ export async function createBillingProfile(data: {
     }
 }
 
+export async function updateBillingProfile(id: string, data: {
+    profileName: string
+    beneficiaryName: string
+    bankName: string
+    accountNumber: string
+    swiftCode?: string
+    address?: string
+    notes?: string
+    isDefault?: boolean
+}) {
+    try {
+        const user = await getCurrentUser()
+        if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
+
+        if (data.isDefault) {
+            // Unset other defaults
+            await prisma.billingProfile.updateMany({
+                where: { isDefault: true, id: { not: id } },
+                data: { isDefault: false }
+            })
+        }
+
+        const profile = await prisma.billingProfile.update({
+            where: { id },
+            data: {
+                profileName: data.profileName,
+                beneficiaryName: data.beneficiaryName,
+                bankName: data.bankName,
+                accountNumber: data.accountNumber,
+                swiftCode: data.swiftCode,
+                address: data.address,
+                notes: data.notes,
+                isDefault: data.isDefault || false
+            }
+        })
+        revalidatePath('/admin/crm')
+        return { success: true, data: profile }
+    } catch (error) {
+        return { error: 'Failed to update billing profile' }
+    }
+}
+
 export async function deleteBillingProfile(id: string) {
     try {
         const user = await getCurrentUser()
         if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
 
-        await prisma.billingProfile.delete({ where: { id } })
-        revalidatePath('/admin/finance')
+        await prisma.billingProfile.delete({
+            where: { id }
+        })
+        revalidatePath('/admin/crm')
         return { success: true }
     } catch (error) {
-        return { error: 'Failed to delete profile' }
+        return { error: 'Failed to delete billing profile' }
     }
 }
+
 
 // ==========================
 // INVOICE & TASKS

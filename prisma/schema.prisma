@@ -353,6 +353,7 @@ model BillingProfile {
   accountNumber   String
   swiftCode       String?
   address         String?
+  notes           String?  // Extra info like Delivery Method, Currency...
   isDefault       Boolean  @default(false)
   
   updatedAt       DateTime @updatedAt

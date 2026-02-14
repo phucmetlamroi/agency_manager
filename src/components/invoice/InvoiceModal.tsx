@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -345,31 +346,75 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                         <p className="text-xs text-gray-500">Select unbilled tasks to include</p>
                     </div>
 
+                    import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from '@/components/ui/accordion'
+                    import {Checkbox} from '@/components/ui/checkbox'
+
+// ... inside component ...
+
+    // Auto-select all tasks when loaded
+    useEffect(() => {
+        if (tasks.length > 0) {
+                        setSelectedTaskIds(tasks.map(t => t.id))
+                    }
+    }, [tasks])
+
+    // Group tasks for Selector
+    const groupedTasks = useMemo(() => {
+        const groups: Record<string, any[]> = { }
+        tasks.forEach(t => {
+            const brand = t.originalClientName || 'General'
+                    if (!groups[brand]) groups[brand] = []
+                    groups[brand].push(t)
+        })
+                    return groups
+    }, [tasks])
+
+                    // ... inside return ...
+
                     <div className="flex-1 overflow-y-auto p-4 space-y-2">
                         {isLoading ? <Loader2 className="animate-spin text-gray-400 mx-auto mt-10" /> : (
                             tasks.length === 0 ? (
                                 <p className="text-sm text-gray-400 text-center mt-10">No unbilled tasks found.</p>
                             ) : (
-                                tasks.map(task => (
-                                    <div
-                                        key={task.id}
-                                        onClick={() => toggleTask(task.id)}
-                                        className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedTaskIds.includes(task.id) ? 'bg-blue-50 border-blue-500 shadow-sm' : 'bg-white border-gray-200 hover:border-blue-300'}`}
-                                    >
-                                        <div className="flex justify-between items-start mb-1">
-                                            <div className="text-sm font-bold text-gray-800 line-clamp-2">{task.title}</div>
-                                            <div className="text-xs font-mono font-bold text-green-600">{formatCurrency(task.jobPriceUSD)}</div>
-                                        </div>
-                                        <div className="flex justify-between items-center text-xs text-gray-400">
-                                            <span>{new Date(task.createdAt).toLocaleDateString()}</span>
-                                            <span className={`px-1.5 py-0.5 rounded text-[10px] ${task.status === 'Hoàn tất' || task.status === 'Review' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>
-                                                {task.status}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))
+                                <Accordion type="multiple" defaultValue={Object.keys(groupedTasks)} className="space-y-2">
+                                    {Object.entries(groupedTasks).map(([brand, brandTasks]) => (
+                                        <AccordionItem key={brand} value={brand} className="border rounded-lg bg-white px-0">
+                                            <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-gray-50 rounded-t-lg">
+                                                <div className="flex justify-between items-center w-full mr-2">
+                                                    <span className="font-bold text-sm text-gray-700">{brand}</span>
+                                                    <span className="text-xs text-gray-400 font-normal">{brandTasks.length} tasks</span>
+                                                </div>
+                                            </AccordionTrigger>
+                                            <AccordionContent className="px-3 pb-2 pt-0">
+                                                <div className="space-y-1 mt-2">
+                                                    {brandTasks.map(task => (
+                                                        <div
+                                                            key={task.id}
+                                                            onClick={() => toggleTask(task.id)}
+                                                            className={`p-2 rounded border cursor-pointer transition-all flex items-center justify-between group ${selectedTaskIds.includes(task.id) ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100 hover:border-blue-300'}`}
+                                                        >
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedTaskIds.includes(task.id) ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'}`}>
+                                                                    {selectedTaskIds.includes(task.id) && <Plus className="text-white rotate-45" size={10} />}
+                                                                </div>
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <div className="text-xs font-medium text-gray-700 truncate w-full">{task.title}</div>
+                                                                    <div className="text-[10px] text-gray-400">{new Date(task.createdAt).toLocaleDateString()}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-xs font-bold text-green-600 whitespace-nowrap ml-2">
+                                                                {formatCurrency(task.jobPriceUSD)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    ))}
+                                </Accordion>
                             )
                         )}
+
 
                         {/* Manual Item Button */}
                         <button

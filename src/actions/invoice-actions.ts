@@ -15,7 +15,12 @@ export async function getBillingProfiles() {
         const profiles = await prisma.billingProfile.findMany({
             orderBy: { isDefault: 'desc' }
         })
-        return { success: true, data: profiles }
+        const safeProfiles = profiles.map(p => ({
+            ...p,
+            createdAt: p.createdAt.toISOString(),
+            updatedAt: p.updatedAt.toISOString()
+        }))
+        return { success: true, data: safeProfiles }
     } catch (error) {
         console.error('Error fetching billing profiles:', error)
         return { error: 'Failed to fetch billing profiles' }
@@ -245,7 +250,23 @@ export async function createInvoiceRecord(data: {
         }
 
         revalidatePath(`/admin/crm/${data.clientId}`)
-        return { success: true, data: result }
+
+        // Sanitize Result (Decimal -> Number, Date -> String)
+        const safeResult = {
+            ...result,
+            subtotalAmount: Number(result.subtotalAmount),
+            depositDeducted: Number(result.depositDeducted),
+            taxPercent: Number(result.taxPercent),
+            taxAmount: Number(result.taxAmount),
+            totalDue: Number(result.totalDue),
+            issueDate: result.issueDate.toISOString(),
+            dueDate: result.dueDate ? result.dueDate.toISOString() : null,
+            createdAt: result.createdAt.toISOString(),
+            updatedAt: result.updatedAt.toISOString(),
+            items: undefined // Optional: Don't need to return items if not used
+        }
+
+        return { success: true, data: safeResult }
 
     } catch (error) {
         console.error('Create Invoice Error:', error)

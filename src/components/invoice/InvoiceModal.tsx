@@ -100,6 +100,24 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
         }
     }
 
+    // Auto-select all tasks when loaded
+    useEffect(() => {
+        if (tasks.length > 0) {
+            setSelectedTaskIds(tasks.map(t => t.id))
+        }
+    }, [tasks])
+
+    // Group tasks for Selector
+    const groupedTasks = useMemo(() => {
+        const groups: Record<string, any[]> = {}
+        tasks.forEach(t => {
+            const brand = t.originalClientName || 'General'
+            if (!groups[brand]) groups[brand] = []
+            groups[brand].push(t)
+        })
+        return groups
+    }, [tasks])
+
     useEffect(() => {
         if (isOpen) {
             fetchData()
@@ -346,28 +364,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                         <p className="text-xs text-gray-500">Select unbilled tasks to include</p>
                     </div>
 
-                    import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from '@/components/ui/accordion'
-                    import {Checkbox} from '@/components/ui/checkbox'
 
-// ... inside component ...
-
-    // Auto-select all tasks when loaded
-    useEffect(() => {
-        if (tasks.length > 0) {
-                        setSelectedTaskIds(tasks.map(t => t.id))
-                    }
-    }, [tasks])
-
-    // Group tasks for Selector
-    const groupedTasks = useMemo(() => {
-        const groups: Record<string, any[]> = { }
-        tasks.forEach(t => {
-            const brand = t.originalClientName || 'General'
-                    if (!groups[brand]) groups[brand] = []
-                    groups[brand].push(t)
-        })
-                    return groups
-    }, [tasks])
 
                     // ... inside return ...
 

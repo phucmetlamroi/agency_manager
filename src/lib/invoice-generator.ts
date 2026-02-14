@@ -1,6 +1,7 @@
 import chromium from '@sparticuz/chromium-min'
 import puppeteer from 'puppeteer-core'
 import handlebars from 'handlebars'
+import fs from 'fs'
 
 // Invoice Template (Inline for now, can move to file later)
 const INVOICE_TEMPLATE = `
@@ -172,35 +173,52 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         const html = compiled(data)
 
         // Configure Puppeteer for Vercel vs Local
-        const isProduction = process.env.NODE_ENV === 'production'
+        // Configure Puppeteer for Vercel vs Local
+        // @sparticuz/chromium-min is designed for Serverless (AWS Lambda / Vercel)
+        // It WON'T work on Windows Local even in Production mode
+        const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION
 
-        if (isProduction) {
+        if (isVercel) {
             browser = await puppeteer.launch({
                 args: chromium.args,
-                defaultViewport: { width: 1920, height: 1080 },
+                defaultViewport: chromium.defaultViewport,
                 executablePath: await chromium.executablePath(),
-                headless: (chromium as any).headless,
+                headless: chromium.headless,
                 ignoreHTTPSErrors: true,
-            } as any)
+            })
         } else {
-            // Local development fallback (requires local Chrome/Chromium installed)
-            // Using puppeteer-core, checking common paths or assuming user has Chrome
-            // Actually, for local dev, 'puppeteer' (full) is better, but to keep package small we rely on core.
-            // We can point to a standard Chrome install if available.
-            // Or we just expect the user to have CHROME_PATH env var manually set if needed.
-            // Attempting to launch with default (might fail if no Chrome found in path).
+            // Local development or Local Production (Windows/Mac/Linux)
+            const platform = process.platform
 
-            // Strategy: Look for Chrome
-            const localExecutablePath =
-                process.platform === 'win32'
-                    ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-                    : process.platform === 'linux'
-                        ? '/usr/bin/google-chrome'
-                        : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+            let executablePath = ''
+            if (platform === 'win32') {
+                const paths = [
+                    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+                    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+                    process.env.LOCALAPPDATA + '\\Google\\Chrome\\Application\\chrome.exe',
+                ]
+
+                for (const p of paths) {
+                    if (fs.existsSync(p)) {
+                        executablePath = p
+                        break
+                    }
+                }
+
+                if (!executablePath) {
+                    console.warn('Chrome/Edge executable not found in standard paths. Puppeteer might fail.')
+                }
+            } else if (platform === 'linux') {
+                executablePath = '/usr/bin/google-chrome'
+            } else if (platform === 'darwin') {
+                executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+            }
 
             browser = await puppeteer.launch({
                 args: ['--no-sandbox', '--disable-setuid-sandbox'],
-                executablePath: localExecutablePath,
+                executablePath: executablePath || undefined, // If undefined, will try to find bundled chromium (if installed, unlikely for generic puppeteer-core)
                 headless: true
             })
         }

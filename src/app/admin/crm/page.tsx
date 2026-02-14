@@ -68,7 +68,7 @@ export default async function CRMDashboard() {
                                             </div>
                                             <div>
                                                 <div className="font-semibold text-sm text-gray-200 group-hover:text-white">{client.name}</div>
-                                                <div className="text-[10px] text-gray-500">{client._count.tasks} tasks</div>
+                                                <div className="text-[10px] text-gray-500">{client.totalTaskCount} tasks</div>
                                             </div>
                                         </div>
                                         <div className="font-mono font-bold text-green-400 text-sm">

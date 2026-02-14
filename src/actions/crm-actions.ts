@@ -39,10 +39,25 @@ export async function getTopClients(limit = 5) {
             include: {
                 _count: {
                     select: { tasks: true }
+                },
+                subsidiaries: {
+                    include: {
+                        _count: { select: { tasks: true } }
+                    }
                 }
             }
         })
-        return { success: true, data: topClients }
+
+        // Aggregate total tasks (Parent + Subsidiaries)
+        const safeTopClients = topClients.map(c => {
+            const subTasks = c.subsidiaries.reduce((sum, sub) => sum + sub._count.tasks, 0)
+            return {
+                ...c,
+                totalTaskCount: c._count.tasks + subTasks
+            }
+        })
+
+        return { success: true, data: safeTopClients }
     } catch (error) {
         return { success: false, error: 'Failed to fetch top clients' }
     }

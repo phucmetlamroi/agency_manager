@@ -88,11 +88,20 @@ export async function deleteBillingProfile(id: string) {
 // ==========================
 
 // Fetch tasks that are COMPLETED (or similar status) and UNBILLED
+// Fetch tasks that are COMPLETED (or similar status) and UNBILLED
+// UPDATED: Now includes tasks from Sub-clients (Subsidiaries)
 export async function getUnbilledTasks(clientId: number) {
     try {
+        // 1. Get all related Client IDs (Parent + Children)
+        const subsidiaries = await prisma.client.findMany({
+            where: { parentId: clientId },
+            select: { id: true }
+        })
+        const allClientIds = [clientId, ...subsidiaries.map(s => s.id)]
+
         const tasks = await prisma.task.findMany({
             where: {
-                clientId: clientId,
+                clientId: { in: allClientIds }, // Query Family
                 invoiceStatus: 'UNBILLED',
             },
             select: {
@@ -102,7 +111,8 @@ export async function getUnbilledTasks(clientId: number) {
                 value: true,
                 createdAt: true,
                 status: true,
-                productLink: true
+                productLink: true,
+                client: { select: { name: true } } // Fetch client name to distinguish
             },
             orderBy: { createdAt: 'desc' }
         })
@@ -110,6 +120,8 @@ export async function getUnbilledTasks(clientId: number) {
         // Sanitize data for Client Component
         const safeTasks = tasks.map(t => ({
             ...t,
+            // If task belongs to sub-client, append name to title for clarity
+            title: t.client && t.client.name && t.client.name !== 'Unknown' ? `[${t.client.name}] ${t.title}` : t.title,
             jobPriceUSD: toSafeNumber(t.jobPriceUSD),
             value: toSafeNumber(t.value),
             createdAt: t.createdAt.toISOString()
@@ -275,10 +287,18 @@ export async function createInvoiceRecord(data: {
 }
 
 // Fetch Invoices for a specific client
+// Fetch Invoices for a specific client (including invoices generated for sub-clients if any)
 export async function getClientInvoices(clientId: number) {
     try {
+        // 1. Get all related Client IDs (Parent + Children)
+        const subsidiaries = await prisma.client.findMany({
+            where: { parentId: clientId },
+            select: { id: true }
+        })
+        const allClientIds = [clientId, ...subsidiaries.map(s => s.id)]
+
         const invoices = await prisma.invoice.findMany({
-            where: { clientId },
+            where: { clientId: { in: allClientIds } },
             orderBy: { issueDate: 'desc' },
             include: {
                 _count: {

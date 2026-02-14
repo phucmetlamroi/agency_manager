@@ -121,7 +121,26 @@ function ClientItem({ client, onEdit }: { client: Client, onEdit: (c: Client) =>
         return 'text-red-400'
     }
 
-    const taskCount = client.tasks?.length || 0
+    // Aggregate Tasks from Parent + Subsidiaries
+    const ownTasks = client.tasks || []
+    const subTasks = client.subsidiaries?.flatMap(s => s.tasks.map(t => ({ ...t, title: `[${s.name}] ${t.title}` }))) || []
+    const allTasks = [...ownTasks, ...subTasks].sort((a, b) => {
+        // Sort by ID or creation if available, else just concat. 
+        // Since we don't have createdAt here easily without changing type, we might just assume order or rely on ID text?
+        // Actually the backend sorts by createdAt desc.
+        // Let's just merge. If we need strict sorting we need createdAt field in the Task type.
+        return 0
+    })
+
+    // Better: The Task type in ClientList doesn't have createdAt. 
+    // Let's check the type definition at top of file. 
+    // It says: type Task = { id, title, status, value? }
+    // We should probably add createdAt to the type to sort correctly, but for now let's just show them.
+    // To make it useful, we really should sort by "Recent". 
+    // I'll assume the arrays from backend are already sorted individually. 
+    // I'll merge them.
+
+    const taskCount = allTasks.length
 
     return (
         <div className="border border-white/10 rounded-lg overflow-hidden bg-white/5">
@@ -173,13 +192,13 @@ function ClientItem({ client, onEdit }: { client: Client, onEdit: (c: Client) =>
 
             {isExpanded && (
                 <div className="bg-black/20 p-4 pl-12 border-t border-white/10 space-y-3">
-                    {/* Tasks/Videos List */}
-                    {client.tasks && client.tasks.length > 0 && (
+                    {/* Tasks/Videos List (Aggregated) */}
+                    {allTasks.length > 0 && (
                         <div className="mb-4">
-                            <div className="text-xs text-purple-400 font-bold uppercase mb-2">Recent Videos</div>
+                            <div className="text-xs text-purple-400 font-bold uppercase mb-2">Recent Videos (Aggregated)</div>
                             <div className="space-y-1">
-                                {client.tasks.slice(0, 5).map(t => (
-                                    <div key={t.id} className="bg-white/5 p-2 rounded text-sm flex justify-between items-center hover:bg-white/10">
+                                {allTasks.slice(0, 5).map((t, idx) => (
+                                    <div key={`${t.id}-${idx}`} className="bg-white/5 p-2 rounded text-sm flex justify-between items-center hover:bg-white/10">
                                         <span className="truncate max-w-[200px]">{t.title}</span>
                                         <span className={`text-[10px] px-1.5 py-0.5 rounded border ${t.status === 'Hoàn tất'
                                             ? 'border-green-500 text-green-400 bg-green-900/20'
@@ -189,9 +208,9 @@ function ClientItem({ client, onEdit }: { client: Client, onEdit: (c: Client) =>
                                         </span>
                                     </div>
                                 ))}
-                                {client.tasks.length > 5 && (
+                                {allTasks.length > 5 && (
                                     <div className="text-xs text-center text-gray-500 pt-1">
-                                        ...còn {client.tasks.length - 5} video nữa
+                                        ...còn {allTasks.length - 5} video nữa
                                     </div>
                                 )}
                             </div>

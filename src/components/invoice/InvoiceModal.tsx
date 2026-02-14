@@ -89,30 +89,30 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
     // Derived State: Items from Tasks + Manual
     const invoiceItems = useMemo(() => {
-        const taskItems: InvoiceItem[] = tasks
-            .filter(t => selectedTaskIds.includes(t.id))
-            .map(t => ({
-                id: t.id,
-                description: t.title, // Initial description
-                note: t.productLink ? `Ref: ${t.productLink}` : undefined,
-                quantity: 1,
-                unitPrice: Number(t.jobPriceUSD || 0),
-                amount: Number(t.jobPriceUSD || 0),
-                isManual: false,
-                taskId: t.id
-            }))
+        try {
+            if (!Array.isArray(tasks)) return []
 
-        // Merge with overrides? 
-        // Logic: We need to allow editing descriptions/prices of Task Items.
-        // So we should probably store ALL items in a state, initialized when tasks are selected?
-        // OR: simpler approach for MVP:
-        // Use a "overrides" map for task items.
-
-        return [...taskItems, ...manualItems]
+            const taskItems: InvoiceItem[] = tasks
+                .filter(t => t && t.id && selectedTaskIds.includes(t.id))
+                .map(t => ({
+                    id: t.id,
+                    description: t.title || 'Untitled Task',
+                    note: t.productLink ? `Ref: ${t.productLink}` : undefined,
+                    quantity: 1,
+                    unitPrice: Number(t.jobPriceUSD) || 0,
+                    amount: Number(t.jobPriceUSD) || 0,
+                    isManual: false,
+                    taskId: t.id
+                }))
+            return [...taskItems, ...manualItems]
+        } catch (error) {
+            console.error('Error generating invoice items:', error)
+            return []
+        }
     }, [tasks, selectedTaskIds, manualItems])
 
     // CALCULATIONS
-    const subtotal = invoiceItems.reduce((sum, item) => sum + (item.isManual ? item.amount : (overrides[item.id]?.amount ?? item.amount)), 0)
+    const subtotal = invoiceItems.reduce((sum, item) => sum + (Number(item.isManual ? item.amount : (overrides[item.id]?.amount ?? item.amount)) || 0), 0)
     // We need 'overrides' state to handle edits to task items
     const [overrides, setOverrides] = useState<Record<string, { description?: string, unitPrice?: number, quantity?: number, amount: number }>>({})
 
@@ -125,17 +125,18 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
         })
     }, [invoiceItems, overrides])
 
-    const activeSubtotal = activeItems.reduce((sum, item) => sum + item.amount, 0)
-    const activeTaxAmount = activeSubtotal * (taxPercent / 100)
+    const activeSubtotal = activeItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+    const activeTaxAmount = activeSubtotal * (Number(taxPercent) / 100)
     const activeTotalBeforeDeposit = activeSubtotal + activeTaxAmount
 
     // Deposit Logic
-    const maxDeductible = Math.min(activeTotalBeforeDeposit, depositBalance)
+    const maxDeductible = Math.min(activeTotalBeforeDeposit, depositBalance || 0)
     const depositDeducted = applyDeposit ? maxDeductible : 0
     const finalTotalDue = activeTotalBeforeDeposit - depositDeducted
 
     // Handlers
     const toggleTask = (taskId: string) => {
+        console.log('Toggling Task:', taskId)
         setSelectedTaskIds(prev =>
             prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
         )

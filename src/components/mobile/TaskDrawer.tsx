@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Calendar, Clock, Link as LinkIcon, Edit, User } from "lucide-react"
+import DOMPurify from "isomorphic-dompurify"
 
 interface TaskDrawerProps {
     open: boolean
@@ -85,9 +86,10 @@ export function TaskDrawer({ open, onOpenChange, task, isAdmin, onEdit }: TaskDr
                                 {/* Instructions */}
                                 <div>
                                     <h4 className="text-sm font-medium text-zinc-400 mb-2">Instructions</h4>
-                                    <p className="text-sm text-zinc-300 leading-relaxed bg-zinc-900 p-4 rounded-lg border border-zinc-800">
-                                        {task.notes || "No specific instructions provided."}
-                                    </p>
+                                    <div
+                                        className="text-sm text-zinc-300 leading-relaxed bg-zinc-900 p-4 rounded-lg border border-zinc-800 prose prose-invert prose-sm max-w-none break-words"
+                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(task.notes || "No specific instructions provided.") }}
+                                    />
                                 </div>
 
                                 {/* Link */}

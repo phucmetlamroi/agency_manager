@@ -397,7 +397,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             NOTES / INSTRUCTIONS
                         </label>
                         {isEditing ? (
-                            <div className="h-64 border border-gray-200 rounded-lg overflow-hidden">
+                            <div className="h-[500px] rounded-lg overflow-hidden">
                                 <TiptapEditor
                                     content={form.notes}
                                     onChange={(html) => setForm({ ...form, notes: html })}

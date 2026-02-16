@@ -118,7 +118,7 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
     )
 
     return (
-        <div className="border border-gray-200 rounded-lg bg-white overflow-hidden flex flex-col">
+        <div className="border border-gray-200 rounded-lg bg-white flex flex-col h-full shadow-sm">
             {/* LINK EDIT MODAL */}
             {isLinkModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
@@ -150,9 +150,9 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                 </div>
             )}
 
-            {/* TOOLBAR */}
+            {/* TOOLBAR - STICKY */}
             {editable && (
-                <div className="border-b border-gray-100 bg-gray-50/50 p-1 flex flex-wrap gap-1 items-center">
+                <div className="sticky top-0 z-10 border-b border-gray-100 bg-gray-50/95 backdrop-blur-sm p-1.5 flex flex-wrap gap-1 items-center shadow-sm">
                     <ToolbarButton
                         onClick={() => editor.chain().focus().toggleBold().run()}
                         isActive={editor.isActive('bold')}
@@ -213,8 +213,9 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                 </div>
             )}
 
-            <div className="flex-1 overflow-auto max-h-[400px]">
-                <EditorContent editor={editor} />
+            {/* CONTENT - SCROLLABLE */}
+            <div className="flex-1 overflow-y-auto min-h-[150px] relative scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+                <EditorContent editor={editor} className="h-full" />
             </div>
         </div>
     )

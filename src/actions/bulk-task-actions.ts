@@ -145,3 +145,85 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any) {
         return { error: "Failed to update tasks" }
     }
 }
+
+// BULK ASSIGN
+export async function bulkAssignTasks(taskIds: string[], assigneeId: string | null) {
+    if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
+
+    try {
+        const isAgency = assigneeId?.startsWith('agency:')
+        const cleanAssigneeId = isAgency ? null : assigneeId
+        const cleanAgencyId = isAgency ? assigneeId?.split(':')[1] : null
+
+        // If assigning to a USER, we should also link their AGENCY
+        let userAgencyId = null
+        if (cleanAssigneeId) {
+            const user = await prisma.user.findUnique({ where: { id: cleanAssigneeId }, select: { agencyId: true } })
+            userAgencyId = user?.agencyId || null
+        }
+
+        // Determine correct assignedAgencyId
+        // If assigning to Agency directly -> use that agency ID
+        // If assigning to User -> use user's agency ID (if any)
+        // If Unassigning -> keep existing agency? No, unassign usually means back to pool or global.
+        // But logic in 'assignTask' says:
+        // - If assign to User: update status='Đã nhận task', assigneeId=User, assignedAgencyId=UserAgency
+        // - If assign to Agency: status='Đang đợi giao', assigneeId=null, assignedAgencyId=Agency
+        // - If Unassign: status='Đang đợi giao', assigneeId=null, assignedAgencyId=null (or keep? Let's check logic)
+        // Replicating 'assignTask' logic for consistency:
+
+        const updateData: any = {}
+        const notifications: any[] = []
+
+        if (cleanAssigneeId) {
+            // Assign to USER
+            updateData.assigneeId = cleanAssigneeId
+            updateData.assignedAgencyId = userAgencyId // Auto-link agency
+            updateData.status = 'Đã nhận task'
+
+            // Prepare notifications
+            taskIds.forEach(id => {
+                notifications.push({
+                    userId: cleanAssigneeId,
+                    message: `Bạn được giao task mới (Bulk Assign)`,
+                    isRead: false,
+                    // We can't easily link to multiple tasks, so generic message
+                })
+            })
+
+        } else if (cleanAgencyId) {
+            // Assign to AGENCY
+            updateData.assigneeId = null
+            updateData.assignedAgencyId = cleanAgencyId
+            updateData.status = 'Đang đợi giao'
+            // No user notification for agency assignment (usually)
+        } else {
+            // UNASSIGN (Back to Global Pool)
+            updateData.assigneeId = null
+            updateData.assignedAgencyId = null
+            updateData.status = 'Đang đợi giao'
+        }
+
+        // Execute Update
+        await prisma.$transaction(async (tx) => {
+            await tx.task.updateMany({
+                where: { id: { in: taskIds } },
+                data: updateData
+            })
+
+            if (notifications.length > 0) {
+                await tx.notification.createMany({
+                    data: notifications
+                })
+            }
+        })
+
+        revalidatePath('/admin/queue')
+        revalidatePath('/dashboard')
+        return { success: true, count: taskIds.length }
+
+    } catch (error) {
+        console.error("Bulk Assign Error:", error)
+        return { error: "Failed to bulk assign tasks" }
+    }
+}

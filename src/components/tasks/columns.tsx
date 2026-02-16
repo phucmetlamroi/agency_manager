@@ -26,7 +26,8 @@ export const getColumns = (
     agencies: any[],
     isAdmin: boolean,
     onTaskClick: (task: TaskWithUser) => void,
-    onDelete?: (id: string) => void
+    onDelete?: (id: string) => void,
+    selectedIds: string[] = []
 ): ColumnDef<TaskWithUser>[] => [
         {
             id: "select",
@@ -87,6 +88,7 @@ export const getColumns = (
                     users={users}
                     agencies={agencies}
                     isAdmin={isAdmin}
+                    selectedIds={selectedIds}
                 />
             )
         },

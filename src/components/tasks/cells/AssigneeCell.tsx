@@ -24,9 +24,10 @@ interface AssigneeCellProps {
     users: { id: string; username: string; reputation?: number }[]
     agencies: { id: string; name: string; code: string }[]
     isAdmin: boolean
+    selectedIds?: string[]
 }
 
-export function AssigneeCell({ task, users, agencies, isAdmin }: AssigneeCellProps) {
+export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [] }: AssigneeCellProps) {
     const router = useRouter()
     const { confirm } = useConfirm()
 
@@ -34,22 +35,51 @@ export function AssigneeCell({ task, users, agencies, isAdmin }: AssigneeCellPro
     const currentValue = task.assignee?.id || (task.assignedAgencyId ? `agency:${task.assignedAgencyId}` : "unassigned")
 
     const handleAssign = async (val: string) => {
-        if (!val || val === "unassigned") return
+        if (!val) return
 
-        // Check availability
-        const res = await checkUserAvailability(val, new Date())
-        if (!res.available) {
-            if (!await confirm({
-                title: '⚠️ CẢNH BÁO LỊCH TRÌNH',
-                message: `Nhân sự này đang có lịch BẬN (Busy) trong khoảng thời gian này. Bạn có chắc chắn muốn giao việc không?`,
-                type: 'danger',
-                confirmText: 'Vẫn giao',
-                cancelText: 'Chọn người khác'
-            })) {
-                return // Cancel assignment
+        // CHECK BULK MODE
+        const isSelected = selectedIds.includes(task.id)
+        const isBulk = isSelected && selectedIds.length > 1
+
+        // Check availability (only for single assign or if we want to check for all - keeping simple for now)
+        if (val !== "unassigned" && !val.startsWith('agency:') && !val.startsWith('sys:')) {
+            const res = await checkUserAvailability(val, new Date())
+            if (!res.available) {
+                if (!await confirm({
+                    title: '⚠️ CẢNH BÁO LỊCH TRÌNH',
+                    message: `Nhân sự này đang có lịch BẬN (Busy) trong khoảng thời gian này. ${isBulk ? 'Bạn có muốn GIAO HÀNG LOẠT không?' : 'Bạn có chắc chắn muốn giao việc không?'}`,
+                    type: 'danger',
+                    confirmText: 'Vẫn giao',
+                    cancelText: 'Chọn người khác'
+                })) {
+                    return // Cancel assignment
+                }
             }
         }
 
+        // BULK ASSIGN CONFIRMATION
+        if (isBulk) {
+            if (await confirm({
+                title: '⚡ Bulk Assignment',
+                message: `Bạn đang chọn ${selectedIds.length} tasks. Bạn có muốn giao TẤT CẢ tasks này cho người được chọn không?`,
+                type: 'info',
+                confirmText: `Giao cho cả ${selectedIds.length} tasks`,
+                cancelText: 'Chỉ giao task này'
+            })) {
+                // Perform Bulk Assign
+                const { bulkAssignTasks } = await import('@/actions/bulk-task-actions')
+                const res = await bulkAssignTasks(selectedIds, val === "unassigned" ? null : val)
+
+                if (res.error) toast.error(res.error)
+                else {
+                    toast.success(`Đã giao ${res.count} tasks thành công!`)
+                    router.refresh()
+                }
+                return
+            }
+        }
+
+        // Single Assign (Default)
         const assignRes = await assignTask(task.id, val === "unassigned" ? null : val)
         if (assignRes?.success) {
             toast.success("Assignment updated")

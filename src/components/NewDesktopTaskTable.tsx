@@ -64,7 +64,8 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], a
             }
             setSelectedTask(task)
         }, // onTaskClick
-        handleDelete // onDelete
+        handleDelete, // onDelete
+        selectedIds // selectedRowIds for Bulk Assign
     )
 
     return (

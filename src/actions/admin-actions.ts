@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
+import { parseVietnamDate } from '@/lib/date-utils'
 
 export async function updateUserRole(userId: string, newRole: string) {
     try {
@@ -92,7 +93,7 @@ export async function createTask(formData: FormData) {
                 title,
                 value,
                 type,
-                deadline: deadline ? new Date(deadline + ':00+07:00') : null,
+                deadline: deadline ? parseVietnamDate(deadline) : null,
                 resources: resources || null,
                 references: references || null,
                 notes: notes || null,

@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { parseVietnamDate } from '@/lib/date-utils'
 
 type BatchTaskInput = {
     titles: string[]
@@ -29,7 +30,7 @@ export async function createBatchTasks(data: BatchTaskInput) {
         const profitVND = revenueVND - data.wageVND
 
         // Prepare deadline date object
-        const deadlineDate = data.deadline ? new Date(data.deadline + ':00+07:00') : null
+        const deadlineDate = data.deadline ? parseVietnamDate(data.deadline) : null
 
         // FIX: Fetch assignee's agencyId if being assigned
         let assignedAgencyId: string | null = null
@@ -125,7 +126,7 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any) {
         if (data.references !== undefined) updateData.references = data.references
         if (data.notes !== undefined) updateData.notes = data.notes
         if (data.productLink !== undefined) updateData.productLink = data.productLink
-        if (data.deadline !== undefined) updateData.deadline = data.deadline ? new Date(data.deadline) : null
+        if (data.deadline !== undefined) updateData.deadline = data.deadline ? parseVietnamDate(data.deadline) : null
         if (data.jobPriceUSD !== undefined) updateData.jobPriceUSD = data.jobPriceUSD
         if (data.value !== undefined) updateData.value = data.value
         if (data.collectFilesLink !== undefined) updateData.collectFilesLink = data.collectFilesLink

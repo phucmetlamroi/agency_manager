@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { parseVietnamDate } from '@/lib/date-utils'
 
 export async function updateTaskDetails(id: string, data: {
     resources?: string
@@ -69,7 +70,7 @@ export async function updateTaskDetails(id: string, data: {
         // Handle Deadline Update + Timer Reset
         if (data.deadline) {
             // Force Vietnam parsing
-            updateData.deadline = new Date(data.deadline + ':00+07:00')
+            updateData.deadline = parseVietnamDate(data.deadline)
             // Reset createdAt to "restart" the Smart Reminder timer
             updateData.createdAt = new Date()
 

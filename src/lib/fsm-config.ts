@@ -44,7 +44,7 @@ export const TRANSITIONS: Record<TaskEvent, TransitionRule> = {
         requiredRole: ['ADMIN', 'SYSTEM']
     },
     start: {
-        from: [TaskState.ASSIGNED, TaskState.PAUSED],
+        from: [TaskState.ASSIGNED, TaskState.PAUSED, TaskState.PENDING], // Allow Claim & Start from Pool
         to: TaskState.IN_PROGRESS,
         requiredRole: ['USER', 'ADMIN']
     },

@@ -56,7 +56,6 @@ const NAV_ITEMS = [
     { label: "Payroll", href: "/admin/payroll", icon: Wallet },
     { label: "Finance", href: "/admin/finance", icon: Building2 }, // Re-added Finance
     { label: "Staff", href: "/admin/users", icon: Users },
-    { label: "Agencies", href: "/admin/agencies", icon: Building2 },
     // { label: "Settings", href: "/admin/settings", icon: Settings },
 ]
 

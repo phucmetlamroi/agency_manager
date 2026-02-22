@@ -52,6 +52,7 @@ export function TasksDataTable<TData, TValue>({
     const [columnVisibility, setColumnVisibility] =
         React.useState<VisibilityState>({})
     const [internalRowSelection, setInternalRowSelection] = React.useState({})
+    const [globalFilter, setGlobalFilter] = React.useState("")
 
     const rowSelection = externalRowSelection ?? internalRowSelection
     const setRowSelection = externalSetRowSelection ?? setInternalRowSelection
@@ -62,6 +63,14 @@ export function TasksDataTable<TData, TValue>({
         getRowId: (row: any) => row.id, // IMPORTANT: Use ID as key for selection
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
+        onGlobalFilterChange: setGlobalFilter,
+        globalFilterFn: (row: any, columnId: string, filterValue: any) => {
+            const client = row.original?.client
+            const clientName = client?.name || ""
+            const parentName = client?.parent?.name || ""
+            const searchStr = String(filterValue).toLowerCase()
+            return clientName.toLowerCase().includes(searchStr) || parentName.toLowerCase().includes(searchStr)
+        },
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -73,6 +82,7 @@ export function TasksDataTable<TData, TValue>({
             columnFilters,
             columnVisibility,
             rowSelection,
+            globalFilter,
         },
     })
 
@@ -80,11 +90,9 @@ export function TasksDataTable<TData, TValue>({
         <div className="w-full">
             <div className="flex items-center py-4 gap-2">
                 <Input
-                    placeholder="Filter tasks..."
-                    value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
-                    onChange={(event) =>
-                        table.getColumn("title")?.setFilterValue(event.target.value)
-                    }
+                    placeholder="Tìm theo Khách hàng / Brand..."
+                    value={globalFilter ?? ""}
+                    onChange={(event) => setGlobalFilter(event.target.value)}
                     className="max-w-sm"
                 />
                 <DropdownMenu>

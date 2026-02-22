@@ -14,10 +14,7 @@ export async function deleteTask(id: string) {
 
         // Permission Check
         if (!user.isSuperAdmin) {
-            // Agency Owner chỉ được xóa task thuộc agency mình
-            if (!user.isAgencyOwner || task.assignedAgencyId !== user.ownedAgencyId) {
-                return { error: 'Forbidden: Bạn không có quyền xóa Task này.' }
-            }
+            return { error: 'Forbidden: Bạn không có quyền xóa Task này.' }
         }
 
         // Nhờ onDelete: Cascade trong Prisma, UserSchedule liên quan sẽ tự mất
@@ -41,8 +38,7 @@ export async function updateTask(id: string, data: any) {
         // Security & Sanitization
         if (!user.isSuperAdmin) {
             // Check Ownership
-            if (user.isAgencyOwner && task.assignedAgencyId !== user.ownedAgencyId) return { error: 'Forbidden' }
-            if (!user.isAgencyOwner && task.assigneeId !== user.id) return { error: 'Forbidden' }
+            if (task.assigneeId !== user.id) return { error: 'Forbidden' }
 
             // SANITIZE: Loại bỏ trường nhạy cảm để nhân viên không tự hack lương/deadline
             delete data.wageVND
@@ -71,16 +67,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
         if (!task) return { error: 'Task not found' }
 
         if (!user.isSuperAdmin) {
-            if (!user.isAgencyOwner) return { error: 'Permission denied: Chỉ Admin/Owner mới được giao việc.' }
-            if (task.assignedAgencyId !== user.ownedAgencyId) return { error: 'Task không thuộc Agency của bạn.' }
-
-            // Validate Target User/Agency
-            if (assignmentId) {
-                if (assignmentId.startsWith('agency:')) return { error: 'Không thể chuyển Task sang Agency khác.' }
-
-                const targetUser = await prisma.user.findUnique({ where: { id: assignmentId } })
-                if (targetUser?.agencyId !== user.ownedAgencyId) return { error: 'Không thể giao cho nhân viên ngoài Agency.' }
-            }
+            return { error: 'Permission denied: Chỉ Admin mới được giao việc.' }
         }
 
         // B. PREPARE DATA & TIMER LOGIC (Fix Time Leak)
@@ -120,33 +107,19 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                 accumulatedSeconds: newAccumulated
             }
         }
-        else if (assignmentId.startsWith('agency:')) {
-            // CASE: ASSIGN TO AGENCY
-            updateData = {
-                assignedAgencyId: assignmentId.split(':')[1],
-                assigneeId: null,
-                status: 'Đang đợi giao',
-                timerStatus: 'PAUSED',
-                accumulatedSeconds: newAccumulated
-            }
-        }
+
         else {
             // CASE: ASSIGN TO USER
             // 1. Check Availability (Nếu không phải Super Admin)
             if (!user.isSuperAdmin) {
                 const { checkUserAvailability } = await import('@/actions/schedule-actions')
                 const availability = await checkUserAvailability(assignmentId, new Date())
-                if (!availability.available) return { error: 'Nhân sự đang bận trong khung giờ này.' }
+                if (availability.available === false) return { error: 'Nhân sự đang bận trong khung giờ này.' }
             }
-
-            const targetUser = await prisma.user.findUnique({
-                where: { id: assignmentId },
-                select: { agencyId: true }
-            })
 
             updateData = {
                 assigneeId: assignmentId,
-                assignedAgencyId: targetUser?.agencyId || null,
+                assignedAgencyId: null, // Clear any agency link
                 status: 'Đã nhận task',
                 isPenalized: false,
                 timerStatus: 'PAUSED', // Reset về Pause để user mới tự bấm Start

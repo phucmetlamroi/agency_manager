@@ -6,10 +6,7 @@ import { UserRole } from '@prisma/client'
 export type AuthContext = {
     id: string
     role: UserRole
-    agencyId: string | null
-    ownedAgencyId: string | null
     isSuperAdmin: boolean
-    isAgencyOwner: boolean
     isTreasurer: boolean // Added
     email: string | null
     username: string | null
@@ -39,10 +36,7 @@ export const getCurrentUser = cache(async (): Promise<AuthContext> => {
     return {
         id: user.id,
         role: user.role as UserRole, // Ensure proper casting if needed or define Role explicitly
-        agencyId: user.agencyId,
-        ownedAgencyId: user.ownedAgency[0]?.id || null,
         isSuperAdmin: user.role === 'ADMIN',
-        isAgencyOwner: user.ownedAgency.length > 0,
         isTreasurer: user.isTreasurer,
         email: user.email,
         username: user.username,

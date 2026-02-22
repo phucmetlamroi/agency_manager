@@ -53,7 +53,7 @@ export async function middleware(request: NextRequest) {
         // Redirect logged in user away from login page
         if (request.nextUrl.pathname === '/login') {
             if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin', request.url))
-            if (role === 'AGENCY_ADMIN') return NextResponse.redirect(new URL('/agency', request.url))
+
             return NextResponse.redirect(new URL('/dashboard', request.url))
         }
 

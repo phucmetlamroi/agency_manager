@@ -22,24 +22,9 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
 
         // RBAC CHECK:
         if (!user.isSuperAdmin) {
-            // Case 1: Agency Owner
-            if (user.isAgencyOwner) {
-                // Can update any task assigned to their agency
-                if (task.assignedAgencyId !== user.ownedAgencyId) {
-                    return { error: 'Forbidden: Bạn không có quyền thao tác trên Task của Agency khác.' }
-                }
-            }
-            // Case 2: Staff / Freelancer
-            else {
-                // Modified: Allow if Assigned to Self OR (Unassigned AND Assigned to My Agency)
-                const isMyTask = task.assigneeId === user.id
-                // Check if task belongs to user's agency (if they have one)
-                const isMyAgencyTask = user.agencyId && task.assignedAgencyId === user.agencyId
-                const isComputable = isMyTask || (isMyAgencyTask && !task.assigneeId)
-
-                if (!isComputable) {
-                    return { error: 'Forbidden: Bạn chỉ được cập nhật Task của chính mình hoặc nhận Task từ Agency.' }
-                }
+            // Can ONLY update tasks assigned to themselves
+            if (task.assigneeId !== user.id) {
+                return { error: 'Forbidden: Bạn chỉ được cập nhật Task của chính mình.' }
             }
         }
 
@@ -131,13 +116,7 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
             }
         }
 
-        // --- AUTO-CLAIM LOGIC (Agency Members) ---
-        let assignmentUpdate = {}
-        if (isRunningState && !task.assigneeId && user.agencyId && task.assignedAgencyId === user.agencyId) {
-            assignmentUpdate = {
-                assigneeId: user.id
-            }
-        }
+
 
         // --- TRANSACTION BLOCK ---
         // Ensure Atomicity: Feedback + Reputation + Task Status must succeed or fail together.
@@ -174,7 +153,6 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
                 ...(newNotes ? { notes: newNotes } : {}),
                 ...deadlineUpdate,
                 ...timerUpdate,
-                ...assignmentUpdate, // <--- Add Auto-Claim
                 version: { increment: 1 }
             }
 

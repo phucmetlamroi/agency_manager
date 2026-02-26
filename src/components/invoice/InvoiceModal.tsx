@@ -51,6 +51,13 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     const [applyDeposit, setApplyDeposit] = useState(false)
     const [groupByBrand, setGroupByBrand] = useState(true) // Default to Grouped View
 
+    // Customizable Fields
+    const [customAgencyName, setCustomAgencyName] = useState('Agency Manager')
+    const [customTitle, setCustomTitle] = useState('INVOICE')
+    const [customClientAddress, setCustomClientAddress] = useState(clientAddress || '')
+    const [dueDateLabel, setDueDateLabel] = useState('Balance Due')
+    const [paymentLink, setPaymentLink] = useState('')
+
     // Editing Item State
     const [editingItemId, setEditingItemId] = useState<string | null>(null)
     const [editForm, setEditForm] = useState({ description: '', unitPrice: 0, quantity: 1 })
@@ -267,9 +274,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 createdBy: 'system',
                 invoiceNumber,
                 invoiceStatus: 'SENT',
-                agencyName: 'Agency Manager',
+                agencyName: customAgencyName,
                 clientName,
-                clientAddress,
+                clientAddress: customClientAddress,
                 issueDate: new Date(issueDate),
                 dueDate: dueDate ? new Date(dueDate) : undefined,
                 items: activeItems.map(i => ({
@@ -297,9 +304,11 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
             toast.success('Invoice saved! Generating PDF...')
 
-            // 3. Generate PDF (Download)
             const pdfPayload = {
                 ...dbPayload,
+                customTitle,
+                dueDateLabel,
+                paymentLink,
                 issueDate: issueDate || new Date().toLocaleDateString(),
                 dueDate: dueDate || 'On Receipt',
                 subtotal: activeSubtotal.toFixed(2),
@@ -471,11 +480,21 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                 <span className="text-xs font-bold">Tax:</span>
                                 <Input
                                     type="number"
-                                    className="w-16 h-8 text-right"
+                                    className="w-16 h-8 text-right bg-white"
                                     value={taxPercent}
                                     onChange={e => setTaxPercent(Number(e.target.value))}
                                 />
                                 <span className="text-xs">%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold whitespace-nowrap">Payment Link:</span>
+                                <Input
+                                    type="text"
+                                    placeholder="https://..."
+                                    className="w-48 h-8 text-xs bg-white"
+                                    value={paymentLink}
+                                    onChange={e => setPaymentLink(e.target.value)}
+                                />
                             </div>
                             <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded border border-blue-200">
                                 <input
@@ -509,9 +528,23 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
                             {/* HEADER */}
                             <div className="flex justify-between mb-10">
-                                <div className="text-2xl font-bold">Agency Manager</div>
+                                <div className="text-2xl font-bold">
+                                    <input
+                                        type="text"
+                                        value={customAgencyName}
+                                        onChange={e => setCustomAgencyName(e.target.value)}
+                                        className="font-bold border-b border-transparent hover:border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent"
+                                        style={{ width: `${Math.max(10, customAgencyName.length)}ch` }}
+                                    />
+                                </div>
                                 <div className="text-right">
-                                    <h1 className="text-4xl font-bold text-gray-900 uppercase">INVOICE</h1>
+                                    <input
+                                        type="text"
+                                        value={customTitle}
+                                        onChange={e => setCustomTitle(e.target.value.toUpperCase())}
+                                        className="text-4xl font-bold text-gray-900 uppercase text-right border-b border-transparent hover:border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent"
+                                        style={{ width: `${Math.max(6, customTitle.length)}ch` }}
+                                    />
                                     <div className="text-gray-500 mt-1"># {invoiceNumber}</div>
                                 </div>
                             </div>
@@ -520,8 +553,13 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                             <div className="grid grid-cols-2 gap-10 mb-10">
                                 <div>
                                     <h3 className="text-xs font-bold text-gray-400 uppercase mb-1">Bill To</h3>
-                                    <div className="font-bold text-lg text-black">{clientName}</div>
-                                    <div className="text-gray-600 whitespace-pre-wrap">{clientAddress || 'No address on file'}</div>
+                                    <div className="font-bold text-lg text-black mb-1">{clientName}</div>
+                                    <textarea
+                                        value={customClientAddress}
+                                        onChange={e => setCustomClientAddress(e.target.value)}
+                                        placeholder="No address on file. Click to add..."
+                                        className="w-full bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 focus:outline-none resize-none text-gray-600 h-16"
+                                    />
                                 </div>
                                 <div className="text-right">
                                     <div className="mb-4">
@@ -534,13 +572,19 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         />
                                     </div>
                                     <div>
-                                        <h3 className="text-xs font-bold text-gray-400 uppercase mb-1">Due Date</h3>
+                                        <input
+                                            type="text"
+                                            value={dueDateLabel}
+                                            onChange={e => setDueDateLabel(e.target.value)}
+                                            className="text-xs font-bold text-gray-400 uppercase mb-1 text-right bg-transparent border-b border-transparent hover:border-gray-300 focus:outline-none focus:border-blue-500 w-32"
+                                        />
+                                        <br />
                                         <input
                                             type="text"
                                             value={dueDate}
                                             onChange={e => setDueDate(e.target.value)}
                                             placeholder="e.g. On Request"
-                                            className="text-right font-bold border-b border-dashed border-gray-300 focus:outline-none focus:border-blue-500 w-32"
+                                            className="text-right font-bold border-b border-dashed border-gray-300 focus:outline-none focus:border-blue-500 w-32 bg-transparent"
                                         />
                                     </div>
                                 </div>

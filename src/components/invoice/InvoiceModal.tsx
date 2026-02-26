@@ -57,6 +57,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     const [customClientAddress, setCustomClientAddress] = useState(clientAddress || '')
     const [dueDateLabel, setDueDateLabel] = useState('Balance Due')
     const [paymentLink, setPaymentLink] = useState('')
+    const [customPrepaid, setCustomPrepaid] = useState(0)
 
     // Editing Item State
     const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -210,7 +211,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     // Deposit Logic
     const maxDeductible = Math.min(activeTotalBeforeDeposit, depositBalance || 0)
     const depositDeducted = applyDeposit ? maxDeductible : 0
-    const finalTotalDue = activeTotalBeforeDeposit - depositDeducted
+    const totalDeducted = depositDeducted + customPrepaid
+    const finalTotalDue = Math.max(0, activeTotalBeforeDeposit - totalDeducted)
 
     // Handlers
     const toggleTask = (taskId: string) => {
@@ -291,7 +293,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 subtotalAmount: activeSubtotal,
                 taxPercent,
                 taxAmount: activeTaxAmount,
-                depositDeducted: depositDeducted,
+                depositDeducted: totalDeducted, // Total deduction to show and store on Invoice
+                clientDepositDeducted: depositDeducted, // Only deduct this amount from Client's automated balance
                 totalDue: finalTotalDue,
                 billingSnapshot: profile,
                 taskIds: selectedTaskIds
@@ -313,7 +316,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 dueDate: dueDate || 'On Receipt',
                 subtotal: activeSubtotal.toFixed(2),
                 taxAmount: activeTaxAmount.toFixed(2),
-                depositDeducted: depositDeducted.toFixed(2),
+                depositDeducted: totalDeducted > 0 ? totalDeducted.toFixed(2) : undefined,
                 totalDue: finalTotalDue.toFixed(2),
                 items: activeItems.map(i => ({
                     description: i.description,
@@ -485,6 +488,15 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                     onChange={e => setTaxPercent(Number(e.target.value))}
                                 />
                                 <span className="text-xs">%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold whitespace-nowrap">Prepaid ($):</span>
+                                <Input
+                                    type="number"
+                                    className="w-20 h-8 text-right bg-white"
+                                    value={customPrepaid}
+                                    onChange={e => setCustomPrepaid(Number(e.target.value))}
+                                />
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold whitespace-nowrap">Payment Link:</span>
@@ -680,10 +692,10 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                             <span>${activeTaxAmount.toFixed(2)}</span>
                                         </div>
                                     )}
-                                    {depositDeducted > 0 && (
+                                    {totalDeducted > 0 && (
                                         <div className="flex justify-between text-red-600 font-medium">
-                                            <span>Less Deposit</span>
-                                            <span>-${depositDeducted.toFixed(2)}</span>
+                                            <span>Less Deposit / Prepaid</span>
+                                            <span>-${totalDeducted.toFixed(2)}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between text-xl font-bold border-t-2 border-gray-900 pt-3 mt-3">

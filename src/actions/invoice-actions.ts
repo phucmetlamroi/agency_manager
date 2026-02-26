@@ -219,6 +219,7 @@ export async function createInvoiceRecord(data: {
     dueDate?: Date,
     subtotalAmount: number,
     depositDeducted: number,
+    clientDepositDeducted?: number,
     taxPercent: number,
     taxAmount: number,
     totalDue: number,
@@ -285,11 +286,11 @@ export async function createInvoiceRecord(data: {
             }
 
             // 3. Deduct Deposit from Client (if any)
-            if (data.depositDeducted > 0) {
+            if (data.clientDepositDeducted && data.clientDepositDeducted > 0) {
                 await tx.client.update({
                     where: { id: data.clientId },
                     data: {
-                        depositBalance: { decrement: data.depositDeducted }
+                        depositBalance: { decrement: data.clientDepositDeducted }
                     }
                 })
             }

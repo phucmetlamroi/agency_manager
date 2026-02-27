@@ -478,32 +478,32 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 <div className="flex-1 bg-gray-100 flex flex-col h-full overflow-hidden">
                     <div className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-6">
                         <span className="font-bold text-gray-500 text-sm">LIVE PREVIEW</span>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold">Tax:</span>
+                        <div className="flex items-center gap-4 flex-wrap pb-2 md:pb-0">
+                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
+                                <span className="text-xs font-bold text-gray-600">Tax:</span>
                                 <Input
                                     type="number"
-                                    className="w-16 h-8 text-right bg-white"
+                                    className="w-16 h-7 text-right bg-white border-gray-300 text-gray-900 font-bold focus:ring-blue-500"
                                     value={taxPercent}
                                     onChange={e => setTaxPercent(Number(e.target.value))}
                                 />
-                                <span className="text-xs">%</span>
+                                <span className="text-xs text-gray-600 font-bold">%</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold whitespace-nowrap">Prepaid ($):</span>
+                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
+                                <span className="text-xs font-bold text-gray-600 whitespace-nowrap">Prepaid ($):</span>
                                 <Input
                                     type="number"
-                                    className="w-20 h-8 text-right bg-white"
+                                    className="w-20 h-7 text-right bg-white border-gray-300 text-red-600 font-bold focus:ring-red-500"
                                     value={customPrepaid}
                                     onChange={e => setCustomPrepaid(Number(e.target.value))}
                                 />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold whitespace-nowrap">Payment Link:</span>
+                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
+                                <span className="text-xs font-bold text-gray-600 whitespace-nowrap">Payment Link:</span>
                                 <Input
                                     type="text"
                                     placeholder="https://..."
-                                    className="w-48 h-8 text-xs bg-white"
+                                    className="w-48 h-7 text-xs bg-white border-gray-300 text-blue-600 font-medium focus:ring-blue-500 placeholder-gray-400"
                                     value={paymentLink}
                                     onChange={e => setPaymentLink(e.target.value)}
                                 />

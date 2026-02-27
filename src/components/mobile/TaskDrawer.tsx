@@ -52,7 +52,7 @@ export function TaskDrawer({ open, onOpenChange, task, isAdmin, onEdit }: TaskDr
                                             <span className="text-xs">Deadline</span>
                                         </div>
                                         <p className="font-mono text-sm text-zinc-200">
-                                            {task.deadline ? new Date(task.deadline).toLocaleDateString('vi-VN') : 'No date'}
+                                            {task.deadline ? `${new Date(task.deadline).toLocaleDateString('vi-VN')} ${new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : 'No date'}
                                         </p>
                                     </div>
 

@@ -108,7 +108,11 @@ export const getColumns = (
             cell: ({ row }) => {
                 const date = row.getValue("deadline") as Date
                 if (!date) return <span className="text-muted-foreground">-</span>
-                return <div className="text-xs font-mono">{new Date(date).toLocaleDateString("vi-VN")}</div>
+                return (
+                    <div className="text-xs font-mono">
+                        {new Date(date).toLocaleDateString("vi-VN")} {new Date(date).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                )
             },
         },
         {

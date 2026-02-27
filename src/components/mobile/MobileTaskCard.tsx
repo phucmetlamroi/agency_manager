@@ -46,8 +46,8 @@ export default function MobileTaskCard({ task, onAction, isAdmin }: {
                 </div>
 
                 {task.deadline && (
-                    <div className={new Date() > new Date(task.deadline) && task.status !== 'Hoàn tất' ? 'text-red-400 font-bold' : ''}>
-                        {new Date(task.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                    <div className={new Date() > new Date(task.deadline) && task.status !== 'Hoàn tất' ? 'text-red-400 font-bold text-xs' : 'text-xs'}>
+                        {new Date(task.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </div>
                 )}
             </div>

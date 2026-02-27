@@ -337,6 +337,27 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                         )}
                     </div>
 
+                    {/* DEADLINE (Visible to everyone) */}
+                    <div className="p-3 rounded-xl border border-red-100 bg-red-50/20">
+                        <label className="block text-xs font-bold text-red-500 mb-2">
+                            DEADLINE
+                        </label>
+                        {isEditing && isAdmin ? (
+                            <input
+                                type="datetime-local"
+                                value={form.deadline}
+                                onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                                className="w-full p-2 border border-red-200 rounded text-sm font-bold text-red-600 bg-white"
+                            />
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <span className={form.deadline && new Date() > new Date(form.deadline) && localTask?.status !== 'Hoàn tất' ? "text-red-600 font-bold text-base" : "text-gray-800 font-bold text-base"}>
+                                    {form.deadline ? `${new Date(form.deadline).toLocaleDateString('vi-VN')} ${new Date(form.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : 'No Deadline'}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
                     {/* FINANCIALS (Admin Only) */}
                     {isAdmin && (
                         <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/50">
@@ -372,22 +393,6 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                 </div>
                             </div>
 
-                            {/* DEADLINE */}
-                            <div className="mt-2 pt-2 border-t border-gray-200">
-                                <label className="text-[10px] text-red-400 font-bold mb-1 block">DEADLINE</label>
-                                {isEditing ? (
-                                    <input
-                                        type="datetime-local"
-                                        value={form.deadline}
-                                        onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                                        className="w-full p-1 border border-red-200 rounded text-sm font-bold text-red-600"
-                                    />
-                                ) : (
-                                    <span className="text-red-500 font-bold text-sm">
-                                        {form.deadline ? new Date(form.deadline).toLocaleString('vi-VN') : 'No Deadline'}
-                                    </span>
-                                )}
-                            </div>
                         </div>
                     )}
 

@@ -18,7 +18,8 @@ import {
     ChevronRight,
     Search,
     UserCircle,
-    Menu
+    Menu,
+    ArchiveRestore
 } from "lucide-react"
 
 import {
@@ -54,6 +55,7 @@ const NAV_ITEMS = [
     { label: "Task Queue", href: "/admin/queue", icon: ListTodo },
     { label: "CRM & Clients", href: "/admin/crm", icon: Smile },
     { label: "Payroll", href: "/admin/payroll", icon: Wallet },
+    { label: "Archive", href: "/admin/archive", icon: ArchiveRestore },
     { label: "Finance", href: "/admin/finance", icon: Building2 }, // Re-added Finance
     { label: "Staff", href: "/admin/users", icon: Users },
     // { label: "Settings", href: "/admin/settings", icon: Settings },

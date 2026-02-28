@@ -28,7 +28,17 @@ export default async function AdminDashboard() {
     const checkResult = await checkOverdueTasks()
     // In a real app we might show a toast with checkResult.notifications
 
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setDate(1);
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 1);
+
     const tasks = await prisma.task.findMany({
+        where: {
+            OR: [
+                { isArchived: false },
+                { updatedAt: { gte: twoMonthsAgo } }
+            ]
+        },
         include: {
             assignee: true,
             client: {
@@ -37,6 +47,8 @@ export default async function AdminDashboard() {
         },
         orderBy: { createdAt: 'desc' }
     })
+
+    const activeTasks = tasks.filter(t => !t.isArchived)
 
     const users = await prisma.user.findMany({
         where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
@@ -49,8 +61,8 @@ export default async function AdminDashboard() {
 
     const agencies = await prisma.agency.findMany({ select: { id: true, name: true, code: true } })
 
-    const unassignedTasks = tasks.filter(t => !t.assigneeId)
-    const assignedTasks = tasks.filter(t => t.assigneeId)
+    const unassignedTasks = activeTasks.filter(t => !t.assigneeId)
+    const assignedTasks = activeTasks.filter(t => t.assigneeId)
 
     return (
         <div className="space-y-8">

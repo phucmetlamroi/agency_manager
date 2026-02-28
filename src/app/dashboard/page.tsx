@@ -36,11 +36,23 @@ export default async function UserDashboard() {
         redirect('/admin')
     }
 
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setDate(1);
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 1);
+
     const tasks = await prisma.task.findMany({
-        where: { assigneeId: userId },
+        where: {
+            assigneeId: userId,
+            OR: [
+                { isArchived: false },
+                { updatedAt: { gte: twoMonthsAgo } }
+            ]
+        },
         include: { client: { include: { parent: true } } },
         orderBy: { createdAt: 'desc' }
     })
+
+    const activeTasks = tasks.filter(t => !t.isArchived)
 
     // Payroll Calculation (Status "Hoàn tất" triggers payment)
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -141,7 +153,7 @@ export default async function UserDashboard() {
             <h3 className="title-gradient" style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Danh sách Task của tôi</h3>
 
             {/* Using the new TaskTable for User too, but restrict Admin controls */}
-            <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={false} isMobile={await isMobileDevice()} />
+            <TaskTable tasks={serializeDecimal(activeTasks) as any} isAdmin={false} isMobile={await isMobileDevice()} />
 
             {/* Draggable Focus Widget */}
             <DraggableFocusWidget userId={userId} />

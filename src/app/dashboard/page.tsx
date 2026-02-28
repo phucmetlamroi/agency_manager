@@ -6,8 +6,9 @@ import { isMobileDevice } from '@/lib/device'
 import DraggableFocusWidget from '@/components/DraggableFocusWidget'
 import { serializeDecimal } from '@/lib/serialization'
 import { UserRole } from '@prisma/client'
+import { getMonthDateRange } from '@/lib/date-utils'
 
-export default async function UserDashboard() {
+export default async function UserDashboard(props: { searchParams?: Promise<any> | any }) {
     const session = await getSession()
     if (!session) redirect('/login')
 
@@ -36,16 +37,18 @@ export default async function UserDashboard() {
         redirect('/admin')
     }
 
-    const twoMonthsAgo = new Date();
-    twoMonthsAgo.setDate(1);
-    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 1);
+    const searchParams = await props.searchParams
+    const monthParam = searchParams?.month
+    const { startDate, endDate } = getMonthDateRange(monthParam)
 
     const tasks = await prisma.task.findMany({
         where: {
             assigneeId: userId,
+            isArchived: false,
             OR: [
-                { isArchived: false },
-                { updatedAt: { gte: twoMonthsAgo } }
+                { status: { notIn: ['Hoàn tất', 'Tạm ngưng'] } },
+                { deadline: { gte: startDate, lte: endDate } },
+                { deadline: null, createdAt: { gte: startDate, lte: endDate } }
             ]
         },
         include: { client: { include: { parent: true } } },
@@ -54,18 +57,22 @@ export default async function UserDashboard() {
 
     const activeTasks = tasks.filter(t => !t.isArchived)
 
-    // Payroll Calculation (Status "Hoàn tất" triggers payment)
-    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-
-    // Filter logic
+    // Payroll Calculation
     const completedTasks = tasks.filter(t => t.status === 'Hoàn tất')
+    // Salary for selected workspace month
+    const baseSalary = completedTasks.reduce((acc, t) => acc + Number(t.value || 0), 0)
 
-    const thisMonthTasks = completedTasks.filter(t => t.updatedAt >= thisMonthStart)
-    const lastMonthTasks = completedTasks.filter(t => t.updatedAt >= lastMonthStart && t.updatedAt < thisMonthStart)
-
-    const baseSalary = thisMonthTasks.reduce((acc, t) => acc + Number(t.value || 0), 0)
-    const lastMonthSalary = lastMonthTasks.reduce((acc, t) => acc + Number(t.value || 0), 0)
+    // Lightweight aggregation for last month's salary (avoiding Memory bloat)
+    const lastMonthStart = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1)
+    const lastMonthSalaryAgg = await prisma.task.aggregate({
+        where: {
+            assigneeId: userId,
+            status: 'Hoàn tất',
+            updatedAt: { gte: lastMonthStart, lt: startDate } // Finished in the previous cycle
+        },
+        _sum: { value: true }
+    })
+    const lastMonthSalary = Number(lastMonthSalaryAgg._sum.value || 0)
 
     // Add Bonus to this month
     const bonusData = userWithBonus?.bonuses[0]

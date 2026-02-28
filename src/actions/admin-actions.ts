@@ -3,7 +3,81 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
-import { parseVietnamDate } from '@/lib/date-utils'
+import { parseVietnamDate, getMonthDateRange } from '@/lib/date-utils'
+import { getSession } from '@/lib/auth'
+
+export async function lockMonthAction(monthString?: string) {
+    try {
+        const session = await getSession()
+        if (!session || session.user.role !== 'ADMIN') {
+            return { error: 'Unauthorized' }
+        }
+
+        const { startDate, endDate } = getMonthDateRange(monthString)
+        const targetYear = startDate.getFullYear()
+        const targetMonth = startDate.getMonth() + 1
+
+        // 1. Check for pending tasks in this month
+        const pendingTasks = await prisma.task.findMany({
+            where: {
+                isArchived: false,
+                status: { notIn: ['Hoàn tất', 'Tạm ngưng'] },
+                deadline: {
+                    gte: startDate,
+                    lte: endDate
+                }
+            }
+        })
+
+        if (pendingTasks.length > 0) {
+            return { error: `Không thể chốt tháng. Còn ${pendingTasks.length} task chưa hoàn tất (Đang đợi giao, Đang làm...). Vui lòng hoàn tất hoặc dời deadline sang tháng sau.` }
+        }
+
+        // 2. Instantiate Lock
+        await prisma.payrollLock.upsert({
+            where: {
+                month_year: {
+                    month: targetMonth,
+                    year: targetYear
+                }
+            },
+            update: {
+                isLocked: true,
+                lockedAt: new Date(),
+                lockedBy: session.user.id
+            },
+            create: {
+                month: targetMonth,
+                year: targetYear,
+                isLocked: true,
+                lockedBy: session.user.id,
+                lockedAt: new Date()
+            }
+        })
+
+        // 3. Soft Archiving
+        await prisma.task.updateMany({
+            where: {
+                isArchived: false,
+                status: 'Hoàn tất',
+                deadline: {
+                    gte: startDate,
+                    lte: endDate
+                }
+            },
+            data: {
+                isArchived: true
+            }
+        })
+
+        revalidatePath('/admin')
+        revalidatePath('/dashboard')
+        revalidatePath('/admin/queue')
+        return { success: true }
+    } catch (e: any) {
+        return { error: e.message || 'Error locking month' }
+    }
+}
 
 export async function updateUserRole(userId: string, newRole: string) {
     try {

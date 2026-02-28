@@ -14,8 +14,9 @@ import TaskCreationManager from '@/components/TaskCreationManager'
 import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import { KPIStats } from '@/components/dashboard/KPIStats'
 import { serializeDecimal } from '@/lib/serialization'
+import { getMonthDateRange } from '@/lib/date-utils'
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard(props: { searchParams?: Promise<any> | any }) {
     const session = await getSession()
     if (!session) redirect('/login')
 
@@ -28,15 +29,28 @@ export default async function AdminDashboard() {
     const checkResult = await checkOverdueTasks()
     // In a real app we might show a toast with checkResult.notifications
 
-    const twoMonthsAgo = new Date();
-    twoMonthsAgo.setDate(1);
-    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 1);
+    const searchParams = await props.searchParams
+    const monthParam = searchParams?.month
+    const { startDate, endDate } = getMonthDateRange(monthParam)
 
     const tasks = await prisma.task.findMany({
         where: {
+            isArchived: false,
             OR: [
-                { isArchived: false },
-                { updatedAt: { gte: twoMonthsAgo } }
+                { status: { notIn: ['Hoàn tất', 'Tạm ngưng'] } },
+                {
+                    deadline: {
+                        gte: startDate,
+                        lte: endDate
+                    }
+                },
+                {
+                    deadline: null,
+                    createdAt: {
+                        gte: startDate,
+                        lte: endDate
+                    }
+                }
             ]
         },
         include: {

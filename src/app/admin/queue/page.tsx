@@ -4,12 +4,24 @@ import { checkOverdueTasks } from '@/actions/reputation-actions'
 
 
 import { serializeDecimal } from '@/lib/serialization'
+import { getMonthDateRange } from '@/lib/date-utils'
 
-export default async function TaskQueuePage() {
+export default async function TaskQueuePage(props: { searchParams?: Promise<any> | any }) {
     await checkOverdueTasks() // Ensure queue is fresh
 
+    const searchParams = await props.searchParams
+    const monthParam = searchParams?.month
+    const { startDate, endDate } = getMonthDateRange(monthParam)
+
     const tasks = await prisma.task.findMany({
-        where: { isArchived: false },
+        where: {
+            isArchived: false,
+            OR: [
+                { status: { notIn: ['Hoàn tất', 'Tạm ngưng'] } },
+                { deadline: { gte: startDate, lte: endDate } },
+                { deadline: null, createdAt: { gte: startDate, lte: endDate } }
+            ]
+        },
         include: {
             assignee: true,
             client: {

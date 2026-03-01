@@ -18,10 +18,11 @@ export async function confirmPayment(data: {
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const payroll = await workspacePrisma.payroll.upsert({
             where: {
-                userId_month_year: {
+                userId_month_year_workspaceId: {
                     userId: data.userId,
                     month: data.month,
-                    year: data.year
+                    year: data.year,
+                    workspaceId
                 }
             },
             update: {
@@ -61,7 +62,11 @@ export async function getPayrollData(month: number, year: number, workspaceId: s
         where: { role: 'USER' },
         include: {
             payrolls: {
-                where: { month, year }
+                where: {
+                    workspaceId,
+                    month,
+                    year
+                }
             }
         }
     })
@@ -74,10 +79,11 @@ export async function revertPayment(userId: string, month: number, year: number,
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         await workspacePrisma.payroll.delete({
             where: {
-                userId_month_year: {
+                userId_month_year_workspaceId: {
                     userId,
                     month,
-                    year
+                    year,
+                    workspaceId
                 }
             }
         })

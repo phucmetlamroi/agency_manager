@@ -44,3 +44,59 @@ export async function createWorkspaceAction(formData: FormData) {
         return { error: 'Lỗi khởi tạo Workspace' }
     }
 }
+
+export async function renameWorkspaceAction(workspaceId: string, newName: string) {
+    const session = await getSession()
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized' }
+    }
+
+    if (!newName || newName.trim().length === 0) {
+        return { error: 'Tên mới không được để trống' }
+    }
+
+    try {
+        await prisma.workspace.update({
+            where: { id: workspaceId },
+            data: { name: newName }
+        })
+        revalidatePath('/workspaces')
+        return { success: true }
+    } catch (error) {
+        console.error(error)
+        return { error: 'Lỗi khi đổi tên Workspace' }
+    }
+}
+
+export async function deleteWorkspaceAction(workspaceId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) {
+        return { error: 'Unauthorized' }
+    }
+
+    try {
+        // Check if user is the OWNER of the workspace
+        const membership = await prisma.workspaceMember.findUnique({
+            where: {
+                userId_workspaceId: {
+                    userId: session.user.id,
+                    workspaceId
+                }
+            }
+        })
+
+        if (!membership || membership.role !== 'OWNER') {
+            return { error: 'Bạn không có quyền xóa Workspace này. Chỉ chủ sở hữu mới có quyền xóa.' }
+        }
+
+        await prisma.workspace.delete({
+            where: { id: workspaceId }
+        })
+
+        revalidatePath('/workspaces')
+        return { success: true }
+    } catch (error) {
+        console.error(error)
+        return { error: 'Lỗi khi xóa Workspace' }
+    }
+}

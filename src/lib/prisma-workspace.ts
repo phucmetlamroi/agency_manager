@@ -10,8 +10,7 @@ const bypassModels = [
     'WorkspaceMember',
     'Agency',
     'BillingProfile',
-    'PayrollLock' // Technically PayrollLock could be per-workspace, but currently it's global
-    // Notice: Client, Project, Task, Invoice, Payroll, PerformanceMetric are NOT bypassed!
+    // Notice: Client, Project, Task, Invoice, Payroll, PerformanceMetric, PayrollLock, MonthlyBonus are NOT bypassed!
 ]
 
 /**

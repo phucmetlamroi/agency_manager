@@ -29,6 +29,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         include: {
             bonuses: {
                 where: {
+                    workspaceId,
                     month: currentMonth,
                     year: currentYear
                 }

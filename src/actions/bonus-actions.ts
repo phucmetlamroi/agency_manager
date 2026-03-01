@@ -13,9 +13,10 @@ export async function getPayrollLockStatus(workspaceId: string) {
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const lock = await workspacePrisma.payrollLock.findUnique({
             where: {
-                month_year: {
+                month_year_workspaceId: {
                     month: currentMonth,
-                    year: currentYear
+                    year: currentYear,
+                    workspaceId
                 }
             }
         })
@@ -48,6 +49,7 @@ export async function revertMonthlyBonus(workspaceId: string) {
         // 2. Delete all bonuses for this month
         await workspacePrisma.monthlyBonus.deleteMany({
             where: {
+                workspaceId,
                 month: currentMonth,
                 year: currentYear
             }
@@ -56,6 +58,7 @@ export async function revertMonthlyBonus(workspaceId: string) {
         // 3. Delete Lock (Unlock)
         await workspacePrisma.payrollLock.deleteMany({
             where: {
+                workspaceId,
                 month: currentMonth,
                 year: currentYear
             }
@@ -108,9 +111,10 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         // Check if already locked
         const existingLock = await workspacePrisma.payrollLock.findUnique({
             where: {
-                month_year: {
+                month_year_workspaceId: {
                     month: currentMonth,
-                    year: currentYear
+                    year: currentYear,
+                    workspaceId
                 }
             }
         })
@@ -209,7 +213,8 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                 where: {
                     userId: user.userId,
                     month: currentMonth,
-                    year: currentYear
+                    year: currentYear,
+                    workspaceId
                 }
             })
 
@@ -219,6 +224,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                     userId: user.userId,
                     month: currentMonth,
                     year: currentYear,
+                    workspaceId,
                     rank,
                     revenue: user.revenue,
                     executionTimeHours: 0, // Migrated/Deprecating field, default 0
@@ -239,15 +245,17 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         // 9. Create Lock Record
         await workspacePrisma.payrollLock.upsert({
             where: {
-                month_year: {
+                month_year_workspaceId: {
                     month: currentMonth,
-                    year: currentYear
+                    year: currentYear,
+                    workspaceId
                 }
             },
             update: { isLocked: true, lockedAt: new Date(), lockedBy: session.user.id },
             create: {
                 month: currentMonth,
                 year: currentYear,
+                workspaceId,
                 isLocked: true,
                 lockedBy: session.user.id
             }

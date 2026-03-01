@@ -28,6 +28,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
         include: {
             tasks: {
                 where: {
+                    workspaceId,
                     status: 'Hoàn tất', // Only completed tasks
                     updatedAt: {
                         gte: startOfMonth,
@@ -40,6 +41,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
             // Include bonuses for this month
             bonuses: {
                 where: {
+                    workspaceId,
                     month: currentMonth,
                     year: currentYear
                 }
@@ -47,6 +49,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
             // Payment Checks
             payrolls: {
                 where: {
+                    workspaceId,
                     month: currentMonth,
                     year: currentYear
                 }

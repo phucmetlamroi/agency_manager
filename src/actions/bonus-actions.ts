@@ -5,9 +5,9 @@ import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 
 export async function getPayrollLockStatus() {
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1
-    const currentYear = now.getFullYear()
+    // TEMPORARY OVERRIDE: Hardcode to Feb 2026
+    const currentMonth = 2
+    const currentYear = 2026
 
     try {
         const lock = await prisma.payrollLock.findUnique({
@@ -39,9 +39,9 @@ export async function revertMonthlyBonus() {
             return { success: false, error: 'Permission denied.' }
         }
 
-        const now = new Date()
-        const currentMonth = now.getMonth() + 1
-        const currentYear = now.getFullYear()
+        // TEMPORARY OVERRIDE: Hardcode to Feb 2026
+        const currentMonth = 2
+        const currentYear = 2026
 
         // 2. Delete all bonuses for this month
         await prisma.monthlyBonus.deleteMany({
@@ -97,10 +97,9 @@ export async function calculateMonthlyBonus() {
             return { success: false, error: 'Permission denied. Only Admin or Treasurer can calculate bonuses.' }
         }
 
-        // 2. Get current month/year (Vietnam Time: UTC+7)
-        const now = new Date()
-        const currentMonth = now.getMonth() + 1 // 1-12
-        const currentYear = now.getFullYear()
+        // TEMPORARY OVERRIDE: Hardcode to Feb 2026
+        const currentMonth = 2 // 1-12
+        const currentYear = 2026
 
         // Check if already locked
         const existingLock = await prisma.payrollLock.findUnique({
@@ -117,7 +116,8 @@ export async function calculateMonthlyBonus() {
         }
 
         const startOfMonth = new Date(currentYear, currentMonth - 1, 1)
-        const endOfMonth = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999)
+        // Expand endOfMonth to include early March tasks into Feb payroll
+        const endOfMonth = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999)
 
         // 3. Fetch all users with completed tasks this month
         const users = await prisma.user.findMany({

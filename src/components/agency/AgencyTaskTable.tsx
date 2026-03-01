@@ -10,7 +10,7 @@ import { updateTaskDetails } from '@/actions/update-task-details'
 import { TaskWithUser } from '@/types/admin'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
-import { checkUserAvailability } from '@/actions/schedule-actions'
+
 
 const statusColors: Record<string, string> = {
     "Đã nhận task": "#60a5fa",   // Blue
@@ -236,18 +236,7 @@ export default function AgencyTaskTable({ tasks, members }: { tasks: TaskWithUse
                                                 value={task.assignee?.id || ''}
                                                 onChange={async (e) => {
                                                     const val = e.target.value
-                                                    if (val) {
-                                                        const res = await checkUserAvailability(val, new Date())
-                                                        if (!res.available) {
-                                                            if (!await confirm({
-                                                                title: '⚠️ CẢNH BÁO LỊCH TRÌNH',
-                                                                message: `Nhân sự này đang có lịch BẬN (Busy). Vẫn giao?`,
-                                                                type: 'danger',
-                                                                confirmText: 'Vẫn giao',
-                                                                cancelText: 'Chọn người khác'
-                                                            })) return
-                                                        }
-                                                    }
+
                                                     await assignTask(task.id, val || null)
                                                     toast.success('Đã cập nhật phân công')
                                                 }}

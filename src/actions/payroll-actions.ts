@@ -58,10 +58,7 @@ export async function getPayrollData(month: number, year: number) {
         include: {
             payrolls: {
                 where: { month, year }
-            },
-            // Include tasks to calculate salary on the fly if not paid?
-            // Actually, for the table, we usually calc on fly, and overlay payroll status.
-            focusTasks: false // optimize
+            }
         }
     })
 

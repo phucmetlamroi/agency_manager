@@ -69,18 +69,6 @@ export async function createBatchTasks(data: BatchTaskInput) {
                         clientId: data.clientId,
                     }
                 })
-
-                // Create Notification if assigned
-                if (data.assigneeId) {
-                    await tx.notification.create({
-                        data: {
-                            userId: data.assigneeId,
-                            message: `Bạn được giao task mới: "${title.trim()}"`,
-                            // Schema verification: uses 'message', not 'content'. No 'link' field.
-                            isRead: false
-                        }
-                    })
-                }
             }
         })
 
@@ -181,17 +169,6 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
             updateData.assigneeId = cleanAssigneeId
             updateData.assignedAgencyId = userAgencyId // Auto-link agency
             updateData.status = 'Đã nhận task'
-
-            // Prepare notifications
-            taskIds.forEach(id => {
-                notifications.push({
-                    userId: cleanAssigneeId,
-                    message: `Bạn được giao task mới (Bulk Assign)`,
-                    isRead: false,
-                    // We can't easily link to multiple tasks, so generic message
-                })
-            })
-
         } else if (cleanAgencyId) {
             // Assign to AGENCY
             updateData.assigneeId = null
@@ -211,12 +188,6 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
                 where: { id: { in: taskIds } },
                 data: updateData
             })
-
-            if (notifications.length > 0) {
-                await tx.notification.createMany({
-                    data: notifications
-                })
-            }
         })
 
         revalidatePath('/admin/queue')

@@ -2,36 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createTask } from '@/actions/admin-actions'
-import { checkUserAvailability } from '@/actions/schedule-actions'
 
-function AvailabilityWarning({ users }: { users: User[] }) {
-    // This is a "hack" to listen to the select change without controlling the whole form state
-    // Ideally we should control the form state, but to avoid refactoring the whole form:
-    const [selectedUser, setSelectedUser] = useState<string>('')
-    const [isBusy, setIsBusy] = useState(false)
-
-    useEffect(() => {
-        const select = document.querySelector('select[name="assigneeId"]') as HTMLSelectElement
-        if (!select) return
-
-        const handler = async () => {
-            const userId = select.value
-            setSelectedUser(userId)
-            if (!userId) { setIsBusy(false); return }
-
-            // Check availability for NOW (assuming task starts now)
-            const res = await checkUserAvailability(userId, new Date())
-            setIsBusy(!res.available)
-        }
-        select.addEventListener('change', handler)
-        return () => select.removeEventListener('change', handler)
-    }, [])
-
-    if (isBusy) {
-        return <div className="text-xs text-red-500 font-bold mt-1">⚠️ Cảnh báo: Nhân sự này đang có lịch BẬN (Busy) trong thời gian này!</div>
-    }
-    return null
-}
 
 
 type User = {
@@ -304,8 +275,7 @@ export default function CreateTaskForm({ users }: { users: User[] }) {
                         )
                     })}
                 </select>
-                {/* Conflict Warning Hook */}
-                <AvailabilityWarning users={users} />
+                {/* Conflict Warning Hook Removed */}
             </div>
 
             <button className="btn btn-primary" type="submit">Tạo Task</button>

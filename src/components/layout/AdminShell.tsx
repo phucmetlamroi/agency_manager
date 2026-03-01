@@ -14,7 +14,7 @@ interface AdminShellProps {
     }
 }
 
-import NotificationBell from "@/components/NotificationBell"
+
 
 export function AdminShell({ children, user }: AdminShellProps) {
     const [collapsed, setCollapsed] = React.useState(false)
@@ -27,8 +27,7 @@ export function AdminShell({ children, user }: AdminShellProps) {
                 style={{ marginLeft: collapsed ? '80px' : '280px' }}
             >
                 <div className="absolute top-4 right-4 z-30 hidden md:block">
-                    <NotificationBell />
-                </div>
+                    {/* Notifications removed */}                </div>
                 <div className="container mx-auto p-4 md:p-8 max-w-7xl animate-fade-in">
                     {children}
                     {/* Safe spacer for bottom content */}

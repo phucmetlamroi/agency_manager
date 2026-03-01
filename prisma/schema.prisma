@@ -25,13 +25,11 @@ model User {
   agencyId          String?
   role              UserRole            @default(USER)
   ownedAgency       Agency[]            @relation("AgencyOwner")
-  focusTasks        FocusTask[]
   bonuses           MonthlyBonus[]
   payrolls          Payroll[]
   metrics           PerformanceMetric[]
   tasks             Task[]
   agency            Agency?             @relation("AgencyMembers", fields: [agencyId], references: [id])
-  schedules         UserSchedule[]
 }
 
 model Payroll {
@@ -86,17 +84,8 @@ model Task {
   client             Client?           @relation(fields: [clientId], references: [id])
   invoice            Invoice?          @relation(fields: [invoiceId], references: [id])
   project            Project?          @relation(fields: [projectId], references: [id])
-  schedules          UserSchedule[]
 }
 
-model Notification {
-  id        String   @id @default(uuid())
-  message   String
-  type      String   @default("INFO")
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  userId    String?
-}
 
 model MonthlyBonus {
   id                 String   @id @default(uuid())
@@ -184,21 +173,6 @@ model PerformanceMetric {
   @@unique([userId, month, year])
 }
 
-model UserSchedule {
-  id        String       @id @default(cuid())
-  userId    String
-  startTime DateTime
-  endTime   DateTime
-  type      ScheduleType @default(BUSY)
-  note      String?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  taskId    String?
-  task      Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, startTime])
-}
 
 model Agency {
   id        String   @id @default(uuid())
@@ -213,20 +187,6 @@ model Agency {
   members   User[]   @relation("AgencyMembers")
 }
 
-model FocusTask {
-  id         String   @id @default(uuid())
-  content    String
-  userId     String
-  isPriority Boolean  @default(false)
-  isDone     Boolean  @default(false)
-  order      Int      @default(0)
-  status     String   @default("DRAFT")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  user       User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-}
 
 model BillingProfile {
   id              String   @id @default(uuid())
@@ -291,12 +251,6 @@ enum ClientTier {
   standard
 }
 
-enum ScheduleType {
-  BUSY
-  OVERTIME
-  TASK
-  AVAILABLE
-}
 
 enum UserRole {
   ADMIN

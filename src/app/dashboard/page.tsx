@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import TaskTable from '@/components/TaskTable'
 import { isMobileDevice } from '@/lib/device'
-import DraggableFocusWidget from '@/components/DraggableFocusWidget'
+
 import { serializeDecimal } from '@/lib/serialization'
 import { UserRole } from '@prisma/client'
 
@@ -146,8 +146,7 @@ export default async function UserDashboard() {
             {/* Using the new TaskTable for User too, but restrict Admin controls */}
             <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={false} isMobile={await isMobileDevice()} />
 
-            {/* Draggable Focus Widget */}
-            <DraggableFocusWidget userId={userId} />
+
         </div>
     )
 }

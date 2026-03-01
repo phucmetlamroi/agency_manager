@@ -189,13 +189,7 @@ export async function getAgencyMembers() {
         const members = await prisma.user.findMany({
             where: { agencyId: targetAgencyId },
             select: {
-                id: true, username: true, nickname: true, email: true, role: true,
-                schedules: {
-                    where: {
-                        startTime: { gte: new Date() }, // Future only
-                        endTime: { lte: new Date(new Date().setHours(23, 59, 59)) } // Today
-                    }
-                }
+                id: true, username: true, nickname: true, email: true, role: true
             }
         })
 

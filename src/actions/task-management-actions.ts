@@ -97,11 +97,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
         else {
             // CASE: ASSIGN TO USER
             // 1. Check Availability (Nếu không phải Super Admin)
-            if (!user.isSuperAdmin) {
-                const { checkUserAvailability } = await import('@/actions/schedule-actions')
-                const availability = await checkUserAvailability(assignmentId, new Date())
-                if (availability.available === false) return { error: 'Nhân sự đang bận trong khung giờ này.' }
-            }
+            // Assigned without schedule constraint
 
             updateData = {
                 assigneeId: assignmentId,
@@ -137,39 +133,6 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                     )
                 }).catch(err => console.error("[Email Error] Background send failed:", err));
             }
-
-            // 2. Auto-Schedule (Fix Duplicate)
-            if (updatedTask.deadline) {
-                const end = new Date(updatedTask.deadline)
-                if (end > new Date()) {
-                    const start = new Date(end)
-                    start.setHours(start.getHours() - 2) // Mặc định 2 tiếng
-
-                    try {
-                        // QUAN TRỌNG: Xóa lịch cũ dựa trên taskId
-                        await prisma.userSchedule.deleteMany({
-                            where: { taskId: taskId }
-                        })
-
-                        // Tạo lịch mới
-                        await prisma.userSchedule.create({
-                            data: {
-                                userId: assignmentId,
-                                startTime: start,
-                                endTime: end,
-                                type: 'TASK',
-                                note: `Task: ${updatedTask.title}`,
-                                taskId: taskId // Link cứng với Task
-                            }
-                        })
-                    } catch (schedErr) {
-                        console.error("Auto-schedule failed:", schedErr)
-                    }
-                }
-            }
-        } else if (!assignmentId) {
-            // Nếu Unassign -> Xóa lịch cũ của task này
-            await prisma.userSchedule.deleteMany({ where: { taskId: taskId } })
         }
 
         // E. REVALIDATE

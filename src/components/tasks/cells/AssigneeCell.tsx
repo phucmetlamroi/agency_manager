@@ -6,7 +6,7 @@ import { TaskWithUser } from "@/types/admin"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { assignTask } from "@/actions/task-management-actions"
-import { checkUserAvailability } from "@/actions/schedule-actions"
+
 import { useConfirm } from "@/components/ui/ConfirmModal"
 import { toast } from "sonner"
 import {
@@ -41,21 +41,7 @@ export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [] 
         const isSelected = selectedIds.includes(task.id)
         const isBulk = isSelected && selectedIds.length > 1
 
-        // Check availability (only for single assign or if we want to check for all - keeping simple for now)
-        if (val !== "unassigned" && !val.startsWith('agency:') && !val.startsWith('sys:')) {
-            const res = await checkUserAvailability(val, new Date())
-            if (!res.available) {
-                if (!await confirm({
-                    title: '⚠️ CẢNH BÁO LỊCH TRÌNH',
-                    message: `Nhân sự này đang có lịch BẬN (Busy) trong khoảng thời gian này. ${isBulk ? 'Bạn có muốn GIAO HÀNG LOẠT không?' : 'Bạn có chắc chắn muốn giao việc không?'}`,
-                    type: 'danger',
-                    confirmText: 'Vẫn giao',
-                    cancelText: 'Chọn người khác'
-                })) {
-                    return // Cancel assignment
-                }
-            }
-        }
+
 
         // BULK ASSIGN CONFIRMATION
         if (isBulk) {

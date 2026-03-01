@@ -14,7 +14,7 @@ import DeleteTaskButton from './DeleteTaskButton'
 import { TaskWithUser } from '@/types/admin'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
-import { checkUserAvailability } from '@/actions/schedule-actions'
+
 
 const statusColors: Record<string, string> = {
     "Đã nhận task": "#60a5fa",   // Blue
@@ -258,19 +258,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                                     onChange={async (e) => {
                                                         const val = e.target.value
                                                         if (val) {
-                                                            // Check availability
-                                                            const res = await checkUserAvailability(val, new Date()) // Check NOW
-                                                            if (!res.available) {
-                                                                if (!await confirm({
-                                                                    title: '⚠️ CẢNH BÁO LỊCH TRÌNH',
-                                                                    message: `Nhân sự này đang có lịch BẬN (Busy) trong khoảng thời gian này. Bạn có chắc chắn muốn giao việc không?`,
-                                                                    type: 'danger',
-                                                                    confirmText: 'Vẫn giao',
-                                                                    cancelText: 'Chọn người khác'
-                                                                })) {
-                                                                    return // Cancel assignment
-                                                                }
-                                                            }
+
                                                         }
                                                         const resAssign = await assignTask(task.id, val || null)
                                                         if (resAssign?.success) router.refresh()

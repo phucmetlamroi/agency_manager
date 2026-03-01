@@ -69,13 +69,6 @@ export async function checkOverdueTasks() {
                         notes: (task.notes || '') + `\n[System] Thu hồi do quá hạn (Deadline: ${task.deadline?.toLocaleString('vi-VN')})`,
                         deadline: null // Reset deadline so it's fresh for next assignee
                     }
-                }),
-                prisma.notification.create({
-                    data: {
-                        message: notifMessage,
-                        type: 'WARNING',
-                        userId: null
-                    }
                 })
             ])
 

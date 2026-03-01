@@ -7,14 +7,14 @@ export default async function WorkspaceLayout({
     params
 }: {
     children: React.ReactNode
-    params: { workspaceId: string }
+    params: Promise<{ workspaceId: string }>
 }) {
     const session = await getSession()
     if (!session?.user?.id) {
         redirect('/login')
     }
 
-    const { workspaceId } = params
+    const { workspaceId } = await params
 
     // Validate that the user actually has access to this workspace
     const membership = await prisma.workspaceMember.findUnique({

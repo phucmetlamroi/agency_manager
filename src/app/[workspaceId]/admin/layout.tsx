@@ -13,9 +13,9 @@ export default async function AdminLayout({
     params,
 }: {
     children: React.ReactNode
-    params: { workspaceId: string }
+    params: Promise<{ workspaceId: string }>
 }) {
-    const { workspaceId } = params
+    const { workspaceId } = await params
     const cookieStore = await cookies()
     const sessionCookie = cookieStore.get('session')
 

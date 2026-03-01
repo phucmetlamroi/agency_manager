@@ -271,7 +271,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => window.location.href = '/profile'}>
+                            <DropdownMenuItem onClick={() => window.location.href = `/${workspaceId}/dashboard/profile`}>
                                 <UserCircle className="mr-2 h-4 w-4" />
                                 <span>Profile</span>
                             </DropdownMenuItem>

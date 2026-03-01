@@ -27,7 +27,7 @@ export default function BottomNav({ role, workspaceId }: { role: string, workspa
                 </Link>
             )}
 
-            <Link href={role === 'ADMIN' ? `/${workspaceId}/admin/schedule` : `/${workspaceId}/dashboard/schedule`} className={`flex flex-col items-center gap-1 ${isActive(`/${workspaceId}/dashboard/schedule`) ? 'text-blue-400' : 'text-gray-400'}`}>
+            <Link href={role === 'ADMIN' ? `/${workspaceId}/admin/queue` : `/${workspaceId}/dashboard`} className={`flex flex-col items-center gap-1 ${isActive(`/${workspaceId}/dashboard/schedule`) ? 'text-blue-400' : 'text-gray-400'}`}>
                 <span className="text-xl">📅</span>
                 <span className="text-[10px] font-bold">Lịch</span>
             </Link>

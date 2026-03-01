@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import BottomNav from '@/components/BottomNav'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 export default function MobileLayoutShell({
@@ -85,9 +86,9 @@ export default function MobileLayoutShell({
 
                         <div className="flex-1 flex flex-col gap-2">
                             {/* Menu Items */}
-                            <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
+                            <Link href={`/${workspaceId}/dashboard/profile`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
                                 <span>👤</span> Hồ sơ cá nhân
-                            </button>
+                            </Link>
                             <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
                                 <span>🔔</span> Thông báo
                             </button>

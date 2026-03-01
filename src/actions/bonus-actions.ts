@@ -122,7 +122,8 @@ export async function calculateMonthlyBonus() {
         // 3. Fetch all users with completed tasks this month
         const users = await prisma.user.findMany({
             where: {
-                role: { not: 'ADMIN' } // Exclude all admin accounts from bonus
+                role: { not: 'ADMIN' }, // Exclude all admin accounts from bonus
+                username: { notIn: ['admin', 'Bảo Phúc', 'Daniel Hee'] } // Specifically exclude these usernames
             },
             include: {
                 tasks: {

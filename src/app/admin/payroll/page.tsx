@@ -19,7 +19,7 @@ export default async function PayrollPage() {
     // 2. Fetch Users and their COMPLETED tasks for this month
     const users = await prisma.user.findMany({
         where: {
-            role: { not: 'ADMIN' }
+            username: { not: 'admin' } // Only exclude the purely system admin, keep other admins visible
         },
         include: {
             tasks: {
@@ -53,6 +53,14 @@ export default async function PayrollPage() {
 
     // Filter out users with 0 income AND no bonus (active users only)
     const activeUsers = users.filter(user => user.tasks.length > 0 || user.bonuses.length > 0)
+
+    // Sort active users: Top 1, 2, 3 first based on bonus.rank, then alphabetically by username
+    activeUsers.sort((a, b) => {
+        const rankA = a.bonuses[0]?.rank || 999
+        const rankB = b.bonuses[0]?.rank || 999
+        if (rankA !== rankB) return rankA - rankB
+        return a.username.localeCompare(b.username)
+    })
 
     // SERIALIZE DECIMAL FIELDS
     const serializedUsers = serializeDecimal(activeUsers)

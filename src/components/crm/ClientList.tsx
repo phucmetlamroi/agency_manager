@@ -32,7 +32,7 @@ type Client = {
     tasks: Task[]
 }
 
-export default function ClientList({ clients }: { clients: Client[] }) {
+export default function ClientList({ clients, workspaceId }: { clients: Client[], workspaceId: string }) {
     const [editingClient, setEditingClient] = useState<Client | null>(null)
     const [newName, setNewName] = useState('')
 
@@ -48,7 +48,7 @@ export default function ClientList({ clients }: { clients: Client[] }) {
             return
         }
 
-        const res = await updateClient(editingClient.id, { name: newName })
+        const res = await updateClient(editingClient.id, { name: newName }, workspaceId)
         if (res.success) {
             toast.success('Đã cập nhật tên khách hàng')
             setEditingClient(null)
@@ -64,7 +64,7 @@ export default function ClientList({ clients }: { clients: Client[] }) {
             )}
 
             {clients.map(client => (
-                <ClientItem key={client.id} client={client} onEdit={handleEditClick} />
+                <ClientItem key={client.id} client={client} onEdit={handleEditClick} workspaceId={workspaceId} />
             ))}
 
             <Dialog open={!!editingClient} onOpenChange={(open) => !open && setEditingClient(null)}>
@@ -92,7 +92,7 @@ export default function ClientList({ clients }: { clients: Client[] }) {
     )
 }
 
-function ClientItem({ client, onEdit }: { client: Client, onEdit: (c: Client) => void }) {
+function ClientItem({ client, onEdit, workspaceId }: { client: Client, onEdit: (c: Client) => void, workspaceId: string }) {
     const { confirm } = useConfirm()
     const [isExpanded, setIsExpanded] = useState(false)
 
@@ -106,7 +106,7 @@ function ClientItem({ client, onEdit }: { client: Client, onEdit: (c: Client) =>
             cancelText: 'Hủy'
         }))) return
 
-        const res = await deleteClient(client.id)
+        const res = await deleteClient(client.id, workspaceId)
         if (!res.success) {
             toast.error(res.error)
         } else {
@@ -161,7 +161,7 @@ function ClientItem({ client, onEdit }: { client: Client, onEdit: (c: Client) =>
                                 ✏️
                             </button>
                             <Link
-                                href={`/admin/crm/${client.id}`}
+                                href={`/${workspaceId}/admin/crm/${client.id}`}
                                 onClick={(e) => e.stopPropagation()} // Prevent expand
                                 className="text-xs bg-purple-600/30 text-purple-400 px-2 py-0.5 rounded hover:bg-purple-600 hover:text-white transition-colors border border-purple-500/50"
                             >
@@ -223,7 +223,7 @@ function ClientItem({ client, onEdit }: { client: Client, onEdit: (c: Client) =>
                             <div className="text-xs text-blue-400 font-bold uppercase mb-2">Brands / Subsidiaries</div>
                             <div className="space-y-2">
                                 {client.subsidiaries.map(sub => (
-                                    <ClientItem key={sub.id} client={sub} onEdit={onEdit} />
+                                    <ClientItem key={sub.id} client={sub} onEdit={onEdit} workspaceId={workspaceId} />
                                 ))}
                             </div>
                         </div>

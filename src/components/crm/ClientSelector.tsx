@@ -8,9 +8,10 @@ type Client = {
     name: string
     subsidiaries: Client[]
     // projects?: any[] // If we use projects later
+    // projects?: any[] // If we use projects later
 }
 
-export default function ClientSelector({ onSelect }: { onSelect: (id: number | null) => void }) {
+export default function ClientSelector({ onSelect, workspaceId }: { onSelect: (id: number | null) => void, workspaceId: string }) {
     const [partners, setPartners] = useState<Client[]>([])
     const [selectedPartner, setSelectedPartner] = useState<Client | null>(null)
     const [selectedSub, setSelectedSub] = useState<number | null>(null)
@@ -19,7 +20,7 @@ export default function ClientSelector({ onSelect }: { onSelect: (id: number | n
     useEffect(() => {
         async function loadClients() {
             setLoading(true)
-            const res = await getClients()
+            const res = await getClients(workspaceId)
             if (res.success && res.data) {
                 // @ts-ignore - mismatch in type definition vs prisma but sufficient for UI
                 setPartners(res.data)

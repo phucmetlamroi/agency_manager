@@ -8,6 +8,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String   
+  description String?  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  members     WorkspaceMember[]
+  tasks       Task[]
+  clients     Client[]
+  projects    Project[]
+  invoices    Invoice[]
+  payrolls    Payroll[]
+  metrics     PerformanceMetric[]
+
+  @@index([name])
+}
+
+model WorkspaceMember {
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String
+  role        String   @default("MEMBER") // "OWNER", "ADMIN", "MEMBER", "GUEST"
+  joinedAt    DateTime @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([userId])
+  @@index([workspaceId])
+}
+
 model User {
   id                String              @id @default(uuid())
   username          String              @unique
@@ -30,6 +63,7 @@ model User {
   metrics           PerformanceMetric[]
   tasks             Task[]
   agency            Agency?             @relation("AgencyMembers", fields: [agencyId], references: [id])
+  workspaces        WorkspaceMember[]
 }
 
 model Payroll {
@@ -45,6 +79,8 @@ model Payroll {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   user        User      @relation(fields: [userId], references: [id])
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
 
   @@unique([userId, month, year])
 }
@@ -84,6 +120,11 @@ model Task {
   client             Client?           @relation(fields: [clientId], references: [id])
   invoice            Invoice?          @relation(fields: [invoiceId], references: [id])
   project            Project?          @relation(fields: [projectId], references: [id])
+  workspaceId        String?
+  workspace          Workspace?        @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, isArchived])
 }
 
 
@@ -130,6 +171,8 @@ model Client {
   invoices       Invoice[]
   projects       Project[]
   tasks          Task[]
+  workspaceId    String?
+  workspace      Workspace? @relation(fields: [workspaceId], references: [id])
 }
 
 model Project {
@@ -141,6 +184,8 @@ model Project {
   feedbacks Feedback[]
   client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tasks     Task[]
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
 }
 
 model Feedback {
@@ -169,6 +214,8 @@ model PerformanceMetric {
   classification        String   @default("NORMAL")
   measuredAt            DateTime @default(now())
   user                  User     @relation(fields: [userId], references: [id])
+  workspaceId           String?
+  workspace             Workspace? @relation(fields: [workspaceId], references: [id])
 
   @@unique([userId, month, year])
 }
@@ -224,6 +271,8 @@ model Invoice {
   client          Client        @relation(fields: [clientId], references: [id])
   items           InvoiceItem[]
   tasks           Task[]
+  workspaceId     String?
+  workspace       Workspace?     @relation(fields: [workspaceId], references: [id])
 }
 
 model InvoiceItem {

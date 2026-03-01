@@ -50,11 +50,14 @@ export async function middleware(request: NextRequest) {
         const session = await decrypt(sessionCookie.value)
         const { role } = session.user
 
-        // Redirect logged in user away from login page
+        // Redirect logged in user away from login page to Workspace portal
         if (request.nextUrl.pathname === '/login') {
-            if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin', request.url))
+            return NextResponse.redirect(new URL('/workspaces', request.url))
+        }
 
-            return NextResponse.redirect(new URL('/dashboard', request.url))
+        // If trying to access exactly root '/', push to workspaces
+        if (request.nextUrl.pathname === '/') {
+            return NextResponse.redirect(new URL('/workspaces', request.url))
         }
 
         return response

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth-guard'
 import { sendEmail } from '@/lib/email'
 import { emailTemplates } from '@/lib/email-templates'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 // Helper to safely convert Decimal/Number/String to Number
 const toSafeNumber = (val: any) => {
@@ -142,16 +143,17 @@ export async function deleteBillingProfile(id: string) {
 // Fetch tasks that are COMPLETED (or similar status) and UNBILLED
 // Fetch tasks that are COMPLETED (or similar status) and UNBILLED
 // UPDATED: Now includes tasks from Sub-clients (Subsidiaries)
-export async function getUnbilledTasks(clientId: number) {
+export async function getUnbilledTasks(clientId: number, workspaceId: string) {
     try {
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
         // 1. Get all related Client IDs (Parent + Children)
-        const subsidiaries = await prisma.client.findMany({
+        const subsidiaries = await workspacePrisma.client.findMany({
             where: { parentId: clientId },
             select: { id: true }
         })
         const allClientIds = [clientId, ...subsidiaries.map(s => s.id)]
 
-        const tasks = await prisma.task.findMany({
+        const tasks = await workspacePrisma.task.findMany({
             where: {
                 clientId: { in: allClientIds }, // Query Family
                 invoiceStatus: 'UNBILLED',
@@ -188,10 +190,11 @@ export async function getUnbilledTasks(clientId: number) {
 }
 
 // Preview Invoice Calculations (No DB connection needed for calc, but good for validation)
-export async function calculateInvoicePreview(taskIds: string[], taxRate: number = 0, depositCurrent: number = 0) {
+export async function calculateInvoicePreview(taskIds: string[], taxRate: number = 0, depositCurrent: number = 0, workspaceId: string) {
     // This is a utility action to help frontend validation if needed
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
     // Fetch fresh data to ensure security
-    const tasks = await prisma.task.findMany({
+    const tasks = await workspacePrisma.task.findMany({
         where: { id: { in: taskIds } },
         select: { jobPriceUSD: true }
     })
@@ -226,15 +229,17 @@ export async function createInvoiceRecord(data: {
     billingSnapshot: any,
     items: any[],
     taskIds: string[]
-}) {
+}, workspaceId: string) {
     try {
         const user = await getCurrentUser()
         // Determine if user has permission (Admin or Treasurer)
         if (!user || (!user.isSuperAdmin && !user.isTreasurer)) return { error: 'Unauthorized' }
 
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+
         // 0. Verify Tasks are Unbilled (Prevent Double Billing)
         if (data.taskIds.length > 0) {
-            const billedCount = await prisma.task.count({
+            const billedCount = await workspacePrisma.task.count({
                 where: {
                     id: { in: data.taskIds },
                     invoiceStatus: 'INVOICED'
@@ -246,7 +251,7 @@ export async function createInvoiceRecord(data: {
         }
 
         // Transaction: Create Invoice + Update Tasks + Update Client Deposit
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await workspacePrisma.$transaction(async (tx) => {
             // 1. Create Invoice
             const invoice = await tx.invoice.create({
                 data: {
@@ -315,7 +320,7 @@ export async function createInvoiceRecord(data: {
             })
         }
 
-        revalidatePath(`/admin/crm/${data.clientId}`)
+        revalidatePath(`/${workspaceId}/admin/crm/${data.clientId}`)
 
         // Sanitize Result (Decimal -> Number, Date -> String)
         const safeResult = {
@@ -342,16 +347,17 @@ export async function createInvoiceRecord(data: {
 
 // Fetch Invoices for a specific client
 // Fetch Invoices for a specific client (including invoices generated for sub-clients if any)
-export async function getClientInvoices(clientId: number) {
+export async function getClientInvoices(clientId: number, workspaceId: string) {
     try {
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
         // 1. Get all related Client IDs (Parent + Children)
-        const subsidiaries = await prisma.client.findMany({
+        const subsidiaries = await workspacePrisma.client.findMany({
             where: { parentId: clientId },
             select: { id: true }
         })
         const allClientIds = [clientId, ...subsidiaries.map(s => s.id)]
 
-        const invoices = await prisma.invoice.findMany({
+        const invoices = await workspacePrisma.invoice.findMany({
             where: { clientId: { in: allClientIds } },
             orderBy: { issueDate: 'desc' },
             include: {
@@ -379,12 +385,14 @@ export async function getClientInvoices(clientId: number) {
 }
 
 // Void Invoice (Revert actions)
-export async function voidInvoice(invoiceId: string) {
+export async function voidInvoice(invoiceId: string, workspaceId: string) {
     try {
         const user = await getCurrentUser()
         if (!user || (!user.isSuperAdmin && !user.isTreasurer)) return { error: 'Unauthorized' }
 
-        const invoice = await prisma.invoice.findUnique({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+
+        const invoice = await workspacePrisma.invoice.findUnique({
             where: { id: invoiceId },
             include: { tasks: true }
         })
@@ -393,7 +401,7 @@ export async function voidInvoice(invoiceId: string) {
         if (invoice.status === 'VOID') return { error: 'Invoice is already void' }
 
         // Transaction: Void Invoice + Revert Tasks + Refund Deposit
-        await prisma.$transaction(async (tx) => {
+        await workspacePrisma.$transaction(async (tx) => {
             // 1. Update Invoice Status
             await tx.invoice.update({
                 where: { id: invoiceId },
@@ -420,7 +428,7 @@ export async function voidInvoice(invoiceId: string) {
             }
         })
 
-        revalidatePath(`/admin/crm/${invoice.clientId}`)
+        revalidatePath(`/${workspaceId}/admin/crm/${invoice.clientId}`)
         return { success: true }
 
     } catch (error) {

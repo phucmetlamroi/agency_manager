@@ -37,9 +37,10 @@ const statusColors: Record<string, string> = {
 interface StatusCellProps {
     task: TaskWithUser
     isAdmin: boolean
+    workspaceId: string
 }
 
-export function StatusCell({ task, isAdmin }: StatusCellProps) {
+export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
 
     const router = useRouter()
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
@@ -52,7 +53,7 @@ export function StatusCell({ task, isAdmin }: StatusCellProps) {
         }
 
         try {
-            const result = await updateTaskStatus(task.id, newStatus, undefined, undefined, task.version)
+            const result = await updateTaskStatus(task.id, newStatus, workspaceId, undefined, undefined, task.version)
             if (result.error) {
                 toast.error(result.error)
                 return
@@ -66,7 +67,7 @@ export function StatusCell({ task, isAdmin }: StatusCellProps) {
 
     const submitFeedback = async () => {
         try {
-            const result = await updateTaskStatus(task.id, 'Revision', undefined, feedback)
+            const result = await updateTaskStatus(task.id, 'Revision', workspaceId, undefined, feedback)
             if (result.error) {
                 toast.error(result.error)
                 return

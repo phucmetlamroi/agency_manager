@@ -19,6 +19,7 @@ interface InvoiceModalProps {
     clientName: string
     clientAddress?: string
     depositBalance?: number
+    workspaceId: string
 }
 
 interface InvoiceItem {
@@ -32,7 +33,7 @@ interface InvoiceItem {
     taskId?: string
 }
 
-export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddress, depositBalance = 0 }: InvoiceModalProps) {
+export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddress, depositBalance = 0, workspaceId }: InvoiceModalProps) {
     const router = useRouter()
     // Data State
     const [tasks, setTasks] = useState<any[]>([])
@@ -72,7 +73,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
         setIsLoading(true)
         try {
             const [tasksRes, profilesRes] = await Promise.all([
-                getUnbilledTasks(clientId),
+                getUnbilledTasks(clientId, workspaceId),
                 getBillingProfiles()
             ])
 
@@ -302,7 +303,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
             // 2. Create Record in DB
             toast.info('Saving invoice...')
-            const saveRes = await createInvoiceRecord(dbPayload)
+            const saveRes = await createInvoiceRecord(dbPayload, workspaceId)
             if (saveRes.error) throw new Error(saveRes.error)
 
             toast.success('Invoice saved! Generating PDF...')

@@ -37,7 +37,7 @@ const statusBg: Record<string, string> = {
 }
 
 // RENAMED PROP: 'users' -> 'members' to match calling code in Agency Page
-export default function AgencyTaskTable({ tasks, members }: { tasks: TaskWithUser[], members: any[] }) {
+export default function AgencyTaskTable({ tasks, members, workspaceId }: { tasks: TaskWithUser[], members: any[], workspaceId: string }) {
     const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
 
@@ -121,7 +121,7 @@ export default function AgencyTaskTable({ tasks, members }: { tasks: TaskWithUse
             const task = tasks.find(t => t.id === taskId)
             const version = task?.version
 
-            const result = await updateTaskStatus(taskId, newStatus, notes, feedback, version)
+            const result = await updateTaskStatus(taskId, newStatus, workspaceId, notes, feedback, version)
 
             if (result?.error) {
                 toast.error(result.error)
@@ -156,7 +156,7 @@ export default function AgencyTaskTable({ tasks, members }: { tasks: TaskWithUse
             productLink: editForm.productLink,
             collectFilesLink: editForm.collectFilesLink,
             // Exclude deadline/prices from Agency update
-        })
+        }, workspaceId)
 
         if (res?.success) {
             setSelectedTask({
@@ -237,7 +237,7 @@ export default function AgencyTaskTable({ tasks, members }: { tasks: TaskWithUse
                                                 onChange={async (e) => {
                                                     const val = e.target.value
 
-                                                    await assignTask(task.id, val || null)
+                                                    await assignTask(task.id, val || null, workspaceId)
                                                     toast.success('Đã cập nhật phân công')
                                                 }}
                                                 className="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-blue-500 max-w-[120px]"

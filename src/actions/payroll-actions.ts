@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { format } from 'date-fns'
 
 export async function confirmPayment(data: {
@@ -11,10 +12,11 @@ export async function confirmPayment(data: {
     baseSalary: number
     bonus: number
     totalAmount: number
-}) {
+}, workspaceId: string) {
     try {
         // Upsert Payroll Record
-        const payroll = await prisma.payroll.upsert({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const payroll = await workspacePrisma.payroll.upsert({
             where: {
                 userId_month_year: {
                     userId: data.userId,
@@ -41,7 +43,7 @@ export async function confirmPayment(data: {
             }
         })
 
-        revalidatePath('/admin/users') // Or wherever payroll is shown
+        revalidatePath(`/${workspaceId}/admin/users`) // Or wherever payroll is shown
         // Send Email logic would go here (omitted for now)
 
         return { success: true }
@@ -51,9 +53,11 @@ export async function confirmPayment(data: {
     }
 }
 
-export async function getPayrollData(month: number, year: number) {
+export async function getPayrollData(month: number, year: number, workspaceId: string) {
     // Fetch all users and their payroll status for the specific month
-    const users = await prisma.user.findMany({
+    // Note: We're fetching 'USER' role users here, may need workspace scoping if users are per-workspace
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
+    const users = await workspacePrisma.user.findMany({
         where: { role: 'USER' },
         include: {
             payrolls: {
@@ -65,9 +69,10 @@ export async function getPayrollData(month: number, year: number) {
     return { success: true, data: users }
 }
 
-export async function revertPayment(userId: string, month: number, year: number) {
+export async function revertPayment(userId: string, month: number, year: number, workspaceId: string) {
     try {
-        await prisma.payroll.delete({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.payroll.delete({
             where: {
                 userId_month_year: {
                     userId,
@@ -77,7 +82,7 @@ export async function revertPayment(userId: string, month: number, year: number)
             }
         })
 
-        revalidatePath('/admin/users')
+        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error) {
         console.error('Revert payment error:', error)

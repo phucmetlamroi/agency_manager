@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { parseVietnamDate } from '@/lib/date-utils'
 
 export async function updateTaskDetails(id: string, data: {
@@ -14,8 +15,9 @@ export async function updateTaskDetails(id: string, data: {
     jobPriceUSD?: number
     value?: number
     collectFilesLink?: string
-}) {
+}, workspaceId: string) {
     try {
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
         const updateData: any = {
             resources: data.resources,
             references: data.references,
@@ -28,7 +30,7 @@ export async function updateTaskDetails(id: string, data: {
         // Handle Price Updates (Financials) - FIXED
         if (data.jobPriceUSD !== undefined || data.value !== undefined) {
             // Fetch current to merge
-            const currentTask = await prisma.task.findUnique({
+            const currentTask = await workspacePrisma.task.findUnique({
                 where: { id },
                 select: { jobPriceUSD: true, value: true, exchangeRate: true, createdAt: true, assigneeId: true }
             })
@@ -39,7 +41,7 @@ export async function updateTaskDetails(id: string, data: {
                     const month = currentTask.createdAt.getMonth() + 1
                     const year = currentTask.createdAt.getFullYear()
 
-                    const payroll = await prisma.payroll.findUnique({
+                    const payroll = await workspacePrisma.payroll.findUnique({
                         where: {
                             userId_month_year: {
                                 userId: currentTask.assigneeId,
@@ -81,12 +83,12 @@ export async function updateTaskDetails(id: string, data: {
             // Maybe not needed, Admin controls status separately.
         }
 
-        await prisma.task.update({
+        await workspacePrisma.task.update({
             where: { id },
             data: updateData
         })
-        revalidatePath('/admin')
-        revalidatePath('/dashboard')
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/dashboard`)
         return { success: true }
     } catch (e) {
         return { error: 'Failed to update task details' }

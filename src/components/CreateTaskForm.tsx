@@ -14,7 +14,7 @@ type User = {
 
 import ClientSelector from '@/components/crm/ClientSelector'
 
-export default function CreateTaskForm({ users }: { users: User[] }) {
+export default function CreateTaskForm({ users, workspaceId }: { users: User[], workspaceId: string }) {
     const [rate, setRate] = useState<number>(25300)
     const [usd, setUsd] = useState<number>(0)
     const [usdDisplay, setUsdDisplay] = useState<string>('')
@@ -130,7 +130,7 @@ export default function CreateTaskForm({ users }: { users: User[] }) {
     const clientAction = async (formData: FormData) => {
         // Appending computed exchange rate if not present (though we have hidden input)
         // Actually hidden input is enough.
-        await createTask(formData)
+        await createTask(formData, workspaceId)
     }
 
     return (
@@ -140,7 +140,7 @@ export default function CreateTaskForm({ users }: { users: User[] }) {
             <input type="hidden" name="clientId" value={clientId || ''} />
 
             {/* NEW: Client Selector */}
-            <ClientSelector onSelect={setClientId} />
+            <ClientSelector onSelect={setClientId} workspaceId={workspaceId} />
 
             <div>
                 <label style={{ fontSize: '0.8rem', color: '#888' }}>Tên công việc</label>

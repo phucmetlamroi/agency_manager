@@ -23,7 +23,7 @@ type ClientData = {
 
 const COLORS = ['#60a5fa', '#a855f7', '#f472b6', '#34d399', '#fbbf24']
 
-export default function ClientAnalytics({ client, distribution }: { client: ClientData, distribution: any[] }) {
+export default function ClientAnalytics({ client, distribution, workspaceId }: { client: ClientData, distribution: any[], workspaceId: string }) {
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
 
     // Tier Badge Logic
@@ -47,6 +47,7 @@ export default function ClientAnalytics({ client, distribution }: { client: Clie
                 clientName={client.name}
                 // address? We might need to fetch this or add to Client model if not exists
                 depositBalance={Number(client.depositBalance || 0)}
+                workspaceId={workspaceId}
             />
 
             {/* HEADER */}
@@ -173,7 +174,7 @@ export default function ClientAnalytics({ client, distribution }: { client: Clie
                 <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
                     <span>🧾</span> Invoice History
                 </h3>
-                <ClientInvoicesTable invoices={client.invoices || []} clientId={client.id} />
+                <ClientInvoicesTable invoices={client.invoices || []} clientId={client.id} workspaceId={workspaceId} />
             </div>
 
             {/* RECENT TASKS LIST */}

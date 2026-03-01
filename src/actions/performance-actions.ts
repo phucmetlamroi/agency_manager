@@ -2,12 +2,14 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { serializeDecimal } from '@/lib/serialization'
 
-export async function getPerformanceReport(month: number, year: number) {
+export async function getPerformanceReport(month: number, year: number, workspaceId: string) {
     try {
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
         // Try to fetch existing snapshot first
-        const metrics = await prisma.performanceMetric.findMany({
+        const metrics = await workspacePrisma.performanceMetric.findMany({
             where: { month, year },
             include: { user: true },
             orderBy: { revenue: 'desc' }
@@ -19,7 +21,7 @@ export async function getPerformanceReport(month: number, year: number) {
         }
 
         // If no data, calculate from scratch (First run for this month)
-        return await calculatePerformance(month, year)
+        return await calculatePerformance(month, year, workspaceId)
 
     } catch (error) {
         console.error('Get Performance Error:', error)
@@ -27,12 +29,13 @@ export async function getPerformanceReport(month: number, year: number) {
     }
 }
 
-export async function calculatePerformance(month: number, year: number) {
+export async function calculatePerformance(month: number, year: number, workspaceId: string) {
     try {
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
         const startDate = new Date(year, month - 1, 1)
         const endDate = new Date(year, month, 0) // Last day of month
 
-        const users = await prisma.user.findMany({
+        const users = await workspacePrisma.user.findMany({
             where: { role: 'USER' },
             include: {
                 tasks: {
@@ -69,10 +72,10 @@ export async function calculatePerformance(month: number, year: number) {
                 }
 
                 // Feedbacks
-                const taskInternalFbs = await prisma.feedback.count({
+                const taskInternalFbs = await workspacePrisma.feedback.count({
                     where: { taskId: task.id, type: 'INTERNAL' }
                 })
-                const taskClientFbs = await prisma.feedback.count({
+                const taskClientFbs = await workspacePrisma.feedback.count({
                     where: { taskId: task.id, type: 'CLIENT' }
                 })
 
@@ -110,7 +113,7 @@ export async function calculatePerformance(month: number, year: number) {
             }
 
             // Push to updates
-            updates.push(prisma.performanceMetric.upsert({
+            updates.push(workspacePrisma.performanceMetric.upsert({
                 where: {
                     userId_month_year: {
                         userId: user.id,
@@ -141,11 +144,11 @@ export async function calculatePerformance(month: number, year: number) {
             }))
         }
 
-        await prisma.$transaction(updates)
-        revalidatePath('/admin/performance')
+        await workspacePrisma.$transaction(updates)
+        revalidatePath(`/${workspaceId}/admin/performance`)
 
         // Fetch fresh data to return
-        const freshData = await prisma.performanceMetric.findMany({
+        const freshData = await workspacePrisma.performanceMetric.findMany({
             where: { month, year },
             include: { user: true },
             orderBy: { revenue: 'desc' }

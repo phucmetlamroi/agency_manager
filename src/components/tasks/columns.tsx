@@ -26,6 +26,7 @@ export const getColumns = (
     agencies: any[],
     isAdmin: boolean,
     onTaskClick: (task: TaskWithUser) => void,
+    workspaceId: string,
     onDelete?: (id: string) => void,
     selectedIds: string[] = []
 ): ColumnDef<TaskWithUser>[] => [
@@ -76,7 +77,7 @@ export const getColumns = (
             accessorKey: "status",
             header: "Status",
             cell: ({ row }) => (
-                <StatusCell task={row.original} isAdmin={isAdmin} />
+                <StatusCell task={row.original} isAdmin={isAdmin} workspaceId={workspaceId} />
             ),
         },
         {
@@ -89,6 +90,7 @@ export const getColumns = (
                     agencies={agencies}
                     isAdmin={isAdmin}
                     selectedIds={selectedIds}
+                    workspaceId={workspaceId}
                 />
             )
         },

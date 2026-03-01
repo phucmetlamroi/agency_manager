@@ -3,13 +3,15 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth-guard'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 // --- 1. DELETE TASK ---
-export async function deleteTask(id: string) {
+export async function deleteTask(id: string, workspaceId: string) {
     try {
         const user = await getCurrentUser() // Guard Check
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
 
-        const task = await prisma.task.findUnique({ where: { id } })
+        const task = await workspacePrisma.task.findUnique({ where: { id } })
         if (!task) return { error: 'Not found' }
 
         // Permission Check
@@ -18,9 +20,9 @@ export async function deleteTask(id: string) {
         }
 
         // Nhờ onDelete: Cascade trong Prisma, UserSchedule liên quan sẽ tự mất
-        await prisma.task.delete({ where: { id } })
+        await workspacePrisma.task.delete({ where: { id } })
 
-        revalidatePath('/admin')
+        revalidatePath(`/${workspaceId}/admin`)
         return { success: true }
     } catch (e: any) {
         return { error: e.message || 'Error deleting task' }
@@ -28,10 +30,11 @@ export async function deleteTask(id: string) {
 }
 
 // --- 2. GENERIC UPDATE (Chống Hack) ---
-export async function updateTask(id: string, data: any) {
+export async function updateTask(id: string, data: any, workspaceId: string) {
     try {
         const user = await getCurrentUser() // Guard Check
-        const task = await prisma.task.findUnique({ where: { id } })
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const task = await workspacePrisma.task.findUnique({ where: { id } })
 
         if (!task) return { error: 'Not found' }
 
@@ -48,9 +51,9 @@ export async function updateTask(id: string, data: any) {
             delete data.isPenalized
         }
 
-        await prisma.task.update({ where: { id }, data })
+        await workspacePrisma.task.update({ where: { id }, data })
 
-        revalidatePath('/admin')
+        revalidatePath(`/${workspaceId}/admin`)
         return { success: true }
     } catch (e: any) {
         return { error: 'Failed to update' }
@@ -58,11 +61,12 @@ export async function updateTask(id: string, data: any) {
 }
 
 // --- 3. ASSIGN TASK (Core Logic) ---
-export async function assignTask(taskId: string, assignmentId: string | null) {
+export async function assignTask(taskId: string, assignmentId: string | null, workspaceId: string) {
     try {
         // A. AUTH & SCOPE CHECK
         const user = await getCurrentUser()
-        const task = await prisma.task.findUnique({ where: { id: taskId } })
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const task = await workspacePrisma.task.findUnique({ where: { id: taskId } })
 
         if (!task) return { error: 'Task not found' }
 
@@ -108,7 +112,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
         }
 
         // C. EXECUTE DB UPDATE
-        const updatedTask = await prisma.task.update({
+        const updatedTask = await workspacePrisma.task.update({
             where: { id: taskId },
             data: updateData,
             include: { assignee: true }
@@ -136,7 +140,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
         }
 
         // E. REVALIDATE
-        const paths = ['/admin', '/dashboard', '/agency', '/admin/queue']
+        const paths = [`/${workspaceId}/admin`, `/${workspaceId}/dashboard`, '/agency', `/${workspaceId}/admin/queue`]
         paths.forEach(p => revalidatePath(p))
 
         return { success: true }

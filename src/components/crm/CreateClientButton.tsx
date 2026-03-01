@@ -29,7 +29,7 @@ type Client = {
     subsidiaries?: Client[]
 }
 
-export default function CreateClientButton({ partners }: { partners: Client[] }) {
+export default function CreateClientButton({ partners, workspaceId }: { partners: Client[], workspaceId: string }) {
     const [open, setOpen] = useState(false)
     const [name, setName] = useState('')
     const [parentId, setParentId] = useState<string>('') // Use string for Shadcn Select
@@ -42,7 +42,7 @@ export default function CreateClientButton({ partners }: { partners: Client[] })
             const res = await createClient({
                 name,
                 parentId: parentId ? Number(parentId) : undefined
-            })
+            }, workspaceId)
             if (res.success) {
                 setOpen(false)
                 setName('')

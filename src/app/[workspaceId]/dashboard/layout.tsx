@@ -13,9 +13,12 @@ import BottomNav from '@/components/BottomNav'
 
 export default async function UserLayout({
     children,
+    params,
 }: {
     children: React.ReactNode
+    params: { workspaceId: string }
 }) {
+    const { workspaceId } = params
     const cookieStore = await cookies()
     const sessionCookie = cookieStore.get('session')
 
@@ -48,7 +51,7 @@ export default async function UserLayout({
     if (isMobile) {
         const { default: MobileLayoutShell } = await import('@/components/layout/MobileLayoutShell')
         return (
-            <MobileLayoutShell user={user} handleLogout={handleLogout}>
+            <MobileLayoutShell user={user} workspaceId={workspaceId} handleLogout={handleLogout}>
                 <RoleWatcher currentRole={user.role} isTreasurer={user.isTreasurer ?? false} />
                 {children}
             </MobileLayoutShell>
@@ -91,16 +94,16 @@ export default async function UserLayout({
                                 .desktop-menu { display: flex !important; }
                             }
                         `}} />
-                        <Link href="/dashboard" className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Tổng quan</Link>
-                        <Link href="/dashboard/schedule" className="btn" style={{ color: '#c084fc', background: 'transparent', padding: '0.5rem 1rem' }}>Lịch làm việc</Link>
-                        <Link href="/dashboard/profile" className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Hồ sơ</Link>
+                        <Link href={`/${workspaceId}/dashboard`} className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Tổng quan</Link>
+                        <Link href={`/${workspaceId}/dashboard/schedule`} className="btn" style={{ color: '#c084fc', background: 'transparent', padding: '0.5rem 1rem' }}>Lịch làm việc</Link>
+                        <Link href={`/${workspaceId}/dashboard/profile`} className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Hồ sơ</Link>
                     </nav>
                 </div>
 
                 {/* RIGHT: User Info & Actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     {/* User Info Badge */}
-                    <Link href="/dashboard/profile" style={{
+                    <Link href={`/${workspaceId}/dashboard/profile`} style={{
                         fontSize: '0.85rem', color: '#ccc',
                         display: 'flex', alignItems: 'center', gap: '0.5rem',
                         background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
@@ -143,7 +146,7 @@ export default async function UserLayout({
             </main>
 
             {/* --- BOTTOM NAV (Mobile Only - Fallback if not Shell) --- */}
-            <BottomNav role={user.role || 'USER'} />
+            <BottomNav role={user.role || 'USER'} workspaceId={workspaceId} />
         </div>
     )
 }

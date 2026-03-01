@@ -6,14 +6,16 @@ import { FeedbackSource } from '@prisma/client'
 import { validateTransition, TaskState } from '@/lib/fsm-config'
 
 import { getCurrentUser } from '@/lib/auth-guard'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
-export async function updateTaskStatus(id: string, newStatus: string, newNotes?: string, feedbackData?: { type: FeedbackSource, content: string }, currentVersion?: number) {
+export async function updateTaskStatus(id: string, newStatus: string, workspaceId: string, newNotes?: string, feedbackData?: { type: FeedbackSource, content: string }, currentVersion?: number) {
     try {
         // --- LAYER 1 & 2: AUTH & CONTEXT ---
         const user = await getCurrentUser()
 
         // --- LAYER 3: DATA SCOPE ---
-        const task = await prisma.task.findUnique({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const task = await workspacePrisma.task.findUnique({
             where: { id },
             include: { assignee: true }
         })
@@ -53,7 +55,7 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
 
         // --- TRANSACTION BLOCK ---
         // Ensure Atomicity: Feedback + Reputation + Task Status must succeed or fail together.
-        const transactionResult = await prisma.$transaction(async (tx) => {
+        const transactionResult = await workspacePrisma.$transaction(async (tx) => {
             // 1. Create Feedback (if applicable)
             if (newStatus === 'Revision' && feedbackData) {
                 await tx.feedback.create({
@@ -109,13 +111,13 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
 
         if (transactionResult.count === 0) {
             // Check if task exists to distinguish found vs version mismatch
-            const exists = await prisma.task.findUnique({ where: { id } })
+            const exists = await workspacePrisma.task.findUnique({ where: { id } })
             if (!exists) return { error: 'Task not found' }
             return { error: 'Task has been modified by another user. Please refresh.' } // Concurrency Error
         }
 
         // Fetch updated task for Emails & Return
-        const updatedTaskResult = await prisma.task.findUnique({
+        const updatedTaskResult = await workspacePrisma.task.findUnique({
             where: { id },
             include: { assignee: true }
         })
@@ -249,9 +251,9 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
 
         // -----------------------
 
-        revalidatePath('/admin')
-        revalidatePath('/dashboard')
-        revalidatePath('/admin/payroll')
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/dashboard`)
+        revalidatePath(`/${workspaceId}/admin/payroll`)
 
         return { success: true }
     } catch (e: any) {

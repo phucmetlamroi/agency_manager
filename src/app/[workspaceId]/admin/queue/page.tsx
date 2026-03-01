@@ -5,7 +5,7 @@ import { checkOverdueTasks } from '@/actions/reputation-actions'
 
 import { serializeDecimal } from '@/lib/serialization'
 
-export default async function TaskQueuePage() {
+export default async function TaskQueuePage({ params }: { params: { workspaceId: string } }) {
     await checkOverdueTasks() // Ensure queue is fresh
 
     const tasks = await prisma.task.findMany({
@@ -48,7 +48,7 @@ export default async function TaskQueuePage() {
                 </div>
 
                 {unassignedTasks.length > 0 ? (
-                    <TaskTable tasks={serializeDecimal(unassignedTasks) as any} isAdmin={true} users={users} agencies={agencies} />
+                    <TaskTable tasks={serializeDecimal(unassignedTasks) as any} isAdmin={true} users={users} agencies={agencies} workspaceId={params.workspaceId} />
                 ) : (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#666', border: '1px dashed #444', borderRadius: '12px' }}>
                         <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Kho đang trống!</p>

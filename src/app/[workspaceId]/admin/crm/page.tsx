@@ -4,10 +4,12 @@ import ClientList from '@/components/crm/ClientList'
 import CreateClientButton from '@/components/crm/CreateClientButton'
 import UpdateScoresButton from '@/components/crm/UpdateScoresButton'
 
-export default async function CRMDashboard() {
+export default async function CRMDashboard({ params }: { params: { workspaceId: string } }) {
+    const { workspaceId } = params
+
     const [clientsRes, topClientsRes] = await Promise.all([
-        getClients(),
-        getTopClients()
+        getClients(workspaceId),
+        getTopClients(workspaceId)
     ])
 
     const clients = clientsRes.data || []
@@ -31,10 +33,10 @@ export default async function CRMDashboard() {
                     <section className="glass-panel p-6">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-semibold text-white">Danh sách Khách hàng</h2>
-                            <CreateClientButton partners={typedClients} />
+                            <CreateClientButton partners={typedClients} workspaceId={workspaceId} />
                         </div>
 
-                        <ClientList clients={serializeDecimal(clients) as any} />
+                        <ClientList clients={serializeDecimal(clients) as any} workspaceId={workspaceId} />
                     </section>
                 </div>
 
@@ -42,16 +44,12 @@ export default async function CRMDashboard() {
                 <div className="space-y-6">
                     <div className="glass-panel p-6 bg-gradient-to-br from-purple-900/40 to-blue-900/20">
                         <h3 className="text-lg font-bold text-purple-300 mb-2">🤖 AI Scoring System</h3>
-                        import UpdateScoresButton from '@/components/crm/UpdateScoresButton'
-
-                        // ... (in the component)
-
                         <p className="text-sm text-gray-400">
                             Hệ thống chấm điểm dựa trên Doanh thu & Tần suất Feedback.
                             Chạy tự động mỗi 24h.
                         </p>
 
-                        <UpdateScoresButton />
+                        <UpdateScoresButton workspaceId={workspaceId} />
 
                         <div className="mt-4 pt-4 border-t border-white/10">
                             <div className="text-xs text-gray-500 uppercase font-bold mb-3 tracking-wider">Top Khách hàng tiềm năng</div>

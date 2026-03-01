@@ -25,9 +25,10 @@ interface AssigneeCellProps {
     agencies: { id: string; name: string; code: string }[]
     isAdmin: boolean
     selectedIds?: string[]
+    workspaceId: string
 }
 
-export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [] }: AssigneeCellProps) {
+export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [], workspaceId }: AssigneeCellProps) {
     const router = useRouter()
     const { confirm } = useConfirm()
 
@@ -54,7 +55,7 @@ export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [] 
             })) {
                 // Perform Bulk Assign
                 const { bulkAssignTasks } = await import('@/actions/bulk-task-actions')
-                const res = await bulkAssignTasks(selectedIds, val === "unassigned" ? null : val)
+                const res = await bulkAssignTasks(selectedIds, val === "unassigned" ? null : val, workspaceId)
 
                 if (res.error) toast.error(res.error)
                 else {
@@ -66,7 +67,7 @@ export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [] 
         }
 
         // Single Assign (Default)
-        const assignRes = await assignTask(task.id, val === "unassigned" ? null : val)
+        const assignRes = await assignTask(task.id, val === "unassigned" ? null : val, workspaceId)
         if (assignRes?.success) {
             toast.success("Assignment updated")
             // In a real app we might want to optimistically update or revalidate

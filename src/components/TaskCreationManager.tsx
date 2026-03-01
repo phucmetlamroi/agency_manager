@@ -11,7 +11,7 @@ type User = {
     role: string
 }
 
-export default function TaskCreationManager({ users }: { users: User[] }) {
+export default function TaskCreationManager({ users, workspaceId }: { users: User[], workspaceId: string }) {
     const [mode, setMode] = useState<'SINGLE' | 'BATCH'>('SINGLE')
 
     return (
@@ -22,7 +22,7 @@ export default function TaskCreationManager({ users }: { users: User[] }) {
                 </h3>
             </div>
 
-            <BulkCreateTaskForm users={users} onSuccess={() => { }} />
+            <BulkCreateTaskForm users={users} onSuccess={() => { }} workspaceId={workspaceId} />
         </div>
     )
 }

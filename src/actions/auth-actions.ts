@@ -37,16 +37,6 @@ export async function loginAction(prevState: any, formData: FormData) {
         return { error: 'Đã có lỗi xảy ra' }
     }
 
-    // Redirect after login (outside try-catch to avoid nextjs redirect error catching)
-    // We can't know role here easily without re-querying or passing it out, 
-    // but we should just redirect to middleware handling or a root page that redirects.
-    // Actually, we can check role here.
-
-    // Re-fetch or rely on the fact we just had 'user'
-    const user = await prisma.user.findUnique({ where: { username } })
-    if (user?.role === UserRole.ADMIN) {
-        redirect('/admin')
-    } else {
-        redirect('/dashboard')
-    }
+    // Redirect all users to the Workspace Portal
+    redirect('/workspaces')
 }

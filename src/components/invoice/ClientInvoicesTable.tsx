@@ -19,7 +19,7 @@ interface Invoice {
     items: any[]
 }
 
-export function ClientInvoicesTable({ invoices, clientId }: { invoices: Invoice[], clientId: number }) {
+export function ClientInvoicesTable({ invoices, clientId, workspaceId }: { invoices: Invoice[], clientId: number, workspaceId: string }) {
     const router = useRouter()
     const [isVoiding, setIsVoiding] = useState<string | null>(null)
 
@@ -28,7 +28,7 @@ export function ClientInvoicesTable({ invoices, clientId }: { invoices: Invoice[
 
         setIsVoiding(id)
         try {
-            const res = await voidInvoice(id)
+            const res = await voidInvoice(id, workspaceId)
             if (res.error) throw new Error(res.error)
 
             toast.success('Invoice voided successfully')

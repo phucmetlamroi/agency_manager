@@ -13,7 +13,7 @@ const TAB_CONFIG = [
     { id: 'COMPLETED', label: '🟢 Hoàn tất', color: 'text-green-400 border-green-500' },
 ]
 
-export default function TaskWorkflowTabs({ tasks, users, agencies, isMobile, isAdmin }: { tasks: TaskWithUser[], users: any[], agencies?: any[] | undefined, isMobile: boolean, isAdmin?: boolean }) {
+export default function TaskWorkflowTabs({ tasks, users, agencies, isMobile, isAdmin, workspaceId }: { tasks: TaskWithUser[], users: any[], agencies?: any[] | undefined, isMobile: boolean, isAdmin?: boolean, workspaceId: string }) {
     const [activeTab, setActiveTab] = useState<TabState>('IN_PROGRESS')
 
     // In Progress: User is working
@@ -90,6 +90,7 @@ export default function TaskWorkflowTabs({ tasks, users, agencies, isMobile, isA
                         users={users}
                         agencies={agencies}
                         isMobile={isMobile}
+                        workspaceId={workspaceId}
                     />
                 )}
             </div>

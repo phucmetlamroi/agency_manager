@@ -14,9 +14,10 @@ interface DesktopTaskTableProps {
     isAdmin?: boolean
     users?: any[]
     agencies?: any[]
+    workspaceId: string
 }
 
-export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], agencies = [] }: DesktopTaskTableProps) {
+export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], agencies = [], workspaceId }: DesktopTaskTableProps) {
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
     const [rowSelection, setRowSelection] = useState({})
     const { confirm } = useConfirm()
@@ -29,7 +30,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], a
             message: 'Are you sure you want to delete this task?',
             type: 'danger'
         })) {
-            await deleteTask(id)
+            await deleteTask(id, workspaceId)
             toast.success('Task deleted')
             window.location.reload()
         }
@@ -42,7 +43,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], a
             type: 'danger'
         })) {
             const { bulkDeleteTasks } = await import('@/actions/bulk-task-actions')
-            const res = await bulkDeleteTasks(selectedIds)
+            const res = await bulkDeleteTasks(selectedIds, workspaceId)
             if (res.error) {
                 toast.error(res.error)
             } else {
@@ -64,6 +65,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], a
             }
             setSelectedTask(task)
         }, // onTaskClick
+        workspaceId, // workspaceId
         handleDelete, // onDelete
         selectedIds // selectedRowIds for Bulk Assign
     )
@@ -103,6 +105,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], a
                 onClose={() => setSelectedTask(null)}
                 isAdmin={isAdmin}
                 bulkSelectedIds={selectedIds} // Pass for Bulk Edit
+                workspaceId={workspaceId}
             />
         </div>
     )

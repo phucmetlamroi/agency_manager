@@ -10,7 +10,7 @@ import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
 import { TaskDrawer } from '@/components/mobile/TaskDrawer'
 
-export default function MobileTaskView({ tasks, isAdmin, users }: { tasks: TaskWithUser[], isAdmin: boolean, users: any[] }) {
+export default function MobileTaskView({ tasks, isAdmin, users, workspaceId }: { tasks: TaskWithUser[], isAdmin: boolean, users: any[], workspaceId: string }) {
     const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
     const [actionSheetOpen, setActionSheetOpen] = useState(false)
@@ -46,7 +46,7 @@ export default function MobileTaskView({ tasks, isAdmin, users }: { tasks: TaskW
 
     const handleStatusChange = async (status: string) => {
         if (!selectedTask) return
-        await updateTaskStatus(selectedTask.id, status)
+        await updateTaskStatus(selectedTask.id, status, workspaceId)
         setActionSheetOpen(false)
         setIsDrawerOpen(false)
         setSelectedTask(null)
@@ -61,7 +61,7 @@ export default function MobileTaskView({ tasks, isAdmin, users }: { tasks: TaskW
             confirmText: 'Delete',
             cancelText: 'Cancel'
         })) {
-            await deleteTask(selectedTask.id)
+            await deleteTask(selectedTask.id, workspaceId)
             setIsDrawerOpen(false)
             toast.success('Task deleted successfully')
         }

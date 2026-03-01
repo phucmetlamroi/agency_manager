@@ -7,10 +7,12 @@ import { usePathname } from 'next/navigation' // For active state if needed
 export default function DesktopLayoutShell({
     children,
     user,
+    workspaceId,
     handleLogout
 }: {
     children: React.ReactNode,
     user: any,
+    workspaceId: string,
     handleLogout: () => void
 }) {
     const pathname = usePathname()
@@ -26,30 +28,27 @@ export default function DesktopLayoutShell({
                 </div>
 
                 <nav className="flex-1 space-y-2">
-                    <Link href="/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/dashboard' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                    <Link href={`/${workspaceId}/dashboard`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                         <span>🏠</span> Tổng quan
                     </Link>
                     {user?.role === 'ADMIN' && (
                         <>
-                            <Link href="/admin" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/admin' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                            <Link href={`/${workspaceId}/admin`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>⚡</span> Quản lý Task
                             </Link>
-                            <Link href="/admin/users" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/admin/users' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                            <Link href={`/${workspaceId}/admin/users`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/users` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>👥</span> Nhân sự
                             </Link>
-                            <Link href="/admin/finance" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/admin/finance' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                            <Link href={`/${workspaceId}/admin/finance`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/finance` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>💰</span> Tài chính
                             </Link>
-                            <Link href="/admin/payroll" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/admin/payroll' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                            <Link href={`/${workspaceId}/admin/payroll`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/payroll` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>💸</span> Payroll
                             </Link>
-                            <Link href="/admin/queue" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/admin/queue' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                            <Link href={`/${workspaceId}/admin/queue`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/queue` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>🎁</span> Queue
                             </Link>
-                            <Link href="/admin/schedule" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/admin/schedule' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
-                                <span>📅</span> Lịch trình
-                            </Link>
-                            <Link href="/admin/agencies" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === '/admin/agencies' ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                            <Link href={`/${workspaceId}/admin/agencies`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/agencies` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>🏢</span> Agencies
                             </Link>
                         </>

@@ -16,7 +16,7 @@ type UserWithPayroll = {
     tasks: { wageVND: number | null, value: number, status: string }[] // Filtered for current month
 }
 
-export default function PayrollTable({ users }: { users: UserWithPayroll[] }) {
+export default function PayrollTable({ users, workspaceId }: { users: UserWithPayroll[], workspaceId: string }) {
     const [selectedUser, setSelectedUser] = useState<UserWithPayroll | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -131,6 +131,7 @@ export default function PayrollTable({ users }: { users: UserWithPayroll[] }) {
                         baseSalary: selectedUser.tasks?.reduce((acc, t) => acc + (t.wageVND || 0), 0) || 0,
                         bonus: selectedUser.payrolls[0]?.bonus || 0
                     }}
+                    workspaceId={workspaceId}
                 />
             )}
         </div>

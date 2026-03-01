@@ -46,20 +46,20 @@ interface SidebarProps {
         reputation?: number
         isTreasurer?: boolean
     }
+    workspaceId: string
     onCollapsedChange?: (collapsed: boolean) => void
 }
 
-const NAV_ITEMS = [
-    { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-    { label: "Task Queue", href: "/admin/queue", icon: ListTodo },
-    { label: "CRM & Clients", href: "/admin/crm", icon: Smile },
-    { label: "Payroll", href: "/admin/payroll", icon: Wallet },
-    { label: "Finance", href: "/admin/finance", icon: Building2 }, // Re-added Finance
-    { label: "Staff", href: "/admin/users", icon: Users },
-    // { label: "Settings", href: "/admin/settings", icon: Settings },
+const getNavItems = (workspaceId: string) => [
+    { label: "Dashboard", href: `/${workspaceId}/admin`, icon: LayoutDashboard },
+    { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo },
+    { label: "CRM & Clients", href: `/${workspaceId}/admin/crm`, icon: Smile },
+    { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet },
+    { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2 },
+    { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users },
 ]
 
-export function AppSidebar({ user, onCollapsedChange }: SidebarProps) {
+export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProps) {
     const pathname = usePathname()
     const [collapsed, setCollapsed] = React.useState(false)
     const [isMobile, setIsMobile] = React.useState(false)
@@ -98,8 +98,8 @@ export function AppSidebar({ user, onCollapsedChange }: SidebarProps) {
                                 <p className="text-sm text-muted-foreground">Mobile Dashboard</p>
                             </div>
                             <nav className="flex-1 space-y-1">
-                                {NAV_ITEMS.filter(item => {
-                                    if (item.href === '/admin/finance') return user.role === 'ADMIN' || user.isTreasurer
+                                {getNavItems(workspaceId).filter(item => {
+                                    if (item.href.includes('/admin/finance')) return user.role === 'ADMIN' || user.isTreasurer
                                     return true
                                 }).map((item) => {
                                     const isActive = pathname === item.href
@@ -206,8 +206,8 @@ export function AppSidebar({ user, onCollapsedChange }: SidebarProps) {
                         )}
                     </div>
 
-                    {NAV_ITEMS.filter(item => {
-                        if (item.href === '/admin/finance') return user.role === 'ADMIN' || user.isTreasurer
+                    {getNavItems(workspaceId).filter(item => {
+                        if (item.href.includes('/admin/finance')) return user.role === 'ADMIN' || user.isTreasurer
                         return true
                     }).map((item) => {
                         const isActive = pathname === item.href
@@ -276,12 +276,16 @@ export function AppSidebar({ user, onCollapsedChange }: SidebarProps) {
                                 <span>Profile</span>
                             </DropdownMenuItem>
                             {user.isTreasurer && (
-                                <DropdownMenuItem onClick={() => window.location.href = '/admin/finance'}>
+                                <DropdownMenuItem onClick={() => window.location.href = `/${workspaceId}/admin/finance`}>
                                     <Wallet className="mr-2 h-4 w-4" />
                                     <span>Finance Portal</span>
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => window.location.href = '/workspaces'}>
+                                <LayoutDashboard className="mr-2 h-4 w-4" />
+                                <span>Switch Workspace</span>
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="text-red-500 focus:text-red-500" onClick={() => window.location.href = '/api/auth/logout'}>
                                 <LogOut className="mr-2 h-4 w-4" />
                                 <span>Log out</span>

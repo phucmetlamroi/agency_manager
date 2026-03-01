@@ -1,13 +1,16 @@
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import BonusCalculator from './BonusCalculator'
 import PayrollCard from '@/components/admin/PayrollCard'
 import { serializeDecimal } from '@/lib/serialization'
 
 export const dynamic = 'force-dynamic'
 
-export default async function PayrollPage() {
+export default async function PayrollPage({ params }: { params: { workspaceId: string } }) {
+    const { workspaceId } = params
+
     // 1. Determine Current Month Range
     // TEMPORARY OVERRIDE: Hardcode to February 2026 to process payroll, 
     // and extend end date to March 5th to include early March completions into Feb payroll.
@@ -17,7 +20,8 @@ export default async function PayrollPage() {
     const endOfMonth = new Date(2026, 2, 5, 23, 59, 59, 999) // March 5, 2026
 
     // 2. Fetch Users and their COMPLETED tasks for this month
-    const users = await prisma.user.findMany({
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
+    const users = await workspacePrisma.user.findMany({
         where: {
             username: { not: 'admin' } // Only exclude the purely system admin, keep other admins visible
         },
@@ -69,7 +73,7 @@ export default async function PayrollPage() {
     const session = await getSession()
     if (!session) redirect('/login')
 
-    const currentUser = await prisma.user.findUnique({
+    const currentUser = await workspacePrisma.user.findUnique({
         where: { id: session.user.id },
         select: { role: true, isTreasurer: true }
     })
@@ -106,6 +110,7 @@ export default async function PayrollPage() {
                         user={user}
                         currentMonth={currentMonth}
                         currentYear={currentYear}
+                        workspaceId={workspaceId}
                     />
                 ))}
 

@@ -18,9 +18,10 @@ type Props = {
         baseSalary: number
         bonus: number
     }
+    workspaceId: string
 }
 
-export default function PaymentModal({ isOpen, onClose, user, payrollData }: Props) {
+export default function PaymentModal({ isOpen, onClose, user, payrollData, workspaceId }: Props) {
     const [loading, setLoading] = useState(false)
 
     if (!isOpen) return null
@@ -34,7 +35,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData }: Pro
             totalAmount: payrollData.totalAmount,
             baseSalary: payrollData.baseSalary,
             bonus: payrollData.bonus
-        })
+        }, workspaceId)
 
         setLoading(false)
         if (res.success) {

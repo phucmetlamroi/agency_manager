@@ -3,11 +3,14 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+
 // --- CLIENT ACTIONS ---
 
-export async function getClients() {
+export async function getClients(workspaceId: string) {
     try {
-        const clients = await prisma.client.findMany({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const clients = await workspacePrisma.client.findMany({
             where: { parentId: null }, // Only fetch top-level to start tree
             include: {
                 subsidiaries: {
@@ -28,9 +31,10 @@ export async function getClients() {
     }
 }
 
-export async function getTopClients(limit = 5) {
+export async function getTopClients(workspaceId: string, limit = 5) {
     try {
-        const topClients = await prisma.client.findMany({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const topClients = await workspacePrisma.client.findMany({
             orderBy: { aiScore: 'desc' },
             take: limit,
             where: {
@@ -63,28 +67,30 @@ export async function getTopClients(limit = 5) {
     }
 }
 
-export async function createClient(data: { name: string, parentId?: number }) {
+export async function createClient(data: { name: string, parentId?: number }, workspaceId: string) {
     try {
-        await prisma.client.create({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.client.create({
             data: {
                 name: data.name,
                 parentId: data.parentId || null
             }
         })
-        revalidatePath('/admin/crm')
+        revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }
     } catch (error) {
         return { success: false, error: 'Failed to create client' }
     }
 }
 
-export async function updateClient(id: number, data: { name: string }) {
+export async function updateClient(id: number, data: { name: string }, workspaceId: string) {
     try {
-        await prisma.client.update({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.client.update({
             where: { id },
             data: { name: data.name }
         })
-        revalidatePath('/admin/crm')
+        revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }
     } catch (error) {
         return { success: false, error: 'Failed to update client' }
@@ -93,16 +99,17 @@ export async function updateClient(id: number, data: { name: string }) {
 
 // --- PROJECT ACTIONS ---
 
-export async function createProject(data: { name: string, clientId: number, code?: string }) {
+export async function createProject(data: { name: string, clientId: number, code?: string }, workspaceId: string) {
     try {
-        await prisma.project.create({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.project.create({
             data: {
                 name: data.name,
                 clientId: data.clientId,
                 code: data.code
             }
         })
-        revalidatePath('/admin/crm')
+        revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }
     } catch (error) {
         return { success: false, error: 'Failed to create project' }
@@ -111,9 +118,11 @@ export async function createProject(data: { name: string, clientId: number, code
 
 // --- FEEDBACK ACTIONS ---
 
-export async function createFeedback(data: { projectId: number, content: string, type: 'CLIENT' | 'INTERNAL', severity: number }) {
+export async function createFeedback(data: { projectId: number, content: string, type: 'CLIENT' | 'INTERNAL', severity: number }, workspaceId: string) {
     try {
-        await prisma.feedback.create({
+        // Feedback model may need workspace isolation double check, but assumed linked via project
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.feedback.create({
             data: {
                 projectId: data.projectId,
                 content: data.content,
@@ -121,7 +130,7 @@ export async function createFeedback(data: { projectId: number, content: string,
                 severity: data.severity
             }
         })
-        revalidatePath('/admin/crm')
+        revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }
     } catch (error) {
         return { success: false, error: 'Failed to create feedback' }
@@ -130,12 +139,13 @@ export async function createFeedback(data: { projectId: number, content: string,
 
 // --- DELETE ACTION ---
 
-export async function deleteClient(id: number) {
+export async function deleteClient(id: number, workspaceId: string) {
     try {
-        await prisma.client.delete({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.client.delete({
             where: { id }
         })
-        revalidatePath('/admin/crm')
+        revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }
     } catch (error) {
         console.error('Delete failed:', error)

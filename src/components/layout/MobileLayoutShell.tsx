@@ -7,10 +7,12 @@ import { useRouter } from 'next/navigation'
 export default function MobileLayoutShell({
     children,
     user,
-    handleLogout
+    handleLogout,
+    workspaceId
 }: {
     children: React.ReactNode,
     user: any,
+    workspaceId: string,
     handleLogout: () => void
 }) {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -46,7 +48,7 @@ export default function MobileLayoutShell({
             </main>
 
             {/* BOTTOM NAV */}
-            <BottomNav role={user.role} />
+            <BottomNav role={user.role} workspaceId={workspaceId} />
 
             {/* USER DRAWER (Slide from Right or Bottom?) 
                 User requested "Menu trượt (Drawer/Modal)". Slide from Right is standard for Profile.

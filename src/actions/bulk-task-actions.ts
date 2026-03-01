@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { parseVietnamDate } from '@/lib/date-utils'
 
 type BatchTaskInput = {
@@ -19,7 +20,7 @@ type BatchTaskInput = {
     type: string
 }
 
-export async function createBatchTasks(data: BatchTaskInput) {
+export async function createBatchTasks(data: BatchTaskInput, workspaceId: string) {
     try {
         if (!data.titles || data.titles.length === 0) {
             return { error: 'Danh sách task trống' }
@@ -42,8 +43,10 @@ export async function createBatchTasks(data: BatchTaskInput) {
             assignedAgencyId = assignee?.agencyId || null
         }
 
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+
         // Use transaction to ensure all tasks are created or none
-        await prisma.$transaction(async (tx) => {
+        await workspacePrisma.$transaction(async (tx) => {
             for (const title of data.titles) {
                 if (!title.trim()) continue;
 
@@ -72,9 +75,9 @@ export async function createBatchTasks(data: BatchTaskInput) {
             }
         })
 
-        revalidatePath('/admin')
-        revalidatePath('/admin/queue')
-        revalidatePath('/admin/crm')
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/admin/queue`)
+        revalidatePath(`/${workspaceId}/admin/crm`)
 
         return { success: true, count: data.titles.length }
 
@@ -85,17 +88,18 @@ export async function createBatchTasks(data: BatchTaskInput) {
 }
 
 // BULK DELETE
-export async function bulkDeleteTasks(taskIds: string[]) {
+export async function bulkDeleteTasks(taskIds: string[], workspaceId: string) {
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
-        await prisma.task.deleteMany({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.task.deleteMany({
             where: {
                 id: { in: taskIds }
             }
         })
-        revalidatePath('/admin/queue')
-        revalidatePath('/dashboard')
+        revalidatePath(`/${workspaceId}/admin/queue`)
+        revalidatePath(`/${workspaceId}/dashboard`)
         return { success: true, count: taskIds.length }
     } catch (error) {
         console.error("Bulk Delete Error:", error)
@@ -104,7 +108,7 @@ export async function bulkDeleteTasks(taskIds: string[]) {
 }
 
 // BULK UPDATE DETAILS
-export async function bulkUpdateTaskDetails(taskIds: string[], data: any) {
+export async function bulkUpdateTaskDetails(taskIds: string[], data: any, workspaceId: string) {
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
@@ -119,15 +123,16 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any) {
         if (data.value !== undefined) updateData.value = data.value
         if (data.collectFilesLink !== undefined) updateData.collectFilesLink = data.collectFilesLink
 
-        await prisma.task.updateMany({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.task.updateMany({
             where: {
                 id: { in: taskIds }
             },
             data: updateData
         })
 
-        revalidatePath('/admin/queue')
-        revalidatePath('/dashboard')
+        revalidatePath(`/${workspaceId}/admin/queue`)
+        revalidatePath(`/${workspaceId}/dashboard`)
         return { success: true, count: taskIds.length }
     } catch (error) {
         console.error("Bulk Update Error:", error)
@@ -136,7 +141,7 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any) {
 }
 
 // BULK ASSIGN
-export async function bulkAssignTasks(taskIds: string[], assigneeId: string | null) {
+export async function bulkAssignTasks(taskIds: string[], assigneeId: string | null, workspaceId: string) {
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
@@ -183,15 +188,16 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
         }
 
         // Execute Update
-        await prisma.$transaction(async (tx) => {
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.$transaction(async (tx) => {
             await tx.task.updateMany({
                 where: { id: { in: taskIds } },
                 data: updateData
             })
         })
 
-        revalidatePath('/admin/queue')
-        revalidatePath('/dashboard')
+        revalidatePath(`/${workspaceId}/admin/queue`)
+        revalidatePath(`/${workspaceId}/dashboard`)
         return { success: true, count: taskIds.length }
 
     } catch (error) {

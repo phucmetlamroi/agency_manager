@@ -14,13 +14,13 @@ type Metric = {
     onTimeRate: number
 }
 
-export default function PerformanceDashboardClient({ initialData, month, year }: { initialData: Metric[], month: number, year: number }) {
+export default function PerformanceDashboardClient({ initialData, month, year, workspaceId }: { initialData: Metric[], month: number, year: number, workspaceId: string }) {
     const [data, setData] = useState(initialData)
     const [isLoading, setIsLoading] = useState(false)
 
     const handleRefresh = async () => {
         setIsLoading(true)
-        const res = await calculatePerformance(month, year)
+        const res = await calculatePerformance(month, year, workspaceId)
         if (res.success && res.data) {
             setData(res.data)
         }

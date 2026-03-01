@@ -15,18 +15,20 @@ export default function TaskTable({
     isAdmin = false,
     users = [],
     isMobile = false,
-    agencies = []
+    agencies = [],
+    workspaceId
 }: {
     tasks: TaskWithUser[],
     isAdmin?: boolean,
     users?: { id: string, username: string, reputation?: number }[],
     isMobile?: boolean,
-    agencies?: any[]
+    agencies?: any[],
+    workspaceId: string
 }) {
     // Dispatcher Logic
     if (isMobile) {
-        return <MobileTaskView tasks={tasks} isAdmin={isAdmin} users={users} />
+        return <MobileTaskView tasks={tasks} isAdmin={isAdmin} users={users} workspaceId={workspaceId} />
     }
 
-    return <NewDesktopTaskTable tasks={tasks} isAdmin={isAdmin} users={users} agencies={agencies} />
+    return <NewDesktopTaskTable tasks={tasks} isAdmin={isAdmin} users={users} agencies={agencies} workspaceId={workspaceId} />
 }

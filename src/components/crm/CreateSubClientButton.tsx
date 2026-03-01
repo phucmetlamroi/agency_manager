@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/actions/crm-actions'
 
-export default function CreateSubClientButton({ parentId, parentName }: { parentId: number, parentName: string }) {
+export default function CreateSubClientButton({ parentId, parentName, workspaceId }: { parentId: number, parentName: string, workspaceId: string }) {
     const [isOpen, setIsOpen] = useState(false)
     const [name, setName] = useState('')
     const [loading, setLoading] = useState(false)
@@ -15,7 +15,7 @@ export default function CreateSubClientButton({ parentId, parentName }: { parent
             const res = await createClient({
                 name,
                 parentId
-            })
+            }, workspaceId)
             if (res.success) {
                 setIsOpen(false)
                 setName('')

@@ -12,7 +12,7 @@ type User = {
     role: string
 }
 
-export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[], onSuccess?: () => void }) {
+export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { users: User[], onSuccess?: () => void, workspaceId: string }) {
     // Common Data State
     const [rate, setRate] = useState<number>(25300)
     const [usd, setUsd] = useState<number>(0)
@@ -104,7 +104,7 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
             collectFilesLink: collectFilesLink || null,
             notes: notes || null,
             type
-        })
+        }, workspaceId)
 
         if (res.error) {
             toast.error(res.error)
@@ -123,7 +123,7 @@ export default function BulkCreateTaskForm({ users, onSuccess }: { users: User[]
             <div className="p-4 rounded-lg bg-white/5 border border-white/10">
                 <h4 className="text-sm uppercase tracking-widest text-blue-400 mb-4 font-bold">1. Thông tin chung (Áp dụng cho cả lô)</h4>
 
-                <ClientSelector onSelect={setClientId} />
+                <ClientSelector onSelect={setClientId} workspaceId={workspaceId} />
 
                 <div className="grid grid-cols-2 gap-4 mt-4">
                     <div>

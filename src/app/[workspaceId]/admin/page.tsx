@@ -15,7 +15,7 @@ import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import { KPIStats } from '@/components/dashboard/KPIStats'
 import { serializeDecimal } from '@/lib/serialization'
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({ params }: { params: { workspaceId: string } }) {
     const session = await getSession()
     if (!session) redirect('/login')
 
@@ -79,6 +79,7 @@ export default async function AdminDashboard() {
                             users={users}
                             agencies={agencies}
                             isMobile={await isMobileDevice()}
+                            workspaceId={params.workspaceId}
                         />
                     </div>
                 </div>
@@ -91,7 +92,7 @@ export default async function AdminDashboard() {
                             <span className="text-xl">⚡</span>
                             <h3 className="font-bold text-white">Quick Create</h3>
                         </div>
-                        <TaskCreationManager users={users} />
+                        <TaskCreationManager users={users} workspaceId={params.workspaceId} />
                     </div>
 
                     {/* Pending Queue Summary */}

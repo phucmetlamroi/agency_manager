@@ -17,9 +17,10 @@ interface TaskDetailModalProps {
     onClose: () => void
     isAdmin: boolean
     bulkSelectedIds?: string[]
+    workspaceId: string
 }
 
-export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedIds = [] }: TaskDetailModalProps) {
+export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedIds = [], workspaceId }: TaskDetailModalProps) {
     // Edit State
     const [isEditing, setIsEditing] = useState(false)
     const [isEditingLink, setIsEditingLink] = useState(false)
@@ -112,7 +113,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 collectFilesLink: form.collectFilesLink
             }
 
-            const res = await bulkUpdateTaskDetails(bulkSelectedIds, bulkData)
+            const res = await bulkUpdateTaskDetails(bulkSelectedIds, bulkData, workspaceId)
 
             if (res.error) {
                 toast.error(res.error)
@@ -135,7 +136,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
             value: isAdmin ? Number(form.value) : undefined,
             collectFilesLink: form.collectFilesLink
-        })
+        }, workspaceId)
 
         if (res?.success) {
             setLocalTask(prev => prev ? ({
@@ -235,7 +236,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                         onClick={async () => {
                                             await handleSave();
                                             if (!isAdmin) {
-                                                const res = await updateTaskStatus(localTask.id, 'Review', undefined, undefined, localTask.version)
+                                                const res = await updateTaskStatus(localTask.id, 'Review', workspaceId, undefined, undefined, localTask.version)
                                                 if (res?.error) {
                                                     toast.error(res.error)
                                                 } else {

@@ -12,16 +12,17 @@ interface AdminShellProps {
         reputation?: number
         isTreasurer?: boolean
     }
+    workspaceId: string
 }
 
 
 
-export function AdminShell({ children, user }: AdminShellProps) {
+export function AdminShell({ children, user, workspaceId }: AdminShellProps) {
     const [collapsed, setCollapsed] = React.useState(false)
 
     return (
         <div className="flex min-h-dvh bg-background text-foreground">
-            <AppSidebar user={user} onCollapsedChange={setCollapsed} />
+            <AppSidebar user={user} workspaceId={workspaceId} onCollapsedChange={setCollapsed} />
             <main
                 className="flex-1 overflow-x-hidden pt-16 md:pt-0 relative transition-all duration-300"
                 style={{ marginLeft: collapsed ? '80px' : '280px' }}

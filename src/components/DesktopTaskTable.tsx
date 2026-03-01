@@ -40,7 +40,7 @@ const statusBg: Record<string, string> = {
     "Sửa frame": "rgba(244, 114, 182, 0.2)"
 }
 
-export default function TaskTable({ tasks, isAdmin = false, users = [], agencies = [] }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[], agencies?: { id: string, name: string, code: string }[] }) {
+export default function TaskTable({ tasks, isAdmin = false, users = [], agencies = [], workspaceId }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[], agencies?: { id: string, name: string, code: string }[], workspaceId: string }) {
     const router = useRouter()
     const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
@@ -134,7 +134,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
 
         try {
             // @ts-ignore - feedback type mismatch fix later if needed, passing string is fine for enum usually if matching
-            await updateTaskStatus(taskId, newStatus, notes, feedback)
+            await updateTaskStatus(taskId, newStatus, workspaceId, notes, feedback)
             // mutate() // Commented out as 'mutate' is not defined in the provided context
         } catch (error) {
             console.error("Optimistic update failed:", error)
@@ -160,7 +160,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
             jobPriceUSD: isAdmin ? Number(editForm.jobPriceUSD) : undefined,
             value: isAdmin ? Number(editForm.value) : undefined,
             collectFilesLink: editForm.collectFilesLink
-        })
+        }, workspaceId)
 
         if (res?.success) {
             setSelectedTask({
@@ -260,7 +260,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                                         if (val) {
 
                                                         }
-                                                        const resAssign = await assignTask(task.id, val || null)
+                                                        const resAssign = await assignTask(task.id, val || null, workspaceId)
                                                         if (resAssign?.success) router.refresh()
                                                     }}
                                                     className="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-blue-500 max-w-[120px]"
@@ -394,7 +394,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                                 confirmText: 'Xóa luôn',
                                                 cancelText: 'Thôi'
                                             })) {
-                                                await deleteTask(task.id)
+                                                await deleteTask(task.id, workspaceId)
                                                 toast.success('Đã xóa task thành công')
                                             }
                                         }}

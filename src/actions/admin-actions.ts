@@ -5,14 +5,16 @@ import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { parseVietnamDate } from '@/lib/date-utils'
 
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+
 export async function updateUserRole(userId: string, newRole: string) {
     try {
         await prisma.user.update({
             where: { id: userId },
             data: { role: newRole as UserRole }
         })
-        revalidatePath('/admin/users')
-        revalidatePath('/admin')
+        revalidatePath('/[workspaceId]/admin/users')
+        revalidatePath('/[workspaceId]/admin')
         return { success: true }
     } catch (e) {
         return { error: 'Failed to update role' }
@@ -43,14 +45,14 @@ export async function updateUserReputation(userId: string, change: number) {
                 role: newRole
             }
         })
-        revalidatePath('/admin/users')
+        revalidatePath('/[workspaceId]/admin/users')
         return { success: true }
     } catch (e) {
         return { error: 'Failed to update reputation' }
     }
 }
 
-export async function createTask(formData: FormData) {
+export async function createTask(formData: FormData, workspaceId: string) {
     try {
         const title = formData.get('title') as string
         const value = parseFloat(formData.get('value') as string) || 0
@@ -88,7 +90,9 @@ export async function createTask(formData: FormData) {
             assignedAgencyId = assignee?.agencyId || null
         }
 
-        await prisma.task.create({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+
+        await workspacePrisma.task.create({
             data: {
                 title,
                 value,
@@ -111,9 +115,9 @@ export async function createTask(formData: FormData) {
                 clientId
             }
         })
-        revalidatePath('/admin')
-        revalidatePath('/admin/queue')
-        revalidatePath('/admin/crm') // Revalidate CRM to show new tasks
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/admin/queue`)
+        revalidatePath(`/${workspaceId}/admin/crm`) // Revalidate CRM to show new tasks
         return { success: true }
     } catch (e) {
         return { error: 'Error creating task' }

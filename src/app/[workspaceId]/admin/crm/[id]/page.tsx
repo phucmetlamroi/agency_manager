@@ -1,16 +1,18 @@
 import { prisma } from '@/lib/db'
 import { serializeDecimal } from '@/lib/serialization'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import ClientAnalytics from '@/components/crm/ClientAnalytics'
 import CreateSubClientButton from '@/components/crm/CreateSubClientButton'
 import { notFound } from 'next/navigation'
 
-export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id: paramId } = await params
+export default async function ClientDetailPage({ params }: { params: Promise<{ id: string, workspaceId: string }> }) {
+    const { id: paramId, workspaceId } = await params
     const id = parseInt(paramId)
     if (isNaN(id)) return notFound()
 
     // Fetch Client with Subsidiaries and Tasks
-    const client = await prisma.client.findUnique({
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
+    const client = await workspacePrisma.client.findUnique({
         where: { id },
         include: {
             subsidiaries: {
@@ -61,10 +63,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 <h1 className="text-2xl font-bold text-white">Chi tiết Hồ sơ Khách hàng</h1>
                 {/* Only show Add Button if this is a Partner (has no parent) - simplified logic for now */}
                 {!client.parentId && (
-                    <CreateSubClientButton parentId={client.id} parentName={client.name} />
+                    <CreateSubClientButton parentId={client.id} parentName={client.name} workspaceId={workspaceId} />
                 )}
             </div>
-            <ClientAnalytics client={serializeDecimal(client) as any} distribution={distribution} />
+            <ClientAnalytics client={serializeDecimal(client) as any} distribution={distribution} workspaceId={workspaceId} />
         </div>
     )
 }

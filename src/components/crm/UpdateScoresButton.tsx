@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Sparkles } from 'lucide-react'
 
-export default function UpdateScoresButton() {
+export default function UpdateScoresButton({ workspaceId }: { workspaceId: string }) {
     const [isLoading, setIsLoading] = useState(false)
 
     const handleUpdate = async () => {
@@ -13,7 +13,7 @@ export default function UpdateScoresButton() {
         const toastId = toast.loading('Đang tính toán lại AI Score...')
 
         try {
-            const res = await calculateAllClientScores()
+            const res = await calculateAllClientScores(workspaceId)
             if (res.success) {
                 toast.success(`Đã cập nhật điểm số cho ${res.count} khách hàng!`, { id: toastId })
             } else {

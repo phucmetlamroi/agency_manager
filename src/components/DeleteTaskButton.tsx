@@ -3,7 +3,7 @@
 import { deleteTask } from '@/actions/task-management-actions'
 import { useState } from 'react'
 
-export default function DeleteTaskButton({ taskId, minimal = false }: { taskId: string, minimal?: boolean }) {
+export default function DeleteTaskButton({ taskId, minimal = false, workspaceId }: { taskId: string, minimal?: boolean, workspaceId: string }) {
     const [isDeleting, setIsDeleting] = useState(false)
 
     const handleDelete = async (e: React.MouseEvent) => {
@@ -13,7 +13,7 @@ export default function DeleteTaskButton({ taskId, minimal = false }: { taskId: 
 
         setIsDeleting(true)
         try {
-            await deleteTask(taskId)
+            await deleteTask(taskId, workspaceId)
             // Router refresh is handled in the server action
         } catch (error) {
             alert('Có lỗi xảy ra khi xóa.')

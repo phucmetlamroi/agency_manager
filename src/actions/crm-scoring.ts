@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 // --- SCORING WEIGHTS ---
 const W_REVENUE = 40 // Max 40 points
@@ -9,9 +10,10 @@ const W_VOLUME = 30  // Max 30 points
 const W_RECENCY = 20 // Max 20 points
 const W_QUALITY = 10 // Max 10 points (Manual Rating)
 
-export async function calculateAllClientScores() {
+export async function calculateAllClientScores(workspaceId: string) {
     try {
-        const clients = await prisma.client.findMany({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const clients = await workspacePrisma.client.findMany({
             include: {
                 tasks: {
                     select: {
@@ -106,7 +108,7 @@ export async function calculateAllClientScores() {
             }
 
             // Update DB
-            await prisma.client.update({
+            await workspacePrisma.client.update({
                 where: { id: client.id },
                 data: {
                     aiScore: finalScore,
@@ -117,7 +119,7 @@ export async function calculateAllClientScores() {
             updatedCount++
         }
 
-        revalidatePath('/admin/crm')
+        revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true, count: updatedCount }
 
     } catch (error) {

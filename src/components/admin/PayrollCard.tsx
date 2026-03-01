@@ -12,9 +12,10 @@ type PayrollCardProps = {
     user: any
     currentMonth: number
     currentYear: number
+    workspaceId: string
 }
 
-export default function PayrollCard({ user, currentMonth, currentYear }: PayrollCardProps) {
+export default function PayrollCard({ user, currentMonth, currentYear, workspaceId }: PayrollCardProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
 
@@ -34,7 +35,7 @@ export default function PayrollCard({ user, currentMonth, currentYear }: Payroll
         if (!confirm('Bạn có chắc chắn muốn hoàn tác (hủy) trạng thái thanh toán này?')) return
 
         startTransition(async () => {
-            const res = await revertPayment(user.id, currentMonth, currentYear)
+            const res = await revertPayment(user.id, currentMonth, currentYear, workspaceId)
             if (res.error) {
                 toast.error(res.error)
             } else {
@@ -59,6 +60,7 @@ export default function PayrollCard({ user, currentMonth, currentYear }: Payroll
                         baseSalary: taskIncome,
                         bonus: bonusAmount
                     }}
+                    workspaceId={workspaceId}
                 />,
                 document.body
             )}

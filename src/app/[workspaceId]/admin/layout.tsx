@@ -10,9 +10,12 @@ import { AdminShell } from '@/components/layout/AdminShell'
 
 export default async function AdminLayout({
     children,
+    params,
 }: {
     children: React.ReactNode
+    params: { workspaceId: string }
 }) {
+    const { workspaceId } = params
     const cookieStore = await cookies()
     const sessionCookie = cookieStore.get('session')
 
@@ -49,7 +52,7 @@ export default async function AdminLayout({
     if (isMobile) {
         const { default: MobileLayoutShell } = await import('@/components/layout/MobileLayoutShell')
         return (
-            <MobileLayoutShell user={user} handleLogout={handleLogout}>
+            <MobileLayoutShell user={user} workspaceId={workspaceId} handleLogout={handleLogout}>
                 <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
                 {children}
             </MobileLayoutShell>
@@ -57,7 +60,7 @@ export default async function AdminLayout({
     }
 
     return (
-        <AdminShell user={user}>
+        <AdminShell user={user} workspaceId={workspaceId}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
             {children}
         </AdminShell>

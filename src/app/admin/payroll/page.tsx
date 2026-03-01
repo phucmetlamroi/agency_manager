@@ -19,7 +19,7 @@ export default async function PayrollPage() {
     // 2. Fetch Users and their COMPLETED tasks for this month
     const users = await prisma.user.findMany({
         where: {
-            username: { not: 'admin' }
+            role: { not: 'ADMIN' }
         },
         include: {
             tasks: {

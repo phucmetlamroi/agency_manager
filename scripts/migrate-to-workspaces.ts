@@ -82,14 +82,14 @@ async function main() {
 
     // 7. Backfill Payrolls
     const payrolls = await prisma.payroll.updateMany({
-        where: { workspaceId: null },
+        where: { workspaceId: null } as any,
         data: { workspaceId: wId }
     })
     console.log(`Updated ${payrolls.count} Payrolls.`)
 
     // 8. Backfill PerformanceMetrics
     const metrics = await prisma.performanceMetric.updateMany({
-        where: { workspaceId: null },
+        where: { workspaceId: null } as any,
         data: { workspaceId: wId }
     })
     console.log(`Updated ${metrics.count} PerformanceMetrics.`)

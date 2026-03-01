@@ -43,12 +43,13 @@ export async function updateTaskDetails(id: string, data: {
 
                     const payroll = await workspacePrisma.payroll.findUnique({
                         where: {
-                            userId_month_year: {
+                            userId_month_year_workspaceId: {
                                 userId: currentTask.assigneeId,
                                 month,
-                                year
+                                year,
+                                workspaceId
                             }
-                        }
+                        } as any
                     })
 
                     if (payroll && payroll.status === 'PAID') {

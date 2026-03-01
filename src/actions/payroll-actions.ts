@@ -24,7 +24,7 @@ export async function confirmPayment(data: {
                     year: data.year,
                     workspaceId
                 }
-            },
+            } as any,
             update: {
                 status: 'PAID',
                 paidAt: new Date(),
@@ -36,6 +36,7 @@ export async function confirmPayment(data: {
                 userId: data.userId,
                 month: data.month,
                 year: data.year,
+                workspaceId: workspaceId,
                 baseSalary: data.baseSalary,
                 bonus: data.bonus,
                 totalAmount: data.totalAmount,
@@ -85,7 +86,7 @@ export async function revertPayment(userId: string, month: number, year: number,
                     year,
                     workspaceId
                 }
-            }
+            } as any
         })
 
         revalidatePath(`/${workspaceId}/admin/users`)

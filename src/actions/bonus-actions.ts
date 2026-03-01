@@ -18,7 +18,7 @@ export async function getPayrollLockStatus(workspaceId: string) {
                     year: currentYear,
                     workspaceId
                 }
-            }
+            } as any
         })
         return { isLocked: lock?.isLocked ?? false }
     } catch (error) {
@@ -116,7 +116,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                     year: currentYear,
                     workspaceId
                 }
-            }
+            } as any
         })
 
         if (existingLock?.isLocked) {
@@ -250,7 +250,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                     year: currentYear,
                     workspaceId
                 }
-            },
+            } as any,
             update: { isLocked: true, lockedAt: new Date(), lockedBy: session.user.id },
             create: {
                 month: currentMonth,

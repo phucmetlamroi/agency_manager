@@ -84,7 +84,7 @@ model Payroll {
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
 
-  @@unique([userId, month, year, workspaceId])
+  @@unique([userId, month, year, workspaceId], name: "userId_month_year_workspaceId")
 }
 
 model Task {
@@ -144,7 +144,7 @@ model MonthlyBonus {
   workspaceId        String
   workspace          Workspace @relation(fields: [workspaceId], references: [id])
 
-  @@unique([userId, month, year, workspaceId])
+  @@unique([userId, month, year, workspaceId], name: "userId_month_year_workspaceId")
 }
 
 model PayrollLock {
@@ -157,7 +157,7 @@ model PayrollLock {
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
 
-  @@unique([month, year, workspaceId])
+  @@unique([month, year, workspaceId], name: "month_year_workspaceId")
 }
 
 model Client {
@@ -220,10 +220,10 @@ model PerformanceMetric {
   classification        String   @default("NORMAL")
   measuredAt            DateTime @default(now())
   user                  User     @relation(fields: [userId], references: [id])
-  workspaceId           String?
-  workspace             Workspace? @relation(fields: [workspaceId], references: [id])
+  workspaceId           String
+  workspace             Workspace @relation(fields: [workspaceId], references: [id])
 
-  @@unique([userId, month, year])
+  @@unique([userId, month, year, workspaceId], name: "userId_month_year_workspaceId")
 }
 
 

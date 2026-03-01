@@ -115,16 +115,18 @@ export async function calculatePerformance(month: number, year: number, workspac
             // Push to updates
             updates.push(workspacePrisma.performanceMetric.upsert({
                 where: {
-                    userId_month_year: {
+                    userId_month_year_workspaceId: {
                         userId: user.id,
                         month,
-                        year
+                        year,
+                        workspaceId
                     }
-                },
+                } as any,
                 create: {
                     userId: user.id,
                     month,
                     year,
+                    workspaceId,
                     revenue: totalRevenue,
                     onTimeRate,
                     internalRevisionCount: internalRevisions,

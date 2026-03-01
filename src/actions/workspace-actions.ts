@@ -18,6 +18,7 @@ export async function createWorkspaceAction(formData: FormData) {
     }
 
     try {
+        let newWorkspaceId = ''
         await prisma.$transaction(async (tx) => {
             const workspace = await tx.workspace.create({
                 data: {
@@ -25,6 +26,7 @@ export async function createWorkspaceAction(formData: FormData) {
                     description: description || null,
                 }
             })
+            newWorkspaceId = workspace.id
 
             await tx.workspaceMember.create({
                 data: {
@@ -36,7 +38,7 @@ export async function createWorkspaceAction(formData: FormData) {
         })
 
         revalidatePath('/workspaces')
-        return { success: true }
+        return { success: true, workspaceId: newWorkspaceId }
     } catch (e: any) {
         console.error(e)
         return { error: 'Lỗi khởi tạo Workspace' }

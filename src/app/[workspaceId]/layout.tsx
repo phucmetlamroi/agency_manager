@@ -16,24 +16,29 @@ export default async function WorkspaceLayout({
 
     const { workspaceId } = await params
 
-    // Fetch the user's role to allow ADMIN bypass
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { role: true }
-    })
+    // Robust check for ADMIN bypass: Check both session and current DB state
+    const isSystemAdmin = session.user.role === 'ADMIN'
 
-    if (user?.role !== 'ADMIN') {
-        // Validate that the user actually has access to this workspace
-        const membership = await prisma.workspaceMember.findFirst({
-            where: {
-                userId: session.user.id,
-                workspaceId: workspaceId
-            }
+    if (!isSystemAdmin) {
+        // Double check against DB for fresh state if session says they are just a user
+        const dbUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true }
         })
 
-        if (!membership) {
-            // If they don't have access, or it doesn't exist, send them back to the portal
-            redirect('/workspaces')
+        if (dbUser?.role !== 'ADMIN') {
+            // Validate that the user actually has access to this workspace
+            const membership = await prisma.workspaceMember.findFirst({
+                where: {
+                    userId: session.user.id,
+                    workspaceId: workspaceId
+                }
+            })
+
+            if (!membership) {
+                // If they don't have access, or it doesn't exist, send them back to the portal
+                redirect('/workspaces')
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
     Dialog,
     DialogContent,
@@ -20,6 +21,7 @@ import { toast } from 'sonner'
 export function CreateWorkspaceModal() {
     const [open, setOpen] = useState(false)
     const [isPending, setIsPending] = useState(false)
+    const router = useRouter()
 
     async function onSubmit(formData: FormData) {
         setIsPending(true)
@@ -31,6 +33,9 @@ export function CreateWorkspaceModal() {
         } else {
             toast.success('Đã tạo Workspace thành công')
             setOpen(false)
+            if (result.workspaceId) {
+                router.push(`/${result.workspaceId}/dashboard`)
+            }
         }
     }
 

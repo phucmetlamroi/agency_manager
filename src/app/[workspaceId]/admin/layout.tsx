@@ -35,7 +35,10 @@ export default async function AdminLayout({
         redirect('/api/auth/logout')
     }
 
-    if (user.role !== 'ADMIN') {
+    // Robust Authorization: Ensure user is strictly an ADMIN
+    const isActuallyAdmin = user.role === 'ADMIN' || session.user.role === 'ADMIN'
+
+    if (!isActuallyAdmin) {
         redirect(`/${workspaceId}/dashboard`)
     }
 

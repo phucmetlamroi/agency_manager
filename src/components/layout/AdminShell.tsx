@@ -3,8 +3,6 @@
 import * as React from "react"
 import { AppSidebar } from "./AppSidebar"
 import { CommandMenu } from "./CommandMenu"
-import MonthPicker from "./MonthPicker"
-import WorkspaceControls from "./WorkspaceControls"
 
 interface AdminShellProps {
     children: React.ReactNode
@@ -28,9 +26,7 @@ export function AdminShell({ children, user }: AdminShellProps) {
                 className="flex-1 overflow-x-hidden pt-16 md:pt-0 relative transition-all duration-300"
                 style={{ marginLeft: collapsed ? '80px' : '280px' }}
             >
-                <div className="absolute top-4 right-4 z-30 hidden md:flex items-center gap-4">
-                    <WorkspaceControls />
-                    <MonthPicker />
+                <div className="absolute top-4 right-4 z-30 hidden md:block">
                     <NotificationBell />
                 </div>
                 <div className="container mx-auto p-4 md:p-8 max-w-7xl animate-fade-in">

@@ -1,10 +1,4 @@
 {
-    "crons": [
-        {
-            "path": "/api/cron/purge-expired-data",
-            "schedule": "0 0 1 * *"
-        }
-    ],
     "functions": {
         "api/*.py": {
             "maxDuration": 10

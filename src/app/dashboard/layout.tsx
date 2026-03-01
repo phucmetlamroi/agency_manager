@@ -7,7 +7,6 @@ import { decrypt } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import RoleWatcher from '@/components/RoleWatcher'
 import BottomNav from '@/components/BottomNav'
-import MonthPicker from '@/components/layout/MonthPicker'
 
 // Standardized User Layout (Top Navigation)
 // Matches specific stability of Admin Layout
@@ -100,10 +99,6 @@ export default async function UserLayout({
 
                 {/* RIGHT: User Info & Actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div className="hidden md:block">
-                        <MonthPicker />
-                    </div>
-
                     {/* User Info Badge */}
                     <Link href="/dashboard/profile" style={{
                         fontSize: '0.85rem', color: '#ccc',

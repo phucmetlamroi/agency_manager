@@ -14,9 +14,8 @@ import TaskCreationManager from '@/components/TaskCreationManager'
 import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import { KPIStats } from '@/components/dashboard/KPIStats'
 import { serializeDecimal } from '@/lib/serialization'
-import { getMonthDateRange } from '@/lib/date-utils'
 
-export default async function AdminDashboard(props: { searchParams?: Promise<any> | any }) {
+export default async function AdminDashboard() {
     const session = await getSession()
     if (!session) redirect('/login')
 
@@ -29,30 +28,7 @@ export default async function AdminDashboard(props: { searchParams?: Promise<any
     const checkResult = await checkOverdueTasks()
     // In a real app we might show a toast with checkResult.notifications
 
-    const searchParams = await props.searchParams
-    const monthParam = searchParams?.month
-    const { startDate, endDate } = getMonthDateRange(monthParam)
-
     const tasks = await prisma.task.findMany({
-        where: {
-            isArchived: false,
-            OR: [
-                { status: { notIn: ['Hoàn tất', 'Tạm ngưng'] } },
-                {
-                    deadline: {
-                        gte: startDate,
-                        lte: endDate
-                    }
-                },
-                {
-                    deadline: null,
-                    createdAt: {
-                        gte: startDate,
-                        lte: endDate
-                    }
-                }
-            ]
-        },
         include: {
             assignee: true,
             client: {
@@ -61,8 +37,6 @@ export default async function AdminDashboard(props: { searchParams?: Promise<any
         },
         orderBy: { createdAt: 'desc' }
     })
-
-    const activeTasks = tasks.filter(t => !t.isArchived)
 
     const users = await prisma.user.findMany({
         where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
@@ -75,8 +49,8 @@ export default async function AdminDashboard(props: { searchParams?: Promise<any
 
     const agencies = await prisma.agency.findMany({ select: { id: true, name: true, code: true } })
 
-    const unassignedTasks = activeTasks.filter(t => !t.assigneeId)
-    const assignedTasks = activeTasks.filter(t => t.assigneeId)
+    const unassignedTasks = tasks.filter(t => !t.assigneeId)
+    const assignedTasks = tasks.filter(t => t.assigneeId)
 
     return (
         <div className="space-y-8">

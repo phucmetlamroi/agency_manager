@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { updateUserReputation } from '@/actions/admin-actions'
 
-export default function ReputationManager({ userId, initialReputation }: { userId: string, initialReputation: number }) {
+export default function ReputationManager({ userId, initialReputation, workspaceId }: { userId: string, initialReputation: number, workspaceId: string }) {
     const [reputation, setReputation] = useState(initialReputation)
     const [loading, setLoading] = useState(false)
 
@@ -17,7 +17,7 @@ export default function ReputationManager({ userId, initialReputation }: { userI
         setReputation(Math.min(newRep, 100))
         setLoading(true)
 
-        const res = await updateUserReputation(userId, change)
+        const res = await updateUserReputation(userId, change, workspaceId)
         if (res?.error) {
             // Revert on error
             setReputation(reputation)

@@ -1,4 +1,3 @@
-import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import TaskTable from '@/components/TaskTable'
@@ -6,6 +5,7 @@ import { isMobileDevice } from '@/lib/device'
 
 import { serializeDecimal } from '@/lib/serialization'
 import { UserRole } from '@prisma/client'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,14 +14,17 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
     const session = await getSession()
     if (!session) redirect('/login')
 
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
     const userId = session.user.id
-    // TEMPORARY OVERRIDE: Hardcode to Feb 2026
-    const currentMonth = 2
-    const currentYear = 2026
+
+    // Use actual month/year
+    const now = new Date()
+    const currentMonth = now.getMonth() + 1
+    const currentYear = now.getFullYear()
 
     // Fetch Tasks & Bonus in parallel or single query pattern
     // Fetch user to get bonus
-    const userWithBonus = await prisma.user.findUnique({
+    const userWithBonus = await workspacePrisma.user.findUnique({
         where: { id: userId },
         include: {
             bonuses: {
@@ -39,16 +42,16 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         redirect(`/${workspaceId}/admin`)
     }
 
-    const tasks = await prisma.task.findMany({
+    const tasks = await workspacePrisma.task.findMany({
         where: { assigneeId: userId },
         include: { client: { include: { parent: true } } },
         orderBy: { createdAt: 'desc' }
     })
 
-    // TEMPORARY OVERRIDE: Hardcode to Feb 2026 to match Admin Payroll
-    const thisMonthStart = new Date(2026, 1, 1) // Feb 1
-    const lastMonthStart = new Date(2026, 0, 1) // Jan 1
-    const thisMonthEnd = new Date(2026, 2, 5, 23, 59, 59, 999) // Expand to March 5
+    // Dynamic month boundaries
+    const thisMonthStart = new Date(currentYear, currentMonth - 1, 1)
+    const lastMonthStart = new Date(currentYear, currentMonth - 2, 1)
+    const thisMonthEnd = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999) // Expand slightly into next month as per previous logic
 
     // Filter logic
     const completedTasks = tasks.filter(t => t.status === 'Hoàn tất')

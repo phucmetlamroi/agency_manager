@@ -1,4 +1,3 @@
-import { prisma } from '@/lib/db'
 import { createTask } from '@/actions/admin-actions'
 import { deleteTask } from '@/actions/task-management-actions'
 import { revalidatePath } from 'next/cache'
@@ -14,22 +13,25 @@ import TaskCreationManager from '@/components/TaskCreationManager'
 import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import { KPIStats } from '@/components/dashboard/KPIStats'
 import { serializeDecimal } from '@/lib/serialization'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 export default async function AdminDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
     const session = await getSession()
     if (!session) redirect('/login')
 
-    const currentUser = await prisma.user.findUnique({
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
+
+    const currentUser = await workspacePrisma.user.findUnique({
         where: { id: session.user.id },
         select: { username: true }
     })
 
     // 1. Run Logic to Deduct Points for Overdue Tasks
-    const checkResult = await checkOverdueTasks()
+    const checkResult = await checkOverdueTasks(workspaceId)
     // In a real app we might show a toast with checkResult.notifications
 
-    const tasks = await prisma.task.findMany({
+    const tasks = await workspacePrisma.task.findMany({
         include: {
             assignee: true,
             client: {
@@ -39,7 +41,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         orderBy: { createdAt: 'desc' }
     })
 
-    const users = await prisma.user.findMany({
+    const users = await workspacePrisma.user.findMany({
         where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
         orderBy: [
             { reputation: 'desc' },
@@ -48,7 +50,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         include: { ownedAgency: true }
     })
 
-    const agencies = await prisma.agency.findMany({ select: { id: true, name: true, code: true } })
+    const agencies = await workspacePrisma.agency.findMany({ select: { id: true, name: true, code: true } })
 
     const unassignedTasks = tasks.filter(t => !t.assigneeId)
     const assignedTasks = tasks.filter(t => t.assigneeId)

@@ -15,8 +15,11 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+import { useParams } from 'next/navigation'
 
 export default function ProfileForm({ user }: { user: any }) {
+    const { workspaceId } = useParams()
+    const workspaceIdStr = workspaceId as string
     const [isLoading, setIsLoading] = useState(false)
 
     // Pass states
@@ -33,7 +36,7 @@ export default function ProfileForm({ user }: { user: any }) {
             phoneNumber: formData.get('phoneNumber') as string
         }
 
-        const res = await updateProfile(user.id, data)
+        const res = await updateProfile(user.id, data, workspaceIdStr)
         setIsLoading(false)
 
         if (res.error) {
@@ -56,7 +59,7 @@ export default function ProfileForm({ user }: { user: any }) {
 
         setPassLoading(true)
 
-        const res = await changePassword(user.id, currentPass, newPass)
+        const res = await changePassword(user.id, currentPass, newPass, workspaceIdStr)
         setPassLoading(false)
 
         if (res.error) {

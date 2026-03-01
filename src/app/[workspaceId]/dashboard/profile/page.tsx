@@ -6,7 +6,8 @@ import { prisma } from '@/lib/db'
 import ProfileForm from '@/components/ProfileForm'
 import PaymentQrUpload from '@/components/profile/PaymentQrUpload'
 
-export default async function ProfilePage() {
+export default async function ProfilePage({ params }: { params: Promise<{ workspaceId: string }> }) {
+    const { workspaceId } = await params
     const cookieStore = await cookies()
     const sessionCookie = cookieStore.get('session')
 

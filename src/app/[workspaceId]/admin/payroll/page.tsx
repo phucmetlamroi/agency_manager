@@ -13,12 +13,11 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
 
 
     // 1. Determine Current Month Range
-    // TEMPORARY OVERRIDE: Hardcode to February 2026 to process payroll, 
-    // and extend end date to March 5th to include early March completions into Feb payroll.
-    const currentMonth = 2
-    const currentYear = 2026
-    const startOfMonth = new Date(2026, 1, 1) // Feb 1, 2026
-    const endOfMonth = new Date(2026, 2, 5, 23, 59, 59, 999) // March 5, 2026
+    const now = new Date()
+    const currentMonth = now.getMonth() + 1
+    const currentYear = now.getFullYear()
+    const startOfMonth = new Date(currentYear, currentMonth - 1, 1)
+    const endOfMonth = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999) // March 5, 2026 pattern logic
 
     // 2. Fetch Users and their COMPLETED tasks for this month
     const workspacePrisma = getWorkspacePrisma(workspaceId)
@@ -100,7 +99,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
 
             {canCalculateBonus && (
                 <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-                    <BonusCalculator />
+                    <BonusCalculator workspaceId={workspaceId} />
                 </div>
             )}
 

@@ -5,7 +5,7 @@ import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 
-export async function createUser(formData: FormData) {
+export async function createUser(formData: FormData, workspaceId: string) {
     const username = formData.get('username') as string
     const password = formData.get('password') as string
     const role = (formData.get('role') as string || 'USER') as UserRole
@@ -24,8 +24,8 @@ export async function createUser(formData: FormData) {
                 agencyId: agencyId // Link to Agency
             }
         })
-        revalidatePath('/admin/users')
-        revalidatePath('/admin') // Update Dashboard dropdown
+        revalidatePath(`/${workspaceId}/admin/users`)
+        revalidatePath(`/${workspaceId}/admin`) // Update Dashboard dropdown
         return { success: true }
     } catch (e) {
         return { error: 'Error creating user' }

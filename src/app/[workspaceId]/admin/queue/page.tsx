@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import TaskTable from '@/components/TaskTable'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 
@@ -7,9 +7,11 @@ import { serializeDecimal } from '@/lib/serialization'
 
 export default async function TaskQueuePage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
-    await checkOverdueTasks() // Ensure queue is fresh
+    await checkOverdueTasks(workspaceId) // Ensure queue is fresh
 
-    const tasks = await prisma.task.findMany({
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
+
+    const tasks = await workspacePrisma.task.findMany({
         include: {
             assignee: true,
             client: {
@@ -19,12 +21,12 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
         orderBy: { createdAt: 'desc' }
     })
 
-    const users = await prisma.user.findMany({
+    const users = await workspacePrisma.user.findMany({
         orderBy: { username: 'asc' },
         include: { ownedAgency: true }
     })
 
-    const agencies = await prisma.agency.findMany({
+    const agencies = await workspacePrisma.agency.findMany({
         select: { id: true, name: true, code: true }
     })
 

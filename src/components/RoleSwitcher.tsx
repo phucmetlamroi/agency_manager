@@ -3,14 +3,14 @@
 import { updateUserRole } from '@/actions/admin-actions'
 import { useState } from 'react'
 
-export default function RoleSwitcher({ userId, initialRole }: { userId: string, initialRole: string }) {
+export default function RoleSwitcher({ userId, initialRole, workspaceId }: { userId: string, initialRole: string, workspaceId: string }) {
     const [role, setRole] = useState(initialRole)
     const [loading, setLoading] = useState(false)
 
     const handleChange = async (newRole: string) => {
         setRole(newRole)
         setLoading(true)
-        await updateUserRole(userId, newRole)
+        await updateUserRole(userId, newRole, workspaceId)
         setLoading(false)
     }
 

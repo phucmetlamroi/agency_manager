@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
 
-export default function BonusCalculator() {
+export default function BonusCalculator({ workspaceId }: { workspaceId: string }) {
     const { confirm } = useConfirm()
     const [isLoading, setIsLoading] = useState(false)
     const [isLocked, setIsLocked] = useState(false)
@@ -14,10 +14,10 @@ export default function BonusCalculator() {
 
     useEffect(() => {
         checkLockStatus()
-    }, [])
+    }, [workspaceId])
 
     const checkLockStatus = async () => {
-        const status = await getPayrollLockStatus()
+        const status = await getPayrollLockStatus(workspaceId)
         setIsLocked(status.isLocked)
     }
 
@@ -31,7 +31,7 @@ export default function BonusCalculator() {
 
         setIsLoading(true)
         try {
-            const res = await calculateMonthlyBonus()
+            const res = await calculateMonthlyBonus(workspaceId)
             if (res.success) {
                 toast.success(`Đã tính xong thưởng tháng ${res.month}/${res.year}! Top 1, 2, 3 đã được cập nhật thưởng. Kỳ lương ĐÃ KHÓA.`)
                 setIsLocked(true)
@@ -58,7 +58,7 @@ export default function BonusCalculator() {
 
         setIsLoading(true)
         try {
-            const res = await revertMonthlyBonus()
+            const res = await revertMonthlyBonus(workspaceId)
             if (res.success) {
                 toast.success(res.message)
                 setIsLocked(false)

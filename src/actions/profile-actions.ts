@@ -9,7 +9,7 @@ export async function updateProfile(userId: string, data: {
     phoneNumber?: string
     email?: string
     avatar?: string // Placeholder for future
-}) {
+}, workspaceId: string) {
     try {
         await prisma.user.update({
             where: { id: userId },
@@ -21,9 +21,9 @@ export async function updateProfile(userId: string, data: {
             }
         })
 
-        revalidatePath('/dashboard')
-        revalidatePath('/dashboard/profile')
-        revalidatePath('/admin/users') // Admin needs to see new nicknames
+        revalidatePath(`/${workspaceId}/dashboard`)
+        revalidatePath(`/${workspaceId}/dashboard/profile`)
+        revalidatePath(`/${workspaceId}/admin/users`) // Admin needs to see new nicknames
 
         return { success: true }
     } catch (error) {
@@ -32,7 +32,7 @@ export async function updateProfile(userId: string, data: {
     }
 }
 
-export async function changePassword(userId: string, currentPass: string, newPass: string) {
+export async function changePassword(userId: string, currentPass: string, newPass: string, workspaceId: string) {
     try {
         const user = await prisma.user.findUnique({
             where: { id: userId }
@@ -59,6 +59,9 @@ export async function changePassword(userId: string, currentPass: string, newPas
                 plainPassword: null
             }
         })
+
+        revalidatePath(`/${workspaceId}/dashboard/profile`)
+        revalidatePath(`/${workspaceId}/admin/users`)
 
         return { success: true }
     } catch (error) {

@@ -1,17 +1,18 @@
-import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 export default async function FinanceDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
     const session = await getSession()
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
 
     // Authorization Check
     // Must be Admin. Specific "Treasurer" check can be added if we strictly enforce it.
     // Spec says: "Chỉ hiển thị cho SUPER_ADMIN ("admin") và ADMIN có quyền xem tài chính."
     // We added `isTreasurer` to User model.
 
-    const user = await prisma.user.findUnique({
+    const user = await workspacePrisma.user.findUnique({
         where: { id: session?.user?.id },
         select: { role: true, isTreasurer: true, username: true }
     })
@@ -30,7 +31,7 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
     }
 
     // Fetch Financial Data (Completed Tasks Only)
-    const tasks = await prisma.task.findMany({
+    const tasks = await workspacePrisma.task.findMany({
         where: { status: 'Hoàn tất' },
         include: { assignee: true },
         orderBy: { updatedAt: 'desc' }

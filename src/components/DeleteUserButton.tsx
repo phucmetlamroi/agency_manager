@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
 
-export default function DeleteUserButton({ userId }: { userId: string }) {
+export default function DeleteUserButton({ userId, workspaceId }: { userId: string, workspaceId: string }) {
     const { confirm } = useConfirm()
     const [isDeleting, setIsDeleting] = useState(false)
     const router = useRouter()
@@ -22,7 +22,7 @@ export default function DeleteUserButton({ userId }: { userId: string }) {
 
         setIsDeleting(true)
         try {
-            await deleteUser(userId)
+            await deleteUser(userId, workspaceId)
             toast.success('Đã xóa user thành công')
         } catch (error) {
             toast.error('Lỗi khi xóa user')

@@ -3,7 +3,7 @@
 import { adminResetPassword } from '@/actions/user-actions'
 import { useState } from 'react'
 
-export default function ResetPasswordButton({ userId, username }: { userId: string, username: string }) {
+export default function ResetPasswordButton({ userId, username, workspaceId }: { userId: string, username: string, workspaceId: string }) {
     const [loading, setLoading] = useState(false)
 
     const handleReset = async () => {
@@ -12,7 +12,7 @@ export default function ResetPasswordButton({ userId, username }: { userId: stri
         if (newPass.length < 6) return alert('Mật khẩu phải có ít nhất 6 ký tự!')
 
         setLoading(true)
-        const res = await adminResetPassword(userId, newPass)
+        const res = await adminResetPassword(userId, newPass, workspaceId)
         setLoading(false)
 
         if (res.success) {

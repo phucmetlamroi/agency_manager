@@ -1,15 +1,16 @@
 'use server'
 
-import { prisma } from '@/lib/db'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { revalidatePath } from 'next/cache'
 
-export async function checkOverdueTasks() {
+export async function checkOverdueTasks(workspaceId: string) {
     try {
+        if (!workspaceId) return { error: 'WorkspaceId required' }
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
         const now = new Date()
 
         // Find tasks that are overdue, not completed, and are STILL assigned
-        // Note: We removed 'isPenalized: false' to catch "stuck" tasks that were penalized but not successfully recalled.
-        const overdueTasks = await prisma.task.findMany({
+        const overdueTasks = await workspacePrisma.task.findMany({
             where: {
                 deadline: { lt: now }, // Deadline has passed
                 status: { notIn: ['Hoàn tất'] }, // Not done
@@ -45,7 +46,7 @@ export async function checkOverdueTasks() {
                     statusMsg = 'Cảnh báo'
                 }
 
-                await prisma.user.update({
+                await workspacePrisma.user.update({
                     where: { id: task.assignee.id },
                     data: { reputation: newRep, role: newRole }
                 })
@@ -58,8 +59,8 @@ export async function checkOverdueTasks() {
             }
 
             // Common Recall Logic
-            await prisma.$transaction([
-                prisma.task.update({
+            await workspacePrisma.$transaction([
+                workspacePrisma.task.update({
                     where: { id: task.id },
                     data: {
                         isPenalized: true, // Mark as "failed" history
@@ -82,9 +83,9 @@ export async function checkOverdueTasks() {
         }
 
         if (notifications.length > 0) {
-            revalidatePath('/admin')
-            revalidatePath('/admin/queue')
-            revalidatePath('/dashboard')
+            revalidatePath(`/${workspaceId}/admin`)
+            revalidatePath(`/${workspaceId}/admin/queue`)
+            revalidatePath(`/${workspaceId}/dashboard`)
         }
 
         return { success: true, notifications }

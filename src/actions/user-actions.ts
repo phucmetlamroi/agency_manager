@@ -6,7 +6,7 @@ import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 
-export async function changePassword(formData: FormData) {
+export async function changePassword(formData: FormData, workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
 
@@ -27,15 +27,15 @@ export async function changePassword(formData: FormData) {
             }
         })
 
-        revalidatePath('/dashboard')
-        revalidatePath('/admin/users') // Make sure admin sees the change
+        revalidatePath(`/${workspaceId}/dashboard`)
+        revalidatePath(`/${workspaceId}/admin/users`) // Make sure admin sees the change
         return { success: true }
     } catch (e) {
         return { error: 'Đổi mật khẩu thất bại' }
     }
 }
 
-export async function updateUserRole(userId: string, newRole: string) {
+export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
         // Super Admin Protection
         const targetUser = await prisma.user.findUnique({ where: { id: userId } })
@@ -47,14 +47,14 @@ export async function updateUserRole(userId: string, newRole: string) {
             where: { id: userId },
             data: { role: newRole as UserRole }
         })
-        revalidatePath('/admin/users')
+        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error) {
         return { success: false, error: 'Failed to update role' }
     }
 }
 
-export async function deleteUser(userId: string) {
+export async function deleteUser(userId: string, workspaceId: string) {
     try {
         // Super Admin Protection
         const targetUser = await prisma.user.findUnique({ where: { id: userId } })
@@ -65,7 +65,7 @@ export async function deleteUser(userId: string) {
         await prisma.user.delete({
             where: { id: userId }
         })
-        revalidatePath('/admin/users')
+        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error) {
         console.error(error)
@@ -73,7 +73,7 @@ export async function deleteUser(userId: string) {
     }
 }
 
-export async function adminResetPassword(userId: string, newPassword: string) {
+export async function adminResetPassword(userId: string, newPassword: string, workspaceId: string) {
     try {
         const session = await getSession()
         const currentUser = await prisma.user.findUnique({ where: { id: session?.user?.id } })
@@ -99,7 +99,7 @@ export async function adminResetPassword(userId: string, newPassword: string) {
                 plainPassword: newPassword
             }
         })
-        revalidatePath('/admin/users')
+        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error) {
         return { success: false, error: 'Failed' }

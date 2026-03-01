@@ -7,24 +7,26 @@ import { parseVietnamDate } from '@/lib/date-utils'
 
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
-export async function updateUserRole(userId: string, newRole: string) {
+export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
-        await prisma.user.update({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        await workspacePrisma.user.update({
             where: { id: userId },
             data: { role: newRole as UserRole }
         })
-        revalidatePath('/[workspaceId]/admin/users')
-        revalidatePath('/[workspaceId]/admin')
+        revalidatePath(`/${workspaceId}/admin/users`)
+        revalidatePath(`/${workspaceId}/admin`)
         return { success: true }
     } catch (e) {
         return { error: 'Failed to update role' }
     }
 }
 
-export async function updateUserReputation(userId: string, change: number) {
+export async function updateUserReputation(userId: string, change: number, workspaceId: string) {
     try {
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
         // Fetch current to check bounds
-        const user = await prisma.user.findUnique({ where: { id: userId } })
+        const user = await workspacePrisma.user.findUnique({ where: { id: userId } })
         if (!user) return { error: 'User not found' }
 
         let newRep = (user.reputation || 100) + change
@@ -38,14 +40,14 @@ export async function updateUserReputation(userId: string, change: number) {
             newRole = 'LOCKED' as UserRole
         }
 
-        await prisma.user.update({
+        await workspacePrisma.user.update({
             where: { id: userId },
             data: {
                 reputation: newRep,
                 role: newRole
             }
         })
-        revalidatePath('/[workspaceId]/admin/users')
+        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (e) {
         return { error: 'Failed to update reputation' }

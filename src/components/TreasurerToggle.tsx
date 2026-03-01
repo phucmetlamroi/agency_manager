@@ -2,11 +2,11 @@
 
 import { toggleTreasurer } from '@/actions/toggle-treasurer'
 
-export default function TreasurerToggle({ userId, isTreasurer }: { userId: string, isTreasurer: boolean }) {
+export default function TreasurerToggle({ userId, isTreasurer, workspaceId }: { userId: string, isTreasurer: boolean, workspaceId: string }) {
 
     return (
         <button
-            onClick={async () => await toggleTreasurer(userId, isTreasurer)}
+            onClick={async () => await toggleTreasurer(userId, isTreasurer, workspaceId)}
             title={isTreasurer ? "Thu hồi quyền Thủ Quỹ" : "Cấp quyền Thủ Quỹ"}
             style={{
                 background: isTreasurer ? 'rgba(234, 179, 8, 0.2)' : 'transparent',

@@ -11,15 +11,16 @@ type Props = {
     users: any[]
     currentUser: any
     agencies?: any[]
+    workspaceId: string
 }
 
-export default function UserList({ users, currentUser, agencies }: Props) {
+export default function UserList({ users, currentUser, agencies, workspaceId }: Props) {
     return (
         <div>
             <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
                 <h3 style={{ marginBottom: '1rem' }}>Thêm tài khoản mới</h3>
                 <form action={async (formData) => {
-                    await createUser(formData)
+                    await createUser(formData, workspaceId)
                 }} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                     <div>
                         <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Username</label>
@@ -145,16 +146,16 @@ export default function UserList({ users, currentUser, agencies }: Props) {
 
                                     <td style={{ padding: '0.8rem' }}>
                                         {!isSuperAdminRow ? (
-                                            <ReputationManager userId={u.id} initialReputation={u.reputation ?? 100} />
+                                            <ReputationManager userId={u.id} initialReputation={u.reputation ?? 100} workspaceId={workspaceId} />
                                         ) : <span className="text-purple-400 font-bold">MAX</span>}
                                     </td>
 
                                     <td style={{ padding: '0.8rem' }}>
                                         {!isSuperAdminRow ? (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <RoleSwitcher userId={u.id} initialRole={u.role} />
+                                                <RoleSwitcher userId={u.id} initialRole={u.role} workspaceId={workspaceId} />
                                                 {currentUser?.username === 'admin' && u.role === 'ADMIN' && (
-                                                    <TreasurerToggle userId={u.id} isTreasurer={u.isTreasurer} />
+                                                    <TreasurerToggle userId={u.id} isTreasurer={u.isTreasurer} workspaceId={workspaceId} />
                                                 )}
                                             </div>
                                         ) : <span style={{ color: '#666', fontSize: '0.8rem' }}>Locked</span>}
@@ -162,9 +163,9 @@ export default function UserList({ users, currentUser, agencies }: Props) {
 
                                     <td style={{ padding: '0.8rem', textAlign: 'center' }}>
                                         {(!isSuperAdminRow || currentUser?.username === 'admin') && (
-                                            <ResetPasswordButton userId={u.id} username={u.username} />
+                                            <ResetPasswordButton userId={u.id} username={u.username} workspaceId={workspaceId} />
                                         )}
-                                        {!isSuperAdminRow && <DeleteUserButton userId={u.id} />}
+                                        {!isSuperAdminRow && <DeleteUserButton userId={u.id} workspaceId={workspaceId} />}
                                     </td>
                                 </tr>
                             )

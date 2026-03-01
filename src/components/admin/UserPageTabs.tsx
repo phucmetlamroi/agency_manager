@@ -28,7 +28,7 @@ export default function UserPageTabs({ users, currentUser, agencies, workspaceId
             {/* CONTENT */}
             <div className="min-h-[600px]">
                 {activeTab === 'users' && (
-                    <UserList users={users} currentUser={currentUser} agencies={agencies} />
+                    <UserList users={users} currentUser={currentUser} agencies={agencies} workspaceId={workspaceId} />
                 )}
 
                 {activeTab === 'payroll' && (

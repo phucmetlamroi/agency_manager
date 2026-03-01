@@ -1,16 +1,17 @@
 'use server'
 
-import { prisma } from '@/lib/db'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 
-export async function getPayrollLockStatus() {
-    // TEMPORARY OVERRIDE: Hardcode to Feb 2026
-    const currentMonth = 2
-    const currentYear = 2026
+export async function getPayrollLockStatus(workspaceId: string) {
+    const now = new Date()
+    const currentMonth = now.getMonth() + 1
+    const currentYear = now.getFullYear()
 
     try {
-        const lock = await prisma.payrollLock.findUnique({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const lock = await workspacePrisma.payrollLock.findUnique({
             where: {
                 month_year: {
                     month: currentMonth,
@@ -24,13 +25,14 @@ export async function getPayrollLockStatus() {
     }
 }
 
-export async function revertMonthlyBonus() {
+export async function revertMonthlyBonus(workspaceId: string) {
     try {
         // 1. Permission Check
         const session = await getSession()
         if (!session) return { success: false, error: 'Unauthorized' }
 
-        const currentUser = await prisma.user.findUnique({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const currentUser = await workspacePrisma.user.findUnique({
             where: { id: session.user.id },
             select: { role: true, isTreasurer: true }
         })
@@ -39,12 +41,12 @@ export async function revertMonthlyBonus() {
             return { success: false, error: 'Permission denied.' }
         }
 
-        // TEMPORARY OVERRIDE: Hardcode to Feb 2026
-        const currentMonth = 2
-        const currentYear = 2026
+        const now = new Date()
+        const currentMonth = now.getMonth() + 1
+        const currentYear = now.getFullYear()
 
         // 2. Delete all bonuses for this month
-        await prisma.monthlyBonus.deleteMany({
+        await workspacePrisma.monthlyBonus.deleteMany({
             where: {
                 month: currentMonth,
                 year: currentYear
@@ -52,14 +54,14 @@ export async function revertMonthlyBonus() {
         })
 
         // 3. Delete Lock (Unlock)
-        await prisma.payrollLock.deleteMany({
+        await workspacePrisma.payrollLock.deleteMany({
             where: {
                 month: currentMonth,
                 year: currentYear
             }
         })
 
-        revalidatePath('/admin/payroll')
+        revalidatePath(`/${workspaceId}/admin/payroll`)
         return { success: true, message: 'Đã hoàn tác và mở khóa kỳ lương.' }
 
     } catch (error) {
@@ -80,7 +82,7 @@ export async function revertMonthlyBonus() {
  * - Top 2: 10% of monthly salary
  * - Top 3: 5% of monthly salary
  */
-export async function calculateMonthlyBonus() {
+export async function calculateMonthlyBonus(workspaceId: string) {
     try {
         // 1. Permission Check: Only Admin or Treasurer can calculate bonuses
         const session = await getSession()
@@ -88,7 +90,8 @@ export async function calculateMonthlyBonus() {
             return { success: false, error: 'Unauthorized' }
         }
 
-        const currentUser = await prisma.user.findUnique({
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const currentUser = await workspacePrisma.user.findUnique({
             where: { id: session.user.id },
             select: { role: true, isTreasurer: true }
         })
@@ -97,12 +100,13 @@ export async function calculateMonthlyBonus() {
             return { success: false, error: 'Permission denied. Only Admin or Treasurer can calculate bonuses.' }
         }
 
-        // TEMPORARY OVERRIDE: Hardcode to Feb 2026
-        const currentMonth = 2 // 1-12
-        const currentYear = 2026
+        // Use actual current date
+        const now = new Date()
+        const currentMonth = now.getMonth() + 1
+        const currentYear = now.getFullYear()
 
         // Check if already locked
-        const existingLock = await prisma.payrollLock.findUnique({
+        const existingLock = await workspacePrisma.payrollLock.findUnique({
             where: {
                 month_year: {
                     month: currentMonth,
@@ -120,7 +124,7 @@ export async function calculateMonthlyBonus() {
         const endOfMonth = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999)
 
         // 3. Fetch all users with completed tasks this month
-        const users = await prisma.user.findMany({
+        const users = await workspacePrisma.user.findMany({
             where: {
                 role: { not: 'ADMIN' }, // Exclude all admin accounts from bonus
                 username: { notIn: ['admin', 'Bảo Phúc', 'Daniel Hee'] } // Specifically exclude these usernames
@@ -201,7 +205,7 @@ export async function calculateMonthlyBonus() {
             const bonusAmount = user.monthlySalary * bonusPercentage
 
             // 7. Delete existing bonus for this month (if recalculating)
-            await prisma.monthlyBonus.deleteMany({
+            await workspacePrisma.monthlyBonus.deleteMany({
                 where: {
                     userId: user.userId,
                     month: currentMonth,
@@ -210,7 +214,7 @@ export async function calculateMonthlyBonus() {
             })
 
             // 8. Save to MonthlyBonus table
-            await prisma.monthlyBonus.create({
+            await workspacePrisma.monthlyBonus.create({
                 data: {
                     userId: user.userId,
                     month: currentMonth,
@@ -233,7 +237,7 @@ export async function calculateMonthlyBonus() {
         }
 
         // 9. Create Lock Record
-        await prisma.payrollLock.upsert({
+        await workspacePrisma.payrollLock.upsert({
             where: {
                 month_year: {
                     month: currentMonth,
@@ -250,7 +254,7 @@ export async function calculateMonthlyBonus() {
         })
 
         // 10. Revalidate payroll page to show updated bonuses
-        revalidatePath('/admin/payroll')
+        revalidatePath(`/${workspaceId}/admin/payroll`)
 
         return {
             success: true,

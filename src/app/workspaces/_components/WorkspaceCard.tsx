@@ -1,3 +1,5 @@
+'use client'
+
 import { Card, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MoreHorizontal } from "lucide-react"

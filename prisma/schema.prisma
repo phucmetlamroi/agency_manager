@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["driverAdapters"]
 }
 
@@ -9,218 +9,276 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  nickname  String?  // Display Name
-  email     String?  // Optional, contact email
-  phoneNumber String? // Contact phone
-
-  password  String
-  plainPassword String? // For Admin visibility
-  role      UserRole   @default(USER)
-  reputation Int     @default(100)
-  isTreasurer Boolean @default(false) // Admin Role: Treasurer (Thủ quỹ)
-  createdAt DateTime @default(now())
-  
-  tasks     Task[]
-  bonuses   MonthlyBonus[]
-  metrics   PerformanceMetric[]
-  schedules UserSchedule[]
-  focusTasks FocusTask[]
-  payrolls   Payroll[]
-  
-  // Agency Relations
-  agencyId    String?
-  agency      Agency?  @relation("AgencyMembers", fields: [agencyId], references: [id])
-  ownedAgency Agency[] @relation("AgencyOwner")
-  
-  // Payment Info
-  paymentQrUrl      String?
-  paymentBankName   String?
+  id                String              @id @default(uuid())
+  username          String              @unique
+  password          String
+  plainPassword     String?
+  createdAt         DateTime            @default(now())
+  reputation        Int                 @default(100)
+  isTreasurer       Boolean             @default(false)
+  email             String?
+  nickname          String?
+  phoneNumber       String?
   paymentAccountNum String?
+  paymentBankName   String?
+  paymentQrUrl      String?
+  agencyId          String?
+  role              UserRole            @default(USER)
+  ownedAgency       Agency[]            @relation("AgencyOwner")
+  focusTasks        FocusTask[]
+  bonuses           MonthlyBonus[]
+  payrolls          Payroll[]
+  metrics           PerformanceMetric[]
+  tasks             Task[]
+  agency            Agency?             @relation("AgencyMembers", fields: [agencyId], references: [id])
+  schedules         UserSchedule[]
 }
 
 model Payroll {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   userId      String
   month       Int
   year        Int
-  
-  baseSalary  Decimal  @default(0)
-  bonus       Decimal  @default(0)
+  baseSalary  Decimal   @default(0)
+  bonus       Decimal   @default(0)
   totalAmount Decimal
-  
-  status      String   @default("UNPAID") // UNPAID, PAID
+  status      String    @default("UNPAID")
   paidAt      DateTime?
-  
-  user        User     @relation(fields: [userId], references: [id])
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id])
+
   @@unique([userId, month, year])
 }
 
 model Task {
-  id          String   @id @default(uuid())
-  title       String
-  deadline    DateTime?
-  value       Decimal  @default(0)
-  isPenalized Boolean  @default(false)
-  status      String   @default("Đang thực hiện") // "Đang thực hiện", "Revision", "Hoàn tất", "Tạm ngưng", "Sửa frame"
-  type        String   @default("Short form") // "Trial", "Short form", "Long form"
-  
-  references  String?
-  resources   String?  // Raw footage, B-roll
-  notes       String?  // Detailed instructions
-  fileLink    String?  // Backward compatibility
-  productLink String?  // User submission link (Thành phẩm)
-  collectFilesLink String? // New: Link to collect files
-  
-  
-  // Financial Fields
-  jobPriceUSD    Decimal? @default(0) // Input: Revenue from Client (USD)
-  wageVND        Decimal? @default(0) // Input: Payment to Staff (VND)
-  exchangeRate   Decimal? @default(25300) // Stored rate at creation
-  profitVND      Decimal? @default(0) // Calculated: (job * rate) - wage
-
-  // Concurrency Control
-  version        Int      @default(0)
-  
-  assignee    User?    @relation(fields: [assigneeId], references: [id])
-  assigneeId  String?
-
-  // Agency Assignment
-  assignedAgencyId String?
-  assignedAgency   Agency? @relation(fields: [assignedAgencyId], references: [id])
-
-  // CRM Relation
-  project     Project? @relation(fields: [projectId], references: [id])
-  projectId   Int?
-  
-  client      Client?  @relation(fields: [clientId], references: [id])
-  clientId    Int?
-  
-  feedbacks   Feedback[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Smart Stopwatch Fields
-  accumulatedSeconds Int       @default(0)
+  id                 String            @id @default(uuid())
+  title              String
+  deadline           DateTime?
+  value              Decimal           @default(0)
+  status             String            @default("Đang thực hiện")
+  type               String            @default("Short form")
+  references         String?
+  resources          String?
+  notes              String?
+  fileLink           String?
+  assigneeId         String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  productLink        String?
+  isPenalized        Boolean           @default(false)
+  exchangeRate       Decimal?          @default(25300)
+  jobPriceUSD        Decimal?          @default(0)
+  profitVND          Decimal?          @default(0)
+  wageVND            Decimal?          @default(0)
+  accumulatedSeconds Int               @default(0)
   timerStartedAt     DateTime?
-  timerStatus        String    @default("PAUSED") // "RUNNING", "PAUSED", "STOPPED"
-  
-  schedules          UserSchedule[]
-
-  // Invoice Relation
-  invoice            Invoice?  @relation(fields: [invoiceId], references: [id])
+  timerStatus        String            @default("PAUSED")
+  projectId          Int?
+  clientId           Int?
+  collectFilesLink   String?
+  assignedAgencyId   String?
+  version            Int               @default(0)
   invoiceId          String?
   invoiceStatus      InvoiceTaskStatus @default(UNBILLED)
-  
+  isArchived         Boolean           @default(false)
+  feedbacks          Feedback[]
   invoiceItems       InvoiceItem[]
+  assignedAgency     Agency?           @relation(fields: [assignedAgencyId], references: [id])
+  assignee           User?             @relation(fields: [assigneeId], references: [id])
+  client             Client?           @relation(fields: [clientId], references: [id])
+  invoice            Invoice?          @relation(fields: [invoiceId], references: [id])
+  project            Project?          @relation(fields: [projectId], references: [id])
+  schedules          UserSchedule[]
 }
 
 model Notification {
   id        String   @id @default(uuid())
   message   String
-  type      String   @default("INFO") // INFO, WARNING, ERROR
+  type      String   @default("INFO")
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-  
-  // Optional: Link to User or Task for context
-  userId    String?  // If null, it's a broadcast to all Admins
+  userId    String?
 }
 
 model MonthlyBonus {
-  id                  String   @id @default(uuid())
-  userId              String
-  month               Int      // 1-12
-  year                Int
-  rank                Int      // 1, 2, or 3
-  revenue             Decimal  // Snapshot of total revenue at calculation time
-  executionTimeHours  Float    // Total hours spent on tasks (tie-breaker) - Keep Float for time
-  bonusAmount         Decimal  // Calculated bonus amount (15%, 10%, or 5% of salary)
-  calculatedAt        DateTime @default(now())
-  
-  user                User     @relation(fields: [userId], references: [id])
-  
+  id                 String   @id @default(uuid())
+  userId             String
+  month              Int
+  year               Int
+  rank               Int
+  revenue            Decimal
+  executionTimeHours Float
+  bonusAmount        Decimal
+  calculatedAt       DateTime @default(now())
+  user               User     @relation(fields: [userId], references: [id])
+
   @@unique([userId, month, year])
 }
 
 model PayrollLock {
-  id        String   @id @default(uuid())
-  month     Int
-  year      Int
-  isLocked  Boolean  @default(false)
-  lockedAt  DateTime @default(now())
-  lockedBy  String   // User ID
+  id       String   @id @default(uuid())
+  month    Int
+  year     Int
+  isLocked Boolean  @default(false)
+  lockedAt DateTime @default(now())
+  lockedBy String
 
   @@unique([month, year])
 }
 
-// ============================================
-// CRM MODULE (Additive)
-// ============================================
-
 model Client {
-  id            Int       @id @default(autoincrement())
-  name          String
-  
-  // Hierarchical Relation (Parent Corporation -> Subsidiaries/Brands)
-  parentId      Int?
-  parent        Client?   @relation("ClientHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  subsidiaries  Client[]  @relation("ClientHierarchy")
-  
-  projects      Project[]
-  tasks         Task[]
-  
-  // Scoring Fields (Computed by Python Cron Job)
-  aiScore       Decimal   @default(0) // 0-100 Performance Score
-  frictionIndex Decimal   @default(0) // How "difficult" the client is
-  
-  // Manual Ratings & AI Classification
-  inputQuality  Int       @default(3) // 1-5
-  paymentRating Int       @default(3) // 1-5
-  tier          ClientTier @default(standard)
-  
-  depositBalance Decimal  @default(0) // Available credit
-  
-  invoices      Invoice[]
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             Int        @id @default(autoincrement())
+  name           String
+  parentId       Int?
+  aiScore        Decimal    @default(0)
+  frictionIndex  Decimal    @default(0)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  inputQuality   Int        @default(3)
+  paymentRating  Int        @default(3)
+  tier           ClientTier @default(standard)
+  depositBalance Decimal    @default(0)
+  parent         Client?    @relation("ClientHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subsidiaries   Client[]   @relation("ClientHierarchy")
+  invoices       Invoice[]
+  projects       Project[]
+  tasks          Task[]
 }
 
 model Project {
-  id          Int       @id @default(autoincrement())
-  name        String
-  code        String?   // Internal Code e.g. "PRJ-001"
-  
-  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    Int
-  
-  tasks       Task[]
-  feedbacks   Feedback[]
-  
-  createdAt   DateTime  @default(now())
+  id        Int        @id @default(autoincrement())
+  name      String
+  code      String?
+  clientId  Int
+  createdAt DateTime   @default(now())
+  feedbacks Feedback[]
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tasks     Task[]
 }
 
 model Feedback {
-  id          Int          @id @default(autoincrement())
-  content     String
-  
-  project     Project?     @relation(fields: [projectId], references: [id])
-  projectId   Int?
-  
-  task        Task?        @relation(fields: [taskId], references: [id])
+  id        Int            @id @default(autoincrement())
+  content   String
+  projectId Int?
+  severity  Int            @default(1)
+  createdAt DateTime       @default(now())
+  taskId    String?
+  type      FeedbackSource @default(CLIENT)
+  project   Project?       @relation(fields: [projectId], references: [id])
+  task      Task?          @relation(fields: [taskId], references: [id])
+}
+
+model PerformanceMetric {
+  id                    String   @id @default(uuid())
+  userId                String
+  month                 Int
+  year                  Int
+  revenue               Decimal  @default(0)
+  avgCompletionTime     Int      @default(0)
+  onTimeRate            Float    @default(100)
+  internalRevisionCount Int      @default(0)
+  clientRevisionCount   Int      @default(0)
+  score                 Float    @default(0)
+  classification        String   @default("NORMAL")
+  measuredAt            DateTime @default(now())
+  user                  User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, month, year])
+}
+
+model UserSchedule {
+  id        String       @id @default(cuid())
+  userId    String
+  startTime DateTime
+  endTime   DateTime
+  type      ScheduleType @default(BUSY)
+  note      String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  taskId    String?
+  task      Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startTime])
+}
+
+model Agency {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  ownerId   String?
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner     User?    @relation("AgencyOwner", fields: [ownerId], references: [id])
+  tasks     Task[]
+  members   User[]   @relation("AgencyMembers")
+}
+
+model FocusTask {
+  id         String   @id @default(uuid())
+  content    String
+  userId     String
+  isPriority Boolean  @default(false)
+  isDone     Boolean  @default(false)
+  order      Int      @default(0)
+  status     String   @default("DRAFT")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model BillingProfile {
+  id              String   @id @default(uuid())
+  profileName     String
+  beneficiaryName String
+  bankName        String
+  accountNumber   String
+  swiftCode       String?
+  address         String?
+  isDefault       Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  notes           String?
+}
+
+model Invoice {
+  id              String        @id @default(uuid())
+  invoiceNumber   String        @unique
+  clientId        Int
+  createdBy       String
+  issueDate       DateTime      @default(now())
+  dueDate         DateTime?
+  subtotalAmount  Decimal       @default(0)
+  depositDeducted Decimal       @default(0)
+  taxPercent      Decimal       @default(0)
+  taxAmount       Decimal       @default(0)
+  totalDue        Decimal       @default(0)
+  status          InvoiceStatus @default(DRAFT)
+  filePath        String?
+  fileCreatedAt   DateTime?
+  billingSnapshot Json
+  clientSnapshot  Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  client          Client        @relation(fields: [clientId], references: [id])
+  items           InvoiceItem[]
+  tasks           Task[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
   taskId      String?
-  
-  // Type: CLIENT (External Feedback), INTERNAL (Team Review)
-  type        FeedbackSource @default(CLIENT)
-  severity    Int          @default(1) // 1 (Minor) -> 5 (Critical)
-  
-  createdAt   DateTime     @default(now())
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Decimal @default(0)
+  amount      Decimal @default(0)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  task        Task?   @relation(fields: [taskId], references: [id])
 }
 
 enum FeedbackSource {
@@ -233,183 +291,21 @@ enum ClientTier {
   GOLD
   SILVER
   WARNING
-  standard // Default safe value
-}
-
-model PerformanceMetric {
-  id                    String   @id @default(uuid())
-  userId                String
-  month                 Int
-  year                  Int
-  
-  // Metrics
-  revenue               Decimal  @default(0)
-  avgCompletionTime     Int      @default(0) // Seconds
-  onTimeRate            Float    @default(100) // Percentage
-  
-  internalRevisionCount Int      @default(0)
-  clientRevisionCount   Int      @default(0)
-  
-  // Classification
-  score                 Float    @default(0) // 0-100
-  classification        String   @default("NORMAL") // POTENTIAL, NORMAL, UNDERPERFORM
-  
-  measuredAt            DateTime @default(now())
-  
-  user                  User     @relation(fields: [userId], references: [id])
-  
-  @@unique([userId, month, year])
-}
-
-// ============================================
-// RESOURCE SCHEDULER (Module Lịch)
-// ============================================
-
-model UserSchedule {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  startTime DateTime
-  endTime   DateTime
-  
-  type      ScheduleType @default(BUSY)
-  note      String?      // e.g., "Đi học", "Ngủ bù"
-  
-  taskId    String?
-  task      Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId, startTime]) // Fast lookup
+  standard
 }
 
 enum ScheduleType {
-  BUSY     // User sets: Bận, không nhận việc
-  OVERTIME // User sets: Có thể nhận thêm (Yellow)
-  AVAILABLE // User sets: Sẵn sàng nhận việc (Green)
-  TASK     // System sets: Đang làm task
+  BUSY
+  OVERTIME
+  TASK
+  AVAILABLE
 }
-// ============================================
-// AGENCY MANAGEMENT MODULE
-// ============================================
-
-model Agency {
-  id        String   @id @default(uuid())
-  name      String
-  code      String   @unique // Short code e.g., "AGC01"
-  
-  ownerId   String?  // Agency Admin ID
-  owner     User?    @relation("AgencyOwner", fields: [ownerId], references: [id])
-  
-  members   User[]   @relation("AgencyMembers")
-  
-  // Tasks assigned to this agency
-  tasks     Task[]
-  
-  status    String   @default("ACTIVE") // ACTIVE, INACTIVE
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// ... existing code ...
-model FocusTask {
-  id          String   @id @default(uuid())
-  content     String
-  
-  userId      String   
-  user        User     @relation(fields: [userId], references: [id])
-  
-  isPriority  Boolean  @default(false)
-  isDone      Boolean  @default(false)
-  
-  order       Int      @default(0)
-  status      String   @default("DRAFT") // DRAFT, PUBLISHED
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([userId])
-}
-
 
 enum UserRole {
   ADMIN
   USER
   AGENCY_ADMIN
   LOCKED
-}
-
-// ============================================
-// INVOICE & FINANCIAL MODULE (Mini-ERP)
-// ============================================
-
-model BillingProfile {
-  id              String   @id @default(uuid())
-  profileName     String   // e.g. "VCB USD", "Techcombank VND"
-  beneficiaryName String
-  bankName        String
-  accountNumber   String
-  swiftCode       String?
-  address         String?
-  notes           String?  // Extra info like Delivery Method, Currency...
-  isDefault       Boolean  @default(false)
-  
-  updatedAt       DateTime @updatedAt
-  createdAt       DateTime @default(now())
-}
-
-model Invoice {
-  id              String   @id @default(uuid())
-  invoiceNumber   String   @unique // e.g. INV-2025-001
-  
-  client          Client   @relation(fields: [clientId], references: [id])
-  clientId        Int
-  
-  createdBy       String   // User ID of Admin
-  
-  issueDate       DateTime @default(now())
-  dueDate         DateTime?
-  
-  // Financials
-  subtotalAmount  Decimal  @default(0)
-  depositDeducted Decimal  @default(0)
-  taxPercent      Decimal  @default(0)
-  taxAmount       Decimal  @default(0)
-  totalDue        Decimal  @default(0)
-  
-  status          InvoiceStatus @default(DRAFT)
-  
-  // File Lifecycle
-  filePath        String?  // Logical path or key
-  fileCreatedAt   DateTime? // For 48h cleanup logic
-  
-  // Snapshot Data (Immutability)
-  billingSnapshot Json     // Stores the full BillingProfile at time of creation
-  clientSnapshot  Json?    // Stores Client info at time of creation
-  
-  items           InvoiceItem[]
-  tasks           Task[]
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-
-model InvoiceItem {
-  id          String   @id @default(uuid())
-  
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  invoiceId   String
-  
-  // Link to Task (Optional - for manual items)
-  task        Task?    @relation(fields: [taskId], references: [id])
-  taskId      String?
-  
-  description String
-  quantity    Int      @default(1)
-  unitPrice   Decimal  @default(0)
-  amount      Decimal  @default(0) // quantity * unitPrice
 }
 
 enum InvoiceStatus {

@@ -47,74 +47,7 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
         const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}
 
         // --- SMART STOPWATCH LOGIC ---
-        const isRunningState = ['Đang thực hiện'].includes(newStatus)
-        const isStoppedState = newStatus === 'Hoàn tất'
-        // Review is PAUSED (implicit fallback in else block below)
-        // const isPaused = ['Tạm ngưng', 'Đang đợi giao'].includes(newStatus)
-
-        let timerUpdate = {}
-        const currentTimerStatus = task.timerStatus
-        const nowTime = new Date()
-
-        // 1. RESET LOGIC (User Request) OR UNASSIGN (Admin)
-        if (newStatus === 'Đã nhận task') {
-            timerUpdate = {
-                timerStatus: 'STOPPED',
-                timerStartedAt: null, // Reset start time
-                accumulatedSeconds: 0 // Reset accumulated time
-            }
-        }
-        else if (newStatus === 'Đang đợi giao') {
-            // UNASSIGN LOGIC: Clear Assignee and Reset everything
-            timerUpdate = {
-                status: 'Đang đợi giao',
-                assigneeId: null,
-                timerStatus: 'STOPPED',
-                timerStartedAt: null,
-                accumulatedSeconds: 0
-            }
-        }
-        // 2. STOP LOGIC
-        else if (isStoppedState) {
-            if (currentTimerStatus === 'RUNNING' && task.timerStartedAt) {
-                const elapsed = Math.floor((nowTime.getTime() - task.timerStartedAt.getTime()) / 1000)
-                timerUpdate = {
-                    timerStatus: 'STOPPED',
-                    timerStartedAt: null,
-                    accumulatedSeconds: task.accumulatedSeconds + elapsed
-                }
-            } else {
-                timerUpdate = {
-                    timerStatus: 'STOPPED',
-                    timerStartedAt: null
-                }
-            }
-        }
-        // 3. START / RESUME LOGIC
-        else if (isRunningState) {
-            if (currentTimerStatus !== 'RUNNING') {
-                timerUpdate = {
-                    timerStatus: 'RUNNING',
-                    timerStartedAt: nowTime
-                }
-            }
-        }
-        // 4. PAUSE LOGIC
-        else {
-            if (currentTimerStatus === 'RUNNING' && task.timerStartedAt) {
-                const elapsed = Math.floor((nowTime.getTime() - task.timerStartedAt.getTime()) / 1000)
-                timerUpdate = {
-                    timerStatus: 'PAUSED',
-                    timerStartedAt: null,
-                    accumulatedSeconds: task.accumulatedSeconds + elapsed
-                }
-            } else {
-                timerUpdate = {
-                    timerStatus: 'PAUSED',
-                    timerStartedAt: null
-                }
-            }
-        }
+        // (Removed to save database usage)
 
 
 
@@ -152,7 +85,6 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
                 status: newStatus,
                 ...(newNotes ? { notes: newNotes } : {}),
                 ...deadlineUpdate,
-                ...timerUpdate,
                 version: { increment: 1 }
             }
 
@@ -317,18 +249,11 @@ export async function updateTaskStatus(id: string, newStatus: string, newNotes?:
 
         // -----------------------
 
-        // Return final accumulated seconds (plus current elapsed if it was running) for the UI Log
-        let finalSeconds = task.accumulatedSeconds
-        if (task.timerStatus === 'RUNNING' && task.timerStartedAt) {
-            const elapsed = Math.floor((nowTime.getTime() - task.timerStartedAt.getTime()) / 1000)
-            finalSeconds += elapsed
-        }
-
         revalidatePath('/admin')
         revalidatePath('/dashboard')
         revalidatePath('/admin/payroll')
 
-        return { success: true, finalSeconds }
+        return { success: true }
     } catch (e: any) {
         console.error('Update Task Status Error:', e)
         return { error: e.message || 'Failed' }

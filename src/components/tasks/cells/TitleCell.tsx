@@ -2,7 +2,6 @@
 
 import { TaskWithUser } from "@/types/admin"
 import { Badge } from "@/components/ui/badge"
-import Stopwatch from "@/components/Stopwatch"
 
 import { calculateRiskLevel, getRiskColor, getRiskLabel } from '@/lib/risk-utils'
 
@@ -15,37 +14,7 @@ interface TitleCellProps {
 export function TitleCell({ task, isAdmin, onClick }: TitleCellProps) {
     const isLocked = !isAdmin && task.status === 'Đã nhận task'
 
-    // Timer Logic Display (Using Stopwatch Component)
-    const ShowTimer = () => {
-        if ((!task.accumulatedSeconds && !task.timerStartedAt) && task.status !== 'Đang thực hiện') return null
-
-        // Map Task Status to Stopwatch Status
-        // If task is 'Đang thực hiện' (IN_PROGRESS) or 'Sửa frame' (FIXING), the timer logic might differ.
-        // Based on previous logic: 
-        // - 'Đang thực hiện' = RUNNING
-        // - 'Sửa frame' = PAUSED? Or running? User said "Sửa frame is now PAUSED state" in task.md
-        // - 'Revision' = PAUSED
-
-        // Let's rely on the task.timerStatus field if available, or fallback to mapped status
-        let stopwatchStatus = 'STOPPED'
-        if (task.status === 'Đang thực hiện') stopwatchStatus = 'RUNNING'
-        else if (task.status === 'Sửa frame') stopwatchStatus = 'PAUSED'
-        else if (task.status === 'Revision') stopwatchStatus = 'PAUSED'
-
-        // Specific override if backend provides timerStatus
-        if (task.timerStatus) stopwatchStatus = task.timerStatus
-
-        return (
-            <div className="mt-1">
-                <Stopwatch
-                    accumulatedSeconds={task.accumulatedSeconds || 0}
-                    timerStartedAt={task.timerStartedAt ?? null}
-                    status={stopwatchStatus}
-                />
-            </div>
-        )
-    }
-
+    // Timer logic removed
     return (
         <div
             className={`flex flex-col max-w-[400px] cursor-pointer group ${isLocked ? 'opacity-50' : ''}`}
@@ -73,10 +42,8 @@ export function TitleCell({ task, isAdmin, onClick }: TitleCellProps) {
                 </span>
             </div>
 
-            {/* Warning / Timer / Platform */}
+            {/* Warning / Platform */}
             <div className="flex items-center gap-2 flex-wrap">
-                <ShowTimer />
-
                 {/* Deadline Warning */}
                 {task.deadline && task.status !== 'Hoàn tất' && (
                     (() => {

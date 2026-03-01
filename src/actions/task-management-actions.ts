@@ -70,16 +70,8 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
             return { error: 'Permission denied: Chỉ Admin mới được giao việc.' }
         }
 
-        // B. PREPARE DATA & TIMER LOGIC (Fix Time Leak)
+        // B. PREPARE DATA
         let updateData: any = {}
-
-        // Nếu task đang chạy mà bị giao lại -> Cộng dồn giờ ngay lập tức
-        let newAccumulated = task.accumulatedSeconds || 0
-        if (task.timerStatus === 'RUNNING' && task.timerStartedAt) {
-            const now = new Date()
-            const elapsed = Math.floor((now.getTime() - task.timerStartedAt.getTime()) / 1000)
-            newAccumulated += elapsed
-        }
 
         if (!assignmentId || assignmentId === 'unassigned') {
             // CASE: UNASSIGN MEMBER (Hủy giao User, giữ lại Agency)
@@ -88,10 +80,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                 // assignedAgencyId: NO CHANGE (Keep it with the agency)
                 status: 'Đang đợi giao',
                 isPenalized: false,
-                deadline: null,
-                timerStatus: 'PAUSED',
-                timerStartedAt: null,
-                accumulatedSeconds: newAccumulated
+                deadline: null
             }
         }
         else if (assignmentId === 'sys:revoke') {
@@ -101,10 +90,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                 assignedAgencyId: null,
                 status: 'Đang đợi giao',
                 isPenalized: false,
-                deadline: null,
-                timerStatus: 'PAUSED',
-                timerStartedAt: null,
-                accumulatedSeconds: newAccumulated
+                deadline: null
             }
         }
 
@@ -121,9 +107,7 @@ export async function assignTask(taskId: string, assignmentId: string | null) {
                 assigneeId: assignmentId,
                 assignedAgencyId: null, // Clear any agency link
                 status: 'Đã nhận task',
-                isPenalized: false,
-                timerStatus: 'PAUSED', // Reset về Pause để user mới tự bấm Start
-                accumulatedSeconds: newAccumulated
+                isPenalized: false
             }
         }
 

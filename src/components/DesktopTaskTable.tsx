@@ -10,7 +10,6 @@ import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
 import DeleteTaskButton from './DeleteTaskButton'
-import Stopwatch from './Stopwatch'
 
 import { TaskWithUser } from '@/types/admin'
 import { useConfirm } from '@/components/ui/ConfirmModal'
@@ -248,29 +247,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                         ) : <span className="italic text-gray-600">No Deadline</span>}
                                     </div>
 
-                                    {/* Timer - Always Visible */}
-                                    <div className="border-t border-dashed border-gray-700 pt-1 md:border-0 md:pt-0">
-                                        <Stopwatch
-                                            accumulatedSeconds={task.accumulatedSeconds || 0}
-                                            timerStartedAt={task.timerStartedAt ?? null}
-                                            status={task.timerStatus || 'PAUSED'}
-                                        />
-                                        {/* Risk Indicator */}
-                                        {(task.accumulatedSeconds || 0) > 0 && task.status === 'Đang thực hiện' && (
-                                            (() => {
-                                                const risk = calculateRiskLevel(task.accumulatedSeconds || 0, 0)
-                                                if (risk !== 'LOW') {
-                                                    return (
-                                                        <div className={`mt-1 text-[10px] px-2 py-0.5 rounded border text-center font-bold animate-pulse ${getRiskColor(risk)}`}>
-                                                            ⚠️ {getRiskLabel(risk)}
-                                                        </div>
-                                                    )
-                                                }
-                                                return null
-                                            })()
-                                        )}
-                                    </div>
-
+                                    {/* Timer - Removed */}
                                     {/* Mobile-Optimized Status/Assignee info */}
                                     <div className="flex items-center gap-4 mt-1 md:mt-0">
                                         {/* Assignee */}
@@ -375,15 +352,6 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                             <div className="flex flex-col gap-1 items-end">
                                                 <span className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/30">
                                                     🏆 Done
-                                                </span>
-                                                {/* Calculate and show Total Time for Finished tasks safely */}
-                                                <span className="text-[10px] text-gray-500 font-mono">
-                                                    {(() => {
-                                                        const s = task.accumulatedSeconds || 0
-                                                        const h = Math.floor(s / 3600)
-                                                        const m = Math.floor((s % 3600) / 60)
-                                                        return `${h}h ${m}m`
-                                                    })()}
                                                 </span>
                                             </div>
                                         )}

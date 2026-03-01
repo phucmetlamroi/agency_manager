@@ -15,10 +15,7 @@ export type TaskWithUser = { // Updated with Client Info
     assignedAgencyId?: string | null // For tasks assigned to agency queue
     assignee: { id: string; username: string; reputation?: number } | null
     createdAt: Date
-    // Stopwatch
-    accumulatedSeconds?: number
-    timerStartedAt?: Date | null
-    timerStatus?: string
+    // Removed Stopwatch fields
     client?: {
         id: number
         name: string

@@ -9,9 +9,7 @@ async function fixTaskStates() {
     // Find tasks that are Waiting but have Running Timer
     const inconsistentTasks = await prisma.task.findMany({
         where: {
-            timerStatus: 'RUNNING',
             status: 'Đang đợi giao'
-            // We assume if Timer is RUNNING, it MUST be 'Doing' (or 'Revision' etc, but specifically NOT 'Waiting')
         }
     })
 

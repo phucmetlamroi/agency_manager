@@ -7,8 +7,6 @@ import { calculateRiskLevel, getRiskColor, getRiskLabel } from '@/lib/risk-utils
 import { assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
-import Stopwatch from '@/components/Stopwatch'
-
 import { TaskWithUser } from '@/types/admin'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
@@ -229,14 +227,7 @@ export default function AgencyTaskTable({ tasks, members }: { tasks: TaskWithUse
                                         ) : <span className="italic text-gray-600">No Deadline</span>}
                                     </div>
 
-                                    {/* Timer - Always Visible */}
-                                    <div className="border-t border-dashed border-gray-700 pt-1 md:border-0 md:pt-0">
-                                        <Stopwatch
-                                            accumulatedSeconds={task.accumulatedSeconds || 0}
-                                            timerStartedAt={task.timerStartedAt ?? null}
-                                            status={task.timerStatus || 'PAUSED'}
-                                        />
-                                    </div>
+                                    {/* Timer - Removed */}
 
                                     {/* Assignee Control for Agency Manager */}
                                     <div className="flex items-center gap-4 mt-1 md:mt-0">

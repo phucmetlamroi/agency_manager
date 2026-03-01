@@ -71,9 +71,6 @@ model Task {
   jobPriceUSD        Decimal?          @default(0)
   profitVND          Decimal?          @default(0)
   wageVND            Decimal?          @default(0)
-  accumulatedSeconds Int               @default(0)
-  timerStartedAt     DateTime?
-  timerStatus        String            @default("PAUSED")
   projectId          Int?
   clientId           Int?
   collectFilesLink   String?

@@ -1,8 +1,6 @@
 'use client'
 
 import { TaskWithUser } from '@/types/admin'
-import Stopwatch from '../Stopwatch'
-
 const statusColors: Record<string, string> = {
     "Đã nhận task": "#60a5fa",
     "Đang đợi giao": "#a855f7",
@@ -53,14 +51,7 @@ export default function MobileTaskCard({ task, onAction, isAdmin }: {
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                <div className="flex items-center gap-2">
-                    <Stopwatch
-                        accumulatedSeconds={task.accumulatedSeconds || 0}
-                        timerStartedAt={task.timerStartedAt ?? null}
-                        status={task.timerStatus || 'PAUSED'}
-                    />
-                </div>
-
+                {/* Timer block removed */}
                 {isAdmin && (
                     <span className="font-mono font-bold text-green-400">
                         {task.value.toLocaleString()} đ

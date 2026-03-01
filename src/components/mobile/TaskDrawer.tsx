@@ -56,15 +56,7 @@ export function TaskDrawer({ open, onOpenChange, task, isAdmin, onEdit }: TaskDr
                                         </p>
                                     </div>
 
-                                    <div className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
-                                        <div className="flex items-center gap-2 text-zinc-400 mb-1">
-                                            <Clock className="w-4 h-4" />
-                                            <span className="text-xs">Time</span>
-                                        </div>
-                                        <p className="font-mono text-sm text-zinc-200">
-                                            {Math.floor((task.accumulatedSeconds || 0) / 3600)}h {Math.floor(((task.accumulatedSeconds || 0) % 3600) / 60)}m
-                                        </p>
-                                    </div>
+                                    {/* Time block removed */}
                                 </div>
 
                                 {/* Assignee */}

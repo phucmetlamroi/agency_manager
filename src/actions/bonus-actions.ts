@@ -153,7 +153,7 @@ export async function calculateMonthlyBonus() {
             userId: string
             username: string
             revenue: number
-            executionTimeHours: number
+            tasksCompleted: number
             monthlySalary: number
         }
 
@@ -170,37 +170,24 @@ export async function calculateMonthlyBonus() {
                 return sum + val
             }, 0)
 
-            // Calculate total execution time in hours using Smart Stopwatch (accumulatedSeconds)
-            let totalExecutionMs = 0
-            for (const task of user.tasks) {
-                const activeSeconds = task.accumulatedSeconds || 0
-                totalExecutionMs += (activeSeconds * 1000)
-            }
-
-            // Avoid division by zero
-            const executionTimeHours = totalExecutionMs > 0 ? totalExecutionMs / (1000 * 60 * 60) : 0.001
-
             rankings.push({
                 userId: user.id,
                 username: user.username,
                 revenue,
-                executionTimeHours,
+                tasksCompleted: user.tasks.length,
                 monthlySalary: revenue // Using revenue as salary for bonus calculation
             })
         }
 
-        // 5. Rank by revenue DESC, then Efficiency (Revenue/Time) DESC
+        // 5. Rank by revenue DESC, then by tasksCompleted DESC (Tie-breaker)
         rankings.sort((a, b) => {
             // Primary: Revenue (higher is better)
             if (Math.abs(b.revenue - a.revenue) > 0.01) {
                 return b.revenue - a.revenue
             }
 
-            // Tie-breaker: Efficiency (Revenue / Time)
-            const efficiencyA = a.revenue / a.executionTimeHours
-            const efficiencyB = b.revenue / b.executionTimeHours
-
-            return efficiencyB - efficiencyA // Higher efficiency wins
+            // Tie-breaker: Who did more tasks to get that revenue
+            return b.tasksCompleted - a.tasksCompleted
         })
 
         // 6. Award Top 1-3 with bonuses
@@ -230,7 +217,7 @@ export async function calculateMonthlyBonus() {
                     year: currentYear,
                     rank,
                     revenue: user.revenue,
-                    executionTimeHours: user.executionTimeHours,
+                    executionTimeHours: 0, // Migrated/Deprecating field, default 0
                     bonusAmount
                 }
             })
@@ -240,7 +227,6 @@ export async function calculateMonthlyBonus() {
                 username: user.username,
                 rank,
                 revenue: user.revenue,
-                executionTimeHours: user.executionTimeHours,
                 bonusAmount,
                 bonusPercentage: bonusPercentage * 100
             })

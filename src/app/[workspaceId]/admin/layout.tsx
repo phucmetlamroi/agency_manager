@@ -36,7 +36,7 @@ export default async function AdminLayout({
     }
 
     if (user.role !== 'ADMIN') {
-        redirect('/dashboard')
+        redirect(`/${workspaceId}/dashboard`)
     }
 
     const headersList = await headers()

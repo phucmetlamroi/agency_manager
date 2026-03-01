@@ -2,7 +2,8 @@ import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
-export default async function FinanceDashboard() {
+export default async function FinanceDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
+    const { workspaceId } = await params
     const session = await getSession()
 
     // Authorization Check
@@ -16,7 +17,7 @@ export default async function FinanceDashboard() {
     })
 
     if (!user || user.role !== 'ADMIN') {
-        redirect('/admin')
+        redirect(`/${workspaceId}/admin`)
     }
 
     if (user.username !== 'admin' && !user.isTreasurer) {

@@ -36,7 +36,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
     // Redirect Super Admin to Admin Dashboard
     if ((userWithBonus?.role as UserRole) === UserRole.ADMIN) {
-        redirect('/admin')
+        redirect(`/${workspaceId}/admin`)
     }
 
     const tasks = await prisma.task.findMany({

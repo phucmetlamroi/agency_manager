@@ -9,7 +9,8 @@ import { UserRole } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function UserDashboard({ params }: { params: { workspaceId: string } }) {
+export default async function UserDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
+    const { workspaceId } = await params
     const session = await getSession()
     if (!session) redirect('/login')
 
@@ -144,7 +145,7 @@ export default async function UserDashboard({ params }: { params: { workspaceId:
             <h3 className="title-gradient" style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Danh sách Task của tôi</h3>
 
             {/* Using the new TaskTable for User too, but restrict Admin controls */}
-            <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={false} isMobile={await isMobileDevice()} workspaceId={params.workspaceId} />
+            <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={false} isMobile={await isMobileDevice()} workspaceId={workspaceId} />
 
 
         </div>

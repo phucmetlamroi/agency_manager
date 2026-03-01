@@ -2,8 +2,8 @@ import { getPerformanceReport } from '@/actions/performance-actions'
 import { serializeDecimal } from '@/lib/serialization'
 import PerformanceDashboardClient from '@/components/performance/PerformanceDashboardClient'
 
-export default async function PerformancePage({ params }: { params: { workspaceId: string } }) {
-    const { workspaceId } = params
+export default async function PerformancePage({ params }: { params: Promise<{ workspaceId: string }> }) {
+    const { workspaceId } = await params
     const today = new Date()
     const month = today.getMonth() + 1
     const year = today.getFullYear()

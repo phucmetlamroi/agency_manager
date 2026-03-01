@@ -3,7 +3,8 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import UserPageTabs from '@/components/admin/UserPageTabs'
 
-export default async function AdminUsersPage({ params }: { params: { workspaceId: string } }) {
+export default async function AdminUsersPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+    const { workspaceId } = await params
     const session = await getSession()
     if (!session) redirect('/login')
 
@@ -45,7 +46,7 @@ export default async function AdminUsersPage({ params }: { params: { workspaceId
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
             <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Quản lý nhân sự</h2>
-            <UserPageTabs users={users} currentUser={currentUser} agencies={agencies} workspaceId={params.workspaceId} />
+            <UserPageTabs users={users} currentUser={currentUser} agencies={agencies} workspaceId={workspaceId} />
         </div>
     )
 }

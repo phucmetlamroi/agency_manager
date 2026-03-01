@@ -8,8 +8,9 @@ import { serializeDecimal } from '@/lib/serialization'
 
 export const dynamic = 'force-dynamic'
 
-export default async function PayrollPage({ params }: { params: { workspaceId: string } }) {
-    const { workspaceId } = params
+export default async function PayrollPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+    const { workspaceId } = await params
+
 
     // 1. Determine Current Month Range
     // TEMPORARY OVERRIDE: Hardcode to February 2026 to process payroll, 

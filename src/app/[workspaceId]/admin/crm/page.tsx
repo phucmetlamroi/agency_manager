@@ -4,8 +4,9 @@ import ClientList from '@/components/crm/ClientList'
 import CreateClientButton from '@/components/crm/CreateClientButton'
 import UpdateScoresButton from '@/components/crm/UpdateScoresButton'
 
-export default async function CRMDashboard({ params }: { params: { workspaceId: string } }) {
-    const { workspaceId } = params
+export default async function CRMDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
+    const { workspaceId } = await params
+
 
     const [clientsRes, topClientsRes] = await Promise.all([
         getClients(workspaceId),

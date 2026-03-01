@@ -7,14 +7,16 @@ import DraggableFocusWidget from '@/components/DraggableFocusWidget'
 import { serializeDecimal } from '@/lib/serialization'
 import { UserRole } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 export default async function UserDashboard() {
     const session = await getSession()
     if (!session) redirect('/login')
 
     const userId = session.user.id
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1
-    const currentYear = now.getFullYear()
+    // TEMPORARY OVERRIDE: Hardcode to Feb 2026
+    const currentMonth = 2
+    const currentYear = 2026
 
     // Fetch Tasks & Bonus in parallel or single query pattern
     // Fetch user to get bonus
@@ -42,14 +44,15 @@ export default async function UserDashboard() {
         orderBy: { createdAt: 'desc' }
     })
 
-    // Payroll Calculation (Status "Hoàn tất" triggers payment)
-    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    // TEMPORARY OVERRIDE: Hardcode to Feb 2026 to match Admin Payroll
+    const thisMonthStart = new Date(2026, 1, 1) // Feb 1
+    const lastMonthStart = new Date(2026, 0, 1) // Jan 1
+    const thisMonthEnd = new Date(2026, 2, 5, 23, 59, 59, 999) // Expand to March 5
 
     // Filter logic
     const completedTasks = tasks.filter(t => t.status === 'Hoàn tất')
 
-    const thisMonthTasks = completedTasks.filter(t => t.updatedAt >= thisMonthStart)
+    const thisMonthTasks = completedTasks.filter(t => t.updatedAt >= thisMonthStart && t.updatedAt <= thisMonthEnd)
     const lastMonthTasks = completedTasks.filter(t => t.updatedAt >= lastMonthStart && t.updatedAt < thisMonthStart)
 
     const baseSalary = thisMonthTasks.reduce((acc, t) => acc + Number(t.value || 0), 0)

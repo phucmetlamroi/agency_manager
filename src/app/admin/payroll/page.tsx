@@ -5,6 +5,8 @@ import BonusCalculator from './BonusCalculator'
 import PayrollCard from '@/components/admin/PayrollCard'
 import { serializeDecimal } from '@/lib/serialization'
 
+export const dynamic = 'force-dynamic'
+
 export default async function PayrollPage() {
     // 1. Determine Current Month Range
     // TEMPORARY OVERRIDE: Hardcode to February 2026 to process payroll, 

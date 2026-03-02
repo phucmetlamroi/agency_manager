@@ -1,8 +1,9 @@
+import { env } from './env'
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-const key = new TextEncoder().encode(process.env.JWT_SECRET || 'default_secret_key_change_me')
+const key = new TextEncoder().encode(env.JWT_SECRET)
 
 export async function encrypt(payload: any) {
     return await new SignJWT(payload)

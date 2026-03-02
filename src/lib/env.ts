@@ -6,10 +6,16 @@ const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 })
 
-// Support Vercel/Neon POSTGRES_URL as a fallback for DATABASE_URL
+// Helper to clean quotes that users might copy-paste into Vercel
+const cleanEnvValue = (val: string | undefined) => {
+    if (!val) return val
+    return val.trim().replace(/^['"](.*)['"]$/, '$1')
+}
+
 const rawEnv = {
     ...process.env,
-    DATABASE_URL: process.env.DATABASE_URL || process.env.POSTGRES_URL
+    DATABASE_URL: cleanEnvValue(process.env.DATABASE_URL || process.env.POSTGRES_URL),
+    JWT_SECRET: cleanEnvValue(process.env.JWT_SECRET)
 }
 
 const parsed = envSchema.safeParse(rawEnv)
@@ -21,9 +27,9 @@ if (!parsed.success) {
 export const env = parsed.success ? parsed.data : envSchema.parse({})
 
 if (env.JWT_SECRET === "temporary-build-secret-key-change-me" && env.NODE_ENV === 'production') {
-    console.warn("⚠️  WARNING: Using default JWT_SECRET in PRODUCTION. Please set JWT_SECRET env var in Vercel.")
+    console.warn("⚠️  WARNING: JWT_SECRET is using DEFAULT value in production!")
 }
 
 if (env.DATABASE_URL === "placeholder_url_replace_me" && env.NODE_ENV === 'production') {
-    console.error("❌ ERROR: DATABASE_URL (hoặc POSTGRES_URL) is not set in Vercel. Database operations will fail.")
+    console.error("❌ ERROR: No DATABASE_URL or POSTGRES_URL found in Vercel env!")
 }

@@ -22,10 +22,18 @@ export const prisma = globalForPrisma.prisma ?? (() => {
         console.error("❌ CRITICAL: DATABASE_URL is missing in production!")
     }
 
-    const pool = new Pool({ connectionString })
+    // Use a slightly longer timeout and prevent too many idle connections
+    const pool = new Pool({
+        connectionString,
+        connectionTimeoutMillis: 10000, // 10s
+        idleTimeoutMillis: 30000,       // 30s
+        max: 1                          // Limit connections per lambda instance
+    })
+
     const adapter = new PrismaNeon(pool)
     const client = new PrismaClient({ adapter })
 
-    if (env.NODE_ENV !== 'production') globalForPrisma.prisma = client
+    // Cache the client globally to prevent connection leakage across lambda warm starts
+    globalForPrisma.prisma = client
     return client
 })()

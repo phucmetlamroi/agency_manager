@@ -35,9 +35,10 @@ interface WorkspaceCardProps {
         updatedAt: Date
     }
     role: string
+    userGlobalRole: string
 }
 
-export function WorkspaceCard({ workspace, role }: WorkspaceCardProps) {
+export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCardProps) {
     const [isRenaming, setIsRenaming] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
     const [newName, setNewName] = useState(workspace.name)
@@ -80,9 +81,11 @@ export function WorkspaceCard({ workspace, role }: WorkspaceCardProps) {
         }
     }
 
+    const targetPath = userGlobalRole === 'ADMIN' ? `/${workspace.id}/admin` : `/${workspace.id}/dashboard`
+
     return (
         <>
-            <Link href={`/${workspace.id}/dashboard`} className="block group">
+            <Link href={targetPath} className="block group">
                 <Card className="relative overflow-hidden bg-slate-900 border-slate-800 transition-all duration-300 group-hover:border-indigo-500/50 group-hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)] cursor-pointer h-64 flex flex-col justify-end p-5 rounded-xl">
 
                     {/* Simulated Image Background */}
@@ -112,29 +115,31 @@ export function WorkspaceCard({ workspace, role }: WorkspaceCardProps) {
                                     Cập nhật {formatDistanceToNow(new Date(workspace.updatedAt), { addSuffix: true, locale: vi })}
                                 </span>
 
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <div
-                                            className="p-1.5 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
-                                            onClick={(e) => {
-                                                e.preventDefault()
-                                                e.stopPropagation()
-                                            }}
-                                        >
-                                            <MoreHorizontal className="w-4 h-4 text-slate-400" />
-                                        </div>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
-                                        <DropdownMenuItem onClick={handleRename} className="hover:bg-slate-800 focus:bg-slate-800 cursor-pointer">
-                                            <Edit2 className="w-4 h-4 mr-2" /> Đổi tên
-                                        </DropdownMenuItem>
-                                        {role === 'OWNER' && (
-                                            <DropdownMenuItem onClick={handleDelete} className="text-red-400 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer">
-                                                <Trash2 className="w-4 h-4 mr-2" /> Xóa Workspace
+                                {userGlobalRole === 'ADMIN' && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <div
+                                                className="p-1.5 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                                                onClick={(e) => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                }}
+                                            >
+                                                <MoreHorizontal className="w-4 h-4 text-slate-400" />
+                                            </div>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
+                                            <DropdownMenuItem onClick={handleRename} className="hover:bg-slate-800 focus:bg-slate-800 cursor-pointer">
+                                                <Edit2 className="w-4 h-4 mr-2" /> Đổi tên
                                             </DropdownMenuItem>
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                            {role === 'OWNER' && (
+                                                <DropdownMenuItem onClick={handleDelete} className="text-red-400 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer">
+                                                    <Trash2 className="w-4 h-4 mr-2" /> Xóa Workspace
+                                                </DropdownMenuItem>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
                             </div>
                         </div>
                     </div>

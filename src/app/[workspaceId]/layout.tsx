@@ -20,26 +20,9 @@ export default async function WorkspaceLayout({
     const isSystemAdmin = session.user.role === 'ADMIN'
 
     if (!isSystemAdmin) {
-        // Double check against DB for fresh state if session says they are just a user
-        const dbUser = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { role: true }
-        })
-
-        if (dbUser?.role !== 'ADMIN') {
-            // Validate that the user actually has access to this workspace
-            const membership = await prisma.workspaceMember.findFirst({
-                where: {
-                    userId: session.user.id,
-                    workspaceId: workspaceId
-                }
-            })
-
-            if (!membership) {
-                // If they don't have access, or it doesn't exist, send them back to the portal
-                redirect('/workspaces')
-            }
-        }
+        // We no longer restrict entry to workspaces based on membership.
+        // Anyone logged in can enter a workspace to see tasks.
+        // Specific sub-routes (like /admin) still have their own role checks.
     }
 
     // We can inject the workspaceId context down if needed, 

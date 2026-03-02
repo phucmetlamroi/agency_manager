@@ -14,18 +14,19 @@ export default async function WorkspacesPage() {
 
     const { id: userId, username } = session.user
 
-    // Fetch workspaces the user is a member of
-    const memberships = await prisma.workspaceMember.findMany({
-        where: { userId },
-        include: {
-            workspace: true
-        },
+    // Fetch ALL workspaces globally
+    const allWorkspaces = await prisma.workspace.findMany({
         orderBy: {
-            workspace: {
-                createdAt: 'desc'
-            }
+            createdAt: 'desc'
         }
     })
+
+    // Fetch user's specific memberships to determine individual roles (OWNER/MEMBER) inside cards
+    const userMemberships = await prisma.workspaceMember.findMany({
+        where: { userId }
+    })
+
+    const membershipMap = new Map(userMemberships.map(m => [m.workspaceId, m.role]))
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-50 font-sans selection:bg-indigo-500/30">
@@ -72,11 +73,12 @@ export default async function WorkspacesPage() {
 
                 {/* Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {memberships.map((membership) => (
+                    {allWorkspaces.map((ws) => (
                         <WorkspaceCard
-                            key={membership.workspaceId}
-                            workspace={membership.workspace}
-                            role={membership.role}
+                            key={ws.id}
+                            workspace={ws}
+                            role={membershipMap.get(ws.id) || 'MEMBER'}
+                            userGlobalRole={session.user.role}
                         />
                     ))}
 

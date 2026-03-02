@@ -80,7 +80,7 @@ export default async function WorkspacesPage() {
                         />
                     ))}
 
-                    <CreateWorkspaceModal />
+                    {session.user.role === 'ADMIN' && <CreateWorkspaceModal />}
                 </div>
             </main>
         </div>

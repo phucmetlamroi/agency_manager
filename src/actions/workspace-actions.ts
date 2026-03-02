@@ -6,8 +6,8 @@ import { revalidatePath } from 'next/cache'
 
 export async function createWorkspaceAction(formData: FormData) {
     const session = await getSession()
-    if (!session?.user?.id) {
-        return { error: 'Unauthorized' }
+    if (!session?.user?.id || session.user.role !== 'ADMIN') {
+        return { error: 'Chỉ Admin mới có quyền tạo Workspace mới.' }
     }
 
     const name = formData.get('name') as string

@@ -47,11 +47,11 @@ export function getWorkspacePrisma(currentWorkspaceId: string) {
                         }
                     }
 
-                    // 2. CREATE Operations (Inject into `workspace` relation)
+                    // 2. CREATE Operations (Inject into `data`)
                     if (['create'].includes(operation)) {
                         (args as any).data = {
                             ...((args as any).data || {}),
-                            workspace: { connect: { id: currentWorkspaceId } }
+                            workspaceId: currentWorkspaceId
                         }
                     }
 
@@ -79,7 +79,7 @@ export function getWorkspacePrisma(currentWorkspaceId: string) {
 
                             (args as any).create = {
                             ...((args as any).create || {}),
-                            workspace: { connect: { id: currentWorkspaceId } }
+                            workspaceId: currentWorkspaceId
                         }
 
                         // We do NOT inject `workspaceId` into `update` because `where` already constrains it,

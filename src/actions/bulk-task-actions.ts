@@ -2,7 +2,6 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { parseVietnamDate } from '@/lib/date-utils'
 
 type BatchTaskInput = {
@@ -43,17 +42,15 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             assignedAgencyId = assignee?.agencyId || null
         }
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
-
-        // Use transaction to ensure all tasks are created or none
-        await workspacePrisma.$transaction(async (tx) => {
+        // Use standard prisma instead of extension for this complex transaction
+        await prisma.$transaction(async (tx) => {
             for (const title of data.titles) {
                 if (!title.trim()) continue;
 
-                const task = await tx.task.create({
+                await tx.task.create({
                     data: {
                         title: title.trim(),
-                        value: data.wageVND, // This is the 'points' or wage for the user
+                        value: data.wageVND,
                         type: data.type,
                         deadline: deadlineDate,
                         resources: data.resources,
@@ -61,7 +58,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         collectFilesLink: data.collectFilesLink,
                         notes: data.notes,
                         assigneeId: data.assigneeId,
-                        assignedAgencyId: assignedAgencyId, // FIX: Sync with assignee's agency
+                        assignedAgencyId: assignedAgencyId,
                         status: data.assigneeId ? 'Đã nhận task' : 'Đang đợi giao',
 
                         // Financials
@@ -70,6 +67,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         exchangeRate: data.exchangeRate,
                         profitVND: profitVND,
                         clientId: data.clientId,
+                        workspaceId: workspaceId // Manual injection
                     }
                 })
             }
@@ -92,10 +90,10 @@ export async function bulkDeleteTasks(taskIds: string[], workspaceId: string) {
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
-        await workspacePrisma.task.deleteMany({
+        await prisma.task.deleteMany({
             where: {
-                id: { in: taskIds }
+                id: { in: taskIds },
+                workspaceId: workspaceId // Manual isolation
             }
         })
         revalidatePath(`/${workspaceId}/admin/queue`)
@@ -123,11 +121,13 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         if (data.value !== undefined) updateData.value = data.value
         if (data.collectFilesLink !== undefined) updateData.collectFilesLink = data.collectFilesLink
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
-        await workspacePrisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
                 await tx.task.update({
-                    where: { id },
+                    where: {
+                        id,
+                        workspaceId: workspaceId // Manual isolation
+                    },
                     data: updateData
                 })
             }
@@ -190,11 +190,13 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
         }
 
         // Execute Update
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
-        await workspacePrisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
                 await tx.task.update({
-                    where: { id },
+                    where: {
+                        id,
+                        workspaceId: workspaceId // Manual isolation
+                    },
                     data: updateData
                 })
             }

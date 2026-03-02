@@ -70,7 +70,6 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         exchangeRate: data.exchangeRate,
                         profitVND: profitVND,
                         clientId: data.clientId,
-                        workspace: { connect: { id: workspaceId } }
                     }
                 })
             }

@@ -62,8 +62,8 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
                     data: {
                         content: feedbackData.content,
                         type: feedbackData.type,
-                        taskId: id,
-                        projectId: task.projectId
+                        task: { connect: { id: id } },
+                        ...(task.projectId ? { project: { connect: { id: task.projectId } } } : {})
                     }
                 })
             }

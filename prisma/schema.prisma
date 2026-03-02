@@ -24,6 +24,7 @@ model Workspace {
   bonuses     MonthlyBonus[]
   payrollLocks PayrollLock[]
   metrics     PerformanceMetric[]
+  feedbacks   Feedback[]
 
   @@index([name])
 }
@@ -195,15 +196,19 @@ model Project {
 }
 
 model Feedback {
-  id        Int            @id @default(autoincrement())
-  content   String
-  projectId Int?
-  severity  Int            @default(1)
-  createdAt DateTime       @default(now())
-  taskId    String?
-  type      FeedbackSource @default(CLIENT)
-  project   Project?       @relation(fields: [projectId], references: [id])
-  task      Task?          @relation(fields: [taskId], references: [id])
+  id          Int            @id @default(autoincrement())
+  content     String
+  projectId   Int?
+  severity    Int            @default(1)
+  createdAt   DateTime       @default(now())
+  taskId      String?
+  workspaceId String?
+  type        FeedbackSource @default(CLIENT)
+  project     Project?       @relation(fields: [projectId], references: [id])
+  task        Task?          @relation(fields: [taskId], references: [id])
+  workspace   Workspace?     @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
 }
 
 model PerformanceMetric {

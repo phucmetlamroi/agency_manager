@@ -90,5 +90,5 @@ export function getWorkspacePrisma(currentWorkspaceId: string) {
                 },
             },
         },
-    })
+    }) as unknown as PrismaClient
 }

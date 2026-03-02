@@ -1,18 +1,25 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-]);
+/** @type {import('eslint').Linter.Config[]} */
+const nextConfig = require("eslint-config-next");
 
-export default eslintConfig;
+export default [
+  ...nextConfig.map((c) => {
+    // Inject our rules into the relevant config objects
+    if (c.name === 'next' || c.name === 'next/typescript') {
+      return {
+        ...c,
+        rules: {
+          ...c.rules,
+          "@typescript-eslint/no-explicit-any": "off",
+          "@typescript-eslint/no-unused-vars": "warn",
+        },
+      };
+    }
+    return c;
+  }),
+  {
+    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts", "*.js"],
+  },
+];

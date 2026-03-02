@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { calculatePerformance } from '@/actions/performance-actions'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import NoSSR from '@/components/ui/NoSSR'
 
 type Metric = {
     id: string
@@ -109,21 +110,23 @@ export default function PerformanceDashboardClient({ initialData, month, year, w
                 <div className="glass-panel p-6 flex flex-col">
                     <h3 className="text-lg font-bold mb-4 text-gray-300">📊 Biểu đồ Doanh thu</h3>
                     <div className="flex-1 min-h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                <XAxis dataKey="name" stroke="#666" fontSize={12} tick={{ fill: '#999' }} />
-                                <Tooltip
-                                    contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '8px' }}
-                                    formatter={(value: number) => [`${value.toLocaleString()} đ`, 'Doanh thu']}
-                                />
-                                <Bar dataKey="revenue" fill="#60a5fa" radius={[4, 4, 0, 0]}>
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.revenue > 10000000 ? '#a855f7' : '#60a5fa'} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+                        <NoSSR>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                    <XAxis dataKey="name" stroke="#666" fontSize={12} tick={{ fill: '#999' }} />
+                                    <Tooltip
+                                        contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '8px' }}
+                                        formatter={(value: number) => [`${value.toLocaleString()} đ`, 'Doanh thu']}
+                                    />
+                                    <Bar dataKey="revenue" fill="#60a5fa" radius={[4, 4, 0, 0]}>
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.revenue > 10000000 ? '#a855f7' : '#60a5fa'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </NoSSR>
                     </div>
                 </div>
             </div>

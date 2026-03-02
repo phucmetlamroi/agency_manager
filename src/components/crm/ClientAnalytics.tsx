@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import NoSSR from '@/components/ui/NoSSR'
 import { InvoiceModal } from '@/components/invoice/InvoiceModal'
 import { FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -138,28 +139,30 @@ export default function ClientAnalytics({ client, distribution, workspaceId }: {
                     <h3 className="text-lg font-bold mb-4 text-gray-300">📊 Workload Distribution</h3>
                     {distribution.length > 0 ? (
                         <div className="flex-1 min-h-[250px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={distribution}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                    >
-                                        {distribution.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        contentStyle={{ background: '#1a1a1a', border: 'none', borderRadius: '8px' }}
-                                        itemStyle={{ color: 'white' }}
-                                    />
-                                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                                </PieChart>
-                            </ResponsiveContainer>
+                            <NoSSR>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={distribution}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={60}
+                                            outerRadius={80}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                        >
+                                            {distribution.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip
+                                            contentStyle={{ background: '#1a1a1a', border: 'none', borderRadius: '8px' }}
+                                            itemStyle={{ color: 'white' }}
+                                        />
+                                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </NoSSR>
                         </div>
                     ) : (
                         <div className="flex-1 flex items-center justify-center text-gray-500 italic">

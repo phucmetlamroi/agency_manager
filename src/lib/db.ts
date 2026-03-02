@@ -14,7 +14,6 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 export const prisma = globalForPrisma.prisma ?? (() => {
-    // Only initialize pool if we have a connection string
     const connectionString = env.DATABASE_URL
     const isPlaceholder = connectionString === "placeholder_url_replace_me"
 
@@ -22,18 +21,22 @@ export const prisma = globalForPrisma.prisma ?? (() => {
         console.error("❌ CRITICAL: DATABASE_URL is missing in production!")
     }
 
-    // Use a slightly longer timeout and prevent too many idle connections
     const pool = new Pool({
         connectionString,
-        connectionTimeoutMillis: 10000, // 10s
-        idleTimeoutMillis: 30000,       // 30s
-        max: 1                          // Limit connections per lambda instance
+        connectionTimeoutMillis: 15000, // 15s for extra stability
+        idleTimeoutMillis: 10000,
+        max: 5, // Allow small pooling
     })
 
-    const adapter = new PrismaNeon(pool)
-    const client = new PrismaClient({ adapter })
+    // Error handler to prevent pool from crashing process
+    pool.on('error', (err) => console.error('Neon Pool Error', err))
 
-    // Cache the client globally to prevent connection leakage across lambda warm starts
+    const adapter = new PrismaNeon(pool)
+    const client = new PrismaClient({
+        adapter,
+        log: env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
+    })
+
     globalForPrisma.prisma = client
     return client
 })()

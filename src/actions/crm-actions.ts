@@ -124,7 +124,7 @@ export async function createFeedback(data: { projectId: number, content: string,
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         await workspacePrisma.feedback.create({
             data: {
-                project: { connect: { id: data.projectId } },
+                projectId: data.projectId,
                 content: data.content,
                 type: data.type,
                 severity: data.severity

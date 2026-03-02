@@ -130,12 +130,13 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         // 3. Fetch all users with completed tasks this month
         const users = await workspacePrisma.user.findMany({
             where: {
-                role: { not: 'ADMIN' }, // Exclude all admin accounts from bonus
-                username: { notIn: ['admin', 'Bảo Phúc', 'Daniel Hee'] } // Specifically exclude these usernames
+                role: { not: 'ADMIN' }, // Exclude generic ADMIN role if desired
+                username: { not: 'admin' } // Only exclude the system 'admin' account
             },
             include: {
                 tasks: {
                     where: {
+                        workspaceId, // CRITICAL: Explicit filter
                         status: 'Hoàn tất',
                         updatedAt: {
                             gte: startOfMonth,

@@ -70,6 +70,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         exchangeRate: data.exchangeRate,
                         profitVND: profitVND,
                         clientId: data.clientId,
+                        workspace: { connect: { id: workspaceId } }
                     }
                 })
             }
@@ -124,11 +125,13 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         if (data.collectFilesLink !== undefined) updateData.collectFilesLink = data.collectFilesLink
 
         const workspacePrisma = getWorkspacePrisma(workspaceId)
-        await workspacePrisma.task.updateMany({
-            where: {
-                id: { in: taskIds }
-            },
-            data: updateData
+        await workspacePrisma.$transaction(async (tx) => {
+            for (const id of taskIds) {
+                await tx.task.update({
+                    where: { id },
+                    data: updateData
+                })
+            }
         })
 
         revalidatePath(`/${workspaceId}/admin/queue`)
@@ -190,10 +193,12 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
         // Execute Update
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         await workspacePrisma.$transaction(async (tx) => {
-            await tx.task.updateMany({
-                where: { id: { in: taskIds } },
-                data: updateData
-            })
+            for (const id of taskIds) {
+                await tx.task.update({
+                    where: { id },
+                    data: updateData
+                })
+            }
         })
 
         revalidatePath(`/${workspaceId}/admin/queue`)

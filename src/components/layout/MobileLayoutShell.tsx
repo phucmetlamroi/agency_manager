@@ -89,6 +89,9 @@ export default function MobileLayoutShell({
                             <Link href={`/${workspaceId}/dashboard/profile`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
                                 <span>👤</span> Hồ sơ cá nhân
                             </Link>
+                            <Link href="/workspaces" onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors flex items-center gap-3 border border-blue-500/20">
+                                <span>🔄</span> Đổi Workspace
+                            </Link>
                             <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
                                 <span>🔔</span> Thông báo
                             </button>

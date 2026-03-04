@@ -6,6 +6,7 @@ import { isMobileDevice } from '@/lib/device'
 import { serializeDecimal } from '@/lib/serialization'
 import { UserRole } from '@prisma/client'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { VideoDownloader } from '@/components/video/VideoDownloader'
 
 export const dynamic = 'force-dynamic'
 
@@ -135,16 +136,11 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                     </div>
                 </div>
 
-                <div className="glass-panel" style={{ padding: '2rem', background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(236, 72, 153, 0.15))', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
-                    <h4 style={{ color: '#e9d5ff', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>
-                        LỜI NHẮN VŨ TRỤ 🌌
-                    </h4>
-                    <div style={{ fontSize: '1.25rem', lineHeight: '1.6', fontWeight: '500', color: '#fff' }}>
-                        <span style={{ fontSize: '2rem', marginRight: '0.5rem' }}>{emoji}</span>
-                        {comparisonMsg}
-                    </div>
+                <div className="glass-panel w-full" style={{ padding: '0', overflow: 'hidden' }}>
+                    <VideoDownloader />
                 </div>
             </div>
+
 
             <h3 className="title-gradient" style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Danh sách Task của tôi</h3>
 

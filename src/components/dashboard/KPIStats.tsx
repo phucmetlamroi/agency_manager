@@ -1,6 +1,7 @@
 "use client"
 
 import { Card, AreaChart, Metric, Text, Flex, Grid, Color } from "@tremor/react"
+import { VideoDownloader } from "@/components/video/VideoDownloader"
 
 interface KPIStatsProps {
     tasks: any[]
@@ -67,17 +68,9 @@ export function KPIStats({ tasks }: KPIStatsProps) {
                 </Flex>
             </Card>
 
-            <Card decoration="top" decorationColor="cyan" className="glass-panel border-none ring-0 bg-transparent p-6">
-                <Flex justifyContent="start" alignItems="baseline" className="space-x-1">
-                    <Metric className="text-white text-3xl font-bold">{inProgressTasks}</Metric>
-                    <Text className="text-tremor-content-subtle">Active Now</Text>
-                </Flex>
-                <div className="mt-4 flex -space-x-2 overflow-hidden">
-                    {[1, 2, 3, 4].map(i => (
-                        <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-background bg-zinc-800 flex items-center justify-center text-xs">U{i}</div>
-                    ))}
-                </div>
-            </Card>
+            <div className="h-full">
+                <VideoDownloader />
+            </div>
         </Grid>
     )
 }

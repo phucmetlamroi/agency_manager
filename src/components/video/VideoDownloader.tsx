@@ -29,8 +29,15 @@ export function VideoDownloader() {
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.error || "Lỗi khi tải video")
+                let errorMessage = "Lỗi khi tải video"
+                try {
+                    const errorData = await response.json()
+                    errorMessage = errorData.error || errorMessage
+                } catch (e) {
+                    // If not JSON, use status text or a generic message
+                    errorMessage = `Server Error: ${response.status} ${response.statusText}`
+                }
+                throw new Error(errorMessage)
             }
 
             toast.loading("Bắt đầu stream dữ liệu về máy...", { id: "download-toast" })

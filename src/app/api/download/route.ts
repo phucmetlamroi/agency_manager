@@ -49,16 +49,23 @@ export async function POST(req: Request) {
         }
 
         // 4. Start the actual download stream
-        // We use child process directly to pipe stdout
-        const ytDlpProcess = ytDlp.exec(url, {
-            format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            mergeOutputFormat: 'mp4',
-            noWarnings: true,
-            callHome: false,
-            noCheckCertificates: true,
-            // Pipe output to stdout
-            output: '-',
-        }) as ChildProcessWithoutNullStreams;
+        // Simplified format to avoid merging (which requires ffmpeg)
+        // 'best[ext=mp4]' is usually a single file with both video and audio.
+        console.log(`Starting download for: ${url}`);
+
+        let ytDlpProcess: ChildProcessWithoutNullStreams;
+        try {
+            ytDlpProcess = ytDlp.exec(url, {
+                format: 'best[ext=mp4]/best',
+                noWarnings: true,
+                callHome: false,
+                noCheckCertificates: true,
+                output: '-',
+            }) as ChildProcessWithoutNullStreams;
+        } catch (e: any) {
+            console.error('Failed to spawn yt-dlp:', e);
+            return NextResponse.json({ error: `Failed to start downloader: ${e.message}` }, { status: 500 });
+        }
 
         // Create a ReadableStream from the child process stdout
         const stream = new ReadableStream({
@@ -68,15 +75,28 @@ export async function POST(req: Request) {
                 });
 
                 ytDlpProcess.stdout.on('end', () => {
+                    console.log('Download stream ended successfully');
                     controller.close();
+                });
+
+                ytDlpProcess.stderr.on('data', (data) => {
+                    console.error(`yt-dlp stderr: ${data}`);
                 });
 
                 ytDlpProcess.on('error', (err) => {
                     console.error('yt-dlp process error:', err);
-                    controller.error(err);
+                    try { controller.error(err); } catch (e) { }
+                });
+
+                ytDlpProcess.on('exit', (code) => {
+                    if (code !== 0) {
+                        console.error(`yt-dlp exited with code ${code}`);
+                        // Note: we can't easily send an error to the client after headers are sent
+                    }
                 });
             },
             cancel() {
+                console.log('Download stream cancelled by client');
                 ytDlpProcess.kill();
             }
         });

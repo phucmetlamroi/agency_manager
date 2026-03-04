@@ -11,6 +11,19 @@ const downloadSchema = z.object({
     url: z.string().url(),
 });
 
+export async function GET() {
+    try {
+        const version = await ytDlp('--version', {
+            noWarnings: true,
+            callHome: false,
+            noCheckCertificates: true,
+        });
+        return NextResponse.json({ status: 'ok', version });
+    } catch (error: any) {
+        return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
+    }
+}
+
 export async function POST(req: Request) {
     try {
         // 1. Authentication Check

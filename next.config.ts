@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
       }
     ],
   },
+  serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "youtube-dl-exec"],
 };
 
 export default nextConfig;

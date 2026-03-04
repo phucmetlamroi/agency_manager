@@ -25,6 +25,7 @@ model Workspace {
   payrollLocks PayrollLock[]
   metrics     PerformanceMetric[]
   feedbacks   Feedback[]
+  mediaTasks  MediaTask[]
 
   @@index([name])
 }
@@ -65,6 +66,7 @@ model User {
   payrolls          Payroll[]
   metrics           PerformanceMetric[]
   tasks             Task[]
+  mediaTasks        MediaTask[]
   agency            Agency?             @relation("AgencyMembers", fields: [agencyId], references: [id])
   workspaces        WorkspaceMember[]
 }
@@ -330,4 +332,29 @@ enum InvoiceStatus {
 enum InvoiceTaskStatus {
   UNBILLED
   INVOICED
+}
+
+enum MediaTaskStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model MediaTask {
+  id              String          @id @default(uuid())
+  workspaceId     String
+  requestedById   String
+  originalUrl     String          @db.Text
+  platform        String
+  fileSizeBytes   BigInt?
+  formatType      String
+  status          MediaTaskStatus @default(PENDING)
+  createdAt       DateTime        @default(now())
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  requestedBy     User            @relation(fields: [requestedById], references: [id])
+
+  @@index([workspaceId, status])
+  @@index([requestedById, status])
 }

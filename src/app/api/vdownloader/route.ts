@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { z } from 'zod';
 import ytDlp from 'youtube-dl-exec';
 import { ChildProcessWithoutNullStreams } from 'child_process';
+const ffmpeg = require('@ffmpeg-installer/ffmpeg');
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,6 @@ export async function POST(req: Request) {
 
         // 2. Validate Input
         const body = await req.json();
-        console.log('Download API: Body:', body);
         const result = downloadSchema.safeParse(body);
 
         if (!result.success) {
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
                 noWarnings: true,
                 callHome: false,
                 noCheckCertificates: true,
+                ffmpegLocation: ffmpeg.path,
             });
             if (typeof metadata === 'object' && metadata !== null && 'title' in metadata) {
                 const title = String((metadata as any).title).replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -53,15 +54,18 @@ export async function POST(req: Request) {
         }
 
         // 4. Start the actual download stream
-        console.log(`Download API: Starting raw stream download for: ${url}`);
+        // Now with high quality merge support thanks to FFmpeg binary
+        console.log(`Download API: Starting high-quality download with FFmpeg for: ${url}`);
 
         let ytDlpProcess: ChildProcessWithoutNullStreams;
         try {
             ytDlpProcess = ytDlp.exec(url, {
-                format: 'best[ext=mp4]/best',
+                format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                mergeOutputFormat: 'mp4',
                 noWarnings: true,
                 callHome: false,
                 noCheckCertificates: true,
+                ffmpegLocation: ffmpeg.path,
                 output: '-',
             }) as ChildProcessWithoutNullStreams;
         } catch (e: any) {
@@ -81,7 +85,6 @@ export async function POST(req: Request) {
                 });
 
                 ytDlpProcess.stderr.on('data', (data) => {
-                    // Log errors locally but don't stop the stream
                     console.error(`yt-dlp stderr: ${data}`);
                 });
 

@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import { PlayCircle, Download, FileAudio, FileVideo, UploadCloud, CheckCircle2 } from "lucide-react"
 
 export function VideoDownloader() {
+    const params = useParams()
+    const workspaceId = params?.workspaceId as string
     const [url, setUrl] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [isDragging, setIsDragging] = useState(false)
@@ -32,7 +35,7 @@ export function VideoDownloader() {
             const response = await fetch('/api/vdownloader', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: targetUrl, formatType: targetFormat })
+                body: JSON.stringify({ url: targetUrl, formatType: targetFormat, workspaceId })
             })
 
             if (!response.ok) {

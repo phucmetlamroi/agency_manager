@@ -1,12 +1,15 @@
 "use client"
 
 import { useState } from "react"
+import { useParams } from "next/navigation"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Download, CloudDownload, FileVideo, FileAudio, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 
 export function AdminVideoDownloader() {
+    const params = useParams()
+    const workspaceId = params?.workspaceId as string
     const [open, setOpen] = useState(false)
     const [url, setUrl] = useState("")
     const [isLoading, setIsLoading] = useState(false)
@@ -29,7 +32,7 @@ export function AdminVideoDownloader() {
             const response = await fetch('/api/vdownloader', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, formatType: format })
+                body: JSON.stringify({ url, formatType: format, workspaceId })
             })
 
             if (!response.ok) {
@@ -129,8 +132,8 @@ export function AdminVideoDownloader() {
                                     <button
                                         onClick={() => setFormat('best')}
                                         className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all border ${format === 'best'
-                                                ? 'bg-zinc-800 text-zinc-100 border-white/10 shadow-sm'
-                                                : 'bg-transparent text-zinc-500 hover:text-zinc-300 border-transparent hover:bg-white/5'
+                                            ? 'bg-zinc-800 text-zinc-100 border-white/10 shadow-sm'
+                                            : 'bg-transparent text-zinc-500 hover:text-zinc-300 border-transparent hover:bg-white/5'
                                             }`}
                                     >
                                         <FileVideo className="w-4 h-4" /> Video Cao
@@ -138,8 +141,8 @@ export function AdminVideoDownloader() {
                                     <button
                                         onClick={() => setFormat('audio')}
                                         className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all border ${format === 'audio'
-                                                ? 'bg-zinc-800 text-zinc-100 border-white/10 shadow-sm'
-                                                : 'bg-transparent text-zinc-500 hover:text-zinc-300 border-transparent hover:bg-white/5'
+                                            ? 'bg-zinc-800 text-zinc-100 border-white/10 shadow-sm'
+                                            : 'bg-transparent text-zinc-500 hover:text-zinc-300 border-transparent hover:bg-white/5'
                                             }`}
                                     >
                                         <FileAudio className="w-4 h-4" /> Bản MP3

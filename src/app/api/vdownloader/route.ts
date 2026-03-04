@@ -15,6 +15,7 @@ export const runtime = 'nodejs';
 const downloadSchema = z.object({
     url: z.string().url(),
     formatType: z.string().default('best'), // 'best' or 'audio'
+    workspaceId: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -27,13 +28,6 @@ export async function POST(req: Request) {
         }
 
         const userId = session.user.id;
-        const workspaceId = session.user.workspaces?.[0]?.workspaceId; // Simplification, get active workspace
-
-        if (!workspaceId) {
-            return NextResponse.json({ error: 'No active workspace found.' }, { status: 400 });
-        }
-
-        // 2. Validate Input
         const body = await req.json();
         const result = downloadSchema.safeParse(body);
 
@@ -41,7 +35,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Invalid config provided.' }, { status: 400 });
         }
 
-        const { url, formatType } = result.data;
+        const { url, formatType, workspaceId: bodyWorkspaceId } = result.data;
+
+        // Try to get workspaceId from body, then session (original fallback), then DB if needed
+        let workspaceId = bodyWorkspaceId || (session.user as any).workspaces?.[0]?.workspaceId;
+
+        if (!workspaceId) {
+            // Last resort: query DB
+            const userWorkspace = await prisma.workspaceMember.findFirst({
+                where: { userId }
+            });
+            workspaceId = userWorkspace?.workspaceId;
+        }
+
+        if (!workspaceId) {
+            return NextResponse.json({ error: 'No active workspace found. Please refresh or provide workspace context.' }, { status: 400 });
+        }
 
         // 3. Concurrency Lock (Max 2 active processing tasks per user)
         const activeTasks = await prisma.mediaTask.count({

@@ -1,51 +1,42 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { z } from 'zod';
-
 import ytDlp from 'youtube-dl-exec';
 import { ChildProcessWithoutNullStreams } from 'child_process';
 
-export const maxDuration = 300; // 5 minutes (Vercel Pro limit)
+export const maxDuration = 300;
+export const dynamic = 'force-dynamic';
 
 const downloadSchema = z.object({
     url: z.string().url(),
 });
 
-export async function GET() {
-    try {
-        const version = await ytDlp('--version', {
-            noWarnings: true,
-            callHome: false,
-            noCheckCertificates: true,
-        });
-        return NextResponse.json({ status: 'ok', version });
-    } catch (error: any) {
-        return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
-    }
-}
-
 export async function POST(req: Request) {
+    console.log('--- Download API: POST Request Received ---');
     try {
         // 1. Authentication Check
         const session = await getSession();
         if (!session || !session.user) {
+            console.error('Download API: Unauthorized');
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         // 2. Validate Input
         const body = await req.json();
+        console.log('Download API: Body:', body);
         const result = downloadSchema.safeParse(body);
 
         if (!result.success) {
+            console.error('Download API: Invalid URL:', result.error);
             return NextResponse.json({ error: 'Invalid URL provided.' }, { status: 400 });
         }
 
         const { url } = result.data;
 
-        // 3. Extract Metadata (to get filename) - Optional, but good for UX
-        // We will do a fast dump-json first to get the title
+        // 3. Extract Metadata
         let filename = 'downloaded_video.mp4';
         try {
+            console.log('Download API: Extracting metadata for:', url);
             const metadata = await ytDlp(url, {
                 dumpJson: true,
                 noWarnings: true,
@@ -53,18 +44,16 @@ export async function POST(req: Request) {
                 noCheckCertificates: true,
             });
             if (typeof metadata === 'object' && metadata !== null && 'title' in metadata) {
-                // Sanitize filename
                 const title = String((metadata as any).title).replace(/[^a-z0-9]/gi, '_').toLowerCase();
                 filename = `${title}.mp4`;
+                console.log('Download API: Filename determined:', filename);
             }
-        } catch (e) {
-            console.warn("Could not fetch metadata for filename, using default.", e);
+        } catch (e: any) {
+            console.warn("Download API: Could not fetch metadata:", e.message);
         }
 
         // 4. Start the actual download stream
-        // Simplified format to avoid merging (which requires ffmpeg)
-        // 'best[ext=mp4]' is usually a single file with both video and audio.
-        console.log(`Starting download for: ${url}`);
+        console.log(`Download API: Starting raw stream download for: ${url}`);
 
         let ytDlpProcess: ChildProcessWithoutNullStreams;
         try {
@@ -76,11 +65,10 @@ export async function POST(req: Request) {
                 output: '-',
             }) as ChildProcessWithoutNullStreams;
         } catch (e: any) {
-            console.error('Failed to spawn yt-dlp:', e);
+            console.error('Download API: Failed to spawn yt-dlp:', e);
             return NextResponse.json({ error: `Failed to start downloader: ${e.message}` }, { status: 500 });
         }
 
-        // Create a ReadableStream from the child process stdout
         const stream = new ReadableStream({
             start(controller) {
                 ytDlpProcess.stdout.on('data', (chunk) => {
@@ -88,43 +76,41 @@ export async function POST(req: Request) {
                 });
 
                 ytDlpProcess.stdout.on('end', () => {
-                    console.log('Download stream ended successfully');
+                    console.log('Download API: Stream ended');
                     controller.close();
                 });
 
                 ytDlpProcess.stderr.on('data', (data) => {
+                    // Log errors locally but don't stop the stream
                     console.error(`yt-dlp stderr: ${data}`);
                 });
 
                 ytDlpProcess.on('error', (err) => {
-                    console.error('yt-dlp process error:', err);
+                    console.error('Download API: yt-dlp error:', err);
                     try { controller.error(err); } catch (e) { }
                 });
 
                 ytDlpProcess.on('exit', (code) => {
                     if (code !== 0) {
-                        console.error(`yt-dlp exited with code ${code}`);
-                        // Note: we can't easily send an error to the client after headers are sent
+                        console.error(`Download API: yt-dlp exited with code ${code}`);
                     }
                 });
             },
             cancel() {
-                console.log('Download stream cancelled by client');
+                console.log('Download API: Stream cancelled');
                 ytDlpProcess.kill();
             }
         });
 
-        // 5. Return the stream
         return new Response(stream, {
             headers: {
                 'Content-Disposition': `attachment; filename="${filename}"`,
                 'Content-Type': 'video/mp4',
-                // Tricking browser into downloading by not setting exact length if unknown
             }
         });
 
-    } catch (error) {
-        console.error('Download API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    } catch (error: any) {
+        console.error('Download API: Global Catch:', error);
+        return NextResponse.json({ error: `Internal Error: ${error.message}` }, { status: 500 });
     }
 }

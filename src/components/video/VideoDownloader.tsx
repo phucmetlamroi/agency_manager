@@ -20,7 +20,7 @@ export function VideoDownloader() {
             setIsLoading(true)
             toast.loading("Đang phân tích URL và khởi tạo luồng tải...", { id: "download-toast" })
 
-            const response = await fetch('/api/download', {
+            const response = await fetch('/api/vdownloader', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

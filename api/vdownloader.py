@@ -8,6 +8,27 @@ import subprocess
 def sanitize_filename(name):
     return re.sub(r'(?u)[^-\w. ]', '', name).strip()
 
+import requests
+
+def get_video_id(url):
+    # Quick regex to extract video ID
+    match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", url)
+    return match.group(1) if match else None
+
+def get_video_title_via_api(video_id):
+    api_key = os.environ.get('YOUTUBE_API_KEY')
+    if not api_key or not video_id:
+        return None
+    try:
+        url = f"https://www.googleapis.com/youtube/v3/videos?id={video_id}&key={api_key}&part=snippet"
+        resp = requests.get(url, timeout=5)
+        data = resp.json()
+        if data.get('items'):
+            return data['items'][0]['snippet']['title']
+    except:
+        pass
+    return None
+
 def get_cookie_path():
     cookies_data = os.environ.get('YOUTUBE_COOKIES')
     if cookies_data:
@@ -67,11 +88,18 @@ class handler(BaseHTTPRequestHandler):
             })
 
         try:
-            # 1. Extract metadata safely
-            with yt_dlp.YoutubeDL({'quiet': True, 'noplaylist': True}) as ydl:
-                info = ydl.extract_info(video_url, download=False)
-                raw_title = info.get('title', 'video')
-                final_filename = sanitize_filename(raw_title)
+            # 1. Extract metadata - Try API Key first for 100% accuracy and speed
+            video_id = get_video_id(video_url)
+            api_title = get_video_title_via_api(video_id)
+            
+            if api_title:
+                final_filename = sanitize_filename(api_title)
+            else:
+                # Fallback to yt-dlp if API key fails or isn't provided
+                with yt_dlp.YoutubeDL({'quiet': True, 'noplaylist': True, 'cookiefile': cookie_path} if cookie_path else {'quiet': True, 'noplaylist': True}) as ydl:
+                    info = ydl.extract_info(video_url, download=False)
+                    raw_title = info.get('title', 'video')
+                    final_filename = sanitize_filename(raw_title)
 
             # 2. Send headers early
             self.send_response(200)

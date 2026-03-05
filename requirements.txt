@@ -1,2 +1,3 @@
 pg8000
 yt-dlp
+requests

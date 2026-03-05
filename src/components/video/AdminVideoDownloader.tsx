@@ -29,8 +29,8 @@ export function AdminVideoDownloader() {
             setIsLoading(true)
             toast.loading("Đang khởi tạo luồng tải trực tiếp...", { id: "admin-download" })
 
-            // Create the download URL for GET request
-            const downloadUrl = `/api/vdownloader?url=${encodeURIComponent(url)}&formatType=${format}${workspaceId ? `&workspaceId=${workspaceId}` : ''}`;
+            // Create the download URL for GET request - Pointing to the new Python implementation
+            const downloadUrl = `/api/vdownloader.py?url=${encodeURIComponent(url)}&formatType=${format}${workspaceId ? `&workspaceId=${workspaceId}` : ''}`;
 
             // Trigger native browser download
             // This is better than fetch + blob because it shows native progress bar

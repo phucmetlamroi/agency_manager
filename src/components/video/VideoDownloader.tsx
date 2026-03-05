@@ -32,7 +32,7 @@ export function VideoDownloader() {
             setIsLoading(true)
             toast.loading("Đang chuẩn bị luồng tải trực tiếp...", { id: "download-toast" })
 
-            const downloadUrl = `/api/vdownloader?url=${encodeURIComponent(targetUrl)}&formatType=${targetFormat}${workspaceId ? `&workspaceId=${workspaceId}` : ''}`;
+            const downloadUrl = `/api/vdownloader.py?url=${encodeURIComponent(targetUrl)}&formatType=${targetFormat}${workspaceId ? `&workspaceId=${workspaceId}` : ''}`;
 
             const link = document.createElement('a');
             link.href = downloadUrl;

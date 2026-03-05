@@ -43,10 +43,42 @@ import json
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        cookie_path = get_cookie_path()
         parsed_path = urllib.parse.urlparse(self.path)
         params = parse_qs(parsed_path.query)
         
+        is_diagnostic = params.get('diagnostic', ['false'])[0] == 'true'
+        
+        # 0. Diagnostic Mode
+        if is_diagnostic:
+            try:
+                import subprocess
+                ffmpeg_v = "Not Found"
+                try:
+                    ffmpeg_v = subprocess.check_output(["ffmpeg", "-version"]).decode().split('\n')[0]
+                except:
+                    # Try to find static_ffmpeg if installed
+                    try:
+                        from static_ffmpeg import run
+                        ffmpeg_v = "static_ffmpeg available"
+                    except: pass
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                diag = {
+                    "ffmpeg": ffmpeg_v,
+                    "python": os.sys.version,
+                    "env": dict(os.environ),
+                    "cwd": os.getcwd()
+                }
+                self.wfile.write(json.dumps(diag, indent=2).encode())
+                return
+            except Exception as e:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(str(e).encode())
+                return
+
         video_url = params.get('url', [None])[0]
         format_type = params.get('formatType', ['best'])[0]
         
@@ -56,10 +88,24 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(b"Error: Missing url parameter")
             return
 
+        cookie_path = get_cookie_path()
         final_filename = "download"
         extension = "mp3" if format_type == "audio" else "mp4"
 
-        # Common options for both metadata and download
+        # Try to find ffmpeg path for yt-dlp
+        ffmpeg_path = None
+        try:
+            import subprocess
+            ffmpeg_path = subprocess.check_output(["which", "ffmpeg"]).decode().strip()
+        except:
+            # Fallback to static_ffmpeg context
+            try:
+                from static_ffmpeg import run
+                # In some envs, we might need to manually set it
+                pass
+            except: pass
+
+        # Common options
         common_ydl_opts = {
             'quiet': True,
             'no_warnings': True,
@@ -76,15 +122,14 @@ class handler(BaseHTTPRequestHandler):
         if cookie_path:
             common_ydl_opts['cookiefile'] = cookie_path
 
-        # Specific format for streaming - MUST use single-file formats because Vercel lacks FFmpeg for merging
-        # for extra safety, we prefer mp4 but allow any single-file format
+        # Enhanced format selection: 22(720p mp4) and 18(360p mp4) are safe single-file fallbacks
         if format_type == 'audio':
             stream_format = 'bestaudio/best'
         else:
-            stream_format = 'best[vcodec!=none][acodec!=none]/best'
+            stream_format = '22/18/best[vcodec!=none][acodec!=none]/best'
 
         try:
-            # 1. Extract metadata - Try API Key first, then library with bypass configs
+            # 1. Extract metadata
             video_id = get_video_id(video_url)
             api_title = get_video_title_via_api(video_id)
             
@@ -96,17 +141,14 @@ class handler(BaseHTTPRequestHandler):
                     raw_title = info.get('title', 'video')
                     final_filename = sanitize_filename(raw_title)
 
-            # 2. Send headers early
+            # 2. Send headers
             self.send_response(200)
             self.send_header('Content-Type', 'audio/mpeg' if format_type == 'audio' else 'video/mp4')
             self.send_header('Content-Disposition', f'attachment; filename="{final_filename}.{extension}"')
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
 
-            # 3. Stream data
-            # Since yt-dlp library doesn't easily return a stream for stdout in memory without complex wrappers,
-            # we fallback to a more robust subprocess call but with the extracted title
-            
+            # 3. Stream data using subprocess for maximum stability
             cmd = [
                 "yt-dlp",
                 "-o", "-",
@@ -125,29 +167,22 @@ class handler(BaseHTTPRequestHandler):
             if format_type == 'audio':
                 cmd.extend(["--extract-audio", "--audio-format", "mp3"])
 
-            import subprocess
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
-            # Use buffer to send data
             try:
                 for chunk in iter(lambda: process.stdout.read(128 * 1024), b''):
                     self.wfile.write(chunk)
             except (ConnectionResetError, BrokenPipeError):
-                # Client disconnected
                 pass
             finally:
                 process.terminate()
                 process.wait()
 
         except Exception as e:
-            # If we already sent headers (200), we can't change to 500
-            # Just log it or write to stream if possible
-            if not self.wfile.closed:
+            if not getattr(self, 'wfile_closed', False):
                 try: 
-                    # If this happens before headers, send 500
                     self.send_response(500)
                     self.send_header('Content-type', 'text/plain')
                     self.end_headers()
                     self.wfile.write(f"Server Error: {str(e)}".encode())
-                except:
-                    pass
+                except: pass

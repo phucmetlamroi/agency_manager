@@ -119,13 +119,13 @@ class handler(BaseHTTPRequestHandler):
         if cookie_path:
             common_ydl_opts['cookiefile'] = cookie_path
 
-        # Enhanced format selection: 
-        # If FFmpeg is found (via static-ffmpeg), we can merge high-quality streams.
-        # Otherwise, 'best' will find a single-file combined stream.
+        # ULTIMATE STABILITY: Force single-file formats (progressive download)
+        # 22 = 720p MP4 (Combined), 18 = 360p MP4 (Combined)
+        # We prefer these because they NEVER require FFmpeg to merge.
         if format_type == 'audio':
             stream_format = 'bestaudio/best'
         else:
-            stream_format = 'bestvideo+bestaudio/best'
+            stream_format = '22/18/best[vcodec!=none][acodec!=none]/best'
 
         try:
             # 1. Extract metadata
@@ -147,7 +147,7 @@ class handler(BaseHTTPRequestHandler):
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
 
-            # 3. Stream data using subprocess for maximum stability
+            # 3. Stream data using subprocess
             cmd = [
                 "yt-dlp",
                 "-o", "-",
@@ -169,13 +169,20 @@ class handler(BaseHTTPRequestHandler):
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
             try:
-                for chunk in iter(lambda: process.stdout.read(128 * 1024), b''):
-                    self.wfile.write(chunk)
+                # Use a larger chunk size for efficiency
+                for chunk in iter(lambda: process.stdout.read(256 * 1024), b''):
+                    if chunk:
+                        self.wfile.write(chunk)
+                    else:
+                        break
             except (ConnectionResetError, BrokenPipeError):
                 pass
             finally:
-                process.terminate()
-                process.wait()
+                try:
+                    process.terminate()
+                    process.wait(timeout=2)
+                except:
+                    process.kill()
 
         except Exception as e:
             if not getattr(self, 'wfile_closed', False):

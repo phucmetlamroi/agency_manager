@@ -30,56 +30,18 @@ export function VideoDownloader() {
 
         try {
             setIsLoading(true)
-            toast.loading("Đang thiết lập luồng tải...", { id: "download-toast" })
+            toast.loading("Đang chuẩn bị luồng tải trực tiếp...", { id: "download-toast" })
 
-            const response = await fetch('/api/vdownloader', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: targetUrl, formatType: targetFormat, workspaceId })
-            })
+            const downloadUrl = `/api/vdownloader?url=${encodeURIComponent(targetUrl)}&formatType=${targetFormat}${workspaceId ? `&workspaceId=${workspaceId}` : ''}`;
 
-            if (!response.ok) {
-                let errorMessage = "Lỗi khi tải video"
-                try {
-                    const errorData = await response.json()
-                    errorMessage = errorData.error || errorMessage
-                } catch (e) {
-                    errorMessage = `Server Error: ${response.status} ${response.statusText}`
-                }
-                throw new Error(errorMessage)
-            }
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
-            toast.loading("Đường truyền đã được thiết lập, quá trình tải đang diễn ra trong nền...", { id: "download-toast" })
-
-            const contentDisposition = response.headers.get('Content-Disposition')
-            let filename = targetFormat === 'audio' ? 'downloadAudio.mp3' : 'downloadVideo.mp4'
-
-            if (contentDisposition) {
-                // Handling filename*=UTF-8''... (Standard for international chars)
-                const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
-                if (utf8Match && utf8Match[1]) {
-                    filename = decodeURIComponent(utf8Match[1]);
-                } else {
-                    // Fallback to standard filename=
-                    const standardMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
-                    if (standardMatch && standardMatch[1]) {
-                        filename = decodeURIComponent(standardMatch[1]);
-                    }
-                }
-            }
-
-            const blob = await response.blob()
-            const downloadUrl = window.URL.createObjectURL(blob)
-
-            const a = document.createElement('a')
-            a.href = downloadUrl
-            a.download = filename
-            document.body.appendChild(a)
-            a.click()
-            window.URL.revokeObjectURL(downloadUrl)
-            document.body.removeChild(a)
-
-            toast.success("Tải hoàn tất!", { id: "download-toast" })
+            toast.success("Đang bắt đầu tải xuống!", { id: "download-toast" })
             setUrl("")
 
         } catch (error: any) {

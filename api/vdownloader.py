@@ -76,8 +76,12 @@ class handler(BaseHTTPRequestHandler):
         if cookie_path:
             common_ydl_opts['cookiefile'] = cookie_path
 
-        # Specific format for streaming
-        stream_format = 'bestaudio/best' if format_type == 'audio' else 'best/bestvideo+bestaudio'
+        # Specific format for streaming - MUST use single-file formats because Vercel lacks FFmpeg for merging
+        # for extra safety, we prefer mp4 but allow any single-file format
+        if format_type == 'audio':
+            stream_format = 'bestaudio/best'
+        else:
+            stream_format = 'best[vcodec!=none][acodec!=none]/best'
 
         try:
             # 1. Extract metadata - Try API Key first, then library with bypass configs

@@ -60,7 +60,7 @@ class handler(BaseHTTPRequestHandler):
         extension = "mp3" if format_type == "audio" else "mp4"
 
         ydl_opts = {
-            'format': 'bestaudio/best' if format_type == 'audio' else 'best[ext=mp4]/best',
+            'format': 'bestaudio/best' if format_type == 'audio' else 'best', # More flexible format selection
             'outtmpl': '-',
             'quiet': True,
             'no_warnings': True,

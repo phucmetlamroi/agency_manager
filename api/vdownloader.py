@@ -1,13 +1,16 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import os
-import subprocess
 import urllib.parse
 from urllib.parse import parse_qs
+import yt_dlp
+import re
+
+def sanitize_filename(name):
+    return re.sub(r'(?u)[^-\w. ]', '', name).strip()
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        # 1. Parse query parameters
         parsed_path = urllib.parse.urlparse(self.path)
         params = parse_qs(parsed_path.query)
         
@@ -17,63 +20,86 @@ class handler(BaseHTTPRequestHandler):
         if not video_url:
             self.send_response(400)
             self.end_headers()
-            self.wfile.write(b'Missing url parameter')
+            self.wfile.write(b"Error: Missing url parameter")
             return
 
-        # 2. Setup yt-dlp command
-        # We use yt-dlp as a standalone binary if possible, 
-        # or call it via python module if installed
-        
-        # On Vercel, we might need to use a specific location or rely on pip install
-        # For this implementation, we assume yt-dlp is available in the environment
-        # as it is a common way to handle this in serverless.
-        
+        # Simple placeholder for filename
+        final_filename = "download"
         extension = "mp3" if format_type == "audio" else "mp4"
-        ydl_opts = [
-            "yt-dlp",
-            "-o", "-", # Output to stdout
-            "--no-playlist",
-            "--no-warnings",
-            "--no-check-certificate",
-            "--format", "bestaudio" if format_type == "audio" else "best[ext=mp4]/best",
-        ]
-        
-        if format_type == "audio":
-            ydl_opts.extend(["--extract-audio", "--audio-format", "mp3"])
 
-        ydl_opts.append(video_url)
+        ydl_opts = {
+            'format': 'bestaudio/best' if format_type == 'audio' else 'best[ext=mp4]/best',
+            'outtmpl': '-', # Stream to stdout
+            'quiet': True,
+            'no_warnings': True,
+            'nocheckcertificate': True,
+            'noplaylist': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        }
+
+        if format_type == 'audio':
+            ydl_opts.update({
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+            })
 
         try:
-            # 3. Get Metadata first for filename
-            meta_cmd = ["yt-dlp", "--get-title", "--no-playlist", video_url]
-            title = "video"
-            try:
-                title = subprocess.check_output(meta_cmd, stderr=subprocess.STDOUT).decode('utf-8').strip()
-                # Clean title
-                title = "".join([c for c in title if c.isalnum() or c in (" ", "-", "_")]).strip()
-            except:
-                pass
+            # 1. Extract metadata safely
+            with yt_dlp.YoutubeDL({'quiet': True, 'noplaylist': True}) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+                raw_title = info.get('title', 'video')
+                final_filename = sanitize_filename(raw_title)
 
-            # 4. Stream the download
+            # 2. Send headers early
             self.send_response(200)
             self.send_header('Content-Type', 'audio/mpeg' if format_type == 'audio' else 'video/mp4')
-            self.send_header('Content-Disposition', f'attachment; filename="{title}.{extension}"')
+            self.send_header('Content-Disposition', f'attachment; filename="{final_filename}.{extension}"')
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
 
-            # Execute yt-dlp and pipe stdout to response
-            process = subprocess.Popen(ydl_opts, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # 3. Stream data
+            # Since yt-dlp library doesn't easily return a stream for stdout in memory without complex wrappers,
+            # we fallback to a more robust subprocess call but with the extracted title
             
-            while True:
-                chunk = process.stdout.read(1024 * 64) # 64KB chunks
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
+            cmd = [
+                "yt-dlp",
+                "-o", "-",
+                "--no-playlist",
+                "--quiet",
+                "--no-warnings",
+                "--format", ydl_opts['format'],
+                video_url
+            ]
             
-            process.stdout.close()
-            process.wait()
+            if format_type == 'audio':
+                cmd.extend(["--extract-audio", "--audio-format", "mp3"])
+
+            import subprocess
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Use buffer to send data
+            try:
+                for chunk in iter(lambda: process.stdout.read(128 * 1024), b''):
+                    self.wfile.write(chunk)
+            except (ConnectionResetError, BrokenPipeError):
+                # Client disconnected
+                pass
+            finally:
+                process.terminate()
+                process.wait()
 
         except Exception as e:
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(f"Error: {str(e)}".encode())
+            # If we already sent headers (200), we can't change to 500
+            # Just log it or write to stream if possible
+            if not self.wfile.closed:
+                try: 
+                    # If this happens before headers, send 500
+                    self.send_response(500)
+                    self.send_header('Content-type', 'text/plain')
+                    self.end_headers()
+                    self.wfile.write(f"Server Error: {str(e)}".encode())
+                except:
+                    pass

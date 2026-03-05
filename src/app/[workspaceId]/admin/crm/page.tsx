@@ -34,7 +34,7 @@ export default async function CRMDashboard({ params }: { params: Promise<{ works
                     <section className="glass-panel p-6">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-semibold text-white">Danh sách Khách hàng</h2>
-                            <CreateClientButton partners={typedClients} workspaceId={workspaceId} />
+                            <CreateClientButton partners={serializeDecimal(typedClients)} workspaceId={workspaceId} />
                         </div>
 
                         <ClientList clients={serializeDecimal(clients) as any} workspaceId={workspaceId} />

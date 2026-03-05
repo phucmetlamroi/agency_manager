@@ -4,13 +4,25 @@ import { z } from 'zod';
 import ytDlp from 'youtube-dl-exec';
 import { ChildProcessWithoutNullStreams } from 'child_process';
 import { prisma } from '@/lib/db';
-
-const ffmpeg = require('@ffmpeg-installer/ffmpeg');
-
+// @ts-ignore
+import ffmpeg from '@ffmpeg-installer/ffmpeg';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+
+export async function GET(req: Request) {
+    const { searchParams } = new URL(req.url);
+    const url = searchParams.get('url');
+    const formatType = searchParams.get('formatType') || 'best';
+    const workspaceId = searchParams.get('workspaceId') || undefined;
+
+    if (!url) {
+        return NextResponse.json({ active: true, message: "Downloader API is ready. Provide 'url' param to download." });
+    }
+
+    // Call the same logic as POST but with query params
+    return handleDownload(url, formatType, workspaceId);
+}
 
 const downloadSchema = z.object({
     url: z.string().url(),
@@ -21,13 +33,6 @@ const downloadSchema = z.object({
 export async function POST(req: Request) {
     console.log('--- Download API: POST Request Received ---');
     try {
-        // 1. Authentication Check
-        const session = await getSession();
-        if (!session || !session.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const userId = session.user.id;
         const body = await req.json();
         const result = downloadSchema.safeParse(body);
 
@@ -35,13 +40,28 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Invalid config provided.' }, { status: 400 });
         }
 
-        const { url, formatType, workspaceId: bodyWorkspaceId } = result.data;
+        const { url, formatType, workspaceId } = result.data;
+        return handleDownload(url, formatType, workspaceId);
+    } catch (error: any) {
+        console.error('Download API: Global Catch:', error);
+        return NextResponse.json({ error: `Internal Error: ${error.message}` }, { status: 500 });
+    }
+}
 
-        // Try to get workspaceId from body, then session (original fallback), then DB if needed
-        let workspaceId = bodyWorkspaceId || (session.user as any).workspaces?.[0]?.workspaceId;
+async function handleDownload(url: string, formatType: string, workspaceIdParam?: string) {
+    try {
+        // 1. Authentication Check
+        const session = await getSession();
+        if (!session || !session.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const userId = session.user.id;
+
+        // Try to get workspaceId from param, then session, then DB
+        let workspaceId = workspaceIdParam || (session.user as any).workspaces?.[0]?.workspaceId;
 
         if (!workspaceId) {
-            // Last resort: query DB
             const userWorkspace = await prisma.workspaceMember.findFirst({
                 where: { userId }
             });
@@ -49,57 +69,55 @@ export async function POST(req: Request) {
         }
 
         if (!workspaceId) {
-            return NextResponse.json({ error: 'No active workspace found. Please refresh or provide workspace context.' }, { status: 400 });
+            return NextResponse.json({ error: 'No active workspace found.' }, { status: 400 });
         }
 
-        // 3. Concurrency Lock (Max 2 active processing tasks per user)
+        // 3. Concurrency Lock
         const activeTasks = await prisma.mediaTask.count({
-            where: {
-                requestedById: userId,
-                status: 'PROCESSING'
-            }
+            where: { requestedById: userId, status: 'PROCESSING' }
         });
 
-        if (activeTasks >= 2) {
-            return NextResponse.json({ error: 'Rate limit exceeded: You can only download 2 files concurrently. Please wait for one to finish.' }, { status: 429 });
+        if (activeTasks >= 3) { // Increased to 3
+            return NextResponse.json({ error: 'Rate limit: You have 3 active downloads. Please wait.' }, { status: 429 });
         }
 
-        // 4. Create MediaTask Record (PENDING -> PROCESSING)
+        // 4. Create MediaTask Record (Early to track attempts)
         const mediaTask = await prisma.mediaTask.create({
             data: {
                 workspaceId,
                 requestedById: userId,
                 originalUrl: url,
-                platform: 'unknown', // Wil be updated
+                platform: 'unknown',
                 formatType,
                 status: 'PROCESSING'
             }
         });
 
-        // 5. Extract Details for Filename (Non-blocking as much as possible)
+        // 5. Metadata Extraction (Faster & More Reliable)
         let filename = 'media_file';
         let extension = formatType === 'audio' ? '.mp3' : '.mp4';
 
         try {
-            // Use a short timeout for metadata to avoid hanging
-            const metadataPromise = ytDlp(url, {
-                dumpJson: true,
-                noWarnings: true,
-                callHome: false,
-                noCheckCertificates: true,
-            });
-
-            // Race with a timeout of 5 seconds
+            console.log(`Download API: Fetching metadata for ${url}...`);
+            // Use --get-title and --get-filename for faster metadata if possible
+            // but dumpJson is more comprehensive for platform detection
             const metadata = await Promise.race([
-                metadataPromise,
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+                ytDlp(url, {
+                    dumpJson: true,
+                    noWarnings: true,
+                    noCheckCertificates: true,
+                    noPlaylist: true,
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Metadata Timeout')), 15000))
             ]) as any;
 
             if (metadata && typeof metadata === 'object') {
                 if (metadata.title) {
-                    // Keep Vietnamese characters, just remove illegal file chars
+                    // Remove characters that are illegal in filenames but keep letters/numbers/spaces
                     filename = String(metadata.title)
-                        .replace(/[\\\/\:\*\?\"\<\>\|]/g, '_')
+                        .replace(/[\\\/\:\*\?\"\<\>\|]/g, '')
+                        .replace(/\s+/g, ' ')
                         .trim();
                 }
                 if (metadata.extractor) {
@@ -108,20 +126,32 @@ export async function POST(req: Request) {
                         data: { platform: metadata.extractor }
                     }).catch(console.error);
                 }
+                console.log(`Download API: Extracted title: "${filename}"`);
             }
         } catch (e: any) {
-            console.warn(`Download API: Metadata extraction failed or timed out: ${e.message}`);
+            // Defensive check: Convert potential ErrorEvent or non-standard error objects to strings
+            const errorMsg = e instanceof Error ? e.message : (typeof e === 'object' ? JSON.stringify(e) : String(e));
+            console.warn(`Download API: Metadata failed (Non-fatal): ${errorMsg}`);
         }
 
+        // Use the sanitized filename for the header
         const finalFileName = encodeURIComponent(`${filename}${extension}`);
 
-        // 6. Config yt-dlp arguments
+        // 6. Config yt-dlp arguments (Optimized for Speed)
         let ytDlpArgs: any = {
             noWarnings: true,
             callHome: false,
             noCheckCertificates: true,
             ffmpegLocation: ffmpeg.path,
             output: '-',
+            noPlaylist: true,
+            // Optimization flags
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            bufferSize: '1M', // Larger buffer for faster throughput
+            format: formatType === 'audio' ? 'bestaudio' : 'best[ext=mp4]/best',
+            // YouTube specific optimizations
+            forceIpv4: true,
+            // Avoid overhead of combining files if possible (only for video)
         };
 
         if (formatType === 'audio') {
@@ -131,44 +161,38 @@ export async function POST(req: Request) {
                 audioFormat: 'mp3',
                 audioQuality: '0',
             }
-        } else {
-            // For stdout streaming, 'best' is safer than merging bestvideo+bestaudio
-            // which requires seeking and temporary files.
-            ytDlpArgs = {
-                ...ytDlpArgs,
-                format: 'best[ext=mp4]/best',
-            }
         }
 
-
-        console.log(`Download API: Starting high-quality FFmpeg stream for: ${url}`);
+        console.log(`Download API: Initiating optimized stream for: ${url}`);
         let ytDlpProcess: ChildProcessWithoutNullStreams;
         try {
             ytDlpProcess = ytDlp.exec(url, ytDlpArgs) as ChildProcessWithoutNullStreams;
         } catch (e: any) {
             await prisma.mediaTask.update({ where: { id: mediaTask.id }, data: { status: 'FAILED' } });
-            return NextResponse.json({ error: `Failed to spawn process: ${e.message}` }, { status: 500 });
+            return NextResponse.json({ error: `Process failed: ${e.message}` }, { status: 500 });
         }
 
         // 7. Stream bridge
         const stream = new ReadableStream({
             start(controller) {
                 let hasSentData = false;
+                let lastChunkTime = Date.now();
 
                 ytDlpProcess.stdout.on('data', (chunk) => {
                     if (!hasSentData) {
-                        console.log(`Download API: First chunk received (${chunk.length} bytes)`);
+                        const elapsed = (Date.now() - lastChunkTime) / 1000;
+                        console.log(`Download API: First chunk sent after ${elapsed}s (${chunk.length} bytes)`);
                         hasSentData = true;
                     }
                     controller.enqueue(chunk);
                 });
 
                 ytDlpProcess.stdout.on('end', async () => {
-                    console.log('Download API: stdout stream ended');
+                    console.log('Download API: Stream closed successfully');
                     if (!hasSentData) {
-                        console.error('Download API: Stream ended without any data!');
+                        console.error('Download API: Zero bytes produced by yt-dlp');
                         await prisma.mediaTask.update({ where: { id: mediaTask.id }, data: { status: 'FAILED' } }).catch(console.error);
-                        controller.error(new Error('No data received from downloader.'));
+                        controller.error(new Error('Empty stream'));
                     } else {
                         await prisma.mediaTask.update({ where: { id: mediaTask.id }, data: { status: 'COMPLETED' } }).catch(console.error);
                         controller.close();
@@ -178,26 +202,30 @@ export async function POST(req: Request) {
                 ytDlpProcess.stderr.on('data', (data) => {
                     const msg = data.toString();
                     if (msg.includes('ERROR:')) {
-                        console.error(`yt-dlp error: ${msg}`);
-                    } else {
-                        // Log progress or warnings to console for debugging
-                        console.log(`yt-dlp info: ${msg.trim()}`);
+                        console.error(`yt-dlp [err]: ${msg.trim()}`);
+                    } else if (msg.includes('[download]') && msg.includes('%')) {
+                        // Log progress occasionally to console
+                        if (Math.random() > 0.95) console.log(`yt-dlp [progress]: ${msg.trim()}`);
                     }
                 });
 
                 ytDlpProcess.on('error', async (err) => {
-                    console.error('Download API: Process error:', err);
+                    console.error('Download API: Process pipe error:', err);
                     await prisma.mediaTask.update({ where: { id: mediaTask.id }, data: { status: 'FAILED' } }).catch(console.error);
                     try { controller.error(err); } catch (e) { }
                 });
 
                 ytDlpProcess.on('exit', (code) => {
-                    console.log(`Download API: yt-dlp exited with code ${code}`);
+                    console.log(`Download API: Process exited with code ${code}`);
+                    if (code !== 0 && !hasSentData) {
+                        prisma.mediaTask.update({ where: { id: mediaTask.id }, data: { status: 'FAILED' } }).catch(console.error);
+                        try { controller.error(new Error(`Process error code ${code}`)); } catch (e) { }
+                    }
                 });
             },
             cancel() {
-                console.log('Download API: Stream cancelled by client');
-                ytDlpProcess.kill();
+                console.log('Download API: Client disconnected, killing process');
+                ytDlpProcess.kill('SIGTERM');
                 prisma.mediaTask.update({ where: { id: mediaTask.id }, data: { status: 'FAILED' } }).catch(console.error);
             }
         });
@@ -205,11 +233,14 @@ export async function POST(req: Request) {
         const headers = new Headers();
         headers.set('Content-Disposition', `attachment; filename*=UTF-8''${finalFileName}`);
         headers.set('Content-Type', formatType === 'audio' ? 'audio/mpeg' : 'video/mp4');
+        // Disable buffering for streaming
+        headers.set('X-Content-Type-Options', 'nosniff');
 
         return new Response(stream, { headers });
 
     } catch (error: any) {
-        console.error('Download API: Global Catch:', error);
-        return NextResponse.json({ error: `Internal Error: ${error.message}` }, { status: 500 });
+        console.error('Download API Error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+

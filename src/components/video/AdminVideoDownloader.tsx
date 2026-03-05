@@ -27,54 +27,22 @@ export function AdminVideoDownloader() {
 
         try {
             setIsLoading(true)
-            toast.loading("Khởi tạo luồng tải an toàn...", { id: "admin-download" })
+            toast.loading("Đang khởi tạo luồng tải trực tiếp...", { id: "admin-download" })
 
-            const response = await fetch('/api/vdownloader', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, formatType: format, workspaceId })
-            })
+            // Create the download URL for GET request
+            const downloadUrl = `/api/vdownloader?url=${encodeURIComponent(url)}&formatType=${format}${workspaceId ? `&workspaceId=${workspaceId}` : ''}`;
 
-            if (!response.ok) {
-                let errorMessage = "Lỗi khi tải video"
-                try {
-                    const data = await response.json()
-                    errorMessage = data.error || errorMessage
-                } catch (e) {
-                    errorMessage = `HTTP ${response.status}`
-                }
-                throw new Error(errorMessage)
-            }
+            // Trigger native browser download
+            // This is better than fetch + blob because it shows native progress bar
+            // and handles large files without memory issues in the tab.
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
-            toast.loading("Đang stream dữ liệu về hệ thống...", { id: "admin-download" })
-
-            const contentDisposition = response.headers.get('Content-Disposition')
-            let filename = format === 'audio' ? 'downloadTask.mp3' : 'downloadTask.mp4'
-
-            if (contentDisposition) {
-                const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
-                if (utf8Match && utf8Match[1]) {
-                    filename = decodeURIComponent(utf8Match[1]);
-                } else {
-                    const standardMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
-                    if (standardMatch && standardMatch[1]) {
-                        filename = decodeURIComponent(standardMatch[1]);
-                    }
-                }
-            }
-
-            const blob = await response.blob()
-            const downloadUrl = window.URL.createObjectURL(blob)
-
-            const a = document.createElement('a')
-            a.href = downloadUrl
-            a.download = filename
-            document.body.appendChild(a)
-            a.click()
-            window.URL.revokeObjectURL(downloadUrl)
-            document.body.removeChild(a)
-
-            toast.success("Trích xuất phương tiện thành công!", { id: "admin-download" })
+            toast.success("Đang bắt đầu tải xuống qua trình duyệt!", { id: "admin-download" })
             setUrl("")
             setOpen(false)
         } catch (error: any) {

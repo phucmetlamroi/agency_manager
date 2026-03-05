@@ -9,27 +9,35 @@ export function serializeDecimal(obj: any): any {
         return obj
     }
 
-    if (typeof obj === 'object') {
-        // Handle Prisma Decimal
-        if (obj instanceof Decimal || (obj.d && obj.e && obj.s)) {
-            return obj.toNumber()
-        }
+    // Handle Arrays
+    if (Array.isArray(obj)) {
+        return obj.map(item => serializeDecimal(item))
+    }
 
-        // Handle Date (Preserve it for Next.js serialization or convert to string if needed)
-        // Next.js App Router handles Date objects in props well usually, but to be safe/consistent:
+    if (typeof obj === 'object') {
+        // Handle Date (Next.js supports passing Date objects directly)
         if (obj instanceof Date) {
             return obj
         }
 
-        // Handle Array
-        if (Array.isArray(obj)) {
-            return obj.map(item => serializeDecimal(item))
+        // Handle Prisma Decimal or similar "Number-like" objects
+        // Some Prisma versions use a structure with d, e, s properties
+        const isDecimal =
+            obj instanceof Decimal ||
+            (obj.constructor && obj.constructor.name === 'Decimal') ||
+            (typeof obj.toNumber === 'function' && obj.d && Array.isArray(obj.d) && typeof obj.s === 'number');
+
+        if (isDecimal) {
+            return obj.toNumber()
         }
 
-        // Handle Object
+        // Handle plain objects: recursive cleaning
         const newObj: any = {}
         for (const key in obj) {
-            newObj[key] = serializeDecimal(obj[key])
+            // Skip internal Prisma properties or functions
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                newObj[key] = serializeDecimal(obj[key])
+            }
         }
         return newObj
     }

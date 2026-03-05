@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import UserPageTabs from '@/components/admin/UserPageTabs'
+import { serializeDecimal } from '@/lib/serialization'
 
 export default async function AdminUsersPage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -46,7 +47,7 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
             <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Quản lý nhân sự</h2>
-            <UserPageTabs users={users} currentUser={currentUser} agencies={agencies} workspaceId={workspaceId} />
+            <UserPageTabs users={serializeDecimal(users)} currentUser={currentUser} agencies={agencies} workspaceId={workspaceId} />
         </div>
     )
 }

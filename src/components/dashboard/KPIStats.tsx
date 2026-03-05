@@ -2,6 +2,7 @@
 
 import { Card, AreaChart, Metric, Text, Flex, Grid, Color } from "@tremor/react"
 import { VideoDownloader } from "@/components/video/VideoDownloader"
+import NoSSR from "@/components/ui/NoSSR"
 
 interface KPIStatsProps {
     tasks: any[]
@@ -42,20 +43,22 @@ export function KPIStats({ tasks }: KPIStatsProps) {
                     <Metric className="text-white text-3xl font-bold">{totalTasks}</Metric>
                     <Text className="text-tremor-content-subtle">Total Tasks</Text>
                 </Flex>
-                <AreaChart
-                    className="mt-6 h-16 w-full"
-                    data={data}
-                    index="Month"
-                    categories={["Sales"]}
-                    colors={["indigo"]}
-                    showXAxis={false}
-                    showGridLines={false}
-                    startEndOnly={true}
-                    showYAxis={false}
-                    showLegend={false}
-                    showTooltip={false}
-                    curveType="monotone"
-                />
+                <NoSSR>
+                    <AreaChart
+                        className="mt-6 h-16 w-full"
+                        data={data}
+                        index="Month"
+                        categories={["Sales"]}
+                        colors={["indigo"]}
+                        showXAxis={false}
+                        showGridLines={false}
+                        startEndOnly={true}
+                        showYAxis={false}
+                        showLegend={false}
+                        showTooltip={false}
+                        curveType="monotone"
+                    />
+                </NoSSR>
             </Card>
 
             <Card decoration="top" decorationColor="fuchsia" className="glass-panel border-none ring-0 bg-transparent p-6">

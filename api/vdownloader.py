@@ -1,16 +1,28 @@
-from http.server import BaseHTTPRequestHandler
-import json
-import os
 import urllib.parse
 from urllib.parse import parse_qs
 import yt_dlp
 import re
+import os
+import subprocess
 
 def sanitize_filename(name):
     return re.sub(r'(?u)[^-\w. ]', '', name).strip()
 
+def get_cookie_path():
+    cookies_data = os.environ.get('YOUTUBE_COOKIES')
+    if cookies_data:
+        path = '/tmp/youtube_cookies.txt'
+        with open(path, 'w') as f:
+            f.write(cookies_data)
+        return path
+    return None
+
+from http.server import BaseHTTPRequestHandler
+import json
+
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        cookie_path = get_cookie_path()
         parsed_path = urllib.parse.urlparse(self.path)
         params = parse_qs(parsed_path.query)
         
@@ -23,7 +35,6 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(b"Error: Missing url parameter")
             return
 
-        # Simple placeholder for filename
         final_filename = "download"
         extension = "mp3" if format_type == "audio" else "mp4"
 
@@ -42,6 +53,9 @@ class handler(BaseHTTPRequestHandler):
                 }
             },
         }
+        
+        if cookie_path:
+            ydl_opts['cookiefile'] = cookie_path
 
         if format_type == 'audio':
             ydl_opts.update({
@@ -81,6 +95,9 @@ class handler(BaseHTTPRequestHandler):
                 "--extractor-args", "youtube:player_client=android,ios,web_creator,mweb,tv;player_skip=web",
                 video_url
             ]
+            
+            if cookie_path:
+                cmd.extend(["--cookies", cookie_path])
             
             if format_type == 'audio':
                 cmd.extend(["--extract-audio", "--audio-format", "mp3"])

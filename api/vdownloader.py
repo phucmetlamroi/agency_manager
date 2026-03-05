@@ -29,12 +29,13 @@ class handler(BaseHTTPRequestHandler):
 
         ydl_opts = {
             'format': 'bestaudio/best' if format_type == 'audio' else 'best[ext=mp4]/best',
-            'outtmpl': '-', # Stream to stdout
+            'outtmpl': '-',
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'noplaylist': True,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'extractor_args': {'youtube': {'player_client': ['ios']}}, # Bypass bot detection
         }
 
         if format_type == 'audio':
@@ -71,6 +72,7 @@ class handler(BaseHTTPRequestHandler):
                 "--quiet",
                 "--no-warnings",
                 "--format", ydl_opts['format'],
+                "--extractor-args", "youtube:player_client=ios", # Bypasses bot detection
                 video_url
             ]
             

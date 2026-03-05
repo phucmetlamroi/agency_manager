@@ -59,9 +59,8 @@ class handler(BaseHTTPRequestHandler):
         final_filename = "download"
         extension = "mp3" if format_type == "audio" else "mp4"
 
-        ydl_opts = {
-            'format': 'bestaudio/best' if format_type == 'audio' else 'best', # More flexible format selection
-            'outtmpl': '-',
+        # Common options for both metadata and download
+        common_ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
@@ -70,33 +69,25 @@ class handler(BaseHTTPRequestHandler):
             'extractor_args': {
                 'youtube': {
                     'player_client': ['android', 'ios', 'web_creator', 'mweb', 'tv'],
-                    'player_skip': ['web'],
                 }
             },
         }
-        
-        if cookie_path:
-            ydl_opts['cookiefile'] = cookie_path
 
-        if format_type == 'audio':
-            ydl_opts.update({
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }],
-            })
+        if cookie_path:
+            common_ydl_opts['cookiefile'] = cookie_path
+
+        # Specific format for streaming
+        stream_format = 'bestaudio/best' if format_type == 'audio' else 'best/bestvideo+bestaudio'
 
         try:
-            # 1. Extract metadata - Try API Key first for 100% accuracy and speed
+            # 1. Extract metadata - Try API Key first, then library with bypass configs
             video_id = get_video_id(video_url)
             api_title = get_video_title_via_api(video_id)
             
             if api_title:
                 final_filename = sanitize_filename(api_title)
             else:
-                # Fallback to yt-dlp if API key fails or isn't provided
-                with yt_dlp.YoutubeDL({'quiet': True, 'noplaylist': True, 'cookiefile': cookie_path} if cookie_path else {'quiet': True, 'noplaylist': True}) as ydl:
+                with yt_dlp.YoutubeDL(common_ydl_opts) as ydl:
                     info = ydl.extract_info(video_url, download=False)
                     raw_title = info.get('title', 'video')
                     final_filename = sanitize_filename(raw_title)
@@ -119,8 +110,8 @@ class handler(BaseHTTPRequestHandler):
                 "--quiet",
                 "--no-warnings",
                 "--no-check-certificate",
-                "--format", ydl_opts['format'],
-                "--extractor-args", "youtube:player_client=android,ios,web_creator,mweb,tv;player_skip=web",
+                "--format", stream_format,
+                "--extractor-args", "youtube:player_client=android,ios,web_creator,mweb,tv",
                 video_url
             ]
             

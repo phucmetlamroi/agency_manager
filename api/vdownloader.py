@@ -35,7 +35,12 @@ class handler(BaseHTTPRequestHandler):
             'nocheckcertificate': True,
             'noplaylist': True,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'extractor_args': {'youtube': {'player_client': ['ios']}}, # Bypass bot detection
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios', 'web_creator', 'mweb', 'tv'],
+                    'player_skip': ['web'],
+                }
+            },
         }
 
         if format_type == 'audio':
@@ -71,8 +76,9 @@ class handler(BaseHTTPRequestHandler):
                 "--no-playlist",
                 "--quiet",
                 "--no-warnings",
+                "--no-check-certificate",
                 "--format", ydl_opts['format'],
-                "--extractor-args", "youtube:player_client=ios", # Bypasses bot detection
+                "--extractor-args", "youtube:player_client=android,ios,web_creator,mweb,tv;player_skip=web",
                 video_url
             ]
             

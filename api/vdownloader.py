@@ -46,9 +46,16 @@ class handler(BaseHTTPRequestHandler):
         parsed_path = urllib.parse.urlparse(self.path)
         params = parse_qs(parsed_path.query)
         
+        # 0. Initialize FFmpeg
+        try:
+            import static_ffmpeg
+            static_ffmpeg.add_paths()
+        except:
+            pass
+
         is_diagnostic = params.get('diagnostic', ['false'])[0] == 'true'
         
-        # 0. Diagnostic Mode
+        # 1. Diagnostic Mode
         if is_diagnostic:
             try:
                 import subprocess
@@ -56,11 +63,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     ffmpeg_v = subprocess.check_output(["ffmpeg", "-version"]).decode().split('\n')[0]
                 except:
-                    # Try to find static_ffmpeg if installed
-                    try:
-                        from static_ffmpeg import run
-                        ffmpeg_v = "static_ffmpeg available"
-                    except: pass
+                    ffmpeg_v = "FFmpeg binary check failed"
 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -68,7 +71,6 @@ class handler(BaseHTTPRequestHandler):
                 diag = {
                     "ffmpeg": ffmpeg_v,
                     "python": os.sys.version,
-                    "env": dict(os.environ),
                     "cwd": os.getcwd()
                 }
                 self.wfile.write(json.dumps(diag, indent=2).encode())
@@ -98,12 +100,7 @@ class handler(BaseHTTPRequestHandler):
             import subprocess
             ffmpeg_path = subprocess.check_output(["which", "ffmpeg"]).decode().strip()
         except:
-            # Fallback to static_ffmpeg context
-            try:
-                from static_ffmpeg import run
-                # In some envs, we might need to manually set it
-                pass
-            except: pass
+            pass
 
         # Common options
         common_ydl_opts = {
@@ -122,11 +119,13 @@ class handler(BaseHTTPRequestHandler):
         if cookie_path:
             common_ydl_opts['cookiefile'] = cookie_path
 
-        # Enhanced format selection: 22(720p mp4) and 18(360p mp4) are safe single-file fallbacks
+        # Enhanced format selection: 
+        # If FFmpeg is found (via static-ffmpeg), we can merge high-quality streams.
+        # Otherwise, 'best' will find a single-file combined stream.
         if format_type == 'audio':
             stream_format = 'bestaudio/best'
         else:
-            stream_format = '22/18/best[vcodec!=none][acodec!=none]/best'
+            stream_format = 'bestvideo+bestaudio/best'
 
         try:
             # 1. Extract metadata

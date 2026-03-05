@@ -1,4 +1,4 @@
 pg8000
 yt-dlp
 requests
-static-ffmpeg-util
+static-ffmpeg

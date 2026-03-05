@@ -36,10 +36,13 @@ export function VideoDownloader() {
 
             const link = document.createElement('a');
             link.href = downloadUrl;
+            link.target = '_blank';
             link.style.display = 'none';
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
+            setTimeout(() => {
+                document.body.removeChild(link);
+            }, 100);
 
             toast.success("Đang bắt đầu tải xuống!", { id: "download-toast" })
             setUrl("")

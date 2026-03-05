@@ -15,13 +15,35 @@ export async function GET(req: Request) {
     const url = searchParams.get('url');
     const formatType = searchParams.get('formatType') || 'best';
     const workspaceId = searchParams.get('workspaceId') || undefined;
+    const isDiagnostic = searchParams.get('diagnostic') === 'true';
+
+    if (isDiagnostic) {
+        try {
+            const { execSync } = require('child_process');
+            return NextResponse.json({
+                env: process.env.NODE_ENV,
+                ffmpegPath: ffmpeg.path,
+                platform: process.platform,
+                cwd: process.cwd(),
+                nodeVersion: process.version,
+                // Check if ffmpeg exists and is executable
+                ffmpegCheck: execSync(`${ffmpeg.path} -version`).toString().split('\n')[0],
+            });
+        } catch (e: any) {
+            return NextResponse.json({ error: 'Diagnostic failed', details: e.message });
+        }
+    }
 
     if (!url) {
         return NextResponse.json({ active: true, message: "Downloader API is ready. Provide 'url' param to download." });
     }
 
-    // Call the same logic as POST but with query params
-    return handleDownload(url, formatType, workspaceId);
+    try {
+        return await handleDownload(url, formatType, workspaceId);
+    } catch (e: any) {
+        console.error('Download API Critical Error:', e);
+        return NextResponse.json({ error: `Internal Server Error: ${e.message}` }, { status: 500 });
+    }
 }
 
 const downloadSchema = z.object({

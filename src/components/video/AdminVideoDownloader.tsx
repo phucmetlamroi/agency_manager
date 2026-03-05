@@ -37,10 +37,13 @@ export function AdminVideoDownloader() {
             // and handles large files without memory issues in the tab.
             const link = document.createElement('a');
             link.href = downloadUrl;
+            link.target = '_blank'; // Open in new tab so errors don't replace the dashboard
             link.style.display = 'none';
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
+            setTimeout(() => {
+                document.body.removeChild(link);
+            }, 100);
 
             toast.success("Đang bắt đầu tải xuống qua trình duyệt!", { id: "admin-download" })
             setUrl("")

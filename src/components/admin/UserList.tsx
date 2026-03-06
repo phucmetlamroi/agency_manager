@@ -35,6 +35,7 @@ export default function UserList({ users, currentUser, agencies, workspaceId }: 
                         <select name="role" style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white' }}>
                             <option value="USER">User</option>
                             <option value="ADMIN">Admin</option>
+                            <option value="CLIENT">Client</option>
                         </select>
                     </div>
                     {agencies && agencies.length > 0 && (

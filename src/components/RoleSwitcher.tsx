@@ -26,8 +26,8 @@ export default function RoleSwitcher({ userId, initialRole, workspaceId }: { use
                     fontSize: '0.8rem',
                     border: 'none',
                     cursor: 'pointer',
-                    background: role === 'ADMIN' ? 'rgba(109, 40, 217, 0.2)' : 'rgba(3, 218, 198, 0.1)',
-                    color: role === 'ADMIN' ? '#a78bfa' : 'var(--secondary)',
+                    background: role === 'ADMIN' ? 'rgba(109, 40, 217, 0.2)' : role === 'CLIENT' ? 'rgba(99, 102, 241, 0.2)' : 'rgba(3, 218, 198, 0.1)',
+                    color: role === 'ADMIN' ? '#a78bfa' : role === 'CLIENT' ? '#818cf8' : 'var(--secondary)',
                     fontWeight: '600',
                     outline: 'none',
                     opacity: loading ? 0.7 : 1
@@ -35,6 +35,7 @@ export default function RoleSwitcher({ userId, initialRole, workspaceId }: { use
             >
                 <option value="USER" style={{ color: 'black' }}>User</option>
                 <option value="ADMIN" style={{ color: 'black' }}>Admin</option>
+                <option value="CLIENT" style={{ color: 'black' }}>Client</option>
             </select>
             {loading && <span style={{ position: 'absolute', right: -20, fontSize: '0.8rem' }}>⌛</span>}
         </div>

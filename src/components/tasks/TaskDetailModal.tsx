@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { getFrameAccount, updateFrameAccount } from "@/actions/global-settings"
 import { toast } from "sonner"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
@@ -21,10 +22,11 @@ interface TaskDetailModalProps {
 }
 
 export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedIds = [], workspaceId }: TaskDetailModalProps) {
-    // Edit State
     const [isEditing, setIsEditing] = useState(false)
     const [isEditingLink, setIsEditingLink] = useState(false)
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
+    const [isFrameExpanded, setIsFrameExpanded] = useState(false)
+    const [frameAccount, setFrameAccount] = useState({ account: '', password: '' })
     const [form, setForm] = useState({
         resources: '',
         linkRaw: '',
@@ -93,6 +95,14 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         }
     }, [task])
 
+    useEffect(() => {
+        if (isOpen) {
+            getFrameAccount().then(data => {
+                setFrameAccount(data)
+            })
+        }
+    }, [isOpen])
+
     if (!isOpen || !localTask) return null
 
     const handleSave = async () => {
@@ -102,6 +112,10 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
         // Sanitize notes before saving
         const cleanNotes = DOMPurify.sanitize(form.notes)
+
+        if (isAdmin) {
+            await updateFrameAccount(frameAccount.account, frameAccount.password)
+        }
 
         // Check for Bulk Mode
         const isBulk = bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id)
@@ -291,12 +305,21 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                             placeholder="Link Project Mẫu..."
                                             className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm outline-none font-bold text-amber-900"
                                         />
-                                        <input
-                                            value={form.submissionFolder || ''}
-                                            onChange={(e) => setForm({ ...form, submissionFolder: e.target.value })}
-                                            placeholder="Link Folder Nộp File..."
-                                            className="w-full p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm outline-none font-bold text-blue-900"
-                                        />
+                                        <div className="flex rounded-xl overflow-hidden mt-1 shadow-sm">
+                                            <input
+                                                value={form.submissionFolder || ''}
+                                                onChange={(e) => setForm({ ...form, submissionFolder: e.target.value })}
+                                                placeholder="Link Folder Nộp File..."
+                                                className="flex-1 p-2.5 bg-blue-50 border border-blue-200 border-r-0 text-sm outline-none font-bold text-blue-900"
+                                            />
+                                            <button
+                                                onClick={() => setIsFrameExpanded(!isFrameExpanded)}
+                                                className="px-4 bg-violet-50 hover:bg-violet-100 border border-blue-200 transition-colors flex items-center justify-center text-violet-700 font-bold"
+                                                title="Cài đặt Frame.io (Global)"
+                                            >
+                                                <span className="mr-1">Frame.io</span> {isFrameExpanded ? '🔽' : '▶️'}
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-2">
@@ -315,14 +338,75 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                                 <span>✨</span> PROJECT MẪU ↗
                                             </a>
                                         )}
-                                        {form.submissionFolder && (
-                                            <a href={formatLink(form.submissionFolder)} target="_blank" className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl text-sm font-black text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all">
-                                                <span>📂</span> FOLDER NỘP FILE ↗
-                                            </a>
-                                        )}
-                                        {!form.linkRaw && !form.linkBroll && !localTask.collectFilesLink && !form.submissionFolder && (
-                                            <div className="text-zinc-400 italic text-xs p-3">No assets linked</div>
-                                        )}
+                                        <div className="flex border border-blue-200 rounded-xl overflow-hidden shadow-sm mt-1">
+                                            {form.submissionFolder ? (
+                                                <a href={formatLink(form.submissionFolder)} target="_blank" className="flex-1 flex items-center gap-2 p-3 bg-blue-50 text-sm font-black text-blue-700 hover:bg-blue-100 transition-all">
+                                                    <span>📂</span> FOLDER NỘP FILE ↗
+                                                </a>
+                                            ) : (
+                                                <div className="flex-1 flex items-center gap-2 p-3 bg-zinc-50 text-sm font-bold text-zinc-400">
+                                                    <span>📂</span> CHƯA CÓ FOLDER NỘP FILE
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={() => setIsFrameExpanded(!isFrameExpanded)}
+                                                className="px-4 bg-violet-50 hover:bg-violet-100 border-l border-blue-200 transition-colors flex items-center justify-center text-violet-700 font-bold tracking-wider"
+                                                title="Thông tin Frame.io (Global)"
+                                            >
+                                                <span className="mr-2">Frame.io</span> {isFrameExpanded ? '🔽' : '▶️'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* FRAME.IO GLOBAL PANEL */}
+                                {isFrameExpanded && (
+                                    <div className="p-4 bg-violet-50/50 border border-violet-100 rounded-xl mt-3 animate-in fade-in slide-in-from-top-1 flex flex-col gap-3 shadow-inner">
+                                        <p className="text-[11px] text-violet-600 font-medium italic">ℹ️ Thông tin tài khoản frame dành cho trường hợp bạn bị out ra khỏi frame của team</p>
+
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-violet-900 w-20">Tài khoản:</span>
+                                            {isEditing && isAdmin ? (
+                                                <input
+                                                    value={frameAccount.account}
+                                                    onChange={e => setFrameAccount({ ...frameAccount, account: e.target.value })}
+                                                    placeholder="Email / Username"
+                                                    className="flex-1 p-2 text-sm bg-white border border-violet-200 rounded-lg outline-none focus:border-violet-400 font-mono"
+                                                />
+                                            ) : (
+                                                <div className="flex-1 p-2 text-sm bg-white/60 border border-violet-100 rounded-lg text-zinc-700 font-mono">
+                                                    {frameAccount.account || '---'}
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={() => { navigator.clipboard.writeText(frameAccount.account); toast.success('Đã copy tài khoản'); }}
+                                                className="px-3 py-2 bg-white hover:bg-violet-100 text-violet-700 text-xs font-bold rounded-lg border border-violet-200 transition-colors shadow-sm whitespace-nowrap active:scale-95"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-violet-900 w-20">Mật khẩu:</span>
+                                            {isEditing && isAdmin ? (
+                                                <input
+                                                    value={frameAccount.password}
+                                                    onChange={e => setFrameAccount({ ...frameAccount, password: e.target.value })}
+                                                    placeholder="Password"
+                                                    className="flex-1 p-2 text-sm bg-white border border-violet-200 rounded-lg outline-none focus:border-violet-400 font-mono"
+                                                />
+                                            ) : (
+                                                <div className="flex-1 p-2 text-sm bg-white/60 border border-violet-100 rounded-lg text-zinc-700 font-mono">
+                                                    {frameAccount.password || '---'}
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={() => { navigator.clipboard.writeText(frameAccount.password); toast.success('Đã copy mật khẩu'); }}
+                                                className="px-3 py-2 bg-white hover:bg-violet-100 text-violet-700 text-xs font-bold rounded-lg border border-violet-200 transition-colors shadow-sm whitespace-nowrap active:scale-95"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>

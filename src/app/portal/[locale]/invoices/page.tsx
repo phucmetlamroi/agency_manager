@@ -11,12 +11,13 @@ export default async function PortalInvoicesPage() {
     const session = await getSession();
     if (!session) redirect('/login');
 
-    // For simplicity, we just use the first workspace they belong to if they don't have one selected in URL.
-    // The previous implementation used URL routing `/[workspaceId]/...`
-    // Next-intl hijacked `/[locale]/`. If we are at `/[locale]/portal/invoices`, where is workspaceId?
-    // From session? Let's check session or db.
+    // Fetch real data
+    const workspaceId = 'legacy';
+    const [invoices, projects] = await Promise.all([
+        getClientInvoices(workspaceId),
+        getClientProjects(workspaceId)
+    ]);
 
-    // For now, let's just render the dashboard structure.
     const t = await getTranslations('Portal');
 
     return (
@@ -25,7 +26,7 @@ export default async function PortalInvoicesPage() {
                 <h1 className="text-3xl font-light text-white tracking-tight">{t('your_invoices')}</h1>
             </div>
 
-            <InvoiceDashboard />
+            <InvoiceDashboard initialInvoices={invoices} initialProjects={projects} />
         </div>
     );
 }

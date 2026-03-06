@@ -4,15 +4,19 @@ import { useState } from 'react';
 import { Search, Filter, MoreVertical, CreditCard, Download, ExternalLink, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Mock data for UI presentation
-const MOCK_INVOICES = [
-    { id: '1', number: 'INV-2026-001', amount: 1500, status: 'PENDING', date: '2026-03-01', project: 'Summer Campaign' },
-    { id: '2', number: 'INV-2026-002', amount: 3200, status: 'PAID', date: '2026-02-15', project: 'Brand Refresh' },
-    { id: '3', number: 'INV-2026-003', amount: 850, status: 'OVERDUE', date: '2026-01-20', project: 'Social Media Shorts' },
-];
-
-export default function InvoiceDashboard() {
+export default function InvoiceDashboard({
+    initialInvoices,
+    initialProjects
+}: {
+    initialInvoices: any[];
+    initialProjects: any[];
+}) {
     const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+    const [search, setSearch] = useState('');
+
+    const filteredInvoices = initialInvoices.filter(inv =>
+        inv.invoiceNumber.toLowerCase().includes(search.toLowerCase())
+    );
 
     return (
         <div className="flex-1 flex gap-6 min-h-0 relative">
@@ -31,12 +35,12 @@ export default function InvoiceDashboard() {
                 <div className="bg-zinc-900/50 backdrop-blur border border-zinc-800 rounded-xl p-4 flex-1">
                     <h3 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-4">Projects</h3>
                     <ul className="space-y-2">
-                        <li className="text-zinc-500 text-sm py-1 px-2 hover:text-zinc-300 cursor-pointer transition-colors flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> Summer Campaign
-                        </li>
-                        <li className="text-zinc-500 text-sm py-1 px-2 hover:text-zinc-300 cursor-pointer transition-colors flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Brand Refresh
-                        </li>
+                        {initialProjects.length === 0 && <li className="text-zinc-500 text-sm py-1 px-2 italic">No projects</li>}
+                        {initialProjects.map(proj => (
+                            <li key={proj.id} className="text-zinc-500 text-sm py-1 px-2 hover:text-zinc-300 cursor-pointer transition-colors flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> {proj.name}
+                            </li>
+                        ))}
                     </ul>
                 </div>
             </div>
@@ -49,6 +53,8 @@ export default function InvoiceDashboard() {
                         <input
                             type="text"
                             placeholder="Search invoices..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
                             className="w-full bg-zinc-900/80 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-zinc-600"
                         />
                     </div>
@@ -57,15 +63,19 @@ export default function InvoiceDashboard() {
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-20 aspect-auto">
-                    {MOCK_INVOICES.map(inv => (
-                        <InvoiceCard
-                            key={inv.id}
-                            invoice={inv}
-                            onClick={() => setSelectedInvoice(inv)}
-                            isActive={selectedInvoice?.id === inv.id}
-                        />
-                    ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-20 aspect-auto text-left">
+                    {filteredInvoices.length === 0 ? (
+                        <div className="col-span-full py-20 text-center text-zinc-500">No invoices found.</div>
+                    ) : (
+                        filteredInvoices.map(inv => (
+                            <InvoiceCard
+                                key={inv.id}
+                                invoice={inv}
+                                onClick={() => setSelectedInvoice(inv)}
+                                isActive={selectedInvoice?.id === inv.id}
+                            />
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -80,7 +90,7 @@ export default function InvoiceDashboard() {
                         className="w-80 lg:w-96 bg-zinc-900/90 backdrop-blur-2xl border-l border-zinc-800/50 shadow-2xl absolute right-0 top-0 bottom-0 z-10 flex flex-col"
                     >
                         <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
-                            <h2 className="text-lg font-medium text-white">{selectedInvoice.number}</h2>
+                            <h2 className="text-lg font-medium text-white">{selectedInvoice.invoiceNumber}</h2>
                             <button onClick={() => setSelectedInvoice(null)} className="text-zinc-500 hover:text-white transition-colors p-1 rounded-md hover:bg-zinc-800">
                                 <X size={18} />
                             </button>
@@ -89,10 +99,10 @@ export default function InvoiceDashboard() {
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             <div className="space-y-1">
                                 <p className="text-zinc-500 text-xs uppercase tracking-wider">Total Due</p>
-                                <p className="text-3xl font-light text-white">${selectedInvoice.amount.toLocaleString()}</p>
+                                <p className="text-3xl font-light text-white">${Number(selectedInvoice.totalDue).toLocaleString()}</p>
                                 <div className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${selectedInvoice.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                        selectedInvoice.status === 'OVERDUE' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                                            'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                    selectedInvoice.status === 'OVERDUE' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                                        'bg-amber-500/10 text-amber-400 border-amber-500/20'
                                     }`}>
                                     {selectedInvoice.status}
                                 </div>
@@ -117,12 +127,14 @@ export default function InvoiceDashboard() {
                                 <dl className="space-y-2 text-sm">
                                     <div className="flex justify-between">
                                         <dt className="text-zinc-500">Date Issued</dt>
-                                        <dd className="text-zinc-300">{selectedInvoice.date}</dd>
+                                        <dd className="text-zinc-300">{new Date(selectedInvoice.issueDate).toLocaleDateString()}</dd>
                                     </div>
-                                    <div className="flex justify-between">
-                                        <dt className="text-zinc-500">Project</dt>
-                                        <dd className="text-zinc-300 text-right">{selectedInvoice.project}</dd>
-                                    </div>
+                                    {selectedInvoice.dueDate && (
+                                        <div className="flex justify-between">
+                                            <dt className="text-zinc-500">Due Date</dt>
+                                            <dd className="text-zinc-300">{new Date(selectedInvoice.dueDate).toLocaleDateString()}</dd>
+                                        </div>
+                                    )}
                                 </dl>
                             </div>
                         </div>
@@ -169,14 +181,14 @@ function InvoiceCard({ invoice, onClick, isActive }: { invoice: any, onClick: ()
             <div className="absolute bottom-0 left-0 right-0 p-4">
                 <div className="flex justify-between items-end">
                     <div>
-                        <p className="text-xs text-zinc-400 mb-1">{invoice.date}</p>
-                        <h4 className="text-white font-medium text-sm truncate w-32">{invoice.number}</h4>
+                        <p className="text-xs text-zinc-400 mb-1">{new Date(invoice.issueDate).toLocaleDateString()}</p>
+                        <h4 className="text-white font-medium text-sm truncate w-32">{invoice.invoiceNumber}</h4>
                     </div>
                     <div className="text-right">
-                        <p className="text-lg font-light text-white">${invoice.amount}</p>
+                        <p className="text-lg font-light text-white">${Number(invoice.totalDue)}</p>
                         <div className={`mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${invoice.status === 'PAID' ? 'text-emerald-400' :
-                                invoice.status === 'OVERDUE' ? 'text-rose-400' :
-                                    'text-amber-400'
+                            invoice.status === 'OVERDUE' ? 'text-rose-400' :
+                                'text-amber-400'
                             }`}>
                             {invoice.status}
                         </div>

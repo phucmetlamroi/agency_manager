@@ -3,8 +3,8 @@ import { Link } from '@/i18n/routing';
 import { ArrowLeft, Clock, FileVideo, MessageSquareQuote } from 'lucide-react';
 import RatingMicroSurvey from '@/components/portal/RatingMicroSurvey';
 
-export default async function PortalTaskDetail({ params }: { params: { id: string } }) {
-    // const { id } = params;
+export default async function PortalTaskDetail({ params }: { params: Promise<{ id: string }> }) {
+    // const { id } = await params;
 
     // Abstracted task status & mock data
     const task = {

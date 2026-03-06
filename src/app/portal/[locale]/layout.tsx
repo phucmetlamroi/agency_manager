@@ -1,10 +1,11 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { notFound, redirect } from 'next/navigation'
-import { routing, Link } from '@/i18n/routing'
+import { routing } from '@/i18n/routing'
 import { getSession } from '@/lib/auth'
 import { FileText, CheckSquare, LogOut } from 'lucide-react'
 import { ReactNode } from 'react'
+import Link from 'next/link'
 
 export default async function LocaleLayout({
     children,
@@ -38,8 +39,8 @@ export default async function LocaleLayout({
                         </div>
 
                         <nav className="space-y-2">
-                            <SidebarLink href="/invoices" icon={<FileText size={18} />} label="Hóa đơn" />
-                            <SidebarLink href="/tasks" icon={<CheckSquare size={18} />} label="Tác vụ" />
+                            <SidebarLink locale={locale} href="/invoices" icon={<FileText size={18} />} label="Hóa đơn" />
+                            <SidebarLink locale={locale} href="/tasks" icon={<CheckSquare size={18} />} label="Tác vụ" />
                         </nav>
                     </div>
 
@@ -66,10 +67,10 @@ export default async function LocaleLayout({
     );
 }
 
-function SidebarLink({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
+function SidebarLink({ locale, href, icon, label }: { locale: string, href: string; icon: ReactNode; label: string }) {
     return (
         <Link
-            href={href}
+            href={`/portal/${locale}${href}`}
             className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-400 rounded-lg hover:bg-zinc-800/50 hover:text-indigo-300 transition-all duration-300 hover:shadow-[inset_2px_0_0_rgba(99,102,241,1)]"
         >
             {icon}

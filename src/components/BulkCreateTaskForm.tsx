@@ -100,10 +100,9 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
             jobPriceUSD: usd,
             exchangeRate: rate,
             wageVND: wage,
-            resources: (linkRaw || linkBroll) ? `RAW: ${linkRaw.trim()} | BROLL: ${linkBroll.trim()}` : null,
+            resources: (linkRaw || linkBroll || submissionFolder) ? `RAW: ${linkRaw.trim()} | BROLL: ${linkBroll.trim()} | SUBMISSION: ${submissionFolder.trim()}` : null,
             references: references || null,
             collectFilesLink: collectFilesLink || null,
-            submissionFolder: submissionFolder || null,
             notes: notes || null,
             type
         }, workspaceId)

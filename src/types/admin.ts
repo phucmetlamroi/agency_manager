@@ -10,7 +10,6 @@ export type TaskWithUser = { // Updated with Client Info
     fileLink: string | null
     productLink: string | null
     collectFilesLink?: string | null
-    submissionFolder?: string | null
     notes: string | null
     assigneeId?: string | null
     assignedAgencyId?: string | null // For tasks assigned to agency queue

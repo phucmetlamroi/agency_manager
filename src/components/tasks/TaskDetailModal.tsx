@@ -55,10 +55,16 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             const resString = task.resources || task.fileLink || ''
             let raw = ''
             let broll = ''
-            if (resString.includes('RAW:') && resString.includes('| BROLL:')) {
-                const parts = resString.split('| BROLL:')
-                raw = parts[0].replace('RAW:', '').trim()
-                broll = parts[1].trim()
+            let submission = ''
+
+            if (resString.startsWith('RAW:')) {
+                const parts = resString.split('|')
+                parts.forEach(p => {
+                    const cleanIdx = p.trim()
+                    if (cleanIdx.startsWith('RAW:')) raw = cleanIdx.replace('RAW:', '').trim()
+                    if (cleanIdx.startsWith('BROLL:')) broll = cleanIdx.replace('BROLL:', '').trim()
+                    if (cleanIdx.startsWith('SUBMISSION:')) submission = cleanIdx.replace('SUBMISSION:', '').trim()
+                })
             } else {
                 raw = resString
             }
@@ -81,7 +87,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 jobPriceUSD: task.jobPriceUSD || 0,
                 value: task.value || 0,
                 collectFilesLink: task.collectFilesLink || '',
-                submissionFolder: task.submissionFolder || ''
+                submissionFolder: submission
             })
             setIsEditing(false)
         }
@@ -90,8 +96,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     if (!isOpen || !localTask) return null
 
     const handleSave = async () => {
-        const combinedResources = (form.linkRaw || form.linkBroll)
-            ? `RAW: ${form.linkRaw.trim()} | BROLL: ${form.linkBroll.trim()}`
+        const combinedResources = (form.linkRaw || form.linkBroll || form.submissionFolder)
+            ? `RAW: ${form.linkRaw.trim()} | BROLL: ${form.linkBroll.trim()} | SUBMISSION: ${form.submissionFolder.trim()}`
             : form.resources
 
         // Sanitize notes before saving
@@ -112,8 +118,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 deadline: form.deadline || undefined,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
                 value: isAdmin ? Number(form.value) : undefined,
-                collectFilesLink: form.collectFilesLink,
-                submissionFolder: form.submissionFolder
+                collectFilesLink: form.collectFilesLink
             }
 
             const res = await bulkUpdateTaskDetails(bulkSelectedIds, bulkData, workspaceId)
@@ -138,8 +143,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             deadline: form.deadline || undefined,
             jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
             value: isAdmin ? Number(form.value) : undefined,
-            collectFilesLink: form.collectFilesLink,
-            submissionFolder: form.submissionFolder
+            collectFilesLink: form.collectFilesLink
         }, workspaceId)
 
         if (res?.success) {
@@ -151,8 +155,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 productLink: form.productLink,
                 value: isAdmin ? Number(form.value) : prev.value,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : prev.jobPriceUSD,
-                collectFilesLink: form.collectFilesLink,
-                submissionFolder: form.submissionFolder
+                collectFilesLink: form.collectFilesLink
             }) : null)
 
             setIsEditing(false)
@@ -312,12 +315,12 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                                 <span>✨</span> PROJECT MẪU ↗
                                             </a>
                                         )}
-                                        {localTask.submissionFolder && (
-                                            <a href={formatLink(localTask.submissionFolder)} target="_blank" className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl text-sm font-black text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all">
+                                        {form.submissionFolder && (
+                                            <a href={formatLink(form.submissionFolder)} target="_blank" className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl text-sm font-black text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all">
                                                 <span>📂</span> FOLDER NỘP FILE ↗
                                             </a>
                                         )}
-                                        {!form.linkRaw && !form.linkBroll && !localTask.collectFilesLink && !localTask.submissionFolder && (
+                                        {!form.linkRaw && !form.linkBroll && !localTask.collectFilesLink && !form.submissionFolder && (
                                             <div className="text-zinc-400 italic text-xs p-3">No assets linked</div>
                                         )}
                                     </div>

@@ -164,74 +164,57 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     }
 
     return (
-        <div style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999
-        }} onClick={onClose}>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="p-0 border-none bg-white text-zinc-950 sm:rounded-[28px] max-w-2xl overflow-hidden shadow-2xl transition-all">
+                {/* STICKY HEADER */}
+                <div className="sticky top-0 z-[60] bg-white/80 backdrop-blur-xl border-b border-zinc-100 px-8 py-6 flex items-start justify-between gap-4">
+                    <div className="flex flex-col gap-1 pr-12">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-600">
+                            Task Details & Actions
+                        </span>
+                        <h2 className="text-xl font-black text-zinc-900 leading-tight">
+                            {localTask.title}
+                        </h2>
+                        {bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id) && (
+                            <div className="mt-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-700 flex items-center gap-1.5 w-fit">
+                                <span className="animate-pulse">⚠️</span>
+                                <span className="font-bold">BULK MODE:</span>
+                                <span>Modify {bulkSelectedIds.length} tasks</span>
+                            </div>
+                        )}
+                    </div>
 
-            <div style={{
-                background: 'white', color: '#1a1a1a',
-                width: '90%', maxWidth: '600px',
-                borderRadius: '24px', padding: '1.5rem',
-                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-                position: 'relative',
-                display: 'flex', flexDirection: 'column', gap: '1.5rem',
-                animation: 'fadeIn 0.2s ease-out',
-                maxHeight: '85vh', overflowY: 'auto'
-            }} onClick={(e) => e.stopPropagation()}>
-
-                {/* HEADER Buttons */}
-                <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '0.5rem' }}>
-                    {(isAdmin || !isEditing) && (
-                        <button
-                            onClick={() => setIsEditing(!isEditing)}
-                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${isEditing ? 'bg-gray-100 text-black border border-gray-200' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
-                        >
-                            {isEditing ? 'Cancel' : (isAdmin ? 'Edit All' : 'Nộp bài / Ghi chú')}
-                        </button>
-                    )}
-                    <button onClick={onClose}
-                        className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-lg"
-                    >
-                        ×
-                    </button>
+                    <div className="flex items-center gap-2 mt-1">
+                        {(isAdmin || !isEditing) && (
+                            <button
+                                onClick={() => setIsEditing(!isEditing)}
+                                className={`whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-sm ${isEditing ? 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200' : 'bg-zinc-900 text-white hover:bg-zinc-800'}`}
+                            >
+                                {isEditing ? 'Cancel' : (isAdmin ? 'Edit All' : 'Submit / Note')}
+                            </button>
+                        )}
+                    </div>
                 </div>
 
-                <div>
-                    <span className="text-xs font-bold uppercase tracking-widest text-violet-500">
-                        PROJECT DETAILS
-                    </span>
-                    <h2 className="text-2xl font-extrabold mt-1 leading-tight">
-                        {localTask.title}
-                    </h2>
-                    {bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id) && (
-                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700 flex items-center gap-2 animate-pulse w-fit">
-                            <span>⚠️</span>
-                            <span className="font-bold">BULK MODE:</span>
-                            <span>Applying to {bulkSelectedIds.length} tasks.</span>
-                        </div>
-                    )}
-                </div>
+                {/* SCROLLABLE BODY */}
+                <div className="max-h-[75vh] overflow-y-auto px-8 py-6 space-y-8 custom-scrollbar">
+                    <div className="flex flex-col gap-8">
 
-                <div className="flex flex-col gap-4">
+                        {/* PRODUCT DELIVERY */}
+                        <div className="space-y-3">
+                            <label className="text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px]">🎯</span>
+                                THÀNH PHẨM (Delivery)
+                            </label>
 
-                    {/* PRODUCT DELIVERY */}
-                    <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50">
-                        <label className="block text-xs font-bold text-blue-500 mb-2 uppercase">
-                            🎯 THÀNH PHẨM (Delivery)
-                        </label>
-
-                        {(!localTask.productLink && !isAdmin) || isEditingLink ? (
-                            <div className="flex bg-white rounded-md border border-blue-200 overflow-hidden">
-                                <input
-                                    value={form.productLink}
-                                    onChange={(e) => setForm({ ...form, productLink: e.target.value })}
-                                    placeholder="Dán link sản phẩm (Drive/Youtube)..."
-                                    className="flex-1 p-2 text-sm outline-none text-blue-900"
-                                />
-                                <div className="flex border-l border-blue-100">
+                            {(!localTask.productLink && !isAdmin) || isEditingLink ? (
+                                <div className="flex flex-col gap-3 p-4 bg-blue-50/30 rounded-2xl border border-blue-100 shadow-inner">
+                                    <input
+                                        value={form.productLink}
+                                        onChange={(e) => setForm({ ...form, productLink: e.target.value })}
+                                        placeholder="Dán link sản phẩm (Google Drive, Youtube, ...)"
+                                        className="w-full bg-white p-3 rounded-xl text-sm border border-blue-200 focus:ring-2 focus:ring-blue-400 outline-none shadow-sm transition-all"
+                                    />
                                     <button
                                         onClick={async () => {
                                             await handleSave();
@@ -245,188 +228,191 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                             }
                                             setIsEditingLink(false);
                                         }}
-                                        className="px-3 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1 transition-colors"
+                                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                                     >
-                                        ✓ Xác nhận
+                                        ✓ Xác nhận Nộp Bài
                                     </button>
                                 </div>
-                            </div>
-                        ) : (
-                            localTask.productLink ? (
-                                <div className="flex flex-col gap-2">
-                                    <a href={formatLink(localTask.productLink)} target="_blank" className="block p-3 bg-white rounded-lg border border-blue-200 text-blue-600 font-bold hover:shadow-md transition-shadow text-center">
-                                        🔗 Mở link sản phẩm
-                                    </a>
-                                    <div className="flex justify-end gap-2 text-xs">
+                            ) : (
+                                localTask.productLink ? (
+                                    <div className="group relative">
+                                        <a
+                                            href={formatLink(localTask.productLink)}
+                                            target="_blank"
+                                            className="flex items-center justify-between p-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 group"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <span className="text-xl">🔗</span>
+                                                Mở Link Sản Phẩm
+                                            </span>
+                                            <span className="text-blue-200 group-hover:translate-x-1 transition-transform">→</span>
+                                        </a>
                                         <button
                                             onClick={() => setIsEditingLink(true)}
-                                            className="text-gray-400 hover:text-blue-500 underline"
+                                            className="absolute -top-2 -right-2 w-8 h-8 bg-white border border-blue-100 rounded-full shadow-md flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Edit link"
                                         >
-                                            Sửa link (Edit)
+                                            ✏️
                                         </button>
                                     </div>
-                                </div>
-                            ) : <span className="text-gray-400 italic text-sm">Chưa có link thành phẩm.</span>
-                        )}
-                    </div>
-
-                    {/* RESOURCES SECTION */}
-                    <div className="p-3 rounded-xl border border-gray-100">
-                        <label className="block text-xs font-bold text-gray-400 mb-2">
-                            RESOURCES
-                        </label>
-                        {isEditing && isAdmin ? (
-                            <div className="flex flex-col gap-2">
-                                <input
-                                    value={form.linkRaw}
-                                    onChange={(e) => setForm({ ...form, linkRaw: e.target.value })}
-                                    placeholder="Link RAW (Source)..."
-                                    className="w-full p-2 border border-gray-200 rounded text-sm text-black"
-                                />
-                                <input
-                                    value={form.linkBroll}
-                                    onChange={(e) => setForm({ ...form, linkBroll: e.target.value })}
-                                    placeholder="Link B-Roll (Tài nguyên)..."
-                                    className="w-full p-2 border border-blue-200 rounded text-sm text-black"
-                                />
-                                <input
-                                    value={form.collectFilesLink || ''}
-                                    onChange={(e) => setForm({ ...form, collectFilesLink: e.target.value })}
-                                    placeholder="Link Collect Files (Project mẫu)..."
-                                    className="w-full p-2 border border-yellow-200 rounded text-sm text-black bg-yellow-50"
-                                />
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-2">
-                                {form.linkRaw && (
-                                    <a href={formatLink(form.linkRaw)} target="_blank" className="text-blue-600 font-semibold hover:underline flex items-center gap-1">
-                                        📁 RAW Link ↗
-                                    </a>
-                                )}
-                                {form.linkBroll && (
-                                    <a href={formatLink(form.linkBroll)} target="_blank" className="text-purple-600 font-semibold hover:underline flex items-center gap-1">
-                                        🎨 B-Roll Link ↗
-                                    </a>
-                                )}
-                                {localTask.collectFilesLink && (
-                                    <a href={formatLink(localTask.collectFilesLink)} target="_blank" className="text-yellow-600 font-bold hover:underline flex items-center gap-2 mt-1">
-                                        🌼 Collect Files (Project Mẫu) ↗
-                                    </a>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* REFERENCES */}
-                    <div className="p-3 rounded-xl border border-purple-100 bg-purple-50/50">
-                        <label className="block text-xs font-bold text-purple-500 mb-2">
-                            REFERENCES / SAMPLES
-                        </label>
-                        {isEditing ? (
-                            <input
-                                value={form.references}
-                                onChange={(e) => setForm({ ...form, references: e.target.value })}
-                                placeholder="Link tham khảo (Youtube/Drive)..."
-                                className="w-full p-2 border border-purple-200 rounded text-sm text-black"
-                            />
-                        ) : (
-                            localTask.references ? (
-                                <a href={formatLink(localTask.references)} target="_blank" className="text-purple-600 font-bold hover:underline flex items-center gap-2">
-                                    📺 Xem Reference Video ↗
-                                </a>
-                            ) : <span className="text-gray-400 italic text-sm">No references provided.</span>
-                        )}
-                    </div>
-
-                    {/* DEADLINE (Visible to everyone) */}
-                    <div className="p-3 rounded-xl border border-red-100 bg-red-50/20">
-                        <label className="block text-xs font-bold text-red-500 mb-2">
-                            DEADLINE
-                        </label>
-                        {isEditing && isAdmin ? (
-                            <input
-                                type="datetime-local"
-                                value={form.deadline}
-                                onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                                className="w-full p-2 border border-red-200 rounded text-sm font-bold text-red-600 bg-white"
-                            />
-                        ) : (
-                            <div className="flex items-center gap-2">
-                                <span className={form.deadline && new Date() > new Date(form.deadline) && localTask?.status !== 'Hoàn tất' ? "text-red-600 font-bold text-base" : "text-gray-800 font-bold text-base"}>
-                                    {form.deadline ? `${new Date(form.deadline).toLocaleDateString('vi-VN')} ${new Date(form.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : 'No Deadline'}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* FINANCIALS (Admin Only) */}
-                    {isAdmin && (
-                        <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/50">
-                            <label className="block text-xs font-bold text-gray-500 mb-2">
-                                FINANCE & DEADLINE
-                            </label>
-                            <div className="grid grid-cols-2 gap-4 mb-2">
-                                <div>
-                                    <label className="text-[10px] text-gray-400 font-bold mb-1 block">GIÁ JOB ($)</label>
-                                    {isEditing ? (
-                                        <input
-                                            type="number"
-                                            value={form.jobPriceUSD}
-                                            onChange={(e) => setForm({ ...form, jobPriceUSD: parseFloat(e.target.value) || 0 })}
-                                            className="w-full p-1 border rounded text-sm font-mono text-green-600 font-bold"
-                                        />
-                                    ) : (
-                                        <span className="font-mono text-green-600 font-bold text-sm">${form.jobPriceUSD}</span>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="text-[10px] text-gray-400 font-bold mb-1 block">LƯƠNG STAFF (VND)</label>
-                                    {isEditing ? (
-                                        <input
-                                            type="number"
-                                            value={form.value}
-                                            onChange={(e) => setForm({ ...form, value: parseFloat(e.target.value) || 0 })}
-                                            className="w-full p-1 border rounded text-sm font-mono text-yellow-600 font-bold"
-                                        />
-                                    ) : (
-                                        <span className="font-mono text-yellow-600 font-bold text-sm">{form.value.toLocaleString()} ₫</span>
-                                    )}
-                                </div>
-                            </div>
-
+                                ) : <div className="p-4 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200 text-zinc-400 italic text-sm text-center">Chưa có link thành phẩm.</div>
+                            )}
                         </div>
-                    )}
 
-                    {/* NOTES */}
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 mb-2">
-                            NOTES / INSTRUCTIONS
-                        </label>
-                        {isEditing ? (
-                            <div className="h-[500px] rounded-lg overflow-hidden">
-                                <TiptapEditor
-                                    content={form.notes}
-                                    onChange={(html) => setForm({ ...form, notes: html })}
-                                />
+                        {/* RESOURCES SECTION */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-3">
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-1">Resources</label>
+                                {isEditing && isAdmin ? (
+                                    <div className="space-y-2">
+                                        <input
+                                            value={form.linkRaw}
+                                            onChange={(e) => setForm({ ...form, linkRaw: e.target.value })}
+                                            placeholder="Link RAW Source..."
+                                            className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm outline-none focus:border-zinc-400"
+                                        />
+                                        <input
+                                            value={form.linkBroll}
+                                            onChange={(e) => setForm({ ...form, linkBroll: e.target.value })}
+                                            placeholder="Link B-Roll..."
+                                            className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm outline-none focus:border-zinc-400"
+                                        />
+                                        <input
+                                            value={form.collectFilesLink || ''}
+                                            onChange={(e) => setForm({ ...form, collectFilesLink: e.target.value })}
+                                            placeholder="Link Project Mẫu..."
+                                            className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm outline-none font-bold text-amber-900"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-2">
+                                        {form.linkRaw && (
+                                            <a href={formatLink(form.linkRaw)} target="_blank" className="flex items-center gap-2 p-3 bg-zinc-50 rounded-xl text-sm font-bold text-zinc-900 hover:bg-zinc-100 border border-transparent hover:border-zinc-200 transition-all">
+                                                <span className="text-blue-500">📁</span> RAW Assets ↗
+                                            </a>
+                                        )}
+                                        {form.linkBroll && (
+                                            <a href={formatLink(form.linkBroll)} target="_blank" className="flex items-center gap-2 p-3 bg-zinc-50 rounded-xl text-sm font-bold text-zinc-900 hover:bg-zinc-100 border border-transparent hover:border-zinc-200 transition-all">
+                                                <span className="text-purple-500">🎨</span> B-Roll Assets ↗
+                                            </a>
+                                        )}
+                                        {localTask.collectFilesLink && (
+                                            <a href={formatLink(localTask.collectFilesLink)} target="_blank" className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl text-sm font-black text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all">
+                                                <span>✨</span> PROJECT MẪU ↗
+                                            </a>
+                                        )}
+                                        {!form.linkRaw && !form.linkBroll && !localTask.collectFilesLink && (
+                                            <div className="text-zinc-400 italic text-xs p-3">No assets linked</div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <div
-                                className="bg-amber-50 p-4 rounded-xl text-amber-900 text-sm leading-relaxed prose prose-sm max-w-none"
-                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(localTask.notes || "No specific instructions.") }}
-                            />
-                        )}
+
+                            <div className="space-y-3">
+                                <label className="text-[11px] font-bold text-purple-500 uppercase tracking-widest px-1">References</label>
+                                {isEditing ? (
+                                    <input
+                                        value={form.references}
+                                        onChange={(e) => setForm({ ...form, references: e.target.value })}
+                                        placeholder="Reference Links..."
+                                        className="w-full p-2.5 bg-purple-50/30 border border-purple-100 rounded-xl text-sm outline-none focus:border-purple-300"
+                                    />
+                                ) : (
+                                    localTask.references ? (
+                                        <a href={formatLink(localTask.references)} target="_blank" className="flex items-center gap-2 p-3 bg-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all">
+                                            <span>📺</span> View Reference ↗
+                                        </a>
+                                    ) : <div className="text-zinc-400 italic text-xs p-3 bg-zinc-50 rounded-xl border border-zinc-100">None provided</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* DEADLINE & FINANCE */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div className="p-4 rounded-2xl bg-rose-50/30 border border-rose-100 space-y-2">
+                                <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Deadline</label>
+                                {isEditing && isAdmin ? (
+                                    <input
+                                        type="datetime-local"
+                                        value={form.deadline}
+                                        onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                                        className="w-full bg-white p-2 border border-rose-200 rounded-lg text-sm font-bold text-rose-600"
+                                    />
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-lg font-black ${form.deadline && new Date() > new Date(form.deadline) && localTask?.status !== 'Hoàn tất' ? "text-rose-600" : "text-zinc-800"}`}>
+                                            {form.deadline ? `${new Date(form.deadline).toLocaleDateString('vi-VN')} @ ${new Date(form.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : 'No Limit'}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {isAdmin && (
+                                <div className="p-4 rounded-2xl bg-zinc-900 text-white space-y-3 shadow-xl">
+                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Finance info</label>
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <p className="text-[9px] text-zinc-500 uppercase font-bold">Client ($)</p>
+                                            {isEditing ? (
+                                                <input
+                                                    type="number"
+                                                    value={form.jobPriceUSD}
+                                                    onChange={(e) => setForm({ ...form, jobPriceUSD: parseFloat(e.target.value) || 0 })}
+                                                    className="bg-zinc-800 border-none rounded p-1 text-sm w-16 font-mono text-emerald-400"
+                                                />
+                                            ) : (
+                                                <p className="text-lg font-mono font-black text-emerald-400">${form.jobPriceUSD}</p>
+                                            )}
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] text-zinc-500 uppercase font-bold">Staff (VND)</p>
+                                            {isEditing ? (
+                                                <input
+                                                    type="number"
+                                                    value={form.value}
+                                                    onChange={(e) => setForm({ ...form, value: parseFloat(e.target.value) || 0 })}
+                                                    className="bg-zinc-800 border-none rounded p-1 text-sm w-24 font-mono text-amber-400 text-right"
+                                                />
+                                            ) : (
+                                                <p className="text-lg font-mono font-black text-amber-400">{form.value.toLocaleString()}₫</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* NOTES */}
+                        <div className="space-y-3">
+                            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-1">Notes & Instructions</label>
+                            {isEditing ? (
+                                <div className="h-[400px] border border-zinc-200 rounded-2xl overflow-hidden shadow-inner">
+                                    <TiptapEditor
+                                        content={form.notes}
+                                        onChange={(html) => setForm({ ...form, notes: html })}
+                                    />
+                                </div>
+                            ) : (
+                                <div
+                                    className="bg-zinc-50 p-6 rounded-2xl text-zinc-800 text-[14px] leading-[1.6] prose prose-zinc max-w-none border border-zinc-100"
+                                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(localTask.notes || "No specific instructions.") }}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
 
                 {isEditing && (
-                    <button
-                        onClick={handleSave}
-                        className="w-full py-3 bg-black text-white font-bold rounded-xl hover:bg-gray-800 transition-colors"
-                    >
-                        Save Changes
-                    </button>
+                    <div className="p-6 bg-zinc-50 border-t border-zinc-100">
+                        <button
+                            onClick={handleSave}
+                            className="w-full py-4 bg-zinc-900 text-white font-black text-sm uppercase tracking-widest rounded-2xl hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200 active:scale-[0.98]"
+                        >
+                            Save Changes
+                        </button>
+                    </div>
                 )}
-            </div>
-        </div >
+            </DialogContent>
+        </Dialog>
     )
 }

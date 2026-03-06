@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { decrypt } from '@/lib/auth'
 
+import createIntlMiddleware from 'next-intl/middleware'
+import { routing } from '@/i18n/routing'
+
+const intlMiddleware = createIntlMiddleware(routing)
+
 export async function middleware(request: NextRequest) {
     const response = NextResponse.next()
 
@@ -58,6 +63,35 @@ export async function middleware(request: NextRequest) {
         // If trying to access exactly root '/', push to workspaces
         if (request.nextUrl.pathname === '/') {
             return NextResponse.redirect(new URL('/workspaces', request.url))
+        }
+
+        // ReBAC Security: Isolate CLIENT role
+        if (role === 'CLIENT') {
+            // If they are trying to access admin, finance, dashboard, queue, etc.
+            if (request.nextUrl.pathname.includes('/admin') ||
+                request.nextUrl.pathname.includes('/dashboard') ||
+                request.nextUrl.pathname.includes('/agency')) {
+                // Redirect to their portal or workspace selection
+                const isWorkspaceRoute = request.nextUrl.pathname.match(/^\/([^/]+)\//)
+                if (isWorkspaceRoute && isWorkspaceRoute[1] !== 'workspaces' && isWorkspaceRoute[1] !== 'portal' && !routing.locales.includes(isWorkspaceRoute[1] as any)) {
+                    // Redirect to portal within that workspace, or general portal
+                    // Since new Client Portal uses /portal, we just dump them to /portal
+                    return NextResponse.redirect(new URL(`/portal`, request.url))
+                }
+                if (!request.nextUrl.pathname.includes('/portal')) {
+                    return NextResponse.redirect(new URL('/portal', request.url))
+                }
+            }
+        }
+
+        // Apply i18n routing only to /portal paths 
+        // (including /en/portal, /vi/portal, etc. or bare /portal)
+        const isPortalRoute = request.nextUrl.pathname.includes('/portal') || routing.locales.some(loc => request.nextUrl.pathname.startsWith(`/${loc}`))
+        if (isPortalRoute) {
+            const intlResponse = intlMiddleware(request)
+            // Preserve device headers
+            intlResponse.headers.set('x-device-type', response.headers.get('x-device-type') || 'desktop')
+            return intlResponse
         }
 
         return response

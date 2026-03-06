@@ -1,0 +1,22 @@
+{
+    "Glossary": {
+        "workspace": "Workspace",
+        "task": "Task",
+        "status": "Status",
+        "revision": "Revision",
+        "invoice": "Invoice",
+        "rating": "Rating"
+    },
+    "TaskStatus": {
+        "pending": "Pending",
+        "in_progress": "In Progress",
+        "action_required": "Action Required",
+        "revising": "Revising",
+        "completed": "Completed"
+    },
+    "Portal": {
+        "welcome": "Welcome back",
+        "your_invoices": "Your Invoices",
+        "your_tasks": "Your Tasks"
+    }
+}

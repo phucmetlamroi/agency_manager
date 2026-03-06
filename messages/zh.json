@@ -1,0 +1,22 @@
+{
+    "Glossary": {
+        "workspace": "工作空间",
+        "task": "任务",
+        "status": "状态",
+        "revision": "修改",
+        "invoice": "发票",
+        "rating": "评分"
+    },
+    "TaskStatus": {
+        "pending": "待处理",
+        "in_progress": "进行中",
+        "action_required": "需要操作",
+        "revising": "修改中",
+        "completed": "已完成"
+    },
+    "Portal": {
+        "welcome": "欢迎回来",
+        "your_invoices": "您的发票",
+        "your_tasks": "您的任务"
+    }
+}

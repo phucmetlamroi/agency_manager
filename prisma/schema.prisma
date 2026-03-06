@@ -10,22 +10,23 @@ datasource db {
 
 model Workspace {
   id          String   @id @default(uuid())
-  name        String   
-  description String?  
+  name        String
+  description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  members     WorkspaceMember[]
-  tasks       Task[]
-  clients     Client[]
-  projects    Project[]
-  invoices    Invoice[]
-  payrolls    Payroll[]
-  bonuses     MonthlyBonus[]
+
+  members      WorkspaceMember[]
+  tasks        Task[]
+  clients      Client[]
+  projects     Project[]
+  invoices     Invoice[]
+  payrolls     Payroll[]
+  bonuses      MonthlyBonus[]
   payrollLocks PayrollLock[]
-  metrics     PerformanceMetric[]
-  feedbacks   Feedback[]
-  mediaTasks  MediaTask[]
+  metrics      PerformanceMetric[]
+  feedbacks    Feedback[]
+  mediaTasks   MediaTask[]
+  ratings      Rating[]
 
   @@index([name])
 }
@@ -37,8 +38,8 @@ model WorkspaceMember {
   role        String   @default("MEMBER") // "OWNER", "ADMIN", "MEMBER", "GUEST"
   joinedAt    DateTime @default(now())
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
   @@index([userId])
@@ -65,10 +66,15 @@ model User {
   bonuses           MonthlyBonus[]
   payrolls          Payroll[]
   metrics           PerformanceMetric[]
-  tasks             Task[]
+  tasks             Task[]              @relation("AssigneeTasks")
   mediaTasks        MediaTask[]
   agency            Agency?             @relation("AgencyMembers", fields: [agencyId], references: [id])
   workspaces        WorkspaceMember[]
+  clientTasks       Task[]              @relation("UserClientTasks")
+  clientProjects    Project[]           @relation("UserClientProjects")
+  clientInvoices    Invoice[]           @relation("UserClientInvoices")
+  clientRatings     Rating[]            @relation("ClientRatings")
+  staffRatings      Rating[]            @relation("StaffRatings")
 }
 
 model Payroll {
@@ -91,50 +97,52 @@ model Payroll {
 }
 
 model Task {
-  id                 String            @id @default(uuid())
-  title              String
-  deadline           DateTime?
-  value              Decimal           @default(0)
-  status             String            @default("Đang thực hiện")
-  type               String            @default("Short form")
-  references         String?
-  resources          String?
-  notes              String?
-  fileLink           String?
-  assigneeId         String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  productLink        String?
-  isPenalized        Boolean           @default(false)
-  exchangeRate       Decimal?          @default(25300)
-  jobPriceUSD        Decimal?          @default(0)
-  profitVND          Decimal?          @default(0)
-  wageVND            Decimal?          @default(0)
-  projectId          Int?
-  clientId           Int?
-  collectFilesLink   String?
-  assignedAgencyId   String?
-  version            Int               @default(0)
-  invoiceId          String?
-  invoiceStatus      InvoiceTaskStatus @default(UNBILLED)
-  isArchived         Boolean           @default(false)
-  feedbacks          Feedback[]
-  invoiceItems       InvoiceItem[]
-  assignedAgency     Agency?           @relation(fields: [assignedAgencyId], references: [id])
-  assignee           User?             @relation(fields: [assigneeId], references: [id])
-  client             Client?           @relation(fields: [clientId], references: [id])
-  invoice            Invoice?          @relation(fields: [invoiceId], references: [id])
-  project            Project?          @relation(fields: [projectId], references: [id])
-  workspaceId        String?
-  workspace          Workspace?        @relation(fields: [workspaceId], references: [id])
+  id               String            @id @default(uuid())
+  title            String
+  deadline         DateTime?
+  value            Decimal           @default(0)
+  status           String            @default("Đang thực hiện")
+  type             String            @default("Short form")
+  references       String?
+  resources        String?
+  notes            String?
+  fileLink         String?
+  assigneeId       String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  productLink      String?
+  isPenalized      Boolean           @default(false)
+  exchangeRate     Decimal?          @default(25300)
+  jobPriceUSD      Decimal?          @default(0)
+  profitVND        Decimal?          @default(0)
+  wageVND          Decimal?          @default(0)
+  projectId        Int?
+  clientId         Int?
+  collectFilesLink String?
+  assignedAgencyId String?
+  version          Int               @default(0)
+  invoiceId        String?
+  invoiceStatus    InvoiceTaskStatus @default(UNBILLED)
+  isArchived       Boolean           @default(false)
+  feedbacks        Feedback[]
+  invoiceItems     InvoiceItem[]
+  assignedAgency   Agency?           @relation(fields: [assignedAgencyId], references: [id])
+  assignee         User?             @relation("AssigneeTasks", fields: [assigneeId], references: [id])
+  client           Client?           @relation(fields: [clientId], references: [id])
+  clientUserId     String?
+  clientUser       User?             @relation("UserClientTasks", fields: [clientUserId], references: [id])
+  invoice          Invoice?          @relation(fields: [invoiceId], references: [id])
+  project          Project?          @relation(fields: [projectId], references: [id])
+  workspaceId      String?
+  workspace        Workspace?        @relation(fields: [workspaceId], references: [id])
+  rating           Rating?
 
   @@index([workspaceId, status])
   @@index([workspaceId, isArchived])
 }
 
-
 model MonthlyBonus {
-  id                 String   @id @default(uuid())
+  id                 String    @id @default(uuid())
   userId             String
   month              Int
   year               Int
@@ -142,8 +150,8 @@ model MonthlyBonus {
   revenue            Decimal
   executionTimeHours Float
   bonusAmount        Decimal
-  calculatedAt       DateTime @default(now())
-  user               User     @relation(fields: [userId], references: [id])
+  calculatedAt       DateTime  @default(now())
+  user               User      @relation(fields: [userId], references: [id])
   workspaceId        String
   workspace          Workspace @relation(fields: [workspaceId], references: [id])
 
@@ -185,16 +193,18 @@ model Client {
 }
 
 model Project {
-  id        Int        @id @default(autoincrement())
-  name      String
-  code      String?
-  clientId  Int
-  createdAt DateTime   @default(now())
-  feedbacks Feedback[]
-  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  tasks     Task[]
-  workspaceId String?
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  id           Int        @id @default(autoincrement())
+  name         String
+  code         String?
+  clientId     Int
+  createdAt    DateTime   @default(now())
+  feedbacks    Feedback[]
+  client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+  workspaceId  String?
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id])
+  clientUserId String?
+  clientUser   User?      @relation("UserClientProjects", fields: [clientUserId], references: [id])
 }
 
 model Feedback {
@@ -214,25 +224,24 @@ model Feedback {
 }
 
 model PerformanceMetric {
-  id                    String   @id @default(uuid())
+  id                    String    @id @default(uuid())
   userId                String
   month                 Int
   year                  Int
-  revenue               Decimal  @default(0)
-  avgCompletionTime     Int      @default(0)
-  onTimeRate            Float    @default(100)
-  internalRevisionCount Int      @default(0)
-  clientRevisionCount   Int      @default(0)
-  score                 Float    @default(0)
-  classification        String   @default("NORMAL")
-  measuredAt            DateTime @default(now())
-  user                  User     @relation(fields: [userId], references: [id])
+  revenue               Decimal   @default(0)
+  avgCompletionTime     Int       @default(0)
+  onTimeRate            Float     @default(100)
+  internalRevisionCount Int       @default(0)
+  clientRevisionCount   Int       @default(0)
+  score                 Float     @default(0)
+  classification        String    @default("NORMAL")
+  measuredAt            DateTime  @default(now())
+  user                  User      @relation(fields: [userId], references: [id])
   workspaceId           String
   workspace             Workspace @relation(fields: [workspaceId], references: [id])
 
   @@unique([userId, month, year, workspaceId], name: "userId_month_year_workspaceId")
 }
-
 
 model Agency {
   id        String   @id @default(uuid())
@@ -246,7 +255,6 @@ model Agency {
   tasks     Task[]
   members   User[]   @relation("AgencyMembers")
 }
-
 
 model BillingProfile {
   id              String   @id @default(uuid())
@@ -285,7 +293,9 @@ model Invoice {
   items           InvoiceItem[]
   tasks           Task[]
   workspaceId     String?
-  workspace       Workspace?     @relation(fields: [workspaceId], references: [id])
+  workspace       Workspace?    @relation(fields: [workspaceId], references: [id])
+  clientUserId    String?
+  clientUser      User?         @relation("UserClientInvoices", fields: [clientUserId], references: [id])
 }
 
 model InvoiceItem {
@@ -313,11 +323,11 @@ enum ClientTier {
   standard
 }
 
-
 enum UserRole {
   ADMIN
   USER
   AGENCY_ADMIN
+  CLIENT
   LOCKED
 }
 
@@ -342,19 +352,41 @@ enum MediaTaskStatus {
 }
 
 model MediaTask {
-  id              String          @id @default(uuid())
-  workspaceId     String
-  requestedById   String
-  originalUrl     String          @db.Text
-  platform        String
-  fileSizeBytes   BigInt?
-  formatType      String
-  status          MediaTaskStatus @default(PENDING)
-  createdAt       DateTime        @default(now())
+  id            String          @id @default(uuid())
+  workspaceId   String
+  requestedById String
+  originalUrl   String          @db.Text
+  platform      String
+  fileSizeBytes BigInt?
+  formatType    String
+  status        MediaTaskStatus @default(PENDING)
+  createdAt     DateTime        @default(now())
 
-  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  requestedBy     User            @relation(fields: [requestedById], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  requestedBy User      @relation(fields: [requestedById], references: [id])
 
   @@index([workspaceId, status])
   @@index([requestedById, status])
+}
+
+model Rating {
+  id                  String   @id @default(cuid())
+  taskId              String   @unique
+  clientId            String
+  staffId             String
+  creativeQuality     Decimal
+  responsiveness      Decimal
+  communication       Decimal
+  qualitativeFeedback String?  @db.Text
+  createdAt           DateTime @default(now())
+  workspaceId         String?
+
+  task      Task       @relation(fields: [taskId], references: [id])
+  client    User       @relation("ClientRatings", fields: [clientId], references: [id])
+  staff     User       @relation("StaffRatings", fields: [staffId], references: [id])
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+
+  @@index([clientId])
+  @@index([staffId])
+  @@index([workspaceId])
 }

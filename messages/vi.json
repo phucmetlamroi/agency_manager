@@ -1,0 +1,22 @@
+{
+    "Glossary": {
+        "workspace": "Không gian làm việc",
+        "task": "Tác vụ",
+        "status": "Trạng thái",
+        "revision": "Bản sửa đổi",
+        "invoice": "Hóa đơn",
+        "rating": "Đánh giá"
+    },
+    "TaskStatus": {
+        "pending": "Chờ xử lý",
+        "in_progress": "Đang thực hiện",
+        "action_required": "Cần hành động",
+        "revising": "Đang chỉnh sửa",
+        "completed": "Hoàn tất"
+    },
+    "Portal": {
+        "welcome": "Chào mừng trở lại",
+        "your_invoices": "Hóa đơn của bạn",
+        "your_tasks": "Tác vụ của bạn"
+    }
+}

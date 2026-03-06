@@ -1,0 +1,22 @@
+{
+    "Glossary": {
+        "workspace": "Рабочая область",
+        "task": "Задача",
+        "status": "Статус",
+        "revision": "Редакция",
+        "invoice": "Счет-фактура",
+        "rating": "Оценка"
+    },
+    "TaskStatus": {
+        "pending": "В ожидании",
+        "in_progress": "В процессе",
+        "action_required": "Требуется действие",
+        "revising": "На доработке",
+        "completed": "Завершено"
+    },
+    "Portal": {
+        "welcome": "С возвращением",
+        "your_invoices": "Ваши счета",
+        "your_tasks": "Ваши задачи"
+    }
+}

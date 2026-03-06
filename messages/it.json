@@ -1,0 +1,22 @@
+{
+    "Glossary": {
+        "workspace": "Area di lavoro",
+        "task": "Attività",
+        "status": "Stato",
+        "revision": "Revisione",
+        "invoice": "Fattura",
+        "rating": "Valutazione"
+    },
+    "TaskStatus": {
+        "pending": "In attesa",
+        "in_progress": "In corso",
+        "action_required": "Azione richiesta",
+        "revising": "In revisione",
+        "completed": "Completato"
+    },
+    "Portal": {
+        "welcome": "Bentornato",
+        "your_invoices": "Le tue fatture",
+        "your_tasks": "Le tue attività"
+    }
+}

@@ -17,6 +17,46 @@
     "Portal": {
         "welcome": "Chào mừng trở lại",
         "your_invoices": "Hóa đơn của bạn",
-        "your_tasks": "Tác vụ của bạn"
+        "your_tasks": "Tác vụ của bạn",
+        "select_workspace": "Chọn Không gian làm việc",
+        "select_workspace_desc": "Vui lòng chọn không gian làm việc để tiếp tục",
+        "no_workspace": "Bạn chưa có dữ liệu trong bất kỳ workspace nào.",
+        "no_workspace_hint": "Vui lòng liên hệ admin để được hỗ trợ.",
+        "open_workspace": "Mở workspace này",
+        "task_count": "{count} tác vụ tổng cộng",
+        "no_tasks": "Không có tác vụ nào trong workspace này."
+    },
+    "Sidebar": {
+        "tasks": "Tác vụ",
+        "invoices": "Hóa đơn",
+        "switch_workspace": "Đổi Workspace",
+        "logout": "Đăng xuất",
+        "language": "Ngôn ngữ"
+    },
+    "TaskDetail": {
+        "back": "Quay lại danh sách",
+        "review_asset": "Xem sản phẩm",
+        "review_asset_desc": "Video của bạn đã sẵn sàng. Mở link để xem.",
+        "open_link": "Mở link sản phẩm →",
+        "notes": "Ghi chú",
+        "assignee": "Phụ trách",
+        "rate_delivery": "Đánh giá bàn giao",
+        "rate_delivery_desc": "Vui lòng đánh giá hiệu suất của editor.",
+        "creative_quality": "Chất lượng sáng tạo",
+        "responsiveness": "Phản hồi nhanh",
+        "communication": "Giao tiếp & Phối hợp",
+        "optional_feedback": "Nhận xét thêm (Không bắt buộc)",
+        "optional_feedback_placeholder": "Bạn thích điều gì? Điều gì có thể được cải thiện?",
+        "submit_rating": "Gửi đánh giá",
+        "submitting": "Đang gửi...",
+        "already_rated_title": "Cảm ơn bạn đã đánh giá!",
+        "already_rated_desc": "Phản hồi của bạn giúp chúng tôi cải thiện dịch vụ và khen thưởng editor.",
+        "not_completed": "Đánh giá dịch vụ",
+        "not_completed_desc": "Bạn có thể đánh giá sau khi tác vụ được hoàn tất."
+    },
+    "Rating": {
+        "creative_quality": "Chất lượng sáng tạo",
+        "responsiveness": "Phản hồi nhanh",
+        "communication": "Giao tiếp & Phối hợp"
     }
 }

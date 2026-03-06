@@ -1,9 +1,9 @@
 {
     "Glossary": {
-        "workspace": "工作空间",
+        "workspace": "工作区",
         "task": "任务",
         "status": "状态",
-        "revision": "修改",
+        "revision": "修订",
         "invoice": "发票",
         "rating": "评分"
     },
@@ -17,6 +17,46 @@
     "Portal": {
         "welcome": "欢迎回来",
         "your_invoices": "您的发票",
-        "your_tasks": "您的任务"
+        "your_tasks": "您的任务",
+        "select_workspace": "选择工作区",
+        "select_workspace_desc": "请选择工作区以继续",
+        "no_workspace": "您在任何工作区中都没有数据。",
+        "no_workspace_hint": "请联系管理员获取支持。",
+        "open_workspace": "打开此工作区",
+        "task_count": "共 {count} 个任务",
+        "no_tasks": "此工作区中没有任务。"
+    },
+    "Sidebar": {
+        "tasks": "任务",
+        "invoices": "发票",
+        "switch_workspace": "切换工作区",
+        "logout": "退出登录",
+        "language": "语言"
+    },
+    "TaskDetail": {
+        "back": "返回任务列表",
+        "review_asset": "查看作品",
+        "review_asset_desc": "您的视频已准备好供审阅。",
+        "open_link": "打开产品链接 →",
+        "notes": "备注",
+        "assignee": "负责人",
+        "rate_delivery": "评价此次交付",
+        "rate_delivery_desc": "请对编辑的工作进行评价。",
+        "creative_quality": "创意质量",
+        "responsiveness": "响应速度",
+        "communication": "沟通与协作",
+        "optional_feedback": "附加评论（可选）",
+        "optional_feedback_placeholder": "您喜欢什么？有什么可以改进的？",
+        "submit_rating": "提交评分",
+        "submitting": "提交中...",
+        "already_rated_title": "感谢您的评价！",
+        "already_rated_desc": "您的反馈帮助我们改进服务并奖励编辑。",
+        "not_completed": "服务评价",
+        "not_completed_desc": "任务完成后即可进行评价。"
+    },
+    "Rating": {
+        "creative_quality": "创意质量",
+        "responsiveness": "响应速度",
+        "communication": "沟通与协作"
     }
 }

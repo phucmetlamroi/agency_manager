@@ -17,6 +17,46 @@
     "Portal": {
         "welcome": "Bentornato",
         "your_invoices": "Le tue fatture",
-        "your_tasks": "Le tue attività"
+        "your_tasks": "Le tue attività",
+        "select_workspace": "Seleziona Area di lavoro",
+        "select_workspace_desc": "Seleziona un'area di lavoro per continuare",
+        "no_workspace": "Non hai dati in nessuna area di lavoro.",
+        "no_workspace_hint": "Contatta l'amministratore per supporto.",
+        "open_workspace": "Apri quest'area",
+        "task_count": "{count} attività in totale",
+        "no_tasks": "Nessuna attività in quest'area di lavoro."
+    },
+    "Sidebar": {
+        "tasks": "Attività",
+        "invoices": "Fatture",
+        "switch_workspace": "Cambia Area",
+        "logout": "Esci",
+        "language": "Lingua"
+    },
+    "TaskDetail": {
+        "back": "Torna alle attività",
+        "review_asset": "Visualizza il risultato",
+        "review_asset_desc": "Il tuo video è pronto per la revisione.",
+        "open_link": "Apri il link →",
+        "notes": "Note",
+        "assignee": "Responsabile",
+        "rate_delivery": "Valuta questa consegna",
+        "rate_delivery_desc": "Valuta il lavoro dell'editor.",
+        "creative_quality": "Qualità creativa",
+        "responsiveness": "Reattività",
+        "communication": "Comunicazione",
+        "optional_feedback": "Commenti aggiuntivi (opzionale)",
+        "optional_feedback_placeholder": "Cosa ti è piaciuto? Cosa si può migliorare?",
+        "submit_rating": "Invia valutazione",
+        "submitting": "Invio in corso...",
+        "already_rated_title": "Grazie per la valutazione!",
+        "already_rated_desc": "Il tuo feedback ci aiuta a migliorare il servizio.",
+        "not_completed": "Valutazione del servizio",
+        "not_completed_desc": "Puoi valutare una volta che l'attività è completata."
+    },
+    "Rating": {
+        "creative_quality": "Qualità creativa",
+        "responsiveness": "Reattività",
+        "communication": "Comunicazione"
     }
 }

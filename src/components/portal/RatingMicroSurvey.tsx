@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Star, Send, ThumbsUp, Loader2 } from 'lucide-react';
 import { submitTaskRating } from '@/actions/client-portal-actions';
+import { useTranslations } from 'next-intl';
 
 interface RatingMicroSurveyProps {
     taskId: string;
@@ -16,6 +17,9 @@ interface RatingMicroSurveyProps {
 }
 
 export default function RatingMicroSurvey({ taskId, status, existingRating }: RatingMicroSurveyProps) {
+    const t = useTranslations('TaskDetail');
+    const rt = useTranslations('Rating');
+
     const [ratings, setRatings] = useState({
         creativeQuality: Number(existingRating?.creativeQuality ?? 0),
         responsiveness: Number(existingRating?.responsiveness ?? 0),
@@ -32,8 +36,8 @@ export default function RatingMicroSurvey({ taskId, status, existingRating }: Ra
     if (!isCompleted) {
         return (
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur">
-                <h3 className="text-white font-medium mb-2">Đánh giá dịch vụ</h3>
-                <p className="text-zinc-500 text-sm">Bạn có thể đánh giá sau khi task được hoàn tất.</p>
+                <h3 className="text-white font-medium mb-2">{t('not_completed')}</h3>
+                <p className="text-zinc-500 text-sm">{t('not_completed_desc')}</p>
             </div>
         );
     }
@@ -44,13 +48,13 @@ export default function RatingMicroSurvey({ taskId, status, existingRating }: Ra
                 <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4">
                     <ThumbsUp className="text-emerald-400" size={24} />
                 </div>
-                <h3 className="text-emerald-400 font-medium mb-2">Cảm ơn bạn đã đánh giá!</h3>
-                <p className="text-zinc-400 text-sm">Phản hồi của bạn giúp chúng tôi cải thiện dịch vụ và khen thưởng editor.</p>
+                <h3 className="text-emerald-400 font-medium mb-2">{t('already_rated_title')}</h3>
+                <p className="text-zinc-400 text-sm">{t('already_rated_desc')}</p>
                 {existingRating && (
-                    <div className="mt-4 space-y-1 text-sm">
-                        <StarDisplay label="Sáng tạo" value={Number(existingRating.creativeQuality)} />
-                        <StarDisplay label="Phản hồi nhanh" value={Number(existingRating.responsiveness)} />
-                        <StarDisplay label="Giao tiếp" value={Number(existingRating.communication)} />
+                    <div className="mt-4 space-y-1 text-sm w-full">
+                        <StarDisplay label={rt('creative_quality')} value={Number(existingRating.creativeQuality)} />
+                        <StarDisplay label={rt('responsiveness')} value={Number(existingRating.responsiveness)} />
+                        <StarDisplay label={rt('communication')} value={Number(existingRating.communication)} />
                     </div>
                 )}
             </div>
@@ -74,7 +78,7 @@ export default function RatingMicroSurvey({ taskId, status, existingRating }: Ra
             if (result.success) {
                 setSubmitted(true);
             } else {
-                setError(result.error || 'Đã xảy ra lỗi.');
+                setError(result.error || 'Error');
             }
         });
     };
@@ -83,29 +87,27 @@ export default function RatingMicroSurvey({ taskId, status, existingRating }: Ra
 
     return (
         <div className="bg-zinc-900/80 border border-indigo-500/20 shadow-[0_0_30px_rgba(99,102,241,0.05)] rounded-2xl p-6 backdrop-blur">
-            <h3 className="text-white font-medium mb-1">Đánh giá bàn giao này</h3>
-            <p className="text-zinc-400 text-xs mb-6">Vui lòng đánh giá editor trên các tiêu chí sau.</p>
+            <h3 className="text-white font-medium mb-1">{t('rate_delivery')}</h3>
+            <p className="text-zinc-400 text-xs mb-6">{t('rate_delivery_desc')}</p>
 
             <div className="space-y-5 mb-6">
-                <RatingRow label="Chất lượng sáng tạo" value={ratings.creativeQuality} onChange={(v) => handleRating('creativeQuality', v)} />
-                <RatingRow label="Phản hồi nhanh" value={ratings.responsiveness} onChange={(v) => handleRating('responsiveness', v)} />
-                <RatingRow label="Giao tiếp & Phối hợp" value={ratings.communication} onChange={(v) => handleRating('communication', v)} />
+                <RatingRow label={rt('creative_quality')} value={ratings.creativeQuality} onChange={(v) => handleRating('creativeQuality', v)} />
+                <RatingRow label={rt('responsiveness')} value={ratings.responsiveness} onChange={(v) => handleRating('responsiveness', v)} />
+                <RatingRow label={rt('communication')} value={ratings.communication} onChange={(v) => handleRating('communication', v)} />
             </div>
 
             <div className="mb-6">
-                <label className="block text-zinc-400 text-xs mb-2">Nhận xét thêm (Không bắt buộc)</label>
+                <label className="block text-zinc-400 text-xs mb-2">{t('optional_feedback')}</label>
                 <textarea
                     rows={3}
-                    placeholder="Bạn thích điều gì? Điều gì có thể được cải thiện?"
+                    placeholder={t('optional_feedback_placeholder')}
                     value={feedback}
                     onChange={(e) => setFeedback(e.target.value)}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500 resize-none transition-colors"
                 />
             </div>
 
-            {error && (
-                <p className="text-red-400 text-sm mb-4">{error}</p>
-            )}
+            {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
             <button
                 onClick={handleSubmit}
@@ -116,7 +118,7 @@ export default function RatingMicroSurvey({ taskId, status, existingRating }: Ra
                     }`}
             >
                 {isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                {isPending ? 'Đang gửi...' : 'Gửi đánh giá'}
+                {isPending ? t('submitting') : t('submit_rating')}
             </button>
         </div>
     );

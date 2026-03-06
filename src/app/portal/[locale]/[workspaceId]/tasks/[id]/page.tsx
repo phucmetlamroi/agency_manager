@@ -1,5 +1,6 @@
 import { getTaskDetailForPortal } from '@/actions/client-portal-actions';
-import { ArrowLeft, Clock, FileVideo, DollarSign, Tag } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
+import { ArrowLeft, Clock, FileVideo, DollarSign, Tag, User } from 'lucide-react';
 import RatingMicroSurvey from '@/components/portal/RatingMicroSurvey';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -11,8 +12,9 @@ export default async function PortalTaskDetail({
 }) {
     const { locale, workspaceId, id } = await params;
     const task = await getTaskDetailForPortal(id);
-
     if (!task) return notFound();
+
+    const t = await getTranslations('TaskDetail');
 
     const statusColorMap: Record<string, string> = {
         'Completed': 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
@@ -21,7 +23,6 @@ export default async function PortalTaskDetail({
         'Revising': 'border-orange-500/30 bg-orange-500/10 text-orange-400',
         'Pending': 'border-zinc-500/30 bg-zinc-500/10 text-zinc-400',
     };
-
     const statusColor = statusColorMap[task.clientStatus] ?? statusColorMap['Pending'];
 
     return (
@@ -30,7 +31,7 @@ export default async function PortalTaskDetail({
                 href={`/portal/${locale}/${workspaceId}/tasks`}
                 className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-300 mb-8 transition-colors"
             >
-                <ArrowLeft size={16} /> Quay lại danh sách
+                <ArrowLeft size={16} /> {t('back')}
             </Link>
 
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
@@ -39,7 +40,7 @@ export default async function PortalTaskDetail({
                     <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-400">
                         {task.deadline && (
                             <span className="flex items-center gap-1">
-                                <Clock size={14} /> {new Date(task.deadline).toLocaleDateString('vi-VN')}
+                                <Clock size={14} /> {new Date(task.deadline).toLocaleDateString(locale === 'vi' ? 'vi-VN' : locale === 'zh' ? 'zh-CN' : locale === 'ru' ? 'ru-RU' : 'en-US')}
                             </span>
                         )}
                         {task.estimatedCost > 0 && (
@@ -68,38 +69,37 @@ export default async function PortalTaskDetail({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Left column */}
+                {/* Left */}
                 <div className="md:col-span-2 space-y-6">
-                    {/* Product Link */}
                     {task.productLink && (
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur">
                             <h3 className="text-white font-medium mb-4 flex items-center gap-2">
-                                <FileVideo size={18} className="text-indigo-400" /> Xem sản phẩm
+                                <FileVideo size={18} className="text-indigo-400" /> {t('review_asset')}
                             </h3>
-                            <p className="text-zinc-400 text-sm mb-4">Video đã sẵn sàng để bạn xem xét.</p>
+                            <p className="text-zinc-400 text-sm mb-4">{t('review_asset_desc')}</p>
                             <a
                                 href={task.productLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="block w-full py-3 text-center bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-indigo-900/20"
                             >
-                                Mở link sản phẩm →
+                                {t('open_link')}
                             </a>
                         </div>
                     )}
 
-                    {/* Notes from task */}
                     {task.notes && (
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur">
-                            <h3 className="text-white font-medium mb-3">Ghi chú</h3>
+                            <h3 className="text-white font-medium mb-3">{t('notes')}</h3>
                             <p className="text-zinc-300 text-sm whitespace-pre-wrap">{task.notes}</p>
                         </div>
                     )}
 
-                    {/* Assignee info */}
                     {task.assignee && (
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur">
-                            <h3 className="text-white font-medium mb-2">Phụ trách</h3>
+                            <h3 className="text-white font-medium mb-2 flex items-center gap-2">
+                                <User size={16} className="text-zinc-400" /> {t('assignee')}
+                            </h3>
                             <p className="text-zinc-300 text-sm">
                                 {task.assignee.nickname || task.assignee.username}
                             </p>
@@ -107,7 +107,7 @@ export default async function PortalTaskDetail({
                     )}
                 </div>
 
-                {/* Right column - Rating */}
+                {/* Right - Rating */}
                 <div className="space-y-6">
                     <RatingMicroSurvey
                         taskId={task.id}

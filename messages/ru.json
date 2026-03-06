@@ -1,22 +1,62 @@
 {
     "Glossary": {
-        "workspace": "Рабочая область",
+        "workspace": "Рабочее пространство",
         "task": "Задача",
         "status": "Статус",
-        "revision": "Редакция",
-        "invoice": "Счет-фактура",
+        "revision": "Правка",
+        "invoice": "Счёт",
         "rating": "Оценка"
     },
     "TaskStatus": {
-        "pending": "В ожидании",
-        "in_progress": "В процессе",
-        "action_required": "Требуется действие",
+        "pending": "Ожидает",
+        "in_progress": "В работе",
+        "action_required": "Требует действия",
         "revising": "На доработке",
         "completed": "Завершено"
     },
     "Portal": {
         "welcome": "С возвращением",
         "your_invoices": "Ваши счета",
-        "your_tasks": "Ваши задачи"
+        "your_tasks": "Ваши задачи",
+        "select_workspace": "Выбор рабочего пространства",
+        "select_workspace_desc": "Выберите рабочее пространство для продолжения",
+        "no_workspace": "У вас нет данных ни в одном рабочем пространстве.",
+        "no_workspace_hint": "Обратитесь к администратору за поддержкой.",
+        "open_workspace": "Открыть это пространство",
+        "task_count": "{count} задач(и) всего",
+        "no_tasks": "В этом рабочем пространстве нет задач."
+    },
+    "Sidebar": {
+        "tasks": "Задачи",
+        "invoices": "Счета",
+        "switch_workspace": "Сменить пространство",
+        "logout": "Выйти",
+        "language": "Язык"
+    },
+    "TaskDetail": {
+        "back": "Назад к задачам",
+        "review_asset": "Просмотр результата",
+        "review_asset_desc": "Ваше видео готово для проверки.",
+        "open_link": "Открыть ссылку →",
+        "notes": "Заметки",
+        "assignee": "Исполнитель",
+        "rate_delivery": "Оцените эту работу",
+        "rate_delivery_desc": "Пожалуйста, оцените работу редактора.",
+        "creative_quality": "Качество",
+        "responsiveness": "Скорость реакции",
+        "communication": "Коммуникация",
+        "optional_feedback": "Дополнительные комментарии (необязательно)",
+        "optional_feedback_placeholder": "Что вам понравилось? Что можно улучшить?",
+        "submit_rating": "Отправить оценку",
+        "submitting": "Отправка...",
+        "already_rated_title": "Спасибо за оценку!",
+        "already_rated_desc": "Ваш отзыв помогает нам улучшать сервис.",
+        "not_completed": "Оценка сервиса",
+        "not_completed_desc": "Вы можете оценить после завершения задачи."
+    },
+    "Rating": {
+        "creative_quality": "Качество",
+        "responsiveness": "Скорость реакции",
+        "communication": "Коммуникация"
     }
 }

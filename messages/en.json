@@ -17,6 +17,46 @@
     "Portal": {
         "welcome": "Welcome back",
         "your_invoices": "Your Invoices",
-        "your_tasks": "Your Tasks"
+        "your_tasks": "Your Tasks",
+        "select_workspace": "Select Workspace",
+        "select_workspace_desc": "Please select a workspace to continue",
+        "no_workspace": "You have no data in any workspace yet.",
+        "no_workspace_hint": "Please contact the admin for support.",
+        "open_workspace": "Open this workspace",
+        "task_count": "{count} task(s) total",
+        "no_tasks": "No tasks found in this workspace."
+    },
+    "Sidebar": {
+        "tasks": "Tasks",
+        "invoices": "Invoices",
+        "switch_workspace": "Switch Workspace",
+        "logout": "Sign out",
+        "language": "Language"
+    },
+    "TaskDetail": {
+        "back": "Back to tasks",
+        "review_asset": "Review Asset",
+        "review_asset_desc": "Your video is ready for review. Open the link to view.",
+        "open_link": "Open product link →",
+        "notes": "Notes",
+        "assignee": "Assignee",
+        "rate_delivery": "Rate this delivery",
+        "rate_delivery_desc": "Please evaluate the editor's performance.",
+        "creative_quality": "Creative Quality",
+        "responsiveness": "Responsiveness",
+        "communication": "Communication & Collaboration",
+        "optional_feedback": "Additional Comments (Optional)",
+        "optional_feedback_placeholder": "What did you love? What could be improved?",
+        "submit_rating": "Submit Rating",
+        "submitting": "Submitting...",
+        "already_rated_title": "Thank you for your rating!",
+        "already_rated_desc": "Your feedback helps us improve our service and reward editors.",
+        "not_completed": "Service Evaluation",
+        "not_completed_desc": "You can rate once the task is marked as Completed."
+    },
+    "Rating": {
+        "creative_quality": "Creative Quality",
+        "responsiveness": "Responsiveness",
+        "communication": "Communication & Collaboration"
     }
 }

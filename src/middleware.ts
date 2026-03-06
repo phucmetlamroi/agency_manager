@@ -38,9 +38,8 @@ export async function middleware(request: NextRequest) {
     }
 
     // 3. Internationalization for Portal
-    const isPortalRoute = pathname.includes('/portal') || routing.locales.some(loc => pathname.startsWith(`/${loc}`))
-    if (isPortalRoute) {
-        return intlMiddleware(request)
+    if (pathname === '/portal' || pathname === '/portal/') {
+        return NextResponse.redirect(new URL(`/portal/${routing.defaultLocale}/invoices`, request.url))
     }
 
     return NextResponse.next()

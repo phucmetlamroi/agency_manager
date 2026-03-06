@@ -102,6 +102,10 @@ export async function getClientTasks(workspaceId: string) {
             type: true,
             productLink: true,
             jobPriceUSD: true,
+            clientId: true,
+            client: {
+                select: { id: true, name: true }
+            },
             project: {
                 select: { id: true, name: true }
             }

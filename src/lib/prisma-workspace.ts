@@ -10,8 +10,7 @@ const bypassModels = [
     'WorkspaceMember',
     'Agency',
     'BillingProfile',
-    'Client', // Clients are global/master data
-    // Notice: Project, Task, Invoice, Payroll, PerformanceMetric, PayrollLock, MonthlyBonus are NOT bypassed!
+    // Notice: Client, Project, Task, Invoice, Payroll, PerformanceMetric, PayrollLock, MonthlyBonus are NOT bypassed!
 ]
 
 /**

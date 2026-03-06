@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { routing } from '@/i18n/routing'
+import { decrypt } from '@/lib/jwt'
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
@@ -17,8 +18,7 @@ export async function middleware(request: NextRequest) {
 
     const sessionCookie = request.cookies.get('session')
 
-    // 2. Ultra-Light Redirect logic (NO DECRYPTION)
-    // This prevents any crypto-related hangs in the middleware hot-path
+    // 2. Redirect logic
     if (!sessionCookie) {
         const protectedPaths = ['/workspaces', '/portal', '/admin', '/dashboard', '/agency']
         const isProtectedRoute = protectedPaths.some(p => pathname.startsWith(p))
@@ -28,13 +28,36 @@ export async function middleware(request: NextRequest) {
         }
     } else {
         // Logged in (has cookie)
-        if (pathname === '/login' || pathname === '/') {
-            // Passive redirect - if they have a cookie, push to workspaces
-            return NextResponse.redirect(new URL('/workspaces', request.url))
+        try {
+            const session = await decrypt(sessionCookie.value)
+            const role = session?.user?.role
+
+            // If user is CLIENT but trying to access non-portal protected routes
+            if (role === 'CLIENT') {
+                const adminPaths = ['/workspaces', '/admin', '/dashboard', '/agency']
+                if (adminPaths.some(p => pathname.startsWith(p))) {
+                    return NextResponse.redirect(new URL('/portal', request.url))
+                }
+            } else {
+                // If STAFF but trying to access /portal
+                if (pathname.startsWith('/portal')) {
+                    return NextResponse.redirect(new URL('/workspaces', request.url))
+                }
+            }
+
+            if (pathname === '/login' || pathname === '/') {
+                const target = role === 'CLIENT' ? '/portal' : '/workspaces'
+                return NextResponse.redirect(new URL(target, request.url))
+            }
+        } catch (err) {
+            // Invalid session - delete cookie and redirect to login
+            const response = NextResponse.redirect(new URL('/login', request.url))
+            response.cookies.delete('session')
+            return response
         }
     }
 
-    // 3. Internationalization for Portal
+    // 3. Internationalization for Portal index
     if (pathname === '/portal' || pathname === '/portal/') {
         return NextResponse.redirect(new URL(`/portal/${routing.defaultLocale}/invoices`, request.url))
     }

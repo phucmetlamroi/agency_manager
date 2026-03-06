@@ -2,14 +2,15 @@ import { getClientTasks } from '@/actions/client-portal-actions';
 import { getTranslations } from 'next-intl/server';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { Clock, PlayCircle, CheckCircle2 } from 'lucide-react';
+import { Clock, PlayCircle, CheckCircle2, Star } from 'lucide-react';
+import Link from 'next/link';
 
 export default async function PortalTasksPage({
     params
 }: {
     params: Promise<{ locale: string, workspaceId: string }>;
 }) {
-    const { workspaceId } = await params;
+    const { locale, workspaceId } = await params;
     const session = await getSession();
     if (!session) redirect('/login');
 
@@ -26,25 +27,27 @@ export default async function PortalTasksPage({
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="border-b border-zinc-800/80 bg-zinc-900/60">
-                            <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Project / Task</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Task</th>
                             <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Deadline</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right text-transparent">Action</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-800/50">
                         {tasks.length === 0 ? (
                             <tr>
                                 <td colSpan={4} className="px-6 py-10 text-center text-zinc-500">
-                                    No tasks found in this workspace.
+                                    Không có task nào trong workspace này.
                                 </td>
                             </tr>
                         ) : (
                             tasks.map(task => (
                                 <tr key={task.id} className="hover:bg-zinc-800/30 transition-colors group">
                                     <td className="px-6 py-4">
-                                        <p className="text-zinc-200 font-medium">{task.title}</p>
-                                        <p className="text-zinc-500 text-sm">{task.type}</p>
+                                        <Link href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`} className="block">
+                                            <p className="text-zinc-200 font-medium group-hover:text-white transition-colors">{task.title}</p>
+                                            <p className="text-zinc-500 text-sm">{task.type}</p>
+                                        </Link>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
@@ -56,18 +59,14 @@ export default async function PortalTasksPage({
                                             </span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-zinc-400">{task.deadline ? new Date(task.deadline).toLocaleDateString() : 'No deadline'}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-400">{task.deadline ? new Date(task.deadline).toLocaleDateString('vi-VN') : '—'}</td>
                                     <td className="px-6 py-4 text-right">
-                                        {task.productLink && (
-                                            <a
-                                                href={task.productLink}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-sm font-medium text-indigo-400 hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                View Link &rarr;
-                                            </a>
-                                        )}
+                                        <Link
+                                            href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
+                                            className="text-sm font-medium text-indigo-400 hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            Xem chi tiết →
+                                        </Link>
                                     </td>
                                 </tr>
                             ))
@@ -78,3 +77,5 @@ export default async function PortalTasksPage({
         </div>
     );
 }
+
+

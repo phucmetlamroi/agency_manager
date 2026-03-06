@@ -4,9 +4,20 @@ import { useState } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import NoSSR from '@/components/ui/NoSSR'
 import { InvoiceModal } from '@/components/invoice/InvoiceModal'
-import { FileText } from 'lucide-react'
+import { FileText, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ClientInvoicesTable } from '@/components/invoice/ClientInvoicesTable'
+
+type RatingData = {
+    id: string
+    createdAt: string
+    creativeQuality: number
+    responsiveness: number
+    communication: number
+    qualitativeFeedback?: string | null
+    task: { id: string; title: string }
+    staff: { username: string; nickname?: string | null }
+}
 
 type ClientData = {
     id: number
@@ -16,15 +27,15 @@ type ClientData = {
     frictionIndex: number
     inputQuality: number
     paymentRating: number
-    depositBalance: number // Added field
+    depositBalance: number
     subsidiaries: any[]
     tasks: any[]
-    invoices: any[] // Added field
+    invoices: any[]
 }
 
 const COLORS = ['#60a5fa', '#a855f7', '#f472b6', '#34d399', '#fbbf24']
 
-export default function ClientAnalytics({ client, distribution, workspaceId }: { client: ClientData, distribution: any[], workspaceId: string }) {
+export default function ClientAnalytics({ client, distribution, workspaceId, ratings = [] }: { client: ClientData, distribution: any[], workspaceId: string, ratings?: RatingData[] }) {
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
 
     // Tier Badge Logic
@@ -179,6 +190,45 @@ export default function ClientAnalytics({ client, distribution, workspaceId }: {
                 </h3>
                 <ClientInvoicesTable invoices={client.invoices || []} clientId={client.id} workspaceId={workspaceId} />
             </div>
+
+            {/* CLIENT RATINGS */}
+            {ratings.length > 0 && (
+                <div className="glass-panel p-6">
+                    <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+                        <Star size={18} className="text-amber-400" /> Đánh giá từ Khách hàng
+                    </h3>
+                    <div className="space-y-4">
+                        {ratings.map(r => {
+                            const avg = ((r.creativeQuality + r.responsiveness + r.communication) / 3).toFixed(1)
+                            return (
+                                <div key={r.id} className="bg-white/5 rounded-xl p-4 flex flex-col sm:flex-row gap-4">
+                                    <div className="flex-1">
+                                        <p className="text-white font-medium text-sm mb-1">{r.task.title}</p>
+                                        <p className="text-gray-400 text-xs">Editor: {r.staff.nickname || r.staff.username}</p>
+                                        {r.qualitativeFeedback && (
+                                            <p className="text-gray-300 text-sm mt-2 italic">&ldquo;{r.qualitativeFeedback}&rdquo;</p>
+                                        )}
+                                        <p className="text-gray-600 text-xs mt-2">{new Date(r.createdAt).toLocaleDateString('vi-VN')}</p>
+                                    </div>
+                                    <div className="shrink-0 text-right">
+                                        <div className="text-3xl font-bold text-amber-400">{avg}</div>
+                                        <div className="flex gap-0.5 justify-end mt-1">
+                                            {[1, 2, 3, 4, 5].map(s => (
+                                                <Star key={s} size={12} className={s <= Math.round(parseFloat(avg)) ? 'fill-amber-400 text-amber-400' : 'text-gray-700'} />
+                                            ))}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-2 space-y-0.5">
+                                            <div>Sáng tạo: {r.creativeQuality}/5</div>
+                                            <div>Phản hồi: {r.responsiveness}/5</div>
+                                            <div>Giao tiếp: {r.communication}/5</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* RECENT TASKS LIST */}
             <div className="glass-panel p-6">

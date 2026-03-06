@@ -175,6 +175,116 @@ export async function getClientInvoices(workspaceId: string) {
 }
 
 /**
+ * Submits a client's star rating for a completed task.
+ */
+export async function submitTaskRating(
+    taskId: string,
+    creativeQuality: number,
+    responsiveness: number,
+    communication: number,
+    qualitativeFeedback?: string
+) {
+    const clientUserId = await getClientSession()
+
+    // Verify the task belongs to this client
+    const relatedClientIds = await getRelatedClientIds(clientUserId)
+    const task = await globalPrisma.task.findFirst({
+        where: {
+            id: taskId,
+            OR: [
+                { clientUserId },
+                { clientId: { in: relatedClientIds } }
+            ]
+        }
+    })
+
+    if (!task) {
+        return { success: false, error: 'Task không tồn tại hoặc bạn không có quyền đánh giá.' }
+    }
+
+    // Check if already rated
+    const existing = await globalPrisma.rating.findUnique({ where: { taskId } })
+    if (existing) {
+        return { success: false, error: 'Task này đã được đánh giá rồi.' }
+    }
+
+    // Find the staff (assignee)
+    if (!task.assigneeId) {
+        return { success: false, error: 'Task chưa được giao cho ai.' }
+    }
+
+    try {
+        await globalPrisma.rating.create({
+            data: {
+                taskId,
+                clientId: clientUserId,
+                staffId: task.assigneeId,
+                creativeQuality,
+                responsiveness,
+                communication,
+                qualitativeFeedback: qualitativeFeedback || null,
+                workspaceId: task.workspaceId || undefined
+            }
+        })
+
+        return { success: true }
+    } catch (err) {
+        console.error('[submitTaskRating] Error:', err)
+        return { success: false, error: 'Không thể lưu đánh giá.' }
+    }
+}
+
+/**
+ * Fetches the real task detail for the client portal task-detail page.
+ */
+export async function getTaskDetailForPortal(taskId: string) {
+    const clientUserId = await getClientSession()
+    const relatedClientIds = await getRelatedClientIds(clientUserId)
+
+    const task = await globalPrisma.task.findFirst({
+        where: {
+            id: taskId,
+            OR: [
+                { clientUserId },
+                { clientId: { in: relatedClientIds } }
+            ]
+        },
+        include: {
+            rating: true,
+            assignee: { select: { username: true, nickname: true } },
+            client: { select: { name: true } },
+            project: { select: { name: true } }
+        }
+    })
+
+    if (!task) return null
+
+    return {
+        ...task,
+        clientStatus: mapClientTaskStatus(task.status),
+        estimatedCost: calculateEstimatedCost(task)
+    }
+}
+
+/**
+ * Fetches all ratings for a client's tasks — used by admin CRM to see client feedback.
+ */
+export async function getClientTaskRatings(
+    clientUserId: string,
+    workspaceId: string
+) {
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
+    return await workspacePrisma.rating.findMany({
+        where: { clientId: clientUserId },
+        include: {
+            task: { select: { title: true } },
+            staff: { select: { username: true, nickname: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+    })
+}
+
+/**
  * Discovers workspaces where the client has data or memberships.
  */
 export async function getClientWorkspaces() {
@@ -189,7 +299,7 @@ export async function getClientWorkspaces() {
 
     const workspaceIds = new Set(memberships.map(m => m.workspaceId))
 
-    // Check Task/Project/Invoice for other workspaces
+    // Check Tasks for other workspaces not in memberships
     const dataWorkspaces = await globalPrisma.task.findMany({
         where: {
             OR: [
@@ -209,4 +319,5 @@ export async function getClientWorkspaces() {
         where: { id: { in: Array.from(workspaceIds) } }
     })
 }
+
 

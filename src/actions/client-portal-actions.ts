@@ -1,6 +1,6 @@
 'use server'
 
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
@@ -53,14 +53,12 @@ function calculateEstimatedCost(task: any): number {
 /**
  * Fetches Tasks for the authenticated Client, strictly isolating data via ReBAC.
  */
-export async function getClientTasks(workspaceId: string) {
+export async function getClientTasks() {
     const clientUserId = await getClientSession()
-    const prisma = getWorkspacePrisma(workspaceId)
 
     const tasks = await prisma.task.findMany({
         where: {
-            clientUserId: clientUserId,
-            workspaceId: workspaceId
+            clientUserId: clientUserId
         },
         select: {
             id: true,
@@ -71,7 +69,6 @@ export async function getClientTasks(workspaceId: string) {
             type: true,
             productLink: true,
             jobPriceUSD: true,
-            // DO NOT SELECT wageVND or profitVND
             project: {
                 select: { id: true, name: true }
             }
@@ -89,14 +86,12 @@ export async function getClientTasks(workspaceId: string) {
 /**
  * Fetches Projects for the authenticated Client, strictly isolating data via ReBAC.
  */
-export async function getClientProjects(workspaceId: string) {
+export async function getClientProjects() {
     const clientUserId = await getClientSession()
-    const prisma = getWorkspacePrisma(workspaceId)
 
     return await prisma.project.findMany({
         where: {
-            clientUserId: clientUserId,
-            workspaceId: workspaceId
+            clientUserId: clientUserId
         },
         select: {
             id: true,
@@ -113,14 +108,12 @@ export async function getClientProjects(workspaceId: string) {
 /**
  * Fetches Invoices for the authenticated Client, strictly isolating data via ReBAC.
  */
-export async function getClientInvoices(workspaceId: string) {
+export async function getClientInvoices() {
     const clientUserId = await getClientSession()
-    const prisma = getWorkspacePrisma(workspaceId)
 
     return await prisma.invoice.findMany({
         where: {
-            clientUserId: clientUserId,
-            workspaceId: workspaceId
+            clientUserId: clientUserId
         },
         orderBy: { createdAt: 'desc' },
         select: {

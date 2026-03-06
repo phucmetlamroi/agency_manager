@@ -13,8 +13,7 @@ export default async function PortalTasksPage() {
     const tasksT = await getTranslations('TaskStatus');
 
     // Fetch real data
-    const workspaceId = 'legacy' // In a multi-tenant app, this would come from the user's session or URL
-    const tasks = await getClientTasks(workspaceId);
+    const tasks = await getClientTasks();
 
     return (
         <div className="w-full max-w-5xl mx-auto p-8">

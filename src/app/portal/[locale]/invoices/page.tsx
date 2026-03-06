@@ -12,10 +12,9 @@ export default async function PortalInvoicesPage() {
     if (!session) redirect('/login');
 
     // Fetch real data
-    const workspaceId = 'legacy';
     const [invoices, projects] = await Promise.all([
-        getClientInvoices(workspaceId),
-        getClientProjects(workspaceId)
+        getClientInvoices(),
+        getClientProjects()
     ]);
 
     const t = await getTranslations('Portal');

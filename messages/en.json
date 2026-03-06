@@ -33,6 +33,11 @@
         "logout": "Sign out",
         "language": "Language"
     },
+    "TaskGroup": {
+        "completed_label": "completed",
+        "in_progress_label": "in progress",
+        "no_tasks": "No tasks in this workspace."
+    },
     "TaskDetail": {
         "back": "Back to tasks",
         "review_asset": "Review Asset",

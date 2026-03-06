@@ -1,11 +1,9 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { getMessages } from 'next-intl/server'
+import { getMessages, setRequestLocale } from 'next-intl/server'
 import { notFound, redirect } from 'next/navigation'
 import { routing } from '@/i18n/routing'
 import { getSession } from '@/lib/auth'
-import { FileText, CheckSquare, LogOut } from 'lucide-react'
 import { ReactNode } from 'react'
-import Link from 'next/link'
 
 export default async function LocaleLayout({
     children,
@@ -15,16 +13,22 @@ export default async function LocaleLayout({
     params: Promise<{ locale: string }>;
 }) {
     const { locale } = await params;
+
+    // Validate locale
     if (!routing.locales.includes(locale as any)) {
         notFound();
     }
+
+    // This is the KEY FIX: tell next-intl which locale to use for this request
+    setRequestLocale(locale);
 
     const session = await getSession()
     if (!session || session.user.role !== 'CLIENT') {
         redirect('/login')
     }
 
-    const messages = await getMessages();
+    // Explicitly load the right messages file for this locale
+    const messages = await getMessages({ locale });
 
     return (
         <NextIntlClientProvider messages={messages} locale={locale}>
@@ -32,3 +36,4 @@ export default async function LocaleLayout({
         </NextIntlClientProvider>
     );
 }
+

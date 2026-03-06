@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronDown, Clock, PlayCircle, CheckCircle2, AlertCircle, RotateCcw, Users } from 'lucide-react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 
 type Task = {
     id: string
@@ -44,6 +45,7 @@ function groupStatusSummary(tasks: Task[]) {
 
 function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGroup; locale: string; workspaceId: string; defaultOpen?: boolean }) {
     const [open, setOpen] = useState(defaultOpen ?? false)
+    const t = useTranslations('TaskGroup')
     const { total, done, inProgress } = groupStatusSummary(group.tasks)
     const allDone = done === total
 
@@ -63,9 +65,9 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
                     <p className="text-zinc-500 text-xs">
                         {total} task{total > 1 ? 's' : ''} &bull;{' '}
                         <span className={allDone ? 'text-emerald-400' : 'text-zinc-400'}>
-                            {done} hoàn tất
+                            {done} {t('completed_label')}
                         </span>
-                        {inProgress > 0 && <span className="text-amber-400"> &bull; {inProgress} đang làm</span>}
+                        {inProgress > 0 && <span className="text-amber-400"> &bull; {inProgress} {t('in_progress_label')}</span>}
                     </p>
                 </div>
 
@@ -150,10 +152,12 @@ export default function TaskGroupAccordion({
         tasks: ts
     }))
 
+    const t = useTranslations('TaskGroup')
+
     if (groups.length === 0) {
         return (
             <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-12 text-center text-zinc-500">
-                Không có task nào trong workspace này.
+                {t('no_tasks')}
             </div>
         )
     }

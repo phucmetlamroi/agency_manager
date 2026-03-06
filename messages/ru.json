@@ -33,6 +33,11 @@
         "logout": "Выйти",
         "language": "Язык"
     },
+    "TaskGroup": {
+        "completed_label": "завершено",
+        "in_progress_label": "в работе",
+        "no_tasks": "В этом рабочем пространстве нет задач."
+    },
     "TaskDetail": {
         "back": "Назад к задачам",
         "review_asset": "Просмотр результата",

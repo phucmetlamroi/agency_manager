@@ -33,6 +33,11 @@
         "logout": "Đăng xuất",
         "language": "Ngôn ngữ"
     },
+    "TaskGroup": {
+        "completed_label": "hoàn tất",
+        "in_progress_label": "đang làm",
+        "no_tasks": "Không có tác vụ nào trong workspace này."
+    },
     "TaskDetail": {
         "back": "Quay lại danh sách",
         "review_asset": "Xem sản phẩm",

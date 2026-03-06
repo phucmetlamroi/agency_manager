@@ -33,6 +33,11 @@
         "logout": "Esci",
         "language": "Lingua"
     },
+    "TaskGroup": {
+        "completed_label": "completati",
+        "in_progress_label": "in corso",
+        "no_tasks": "Nessuna attività in quest'area di lavoro."
+    },
     "TaskDetail": {
         "back": "Torna alle attività",
         "review_asset": "Visualizza il risultato",

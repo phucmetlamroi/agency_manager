@@ -33,6 +33,11 @@
         "logout": "退出登录",
         "language": "语言"
     },
+    "TaskGroup": {
+        "completed_label": "已完成",
+        "in_progress_label": "进行中",
+        "no_tasks": "此工作区中没有任务。"
+    },
     "TaskDetail": {
         "back": "返回任务列表",
         "review_asset": "查看作品",

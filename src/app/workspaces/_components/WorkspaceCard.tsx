@@ -32,7 +32,7 @@ interface WorkspaceCardProps {
         id: string
         name: string
         description: string | null
-        updatedAt: Date
+        updatedAt: string | Date
     }
     role: string
     userGlobalRole: string

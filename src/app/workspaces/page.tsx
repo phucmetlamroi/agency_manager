@@ -28,6 +28,12 @@ export default async function WorkspacesPage() {
 
     const membershipMap = new Map(userMemberships.map(m => [m.workspaceId, m.role]))
 
+    const serializedWorkspaces = allWorkspaces.map(ws => ({
+        ...ws,
+        updatedAt: ws.updatedAt.toISOString(),
+        createdAt: ws.createdAt.toISOString()
+    }))
+
     return (
         <div className="min-h-screen bg-[#020617] text-slate-50 font-sans selection:bg-indigo-500/30">
             {/* Global Header (Frame.io Style) */}
@@ -35,7 +41,7 @@ export default async function WorkspacesPage() {
                 <div className="flex items-center gap-6">
                     <Avatar className="h-10 w-10 border border-slate-700 shadow-sm">
                         <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-semibold">
-                            {username.substring(0, 2).toUpperCase()}
+                            {(username || 'U').substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                     </Avatar>
                     <h1 className="text-xl font-semibold tracking-tight">Tài khoản của <span className="text-indigo-400">{username}</span></h1>
@@ -73,10 +79,10 @@ export default async function WorkspacesPage() {
 
                 {/* Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {allWorkspaces.map((ws) => (
+                    {serializedWorkspaces.map((ws) => (
                         <WorkspaceCard
                             key={ws.id}
-                            workspace={ws}
+                            workspace={ws as any}
                             role={membershipMap.get(ws.id) || 'MEMBER'}
                             userGlobalRole={session.user.role}
                         />

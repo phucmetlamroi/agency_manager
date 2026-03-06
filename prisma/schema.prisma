@@ -119,6 +119,10 @@ model Task {
   projectId        Int?
   clientId         Int?
   collectFilesLink String?
+  submissionFolder String?
+  frameUsername    String?
+  framePassword    String?
+  frameNote        String?   @default("Thông tin tài khoản frame dành cho trường hợp bạn bị out ra khỏi frame của team")
   assignedAgencyId String?
   version          Int               @default(0)
   invoiceId        String?

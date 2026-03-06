@@ -19,7 +19,7 @@ async function getClientSession() {
 /**
  * Maps the 8 internal task states into 5 abstract states suitable for the Client Portal.
  */
-export function mapClientTaskStatus(internalStatus: string): string {
+function mapClientTaskStatus(internalStatus: string): string {
     const statusLower = internalStatus.toLowerCase()
 
     if (statusLower.includes('đợi') || statusLower.includes('đã nhận')) {
@@ -46,7 +46,7 @@ export function mapClientTaskStatus(internalStatus: string): string {
  * In a real implementation, this could use video complexity or duration.
  * For now, it defaults to the agreed jobPriceUSD.
  */
-export function calculateEstimatedCost(task: any): number {
+function calculateEstimatedCost(task: any): number {
     return task.jobPriceUSD ? Number(task.jobPriceUSD) : 0
 }
 

@@ -26,6 +26,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
     const [linkRaw, setLinkRaw] = useState<string>('')
     const [linkBroll, setLinkBroll] = useState<string>('')
     const [collectFilesLink, setCollectFilesLink] = useState<string>('')
+    const [submissionFolder, setSubmissionFolder] = useState<string>('')
     const [references, setReferences] = useState<string>('')
     const [notes, setNotes] = useState<string>('')
 
@@ -102,6 +103,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
             resources: (linkRaw || linkBroll) ? `RAW: ${linkRaw.trim()} | BROLL: ${linkBroll.trim()}` : null,
             references: references || null,
             collectFilesLink: collectFilesLink || null,
+            submissionFolder: submissionFolder || null,
             notes: notes || null,
             type
         }, workspaceId)
@@ -185,10 +187,17 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                             className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
                     </div>
 
-                    <div className="mt-4">
-                        <label className="text-xs text-gray-400">Collect Files Link (Nơi nộp file/Project mẫu)</label>
-                        <input value={collectFilesLink} onChange={e => setCollectFilesLink(e.target.value)} placeholder="https://..."
-                            className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
+                    <div className="mt-4 grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs text-gray-400">Project Mẫu / Collect Files</label>
+                            <input value={collectFilesLink} onChange={e => setCollectFilesLink(e.target.value)} placeholder="https://..."
+                                className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400">Folder Nộp File</label>
+                            <input value={submissionFolder} onChange={e => setSubmissionFolder(e.target.value)} placeholder="https://..."
+                                className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
+                        </div>
                     </div>
                 </div>
 

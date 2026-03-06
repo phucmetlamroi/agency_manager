@@ -15,7 +15,7 @@ type BatchTaskInput = {
     resources: string | null
     references: string | null
     collectFilesLink: string | null
-    submissionFolder: string | null
+    submissionFolder?: string | null
     notes: string | null
     type: string
 }

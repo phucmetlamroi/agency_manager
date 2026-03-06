@@ -14,7 +14,7 @@ const cleanEnvValue = (val: string | undefined) => {
 
 const rawEnv = {
     ...process.env,
-    DATABASE_URL: cleanEnvValue(process.env.DATABASE_URL || process.env.POSTGRES_URL),
+    DATABASE_URL: cleanEnvValue(process.env.POSTGRES_URL || process.env.DATABASE_URL),
     JWT_SECRET: cleanEnvValue(process.env.JWT_SECRET)
 }
 

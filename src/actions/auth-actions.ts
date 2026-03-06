@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { login } from '@/lib/auth'
-import bcrypt from 'bcryptjs'
+import { compare } from 'bcryptjs'
 import { redirect } from 'next/navigation'
 import { UserRole } from '@prisma/client'
 
@@ -26,7 +26,7 @@ export async function loginAction(prevState: any, formData: FormData) {
             return { error: 'Tài khoản không tồn tại' }
         }
 
-        const isValid = await bcrypt.compare(password, user.password)
+        const isValid = await compare(password, user.password)
 
         if (!isValid) {
             console.log(`[Login] Invalid password for: ${username}`)

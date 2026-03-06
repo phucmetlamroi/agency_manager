@@ -21,8 +21,9 @@ export async function middleware(request: NextRequest) {
 
     const sessionCookie = request.cookies.get('session')
 
-    // 2. Redirect logic (Basic)
+    // 2. Redirect logic
     if (!sessionCookie) {
+        // Protected routes require login
         const isProtectedRoute =
             pathname.startsWith('/admin') ||
             pathname.startsWith('/dashboard') ||
@@ -34,23 +35,19 @@ export async function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
     } else {
-        // Logged in
+        // Logged in (or has cookie)
         if (pathname === '/login' || pathname === '/') {
-            return NextResponse.redirect(new URL('/workspaces', request.url))
-        }
-
-        // ReBAC for CLIENT role (optional check in middleware for faster redirect)
-        // We can temporarily disable decryption here to avoid hangs
-        /*
-        try {
-            const session = await decrypt(sessionCookie.value)
-            if (session?.user?.role === 'CLIENT') {
-                if (pathname.includes('/admin') || pathname.includes('/dashboard') || pathname.includes('/agency')) {
-                    return NextResponse.redirect(new URL('/portal', request.url))
-                }
+            try {
+                // Validate cookie to prevent infinite redirect loops
+                await decrypt(sessionCookie.value)
+                return NextResponse.redirect(new URL('/workspaces', request.url))
+            } catch (error) {
+                // Invalid cookie - clear it and stay on login
+                const response = (pathname === '/login') ? NextResponse.next() : NextResponse.redirect(new URL('/login', request.url))
+                response.cookies.delete('session')
+                return response
             }
-        } catch (e) {}
-        */
+        }
     }
 
     // 3. Internationalization for Portal
@@ -59,7 +56,6 @@ export async function middleware(request: NextRequest) {
         return intlMiddleware(request)
     }
 
-    // Default: Continue
     return NextResponse.next()
 }
 

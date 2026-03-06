@@ -2,7 +2,6 @@
 
 import { useActionState } from 'react'
 import { loginAction } from '@/actions/auth-actions'
-import '@/app/globals.css'
 
 export default function LoginPage() {
     const [state, formAction, isPending] = useActionState(loginAction, null)

@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
 
     // 3. Internationalization for Portal index
     if (pathname === '/portal' || pathname === '/portal/') {
-        return NextResponse.redirect(new URL(`/portal/${routing.defaultLocale}/invoices`, request.url))
+        return NextResponse.redirect(new URL(`/portal/${routing.defaultLocale}`, request.url))
     }
 
     return NextResponse.next()

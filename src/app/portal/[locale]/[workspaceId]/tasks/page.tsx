@@ -2,18 +2,21 @@ import { getClientTasks } from '@/actions/client-portal-actions';
 import { getTranslations } from 'next-intl/server';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { Link } from '@/i18n/routing';
 import { Clock, PlayCircle, CheckCircle2 } from 'lucide-react';
 
-export default async function PortalTasksPage() {
+export default async function PortalTasksPage({
+    params
+}: {
+    params: Promise<{ locale: string, workspaceId: string }>;
+}) {
+    const { workspaceId } = await params;
     const session = await getSession();
     if (!session) redirect('/login');
 
     const t = await getTranslations('Portal');
-    const tasksT = await getTranslations('TaskStatus');
 
-    // Fetch real data
-    const tasks = await getClientTasks();
+    // Fetch real data for the specific workspace
+    const tasks = await getClientTasks(workspaceId);
 
     return (
         <div className="w-full max-w-5xl mx-auto p-8">
@@ -26,14 +29,14 @@ export default async function PortalTasksPage() {
                             <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Project / Task</th>
                             <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Deadline</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Action</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right text-transparent">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-800/50">
                         {tasks.length === 0 ? (
                             <tr>
                                 <td colSpan={4} className="px-6 py-10 text-center text-zinc-500">
-                                    No tasks found.
+                                    No tasks found in this workspace.
                                 </td>
                             </tr>
                         ) : (
@@ -55,9 +58,16 @@ export default async function PortalTasksPage() {
                                     </td>
                                     <td className="px-6 py-4 text-sm text-zinc-400">{task.deadline ? new Date(task.deadline).toLocaleDateString() : 'No deadline'}</td>
                                     <td className="px-6 py-4 text-right">
-                                        <Link href={`/portal/tasks/${task.id}`} className="text-sm font-medium text-indigo-400 hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            View Details &rarr;
-                                        </Link>
+                                        {task.productLink && (
+                                            <a
+                                                href={task.productLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm font-medium text-indigo-400 hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                View Link &rarr;
+                                            </a>
+                                        )}
                                     </td>
                                 </tr>
                             ))

@@ -4,17 +4,19 @@ import { getTranslations } from 'next-intl/server';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
-export default async function PortalInvoicesPage() {
-    // Assuming the user is logging in without selecting workspace first?
-    // Wait, the user might be mapped to a workspace or multiple.
-    // In this MVP we just fetch the user's workspace memberships.
+export default async function PortalInvoicesPage({
+    params
+}: {
+    params: Promise<{ locale: string, workspaceId: string }>;
+}) {
+    const { workspaceId } = await params;
     const session = await getSession();
     if (!session) redirect('/login');
 
-    // Fetch real data
+    // Fetch real data for specific workspace
     const [invoices, projects] = await Promise.all([
-        getClientInvoices(),
-        getClientProjects()
+        getClientInvoices(workspaceId),
+        getClientProjects(workspaceId)
     ]);
 
     const t = await getTranslations('Portal');

@@ -1,6 +1,7 @@
 'use server'
 
-import { prisma } from '@/lib/db'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { prisma as globalPrisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
@@ -14,6 +15,35 @@ async function getClientSession() {
         redirect('/login')
     }
     return session.user.id
+}
+
+/**
+ * Finds all client records associated with the user and their subsidiaries.
+ */
+async function getRelatedClientIds(clientUserId: string) {
+    const user = await globalPrisma.user.findUnique({ where: { id: clientUserId } })
+    if (!user) return []
+
+    const rootClients = await globalPrisma.client.findMany({
+        where: {
+            OR: [
+                { name: user.username },
+                { name: user.nickname || '' }
+            ]
+        }
+    })
+
+    const rootIds = rootClients.map(c => c.id)
+    const allIds = new Set(rootIds)
+
+    if (rootIds.length > 0) {
+        const subs = await globalPrisma.client.findMany({
+            where: { parentId: { in: rootIds } }
+        })
+        subs.forEach(s => allIds.add(s.id))
+    }
+
+    return Array.from(allIds)
 }
 
 /**
@@ -43,8 +73,6 @@ function mapClientTaskStatus(internalStatus: string): string {
 
 /**
  * Calculates a dynamic estimated cost to obscure internal profit boundaries.
- * In a real implementation, this could use video complexity or duration.
- * For now, it defaults to the agreed jobPriceUSD.
  */
 function calculateEstimatedCost(task: any): number {
     return task.jobPriceUSD ? Number(task.jobPriceUSD) : 0
@@ -53,12 +81,17 @@ function calculateEstimatedCost(task: any): number {
 /**
  * Fetches Tasks for the authenticated Client, strictly isolating data via ReBAC.
  */
-export async function getClientTasks() {
+export async function getClientTasks(workspaceId: string) {
     const clientUserId = await getClientSession()
+    const prisma = getWorkspacePrisma(workspaceId)
+    const relatedClientIds = await getRelatedClientIds(clientUserId)
 
     const tasks = await prisma.task.findMany({
         where: {
-            clientUserId: clientUserId
+            OR: [
+                { clientUserId: clientUserId },
+                { clientId: { in: relatedClientIds } }
+            ]
         },
         select: {
             id: true,
@@ -84,14 +117,19 @@ export async function getClientTasks() {
 }
 
 /**
- * Fetches Projects for the authenticated Client, strictly isolating data via ReBAC.
+ * Fetches Projects for the authenticated Client.
  */
-export async function getClientProjects() {
+export async function getClientProjects(workspaceId: string) {
     const clientUserId = await getClientSession()
+    const prisma = getWorkspacePrisma(workspaceId)
+    const relatedClientIds = await getRelatedClientIds(clientUserId)
 
     return await prisma.project.findMany({
         where: {
-            clientUserId: clientUserId
+            OR: [
+                { clientUserId: clientUserId },
+                { clientId: { in: relatedClientIds } }
+            ]
         },
         select: {
             id: true,
@@ -106,14 +144,19 @@ export async function getClientProjects() {
 }
 
 /**
- * Fetches Invoices for the authenticated Client, strictly isolating data via ReBAC.
+ * Fetches Invoices for the authenticated Client.
  */
-export async function getClientInvoices() {
+export async function getClientInvoices(workspaceId: string) {
     const clientUserId = await getClientSession()
+    const prisma = getWorkspacePrisma(workspaceId)
+    const relatedClientIds = await getRelatedClientIds(clientUserId)
 
     return await prisma.invoice.findMany({
         where: {
-            clientUserId: clientUserId
+            OR: [
+                { clientUserId: clientUserId },
+                { clientId: { in: relatedClientIds } }
+            ]
         },
         orderBy: { createdAt: 'desc' },
         select: {
@@ -130,3 +173,40 @@ export async function getClientInvoices() {
         }
     })
 }
+
+/**
+ * Discovers workspaces where the client has data or memberships.
+ */
+export async function getClientWorkspaces() {
+    const userId = await getClientSession()
+    const relatedClientIds = await getRelatedClientIds(userId)
+
+    // Check memberships
+    const memberships = await globalPrisma.workspaceMember.findMany({
+        where: { userId },
+        select: { workspaceId: true }
+    })
+
+    const workspaceIds = new Set(memberships.map(m => m.workspaceId))
+
+    // Check Task/Project/Invoice for other workspaces
+    const dataWorkspaces = await globalPrisma.task.findMany({
+        where: {
+            OR: [
+                { clientUserId: userId },
+                { clientId: { in: relatedClientIds } }
+            ]
+        },
+        select: { workspaceId: true },
+        distinct: ['workspaceId']
+    })
+
+    dataWorkspaces.forEach(dw => {
+        if (dw.workspaceId) workspaceIds.add(dw.workspaceId)
+    })
+
+    return await globalPrisma.workspace.findMany({
+        where: { id: { in: Array.from(workspaceIds) } }
+    })
+}
+

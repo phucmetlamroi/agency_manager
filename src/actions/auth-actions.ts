@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from '@/lib/db'
-import { login } from '@/lib/auth'
+import { login, logout } from '@/lib/auth'
 import { compare } from 'bcryptjs'
 import { redirect } from 'next/navigation'
 import { UserRole } from '@prisma/client'
@@ -55,4 +55,9 @@ export async function loginAction(prevState: any, formData: FormData) {
 
     // Redirect staff/admins to the Workspace Portal
     redirect('/workspaces')
+}
+
+export async function logoutAction() {
+    await logout()
+    redirect('/login')
 }

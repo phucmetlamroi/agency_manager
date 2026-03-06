@@ -3,17 +3,15 @@ import { routing } from './routing';
 import { headers } from 'next/headers';
 
 export default getRequestConfig(async ({ requestLocale }) => {
-    // Primary: try requestLocale from next-intl context
+    // Try requestLocale first (may work in some contexts)
     let locale = await requestLocale;
 
-    // Fallback: read locale from URL path directly
+    // Primary reliable source: read from the header we inject in middleware
     if (!locale || !routing.locales.includes(locale as any)) {
         const headersList = await headers();
-        const url = headersList.get('x-invoke-path') || headersList.get('x-url') || '';
-        // URL pattern: /portal/[locale]/...
-        const match = url.match(/\/portal\/([a-z]{2})(\/|$)/);
-        if (match && routing.locales.includes(match[1] as any)) {
-            locale = match[1];
+        const injectedLocale = headersList.get('x-portal-locale');
+        if (injectedLocale && routing.locales.includes(injectedLocale as any)) {
+            locale = injectedLocale;
         } else {
             locale = routing.defaultLocale;
         }
@@ -24,4 +22,5 @@ export default getRequestConfig(async ({ requestLocale }) => {
         messages: (await import(`../../messages/${locale}.json`)).default
     };
 });
+
 

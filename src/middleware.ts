@@ -27,19 +27,16 @@ export async function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
     } else {
-        // Logged in (has cookie)
         try {
             const session = await decrypt(sessionCookie.value)
             const role = session?.user?.role
 
-            // If user is CLIENT but trying to access non-portal protected routes
             if (role === 'CLIENT') {
                 const adminPaths = ['/workspaces', '/admin', '/dashboard', '/agency']
                 if (adminPaths.some(p => pathname.startsWith(p))) {
                     return NextResponse.redirect(new URL('/portal', request.url))
                 }
             } else {
-                // If STAFF but trying to access /portal
                 if (pathname.startsWith('/portal')) {
                     return NextResponse.redirect(new URL('/workspaces', request.url))
                 }
@@ -50,7 +47,6 @@ export async function middleware(request: NextRequest) {
                 return NextResponse.redirect(new URL(target, request.url))
             }
         } catch (err) {
-            // Invalid session - delete cookie and redirect to login
             const response = NextResponse.redirect(new URL('/login', request.url))
             response.cookies.delete('session')
             return response
@@ -62,9 +58,19 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(`/portal/${routing.defaultLocale}`, request.url))
     }
 
+    // 4. Inject locale header so i18n/request.ts can read the locale from URL
+    //    URL pattern: /portal/[locale]/...
+    const localeMatch = pathname.match(/^\/portal\/([a-z]{2})(\/|$)/)
+    if (localeMatch && routing.locales.includes(localeMatch[1] as any)) {
+        const requestHeaders = new Headers(request.headers)
+        requestHeaders.set('x-portal-locale', localeMatch[1])
+        return NextResponse.next({ request: { headers: requestHeaders } })
+    }
+
     return NextResponse.next()
 }
 
 export const config = {
     matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 }
+

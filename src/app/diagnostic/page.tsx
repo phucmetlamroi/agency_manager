@@ -1,60 +1,38 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { prisma } from '@/lib/db'
-import { env } from '@/lib/env'
+'use client'
 
-export default async function DiagnosticPage() {
-    const results = []
+import { useState } from 'react'
 
-    // Test 1: Env Vars
-    results.push({
-        test: "Environment Variables Detection",
-        status: env.DATABASE_URL !== "placeholder_url_replace_me" ? "OK" : "MISSING",
-        details: `DATABASE_URL length: ${env.DATABASE_URL?.length || 0}. JWT_SECRET set: ${env.JWT_SECRET !== "temporary-build-secret-key-change-me"}`
-    })
+export default function DiagnosticPage() {
+    const [result, setResult] = useState<string>('Ready')
+    const [loading, setLoading] = useState(false)
 
-    // Test 2: Prisma Connection
-    let prismaStatus = "UNKNOWN"
-    let prismaDetails = ""
-    try {
-        const workspaceCount = await prisma.workspace.count()
-        prismaStatus = "OK"
-        prismaDetails = `Successfully connected to DB. Found ${workspaceCount} workspaces.`
-    } catch (e: any) {
-        prismaStatus = "FAILED"
-        prismaDetails = e.message
+    const runTest = async () => {
+        setLoading(true)
+        setResult('Running...')
+        try {
+            const res = await fetch('/api/diagnostic')
+            const data = await res.json()
+            setResult(JSON.stringify(data, null, 2))
+        } catch (e: any) {
+            setResult('Error: ' + e.message)
+        } finally {
+            setLoading(false)
+        }
     }
-    results.push({
-        test: "Prisma DB Connection",
-        status: prismaStatus,
-        details: prismaDetails
-    })
 
     return (
-        <div style={{ padding: '40px', background: '#0f172a', color: 'white', minHeight: '100vh', fontFamily: 'monospace' }}>
-            <h1 style={{ color: '#6366f1' }}>Diagnostic Dashboard</h1>
-            <p>Time: {new Date().toISOString()}</p>
-            <hr style={{ opacity: 0.1, margin: '20px 0' }} />
-
-            <div style={{ display: 'grid', gap: '20px' }}>
-                {results.map((r, i) => (
-                    <div key={i} style={{
-                        padding: '20px',
-                        background: '#1e293b',
-                        borderRadius: '12px',
-                        border: `1px solid ${r.status === 'OK' ? '#10b981' : '#f43f5e'}`
-                    }}>
-                        <h3 style={{ margin: '0 0 10px 0' }}>{r.test}</h3>
-                        <div style={{ padding: '8px 12px', background: r.status === 'OK' ? '#064e3b' : '#451225', borderRadius: '4px', display: 'inline-block', marginBottom: '10px' }}>
-                            {r.status}
-                        </div>
-                        <p style={{ margin: 0, opacity: 0.8, wordBreak: 'break-all' }}>{r.details}</p>
-                    </div>
-                ))}
-            </div>
-
-            <div style={{ marginTop: '40px' }}>
-                <a href="/login" style={{ color: '#6366f1', textDecoration: 'none' }}>← Back to Login</a>
-            </div>
+        <div className="p-10 bg-slate-900 text-white min-h-screen">
+            <h1 className="text-2xl mb-4">DB Diagnostic</h1>
+            <button
+                onClick={runTest}
+                disabled={loading}
+                className="px-4 py-2 bg-indigo-600 rounded"
+            >
+                {loading ? 'Testing...' : 'Test Connection'}
+            </button>
+            <pre className="mt-10 bg-black p-4 rounded border border-gray-800">
+                {result}
+            </pre>
         </div>
     )
 }

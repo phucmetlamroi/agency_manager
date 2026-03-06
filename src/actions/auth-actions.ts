@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { login } from '@/lib/auth'
-import * as bcrypt from 'bcryptjs'
+import bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
 import { UserRole } from '@prisma/client'
 

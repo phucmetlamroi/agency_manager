@@ -7,14 +7,20 @@ import { routing } from '@/i18n/routing'
 
 const intlMiddleware = createIntlMiddleware(routing)
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl
+
+    // Skip all static files and API early
+    if (pathname.includes('.') || pathname.startsWith('/api') || pathname.startsWith('/_next')) {
+        return NextResponse.next()
+    }
+
     const sessionCookie = request.cookies.get('session')
 
-    // 1. Handle non-authenticated paths early
+    // 1. Handle non-authenticated paths
     if (!sessionCookie) {
         if (pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || pathname.startsWith('/agency')) {
-            return NextResponse.redirect(new URL('/login', request.url))
+            return applyDeviceHeaders(request, NextResponse.redirect(new URL('/login', request.url)))
         }
         return applyDeviceHeaders(request, NextResponse.next())
     }
@@ -24,13 +30,11 @@ export async function middleware(request: NextRequest) {
         const session = await decrypt(sessionCookie.value)
         const { role } = session?.user || {}
 
-        if (!role) {
-            throw new Error('Invalid session payload')
-        }
+        if (!role) throw new Error('No role')
 
         // Redirect away from login if already logged in
         if (pathname === '/login' || pathname === '/') {
-            return NextResponse.redirect(new URL('/workspaces', request.url))
+            return applyDeviceHeaders(request, NextResponse.redirect(new URL('/workspaces', request.url)))
         }
 
         // ReBAC for CLIENT role

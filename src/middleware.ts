@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from '@/i18n/routing'
-import { decrypt } from '@/lib/auth'
+import { decrypt } from '@/lib/jwt'
 
 const intlMiddleware = createIntlMiddleware(routing)
 
@@ -24,21 +24,17 @@ export async function middleware(request: NextRequest) {
     // 2. Redirect logic
     if (!sessionCookie) {
         // Protected routes require login
-        const isProtectedRoute =
-            pathname.startsWith('/admin') ||
-            pathname.startsWith('/dashboard') ||
-            pathname.startsWith('/agency') ||
-            pathname.startsWith('/workspaces') ||
-            pathname.includes('/portal')
+        const protectedPaths = ['/workspaces', '/portal', '/admin', '/dashboard', '/agency']
+        const isProtectedRoute = protectedPaths.some(p => pathname.startsWith(p))
 
         if (isProtectedRoute && pathname !== '/login') {
             return NextResponse.redirect(new URL('/login', request.url))
         }
     } else {
-        // Logged in (or has cookie)
+        // Logged in
         if (pathname === '/login' || pathname === '/') {
             try {
-                // Validate cookie to prevent infinite redirect loops
+                // IMPORTANT: Use the safe decrypt from @/lib/jwt
                 await decrypt(sessionCookie.value)
                 return NextResponse.redirect(new URL('/workspaces', request.url))
             } catch (error) {

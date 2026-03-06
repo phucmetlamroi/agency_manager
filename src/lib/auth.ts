@@ -1,24 +1,5 @@
-import { env } from './env'
-import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-
-const key = new TextEncoder().encode(env.JWT_SECRET)
-
-export async function encrypt(payload: any) {
-    return await new SignJWT(payload)
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime('1 week')
-        .sign(key)
-}
-
-export async function decrypt(input: string): Promise<any> {
-    const { payload } = await jwtVerify(input, key, {
-        algorithms: ['HS256'],
-    })
-    return payload
-}
+import { encrypt, decrypt } from './jwt'
 
 export async function login(userData: any) {
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -49,3 +30,4 @@ export async function getSession() {
         return null
     }
 }
+export { decrypt }

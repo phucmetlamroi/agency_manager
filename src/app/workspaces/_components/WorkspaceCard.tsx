@@ -111,7 +111,7 @@ export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCard
                             </CardDescription>
 
                             <div className="mt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-800/50 pt-4">
-                                <span className="flex-1">
+                                <span className="flex-1" suppressHydrationWarning>
                                     Cập nhật {formatDistanceToNow(new Date(workspace.updatedAt), { addSuffix: true, locale: vi })}
                                 </span>
 

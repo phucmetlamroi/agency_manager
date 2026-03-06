@@ -91,7 +91,10 @@ export default async function PortalTaskDetail({
                     {task.notes && (
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur">
                             <h3 className="text-white font-medium mb-3">{t('notes')}</h3>
-                            <p className="text-zinc-300 text-sm whitespace-pre-wrap">{task.notes}</p>
+                            <div
+                                className="text-zinc-300 text-sm prose-portal"
+                                dangerouslySetInnerHTML={{ __html: task.notes }}
+                            />
                         </div>
                     )}
 

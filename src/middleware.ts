@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from '@/i18n/routing'
-import { decrypt } from '@/lib/jwt'
 
 const intlMiddleware = createIntlMiddleware(routing)
 
@@ -21,9 +20,9 @@ export async function middleware(request: NextRequest) {
 
     const sessionCookie = request.cookies.get('session')
 
-    // 2. Redirect logic
+    // 2. Ultra-Light Redirect logic (NO DECRYPTION)
+    // This prevents any crypto-related hangs in the middleware hot-path
     if (!sessionCookie) {
-        // Protected routes require login
         const protectedPaths = ['/workspaces', '/portal', '/admin', '/dashboard', '/agency']
         const isProtectedRoute = protectedPaths.some(p => pathname.startsWith(p))
 
@@ -31,18 +30,10 @@ export async function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
     } else {
-        // Logged in
+        // Logged in (has cookie)
         if (pathname === '/login' || pathname === '/') {
-            try {
-                // IMPORTANT: Use the safe decrypt from @/lib/jwt
-                await decrypt(sessionCookie.value)
-                return NextResponse.redirect(new URL('/workspaces', request.url))
-            } catch (error) {
-                // Invalid cookie - clear it and stay on login
-                const response = (pathname === '/login') ? NextResponse.next() : NextResponse.redirect(new URL('/login', request.url))
-                response.cookies.delete('session')
-                return response
-            }
+            // Passive redirect - if they have a cookie, push to workspaces
+            return NextResponse.redirect(new URL('/workspaces', request.url))
         }
     }
 

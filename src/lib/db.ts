@@ -1,7 +1,5 @@
-import { env } from './env'
 import { PrismaClient } from '@prisma/client'
-import { Pool } from '@neondatabase/serverless'
-import { PrismaNeon } from '@prisma/adapter-neon'
+import { env } from './env'
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined
@@ -15,22 +13,20 @@ export const prisma = globalForPrisma.prisma ?? (() => {
         console.error("❌ CRITICAL: DATABASE_URL is missing in production!")
     }
 
-    // Standard pool for Neon with better connection parameters
-    const pool = new Pool({
-        connectionString,
-        max: 10,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000,
-    })
-
-    pool.on('error', (err) => console.error('Neon Pool Error', err))
-
-    const adapter = new PrismaNeon(pool)
+    // Standard Prisma Client for Node.js runtime (Vercel standard functions)
+    // We avoid @neondatabase/serverless Pool here to prevent hangs in standard environments
     const client = new PrismaClient({
-        adapter,
+        datasources: {
+            db: {
+                url: connectionString,
+            },
+        },
         log: env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
     })
 
-    globalForPrisma.prisma = client
+    if (env.NODE_ENV !== 'production') {
+        globalForPrisma.prisma = client
+    }
+
     return client
 })()

@@ -10,50 +10,60 @@ const intlMiddleware = createIntlMiddleware(routing)
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl
 
-    // Skip all static files and API early
-    if (pathname.includes('.') || pathname.startsWith('/api') || pathname.startsWith('/_next')) {
+    // 1. Skip static assets and internal next.js paths
+    if (
+        pathname.startsWith('/_next') ||
+        pathname.startsWith('/api') ||
+        pathname.includes('.') ||
+        pathname === '/favicon.ico'
+    ) {
         return NextResponse.next()
     }
 
     const sessionCookie = request.cookies.get('session')
 
-    // 1. Handle non-authenticated paths
+    // 2. Not Logged In
     if (!sessionCookie) {
-        if (pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || pathname.startsWith('/agency')) {
-            return applyDeviceHeaders(request, NextResponse.redirect(new URL('/login', request.url)))
+        // Protected routes require login
+        const isProtectedRoute =
+            pathname.startsWith('/admin') ||
+            pathname.startsWith('/dashboard') ||
+            pathname.startsWith('/agency') ||
+            pathname.startsWith('/workspaces') ||
+            pathname.startsWith('/portal')
+
+        if (isProtectedRoute) {
+            return NextResponse.redirect(new URL('/login', request.url))
         }
         return applyDeviceHeaders(request, NextResponse.next())
     }
 
-    // 2. Validate session
+    // 3. Logged In
     try {
         const session = await decrypt(sessionCookie.value)
-        const { role } = session?.user || {}
+        const role = session?.user?.role
 
-        if (!role) throw new Error('No role')
+        if (!role) throw new Error('Invalid Session')
 
-        // Redirect away from login if already logged in
-        if (pathname === '/login' || pathname === '/') {
-            return applyDeviceHeaders(request, NextResponse.redirect(new URL('/workspaces', request.url)))
+        // If at login page and already logged in, go to workspaces
+        if (pathname === '/login') {
+            return NextResponse.redirect(new URL('/workspaces', request.url))
         }
 
-        // ReBAC for CLIENT role
-        if (role === 'CLIENT') {
-            const isProtected = pathname.includes('/admin') || pathname.includes('/dashboard') || pathname.includes('/agency')
-            const isWorkspaceRoot = pathname === '/workspaces'
+        // Handle exactly '/' -> go to workspaces
+        if (pathname === '/') {
+            return NextResponse.redirect(new URL('/workspaces', request.url))
+        }
 
-            if (isProtected) {
-                // If they have a workspace context in URL, try to push to portal
-                const isWorkspaceRoute = pathname.match(/^\/([^/]+)\//)
-                if (isWorkspaceRoute && isWorkspaceRoute[1] !== 'workspaces' && isWorkspaceRoute[1] !== 'portal' && !routing.locales.includes(isWorkspaceRoute[1] as any)) {
-                    return NextResponse.redirect(new URL(`/portal`, request.url))
-                }
+        // ReBAC: Restrict CLIENT role
+        if (role === 'CLIENT') {
+            const isAdminPath = pathname.includes('/admin') || pathname.includes('/dashboard') || pathname.includes('/agency')
+            if (isAdminPath) {
                 return NextResponse.redirect(new URL('/portal', request.url))
             }
-            // Clients are allowed at /workspaces to pick their entry point
         }
 
-        // 3. Internationalization for Portal
+        // 4. i18n for Portal
         const isPortalRoute = pathname.includes('/portal') || routing.locales.some(loc => pathname.startsWith(`/${loc}`))
         if (isPortalRoute) {
             const intlResponse = intlMiddleware(request)
@@ -63,8 +73,8 @@ export async function proxy(request: NextRequest) {
         return applyDeviceHeaders(request, NextResponse.next())
 
     } catch (error) {
-        // Clear session and redirect to login if something is wrong
-        const response = (pathname === '/login')
+        // Session validation failed - clear it and go to login
+        const response = pathname === '/login'
             ? NextResponse.next()
             : NextResponse.redirect(new URL('/login', request.url))
 

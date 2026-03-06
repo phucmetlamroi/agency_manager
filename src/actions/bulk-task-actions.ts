@@ -15,6 +15,7 @@ type BatchTaskInput = {
     resources: string | null
     references: string | null
     collectFilesLink: string | null
+    submissionFolder: string | null
     notes: string | null
     type: string
 }
@@ -56,6 +57,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         resources: data.resources,
                         references: data.references,
                         collectFilesLink: data.collectFilesLink,
+                        submissionFolder: data.submissionFolder,
                         notes: data.notes,
                         assigneeId: data.assigneeId,
                         assignedAgencyId: assignedAgencyId,
@@ -120,6 +122,7 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         if (data.jobPriceUSD !== undefined) updateData.jobPriceUSD = data.jobPriceUSD
         if (data.value !== undefined) updateData.value = data.value
         if (data.collectFilesLink !== undefined) updateData.collectFilesLink = data.collectFilesLink
+        if (data.submissionFolder !== undefined) updateData.submissionFolder = data.submissionFolder
 
         await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {

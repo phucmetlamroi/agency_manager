@@ -113,6 +113,7 @@ model Task {
   projectId          Int?
   clientId           Int?
   collectFilesLink   String?
+  submissionFolder   String?
   assignedAgencyId   String?
   version            Int               @default(0)
   invoiceId          String?

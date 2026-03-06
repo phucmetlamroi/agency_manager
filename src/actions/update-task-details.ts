@@ -15,6 +15,7 @@ export async function updateTaskDetails(id: string, data: {
     jobPriceUSD?: number
     value?: number
     collectFilesLink?: string
+    submissionFolder?: string
 }, workspaceId: string) {
     try {
         const workspacePrisma = getWorkspacePrisma(workspaceId)
@@ -24,7 +25,8 @@ export async function updateTaskDetails(id: string, data: {
             notes: data.notes,
             title: data.title,
             productLink: data.productLink,
-            collectFilesLink: data.collectFilesLink
+            collectFilesLink: data.collectFilesLink,
+            submissionFolder: data.submissionFolder
         }
 
         // Handle Price Updates (Financials) - FIXED

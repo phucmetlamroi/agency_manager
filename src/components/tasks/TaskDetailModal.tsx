@@ -35,7 +35,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         deadline: '',
         jobPriceUSD: 0,
         value: 0,
-        collectFilesLink: ''
+        collectFilesLink: '',
+        submissionFolder: ''
     })
 
     // Helper: Parse content for Tiptap
@@ -79,7 +80,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 deadline: deadlineStr,
                 jobPriceUSD: task.jobPriceUSD || 0,
                 value: task.value || 0,
-                collectFilesLink: task.collectFilesLink || ''
+                collectFilesLink: task.collectFilesLink || '',
+                submissionFolder: task.submissionFolder || ''
             })
             setIsEditing(false)
         }
@@ -110,7 +112,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 deadline: form.deadline || undefined,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
                 value: isAdmin ? Number(form.value) : undefined,
-                collectFilesLink: form.collectFilesLink
+                collectFilesLink: form.collectFilesLink,
+                submissionFolder: form.submissionFolder
             }
 
             const res = await bulkUpdateTaskDetails(bulkSelectedIds, bulkData, workspaceId)
@@ -135,7 +138,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             deadline: form.deadline || undefined,
             jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
             value: isAdmin ? Number(form.value) : undefined,
-            collectFilesLink: form.collectFilesLink
+            collectFilesLink: form.collectFilesLink,
+            submissionFolder: form.submissionFolder
         }, workspaceId)
 
         if (res?.success) {
@@ -147,7 +151,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 productLink: form.productLink,
                 value: isAdmin ? Number(form.value) : prev.value,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : prev.jobPriceUSD,
-                collectFilesLink: form.collectFilesLink
+                collectFilesLink: form.collectFilesLink,
+                submissionFolder: form.submissionFolder
             }) : null)
 
             setIsEditing(false)
@@ -283,6 +288,12 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                             placeholder="Link Project Mẫu..."
                                             className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm outline-none font-bold text-amber-900"
                                         />
+                                        <input
+                                            value={form.submissionFolder || ''}
+                                            onChange={(e) => setForm({ ...form, submissionFolder: e.target.value })}
+                                            placeholder="Link Folder Nộp File..."
+                                            className="w-full p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm outline-none font-bold text-blue-900"
+                                        />
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-2">
@@ -301,7 +312,12 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                                 <span>✨</span> PROJECT MẪU ↗
                                             </a>
                                         )}
-                                        {!form.linkRaw && !form.linkBroll && !localTask.collectFilesLink && (
+                                        {localTask.submissionFolder && (
+                                            <a href={formatLink(localTask.submissionFolder)} target="_blank" className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl text-sm font-black text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all">
+                                                <span>📂</span> FOLDER NỘP FILE ↗
+                                            </a>
+                                        )}
+                                        {!form.linkRaw && !form.linkBroll && !localTask.collectFilesLink && !localTask.submissionFolder && (
                                             <div className="text-zinc-400 italic text-xs p-3">No assets linked</div>
                                         )}
                                     </div>

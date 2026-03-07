@@ -25,3 +25,19 @@ export function formatCurrency(amount: number | string | any) {
         minimumFractionDigits: 2
     }).format(value)
 }
+
+/**
+ * Ensures all <a> tags in an HTML string have target="_blank" and rel="noopener noreferrer"
+ */
+export function ensureExternalLinks(html: string | null | undefined): string {
+    if (!html) return '';
+
+    // Step 1: Add target="_blank" if missing
+    let processed = html.replace(/<a\s+(?![^>]*\btarget\s*=)([^>]+)>/gi, '<a $1 target="_blank">');
+
+    // Step 2: Add rel="noopener noreferrer" if missing
+    processed = processed.replace(/<a\s+(?![^>]*\brel\s*=)([^>]+)>/gi, '<a $1 rel="noopener noreferrer">');
+
+    return processed;
+}
+

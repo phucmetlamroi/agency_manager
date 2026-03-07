@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
 import DOMPurify from 'isomorphic-dompurify'
+import { ensureExternalLinks } from "@/lib/utils"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
 
@@ -498,7 +499,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             ) : (
                                 <div
                                     className="bg-zinc-50 p-6 rounded-2xl text-zinc-800 text-[14px] leading-[1.6] prose prose-zinc max-w-none border border-zinc-100"
-                                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(localTask.notes || "No specific instructions.") }}
+                                    dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes || "No specific instructions.")) }}
                                 />
                             )}
                         </div>

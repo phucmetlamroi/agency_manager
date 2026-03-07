@@ -22,6 +22,11 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
     })
 
     const users = await workspacePrisma.user.findMany({
+        where: {
+            role: {
+                notIn: ['CLIENT', 'LOCKED']
+            }
+        },
         orderBy: { username: 'asc' },
         include: { ownedAgency: true }
     })

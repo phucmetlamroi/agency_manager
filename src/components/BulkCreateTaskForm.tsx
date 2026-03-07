@@ -218,11 +218,13 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                     <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)}
                         className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm">
                         <option value="">-- Để trống (Kho Task) --</option>
-                        {users.map((u) => (
-                            <option key={u.id} value={u.id} disabled={u.role === 'LOCKED'}>
-                                {u.username} ({u.reputation ?? 100}đ)
-                            </option>
-                        ))}
+                        {users
+                            .filter(u => u.role !== 'CLIENT' && u.role !== 'LOCKED')
+                            .map((u) => (
+                                <option key={u.id} value={u.id}>
+                                    {u.username} ({u.reputation ?? 100}đ)
+                                </option>
+                            ))}
                     </select>
                 </div>
             </div>

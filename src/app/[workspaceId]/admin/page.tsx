@@ -42,7 +42,12 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     })
 
     const users = await workspacePrisma.user.findMany({
-        where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
+        where: {
+            AND: [
+                currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
+                { role: { notIn: ['CLIENT', 'LOCKED'] } }
+            ]
+        },
         orderBy: [
             { reputation: 'desc' },
             { username: 'asc' }

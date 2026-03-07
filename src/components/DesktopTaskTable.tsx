@@ -278,7 +278,11 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                                     )}
                                                     <optgroup label="Nhân viên">
                                                         {users
-                                                            .filter(u => !((u as any).ownedAgency && (u as any).ownedAgency.length > 0)) // Filter out Agency Owners
+                                                            .filter(u => {
+                                                                const role = (u as any).role
+                                                                const isAgencyOwner = (u as any).ownedAgency && (u as any).ownedAgency.length > 0
+                                                                return role !== 'CLIENT' && role !== 'LOCKED' && !isAgencyOwner
+                                                            })
                                                             .map(u => {
                                                                 return (
                                                                     <option key={u.id} value={u.id} className="text-black">

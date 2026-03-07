@@ -127,7 +127,11 @@ export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [],
                 <SelectGroup>
                     <SelectLabel>Team Members</SelectLabel>
                     {users
-                        .filter(u => !((u as any).ownedAgency && (u as any).ownedAgency.length > 0))
+                        .filter(u => {
+                            const role = (u as any).role
+                            const isAgencyOwner = (u as any).ownedAgency && (u as any).ownedAgency.length > 0
+                            return role !== 'CLIENT' && role !== 'LOCKED' && !isAgencyOwner
+                        })
                         .map(u => (
                             <SelectItem key={u.id} value={u.id}>
                                 <div className="flex items-center gap-2">

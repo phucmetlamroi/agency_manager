@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { getSession as getAuthSession } from '@/lib/auth'
 import { getTranslations } from 'next-intl/server'
 import LanguageSwitcher from '@/components/portal/LanguageSwitcher'
+import { isMobileDevice } from '@/lib/device'
 
 export default async function WorkspaceLayout({
     children,
@@ -19,12 +20,13 @@ export default async function WorkspaceLayout({
     if (!session || session.user.role !== 'CLIENT') {
         redirect('/login')
     }
+    const isMobile = await isMobileDevice()
     const t = await getTranslations('Sidebar')
 
     return (
-        <div className="flex h-screen w-full bg-zinc-950 text-slate-200 overflow-hidden font-sans antialiased" style={{ colorScheme: 'dark' }}>
-            {/* Sidebar */}
-            <aside className="w-64 flex-shrink-0 border-r border-zinc-800 bg-zinc-950/50 backdrop-blur-xl flex flex-col justify-between">
+        <div className="flex h-screen w-full bg-zinc-950 text-slate-200 overflow-hidden font-sans antialiased flex-col md:flex-row" style={{ colorScheme: 'dark' }}>
+            {/* Desktop Sidebar (Hidden on mobile) */}
+            <aside className="hidden md:flex w-64 flex-shrink-0 border-r border-zinc-800 bg-zinc-950/50 backdrop-blur-xl flex-col justify-between">
                 <div className="p-6">
                     {/* Logo */}
                     <div className="flex items-center gap-3 mb-10">
@@ -69,10 +71,49 @@ export default async function WorkspaceLayout({
                 </div>
             </aside>
 
-            {/* Main Content */}
-            <main className="flex-1 relative overflow-y-auto bg-zinc-950">
+            {/* Mobile Header (Only on mobile) */}
+            <header className="md:hidden flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-50">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-gradient-to-tr from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/20"></div>
+                    <span className="font-bold text-white tracking-tight">Portal</span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <LanguageSwitcher currentLocale={locale} />
+                    <form action={logoutAction}>
+                        <button type="submit" className="text-zinc-500 hover:text-white transition-colors">
+                            <LogOut size={18} />
+                        </button>
+                    </form>
+                </div>
+            </header>
+
+            {/* Content Area */}
+            <main className="flex-1 relative overflow-y-auto bg-zinc-950 custom-scrollbar">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900/40 via-zinc-950 to-zinc-950 -z-10 pointer-events-none"></div>
-                {children}
+
+                {/* Mobile Bottom Nav in Portal? 
+                    Let's add a simple one for portal links.
+                */}
+                <div className="pb-20 md:pb-0">
+                    {children}
+                </div>
+
+                {/* Simple Mobile Bottom Nav for Clients */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-zinc-900/90 backdrop-blur-xl border-t border-zinc-800 flex items-center justify-around z-50 pb-[env(safe-area-inset-bottom)]">
+                    <Link href={`/portal/${locale}/${workspaceId}/tasks`} className="flex flex-col items-center gap-1 text-zinc-400 hover:text-white active:text-indigo-400 transition-colors">
+                        <CheckSquare size={20} />
+                        <span className="text-[10px] uppercase font-bold tracking-tighter">{t('tasks')}</span>
+                    </Link>
+                    <Link href={`/portal/${locale}/${workspaceId}/invoices`} className="flex flex-col items-center gap-1 text-zinc-400 hover:text-white active:text-indigo-400 transition-colors">
+                        <FileText size={20} />
+                        <span className="text-[10px] uppercase font-bold tracking-tighter">{t('invoices')}</span>
+                    </Link>
+                    <Link href={`/portal/${locale}`} className="flex flex-col items-center gap-1 text-zinc-400 hover:text-white active:text-indigo-400 transition-colors">
+                        <LayoutGrid size={20} />
+                        <span className="text-[10px] uppercase font-bold tracking-tighter">WS</span>
+                    </Link>
+                </div>
             </main>
         </div>
     );

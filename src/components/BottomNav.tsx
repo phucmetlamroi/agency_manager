@@ -9,7 +9,7 @@ export default function BottomNav({ role, workspaceId }: { role: string, workspa
     const isActive = (path: string) => pathname === path
 
     return (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white/10 backdrop-blur-md border-t border-white/10 flex items-center justify-around z-50">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 py-3 pb-[calc(12px+env(safe-area-inset-bottom))] bg-black/80 backdrop-blur-md border-t border-white/10 flex items-center justify-around z-50">
             <Link href={`/${workspaceId}/dashboard`} className={`flex flex-col items-center gap-1 ${isActive(`/${workspaceId}/dashboard`) ? 'text-blue-400' : 'text-gray-400'}`}>
                 <span className="text-xl">🏠</span>
                 <span className="text-[10px] font-bold">Home</span>

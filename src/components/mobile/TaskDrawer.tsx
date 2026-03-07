@@ -101,8 +101,8 @@ export function TaskDrawer({ open, onOpenChange, task, isAdmin, onEdit }: TaskDr
                         </div>
                     </div>
 
-                    {/* Fixed Footer Actions */}
-                    <div className="p-4 bg-zinc-950 border-t border-zinc-800 mt-auto">
+                    {/* Fixed Footer Actions - iOS Safe Area aware */}
+                    <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-zinc-950 border-t border-zinc-800 mt-auto">
                         <div className="max-w-md mx-auto grid grid-cols-2 gap-4">
                             <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
                                 Close

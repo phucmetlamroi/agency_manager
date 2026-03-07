@@ -105,7 +105,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
 
             {/* Analytics Cards - Gen Z Gradient */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
                 <div className="glass-panel" style={{ padding: '2rem', background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))', position: 'relative' }}>
                     <h4 style={{ color: '#9ca3af', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>
                         LƯƠNG THÁNG NÀY (TẠM TÍNH) 💸

@@ -68,9 +68,9 @@ export default function MobileTaskView({ tasks, isAdmin, users, workspaceId }: {
     }
 
     return (
-        <div className="flex flex-col gap-3 pb-24 relative min-h-screen bg-black/95">
-            {/* Mobile Tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-4 pt-2 px-2 no-scrollbar sticky top-0 bg-black/95 z-10">
+        <div className="flex flex-col gap-3 pb-24 relative min-h-dvh bg-black/95">
+            {/* Mobile Tabs - Offset by header height */}
+            <div className="flex gap-2 overflow-x-auto pb-4 pt-2 px-2 no-scrollbar sticky top-[calc(52px+env(safe-area-inset-top))] bg-black/95 z-10 border-b border-white/5 shadow-lg">
                 {['DOING', 'ASSIGNED', 'review', 'ALL'].map(tab => (
                     <button
                         key={tab}

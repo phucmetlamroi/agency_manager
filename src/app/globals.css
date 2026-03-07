@@ -65,8 +65,19 @@
     @apply border-border;
   }
 
+  html {
+    @apply bg-[#111111];
+    /* Critical for iOS elastic scroll color */
+    -webkit-text-size-adjust: 100%;
+    /* Prevent font-scale on orientation change */
+  }
+
   body {
     @apply bg-background text-foreground;
+    min-height: 100vh;
+    /* Fallback for dvh */
+    min-height: -webkit-fill-available;
+    /* iOS specific fallback */
   }
 }
 

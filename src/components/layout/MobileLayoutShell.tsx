@@ -22,9 +22,9 @@ export default function MobileLayoutShell({
     // User requested "Slim Header" with "Left: Logo/PageName" and "Right: Avatar -> Drawer"
 
     return (
-        <div className="flex min-h-dvh bg-[#111111] text-white flex-col overflow-x-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-            {/* SLIM HEADER */}
-            <header className="flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-white/10">
+        <div className="flex min-h-dvh bg-[#111111] text-white flex-col overflow-x-hidden">
+            {/* SLIM HEADER - Improved for iOS Safe Areas */}
+            <header className="flex items-center justify-between px-4 pb-3 pt-[calc(12px+env(safe-area-inset-top))] bg-black/90 backdrop-blur-xl sticky top-0 z-50 border-b border-white/5">
                 <div className="flex items-center gap-2">
                     <span className="text-xl">🚀</span>
                     <h1 className="font-bold text-lg leading-none bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">

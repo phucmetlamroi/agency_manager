@@ -24,7 +24,7 @@ export async function translateTaskNote(text: string | null | undefined): Promis
     }
 
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
         const systemPrompt = `You are a professional translator for a video editing agency. Translate the following task instructions from Vietnamese to English. Keep technical video editing terms (like geolayer, SFX, pop-up, zoom, neon) intact. Make it sound professional and easy to understand for a native English-speaking client.`;
 

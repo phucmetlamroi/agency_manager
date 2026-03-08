@@ -10,6 +10,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
 import DOMPurify from 'isomorphic-dompurify'
 import { ensureExternalLinks } from "@/lib/utils"
+import { retryTaskTranslation } from '@/actions/retry-translation-action'
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
 
@@ -27,6 +28,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     const [isEditingLink, setIsEditingLink] = useState(false)
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
     const [isFrameExpanded, setIsFrameExpanded] = useState(false)
+    const [isTranslating, setIsTranslating] = useState(false)
     const [frameAccount, setFrameAccount] = useState({ account: '', password: '' })
     const [form, setForm] = useState({
         resources: '',
@@ -189,6 +191,24 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         if (!link) return '#'
         if (link.startsWith('http')) return link
         return `https://${link}`
+    }
+
+    const handleRetryTranslation = async () => {
+        if (!localTask) return
+        setIsTranslating(true)
+        try {
+            const res = await retryTaskTranslation(localTask.id, workspaceId)
+            if (res.error) {
+                toast.error(res.error)
+            } else if (res.notes_en) {
+                toast.success('Dịch lại thành công!')
+                setLocalTask(prev => prev ? { ...prev, notes_en: res.notes_en } : null)
+            }
+        } catch (error) {
+            toast.error('Có lỗi xảy ra khi gọi API dịch thuật.')
+        } finally {
+            setIsTranslating(false)
+        }
     }
 
     return (
@@ -516,17 +536,42 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                     <div className="p-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-600 font-semibold mb-2 flex items-center gap-2">
                                         ✨ Bản dịch hiển thị cho Client (Không thể đổi thủ công trong lần sửa chung này, nó sẽ tự động dịch từ Ghi chú Tiếng Việt)
                                     </div>
-                                    {/* Disabled editing for now to keep simple, will auto-translate on save as set in updateTaskDetails */}
                                     <div
                                         className="p-4 text-zinc-500 text-[14px] leading-[1.6] prose prose-zinc max-w-none opacity-50"
                                         dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_en || "Sẽ tự động dịch khi lưu Ghi Chú Tiếng Việt...")) }}
                                     />
                                 </div>
                             ) : (
-                                <div
-                                    className="bg-blue-50/30 p-6 rounded-2xl text-zinc-800 text-[14px] leading-[1.6] prose prose-zinc max-w-none border border-blue-100"
-                                    dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_en || "Chưa có bản dịch Tiếng Anh.")) }}
-                                />
+                                <div className="bg-blue-50/30 p-6 rounded-2xl border border-blue-100 relative">
+                                    {(!localTask.notes_en || localTask.notes_en.trim() === '') ? (
+                                        <div className="flex flex-col items-center justify-center py-4 gap-3">
+                                            <span className="text-zinc-400 text-sm italic">⚠️ Chưa có bản dịch Tiếng Anh.</span>
+                                            {(localTask.notes_vi && localTask.notes_vi.trim() !== '' && localTask.notes_vi !== '<p></p>') && (
+                                                <button
+                                                    onClick={handleRetryTranslation}
+                                                    disabled={isTranslating}
+                                                    className="px-4 py-2 bg-white border border-blue-200 text-blue-600 font-bold rounded-xl shadow-sm hover:bg-blue-50 hover:border-blue-300 transition-all text-sm flex items-center gap-2 disabled:opacity-50"
+                                                >
+                                                    {isTranslating ? (
+                                                        <>
+                                                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                                            Đang dịch...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>✨</span> Dịch lại bằng AI
+                                                        </>
+                                                    )}
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div
+                                            className="text-zinc-800 text-[14px] leading-[1.6] prose prose-zinc max-w-none"
+                                            dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_en)) }}
+                                        />
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>

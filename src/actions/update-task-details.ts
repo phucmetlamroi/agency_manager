@@ -19,6 +19,17 @@ export async function updateTaskDetails(id: string, data: {
 }, workspaceId: string) {
     try {
         const workspacePrisma = getWorkspacePrisma(workspaceId)
+
+        // Fetch current task first to compare notes and check financial locks
+        const currentTask = await workspacePrisma.task.findUnique({
+            where: { id },
+            select: { notes_vi: true, jobPriceUSD: true, value: true, exchangeRate: true, createdAt: true, assigneeId: true }
+        })
+
+        if (!currentTask) {
+            return { error: 'Task not found' }
+        }
+
         const updateData: any = {
             resources: data.resources,
             references: data.references,
@@ -29,54 +40,53 @@ export async function updateTaskDetails(id: string, data: {
 
         if (data.notes !== undefined) {
             updateData.notes_vi = data.notes
-            if (data.notes) {
-                updateData.notes_en = await translateTaskNote(data.notes)
+
+            // Optimization: Only translate if the notes actually changed
+            if (data.notes !== currentTask.notes_vi) {
+                if (data.notes) {
+                    console.log(`[Auto-Translate] Task ${id} notes changed, calling Gemini API...`)
+                    updateData.notes_en = await translateTaskNote(data.notes)
+                } else {
+                    updateData.notes_en = null
+                }
             } else {
-                updateData.notes_en = null
+                console.log(`[Auto-Translate] Task ${id} notes unchanged, skipping API call.`)
             }
         }
 
         // Handle Price Updates (Financials) - FIXED
         if (data.jobPriceUSD !== undefined || data.value !== undefined) {
-            // Fetch current to merge
-            const currentTask = await workspacePrisma.task.findUnique({
-                where: { id },
-                select: { jobPriceUSD: true, value: true, exchangeRate: true, createdAt: true, assigneeId: true }
-            })
+            // FINANCIAL LOCK CHECK
+            if (currentTask.assigneeId) {
+                const month = currentTask.createdAt.getMonth() + 1
+                const year = currentTask.createdAt.getFullYear()
 
-            if (currentTask) {
-                // FINANCIAL LOCK CHECK
-                if (currentTask.assigneeId) {
-                    const month = currentTask.createdAt.getMonth() + 1
-                    const year = currentTask.createdAt.getFullYear()
+                const payroll = await workspacePrisma.payroll.findUnique({
+                    where: {
+                        userId_month_year_workspaceId: {
+                            userId: currentTask.assigneeId,
+                            month,
+                            year,
+                            workspaceId
+                        }
+                    } as any
+                })
 
-                    const payroll = await workspacePrisma.payroll.findUnique({
-                        where: {
-                            userId_month_year_workspaceId: {
-                                userId: currentTask.assigneeId,
-                                month,
-                                year,
-                                workspaceId
-                            }
-                        } as any
-                    })
-
-                    if (payroll && payroll.status === 'PAID') {
-                        return { error: 'BLOCK: Kỳ lương này đã chốt (PAID). Không thể sửa đổi tài chính!' }
-                    }
+                if (payroll && payroll.status === 'PAID') {
+                    return { error: 'BLOCK: Kỳ lương này đã chốt (PAID). Không thể sửa đổi tài chính!' }
                 }
-
-                const newJobPriceUSD = data.jobPriceUSD !== undefined ? data.jobPriceUSD : (currentTask.jobPriceUSD || 0)
-                const newValue = data.value !== undefined ? data.value : (currentTask.value || 0) // This is Wage VND
-                const rate = currentTask.exchangeRate || 25300
-
-                updateData.jobPriceUSD = newJobPriceUSD
-                updateData.value = newValue
-                updateData.wageVND = newValue // Sync wageVND with value
-
-                // Recalculate Profit
-                updateData.profitVND = (Number(newJobPriceUSD) * Number(rate)) - Number(newValue)
             }
+
+            const newJobPriceUSD = data.jobPriceUSD !== undefined ? data.jobPriceUSD : (currentTask.jobPriceUSD || 0)
+            const newValue = data.value !== undefined ? data.value : (currentTask.value || 0) // This is Wage VND
+            const rate = currentTask.exchangeRate || 25300
+
+            updateData.jobPriceUSD = newJobPriceUSD
+            updateData.value = newValue
+            updateData.wageVND = newValue // Sync wageVND with value
+
+            // Recalculate Profit
+            updateData.profitVND = (Number(newJobPriceUSD) * Number(rate)) - Number(newValue)
         }
 
         // Handle Deadline Update + Timer Reset

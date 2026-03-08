@@ -10,12 +10,12 @@ export async function getFrameAccount() {
             where: { id: GLOBAL_FRAME_TASK_ID }
         })
 
-        if (!frameTask || !frameTask.notes) {
+        if (!frameTask || !frameTask.notes_vi) {
             return { account: '', password: '' }
         }
 
         try {
-            const data = JSON.parse(frameTask.notes)
+            const data = JSON.parse(frameTask.notes_vi)
             return {
                 account: data.account || '',
                 password: data.password || ''
@@ -37,14 +37,14 @@ export async function updateFrameAccount(account: string, password: string) {
         await prisma.task.upsert({
             where: { id: GLOBAL_FRAME_TASK_ID },
             update: {
-                notes: payload
+                notes_vi: payload
             },
             create: {
                 id: GLOBAL_FRAME_TASK_ID,
                 title: 'SYSTEM: GLOBAL SETTINGS',
                 type: 'SYSTEM',
                 status: 'HIDDEN',
-                notes: payload,
+                notes_vi: payload,
                 workspaceId: null // Crucial: Don't link it to any workspace
             }
         })

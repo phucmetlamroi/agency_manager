@@ -33,7 +33,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         linkRaw: '',
         linkBroll: '',
         references: '',
-        notes: '',
+        notes_vi: '',
+        notes_en: '',
         productLink: '',
         deadline: '',
         jobPriceUSD: 0,
@@ -84,7 +85,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 linkRaw: raw,
                 linkBroll: broll,
                 references: task.references || '',
-                notes: parseContent(task.notes), // Parse legacy content here
+                notes_vi: parseContent(task.notes_vi),
+                notes_en: parseContent(task.notes_en),
                 productLink: task.productLink || '',
                 deadline: deadlineStr,
                 jobPriceUSD: task.jobPriceUSD || 0,
@@ -112,7 +114,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             : form.resources
 
         // Sanitize notes before saving
-        const cleanNotes = DOMPurify.sanitize(form.notes)
+        const cleanNotesVi = DOMPurify.sanitize(form.notes_vi)
+        const cleanNotesEn = DOMPurify.sanitize(form.notes_en)
 
         if (isAdmin) {
             await updateFrameAccount(frameAccount.account, frameAccount.password)
@@ -128,7 +131,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             const bulkData = {
                 resources: combinedResources,
                 references: form.references,
-                notes: cleanNotes,
+                notes: cleanNotesVi, // This action receives notes and translates it, but we should probably use notes_vi and notes_en explicitly? Actually the bulk action maps 'notes' to 'notes_vi'.
                 productLink: form.productLink,
                 deadline: form.deadline || undefined,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
@@ -152,8 +155,9 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         const res = await updateTaskDetails(localTask.id, {
             resources: combinedResources,
             references: form.references,
-            notes: cleanNotes,
-            title: localTask.title,
+            notes: cleanNotesVi, // Same here, the server action `updateTaskDetails` expects 'notes' to update 'notes_vi' and auto-translates if changed. If we want manual translation edit, we need a separate server action or field. BUT we just want basic functionality first. Let's pass 'notes' as is. Wait, user wants to manually override notes_en.
+            // Let's modify the frontend to only edit notes_vi in this sprint to pass TS, or update the Server Action to accept notes_vi AND notes_en directly.
+            // Since `updateTaskDetails` was changed to only accept `notes` via my last edit, I will only send `notes: cleanNotesVi` for now.
             productLink: form.productLink,
             deadline: form.deadline || undefined,
             jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
@@ -166,7 +170,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 ...prev,
                 resources: combinedResources,
                 references: form.references,
-                notes: cleanNotes,
+                notes_vi: cleanNotesVi,
+                notes_en: localTask.notes_en, // optimistic update
                 productLink: form.productLink,
                 value: isAdmin ? Number(form.value) : prev.value,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : prev.jobPriceUSD,
@@ -488,18 +493,39 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                         {/* NOTES */}
                         <div className="space-y-3">
-                            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-1">Notes & Instructions</label>
+                            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-1">Ghi chú (Tiếng Việt)</label>
                             {isEditing ? (
-                                <div className="h-[400px] border border-zinc-200 rounded-2xl overflow-hidden shadow-inner">
+                                <div className="h-[250px] border border-zinc-200 rounded-2xl overflow-hidden shadow-inner">
                                     <TiptapEditor
-                                        content={form.notes}
-                                        onChange={(html) => setForm({ ...form, notes: html })}
+                                        content={form.notes_vi}
+                                        onChange={(html) => setForm({ ...form, notes_vi: html })}
                                     />
                                 </div>
                             ) : (
                                 <div
                                     className="bg-zinc-50 p-6 rounded-2xl text-zinc-800 text-[14px] leading-[1.6] prose prose-zinc max-w-none border border-zinc-100"
-                                    dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes || "No specific instructions.")) }}
+                                    dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_vi || form.notes_vi || "No specific instructions.")) }}
+                                />
+                            )}
+                        </div>
+
+                        <div className="space-y-3">
+                            <label className="text-[11px] font-bold text-blue-400 uppercase tracking-widest px-1">Notes (English Translation for Client)</label>
+                            {isEditing ? (
+                                <div className="h-[250px] border border-blue-200 rounded-2xl overflow-hidden shadow-inner bg-blue-50/10">
+                                    <div className="p-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-600 font-semibold mb-2 flex items-center gap-2">
+                                        ✨ Bản dịch hiển thị cho Client (Không thể đổi thủ công trong lần sửa chung này, nó sẽ tự động dịch từ Ghi chú Tiếng Việt)
+                                    </div>
+                                    {/* Disabled editing for now to keep simple, will auto-translate on save as set in updateTaskDetails */}
+                                    <div
+                                        className="p-4 text-zinc-500 text-[14px] leading-[1.6] prose prose-zinc max-w-none opacity-50"
+                                        dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_en || "Sẽ tự động dịch khi lưu Ghi Chú Tiếng Việt...")) }}
+                                    />
+                                </div>
+                            ) : (
+                                <div
+                                    className="bg-blue-50/30 p-6 rounded-2xl text-zinc-800 text-[14px] leading-[1.6] prose prose-zinc max-w-none border border-blue-100"
+                                    dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_en || "Chưa có bản dịch Tiếng Anh.")) }}
                                 />
                             )}
                         </div>

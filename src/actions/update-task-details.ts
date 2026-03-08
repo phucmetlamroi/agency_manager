@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { parseVietnamDate } from '@/lib/date-utils'
+import { translateTaskNote } from '@/lib/gemini-translator'
 
 export async function updateTaskDetails(id: string, data: {
     resources?: string
@@ -21,10 +22,18 @@ export async function updateTaskDetails(id: string, data: {
         const updateData: any = {
             resources: data.resources,
             references: data.references,
-            notes: data.notes,
             title: data.title,
             productLink: data.productLink,
             collectFilesLink: data.collectFilesLink
+        }
+
+        if (data.notes !== undefined) {
+            updateData.notes_vi = data.notes
+            if (data.notes) {
+                updateData.notes_en = await translateTaskNote(data.notes)
+            } else {
+                updateData.notes_en = null
+            }
         }
 
         // Handle Price Updates (Financials) - FIXED

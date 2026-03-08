@@ -9,7 +9,8 @@ export type TaskWithUser = {
     resources: string | null
     fileLink: string | null
     productLink: string | null
-    notes: string | null
+    notes_vi: string | null
+    notes_en: string | null
     assignee: { username: string } | null
     createdAt: Date
 }

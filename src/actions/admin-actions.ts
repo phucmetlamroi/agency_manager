@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { parseVietnamDate } from '@/lib/date-utils'
+import { translateTaskNote } from '@/lib/gemini-translator'
 
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
@@ -102,7 +103,8 @@ export async function createTask(formData: FormData, workspaceId: string) {
                 deadline: deadline ? parseVietnamDate(deadline) : null,
                 resources: resources || null,
                 references: references || null,
-                notes: notes || null,
+                notes_vi: notes || null,
+                notes_en: notes ? await translateTaskNote(notes) : null,
                 assigneeId: assigneeId || null,
                 assignedAgencyId: assignedAgencyId, // FIX: Sync with assignee's agency
                 fileLink: fileLink || null,

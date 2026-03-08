@@ -130,7 +130,7 @@ async function main() {
                             type: t.type,
                             references: t.references,
                             resources: t.resources,
-                            notes: t.notes,
+                            notes_vi: t.notes_vi || t.notes, // Accommodate both formats for restoration
                             fileLink: t.fileLink,
                             productLink: t.productLink,
                             collectFilesLink: t.collectFilesLink,

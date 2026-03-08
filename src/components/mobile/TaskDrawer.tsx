@@ -81,7 +81,7 @@ export function TaskDrawer({ open, onOpenChange, task, isAdmin, onEdit }: TaskDr
                                     <h4 className="text-sm font-medium text-zinc-400 mb-2">Instructions</h4>
                                     <div
                                         className="text-sm text-zinc-300 leading-relaxed bg-zinc-900 p-4 rounded-lg border border-zinc-800 prose prose-invert prose-sm max-w-none break-words"
-                                        dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(task.notes || "No specific instructions provided.")) }}
+                                        dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(isAdmin ? (task.notes_vi || "No specific instructions.") : (task.notes_en || task.notes_vi || "No specific instructions provided."))) }}
                                     />
                                 </div>
 

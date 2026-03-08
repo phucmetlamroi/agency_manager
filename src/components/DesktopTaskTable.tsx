@@ -53,7 +53,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
         linkRaw: '',
         linkBroll: '',
         references: '',
-        notes: '',
+        notes_vi: '',
         productLink: '',
         deadline: '',
         jobPriceUSD: 0,
@@ -106,7 +106,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
             linkRaw: raw,
             linkBroll: broll,
             references: task.references || '',
-            notes: task.notes || '',
+            notes_vi: task.notes_vi || '',
             productLink: task.productLink || '',
             deadline: deadlineStr,
             jobPriceUSD: task.jobPriceUSD || 0,
@@ -153,7 +153,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
         const res = await updateTaskDetails(selectedTask.id, {
             resources: combinedResources,
             references: editForm.references,
-            notes: editForm.notes,
+            notes: editForm.notes_vi,
             title: selectedTask.title, // Keep existing title
             productLink: editForm.productLink,
             deadline: editForm.deadline || undefined, // Pass deadline string
@@ -168,7 +168,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                 ...selectedTask,
                 resources: combinedResources,
                 references: editForm.references,
-                notes: editForm.notes,
+                notes_vi: editForm.notes_vi,
                 productLink: editForm.productLink,
             })
             setIsEditing(false)
@@ -700,8 +700,8 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                 </label>
                                 {isEditing ? (
                                     <textarea
-                                        value={editForm.notes}
-                                        onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                        value={editForm.notes_vi}
+                                        onChange={(e) => setEditForm({ ...editForm, notes_vi: e.target.value })}
                                         placeholder="Enter notes..."
                                         rows={4}
                                         disabled={!isAdmin} // Users can edit notes if needed? Maybe better restricted to Admin for instructions.
@@ -709,7 +709,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                     />
                                 ) : (
                                     <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '12px', color: '#92400e', fontSize: '0.95rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                                        {selectedTask.notes || "No specific instructions."}
+                                        {selectedTask.notes_vi || "No specific instructions."}
                                     </div>
                                 )}
                             </div>

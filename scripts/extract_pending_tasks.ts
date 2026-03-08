@@ -31,7 +31,7 @@ async function main() {
         const clientName = t.client ? (t.client.parent ? `${t.client.parent.name} > ${t.client.name}` : t.client.name) : 'N/A'
         const deadline = t.deadline ? t.deadline.toISOString().split('T')[0] : 'No Deadline'
         const value = t.value ? t.value.toLocaleString() : '0'
-        const notes = t.notes ? t.notes.replace(/\n/g, ' ') : ''
+        const notes = t.notes_vi ? t.notes_vi.replace(/\n/g, ' ') : ''
 
         markdown += `| ${t.id} | ${t.title} | ${t.status} | ${clientName} | ${deadline} | ${value} | ${t.jobPriceUSD} | ${t.resources ? 'Yes' : 'No'} | ${notes} |\n`
     })

@@ -105,7 +105,8 @@ model Task {
   type             String            @default("Short form")
   references       String?
   resources        String?
-  notes            String?
+  notes_vi         String?
+  notes_en         String?
   fileLink         String?
   assigneeId       String?
   createdAt        DateTime          @default(now())

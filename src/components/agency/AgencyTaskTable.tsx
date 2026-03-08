@@ -49,7 +49,7 @@ export default function AgencyTaskTable({ tasks, members, workspaceId }: { tasks
         linkRaw: '',
         linkBroll: '',
         references: '',
-        notes: '',
+        notes_vi: '',
         productLink: '',
         deadline: '',
         jobPriceUSD: 0,
@@ -97,7 +97,7 @@ export default function AgencyTaskTable({ tasks, members, workspaceId }: { tasks
             linkRaw: raw,
             linkBroll: broll,
             references: task.references || '',
-            notes: task.notes || '',
+            notes_vi: task.notes_vi || '',
             productLink: task.productLink || '',
             deadline: deadlineStr,
             jobPriceUSD: task.jobPriceUSD || 0,
@@ -151,7 +151,7 @@ export default function AgencyTaskTable({ tasks, members, workspaceId }: { tasks
         const res = await updateTaskDetails(selectedTask.id, {
             resources: combinedResources,
             references: editForm.references,
-            notes: editForm.notes,
+            notes: editForm.notes_vi,
             title: selectedTask.title,
             productLink: editForm.productLink,
             collectFilesLink: editForm.collectFilesLink,
@@ -163,7 +163,7 @@ export default function AgencyTaskTable({ tasks, members, workspaceId }: { tasks
                 ...selectedTask,
                 resources: combinedResources,
                 references: editForm.references,
-                notes: editForm.notes,
+                notes_vi: editForm.notes_vi,
                 productLink: editForm.productLink,
             })
             setIsEditing(false)
@@ -501,15 +501,15 @@ export default function AgencyTaskTable({ tasks, members, workspaceId }: { tasks
                                 </label>
                                 {isEditing ? (
                                     <textarea
-                                        value={editForm.notes}
-                                        onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                        value={editForm.notes_vi}
+                                        onChange={(e) => setEditForm({ ...editForm, notes_vi: e.target.value })}
                                         placeholder="Enter notes..."
                                         rows={4}
                                         className="w-full p-2 border border-gray-700 rounded text-sm bg-[#222] text-white"
                                     />
                                 ) : (
                                     <div style={{ background: '#222', padding: '1rem', borderRadius: '12px', color: '#ddd', fontSize: '0.95rem', lineHeight: '1.5', whiteSpace: 'pre-wrap', border: '1px solid #333' }}>
-                                        {selectedTask.notes || "No specific instructions."}
+                                        {selectedTask.notes_vi || "No specific instructions."}
                                     </div>
                                 )}
                             </div>

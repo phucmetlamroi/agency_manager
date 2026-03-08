@@ -85,7 +85,7 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             // 3. Update Task Status
             const updateData = {
                 status: newStatus,
-                ...(newNotes ? { notes: newNotes } : {}),
+                ...(newNotes ? { notes_vi: newNotes } : {}),
                 ...deadlineUpdate,
                 version: { increment: 1 }
             }
@@ -215,7 +215,7 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
                                     html: emailTemplates.taskFeedback(
                                         updatedTaskResult.assignee.username || 'User',
                                         updatedTaskResult.title,
-                                        newNotes || updatedTaskResult.notes || 'Vui lòng kiểm tra chi tiết trên hệ thống.'
+                                        newNotes || updatedTaskResult.notes_vi || 'Vui lòng kiểm tra chi tiết trên hệ thống.'
                                     )
                                 })
                             } else {

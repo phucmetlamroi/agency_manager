@@ -2,6 +2,7 @@ import { getClientWorkspaces } from '@/actions/client-portal-actions'
 import { getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { LayoutGrid, ArrowRight } from 'lucide-react'
+import { localizeWorkspaceName } from '@/lib/workspace-name'
 
 export default async function PortalWorkspaceSelectPage({
     params
@@ -39,7 +40,9 @@ export default async function PortalWorkspaceSelectPage({
                                 className="group bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800 hover:border-indigo-500/50 p-6 rounded-2xl transition-all duration-300 flex items-center justify-between"
                             >
                                 <div>
-                                    <h3 className="text-xl font-medium text-white group-hover:text-indigo-400 transition-colors">{ws.name || ws.id}</h3>
+                                    <h3 className="text-xl font-medium text-white group-hover:text-indigo-400 transition-colors">
+                                        {localizeWorkspaceName(ws.name || ws.id, locale)}
+                                    </h3>
                                     <p className="text-sm text-zinc-500">{t('open_workspace')}</p>
                                 </div>
                                 <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500 group-hover:bg-indigo-500 group-hover:text-white transition-all transform group-hover:translate-x-1">

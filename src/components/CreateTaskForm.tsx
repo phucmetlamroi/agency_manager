@@ -149,7 +149,7 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
             </div>
 
             {/* Financials Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
                     <label style={{ fontSize: '0.8rem', color: '#888' }}>Tiền Job (USD)</label>
                     <div style={{ position: 'relative' }}>
@@ -188,9 +188,9 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
 
             {/* Live Calculation Info */}
             <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.8rem', borderRadius: '6px', fontSize: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', color: '#aaa' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.3rem', color: '#aaa' }}>
                     <span>ℹ️ Tỷ giá: 1 USD = {rate.toLocaleString()} VND</span>
-                    <span>Doanh thu: {revenueVnd.toLocaleString()} ₫</span>
+                    <span>💵 Doanh thu: {revenueVnd.toLocaleString()} ₫</span>
                 </div>
                 {usd > 0 && (
                     <div style={{
@@ -205,7 +205,7 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
             </div>
 
             {/* New Fields Gen Z Style */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
                     <label style={{ fontSize: '0.8rem', color: '#888' }}>Loại Task</label>
                     <select name="type" required

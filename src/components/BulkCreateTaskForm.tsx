@@ -126,7 +126,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
 
                 <ClientSelector onSelect={setClientId} workspaceId={workspaceId} />
 
-                <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="flex flex-col gap-4 mt-4">
                     <div>
                         <label className="text-xs text-gray-400">Loại Task</label>
                         <select value={type} onChange={e => setType(e.target.value)}
@@ -143,7 +143,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="flex flex-col gap-4 mt-4">
                     <div>
                         <label className="text-xs text-gray-400">Giá Job (USD)</label>
                         <input value={usdDisplay} onChange={handleUsdChange} placeholder="0"
@@ -158,9 +158,9 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
 
                 {/* Financial Info */}
                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.8rem', borderRadius: '6px', fontSize: '0.85rem', marginTop: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', color: '#aaa' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.3rem', color: '#aaa' }}>
                         <span>ℹ️ Tỷ giá: 1 USD = {rate.toLocaleString()} VND</span>
-                        <span>Doanh thu: {revenueVnd.toLocaleString()} ₫</span>
+                        <span>💵 Doanh thu: {revenueVnd.toLocaleString()} ₫</span>
                     </div>
                     {usd > 0 && wage > 0 && (
                         <div style={{
@@ -174,7 +174,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                     )}
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="mt-4 flex flex-col gap-4">
                     <div>
                         <label className="text-xs text-gray-400">Link Source (Raw Footage)</label>
                         <input value={linkRaw} onChange={e => setLinkRaw(e.target.value)} placeholder="https://..."
@@ -186,7 +186,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                             className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm" />
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-4">
+                    <div className="mt-4 flex flex-col gap-4">
                         <div>
                             <label className="text-xs text-gray-400">Project Mẫu / Collect Files</label>
                             <input value={collectFilesLink} onChange={e => setCollectFilesLink(e.target.value)} placeholder="https://..."

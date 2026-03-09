@@ -2,7 +2,7 @@ import { getClientTasks } from '@/actions/client-portal-actions';
 import { getTranslations } from 'next-intl/server';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import TaskGroupAccordion from '@/components/portal/TaskGroupAccordion';
+import PortalDashboardBento from '@/components/portal/PortalDashboardBento';
 
 export default async function PortalTasksPage({
     params
@@ -17,17 +17,18 @@ export default async function PortalTasksPage({
     const tasks = await getClientTasks(workspaceId);
 
     return (
-        <div className="w-full max-w-4xl mx-auto p-8">
+        <div className="w-full max-w-6xl mx-auto p-4 sm:p-8">
             <div className="flex items-center justify-between mb-8">
-                <h1 className="text-3xl font-light text-white tracking-tight">{t('your_tasks')}</h1>
-                <span className="text-sm text-zinc-500">{t('task_count', { count: tasks.length })}</span>
+                <div>
+                    <h1 className="text-3xl font-light text-white tracking-tight">{t('your_tasks')}</h1>
+                    <p className="text-sm text-zinc-500 mt-1">Command Center &middot; {tasks.length} active processes</p>
+                </div>
             </div>
 
-            <TaskGroupAccordion
+            <PortalDashboardBento
                 tasks={tasks as any}
                 locale={locale}
                 workspaceId={workspaceId}
-                rootClientName={session.user.username}
             />
         </div>
     );

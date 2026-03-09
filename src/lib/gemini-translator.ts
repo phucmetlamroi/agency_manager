@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize the API client
 // Ensure GEMINI_API_KEY is available in the environment
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(process.env.GPT4_API_KEY || '');
 
 /**
  * Translates task instructions from Vietnamese to English using Gemini 1.5 Flash.
@@ -18,7 +18,7 @@ export async function translateTaskNote(text: string | null | undefined): Promis
     }
 
     // If API Key is missing, log warning and return original or empty
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GPT4_API_KEY) {
         console.warn('GEMINI_API_KEY is missing. Skipping auto-translation.');
         return '';
     }

@@ -13,6 +13,9 @@ type Task = {
     clientStatus: string
     deadline: Date | null
     client: { id: number; name: string } | null
+    productLink?: string | null
+    notes_en?: string | null
+    notes_vi?: string | null
 }
 
 type TaskGroup = {
@@ -92,33 +95,58 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
             {open && (
                 <div className="divide-y divide-zinc-800/50">
                     {group.tasks.map(task => (
-                        <div key={task.id} className="flex items-center gap-4 px-6 py-3.5 bg-zinc-950/40 hover:bg-zinc-900/30 transition-colors group">
-                            <StatusIcon status={task.clientStatus} />
+                        <div key={task.id} className="flex flex-col px-6 py-4 bg-zinc-950/40 hover:bg-zinc-900/30 transition-colors group">
+                            <div className="flex items-center gap-4">
+                                <StatusIcon status={task.clientStatus} />
 
-                            <div className="flex-1 min-w-0">
-                                <Link
-                                    href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
-                                    className="block truncate text-sm text-zinc-200 font-medium group-hover:text-white transition-colors"
-                                >
-                                    {task.title}
-                                </Link>
-                                <p className="text-zinc-600 text-xs">{task.type}</p>
+                                <div className="flex-1 min-w-0">
+                                    <Link
+                                        href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
+                                        className="block truncate text-sm text-zinc-200 font-medium group-hover:text-white transition-colors underline decoration-zinc-700/50 underline-offset-4"
+                                    >
+                                        {task.title}
+                                    </Link>
+                                    <p className="text-zinc-600 text-[10px] uppercase tracking-wider mt-0.5">{task.type}</p>
+                                </div>
+
+                                <div className="flex items-center gap-4">
+                                    <span className={`text-[10px] font-bold uppercase tracking-tight shrink-0 ${statusColor(task.clientStatus)}`}>
+                                        {task.clientStatus}
+                                    </span>
+
+                                    <span className="text-zinc-600 text-[10px] shrink-0 hidden sm:block">
+                                        {task.deadline ? new Date(task.deadline).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US') : '—'}
+                                    </span>
+
+                                    <Link
+                                        href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
+                                        className="text-[10px] font-bold uppercase text-indigo-400 hover:text-indigo-300 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        {t('details')} →
+                                    </Link>
+                                </div>
                             </div>
 
-                            <span className={`text-xs shrink-0 ${statusColor(task.clientStatus)}`}>
-                                {task.clientStatus}
-                            </span>
-
-                            <span className="text-zinc-600 text-xs shrink-0 hidden sm:block">
-                                {task.deadline ? new Date(task.deadline).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US') : '—'}
-                            </span>
-
-                            <Link
-                                href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
-                                className="text-xs text-indigo-400 hover:text-indigo-300 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                                {t('details')} →
-                            </Link>
+                            {/* Inline Info to satisfy "no need to wait until click" */}
+                            <div className="mt-3 pl-8 flex flex-col gap-2">
+                                {task.productLink && (
+                                    <div className="flex items-center gap-2">
+                                        <a
+                                            href={task.productLink}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-[11px] text-emerald-400 bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/20 hover:bg-emerald-500/10 transition-colors flex items-center gap-1.5"
+                                        >
+                                            <PlayCircle size={12} /> View Content
+                                        </a>
+                                    </div>
+                                )}
+                                {(task.notes_en || task.notes_vi) && (
+                                    <div className="text-[11px] text-zinc-500 line-clamp-1 italic max-w-2xl">
+                                        {(task.notes_en || task.notes_vi)?.replace(/<[^>]*>?/gm, '')}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>

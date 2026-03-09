@@ -89,16 +89,58 @@ export default async function PortalTaskDetail({
                         </div>
                     )}
 
-                    {task.notes_en && (
+                    {(task.notes_en || task.notes_vi) && (
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur">
                             <h3 className="text-white font-medium mb-3">{t('notes')}</h3>
                             <div
                                 className="text-zinc-300 text-sm prose-portal"
-                                dangerouslySetInnerHTML={{ __html: ensureExternalLinks(task.notes_en) }}
+                                dangerouslySetInnerHTML={{ __html: ensureExternalLinks(task.notes_en || task.notes_vi) }}
                             />
+                            {!task.notes_en && task.notes_vi && (
+                                <p className="mt-4 text-[10px] text-zinc-500 italic">
+                                    * Showing original notes (Translation pending)
+                                </p>
+                            )}
                         </div>
                     )}
 
+                    {(task.references || task.resources || task.collectFilesLink) && (
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur space-y-4">
+                            <h3 className="text-white font-medium mb-1">Project Assets</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {task.references && (
+                                    <a
+                                        href={ensureExternalLinks(task.references)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-xs text-zinc-300 hover:bg-zinc-800 transition-colors flex items-center gap-2"
+                                    >
+                                        <Tag size={14} className="text-purple-400" /> References
+                                    </a>
+                                )}
+                                {task.resources && (
+                                    <a
+                                        href={ensureExternalLinks(task.resources)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-xs text-zinc-300 hover:bg-zinc-800 transition-colors flex items-center gap-2"
+                                    >
+                                        <FileVideo size={14} className="text-blue-400" /> Resources
+                                    </a>
+                                )}
+                                {task.collectFilesLink && (
+                                    <a
+                                        href={ensureExternalLinks(task.collectFilesLink)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-xs text-zinc-300 hover:bg-zinc-800 transition-colors flex items-center gap-2"
+                                    >
+                                        <Clock size={14} className="text-amber-400" /> Upload assets
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                 </div>
 
@@ -134,6 +176,31 @@ export default async function PortalTaskDetail({
                                     <p className="text-zinc-500 text-[10px] uppercase tracking-tighter">Verified Studio Editor</p>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {(task.frameUsername || task.framePassword) && (
+                        <div className="bg-indigo-950/20 border border-indigo-500/20 rounded-2xl p-6 backdrop-blur space-y-3">
+                            <h3 className="text-indigo-400 text-[10px] uppercase font-bold tracking-widest">Frame account</h3>
+                            <div className="space-y-2">
+                                {task.frameUsername && (
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-zinc-500">Username</span>
+                                        <span className="text-zinc-200 font-mono">{task.frameUsername}</span>
+                                    </div>
+                                )}
+                                {task.framePassword && (
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-zinc-500">Password</span>
+                                        <span className="text-zinc-200 font-mono">{task.framePassword}</span>
+                                    </div>
+                                )}
+                            </div>
+                            {task.frameNote && (
+                                <p className="text-[10px] text-zinc-500 italic mt-2 border-t border-indigo-500/10 pt-2">
+                                    {task.frameNote}
+                                </p>
+                            )}
                         </div>
                     )}
                 </div>

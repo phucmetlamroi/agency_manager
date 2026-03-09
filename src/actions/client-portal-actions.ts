@@ -103,6 +103,14 @@ export async function getClientTasks(workspaceId: string) {
             productLink: true,
             jobPriceUSD: true,
             clientId: true,
+            notes_vi: true,
+            notes_en: true,
+            references: true,
+            resources: true,
+            collectFilesLink: true,
+            frameUsername: true,
+            framePassword: true,
+            frameNote: true,
             client: {
                 select: { id: true, name: true }
             },

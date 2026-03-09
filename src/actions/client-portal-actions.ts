@@ -116,6 +116,10 @@ export async function getClientTasks(workspaceId: string) {
             },
             project: {
                 select: { id: true, name: true }
+            },
+            rating: true,
+            assignee: {
+                select: { username: true, nickname: true }
             }
         },
         orderBy: { createdAt: 'desc' }

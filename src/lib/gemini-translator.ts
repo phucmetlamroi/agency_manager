@@ -24,7 +24,7 @@ export async function translateTaskNote(text: string | null | undefined): Promis
     }
 
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'GPT-4' });
 
         const systemPrompt = `You are a professional translator for a video editing agency. Translate the following task instructions from Vietnamese to English. 
 

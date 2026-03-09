@@ -3,6 +3,7 @@
 import * as React from "react"
 import { AppSidebar } from "./AppSidebar"
 import { CommandMenu } from "./CommandMenu"
+import { cn } from "@/lib/utils"
 import { AdminVideoDownloader } from "@/components/video/AdminVideoDownloader"
 
 interface AdminShellProps {
@@ -25,8 +26,10 @@ export function AdminShell({ children, user, workspaceId }: AdminShellProps) {
         <div className="flex min-h-dvh bg-background text-foreground">
             <AppSidebar user={user} workspaceId={workspaceId} onCollapsedChange={setCollapsed} />
             <main
-                className="flex-1 overflow-x-hidden pt-16 md:pt-0 relative transition-all duration-300"
-                style={{ marginLeft: collapsed ? '80px' : '280px' }}
+                className={cn(
+                    "flex-1 overflow-x-hidden pt-16 md:pt-0 relative transition-all duration-300",
+                    collapsed ? "md:ml-[80px]" : "md:ml-[280px]"
+                )}
             >
                 <div className="absolute top-4 right-4 z-30 hidden md:flex items-center gap-4">
                     <AdminVideoDownloader />

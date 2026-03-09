@@ -36,7 +36,10 @@
     "TaskGroup": {
         "completed_label": "completed",
         "in_progress_label": "in progress",
-        "no_tasks": "No tasks in this workspace."
+        "no_tasks": "No tasks in this workspace.",
+        "details": "Details",
+        "task_count": "{count} task(s)",
+        "default_group_name": "General Tasks"
     },
     "TaskDetail": {
         "back": "Back to tasks",

@@ -36,7 +36,10 @@
     "TaskGroup": {
         "completed_label": "hoàn tất",
         "in_progress_label": "đang làm",
-        "no_tasks": "Không có tác vụ nào trong workspace này."
+        "no_tasks": "Không có tác vụ nào trong workspace này.",
+        "details": "Chi tiết",
+        "task_count": "{count} tác vụ",
+        "default_group_name": "Tác vụ khác"
     },
     "TaskDetail": {
         "back": "Quay lại danh sách",

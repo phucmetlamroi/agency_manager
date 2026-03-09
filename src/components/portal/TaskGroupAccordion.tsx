@@ -63,7 +63,7 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
                 <div className="flex-1 min-w-0">
                     <p className="text-white font-semibold truncate">{group.groupName}</p>
                     <p className="text-zinc-500 text-xs">
-                        {total} task{total > 1 ? 's' : ''} &bull;{' '}
+                        {t('task_count', { count: total })} &bull;{' '}
                         <span className={allDone ? 'text-emerald-400' : 'text-zinc-400'}>
                             {done} {t('completed_label')}
                         </span>
@@ -110,14 +110,14 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
                             </span>
 
                             <span className="text-zinc-600 text-xs shrink-0 hidden sm:block">
-                                {task.deadline ? new Date(task.deadline).toLocaleDateString('vi-VN') : '—'}
+                                {task.deadline ? new Date(task.deadline).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US') : '—'}
                             </span>
 
                             <Link
                                 href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
                                 className="text-xs text-indigo-400 hover:text-indigo-300 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                             >
-                                Chi tiết →
+                                {t('details')} →
                             </Link>
                         </div>
                     ))}
@@ -139,10 +139,11 @@ export default function TaskGroupAccordion({
     rootClientName?: string
 }) {
     // Group tasks by client name; tasks with no client go under rootClientName or "Khác"
+    const t = useTranslations('TaskGroup')
     const groupMap = new Map<string, Task[]>()
 
     for (const task of tasks) {
-        const key = task.client?.name ?? rootClientName ?? 'Chung'
+        const key = task.client?.name ?? rootClientName ?? t('default_group_name')
         if (!groupMap.has(key)) groupMap.set(key, [])
         groupMap.get(key)!.push(task)
     }
@@ -151,8 +152,6 @@ export default function TaskGroupAccordion({
         groupName: name,
         tasks: ts
     }))
-
-    const t = useTranslations('TaskGroup')
 
     if (groups.length === 0) {
         return (

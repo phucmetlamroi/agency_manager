@@ -20,7 +20,7 @@ export default async function PortalTasksPage({
         <div className="w-full max-w-4xl mx-auto p-8">
             <div className="flex items-center justify-between mb-8">
                 <h1 className="text-3xl font-light text-white tracking-tight">{t('your_tasks')}</h1>
-                <span className="text-sm text-zinc-500">{tasks.length} task{tasks.length !== 1 ? 's' : ''} tổng</span>
+                <span className="text-sm text-zinc-500">{t('task_count', { count: tasks.length })}</span>
             </div>
 
             <TaskGroupAccordion

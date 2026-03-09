@@ -530,7 +530,29 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                         </div>
 
                         <div className="space-y-3">
-                            <label className="text-[11px] font-bold text-blue-400 uppercase tracking-widest px-1">Notes (English Translation for Client)</label>
+                            <div className="flex justify-between items-center px-1">
+                                <label className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">Notes (English Translation for Client)</label>
+                                {(!isEditing && localTask?.notes_vi && localTask.notes_vi.trim() !== '' && localTask.notes_vi !== '<p></p>') && (
+                                    <button
+                                        onClick={handleRetryTranslation}
+                                        disabled={isTranslating}
+                                        className="px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-600 font-bold rounded-lg shadow-sm hover:bg-blue-100 hover:border-blue-300 transition-all text-xs flex items-center gap-1.5 disabled:opacity-50"
+                                        title="Dịch lại nhanh bằng Model AI mới nhất"
+                                    >
+                                        {isTranslating ? (
+                                            <>
+                                                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                                Đang dịch...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>✨</span> Dịch Lại
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+
                             {isEditing ? (
                                 <div className="h-[250px] border border-blue-200 rounded-2xl overflow-hidden shadow-inner bg-blue-50/10">
                                     <div className="p-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-600 font-semibold mb-2 flex items-center gap-2">
@@ -544,26 +566,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             ) : (
                                 <div className="bg-blue-50/30 p-6 rounded-2xl border border-blue-100 relative">
                                     {(!localTask.notes_en || localTask.notes_en.trim() === '') ? (
-                                        <div className="flex flex-col items-center justify-center py-4 gap-3">
-                                            <span className="text-zinc-400 text-sm italic">⚠️ Chưa có bản dịch Tiếng Anh.</span>
-                                            {(localTask.notes_vi && localTask.notes_vi.trim() !== '' && localTask.notes_vi !== '<p></p>') && (
-                                                <button
-                                                    onClick={handleRetryTranslation}
-                                                    disabled={isTranslating}
-                                                    className="px-4 py-2 bg-white border border-blue-200 text-blue-600 font-bold rounded-xl shadow-sm hover:bg-blue-50 hover:border-blue-300 transition-all text-sm flex items-center gap-2 disabled:opacity-50"
-                                                >
-                                                    {isTranslating ? (
-                                                        <>
-                                                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                                            Đang dịch...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span>✨</span> Dịch lại bằng AI
-                                                        </>
-                                                    )}
-                                                </button>
-                                            )}
+                                        <div className="flex flex-col items-center justify-center py-4 gap-2">
+                                            <span className="text-zinc-400 text-sm italic">⚠️ Chưa có bản dịch Tiếng Anh. Hãy bấm <b>"Dịch Lại"</b> ở góc phải phía trên.</span>
                                         </div>
                                     ) : (
                                         <div

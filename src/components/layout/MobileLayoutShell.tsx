@@ -87,16 +87,16 @@ export default function MobileLayoutShell({
                         <div className="flex-1 flex flex-col gap-2">
                             {/* Menu Items */}
                             <Link href={`/${workspaceId}/dashboard/profile`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
-                                <span>👤</span> Hồ sơ cá nhân
+                                <span>👤</span> Profile
                             </Link>
                             <Link href="/workspaces" onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors flex items-center gap-3 border border-blue-500/20">
-                                <span>🔄</span> Đổi Workspace
+                                <span>🔄</span> Change Workspace
                             </Link>
                             <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
-                                <span>🔔</span> Thông báo
+                                <span>🔔</span> Notifications
                             </button>
                             <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
-                                <span>⚙️</span> Cài đặt
+                                <span>⚙️</span> Settings
                             </button>
                         </div>
 
@@ -104,7 +104,7 @@ export default function MobileLayoutShell({
                             onClick={handleLogout}
                             className="w-full py-4 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 active:scale-95 transition-transform mt-auto"
                         >
-                            Đăng xuất
+                            Log out
                         </button>
 
                         <form action={async () => {

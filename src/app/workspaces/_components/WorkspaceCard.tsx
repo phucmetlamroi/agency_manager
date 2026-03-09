@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-import { vi } from "date-fns/locale"
+import { enUS } from "date-fns/locale"
 import { useState } from "react"
 import { renameWorkspaceAction, deleteWorkspaceAction } from "@/actions/workspace-actions"
 import { toast } from "sonner"
@@ -62,10 +62,10 @@ export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCard
         const res = await renameWorkspaceAction(workspace.id, newName)
         setIsLoading(false)
         if (res.success) {
-            toast.success("Đã đổi tên Workspace thành công")
+            toast.success("Workspace renamed successfully")
             setIsRenaming(false)
         } else {
-            toast.error(res.error || "Có lỗi xảy ra")
+            toast.error(res.error || "An error occurred")
         }
     }
 
@@ -74,10 +74,10 @@ export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCard
         const res = await deleteWorkspaceAction(workspace.id)
         setIsLoading(false)
         if (res.success) {
-            toast.success("Đã xóa Workspace thành công")
+            toast.success("Workspace deleted successfully")
             setIsDeleting(false)
         } else {
-            toast.error(res.error || "Có lỗi xảy ra")
+            toast.error(res.error || "An error occurred")
         }
     }
 
@@ -107,12 +107,12 @@ export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCard
                                 {workspace.name}
                             </CardTitle>
                             <CardDescription className="text-slate-400 line-clamp-2 min-h-[2.5rem]">
-                                {workspace.description || 'Không gian làm việc'}
+                                {workspace.description || 'Workspace'}
                             </CardDescription>
 
                             <div className="mt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-800/50 pt-4">
                                 <span className="flex-1" suppressHydrationWarning>
-                                    Cập nhật {formatDistanceToNow(new Date(workspace.updatedAt), { addSuffix: true, locale: vi })}
+                                    Updated {formatDistanceToNow(new Date(workspace.updatedAt), { addSuffix: true, locale: enUS })}
                                 </span>
 
                                 {userGlobalRole === 'ADMIN' && (
@@ -130,11 +130,11 @@ export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCard
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800 text-slate-200">
                                             <DropdownMenuItem onClick={handleRename} className="hover:bg-slate-800 focus:bg-slate-800 cursor-pointer">
-                                                <Edit2 className="w-4 h-4 mr-2" /> Đổi tên
+                                                <Edit2 className="w-4 h-4 mr-2" /> Rename
                                             </DropdownMenuItem>
                                             {role === 'OWNER' && (
                                                 <DropdownMenuItem onClick={handleDelete} className="text-red-400 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer">
-                                                    <Trash2 className="w-4 h-4 mr-2" /> Xóa Workspace
+                                                    <Trash2 className="w-4 h-4 mr-2" /> Delete Workspace
                                                 </DropdownMenuItem>
                                             )}
                                         </DropdownMenuContent>
@@ -150,9 +150,9 @@ export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCard
             <Dialog open={isRenaming} onOpenChange={setIsRenaming}>
                 <DialogContent className="bg-slate-900 border-slate-800 text-white">
                     <DialogHeader>
-                        <DialogTitle>Đổi tên Workspace</DialogTitle>
+                        <DialogTitle>Rename Workspace</DialogTitle>
                         <DialogDescription className="text-slate-400">
-                            Nhập tên mới cho không gian làm việc của bạn.
+                            Enter a new name for your workspace.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
@@ -160,14 +160,14 @@ export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCard
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
                             className="bg-slate-950 border-slate-800 text-white focus:ring-indigo-500"
-                            placeholder="Tên workspace..."
+                            placeholder="Workspace name..."
                         />
                     </div>
                     <DialogFooter>
-                        <Button variant="ghost" onClick={() => setIsRenaming(false)} className="text-slate-400 hover:bg-slate-800">Hủy</Button>
+                        <Button variant="ghost" onClick={() => setIsRenaming(false)} className="text-slate-400 hover:bg-slate-800">Cancel</Button>
                         <Button onClick={confirmRename} disabled={isLoading || !newName.trim()} className="bg-indigo-600 hover:bg-indigo-700">
                             {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            Lưu thay đổi
+                            Save changes
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -177,13 +177,13 @@ export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCard
             <Dialog open={isDeleting} onOpenChange={setIsDeleting}>
                 <DialogContent className="bg-slate-900 border-slate-800 text-white">
                     <DialogHeader>
-                        <DialogTitle className="text-red-400">Xác nhận xóa Workspace</DialogTitle>
+                        <DialogTitle className="text-red-400">Confirm Delete Workspace</DialogTitle>
                         <DialogDescription className="text-slate-400">
-                            Hành động này không thể hoàn tác. Mọi dữ liệu (task, invoice, payroll...) trong workspace <strong>{workspace.name}</strong> sẽ bị xóa vĩnh viễn.
+                            This action cannot be undone. All data (tasks, invoices, payrolls...) in workspace <strong>{workspace.name}</strong> will be permanently deleted.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="ghost" onClick={() => setIsDeleting(false)} className="text-slate-400 hover:bg-slate-800">Hủy</Button>
+                        <Button variant="ghost" onClick={() => setIsDeleting(false)} className="text-slate-400 hover:bg-slate-800">Cancel</Button>
                         <Button
                             variant="destructive"
                             onClick={confirmDelete}
@@ -191,7 +191,7 @@ export function WorkspaceCard({ workspace, role, userGlobalRole }: WorkspaceCard
                             className="bg-red-600 hover:bg-red-700"
                         >
                             {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            Xác nhận xóa
+                            Confirm Delete
                         </Button>
                     </DialogFooter>
                 </DialogContent>

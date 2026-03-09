@@ -31,7 +31,7 @@ export function CreateWorkspaceModal() {
         if (result.error) {
             toast.error(result.error)
         } else {
-            toast.success('Đã tạo Workspace thành công')
+            toast.success('Workspace created successfully')
             setOpen(false)
             if (result.workspaceId) {
                 router.push(`/${result.workspaceId}/dashboard`)
@@ -46,41 +46,41 @@ export function CreateWorkspaceModal() {
                     <div className="w-12 h-12 rounded-full bg-slate-800 group-hover:bg-indigo-600 flex items-center justify-center mb-4 transition-colors">
                         <Plus className="w-6 h-6" />
                     </div>
-                    <span className="font-medium text-lg">Tạo Workspace mới</span>
+                    <span className="font-medium text-lg">Create New Workspace</span>
                 </div>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] bg-slate-900 text-slate-50 border-slate-800">
                 <DialogHeader>
-                    <DialogTitle className="text-xl">Khởi tạo Không gian làm việc</DialogTitle>
+                    <DialogTitle className="text-xl">Initialize Workspace</DialogTitle>
                     <DialogDescription className="text-slate-400">
-                        Phân tách dữ liệu các tháng hoặc dự án riêng biệt. Bạn sẽ tự động trở thành Chủ sở hữu.
+                        Separate data for months or projects. You will automatically become the owner.
                     </DialogDescription>
                 </DialogHeader>
                 <form action={onSubmit} className="grid gap-4 py-4">
                     <div className="grid gap-2">
                         <Label htmlFor="name" className="text-slate-200">
-                            Tên <span className="text-red-400">*</span>
+                            Name <span className="text-red-400">*</span>
                         </Label>
                         <Input
                             id="name"
                             name="name"
-                            placeholder="VD: Tháng 4/2026"
+                            placeholder="e.g. April 2026"
                             className="bg-slate-950 border-slate-700 focus-visible:ring-indigo-500"
                             required
                         />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="description" className="text-slate-200">Mô tả (Tùy chọn)</Label>
+                        <Label htmlFor="description" className="text-slate-200">Description (Optional)</Label>
                         <Textarea
                             id="description"
                             name="description"
-                            placeholder="Công việc của team ABC..."
+                            placeholder="ABC team tasks..."
                             className="bg-slate-950 border-slate-700 focus-visible:ring-indigo-500"
                         />
                     </div>
                     <div className="flex justify-end pt-4">
                         <Button type="submit" disabled={isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md">
-                            {isPending ? 'Đang tạo...' : 'Khởi tạo ngay'}
+                            {isPending ? 'Creating...' : 'Initialize Now'}
                         </Button>
                     </div>
                 </form>

@@ -25,11 +25,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8">
             <h1 className="text-2xl font-bold mb-6 text-white flex items-center gap-2">
-                <span>👤</span> Thông tin cá nhân
+                <span>👤</span> Personal Information
             </h1>
 
             <div className="glass-panel p-6 mb-8">
-                <h2 className="text-xl font-semibold mb-4 text-purple-300">Cài đặt chung</h2>
+                <h2 className="text-xl font-semibold mb-4 text-purple-300">General Settings</h2>
                 <ProfileForm user={user} />
             </div>
 

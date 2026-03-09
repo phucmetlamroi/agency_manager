@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { login, logout } from '@/lib/auth'
 import { compare } from 'bcryptjs'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { UserRole } from '@prisma/client'
 
 export async function loginAction(prevState: any, formData: FormData) {
@@ -11,7 +12,7 @@ export async function loginAction(prevState: any, formData: FormData) {
     const password = formData.get('password') as string
 
     if (!username || !password) {
-        return { error: 'Vui lòng nhập đầy đủ thông tin' }
+        return { error: 'Please enter all required information' }
     }
 
     console.log(`[Login] Attempt for user: ${username}`)
@@ -25,14 +26,14 @@ export async function loginAction(prevState: any, formData: FormData) {
 
         if (!user) {
             console.log(`[Login] User not found: ${username}`)
-            return { error: 'Tài khoản không tồn tại' }
+            return { error: 'Account does not exist' }
         }
 
         const isValid = await compare(password, user.password)
 
         if (!isValid) {
             console.log(`[Login] Invalid password for: ${username}`)
-            return { error: 'Mật khẩu không chính xác' }
+            return { error: 'Incorrect password' }
         }
 
         role = user.role
@@ -44,13 +45,15 @@ export async function loginAction(prevState: any, formData: FormData) {
     } catch (err) {
         if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
         console.error('[Login] ERROR:', err)
-        return { error: 'Đã có lỗi xảy ra' }
+        return { error: 'Something went wrong. Please try again later.' }
     }
 
     console.log(`[Login] Redirecting ${username} based on role: ${role}`)
 
     if (role === 'CLIENT') {
-        redirect('/portal')
+        const cookieStore = await cookies()
+        cookieStore.set('NEXT_LOCALE', 'en', { path: '/' })
+        redirect('/portal/en')
     }
 
     // Redirect staff/admins to the Workspace Portal

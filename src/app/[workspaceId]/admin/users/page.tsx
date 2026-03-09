@@ -46,7 +46,7 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
 
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-            <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Quản lý nhân sự</h2>
+            <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Staff Management</h2>
             <UserPageTabs users={serializeDecimal(users)} currentUser={currentUser} agencies={agencies} workspaceId={workspaceId} />
         </div>
     )

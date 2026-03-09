@@ -23,8 +23,8 @@ export default function LoginPage() {
                 gap: '1.5rem'
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-                    <h1 className="title-gradient" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Đăng nhập</h1>
-                    <p style={{ color: '#888' }}>Hệ thống quản lý nội bộ</p>
+                    <h1 className="title-gradient" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Sign In</h1>
+                    <p style={{ color: '#888' }}>Internal Management System</p>
                 </div>
 
                 {state?.error && (
@@ -42,7 +42,7 @@ export default function LoginPage() {
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.9rem', color: '#ccc' }}>Tên đăng nhập</label>
+                    <label style={{ fontSize: '0.9rem', color: '#ccc' }}>Username</label>
                     <input
                         name="username"
                         type="text"
@@ -60,7 +60,7 @@ export default function LoginPage() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.9rem', color: '#ccc' }}>Mật khẩu</label>
+                    <label style={{ fontSize: '0.9rem', color: '#ccc' }}>Password</label>
                     <input
                         name="password"
                         type="password"
@@ -83,7 +83,7 @@ export default function LoginPage() {
                     className="btn btn-primary"
                     style={{ marginTop: '1rem', width: '100%' }}
                 >
-                    {isPending ? 'Đang xử lý...' : 'Đăng nhập'}
+                    {isPending ? 'Processing...' : 'Sign In'}
                 </button>
             </form>
         </div>

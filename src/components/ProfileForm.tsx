@@ -42,18 +42,18 @@ export default function ProfileForm({ user }: { user: any }) {
         if (res.error) {
             toast.error(res.error)
         } else {
-            toast.success('Cập nhật thông tin thành công!')
+            toast.success('Profile updated successfully!')
         }
     }
 
     async function handleChangePass(e: React.FormEvent) {
         e.preventDefault()
         if (newPass !== confirmPass) {
-            toast.error('Mật khẩu mới không khớp')
+            toast.error('New passwords do not match')
             return
         }
         if (newPass.length < 6) {
-            toast.error('Mật khẩu phải từ 6 ký tự')
+            toast.error('Password must be at least 6 characters')
             return
         }
 
@@ -65,7 +65,7 @@ export default function ProfileForm({ user }: { user: any }) {
         if (res.error) {
             toast.error(res.error)
         } else {
-            toast.success('Đổi mật khẩu thành công!')
+            toast.success('Password changed successfully!')
             setCurrentPass('')
             setNewPass('')
             setConfirmPass('')
@@ -76,8 +76,8 @@ export default function ProfileForm({ user }: { user: any }) {
         <div className="space-y-6">
             <Card className="bg-[#1a1a1a] border-[#333]">
                 <CardHeader>
-                    <CardTitle className="text-white">Thông tin cá nhân</CardTitle>
-                    <CardDescription>Quản lý thông tin hiển thị và liên hệ của bạn.</CardDescription>
+                    <CardTitle className="text-white">Profile Information</CardTitle>
+                    <CardDescription>Manage your display information and contact details.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form action={handleUpdateInfo} id="profile-form">
@@ -87,7 +87,7 @@ export default function ProfileForm({ user }: { user: any }) {
                                 <Input id="username" value={user.username} disabled className="bg-gray-800/50 border-gray-700 text-gray-500" />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="nickname" className="text-white">Nickname (Hiển thị)</Label>
+                                <Label htmlFor="nickname" className="text-white">Nickname (Display Name)</Label>
                                 <Input
                                     id="nickname"
                                     name="nickname"
@@ -106,7 +106,7 @@ export default function ProfileForm({ user }: { user: any }) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="phoneNumber" className="text-white">Số điện thoại</Label>
+                                <Label htmlFor="phoneNumber" className="text-white">Phone Number</Label>
                                 <Input
                                     id="phoneNumber"
                                     name="phoneNumber"
@@ -121,20 +121,20 @@ export default function ProfileForm({ user }: { user: any }) {
                 <CardFooter className="flex justify-end">
                     <Button type="submit" form="profile-form" disabled={isLoading} className="bg-purple-600 hover:bg-purple-500">
                         {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Lưu thay đổi
+                        Save Changes
                     </Button>
                 </CardFooter>
             </Card>
 
             <Card className="bg-[#1a1a1a] border-[#333]">
                 <CardHeader>
-                    <CardTitle className="text-white">Đổi mật khẩu</CardTitle>
-                    <CardDescription>Cập nhật mật khẩu định kỳ để bảo vệ tài khoản.</CardDescription>
+                    <CardTitle className="text-white">Change Password</CardTitle>
+                    <CardDescription>Update your password regularly to protect your account.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleChangePass} id="password-form" className="max-w-md space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="currentPass" className="text-white">Mật khẩu hiện tại</Label>
+                            <Label htmlFor="currentPass" className="text-white">Current Password</Label>
                             <Input
                                 id="currentPass"
                                 type="password"
@@ -144,7 +144,7 @@ export default function ProfileForm({ user }: { user: any }) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="newPass" className="text-white">Mật khẩu mới</Label>
+                            <Label htmlFor="newPass" className="text-white">New Password</Label>
                             <Input
                                 id="newPass"
                                 type="password"
@@ -154,7 +154,7 @@ export default function ProfileForm({ user }: { user: any }) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="confirmPass" className="text-white">Nhập lại mật khẩu mới</Label>
+                            <Label htmlFor="confirmPass" className="text-white">Confirm New Password</Label>
                             <Input
                                 id="confirmPass"
                                 type="password"
@@ -174,7 +174,7 @@ export default function ProfileForm({ user }: { user: any }) {
                         className="bg-gray-800 text-white hover:bg-gray-700"
                     >
                         {passLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Đổi mật khẩu
+                        Change Password
                     </Button>
                 </CardFooter>
             </Card>

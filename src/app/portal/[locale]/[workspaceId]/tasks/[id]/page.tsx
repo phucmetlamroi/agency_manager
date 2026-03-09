@@ -4,7 +4,7 @@ import { ArrowLeft, Clock, FileVideo, DollarSign, Tag, User } from 'lucide-react
 import RatingMicroSurvey from '@/components/portal/RatingMicroSurvey';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ensureExternalLinks } from '@/lib/utils';
+import { ensureExternalLinks, removeAccents } from '@/lib/utils';
 
 export default async function PortalTaskDetail({
     params
@@ -99,16 +99,7 @@ export default async function PortalTaskDetail({
                         </div>
                     )}
 
-                    {task.assignee && (
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur">
-                            <h3 className="text-white font-medium mb-2 flex items-center gap-2">
-                                <User size={16} className="text-zinc-400" /> {t('assignee')}
-                            </h3>
-                            <p className="text-zinc-300 text-sm">
-                                {task.assignee.nickname || task.assignee.username}
-                            </p>
-                        </div>
-                    )}
+
                 </div>
 
                 {/* Right - Rating */}
@@ -123,6 +114,28 @@ export default async function PortalTaskDetail({
                             qualitativeFeedback: task.rating.qualitativeFeedback
                         } : null}
                     />
+
+                    {task.assignee && (
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            <h3 className="text-zinc-400 text-xs uppercase tracking-widest font-bold mb-3 flex items-center gap-2">
+                                <User size={14} className="text-indigo-400" /> {t('assignee')}
+                            </h3>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">
+                                    {(task.assignee.nickname || task.assignee.username).charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="text-white font-medium">
+                                        {locale === 'vi'
+                                            ? (task.assignee.nickname || task.assignee.username)
+                                            : removeAccents(task.assignee.nickname || task.assignee.username)
+                                        }
+                                    </p>
+                                    <p className="text-zinc-500 text-[10px] uppercase tracking-tighter">Verified Studio Editor</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

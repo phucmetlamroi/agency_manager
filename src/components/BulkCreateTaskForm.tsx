@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createBatchTasks } from '@/actions/bulk-task-actions'
 import ClientSelector from '@/components/crm/ClientSelector'
 import { toast } from 'sonner'
+import { Copy } from 'lucide-react'
 
 type User = {
     id: string
@@ -29,6 +30,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
     const [submissionFolder, setSubmissionFolder] = useState<string>('')
     const [references, setReferences] = useState<string>('')
     const [notes, setNotes] = useState<string>('')
+    const [notesEn, setNotesEn] = useState<string>('')
 
     // Batch Data State
     const [rawTitles, setRawTitles] = useState<string>('')
@@ -104,6 +106,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
             references: references || null,
             collectFilesLink: collectFilesLink || null,
             notes: notes || null,
+            notes_en: notesEn || null,
             type
         }, workspaceId)
 
@@ -207,10 +210,30 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                 </div>
 
                 <div className="mt-4">
-                    <label className="text-xs text-gray-400">Ghi chú (Note)</label>
-                    <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Ghi chú thêm cho Editor..."
+                    <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs text-gray-400">Ghi chú (Tiếng Việt)</label>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                navigator.clipboard.writeText(notes);
+                                toast.success('Đã copy nội dung tiếng Việt');
+                            }}
+                            className="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+                        >
+                            <Copy size={10} /> Copy
+                        </button>
+                    </div>
+                    <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Ghi chú thêm cho Editor (Tiếng Việt)..."
                         rows={3}
                         className="w-full p-2 bg-[#222] border border-[#333] rounded text-white text-sm focus:outline-none focus:border-blue-500" />
+                </div>
+
+                <div className="mt-4">
+                    <label className="text-xs text-gray-400">Nhập bản dịch (English Notes)</label>
+                    <textarea value={notesEn} onChange={e => setNotesEn(e.target.value)} placeholder="Dán nội dung tiếng Anh vào đây..."
+                        rows={3}
+                        className="w-full p-2 bg-[#1a1a1a] border border-[#22c55e44] rounded text-white text-sm focus:outline-none focus:border-green-500/50" />
+                    <p className="text-[10px] text-gray-600 mt-1 italic">ℹ️ Tự dán kết quả dịch vào đây để tối ưu chi phí.</p>
                 </div>
 
                 <div className="mt-4">

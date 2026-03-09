@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createTask } from '@/actions/admin-actions'
+import { Copy } from 'lucide-react'
+import { toast } from 'sonner'
 
 
 
@@ -26,6 +28,7 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
     const [revenueVnd, setRevenueVnd] = useState<number>(0)
 
     const [clientId, setClientId] = useState<number | null>(null)
+    const notesViRef = useRef<HTMLTextAreaElement>(null)
 
     useEffect(() => {
         // Fetch Exchange Rate
@@ -240,10 +243,40 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
                     style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }} />
             </div>
 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: '0.8rem', color: '#888' }}>Ghi chú (Tiếng Việt)</label>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (notesViRef.current) {
+                                navigator.clipboard.writeText(notesViRef.current.value);
+                                toast.success('Đã copy nội dung tiếng Việt');
+                            }
+                        }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: '#888', fontSize: '0.7rem' }}
+                    >
+                        <Copy size={12} /> Copy
+                    </button>
+                </div>
+                <textarea
+                    ref={notesViRef}
+                    name="notes"
+                    placeholder="Yêu cầu cụ thể bằng Tiếng Việt..."
+                    rows={3}
+                    style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}
+                />
+            </div>
+
             <div>
-                <label style={{ fontSize: '0.8rem', color: '#888' }}>Ghi chú (Notes)</label>
-                <textarea name="notes" placeholder="Yêu cầu cụ thể..." rows={3}
-                    style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }} />
+                <label style={{ fontSize: '0.8rem', color: '#888' }}>Nhập bản dịch (English Notes)</label>
+                <textarea
+                    name="notes_en"
+                    placeholder="Dán nội dung tiếng Anh vào đây..."
+                    rows={3}
+                    style={{ width: '100%', padding: '0.5rem', background: '#1a1a1a', border: '1px solid #22c55e44', color: 'white', borderRadius: '6px' }}
+                />
+                <p style={{ fontSize: '0.65rem', color: '#555', marginTop: '4px' }}>ℹ️ Tự dán kết quả dịch vào ô này để tối ưu chi phí.</p>
             </div>
 
             <div>

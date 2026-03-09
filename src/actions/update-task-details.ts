@@ -4,12 +4,12 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { parseVietnamDate } from '@/lib/date-utils'
-import { translateTaskNote } from '@/lib/gemini-translator'
 
 export async function updateTaskDetails(id: string, data: {
     resources?: string
     references?: string
     notes?: string
+    notes_en?: string
     title?: string
     productLink?: string
     deadline?: string
@@ -40,18 +40,9 @@ export async function updateTaskDetails(id: string, data: {
 
         if (data.notes !== undefined) {
             updateData.notes_vi = data.notes
-
-            // Optimization: Only translate if the notes actually changed
-            if (data.notes !== currentTask.notes_vi) {
-                if (data.notes) {
-                    console.log(`[Auto-Translate] Task ${id} notes changed, calling Gemini API...`)
-                    updateData.notes_en = await translateTaskNote(data.notes)
-                } else {
-                    updateData.notes_en = null
-                }
-            } else {
-                console.log(`[Auto-Translate] Task ${id} notes unchanged, skipping API call.`)
-            }
+        }
+        if (data.notes_en !== undefined) {
+            updateData.notes_en = data.notes_en
         }
 
         // Handle Price Updates (Financials) - FIXED

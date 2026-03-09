@@ -4,8 +4,6 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { parseVietnamDate } from '@/lib/date-utils'
-import { translateTaskNote } from '@/lib/gemini-translator'
-
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
@@ -70,7 +68,8 @@ export async function createTask(formData: FormData, workspaceId: string) {
         const fileLink = formData.get('fileLink') as string
         const type = formData.get('type') as string || 'Short form'
         const resources = formData.get('resources') as string
-        const notes = formData.get('notes') as string
+        const notes_vi = formData.get('notes') as string
+        const notes_en = formData.get('notes_en') as string
         const collectFilesLink = formData.get('collectFilesLink') as string
 
         const jobPriceUSD = parseFloat(formData.get('jobPriceUSD') as string) || 0
@@ -103,8 +102,8 @@ export async function createTask(formData: FormData, workspaceId: string) {
                 deadline: deadline ? parseVietnamDate(deadline) : null,
                 resources: resources || null,
                 references: references || null,
-                notes_vi: notes || null,
-                notes_en: notes ? await translateTaskNote(notes) : null,
+                notes_vi: notes_vi || null,
+                notes_en: notes_en || null,
                 assigneeId: assigneeId || null,
                 assignedAgencyId: assignedAgencyId, // FIX: Sync with assignee's agency
                 fileLink: fileLink || null,

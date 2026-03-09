@@ -4,8 +4,6 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
 
-import { translateTaskNote } from '@/lib/gemini-translator'
-
 type BatchTaskInput = {
     titles: string[]
     clientId: number | null
@@ -18,6 +16,7 @@ type BatchTaskInput = {
     references: string | null
     collectFilesLink: string | null
     notes: string | null
+    notes_en: string | null
     type: string
 }
 
@@ -44,8 +43,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             assignedAgencyId = assignee?.agencyId || null
         }
 
-        // Pre-translate the common note for all batch tasks
-        const translatedNotesEn = await translateTaskNote(data.notes)
+
 
         // Use standard prisma instead of extension for this complex transaction
         await prisma.$transaction(async (tx) => {
@@ -62,7 +60,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         references: data.references,
                         collectFilesLink: data.collectFilesLink,
                         notes_vi: data.notes,
-                        notes_en: translatedNotesEn,
+                        notes_en: data.notes_en,
                         assigneeId: data.assigneeId,
                         assignedAgencyId: assignedAgencyId,
                         status: data.assigneeId ? 'Đã nhận task' : 'Đang đợi giao',
@@ -122,12 +120,9 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         if (data.references !== undefined) updateData.references = data.references
         if (data.notes !== undefined) {
             updateData.notes_vi = data.notes
-            // Bulk update translation too if notes changed
-            if (data.notes) {
-                updateData.notes_en = await translateTaskNote(data.notes)
-            } else {
-                updateData.notes_en = null
-            }
+        }
+        if (data.notes_en !== undefined) {
+            updateData.notes_en = data.notes_en
         }
         if (data.productLink !== undefined) updateData.productLink = data.productLink
         if (data.deadline !== undefined) updateData.deadline = data.deadline ? parseVietnamDate(data.deadline) : null

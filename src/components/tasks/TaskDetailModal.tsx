@@ -10,7 +10,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
 import DOMPurify from 'isomorphic-dompurify'
 import { ensureExternalLinks } from "@/lib/utils"
-import { retryTaskTranslation } from '@/actions/retry-translation-action'
+import { Copy } from "lucide-react"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
 
@@ -28,7 +28,6 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     const [isEditingLink, setIsEditingLink] = useState(false)
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
     const [isFrameExpanded, setIsFrameExpanded] = useState(false)
-    const [isTranslating, setIsTranslating] = useState(false)
     const [frameAccount, setFrameAccount] = useState({ account: '', password: '' })
     const [form, setForm] = useState({
         resources: '',
@@ -133,7 +132,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             const bulkData = {
                 resources: combinedResources,
                 references: form.references,
-                notes: cleanNotesVi, // This action receives notes and translates it, but we should probably use notes_vi and notes_en explicitly? Actually the bulk action maps 'notes' to 'notes_vi'.
+                notes: cleanNotesVi,
+                notes_en: cleanNotesEn,
                 productLink: form.productLink,
                 deadline: form.deadline || undefined,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
@@ -157,9 +157,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         const res = await updateTaskDetails(localTask.id, {
             resources: combinedResources,
             references: form.references,
-            notes: cleanNotesVi, // Same here, the server action `updateTaskDetails` expects 'notes' to update 'notes_vi' and auto-translates if changed. If we want manual translation edit, we need a separate server action or field. BUT we just want basic functionality first. Let's pass 'notes' as is. Wait, user wants to manually override notes_en.
-            // Let's modify the frontend to only edit notes_vi in this sprint to pass TS, or update the Server Action to accept notes_vi AND notes_en directly.
-            // Since `updateTaskDetails` was changed to only accept `notes` via my last edit, I will only send `notes: cleanNotesVi` for now.
+            notes: cleanNotesVi,
+            notes_en: cleanNotesEn,
             productLink: form.productLink,
             deadline: form.deadline || undefined,
             jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
@@ -173,7 +172,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 resources: combinedResources,
                 references: form.references,
                 notes_vi: cleanNotesVi,
-                notes_en: localTask.notes_en, // optimistic update
+                notes_en: cleanNotesEn,
                 productLink: form.productLink,
                 value: isAdmin ? Number(form.value) : prev.value,
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : prev.jobPriceUSD,
@@ -193,23 +192,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         return `https://${link}`
     }
 
-    const handleRetryTranslation = async () => {
-        if (!localTask) return
-        setIsTranslating(true)
-        try {
-            const res = await retryTaskTranslation(localTask.id, workspaceId)
-            if (res.error) {
-                toast.error(res.error)
-            } else if (res.notes_en) {
-                toast.success('Dịch lại thành công!')
-                setLocalTask(prev => prev ? { ...prev, notes_en: res.notes_en } : null)
-            }
-        } catch (error) {
-            toast.error('Có lỗi xảy ra khi gọi API dịch thuật.')
-        } finally {
-            setIsTranslating(false)
-        }
-    }
+
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -511,9 +494,21 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             )}
                         </div>
 
-                        {/* NOTES */}
                         <div className="space-y-3">
-                            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-1">Ghi chú (Tiếng Việt)</label>
+                            <div className="flex items-center justify-between px-1">
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Ghi chú (Tiếng Việt)</label>
+                                <button
+                                    onClick={() => {
+                                        const cleanText = form.notes_vi.replace(/<[^>]*>/g, '').trim();
+                                        navigator.clipboard.writeText(cleanText);
+                                        toast.success('Đã copy nội dung tiếng Việt');
+                                    }}
+                                    className="p-1.5 hover:bg-zinc-100 rounded-lg transition-colors text-zinc-400 hover:text-zinc-600"
+                                    title="Copy nội dung Tiếng Việt"
+                                >
+                                    <Copy className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
                             {isEditing ? (
                                 <div className="h-[250px] border border-zinc-200 rounded-2xl overflow-hidden shadow-inner">
                                     <TiptapEditor
@@ -532,42 +527,20 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                         <div className="space-y-3">
                             <div className="flex justify-between items-center px-1">
                                 <label className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">Notes (English Translation for Client)</label>
-                                {(!isEditing && localTask?.notes_vi && localTask.notes_vi.trim() !== '' && localTask.notes_vi !== '<p></p>') && (
-                                    <button
-                                        onClick={handleRetryTranslation}
-                                        disabled={isTranslating}
-                                        className="px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-600 font-bold rounded-lg shadow-sm hover:bg-blue-100 hover:border-blue-300 transition-all text-xs flex items-center gap-1.5 disabled:opacity-50"
-                                        title="Dịch lại nhanh bằng Model AI mới nhất"
-                                    >
-                                        {isTranslating ? (
-                                            <>
-                                                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                                Đang dịch...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span>✨</span> Dịch Lại
-                                            </>
-                                        )}
-                                    </button>
-                                )}
                             </div>
 
                             {isEditing ? (
                                 <div className="h-[250px] border border-blue-200 rounded-2xl overflow-hidden shadow-inner bg-blue-50/10">
-                                    <div className="p-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-600 font-semibold mb-2 flex items-center gap-2">
-                                        ✨ Bản dịch hiển thị cho Client (Không thể đổi thủ công trong lần sửa chung này, nó sẽ tự động dịch từ Ghi chú Tiếng Việt)
-                                    </div>
-                                    <div
-                                        className="p-4 text-zinc-500 text-[14px] leading-[1.6] prose prose-zinc max-w-none opacity-50"
-                                        dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_en || "Sẽ tự động dịch khi lưu Ghi Chú Tiếng Việt...")) }}
+                                    <TiptapEditor
+                                        content={form.notes_en}
+                                        onChange={(html) => setForm({ ...form, notes_en: html })}
                                     />
                                 </div>
                             ) : (
                                 <div className="bg-blue-50/30 p-6 rounded-2xl border border-blue-100 relative">
-                                    {(!localTask.notes_en || localTask.notes_en.trim() === '') ? (
+                                    {(!localTask.notes_en || localTask.notes_en.trim() === '' || localTask.notes_en === '<p></p>') ? (
                                         <div className="flex flex-col items-center justify-center py-4 gap-2">
-                                            <span className="text-zinc-400 text-sm italic">⚠️ Chưa có bản dịch Tiếng Anh. Hãy bấm <b>"Dịch Lại"</b> ở góc phải phía trên.</span>
+                                            <span className="text-zinc-400 text-sm italic">⚠️ Chưa có bản dịch Tiếng Anh. Hãy bấm <b>"Edit"</b> để nhập thủ công.</span>
                                         </div>
                                     ) : (
                                         <div

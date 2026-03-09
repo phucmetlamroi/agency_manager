@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Flame } from 'lucide-react'
+import { Flame, ChevronDown } from 'lucide-react'
 import PortalStatusBadge from './PortalStatusBadge'
+import { motion, AnimatePresence } from 'framer-motion'
 
 type Task = {
     id: string
@@ -19,47 +21,103 @@ export default function ActiveFocusWidget({ tasks, onSelectTask }: { tasks: Task
     const priority = ['Action Required', 'Revising', 'In Progress', 'Pending', 'Completed']
     const activeTasks = [...tasks].sort((a, b) => {
         return priority.indexOf(a.clientStatus) - priority.indexOf(b.clientStatus)
-    }).slice(0, 5) // Show top 5
+    })
+
+    // Group by type
+    const groupedTasks = activeTasks.reduce((acc, task) => {
+        const typeName = task.type || 'General'
+        if (!acc[typeName]) acc[typeName] = []
+        acc[typeName].push(task)
+        return acc
+    }, {} as Record<string, Task[]>)
+
+    const groups = Object.keys(groupedTasks).sort()
+
+    // Default open the first group
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
+        if (groups.length > 0) return { [groups[0]]: true }
+        return {}
+    })
+
+    const toggleGroup = (group: string) => {
+        setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }))
+    }
 
     return (
         <div className="bg-zinc-950/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 h-full flex flex-col group hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden">
             {/* Ambient Background Glow */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
 
-            <div className="flex items-center gap-3 mb-6 relative z-10">
+            <div className="flex items-center gap-3 mb-6 relative z-10 shrink-0">
                 <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
                     <Flame size={20} className="text-orange-400" />
                 </div>
                 <div>
                     <h2 className="text-white font-medium">Active Focus</h2>
-                    <p className="text-zinc-500 text-xs">High priority items</p>
+                    <p className="text-zinc-500 text-xs">High priority items by type</p>
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2 relative z-10 custom-scrollbar">
-                {activeTasks.length > 0 ? activeTasks.map(task => (
-                    <button
-                        key={task.id}
-                        onClick={() => onSelectTask(task.id)}
-                        className="w-full text-left bg-zinc-900/50 hover:bg-zinc-800/80 border border-white/5 hover:border-white/10 p-4 rounded-2xl flex flex-col gap-3 transition-all duration-300 group/card"
-                    >
-                        <div className="flex justify-between items-start gap-4">
-                            <h3 className="text-sm font-medium text-zinc-200 group-hover/card:text-white truncate flex-1">
-                                {task.title}
-                            </h3>
-                            <PortalStatusBadge status={task.clientStatus} pulse={task.clientStatus === 'Action Required'} />
+            <div className="flex-1 overflow-y-auto pr-2 relative z-10 custom-scrollbar space-y-3">
+                {groups.length > 0 ? groups.map(groupName => {
+                    const groupTasks = groupedTasks[groupName]
+                    const isExpanded = !!expandedGroups[groupName]
+
+                    return (
+                        <div key={groupName} className="bg-zinc-900/40 border border-white/5 rounded-2xl overflow-hidden shadow-sm">
+                            <button
+                                onClick={() => toggleGroup(groupName)}
+                                className="w-full flex items-center justify-between p-4 bg-zinc-900/60 hover:bg-zinc-800/80 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+                                    <span className="text-sm font-bold text-white tracking-wide uppercase">{groupName}</span>
+                                    <span className="text-[10px] text-zinc-500 bg-black/50 px-2 py-0.5 rounded-full border border-white/10 font-mono">
+                                        {groupTasks.length} {groupTasks.length === 1 ? 'Task' : 'Tasks'}
+                                    </span>
+                                </div>
+                                <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                                    <ChevronDown size={16} className="text-zinc-500" />
+                                </motion.div>
+                            </button>
+
+                            <AnimatePresence initial={false}>
+                                {isExpanded && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="p-3 border-t border-white/5 space-y-2 bg-zinc-950/20">
+                                            {groupTasks.map(task => (
+                                                <button
+                                                    key={task.id}
+                                                    onClick={() => onSelectTask(task.id)}
+                                                    className="w-full text-left bg-zinc-900/40 hover:bg-zinc-800/80 border border-transparent hover:border-white/10 p-4 flex flex-col gap-3 rounded-xl transition-all duration-300 group/card"
+                                                >
+                                                    <div className="flex justify-between items-start gap-4">
+                                                        <h3 className="text-sm font-medium text-zinc-300 group-hover/card:text-white truncate flex-1">
+                                                            {task.title}
+                                                        </h3>
+                                                        <PortalStatusBadge status={task.clientStatus} pulse={task.clientStatus === 'Action Required'} />
+                                                    </div>
+                                                    <div className="flex justify-end mt-1">
+                                                        <span className="text-xs text-indigo-400 group-hover/card:text-indigo-300 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-1 font-medium">
+                                                            Open Details &rarr;
+                                                        </span>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
-                        <div className="flex justify-between items-end">
-                            <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
-                                {task.type}
-                            </span>
-                            <span className="text-xs text-indigo-400 group-hover/card:text-indigo-300 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-1">
-                                Open Details &rarr;
-                            </span>
-                        </div>
-                    </button>
-                )) : (
-                    <div className="flex-1 flex items-center justify-center text-zinc-500 text-xs italic">
+                    )
+                }) : (
+                    <div className="h-full flex items-center justify-center text-zinc-500 text-xs italic">
                         No active tasks
                     </div>
                 )}

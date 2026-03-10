@@ -11,10 +11,11 @@ type Props = {
     users: any[]
     currentUser: any
     agencies?: any[]
+    profiles?: any[]
     workspaceId: string
 }
 
-export default function UserList({ users, currentUser, agencies, workspaceId }: Props) {
+export default function UserList({ users, currentUser, agencies, profiles, workspaceId }: Props) {
     return (
         <div>
             <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
@@ -45,6 +46,17 @@ export default function UserList({ users, currentUser, agencies, workspaceId }: 
                                 <option value="">-- None --</option>
                                 {agencies.map(a => (
                                     <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    {currentUser?.username === 'admin' && profiles && profiles.length > 0 && (
+                        <div>
+                            <label style={{ display: 'block', textShadow: '0 0 5px #3b82f6', color: '#60a5fa', fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Team Profile</label>
+                            <select name="profileId" required style={{ padding: '0.6rem', borderRadius: '6px', border: '1px solid #3b82f6', background: '#1e3a8a', color: 'white' }}>
+                                <option value="">-- Cấp phái Team --</option>
+                                {profiles.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                             </select>
                         </div>

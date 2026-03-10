@@ -4,7 +4,7 @@ import { useState } from 'react'
 import UserList from '@/components/admin/UserList'
 import PayrollTable from '@/components/admin/PayrollTable'
 
-export default function UserPageTabs({ users, currentUser, agencies, workspaceId }: { users: any[], currentUser: any, agencies?: any[], workspaceId: string }) {
+export default function UserPageTabs({ users, currentUser, agencies, profiles, workspaceId }: { users: any[], currentUser: any, agencies?: any[], profiles?: any[], workspaceId: string }) {
     const [activeTab, setActiveTab] = useState<'users' | 'payroll'>('users')
 
     return (
@@ -28,7 +28,7 @@ export default function UserPageTabs({ users, currentUser, agencies, workspaceId
             {/* CONTENT */}
             <div className="min-h-[600px]">
                 {activeTab === 'users' && (
-                    <UserList users={users} currentUser={currentUser} agencies={agencies} workspaceId={workspaceId} />
+                    <UserList users={users} currentUser={currentUser} agencies={agencies} profiles={profiles} workspaceId={workspaceId} />
                 )}
 
                 {activeTab === 'payroll' && (

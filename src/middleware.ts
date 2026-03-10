@@ -27,39 +27,59 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set('x-client-city', city)
 
     let finalResponse: NextResponse | null = null;
+    let isRedirecting = false; // flag to prevent overwriting response
     const sessionCookie = request.cookies.get('session')
+    const profileCookie = request.cookies.get('current_profile_id')
 
     // 2. Redirect logic
     if (!sessionCookie) {
-        const protectedPaths = ['/workspaces', '/portal', '/admin', '/dashboard', '/agency']
+        const protectedPaths = ['/workspaces', '/portal', '/admin', '/dashboard', '/agency', '/profile-selection']
         const isProtectedRoute = protectedPaths.some(p => pathname.startsWith(p))
 
         if (isProtectedRoute && pathname !== '/login') {
             finalResponse = NextResponse.redirect(new URL('/login', request.url))
+            isRedirecting = true
         }
     } else {
         try {
             const session = await decrypt(sessionCookie.value)
             const role = session?.user?.role
 
-            if (role === 'CLIENT') {
-                const adminPaths = ['/workspaces', '/admin', '/dashboard', '/agency']
-                if (adminPaths.some(p => pathname.startsWith(p))) {
-                    finalResponse = NextResponse.redirect(new URL('/portal', request.url))
-                }
-            } else {
-                if (pathname.startsWith('/portal')) {
-                    finalResponse = NextResponse.redirect(new URL('/workspaces', request.url))
-                }
+            // --- MULTI-TENANT PROFILE GUARD ---
+            if (!profileCookie && pathname !== '/profile-selection' && !pathname.startsWith('/api')) {
+                finalResponse = NextResponse.redirect(new URL('/profile-selection', request.url))
+                isRedirecting = true
             }
 
-            if (!finalResponse && (pathname === '/login' || pathname === '/')) {
-                const target = role === 'CLIENT' ? '/portal' : '/workspaces'
-                finalResponse = NextResponse.redirect(new URL(target, request.url))
+            if (!isRedirecting) {
+                if (role === 'CLIENT') {
+                    const adminPaths = ['/workspaces', '/admin', '/dashboard', '/agency']
+                    if (adminPaths.some(p => pathname.startsWith(p))) {
+                        finalResponse = NextResponse.redirect(new URL('/portal', request.url))
+                        isRedirecting = true
+                    }
+                } else {
+                    if (pathname.startsWith('/portal')) {
+                        finalResponse = NextResponse.redirect(new URL('/workspaces', request.url))
+                        isRedirecting = true
+                    }
+                }
+
+                if (!isRedirecting && (pathname === '/login' || pathname === '/')) {
+                    if (!profileCookie) {
+                        finalResponse = NextResponse.redirect(new URL('/profile-selection', request.url))
+                    } else {
+                        const target = role === 'CLIENT' ? '/portal' : '/workspaces'
+                        finalResponse = NextResponse.redirect(new URL(target, request.url))
+                    }
+                    isRedirecting = true
+                }
             }
         } catch (err) {
             finalResponse = NextResponse.redirect(new URL('/login', request.url))
             finalResponse.cookies.delete('session')
+            finalResponse.cookies.delete('current_profile_id') // clean up profile cookie on failure
+            isRedirecting = true
         }
     }
 

@@ -8,12 +8,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Profile {
+  id        String   @id @default(uuid())
+  name      String
+  bannerUrl String?
+  logoUrl   String?
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  workspaces   Workspace[]
+  tasks        Task[]
+  clients      Client[]
+  projects     Project[]
+  invoices     Invoice[]
+  payrolls     Payroll[]
+  bonuses      MonthlyBonus[]
+  payrollLocks PayrollLock[]
+  metrics      PerformanceMetric[]
+}
+
 model Workspace {
   id          String   @id @default(uuid())
   name        String
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  profileId   String?
 
   members      WorkspaceMember[]
   tasks        Task[]
@@ -28,6 +50,8 @@ model Workspace {
   mediaTasks   MediaTask[]
   ratings      Rating[]
   sessions     Session[]
+
+  profile Profile? @relation(fields: [profileId], references: [id])
 
   @@index([name])
 }
@@ -62,6 +86,7 @@ model User {
   paymentBankName   String?
   paymentQrUrl      String?
   agencyId          String?
+  profileId         String?
   role              UserRole            @default(USER)
   ownedAgency       Agency[]            @relation("AgencyOwner")
   bonuses           MonthlyBonus[]
@@ -79,6 +104,8 @@ model User {
   sessions          Session[]
   events            Event[]
   presence          UserPresence?
+
+  profile Profile? @relation(fields: [profileId], references: [id])
 }
 
 model Payroll {
@@ -96,6 +123,8 @@ model Payroll {
   user        User      @relation(fields: [userId], references: [id])
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  profileId   String?
+  profile     Profile?  @relation(fields: [profileId], references: [id])
 
   @@unique([userId, month, year, workspaceId], name: "userId_month_year_workspaceId")
 }
@@ -144,6 +173,8 @@ model Task {
   project          Project?          @relation(fields: [projectId], references: [id])
   workspaceId      String?
   workspace        Workspace?        @relation(fields: [workspaceId], references: [id])
+  profileId        String?
+  profile          Profile?          @relation(fields: [profileId], references: [id])
   rating           Rating?
 
   @@index([workspaceId, status])
@@ -163,6 +194,8 @@ model MonthlyBonus {
   user               User      @relation(fields: [userId], references: [id])
   workspaceId        String
   workspace          Workspace @relation(fields: [workspaceId], references: [id])
+  profileId          String?
+  profile            Profile?  @relation(fields: [profileId], references: [id])
 
   @@unique([userId, month, year, workspaceId], name: "userId_month_year_workspaceId")
 }
@@ -176,6 +209,8 @@ model PayrollLock {
   lockedBy    String
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  profileId   String?
+  profile     Profile?  @relation(fields: [profileId], references: [id])
 
   @@unique([month, year, workspaceId], name: "month_year_workspaceId")
 }
@@ -199,6 +234,8 @@ model Client {
   tasks          Task[]
   workspaceId    String?
   workspace      Workspace? @relation(fields: [workspaceId], references: [id])
+  profileId      String?
+  profile        Profile?   @relation(fields: [profileId], references: [id])
 }
 
 model Project {
@@ -214,6 +251,8 @@ model Project {
   workspace    Workspace? @relation(fields: [workspaceId], references: [id])
   clientUserId String?
   clientUser   User?      @relation("UserClientProjects", fields: [clientUserId], references: [id])
+  profileId    String?
+  profile      Profile?   @relation(fields: [profileId], references: [id])
 }
 
 model Feedback {
@@ -248,6 +287,8 @@ model PerformanceMetric {
   user                  User      @relation(fields: [userId], references: [id])
   workspaceId           String
   workspace             Workspace @relation(fields: [workspaceId], references: [id])
+  profileId             String?
+  profile               Profile?  @relation(fields: [profileId], references: [id])
 
   @@unique([userId, month, year, workspaceId], name: "userId_month_year_workspaceId")
 }
@@ -305,6 +346,8 @@ model Invoice {
   workspace       Workspace?    @relation(fields: [workspaceId], references: [id])
   clientUserId    String?
   clientUser      User?         @relation("UserClientInvoices", fields: [clientUserId], references: [id])
+  profileId       String?
+  profile         Profile?      @relation(fields: [profileId], references: [id])
 }
 
 model InvoiceItem {

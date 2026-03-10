@@ -44,10 +44,15 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
     // Fetch Agencies for selection
     const agencies = await prisma.agency.findMany({ select: { id: true, name: true, code: true } })
 
+    // Fetch Profiles for Super Admin user creation
+    const profiles = currentUser?.username === 'admin' ? 
+        await prisma.profile.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }) : 
+        []
+
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
             <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Staff Management</h2>
-            <UserPageTabs users={serializeDecimal(users)} currentUser={currentUser} agencies={agencies} workspaceId={workspaceId} />
+            <UserPageTabs users={serializeDecimal(users)} currentUser={currentUser} agencies={agencies} profiles={profiles} workspaceId={workspaceId} />
         </div>
     )
 }

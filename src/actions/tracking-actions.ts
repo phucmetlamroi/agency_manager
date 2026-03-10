@@ -257,3 +257,41 @@ export async function getFrictionData() {
         return []
     }
 }
+
+/**
+ * Get current live presence of all users
+ */
+export async function getLivePresence() {
+    try {
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+
+        const presence = await prisma.userPresence.findMany({
+            where: {
+                lastHeartbeat: { gte: fiveMinutesAgo }
+            },
+            include: {
+                user: {
+                    select: {
+                        username: true,
+                        nickname: true,
+                        role: true
+                    }
+                }
+            },
+            orderBy: {
+                lastHeartbeat: 'desc'
+            }
+        })
+
+        return presence.map((p: any) => ({
+            userId: p.userId,
+            username: p.user?.nickname || p.user?.username || 'Unknown',
+            role: p.user?.role || 'USER',
+            status: p.status, // ONLINE or AWAY
+            lastSeen: p.lastHeartbeat.toLocaleTimeString('vi-VN')
+        }))
+    } catch (error) {
+        console.error('[Tracking] Live presence fetch failed:', error)
+        return []
+    }
+}

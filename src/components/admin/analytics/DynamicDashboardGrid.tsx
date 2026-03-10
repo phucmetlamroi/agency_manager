@@ -29,8 +29,8 @@ export default function DynamicDashboardGrid({ initialData }: { initialData?: an
     }, [])
 
     const layout = [
-        { i: 'presence_board', x: 0, y: 0, w: 4, h: 9, minW: 3, minH: 5 },
-        { i: 'traffic_chart', x: 4, y: 0, w: 8, h: 5, minW: 4, minH: 3 },
+        { i: 'presence_board', x: 0, y: 0, w: 12, h: 6, minW: 6, minH: 4 },
+        { i: 'traffic_chart', x: 0, y: 6, w: 12, h: 5, minW: 6, minH: 3 },
     ]
 
     // Prevents SSR mismatch for the draggable grid

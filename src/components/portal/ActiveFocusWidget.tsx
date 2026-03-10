@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Flame, ChevronDown } from 'lucide-react'
-import { trackEvent } from '@/actions/tracking-actions'
 import PortalStatusBadge from './PortalStatusBadge'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -97,11 +96,6 @@ export default function ActiveFocusWidget({ tasks, onSelectTask }: { tasks: Task
                                                     key={task.id}
                                                     onClick={() => {
                                                         onSelectTask(task.id)
-                                                        trackEvent({
-                                                            eventType: 'TASK_CLICK',
-                                                            featureName: 'ActiveFocusWidget',
-                                                            metadata: { taskId: task.id, title: task.title }
-                                                        }).catch(() => {})
                                                     }}
                                                     className="w-full text-left bg-zinc-900/40 hover:bg-zinc-800/80 border border-transparent hover:border-white/10 p-4 flex flex-col gap-3 rounded-xl transition-all duration-300 group/card"
                                                 >

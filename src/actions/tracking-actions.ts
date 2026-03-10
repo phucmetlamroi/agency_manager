@@ -25,6 +25,10 @@ let eventBuffer: Array<{
 const FLUSH_THRESHOLD = 50 
 let flushTimeout: NodeJS.Timeout | null = null
 
+export async function forceFlush() {
+    await flushEvents()
+}
+
 async function flushEvents() {
     if (eventBuffer.length === 0) return
 
@@ -141,5 +145,122 @@ export async function pingHeartbeat(status: 'ONLINE' | 'AWAY' = 'ONLINE', curren
     } catch (error) {
         console.error('[Heartbeat Error]', error)
         return { success: false }
+    }
+}
+
+/**
+ * Get daily session counts for the line chart (last 24 hours/7 days)
+ */
+export async function getSessionTrends() {
+    try {
+        const now = new Date()
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+
+        // Raw query or group by hour
+        // Note: Prisma doesn't have a built-in "groupBy hour" that works across all DBs easily 
+        // without raw SQL or a lot of post-processing.
+        const sessions = await prisma.session.findMany({
+            where: {
+                startTime: { gte: twentyFourHoursAgo }
+            },
+            select: {
+                startTime: true
+            },
+            orderBy: {
+                startTime: 'asc'
+            }
+        })
+
+        // Group by hour
+        const hourlyData: Record<string, number> = {}
+        for (let i = 0; i < 24; i++) {
+            const d = new Date(twentyFourHoursAgo.getTime() + i * 60 * 60 * 1000)
+            const hourStr = `${d.getHours().toString().padStart(2, '0')}:00`
+            hourlyData[hourStr] = 0
+        }
+
+        sessions.forEach((s: any) => {
+            const hour = `${s.startTime.getHours().toString().padStart(2, '0')}:00`
+            if (hourlyData[hour] !== undefined) hourlyData[hour]++
+        })
+
+        return Object.entries(hourlyData).map(([time, sessions]) => ({ time, sessions }))
+    } catch (error) {
+        console.error('[Tracking] Session trends fetch failed:', error)
+        return []
+    }
+}
+
+/**
+ * Get recent event logs for the data table
+ */
+export async function getRecentEventLogs(limit = 20) {
+    try {
+        const logs = await prisma.event.findMany({
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            include: {
+                user: {
+                    select: {
+                        username: true,
+                        nickname: true
+                    }
+                }
+            }
+        })
+
+        return logs.map((l: any) => ({
+            id: l.id,
+            time: l.createdAt.toLocaleTimeString('vi-VN'),
+            user: l.user?.nickname || l.user?.username || 'Guest',
+            event: l.eventType,
+            feature: l.featureName
+        }))
+    } catch (error) {
+        console.error('[Tracking] Event logs fetch failed:', error)
+        return []
+    }
+}
+
+/**
+ * Get friction heatmap data (Events group by hour/day)
+ */
+export async function getFrictionData() {
+    try {
+        const now = new Date()
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+        const events = await prisma.event.findMany({
+            where: {
+                createdAt: { gte: sevenDaysAgo }
+            },
+            select: {
+                createdAt: true,
+                eventType: true
+            }
+        })
+
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        // Structure: [dayIndex][hourIndex] = count
+        const matrix = Array.from({ length: 7 }, () => Array(24).fill(0))
+
+        events.forEach((e: any) => {
+            const day = e.createdAt.getDay()
+            const hour = e.createdAt.getHours()
+            
+            // Weight certain events more if they indicate friction (e.g. REVISION, ERROR)
+            let weight = 1
+            if (e.eventType === 'REVISION') weight = 5
+            if (e.eventType === 'ERROR') weight = 10
+            
+            matrix[day][hour] += weight
+        })
+
+        // Note: Client expects days starting with Monday in the UI mock, 
+        // JavaScript getDay() starts with Sunday (0). We'll rotate or just handle in UI.
+        return matrix
+    } catch (error) {
+        console.error('[Tracking] Friction data fetch failed:', error)
+        return []
     }
 }

@@ -42,6 +42,16 @@ export async function middleware(request: NextRequest) {
             if (role === 'CLIENT' && !pathname.startsWith('/portal') && !pathname.startsWith('/api')) {
                 return NextResponse.redirect(new URL('/portal/en', request.url))
             }
+
+            // VERCEL FIX 4: CHECK EMBEDDED PROFILE ID
+            // If they are trying to access a workspace or admin panel but haven't selected a profile
+            const requiresProfilePaths = ['/workspace', '/admin', '/dashboard', '/agency'];
+            if (requiresProfilePaths.some(p => pathname.startsWith(p))) {
+                if (!session.user.sessionProfileId) {
+                    console.log(`[Middleware] Missing sessionProfileId for path ${pathname}. Redirecting to /profile`);
+                    return NextResponse.redirect(new URL('/profile', request.url))
+                }
+            }
         } catch (err) {
             console.error('[Middleware] Session Decrypt Error for path', pathname, err);
             // Don't overly-aggressively delete cookies, just redirect to login for a fresh start 

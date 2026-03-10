@@ -88,4 +88,4 @@ export async function stopImpersonationSession() {
     cookieStore.delete('admin_session')
 }
 
-export { decrypt }
+export { encrypt, decrypt }

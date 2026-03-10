@@ -44,26 +44,41 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, error: 'Bạn không có quyền truy cập vào Team này.' }, { status: 403 });
         }
 
-        // We still call cookies().set for Vercel Serverless consistency
-        const cookieStore = await cookies();
-        cookieStore.set('current_profile_id', profileId, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/'
-        });
-
         const role = session.user.role || 'USER';
 
-        // Explicitly create response and inject Set-Cookie header to prevent Vercel dropping it
+        // --- VERCEL FIX 4: SESSION-BASED PROFILE ID ---
+        // Instead of a separate cookie that gets lost in the race condition,
+        // we embed the verified profileId directly into a fresh Session JWT.
+        const newPayload = {
+            ...session,
+            user: {
+                ...session.user,
+                sessionProfileId: profileId 
+            }
+        };
+
+        // Preserve expiration from original session if it exists, else 7 days
+        const expires = session.expires ? new Date(session.expires) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        newPayload.expires = expires;
+
+        // Re-sign the JWT
+        const { encrypt } = await import('@/lib/auth');
+        const newSessionToken = await encrypt(newPayload);
+
+        // Explicitly create response 
         const response = NextResponse.json({ success: true, role });
         
-        // Construct Set-Cookie string manually to bulletproof it
+        // Write the new 'session' cookie, completely overriding the old one
         const isProd = process.env.NODE_ENV === 'production';
-        const cookieString = `current_profile_id=${profileId}; Path=/; HttpOnly; SameSite=Lax${isProd ? '; Secure' : ''}`;
-        response.headers.append('Set-Cookie', cookieString);
+        const sessionCookieString = `session=${newSessionToken}; Path=/; HttpOnly; SameSite=Lax${isProd ? '; Secure' : ''}; Expires=${expires.toUTCString()}`;
+        response.headers.append('Set-Cookie', sessionCookieString);
         
-        console.log('[API/Select] Successfully set profile_id cookie and returning 200.', { profileId, role });
+        // We still attempt to set current_profile_id just for backward compatibility during transition,
+        // but it is no longer the source of truth.
+        const profileCookieString = `current_profile_id=${profileId}; Path=/; HttpOnly; SameSite=Lax${isProd ? '; Secure' : ''}`;
+        response.headers.append('Set-Cookie', profileCookieString);
+        
+        console.log('[API/Select] Successfully re-signed session with profileId and returning 200.', { profileId, role });
 
         return response;
     } catch (e: any) {

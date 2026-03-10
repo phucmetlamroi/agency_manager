@@ -16,11 +16,10 @@ export default async function WorkspacePage() {
     const { id: userId, username } = session.user
 
     // --- PAGE-LEVEL PROFILE GUARD ---
-    const cookieStore = await cookies()
-    const profileId = cookieStore.get('current_profile_id')?.value
+    const profileId = session.user.sessionProfileId
 
     if (!profileId) {
-        console.log(`[WorkspacePage] No profileId found for ${username}, redirecting to /profile`)
+        console.log(`[WorkspacePage] No sessionProfileId found for ${username}, redirecting to /profile`)
         redirect('/profile')
     }
 

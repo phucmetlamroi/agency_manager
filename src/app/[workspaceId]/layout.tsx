@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import PresenceTracker from '@/components/tracking/PresenceTracker'
+import ImpersonationBanner from '@/components/layout/ImpersonationBanner'
 
 export default async function WorkspaceLayout({
     children,
@@ -17,15 +18,22 @@ export default async function WorkspaceLayout({
 
     const { workspaceId } = await params
 
-    // Robust check for ADMIN bypass: Check both session and current DB state
     const isSystemAdmin = session.user.role === 'ADMIN'
 
     // We can inject the workspaceId context down if needed, 
     // but React Server Components inside will also get `params.workspaceId` from their own props.
     return (
-        <div className="workspace-container h-full w-full relative">
+        <div className="workspace-container h-full w-full relative flex flex-col">
+            {session.user.isImpersonating && (
+                <ImpersonationBanner 
+                    username={session.user.nickname || session.user.username} 
+                    workspaceId={workspaceId} 
+                />
+            )}
             <PresenceTracker currentUserId={session.user.id} />
-            {children}
+            <div className="flex-1 min-h-0 overflow-hidden relative">
+                {children}
+            </div>
         </div>
     )
 }

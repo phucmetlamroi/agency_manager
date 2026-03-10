@@ -1,14 +1,31 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useTransition } from 'react'
+import { useParams } from 'next/navigation'
 import { getLivePresence } from '@/actions/tracking-actions'
-import { Monitor, Clock, User, UserCheck, UserMinus, RefreshCw } from 'lucide-react'
+import { startImpersonation } from '@/actions/impersonation-actions'
+import { Monitor, Clock, UserCheck, UserMinus, RefreshCw, Eye, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export default function LivePresenceBoard() {
+    const params = useParams()
+    const workspaceId = params.workspaceId as string
+    
     const [presence, setPresence] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [isPending, startTransition] = useTransition()
+    const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
+
+    const handleImpersonate = (userId: string) => {
+        if (!workspaceId) return
+        setImpersonatingId(userId)
+        startTransition(() => {
+            startImpersonation(userId, workspaceId).catch(console.error).finally(() => {
+                setImpersonatingId(null)
+            })
+        })
+    }
 
     const fetchData = async () => {
         setLoading(true)
@@ -86,6 +103,21 @@ export default function LivePresenceBoard() {
                                     </span>
                                 </div>
                             </div>
+
+                            {p.role !== 'ADMIN' && (
+                                <button
+                                    onClick={() => handleImpersonate(p.userId)}
+                                    disabled={isPending || loading}
+                                    className="ml-2 p-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50 flex items-center justify-center border border-indigo-500/20 shadow-sm z-10"
+                                    title={`Test as ${p.username}`}
+                                >
+                                    {impersonatingId === p.userId ? (
+                                        <Loader2 size={16} className="animate-spin" />
+                                    ) : (
+                                        <Eye size={16} />
+                                    )}
+                                </button>
+                            )}
                         </div>
 
                         {/* Hover Detail Glow */}

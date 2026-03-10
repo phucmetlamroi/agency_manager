@@ -27,8 +27,11 @@ export async function startImpersonation(targetUserId: string, workspaceId: stri
 
     await createImpersonationSession(session.user, targetUser)
 
-    // Redirect to the workspace root or their specific dashboard
-    // Depending on their role, let's just go to the portal root for that workspace
+    // Redirect based on target role
+    if (targetUser.role === 'CLIENT') {
+        redirect(`/portal/en/${workspaceId}/tasks`)
+    }
+
     const dest = `/${workspaceId}`
     redirect(dest)
 }

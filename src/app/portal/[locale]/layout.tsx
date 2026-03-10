@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { routing } from '@/i18n/routing'
 import { getSession } from '@/lib/auth'
 import { ReactNode } from 'react'
+import PresenceTracker from '@/components/tracking/PresenceTracker'
 
 export default async function LocaleLayout({
     children,
@@ -32,6 +33,7 @@ export default async function LocaleLayout({
 
     return (
         <NextIntlClientProvider messages={messages} locale={locale}>
+            <PresenceTracker currentUserId={session.user.id} />
             {children}
         </NextIntlClientProvider>
     );

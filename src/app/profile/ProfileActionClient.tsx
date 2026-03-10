@@ -24,7 +24,7 @@ export default function ProfileActionClient({ profileId, isAllowed, role, childr
                 if (role === 'CLIENT') {
                     window.location.href = '/portal'
                 } else {
-                    window.location.href = '/workspaces'
+                    window.location.href = '/workspace'
                 }
             } else {
                 alert(res.error || 'Failed to select profile')

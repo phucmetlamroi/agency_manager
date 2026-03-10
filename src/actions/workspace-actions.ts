@@ -37,7 +37,7 @@ export async function createWorkspaceAction(formData: FormData) {
             })
         })
 
-        revalidatePath('/workspaces')
+        revalidatePath('/workspace')
         return { success: true, workspaceId: newWorkspaceId }
     } catch (e: any) {
         console.error(e)
@@ -60,7 +60,7 @@ export async function renameWorkspaceAction(workspaceId: string, newName: string
             where: { id: workspaceId },
             data: { name: newName }
         })
-        revalidatePath('/workspaces')
+        revalidatePath('/workspace')
         return { success: true }
     } catch (error) {
         console.error(error)
@@ -93,7 +93,7 @@ export async function deleteWorkspaceAction(workspaceId: string) {
             where: { id: workspaceId }
         })
 
-        revalidatePath('/workspaces')
+        revalidatePath('/workspace')
         return { success: true }
     } catch (error) {
         console.error(error)

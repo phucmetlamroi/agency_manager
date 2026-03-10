@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
     const profileCookie = request.cookies.get('current_profile_id')
 
     if (!sessionCookie) {
-        const protectedPaths = ['/workspaces', '/portal', '/admin', '/dashboard', '/agency', '/profile-selection']
+        const protectedPaths = ['/workspace', '/portal', '/admin', '/dashboard', '/agency', '/profile']
         if (protectedPaths.some(p => pathname.startsWith(p))) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
@@ -38,26 +38,26 @@ export async function middleware(request: NextRequest) {
             if (!session?.user) throw new Error('Invalid session')
             const role = session.user.role
 
-            if (!profileCookie && pathname !== '/profile-selection') {
-                return NextResponse.redirect(new URL('/profile-selection', request.url))
+            if (!profileCookie && pathname !== '/profile') {
+                return NextResponse.redirect(new URL('/profile', request.url))
             }
 
             if (role === 'CLIENT') {
-                const adminPaths = ['/workspaces', '/admin', '/dashboard', '/agency']
+                const adminPaths = ['/workspace', '/admin', '/dashboard', '/agency']
                 if (adminPaths.some(p => pathname.startsWith(p))) {
                     return NextResponse.redirect(new URL('/portal', request.url))
                 }
             } else {
                 if (pathname.startsWith('/portal')) {
-                    return NextResponse.redirect(new URL('/workspaces', request.url))
+                    return NextResponse.redirect(new URL('/workspace', request.url))
                 }
             }
 
             if (pathname === '/login' || pathname === '/') {
                 if (!profileCookie) {
-                    return NextResponse.redirect(new URL('/profile-selection', request.url))
+                    return NextResponse.redirect(new URL('/profile', request.url))
                 }
-                const target = role === 'CLIENT' ? '/portal' : '/workspaces'
+                const target = role === 'CLIENT' ? '/portal' : '/workspace'
                 return NextResponse.redirect(new URL(target, request.url))
             }
         } catch (err) {

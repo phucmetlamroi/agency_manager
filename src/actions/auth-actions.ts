@@ -57,7 +57,7 @@ export async function loginAction(prevState: any, formData: FormData) {
     }
 
     // Redirect staff/admins to the Workspace Portal
-    redirect('/workspaces')
+    redirect('/workspace')
 }
 
 export async function logoutAction() {

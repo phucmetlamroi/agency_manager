@@ -286,7 +286,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => window.location.href = '/workspaces'}>
+                            <DropdownMenuItem onClick={() => window.location.href = '/workspace'}>
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
                                 <span>Switch Workspace</span>
                             </DropdownMenuItem>

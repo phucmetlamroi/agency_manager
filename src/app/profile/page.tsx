@@ -64,7 +64,7 @@ export default async function ProfileSelectionPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl w-full">
-                {allProfiles.map((profile) => {
+                {allProfiles.map((profile: any) => {
                     const isAllowed = allowedProfileIds.includes(profile.id)
                     // If no banner, use a nice gradient fallback
                     const bannerSrc = profile.bannerUrl || 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=1000&auto=format&fit=crop'

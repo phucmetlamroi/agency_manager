@@ -34,6 +34,7 @@ export async function getAllAgencies() {
 
     try {
         const agencies = await prisma.agency.findMany({
+            where: { profileId: (admin as any).sessionProfileId },
             include: {
                 owner: { select: { id: true, username: true, nickname: true } },
                 _count: { select: { members: true, tasks: true } }
@@ -71,7 +72,8 @@ export async function createAgency(data: { name: string, code: string, ownerId?:
                 name: data.name,
                 code: data.code.toUpperCase(),
                 ownerId: data.ownerId,
-                status: 'ACTIVE'
+                status: 'ACTIVE',
+                profileId: (admin as any).sessionProfileId
             }
         })
 

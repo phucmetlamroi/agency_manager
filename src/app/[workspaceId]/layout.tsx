@@ -16,6 +16,12 @@ export default async function WorkspaceLayout({
         redirect('/login')
     }
 
+    // MANDATORY: Check if user has selected a profile session
+    const profileId = (session.user as any).sessionProfileId
+    if (!profileId) {
+        redirect('/profile')
+    }
+
     const { workspaceId } = await params
 
     const isSystemAdmin = session.user.role === 'ADMIN'

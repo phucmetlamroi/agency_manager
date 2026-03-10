@@ -27,6 +27,7 @@ model Profile {
   bonuses      MonthlyBonus[]
   payrollLocks PayrollLock[]
   metrics      PerformanceMetric[]
+  agencies     Agency[]
 }
 
 model Workspace {
@@ -304,6 +305,9 @@ model Agency {
   owner     User?    @relation("AgencyOwner", fields: [ownerId], references: [id])
   tasks     Task[]
   members   User[]   @relation("AgencyMembers")
+
+  profileId String?
+  profile   Profile? @relation(fields: [profileId], references: [id])
 }
 
 model BillingProfile {

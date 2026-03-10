@@ -9,6 +9,9 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
     const session = await getSession()
     if (!session) redirect('/login')
 
+    const profileId = (session.user as any).sessionProfileId
+    if (!profileId) redirect('/profile')
+
     const currentUser = await prisma.user.findUnique({
         where: { id: session.user.id },
         select: { username: true }
@@ -21,7 +24,11 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
     const year = now.getFullYear()
 
     const users = await prisma.user.findMany({
-        where: currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
+        where: {
+            // @ts-ignore
+            profileId: profileId,
+            ...(currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } })
+        },
         orderBy: { username: 'asc' },
         include: {
             _count: { select: { tasks: true } },
@@ -41,8 +48,12 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
         }
     })
 
-    // Fetch Agencies for selection
-    const agencies = await prisma.agency.findMany({ select: { id: true, name: true, code: true } })
+    // Fetch Agencies for selection - MUST ALSO FILTER BY PROFILE
+    const agencies = await prisma.agency.findMany({ 
+        // @ts-ignore
+        where: { profileId: session.user.sessionProfileId },
+        select: { id: true, name: true, code: true } 
+    })
 
     // Fetch Profiles for Super Admin user creation
     const profiles = currentUser?.username === 'admin' ? 

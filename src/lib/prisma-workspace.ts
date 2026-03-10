@@ -5,6 +5,7 @@ import { prisma as globalPrisma } from './db'
  * List of models that are shared across all workspaces and should NOT be filtered by `workspaceId`.
  */
 const bypassModels = [
+    'Profile',
     'User',
     'Workspace',
     'WorkspaceMember',
@@ -33,21 +34,17 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
         query: {
             $allModels: {
                 async $allOperations({ model, operation, args, query }) {
-                    // Skip isolation if model is in bypass list
-                    if (bypassModels.includes(model)) {
-                        return query(args)
-                    }
-
-                    // Protect against operations without args
                     if (!args) {
                         args = {} as any
                     }
+
+                    const isBypassed = bypassModels.includes(model)
 
                     // 1. READ & DELETE Operations (Inject into `where`)
                     if (['findUnique', 'findUniqueOrThrow', 'findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'delete', 'deleteMany'].includes(operation)) {
                         (args as any).where = {
                             ...((args as any).where || {}),
-                            workspaceId: currentWorkspaceId,
+                            ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
                             ...(currentProfileId ? { profileId: currentProfileId } : {})
                         }
                     }
@@ -56,23 +53,22 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
                     if (['create'].includes(operation)) {
                         (args as any).data = {
                             ...((args as any).data || {}),
-                            workspaceId: currentWorkspaceId,
+                            ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
                             ...(currentProfileId ? { profileId: currentProfileId } : {})
                         }
                     }
 
                     if (['createMany'].includes(operation)) {
-                        // `createMany` takes an array of data objects
                         if (Array.isArray((args as any).data)) {
                             (args as any).data = (args as any).data.map((item: any) => ({
                                 ...item,
-                                workspaceId: currentWorkspaceId,
+                                ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
                                 ...(currentProfileId ? { profileId: currentProfileId } : {})
                             }))
                         } else {
                             (args as any).data = {
                                 ...((args as any).data || {}),
-                                workspaceId: currentWorkspaceId,
+                                ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
                                 ...(currentProfileId ? { profileId: currentProfileId } : {})
                             }
                         }
@@ -82,18 +78,15 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
                     if (['upsert'].includes(operation)) {
                         (args as any).where = {
                             ...((args as any).where || {}),
-                            workspaceId: currentWorkspaceId,
+                            ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
                             ...(currentProfileId ? { profileId: currentProfileId } : {})
                         }
 
-                            (args as any).create = {
+                        (args as any).create = {
                             ...((args as any).create || {}),
-                            workspaceId: currentWorkspaceId,
+                            ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
                             ...(currentProfileId ? { profileId: currentProfileId } : {})
                         }
-
-                        // We do NOT inject `workspaceId` into `update` because `where` already constrains it,
-                        // and updating the workspaceId is generally not allowed via standard upsert.
                     }
 
                     return query(args)

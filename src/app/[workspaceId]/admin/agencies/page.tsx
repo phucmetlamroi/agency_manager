@@ -1,4 +1,6 @@
 import { getAllAgencies } from '@/actions/agency-actions'
+import { getSession } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -6,11 +8,23 @@ import { prisma } from '@/lib/db'
 import CreateAgencyForm from '@/components/agencies/CreateAgencyForm'
 import DeleteAgencyButton from '@/components/agencies/DeleteAgencyButton'
 
-export default async function AgenciesPage() {
+export default async function AgenciesPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+    const { workspaceId } = await params
+    const session = await getSession()
+    if (!session) redirect('/login')
+
+    const profileId = (session.user as any).sessionProfileId
+    if (!profileId) redirect('/profile')
+
     const res = await getAllAgencies()
     const agencies = res.success ? res.data : []
 
-    const users = await prisma.user.findMany({ select: { id: true, username: true, nickname: true }, orderBy: { username: 'asc' } })
+    const users = await prisma.user.findMany({ 
+        // @ts-ignore
+        where: { profileId: profileId },
+        select: { id: true, username: true, nickname: true }, 
+        orderBy: { username: 'asc' } 
+    })
 
     return (
         <div className="p-6 max-w-[1600px] mx-auto">

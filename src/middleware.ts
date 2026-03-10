@@ -16,6 +16,17 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next()
     }
 
+    // --- TRACKING METADATA PREPARATION ---
+    const requestHeaders = new Headers(request.headers)
+    const ip = request.headers.get('x-forwarded-for') || '127.0.0.1'
+    const country = request.headers.get('x-vercel-ip-country') || 'Unknown'
+    const city = request.headers.get('x-vercel-ip-city') || 'Unknown'
+
+    requestHeaders.set('x-client-ip', ip)
+    requestHeaders.set('x-client-country', country)
+    requestHeaders.set('x-client-city', city)
+
+    let finalResponse: NextResponse | null = null;
     const sessionCookie = request.cookies.get('session')
 
     // 2. Redirect logic
@@ -24,7 +35,7 @@ export async function middleware(request: NextRequest) {
         const isProtectedRoute = protectedPaths.some(p => pathname.startsWith(p))
 
         if (isProtectedRoute && pathname !== '/login') {
-            return NextResponse.redirect(new URL('/login', request.url))
+            finalResponse = NextResponse.redirect(new URL('/login', request.url))
         }
     } else {
         try {
@@ -34,40 +45,54 @@ export async function middleware(request: NextRequest) {
             if (role === 'CLIENT') {
                 const adminPaths = ['/workspaces', '/admin', '/dashboard', '/agency']
                 if (adminPaths.some(p => pathname.startsWith(p))) {
-                    return NextResponse.redirect(new URL('/portal', request.url))
+                    finalResponse = NextResponse.redirect(new URL('/portal', request.url))
                 }
             } else {
                 if (pathname.startsWith('/portal')) {
-                    return NextResponse.redirect(new URL('/workspaces', request.url))
+                    finalResponse = NextResponse.redirect(new URL('/workspaces', request.url))
                 }
             }
 
-            if (pathname === '/login' || pathname === '/') {
+            if (!finalResponse && (pathname === '/login' || pathname === '/')) {
                 const target = role === 'CLIENT' ? '/portal' : '/workspaces'
-                return NextResponse.redirect(new URL(target, request.url))
+                finalResponse = NextResponse.redirect(new URL(target, request.url))
             }
         } catch (err) {
-            const response = NextResponse.redirect(new URL('/login', request.url))
-            response.cookies.delete('session')
-            return response
+            finalResponse = NextResponse.redirect(new URL('/login', request.url))
+            finalResponse.cookies.delete('session')
         }
     }
 
-    // 3. Internationalization for Portal index
-    if (pathname === '/portal' || pathname === '/portal/') {
-        return NextResponse.redirect(new URL(`/portal/${routing.defaultLocale}`, request.url))
+    if (!finalResponse) {
+        // 3. Internationalization for Portal index
+        if (pathname === '/portal' || pathname === '/portal/') {
+            finalResponse = NextResponse.redirect(new URL(`/portal/${routing.defaultLocale}`, request.url))
+        } else {
+            // 4. Inject locale header so i18n/request.ts can read the locale from URL
+            const localeMatch = pathname.match(/^\/portal\/([a-z]{2})(\/|$)/)
+            if (localeMatch && routing.locales.includes(localeMatch[1] as any)) {
+                requestHeaders.set('x-portal-locale', localeMatch[1])
+            }
+            finalResponse = NextResponse.next({ request: { headers: requestHeaders } })
+        }
     }
 
-    // 4. Inject locale header so i18n/request.ts can read the locale from URL
-    //    URL pattern: /portal/[locale]/...
-    const localeMatch = pathname.match(/^\/portal\/([a-z]{2})(\/|$)/)
-    if (localeMatch && routing.locales.includes(localeMatch[1] as any)) {
-        const requestHeaders = new Headers(request.headers)
-        requestHeaders.set('x-portal-locale', localeMatch[1])
-        return NextResponse.next({ request: { headers: requestHeaders } })
+    // --- TRACKING SESSION COOKIE INJECTION ---
+    let trackingId = request.cookies.get('tracking_session_id')?.value
+    if (!trackingId) {
+        trackingId = crypto.randomUUID()
     }
+    
+    // Always refresh the expiration so it acts as a sliding window (30 minutes)
+    finalResponse.cookies.set('tracking_session_id', trackingId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 30 * 60, // 30 minutes
+        path: '/'
+    })
 
-    return NextResponse.next()
+    return finalResponse;
 }
 
 export const config = {

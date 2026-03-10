@@ -27,6 +27,7 @@ model Workspace {
   feedbacks    Feedback[]
   mediaTasks   MediaTask[]
   ratings      Rating[]
+  sessions     Session[]
 
   @@index([name])
 }
@@ -75,6 +76,9 @@ model User {
   clientInvoices    Invoice[]           @relation("UserClientInvoices")
   clientRatings     Rating[]            @relation("ClientRatings")
   staffRatings      Rating[]            @relation("StaffRatings")
+  sessions          Session[]
+  events            Event[]
+  presence          UserPresence?
 }
 
 model Payroll {
@@ -123,7 +127,7 @@ model Task {
   submissionFolder String?
   frameUsername    String?
   framePassword    String?
-  frameNote        String?   @default("Thông tin tài khoản frame dành cho trường hợp bạn bị out ra khỏi frame của team")
+  frameNote        String?           @default("Thông tin tài khoản frame dành cho trường hợp bạn bị out ra khỏi frame của team")
   assignedAgencyId String?
   version          Int               @default(0)
   invoiceId        String?
@@ -394,4 +398,55 @@ model Rating {
   @@index([clientId])
   @@index([staffId])
   @@index([workspaceId])
+}
+
+// ----------------------------------------------------------------------
+// Tracking & Analytics Models
+// ----------------------------------------------------------------------
+
+model Session {
+  id          String    @id @default(cuid())
+  userId      String?
+  workspaceId String?
+  ipAddress   String?
+  countryCode String?
+  city        String?
+  timezone    String?
+  userAgent   String?
+  startTime   DateTime  @default(now())
+  endTime     DateTime?
+  durationSec Int? // Thời lượng phiên làm việc (giây)
+
+  user      User?      @relation(fields: [userId], references: [id])
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  events    Event[]
+
+  @@index([workspaceId, countryCode])
+  @@index([startTime])
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String?
+  eventType   String // Phân loại: PAGE_VIEW, BUTTON_CLICK, TASK_START, REVISION...
+  featureName String // Định danh tính năng cụ thể
+  metadata    Json? // Cấu trúc linh hoạt lưu trữ toạ độ, chuỗi cấu hình, điểm đánh giá
+  createdAt   DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([featureName])
+}
+
+model UserPresence {
+  userId        String   @id
+  status        String   @default("OFFLINE") // Trạng thái: ONLINE, OFFLINE, AWAY
+  lastHeartbeat DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, lastHeartbeat])
 }

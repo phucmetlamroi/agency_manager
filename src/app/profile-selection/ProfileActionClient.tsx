@@ -22,9 +22,9 @@ export default function ProfileActionClient({ profileId, isAllowed, role, childr
             const res = await selectProfile(profileId)
             if (res.success) {
                 if (role === 'CLIENT') {
-                    router.push('/portal')
+                    window.location.href = '/portal'
                 } else {
-                    router.push('/workspaces')
+                    window.location.href = '/workspaces'
                 }
             } else {
                 alert(res.error || 'Failed to select profile')

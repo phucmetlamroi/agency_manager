@@ -104,20 +104,18 @@ export default function LivePresenceBoard() {
                                 </div>
                             </div>
 
-                            {p.role !== 'ADMIN' && (
-                                <button
-                                    onClick={() => handleImpersonate(p.userId)}
-                                    disabled={isPending || loading}
-                                    className="ml-2 p-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50 flex items-center justify-center border border-indigo-500/20 shadow-sm z-10"
-                                    title={`Test as ${p.username}`}
-                                >
-                                    {impersonatingId === p.userId ? (
-                                        <Loader2 size={16} className="animate-spin" />
-                                    ) : (
-                                        <Eye size={16} />
-                                    )}
-                                </button>
-                            )}
+                            <button
+                                onClick={() => handleImpersonate(p.userId)}
+                                disabled={isPending || loading}
+                                className="ml-2 p-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 opacity-40 hover:opacity-100 transition-all disabled:opacity-50 flex items-center justify-center border border-indigo-500/20 shadow-sm z-10"
+                                title={`Test as ${p.username}`}
+                            >
+                                {impersonatingId === p.userId ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <Eye size={16} />
+                                )}
+                            </button>
                         </div>
 
                         {/* Hover Detail Glow */}

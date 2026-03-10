@@ -5,6 +5,7 @@ import { WorkspaceCard } from './_components/WorkspaceCard'
 import { CreateWorkspaceModal } from './_components/CreateWorkspaceModal'
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Search } from 'lucide-react'
+import { cookies } from 'next/headers'
 
 export default async function WorkspacesPage() {
     const session = await getSession()
@@ -14,14 +15,19 @@ export default async function WorkspacesPage() {
 
     const { id: userId, username } = session.user
 
-    // Fetch ALL workspaces globally
+    // --- DATA ISOLATION ---
+    const cookieStore = await cookies()
+    const profileId = cookieStore.get('current_profile_id')?.value
+
+    // Fetch workspaces filtered by profileId
     const allWorkspaces = await prisma.workspace.findMany({
+        where: profileId ? { profileId } : {},
         orderBy: {
             createdAt: 'desc'
         }
     })
 
-    // Fetch user's specific memberships to determine individual roles (OWNER/MEMBER) inside cards
+    // Fetch user's specific memberships
     const userMemberships = await prisma.workspaceMember.findMany({
         where: { userId }
     })
@@ -36,7 +42,6 @@ export default async function WorkspacesPage() {
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-50 font-sans selection:bg-indigo-500/30">
-            {/* Global Header (Frame.io Style) */}
             <header className="sticky top-0 z-50 px-6 py-4 flex items-center justify-between border-b border-slate-800/50 bg-[#020617]/80 backdrop-blur-md">
                 <div className="flex items-center gap-6">
                     <Avatar className="h-10 w-10 border border-slate-700 shadow-sm">
@@ -59,16 +64,13 @@ export default async function WorkspacesPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="hidden sm:block text-sm text-slate-400 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800 font-medium">
+                    <div className="hidden sm:block text-sm text-neutral-400 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800 font-medium">
                         Agency Manager
                     </div>
                 </div>
             </header>
 
-            {/* Main Content Area */}
             <main className="max-w-7xl mx-auto px-6 py-10">
-
-                {/* Visual Toolbar */}
                 <div className="flex items-center justify-between mb-8 border-b border-slate-800 pb-4">
                     <h2 className="text-2xl font-medium tracking-tight">Your Workspaces</h2>
                     <div className="flex gap-2 text-sm font-medium text-slate-400">
@@ -77,7 +79,6 @@ export default async function WorkspacesPage() {
                     </div>
                 </div>
 
-                {/* Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {serializedWorkspaces.map((ws) => (
                         <WorkspaceCard

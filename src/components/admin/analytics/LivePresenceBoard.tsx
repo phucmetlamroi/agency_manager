@@ -107,7 +107,7 @@ export default function LivePresenceBoard() {
                             <button
                                 onClick={() => handleImpersonate(p.userId)}
                                 disabled={isPending || loading}
-                                className="ml-2 p-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 opacity-40 hover:opacity-100 transition-all disabled:opacity-50 flex items-center justify-center border border-indigo-500/20 shadow-sm z-10"
+                                className="shrink-0 ml-2 w-10 h-10 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 opacity-60 hover:opacity-100 transition-all disabled:opacity-50 flex items-center justify-center border border-indigo-500/20 shadow-sm z-20"
                                 title={`Test as ${p.username}`}
                             >
                                 {impersonatingId === p.userId ? (

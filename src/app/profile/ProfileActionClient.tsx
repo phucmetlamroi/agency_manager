@@ -1,8 +1,7 @@
 'use client'
 
-import { selectProfile } from '@/actions/profile-actions'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useTransition } from 'react'
 
 interface Props {
     profileId: string
@@ -13,17 +12,34 @@ interface Props {
 
 export default function ProfileActionClient({ profileId, isAllowed, role, children }: Props) {
     const router = useRouter()
-    const [isPending, startTransition] = useTransition()
+    const [isPending, setIsPending] = useState(false)
 
-    const handleClick = () => {
+    const handleClick = async () => {
         if (!isAllowed || isPending) return
+        setIsPending(true)
 
-        startTransition(async () => {
-            const res = await selectProfile(profileId)
-            if (res && !(res as any).success) {
-                alert((res as any).error || 'Failed to select profile')
+        try {
+            const res = await fetch('/api/profile/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profileId })
+            })
+            
+            const data = await res.json()
+            if (data.success) {
+                if (data.role === 'CLIENT') {
+                    window.location.href = '/portal'
+                } else {
+                    window.location.href = '/workspace'
+                }
+            } else {
+                alert(data.error || 'Failed to select profile')
+                setIsPending(false)
             }
-        })
+        } catch (e) {
+            alert('Lỗi kết nối đến máy chủ. Định dạng phản hồi không hợp lệ.')
+            setIsPending(false)
+        }
     }
 
     return (

@@ -43,12 +43,7 @@ export async function selectProfile(profileId: string) {
         path: '/'
     })
 
-    const session = await getSession()
-    if (session?.user?.role === 'CLIENT') {
-        redirect('/portal')
-    }
-    
-    redirect('/workspace')
+    return { success: true }
 }
 
 export async function getAvailableProfiles() {

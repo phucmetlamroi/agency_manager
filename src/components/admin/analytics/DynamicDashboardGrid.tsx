@@ -12,7 +12,7 @@ import LivePresenceBoard from './LivePresenceBoard'
 function useWindowWidth() {
     const [width, setWidth] = useState(1200)
     useEffect(() => {
-        const handleResize = () => setWidth(window.innerWidth - 300) // Rough accounting for sidebar
+        const handleResize = () => setWidth(window.innerWidth - 380) // Accounting for sidebar + padding
         handleResize()
         window.addEventListener('resize', handleResize)
         return () => window.removeEventListener('resize', handleResize)

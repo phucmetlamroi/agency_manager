@@ -104,31 +104,21 @@ export default function LivePresenceBoard() {
                                 </div>
                             </div>
 
-                                <div className="ml-auto flex items-center pr-2">
+                                <div className="ml-auto flex items-center">
                                     <button
                                         onClick={() => handleImpersonate(p.userId)}
                                         disabled={isPending || loading}
-                                        className="shrink-0 group/btn relative overflow-hidden bg-indigo-500/10 hover:bg-indigo-500/30 text-indigo-400 px-4 py-2 rounded-xl transition-all duration-300 disabled:opacity-50 flex items-center gap-2 border border-indigo-500/20 hover:border-indigo-500/50 shadow-lg z-20"
+                                        className="shrink-0 w-10 h-10 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-400 transition-all duration-300 disabled:opacity-50 flex items-center justify-center border border-indigo-500/30 hover:border-indigo-500/60 shadow-xl z-20"
+                                        title={`Test as ${p.username}`}
                                     >
                                         {impersonatingId === p.userId ? (
-                                            <Loader2 size={16} className="animate-spin" />
+                                            <Loader2 size={18} className="animate-spin" />
                                         ) : (
-                                            <Eye size={16} className="group-hover/btn:scale-110 transition-transform" />
+                                            <Eye size={18} />
                                         )}
-                                        <span className="text-[10px] font-bold uppercase tracking-widest">Test Account</span>
-                                        
-                                        {/* Inner Glow effect on hover */}
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
                                     </button>
                                 </div>
                             </div>
-                            
-                            {/* Full row interactive hover effect for the entire card */}
-                            <div 
-                                onClick={() => handleImpersonate(p.userId)}
-                                className="absolute inset-0 z-10 cursor-pointer rounded-2xl" 
-                                title={`Test as ${p.username}`}
-                            />
 
                         {/* Hover Detail Glow */}
                         <div className={clsx(

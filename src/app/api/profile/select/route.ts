@@ -1,18 +1,28 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getSession } from '@/lib/auth';
+import { getSession, decrypt } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { profileId } = body;
+        const { profileId, sessionToken } = body;
 
         if (!profileId) {
             return NextResponse.json({ success: false, error: 'Missing profileId' }, { status: 400 });
         }
 
-        const session = await getSession();
+        let session = await getSession();
+        
+        // Vercel Edge Cache Workaround: If cookies() fails but we have the token in the body, manually decrypt it.
+        if (!session?.user && sessionToken) {
+            try {
+                session = await decrypt(sessionToken);
+            } catch (e) {
+                console.error("Failed to decrypt manual session token:", e);
+            }
+        }
+
         if (!session?.user) {
             return NextResponse.json({ success: false, error: 'Unauthorized Session' }, { status: 401 });
         }

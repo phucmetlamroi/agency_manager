@@ -1,14 +1,18 @@
 import { getAvailableProfiles, selectProfile } from '@/actions/profile-actions'
 import { getSession } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import Image from 'next/image'
+import { redirect } from 'next/navigation'
 import { Lock, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import ProfileActionClient from './ProfileActionClient' // We will create this
 
 export default async function ProfileSelectionPage() {
     const session = await getSession()
-    if (!session?.user) {
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get('session')?.value
+
+    if (!session?.user || !sessionToken) {
         redirect('/login')
     }
 
@@ -76,6 +80,7 @@ export default async function ProfileSelectionPage() {
                             profileId={profile.id} 
                             isAllowed={isAllowed} 
                             role={session.user.role}
+                            sessionToken={sessionToken}
                         >
                             <div className={`relative rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900 transition-all duration-300 w-full h-[300px] flex flex-col
                                 ${isAllowed ? 'hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20 cursor-pointer' : 'grayscale opacity-60 cursor-not-allowed'}

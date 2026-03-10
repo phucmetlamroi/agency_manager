@@ -7,10 +7,11 @@ interface Props {
     profileId: string
     isAllowed: boolean
     role: string
+    sessionToken: string
     children: React.ReactNode
 }
 
-export default function ProfileActionClient({ profileId, isAllowed, role, children }: Props) {
+export default function ProfileActionClient({ profileId, isAllowed, role, sessionToken, children }: Props) {
     const router = useRouter()
     const [isPending, setIsPending] = useState(false)
 
@@ -23,7 +24,7 @@ export default function ProfileActionClient({ profileId, isAllowed, role, childr
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ profileId })
+                body: JSON.stringify({ profileId, sessionToken })
             })
             
             const data = await res.json()

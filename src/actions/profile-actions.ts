@@ -5,6 +5,8 @@ import { cookies } from 'next/headers'
 import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { hash, compare } from 'bcryptjs'
+import { redirect } from 'next/navigation'
+import { UserRole } from '@prisma/client'
 
 export async function checkProfileAccess(profileId: string) {
     const session = await getSession()
@@ -20,7 +22,7 @@ export async function checkProfileAccess(profileId: string) {
         return { success: true }
     }
 
-    if (user.profileId === profileId) {
+    if ((user as any).profileId === profileId) {
         return { success: true }
     }
 
@@ -41,7 +43,12 @@ export async function selectProfile(profileId: string) {
         path: '/'
     })
 
-    return { success: true }
+    const session = await getSession()
+    if (session?.user?.role === 'CLIENT') {
+        redirect('/portal')
+    }
+    
+    redirect('/workspace')
 }
 
 export async function getAvailableProfiles() {
@@ -56,7 +63,7 @@ export async function getAvailableProfiles() {
 
     // For Super Admin/Admin, fetch all profiles + member counts
     if (user.role === 'ADMIN') {
-        return prisma.profile.findMany({
+        return (prisma as any).profile.findMany({
             include: {
                 _count: {
                     select: { users: true, workspaces: true }
@@ -67,9 +74,9 @@ export async function getAvailableProfiles() {
     }
 
     // For User/Client, fetch only their linked profile
-    if (user.profileId) {
-        return prisma.profile.findMany({
-            where: { id: user.profileId },
+    if ((user as any).profileId) {
+        return (prisma as any).profile.findMany({
+            where: { id: (user as any).profileId },
             include: {
                 _count: {
                     select: { users: true, workspaces: true }

@@ -20,14 +20,8 @@ export default function ProfileActionClient({ profileId, isAllowed, role, childr
 
         startTransition(async () => {
             const res = await selectProfile(profileId)
-            if (res.success) {
-                if (role === 'CLIENT') {
-                    window.location.href = '/portal'
-                } else {
-                    window.location.href = '/workspace'
-                }
-            } else {
-                alert(res.error || 'Failed to select profile')
+            if (res && !(res as any).success) {
+                alert((res as any).error || 'Failed to select profile')
             }
         })
     }

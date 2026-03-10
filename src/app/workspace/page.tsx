@@ -25,7 +25,7 @@ export default async function WorkspacePage() {
     }
 
     // Fetch workspaces filtered by profileId
-    const allWorkspaces = await prisma.workspace.findMany({
+    const allWorkspaces = await (prisma as any).workspace.findMany({
         where: { profileId },
         orderBy: {
             createdAt: 'desc'
@@ -39,7 +39,7 @@ export default async function WorkspacePage() {
 
     const membershipMap = new Map(userMemberships.map(m => [m.workspaceId, m.role]))
 
-    const serializedWorkspaces = allWorkspaces.map(ws => ({
+    const serializedWorkspaces = allWorkspaces.map((ws: any) => ({
         id: ws.id,
         name: ws.name,
         description: ws.description,
@@ -87,7 +87,7 @@ export default async function WorkspacePage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {serializedWorkspaces.map((ws) => (
+                    {serializedWorkspaces.map((ws: any) => (
                         <WorkspaceCard
                             key={ws.id}
                             workspace={ws as any}

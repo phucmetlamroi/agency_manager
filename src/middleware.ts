@@ -6,6 +6,7 @@ import { decrypt } from '@/lib/jwt'
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
 
+    // 1. Skip static assets and internal paths
     if (
         pathname.startsWith('/_next') ||
         pathname.startsWith('/api') ||
@@ -16,17 +17,9 @@ export async function middleware(request: NextRequest) {
     }
 
     const requestHeaders = new Headers(request.headers)
-    const ip = request.headers.get('x-forwarded-for') || '127.0.0.1'
-    const country = request.headers.get('x-vercel-ip-country') || 'Unknown'
-    const city = request.headers.get('x-vercel-ip-city') || 'Unknown'
-
-    requestHeaders.set('x-client-ip', ip)
-    requestHeaders.set('x-client-country', country)
-    requestHeaders.set('x-client-city', city)
-
     const sessionCookie = request.cookies.get('session')
-    const profileCookie = request.cookies.get('current_profile_id')
 
+    // 2. Auth Guard ONLY
     if (!sessionCookie) {
         const protectedPaths = ['/workspace', '/portal', '/admin', '/dashboard', '/agency', '/profile']
         if (protectedPaths.some(p => pathname.startsWith(p))) {
@@ -36,29 +29,18 @@ export async function middleware(request: NextRequest) {
         try {
             const session = await decrypt(sessionCookie.value)
             if (!session?.user) throw new Error('Invalid session')
+            
             const role = session.user.role
 
-            if (!profileCookie && pathname !== '/profile') {
-                return NextResponse.redirect(new URL('/profile', request.url))
-            }
-
-            if (role === 'CLIENT') {
-                const adminPaths = ['/workspace', '/admin', '/dashboard', '/agency']
-                if (adminPaths.some(p => pathname.startsWith(p))) {
-                    return NextResponse.redirect(new URL('/portal', request.url))
-                }
-            } else {
-                if (pathname.startsWith('/portal')) {
-                    return NextResponse.redirect(new URL('/workspace', request.url))
-                }
-            }
-
+            // Handle Root and Login direct access
             if (pathname === '/login' || pathname === '/') {
-                if (!profileCookie) {
-                    return NextResponse.redirect(new URL('/profile', request.url))
-                }
-                const target = role === 'CLIENT' ? '/portal' : '/workspace'
+                const target = role === 'CLIENT' ? '/portal/en' : '/profile'
                 return NextResponse.redirect(new URL(target, request.url))
+            }
+            
+            // Basic role isolation
+            if (role === 'CLIENT' && !pathname.startsWith('/portal') && !pathname.startsWith('/api')) {
+                return NextResponse.redirect(new URL('/portal/en', request.url))
             }
         } catch (err) {
             const res = NextResponse.redirect(new URL('/login', request.url))
@@ -68,6 +50,7 @@ export async function middleware(request: NextRequest) {
         }
     }
 
+    // 3. I18n and Response Assembly
     let finalResponse: NextResponse;
     if (pathname === '/portal' || pathname === '/portal/') {
         finalResponse = NextResponse.redirect(new URL(`/portal/${routing.defaultLocale}`, request.url))

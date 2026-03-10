@@ -15,20 +15,22 @@ export default async function WorkspacePage() {
 
     const { id: userId, username } = session.user
 
-    // --- DATA ISOLATION & DIAGNOSTICS ---
+    // --- PAGE-LEVEL PROFILE GUARD ---
     const cookieStore = await cookies()
     const profileId = cookieStore.get('current_profile_id')?.value
-    console.log(`[WorkspacePage] Loading for user: ${username}, profileId: ${profileId}`)
+
+    if (!profileId) {
+        console.log(`[WorkspacePage] No profileId found for ${username}, redirecting to /profile`)
+        redirect('/profile')
+    }
 
     // Fetch workspaces filtered by profileId
     const allWorkspaces = await prisma.workspace.findMany({
-        where: profileId ? { profileId } : { profileId: 'default-not-found' }, // Stricter filtering
+        where: { profileId },
         orderBy: {
             createdAt: 'desc'
         }
     })
-
-    console.log(`[WorkspacePage] Found ${allWorkspaces.length} workspaces.`)
 
     // Fetch user's specific memberships
     const userMemberships = await prisma.workspaceMember.findMany({
@@ -37,12 +39,10 @@ export default async function WorkspacePage() {
 
     const membershipMap = new Map(userMemberships.map(m => [m.workspaceId, m.role]))
 
-    // Aggressive manual serialization to prevent any Prisma hidden properties from causing hydration issues
     const serializedWorkspaces = allWorkspaces.map(ws => ({
         id: ws.id,
         name: ws.name,
         description: ws.description,
-        profileId: ws.profileId,
         updatedAt: ws.updatedAt.toISOString(),
         createdAt: ws.createdAt.toISOString()
     }))

@@ -22,6 +22,7 @@ export default function ProfileActionClient({ profileId, isAllowed, role, childr
             const res = await fetch('/api/profile/select', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ profileId })
             })
             

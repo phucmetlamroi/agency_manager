@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { checkProfileAccess } from '@/actions/profile-actions';
 import { cookies } from 'next/headers';
 import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/db';
 
 export async function POST(req: Request) {
     try {
@@ -12,9 +12,26 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, error: 'Missing profileId' }, { status: 400 });
         }
 
-        const access = await checkProfileAccess(profileId);
-        if (!access.success) {
-            return NextResponse.json(access, { status: 403 });
+        const session = await getSession();
+        if (!session?.user) {
+            return NextResponse.json({ success: false, error: 'Unauthorized Session' }, { status: 401 });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id }
+        });
+
+        if (!user) {
+            return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+        }
+
+        let hasAccess = false;
+        if (user.role === 'ADMIN' || (user as any).profileId === profileId) {
+            hasAccess = true;
+        }
+
+        if (!hasAccess) {
+            return NextResponse.json({ success: false, error: 'Bạn không có quyền truy cập vào Team này.' }, { status: 403 });
         }
 
         const cookieStore = await cookies();
@@ -25,8 +42,7 @@ export async function POST(req: Request) {
             path: '/'
         });
 
-        const session = await getSession();
-        const role = session?.user?.role || 'USER';
+        const role = session.user.role || 'USER';
 
         return NextResponse.json({ success: true, role });
     } catch (e: any) {

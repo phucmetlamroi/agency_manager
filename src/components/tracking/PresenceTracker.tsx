@@ -1,14 +1,24 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { pingHeartbeat } from '@/actions/tracking-actions'
+import { usePathname } from 'next/navigation'
+import { pingHeartbeat, trackEvent } from '@/actions/tracking-actions'
 
 const PING_INTERVAL_MS = 30000 // 30 seconds
 const ACTIVITY_TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes to mark as AWAY
 
 export default function PresenceTracker({ currentUserId }: { currentUserId?: string }) {
+    const pathname = usePathname()
     const lastActivityRef = useRef<number>(Date.now())
     const statusRef = useRef<'ONLINE' | 'AWAY'>('ONLINE')
+
+    // Track Page View on every route change
+    useEffect(() => {
+        trackEvent({
+            eventType: 'PAGE_VIEW',
+            featureName: pathname
+        }).catch(() => {})
+    }, [pathname])
     
     useEffect(() => {
         // Track DOM activity to determine if user is active

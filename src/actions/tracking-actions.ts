@@ -22,7 +22,7 @@ let eventBuffer: Array<{
     createdAt: Date;
 }> = []
 
-const FLUSH_THRESHOLD = 50 
+const FLUSH_THRESHOLD = 5 
 let flushTimeout: NodeJS.Timeout | null = null
 
 export async function forceFlush() {
@@ -48,8 +48,6 @@ async function flushEvents() {
         console.log(`[Tracking] Flushed ${eventsToInsert.length} events to database.`)
     } catch (error) {
         console.error('[Tracking] Failed to flush events:', error)
-        // If critical, could push them back to the buffer, 
-        // but for analytics failing gracefully is better than OOM.
     }
 }
 
@@ -63,13 +61,9 @@ export async function trackEvent(payload: TrackingEventPayload) {
 
         if (!sessionId) return { success: false, reason: 'No session' }
 
-        // We could extract the UserId from auth session, but for now we assume 
-        // the session update logic handles user binding when they login.
-        // We'll leave userId null initially, or fetch if needed.
-
         eventBuffer.push({
             sessionId,
-            userId: null, // Depending on system architecture, we might bind this via a side-job
+            userId: null, 
             eventType: payload.eventType,
             featureName: payload.featureName,
             metadata: payload.metadata ? JSON.stringify(payload.metadata) : null,
@@ -77,11 +71,10 @@ export async function trackEvent(payload: TrackingEventPayload) {
         })
 
         if (eventBuffer.length >= FLUSH_THRESHOLD) {
-            // Flush immediately if full
             await flushEvents()
         } else if (!flushTimeout) {
-            // Otherwise, flush after 5 seconds
-            flushTimeout = setTimeout(flushEvents, 5000)
+            // Flush after 1 second in serverless to catch the tail end
+            flushTimeout = setTimeout(flushEvents, 1000)
         }
 
         return { success: true }

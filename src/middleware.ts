@@ -43,9 +43,14 @@ export async function middleware(request: NextRequest) {
                 return NextResponse.redirect(new URL('/portal/en', request.url))
             }
         } catch (err) {
+            console.error('[Middleware] Session Decrypt Error for path', pathname, err);
+            // Don't overly-aggressively delete cookies, just redirect to login for a fresh start 
+            // Vercel edge can sometimes throw errors decrypting if the key isn't perfectly synced.
             const res = NextResponse.redirect(new URL('/login', request.url))
+            // Only drop the session if it's completely unreadable to prevent infinite loops, 
+            // but log it so we know.
+            console.log('[Middleware] Dropping session cookie due to decrypt error.');
             res.cookies.delete('session')
-            res.cookies.delete('current_profile_id')
             return res
         }
     }

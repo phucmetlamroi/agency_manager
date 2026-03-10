@@ -88,6 +88,7 @@ export default async function ProfileSelectionPage() {
                                         fill 
                                         className="object-cover"
                                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                        unoptimized
                                     />
                                     {/* Gradient overlay */}
                                     <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 to-transparent" />
@@ -97,8 +98,8 @@ export default async function ProfileSelectionPage() {
                                 <div className="p-6 relative flex-grow flex flex-col justify-between">
                                     <div className="flex items-center gap-4 -mt-12 mb-4 relative z-10">
                                         {logoSrc ? (
-                                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-neutral-800 border-4 border-neutral-900 flex-shrink-0">
-                                                <Image src={logoSrc} alt="Logo" width={64} height={64} className="object-cover" />
+                                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-neutral-800 border-4 border-neutral-900 flex-shrink-0 relative">
+                                                <Image src={logoSrc} alt="Logo" fill className="object-cover" unoptimized />
                                             </div>
                                         ) : (
                                             <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 border-4 border-neutral-900 flex items-center justify-center flex-shrink-0 shadow-lg">

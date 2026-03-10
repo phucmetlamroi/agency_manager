@@ -104,19 +104,31 @@ export default function LivePresenceBoard() {
                                 </div>
                             </div>
 
-                            <button
+                                <div className="ml-auto flex items-center pr-2">
+                                    <button
+                                        onClick={() => handleImpersonate(p.userId)}
+                                        disabled={isPending || loading}
+                                        className="shrink-0 group/btn relative overflow-hidden bg-indigo-500/10 hover:bg-indigo-500/30 text-indigo-400 px-4 py-2 rounded-xl transition-all duration-300 disabled:opacity-50 flex items-center gap-2 border border-indigo-500/20 hover:border-indigo-500/50 shadow-lg z-20"
+                                    >
+                                        {impersonatingId === p.userId ? (
+                                            <Loader2 size={16} className="animate-spin" />
+                                        ) : (
+                                            <Eye size={16} className="group-hover/btn:scale-110 transition-transform" />
+                                        )}
+                                        <span className="text-[10px] font-bold uppercase tracking-widest">Test Account</span>
+                                        
+                                        {/* Inner Glow effect on hover */}
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Full row interactive hover effect for the entire card */}
+                            <div 
                                 onClick={() => handleImpersonate(p.userId)}
-                                disabled={isPending || loading}
-                                className="shrink-0 ml-2 w-10 h-10 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 opacity-60 hover:opacity-100 transition-all disabled:opacity-50 flex items-center justify-center border border-indigo-500/20 shadow-sm z-20"
+                                className="absolute inset-0 z-10 cursor-pointer rounded-2xl" 
                                 title={`Test as ${p.username}`}
-                            >
-                                {impersonatingId === p.userId ? (
-                                    <Loader2 size={16} className="animate-spin" />
-                                ) : (
-                                    <Eye size={16} />
-                                )}
-                            </button>
-                        </div>
+                            />
 
                         {/* Hover Detail Glow */}
                         <div className={clsx(

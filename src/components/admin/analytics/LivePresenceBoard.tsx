@@ -60,12 +60,13 @@ export default function LivePresenceBoard() {
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                {presence.length > 0 ? presence.map((p) => (
-                    <div 
-                        key={p.userId} 
-                        className="group relative bg-zinc-900/40 hover:bg-zinc-800/60 border border-white/5 p-3 rounded-2xl transition-all duration-300"
-                    >
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <div className="max-w-2xl mx-auto space-y-3">
+                    {presence.length > 0 ? presence.map((p) => (
+                        <div 
+                            key={p.userId} 
+                            className="group relative bg-zinc-900/40 hover:bg-zinc-800/60 border border-white/5 p-3 rounded-2xl transition-all duration-300"
+                        >
                         <div className="flex items-center gap-4">
                             <div className="relative">
                                 <Avatar className="h-10 w-10 border border-white/10">
@@ -126,12 +127,13 @@ export default function LivePresenceBoard() {
                             p.status === 'ONLINE' ? "border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.05)]" : "border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.05)]"
                         )} />
                     </div>
-                )) : (
-                    <div className="h-full flex flex-col items-center justify-center text-zinc-600 gap-3 py-10 italic">
-                        <UserMinus size={32} strokeWidth={1} />
-                        <span className="text-xs">No users currently active.</span>
-                    </div>
-                )}
+                    )) : (
+                        <div className="h-full flex flex-col items-center justify-center text-zinc-600 gap-3 py-10 italic">
+                            <UserMinus size={32} strokeWidth={1} />
+                            <span className="text-xs">No users currently active.</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="p-3 bg-zinc-900/20 border-t border-white/5 flex gap-4 justify-center">

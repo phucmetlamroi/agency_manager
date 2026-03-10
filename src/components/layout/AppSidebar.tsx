@@ -18,6 +18,7 @@ import {
     ChevronRight,
     Search,
     UserCircle,
+    Activity,
     Menu
 } from "lucide-react"
 
@@ -57,6 +58,7 @@ const getNavItems = (workspaceId: string) => [
     { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet },
     { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2 },
     { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users },
+    { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity },
 ]
 
 export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProps) {
@@ -100,6 +102,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                             <nav className="flex-1 space-y-1">
                                 {getNavItems(workspaceId).filter(item => {
                                     if (item.href.includes('/admin/finance')) return user.role === 'ADMIN' || user.isTreasurer
+                                    if (item.href.includes('/admin/analytics')) return user.role === 'ADMIN'
                                     return true
                                 }).map((item) => {
                                     const isActive = pathname === item.href
@@ -208,6 +211,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
 
                     {getNavItems(workspaceId).filter(item => {
                         if (item.href.includes('/admin/finance')) return user.role === 'ADMIN' || user.isTreasurer
+                        if (item.href.includes('/admin/analytics')) return user.role === 'ADMIN'
                         return true
                     }).map((item) => {
                         const isActive = pathname === item.href

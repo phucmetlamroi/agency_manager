@@ -42,7 +42,7 @@ export default async function ProfileSelectionPage() {
         allProfiles = availableProfiles 
     }
 
-    const allowedProfileIds = availableProfiles.map(p => p.id)
+    const allowedProfileIds = availableProfiles.map((p: any) => p.id)
 
     return (
         <div className="min-h-screen bg-neutral-950 text-white p-8 flex flex-col items-center justify-center">

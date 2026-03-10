@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Search } from 'lucide-react'
 import { cookies } from 'next/headers'
 
-export default async function WorkspacesPage() {
+export default async function WorkspacePage() {
     const session = await getSession()
     if (!session?.user) {
         redirect('/login')
@@ -15,17 +15,20 @@ export default async function WorkspacesPage() {
 
     const { id: userId, username } = session.user
 
-    // --- DATA ISOLATION ---
+    // --- DATA ISOLATION & DIAGNOSTICS ---
     const cookieStore = await cookies()
     const profileId = cookieStore.get('current_profile_id')?.value
+    console.log(`[WorkspacePage] Loading for user: ${username}, profileId: ${profileId}`)
 
     // Fetch workspaces filtered by profileId
     const allWorkspaces = await prisma.workspace.findMany({
-        where: profileId ? { profileId } : {},
+        where: profileId ? { profileId } : { profileId: 'default-not-found' }, // Stricter filtering
         orderBy: {
             createdAt: 'desc'
         }
     })
+
+    console.log(`[WorkspacePage] Found ${allWorkspaces.length} workspaces.`)
 
     // Fetch user's specific memberships
     const userMemberships = await prisma.workspaceMember.findMany({
@@ -34,8 +37,12 @@ export default async function WorkspacesPage() {
 
     const membershipMap = new Map(userMemberships.map(m => [m.workspaceId, m.role]))
 
+    // Aggressive manual serialization to prevent any Prisma hidden properties from causing hydration issues
     const serializedWorkspaces = allWorkspaces.map(ws => ({
-        ...ws,
+        id: ws.id,
+        name: ws.name,
+        description: ws.description,
+        profileId: ws.profileId,
         updatedAt: ws.updatedAt.toISOString(),
         createdAt: ws.createdAt.toISOString()
     }))

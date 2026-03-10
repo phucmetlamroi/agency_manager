@@ -17,6 +17,20 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "youtube-dl-exec"],
+  async redirects() {
+    return [
+      {
+        source: '/workspaces',
+        destination: '/workspace',
+        permanent: true,
+      },
+      {
+        source: '/profile-selection',
+        destination: '/profile',
+        permanent: true,
+      }
+    ]
+  }
 };
 
 export default withNextIntl(nextConfig);

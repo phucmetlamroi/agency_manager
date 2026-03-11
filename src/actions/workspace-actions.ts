@@ -24,6 +24,7 @@ export async function createWorkspaceAction(formData: FormData) {
                 data: {
                     name,
                     description: description || null,
+                    profileId: session.user.sessionProfileId
                 }
             })
             newWorkspaceId = workspace.id

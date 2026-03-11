@@ -18,11 +18,11 @@ export async function checkProfileAccess(profileId: string) {
 
     if (!user) return { success: false, error: 'User not found' }
 
-    if (user.role === 'ADMIN') {
+    if (user.username === 'admin') {
         return { success: true }
     }
 
-    if ((user as any).profileId === profileId) {
+    if (user.profileId === profileId) {
         return { success: true }
     }
 
@@ -56,9 +56,9 @@ export async function getAvailableProfiles() {
 
     if (!user) return []
 
-    // For Super Admin/Admin, fetch all profiles + member counts
-    if (user.role === 'ADMIN') {
-        return (prisma as any).profile.findMany({
+    // For Super Admin ('admin' username), fetch all profiles + member counts
+    if (user.username === 'admin') {
+        return prisma.profile.findMany({
             include: {
                 _count: {
                     select: { users: true, workspaces: true }
@@ -68,10 +68,10 @@ export async function getAvailableProfiles() {
         })
     }
 
-    // For User/Client, fetch only their linked profile
-    if ((user as any).profileId) {
-        return (prisma as any).profile.findMany({
-            where: { id: (user as any).profileId },
+    // For any other user (including other ADMINs), fetch only their linked profile
+    if (user.profileId) {
+        return prisma.profile.findMany({
+            where: { id: user.profileId },
             include: {
                 _count: {
                     select: { users: true, workspaces: true }

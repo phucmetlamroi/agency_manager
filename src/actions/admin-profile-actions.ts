@@ -59,21 +59,41 @@ export async function deleteProfile(id: string) {
         throw new Error('Unauthorized')
     }
 
-    // Check if profile is tied to users or workspaces
-    const userCount = await prisma.user.count({ where: { profileId: id } })
-    if (userCount > 0) {
-        throw new Error('Không thể xóa Team này vì đang có User liên kết.')
-    }
-
-    const workspaceCount = await prisma.workspace.count({ where: { profileId: id } })
-    if (workspaceCount > 0) {
-        throw new Error('Không thể xóa Team này vì đang có Workspace liên kết.')
-    }
-
-    await prisma.profile.delete({
-        where: { id }
-    })
+    // Since we are "Super Admin", we can delete even if there are members.
+    // We will nullify the profileId on all related models to avoid foreign key violations.
+    await prisma.$transaction([
+        prisma.user.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.workspace.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.task.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.client.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.project.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.invoice.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.payroll.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.monthlyBonus.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.payrollLock.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.performanceMetric.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.agency.updateMany({ where: { profileId: id }, data: { profileId: null } }),
+        prisma.profile.delete({ where: { id } })
+    ])
 
     revalidatePath('/[workspaceId]/admin/users', 'page')
     return { success: true }
+}
+
+export async function changeUserProfile(userId: string, newProfileId: string | null, workspaceId: string) {
+    const session = await getSession()
+    if (session?.user?.username !== 'admin') {
+        throw new Error('Unauthorized')
+    }
+
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: { profileId: newProfileId }
+        })
+        revalidatePath(`/${workspaceId}/admin/users`)
+        return { success: true }
+    } catch (e) {
+        return { error: 'Failed to change user team' }
+    }
 }

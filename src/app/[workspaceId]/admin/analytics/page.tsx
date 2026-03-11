@@ -18,10 +18,10 @@ export default async function AdminAnalyticsPage({ params }: { params: Promise<{
 
     const [sessionCount, eventCount] = await Promise.all([
         prisma.session.count({
-            where: { startTime: { gte: today } }
+            where: { startTime: { gte: today }, workspaceId }
         }),
         prisma.event.count({
-            where: { createdAt: { gte: today } }
+            where: { createdAt: { gte: today }, session: { workspaceId } }
         })
     ])
 

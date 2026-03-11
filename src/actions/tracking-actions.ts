@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { cookies, headers } from 'next/headers'
+import { getSession } from '@/lib/auth'
 
 // Type definition for micro-events
 export type TrackingEventPayload = {
@@ -146,6 +147,10 @@ export async function pingHeartbeat(status: 'ONLINE' | 'AWAY' = 'ONLINE', curren
  */
 export async function getSessionTrends() {
     try {
+        const authSession = await getSession();
+        const profileId = (authSession?.user as any)?.sessionProfileId;
+        if (!profileId && authSession?.user?.username !== 'admin') return [];
+
         const now = new Date()
         const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
@@ -154,7 +159,8 @@ export async function getSessionTrends() {
         // without raw SQL or a lot of post-processing.
         const sessions = await prisma.session.findMany({
             where: {
-                startTime: { gte: twentyFourHoursAgo }
+                startTime: { gte: twentyFourHoursAgo },
+                ...(authSession?.user?.username !== 'admin' ? { workspace: { profileId } } : {})
             },
             select: {
                 startTime: true
@@ -189,8 +195,15 @@ export async function getSessionTrends() {
  */
 export async function getRecentEventLogs(limit = 20) {
     try {
+        const authSession = await getSession();
+        const profileId = (authSession?.user as any)?.sessionProfileId;
+        if (!profileId && authSession?.user?.username !== 'admin') return [];
+
         const logs = await prisma.event.findMany({
             take: limit,
+            where: {
+                ...(authSession?.user?.username !== 'admin' ? { session: { workspace: { profileId } } } : {})
+            },
             orderBy: { createdAt: 'desc' },
             include: {
                 user: {
@@ -220,12 +233,17 @@ export async function getRecentEventLogs(limit = 20) {
  */
 export async function getFrictionData() {
     try {
+        const authSession = await getSession();
+        const profileId = (authSession?.user as any)?.sessionProfileId;
+        if (!profileId && authSession?.user?.username !== 'admin') return [];
+
         const now = new Date()
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
         const events = await prisma.event.findMany({
             where: {
-                createdAt: { gte: sevenDaysAgo }
+                createdAt: { gte: sevenDaysAgo },
+                ...(authSession?.user?.username !== 'admin' ? { session: { workspace: { profileId } } } : {})
             },
             select: {
                 createdAt: true,
@@ -263,11 +281,16 @@ export async function getFrictionData() {
  */
 export async function getLivePresence() {
     try {
+        const authSession = await getSession();
+        const profileId = (authSession?.user as any)?.sessionProfileId;
+        if (!profileId && authSession?.user?.username !== 'admin') return [];
+
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
 
         const presence = await prisma.userPresence.findMany({
             where: {
-                lastHeartbeat: { gte: fiveMinutesAgo }
+                lastHeartbeat: { gte: fiveMinutesAgo },
+                ...(authSession?.user?.username !== 'admin' ? { user: { profileId } } : {})
             },
             include: {
                 user: {

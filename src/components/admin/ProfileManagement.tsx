@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { Plus, Edit2, Trash2, Image as ImageIcon, X } from 'lucide-react'
 import Image from 'next/image'
 import { createProfile, updateProfile, deleteProfile } from '@/actions/admin-profile-actions'
+import { useConfirm } from '@/components/ui/ConfirmModal'
 
 type Profile = {
     id: string;
@@ -13,6 +14,7 @@ type Profile = {
 }
 
 export default function ProfileManagement({ initialProfiles }: { initialProfiles: Profile[] }) {
+    const { confirm } = useConfirm()
     const [profiles, setProfiles] = useState<Profile[]>(initialProfiles)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
@@ -70,9 +72,15 @@ export default function ProfileManagement({ initialProfiles }: { initialProfiles
     }
 
     const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`Bạn có chắc chắn muốn xóa Team "${name}"? Thao tác này chỉ thực hiện được nếu Team không còn User hoặc Workspace nào.`)) {
-            return
-        }
+        const ok = await confirm({
+            title: 'Xóa Team / Profile',
+            message: `Bạn có chắc chắn muốn xóa Team "${name}"? Thao tác này sẽ gỡ bỏ liên kết Team khỏi tất cả nhân sự và dữ liệu hiện có. Đây là hành động không thể hoàn tác.`,
+            confirmText: 'Xóa Vĩnh Viễn',
+            cancelText: 'Hủy',
+            type: 'danger'
+        })
+
+        if (!ok) return
 
         try {
             const result = await deleteProfile(id)

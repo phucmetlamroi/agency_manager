@@ -6,6 +6,7 @@ import DeleteUserButton from '@/components/DeleteUserButton'
 import ReputationManager from '@/components/ReputationManager'
 import TreasurerToggle from '@/components/TreasurerToggle'
 import { createUser } from '@/actions/create-user'
+import ProfileSwitcher from '@/components/admin/ProfileSwitcher'
 
 type Props = {
     users: any[]
@@ -165,10 +166,15 @@ export default function UserList({ users, currentUser, agencies, profiles, works
 
                                     <td style={{ padding: '0.8rem' }}>
                                         {!isSuperAdminRow ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <RoleSwitcher userId={u.id} initialRole={u.role} workspaceId={workspaceId} />
-                                                {currentUser?.username === 'admin' && u.role === 'ADMIN' && (
-                                                    <TreasurerToggle userId={u.id} isTreasurer={u.isTreasurer} workspaceId={workspaceId} />
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', gap: '0.5rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <RoleSwitcher userId={u.id} initialRole={u.role} workspaceId={workspaceId} />
+                                                    {currentUser?.username === 'admin' && u.role === 'ADMIN' && (
+                                                        <TreasurerToggle userId={u.id} isTreasurer={u.isTreasurer} workspaceId={workspaceId} />
+                                                    )}
+                                                </div>
+                                                {currentUser?.username === 'admin' && profiles && profiles.length > 0 && (
+                                                    <ProfileSwitcher userId={u.id} currentProfileId={u.profileId} profiles={profiles} workspaceId={workspaceId} />
                                                 )}
                                             </div>
                                         ) : <span style={{ color: '#666', fontSize: '0.8rem' }}>Locked</span>}

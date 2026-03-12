@@ -76,22 +76,33 @@ export async function getUserErrorDetails(workspaceId: string, userId: string) {
     if (!session || !session.user) return []
     const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
 
-    const errorDetails = await (workspacePrisma as any).errorLog.groupBy({
+    // 1. Lấy toàn bộ từ điển lỗi hoạt động
+    const dict = await (workspacePrisma as any).errorDictionary.findMany({
+        where: { isActive: true }
+    })
+
+    // 2. Nhóm các lỗi thực tế của user
+    const errorLogsGrouped = await (workspacePrisma as any).errorLog.groupBy({
         by: ['errorId'],
-        where: { userId },
+        where: { userId, workspaceId },
         _sum: { frequency: true, calculatedScore: true }
     })
 
-    const dict = await (workspacePrisma as any).errorDictionary.findMany()
-
-    return errorDetails.map((e: any) => {
-        const errDef = dict.find((d: any) => d.id === e.errorId)
+    // 3. Trộn dữ liệu: Hiển thị 0 cho các lỗi không có trong log
+    return dict.map((d: any) => {
+        const log = errorLogsGrouped.find((e: any) => e.errorId === d.id)
         return {
-            errorId: e.errorId,
-            code: errDef?.code || 'UNKNOWN',
-            description: errDef?.description || 'Unknown Error',
-            totalFrequency: e._sum.frequency || 0,
-            totalPenalty: e._sum.calculatedScore || 0
+            errorId: d.id,
+            code: d.code,
+            description: d.description,
+            totalFrequency: log?._sum.frequency || 0,
+            totalPenalty: log?._sum.calculatedScore || 0
         }
-    }).sort((a: any, b: any) => b.totalFrequency - a.totalFrequency)
+    }).sort((a: any, b: any) => {
+        // Ưu tiên lỗi có tần suất cao lên đầu, sau đó đến mã lỗi
+        if (b.totalFrequency !== a.totalFrequency) {
+            return b.totalFrequency - a.totalFrequency
+        }
+        return a.code.localeCompare(b.code)
+    })
 }

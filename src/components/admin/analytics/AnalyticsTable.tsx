@@ -98,11 +98,17 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
   })
 
   const loadDetails = async (userId: string) => {
-    setSelectedUserId(userId)
-    setLoadingDetails(true)
-    const details = await getUserErrorDetails(workspaceId, userId)
-    setErrorDetails(details)
-    setLoadingDetails(false)
+    try {
+      setSelectedUserId(userId)
+      setLoadingDetails(true)
+      const details = await getUserErrorDetails(workspaceId, userId)
+      setErrorDetails(details)
+    } catch (err) {
+      console.error("Failed to load user error details", err)
+      setErrorDetails([])
+    } finally {
+      setLoadingDetails(false)
+    }
   }
 
   return (

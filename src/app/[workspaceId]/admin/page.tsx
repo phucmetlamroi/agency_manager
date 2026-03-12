@@ -14,6 +14,8 @@ import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import { KPIStats } from '@/components/dashboard/KPIStats'
 import { serializeDecimal } from '@/lib/serialization'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import Leaderboard from '@/components/dashboard/Leaderboard'
+import { Suspense } from 'react'
 
 export default async function AdminDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -107,8 +109,15 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                     </div>
                 </div>
 
-                {/* Right Column: Quick Actions & Forms (1/4 width) */}
+                {/* Right Column: Leaderboard & Quick Actions (1/4 width) */}
                 <div className="space-y-6">
+                    {/* Leaderboard - Top Right position */}
+                    <div className="min-h-[400px]">
+                        <Suspense fallback={<div className="glass-panel w-full h-[300px] flex items-center justify-center text-zinc-500 animate-pulse">Đang tải Bảng Xếp Hạng...</div>}>
+                            <Leaderboard workspaceId={workspaceId} />
+                        </Suspense>
+                    </div>
+
                     {/* Quick Create Task */}
                     <div className="glass-panel p-4">
                         <div className="flex items-center gap-2 mb-4">

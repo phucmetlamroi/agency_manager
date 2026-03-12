@@ -189,21 +189,38 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
                       </div>
                   ) : errorDetails.length > 0 ? (
                       <div className="space-y-4">
-                          {errorDetails.map(err => (
-                              <div key={err.errorId} className="bg-zinc-900/80 border border-red-500/10 hover:border-red-500/30 transition-colors rounded-xl p-4 shadow-sm">
-                                  <div className="flex justify-between items-start mb-2">
-                                      <span className="font-bold text-zinc-200">{err.code}</span>
-                                      <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-xs px-2 py-1 rounded font-mono">
-                                          - {err.totalPenalty} pts
-                                      </span>
-                                  </div>
-                                  <p className="text-xs text-zinc-400 mb-3 leading-relaxed">{err.description}</p>
-                                  <div className="flex justify-between items-center text-xs border-t border-zinc-800 pt-3 mt-1">
-                                      <span className="text-zinc-500 uppercase tracking-wider text-[10px]">Tần suất mắc lỗi</span>
-                                      <span className="text-white font-bold bg-zinc-800 px-2 py-1 rounded">{err.totalFrequency} lần</span>
-                                  </div>
-                              </div>
-                          ))}
+                            {errorDetails.map(err => {
+                                const hasError = err.totalFrequency > 0;
+                                return (
+                                    <div 
+                                        key={err.errorId} 
+                                        className={`rounded-xl p-4 shadow-sm transition-all duration-200 border ${
+                                            hasError 
+                                                ? 'bg-red-500/5 border-red-500/30 ring-1 ring-red-500/10' 
+                                                : 'bg-zinc-900/40 border-zinc-800/50 opacity-60 grayscale-[0.5]'
+                                        }`}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className={`font-bold ${hasError ? 'text-red-400' : 'text-zinc-400'}`}>{err.code}</span>
+                                            {hasError && (
+                                                <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-xs px-2 py-1 rounded font-mono font-bold animate-pulse">
+                                                    -{err.totalPenalty} pts
+                                                </span>
+                                            )}
+                                            {!hasError && (
+                                                <span className="text-[10px] text-zinc-600 uppercase font-bold tracking-tighter">Sạch lỗi</span>
+                                            )}
+                                        </div>
+                                        <p className={`text-xs mb-3 leading-relaxed ${hasError ? 'text-zinc-300' : 'text-zinc-500'}`}>{err.description}</p>
+                                        <div className={`flex justify-between items-center text-xs border-t pt-3 mt-1 ${hasError ? 'border-red-900/20' : 'border-zinc-800/50'}`}>
+                                            <span className="text-zinc-500 uppercase tracking-wider text-[10px]">Tần suất mắc lỗi</span>
+                                            <span className={`px-2 py-1 rounded font-bold ${hasError ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                                                {err.totalFrequency} lần
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                       </div>
                   ) : (
                       <div className="text-center py-16 flex flex-col items-center justify-center">

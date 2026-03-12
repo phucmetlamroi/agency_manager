@@ -69,13 +69,13 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
     const thisMonthEnd = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999) // Expand slightly into next month as per previous logic
 
     // Filter logic
-    const completedTasks = tasks.filter(t => t.status === 'Hoàn tất')
+    const completedTasks = tasks.filter((t: any) => t.status === 'Hoàn tất')
 
-    const thisMonthTasks = completedTasks.filter(t => t.updatedAt >= thisMonthStart && t.updatedAt <= thisMonthEnd)
-    const lastMonthTasks = completedTasks.filter(t => t.updatedAt >= lastMonthStart && t.updatedAt < thisMonthStart)
+    const thisMonthTasks = completedTasks.filter((t: any) => t.updatedAt >= thisMonthStart && t.updatedAt <= thisMonthEnd)
+    const lastMonthTasks = completedTasks.filter((t: any) => t.updatedAt >= lastMonthStart && t.updatedAt < thisMonthStart)
 
-    const baseSalary = thisMonthTasks.reduce((acc, t) => acc + Number(t.value || 0), 0)
-    const lastMonthSalary = lastMonthTasks.reduce((acc, t) => acc + Number(t.value || 0), 0)
+    const baseSalary = thisMonthTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
+    const lastMonthSalary = lastMonthTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
 
     // Add Bonus to this month
     const bonusData = userWithBonus?.bonuses[0]

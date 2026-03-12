@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useTransition } from 'react'
 import { acceptTermsAction } from '@/actions/tos-actions'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'

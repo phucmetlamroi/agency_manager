@@ -2,6 +2,8 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import TaskTable from '@/components/TaskTable'
 import { isMobileDevice } from '@/lib/device'
+import Leaderboard from '@/components/dashboard/Leaderboard'
+import { Suspense } from 'react'
 
 import { serializeDecimal } from '@/lib/serialization'
 import { UserRole } from '@prisma/client'
@@ -44,7 +46,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         redirect(`/${workspaceId}/admin`)
     }
 
-    const tasks = await workspacePrisma.task.findMany({
+    const tasks = await (workspacePrisma as any).task.findMany({
         where: { assigneeId: userId },
         include: { 
             client: { include: { parent: true } },
@@ -148,6 +150,11 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                 </div>
 
                 {/* Gamification Leaderboard Space*/}
+                <div style={{ height: '400px' }}>
+                    <Suspense fallback={<div className="glass-panel w-full h-full flex items-center justify-center text-zinc-500 animate-pulse">Đang tải Bảng Xếp Hạng...</div>}>
+                        <Leaderboard workspaceId={workspaceId} />
+                    </Suspense>
+                </div>
             </div>
 
 

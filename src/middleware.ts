@@ -19,6 +19,11 @@ export async function middleware(request: NextRequest) {
     const requestHeaders = new Headers(request.headers)
     const sessionCookie = request.cookies.get('session')
 
+    // 1.5. Block Deprecated Paths (Phase 1)
+    if (pathname.startsWith('/download') || pathname.startsWith('/extract')) {
+        return NextResponse.rewrite(new URL('/404', request.url))
+    }
+
     // 2. Auth Guard ONLY
     if (!sessionCookie) {
         const protectedPaths = ['/workspace', '/portal', '/admin', '/dashboard', '/agency', '/profile']

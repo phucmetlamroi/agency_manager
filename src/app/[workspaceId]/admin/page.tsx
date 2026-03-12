@@ -33,7 +33,15 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
 
     const tasks = await workspacePrisma.task.findMany({
         include: {
-            assignee: true,
+            assignee: {
+                include: {
+                    monthlyRanks: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 1,
+                        select: { rank: true }
+                    }
+                }
+            },
             client: {
                 include: { parent: true }
             }
@@ -52,7 +60,14 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             { reputation: 'desc' },
             { username: 'asc' }
         ],
-        include: { ownedAgency: true }
+        include: {
+            ownedAgency: true,
+            monthlyRanks: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: { rank: true }
+            }
+        }
     })
 
     const agencies = await workspacePrisma.agency.findMany({ select: { id: true, name: true, code: true } })
@@ -112,7 +127,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                         {unassignedTasks.slice(0, 5).map(t => (
                             <div key={t.id} className="mb-2 p-2 bg-zinc-900/50 rounded border border-white/5 text-sm">
                                 <div className="font-medium text-indigo-400 truncate">{t.title}</div>
-                                <div className="text-xs text-gray-500">{t.client?.name || 'No Client'}</div>
+                                <div className="text-xs text-gray-500">{(t as any).client?.name || 'No Client'}</div>
                             </div>
                         ))}
                         {unassignedTasks.length > 5 && (

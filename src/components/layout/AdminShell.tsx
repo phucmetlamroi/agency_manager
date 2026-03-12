@@ -4,7 +4,7 @@ import * as React from "react"
 import { AppSidebar } from "./AppSidebar"
 import { CommandMenu } from "./CommandMenu"
 import { cn } from "@/lib/utils"
-import { AdminVideoDownloader } from "@/components/video/AdminVideoDownloader"
+
 
 interface AdminShellProps {
     children: React.ReactNode
@@ -31,9 +31,7 @@ export function AdminShell({ children, user, workspaceId }: AdminShellProps) {
                     collapsed ? "md:ml-[80px]" : "md:ml-[280px]"
                 )}
             >
-                <div className="absolute top-4 right-4 z-30 hidden md:flex items-center gap-4">
-                    <AdminVideoDownloader />
-                </div>
+                    {/* Leaderboard will go here */}
                 <div className="container mx-auto p-4 md:p-8 max-w-7xl animate-fade-in">
                     {children}
                     {/* Safe spacer for bottom content */}

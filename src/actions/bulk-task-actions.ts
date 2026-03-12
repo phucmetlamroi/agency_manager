@@ -181,6 +181,15 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
         const notifications: any[] = []
 
         if (cleanAssigneeId) {
+            // Check Rank D
+            const latestRank = await prisma.monthlyRank.findFirst({
+                where: { userId: cleanAssigneeId, workspaceId },
+                orderBy: { createdAt: 'desc' }
+            })
+            if (latestRank && latestRank.rank === 'D') {
+                return { error: 'Không thể giao Task: Nhân sự đang bị Cảnh cáo Đỏ (Rank D).' }
+            }
+
             // Assign to USER
             updateData.assigneeId = cleanAssigneeId
             updateData.assignedAgencyId = userAgencyId // Auto-link agency

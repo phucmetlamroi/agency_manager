@@ -80,12 +80,20 @@ export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [],
     if (!isAdmin) {
         // Read-only view for non-admins
         if (task.assignee) {
+            const latestRank = (task.assignee as any).monthlyRanks?.[0]?.rank
+            const flagColor = latestRank === 'C' ? 'bg-yellow-500' : latestRank === 'D' ? 'bg-red-500' : null
+
             return (
                 <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                        <AvatarImage src={`https://avatar.vercel.sh/${task.assignee.username}`} />
-                        <AvatarFallback>{task.assignee.username[0]}</AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                        <Avatar className="h-6 w-6">
+                            <AvatarImage src={`https://avatar.vercel.sh/${task.assignee.username}`} />
+                            <AvatarFallback>{task.assignee.username[0]}</AvatarFallback>
+                        </Avatar>
+                        {flagColor && (
+                            <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-zinc-900 ${flagColor} shadow-sm`} title={`Rank ${latestRank} Warning`} />
+                        )}
+                    </div>
                     <span className="text-sm">{task.assignee.username}</span>
                 </div>
             )
@@ -132,18 +140,28 @@ export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [],
                             const isAgencyOwner = (u as any).ownedAgency && (u as any).ownedAgency.length > 0
                             return role !== 'CLIENT' && role !== 'LOCKED' && !isAgencyOwner
                         })
-                        .map(u => (
-                            <SelectItem key={u.id} value={u.id}>
-                                <div className="flex items-center gap-2">
-                                    <Avatar className="h-5 w-5">
-                                        <AvatarImage src={`https://avatar.vercel.sh/${u.username}`} />
-                                        <AvatarFallback>{u.username[0]}</AvatarFallback>
-                                    </Avatar>
-                                    <span>{u.username}</span>
-                                    <span className="text-xs text-muted-foreground">({u.reputation ?? 100}đ)</span>
-                                </div>
-                            </SelectItem>
-                        ))}
+                        .map(u => {
+                            const latestRank = (u as any).monthlyRanks?.[0]?.rank
+                            const flagColor = latestRank === 'C' ? 'bg-yellow-500' : latestRank === 'D' ? 'bg-red-500' : null
+
+                            return (
+                                <SelectItem key={u.id} value={u.id}>
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                            <Avatar className="h-5 w-5">
+                                                <AvatarImage src={`https://avatar.vercel.sh/${u.username}`} />
+                                                <AvatarFallback>{u.username[0]}</AvatarFallback>
+                                            </Avatar>
+                                            {flagColor && (
+                                                <div className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${flagColor} shadow-sm`} title={`Rank ${latestRank} Warning`} />
+                                            )}
+                                        </div>
+                                        <span>{u.username}</span>
+                                        <span className="text-xs text-muted-foreground">({u.reputation ?? 100}đ)</span>
+                                    </div>
+                                </SelectItem>
+                            )
+                        })}
                 </SelectGroup>
             </SelectContent>
         </Select>

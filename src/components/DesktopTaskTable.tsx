@@ -10,6 +10,7 @@ import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
 import DeleteTaskButton from './DeleteTaskButton'
+import ManagerReviewChecklist from './tasks/ManagerReviewChecklist'
 
 import { TaskWithUser } from '@/types/admin'
 import { useConfirm } from '@/components/ui/ConfirmModal'
@@ -497,7 +498,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                             <button
                                                 onClick={async () => {
                                                     await handleSaveDetails(); // Saves everything, effectively saving the link
-                                                    if (!isAdmin) await handleStatusChange(selectedTask.id, 'Revision'); // Only set Revision if user submits
+                                                    if (!isAdmin) await handleStatusChange(selectedTask.id, 'Review'); // Only set Review if user submits
                                                     setIsEditingLink(false);
                                                 }}
                                                 className="px-3 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1 transition-colors"
@@ -737,63 +738,17 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
             )
             }
 
-            {/* FEEDBACK MODAL */}
-            {/* FEEDBACK MODAL */}
-            {feedbackModal.isOpen && (
-                <div style={{
-                    position: 'fixed', inset: 0,
-                    background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    zIndex: 10000
-                }} onClick={() => setFeedbackModal({ isOpen: false, taskId: null })}>
-                    <div style={{
-                        background: '#1a1a1a', color: 'white',
-                        width: '90%', maxWidth: '400px',
-                        borderRadius: '16px', padding: '1.5rem',
-                        border: '1px solid #333'
-                    }} onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold mb-4 text-red-500">Phân loại Revision</h3>
-
-                        <p className="text-sm text-gray-400 mb-4">
-                            Vui lòng chọn nguồn yêu cầu sửa đổi để tính điểm CRM & KPI.
-                        </p>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm text-gray-400 mb-2">Nguồn Feedback</label>
-                                <div className="flex gap-4">
-                                    <label className={`flex-1 p-3 rounded border cursor-pointer flex items-center justify-center gap-2 ${feedbackForm.type === 'CLIENT' ? 'bg-red-500/20 border-red-500' : 'border-gray-700'}`}>
-                                        <input
-                                            type="radio"
-                                            name="fbType"
-                                            checked={feedbackForm.type === 'CLIENT'}
-                                            onChange={() => setFeedbackForm({ ...feedbackForm, type: 'CLIENT' })}
-                                            className="hidden"
-                                        />
-                                        <span>👤 Khách hàng</span>
-                                    </label>
-                                    <label className={`flex-1 p-3 rounded border cursor-pointer flex items-center justify-center gap-2 ${feedbackForm.type === 'INTERNAL' ? 'bg-yellow-500/20 border-yellow-500' : 'border-gray-700'}`}>
-                                        <input
-                                            type="radio"
-                                            name="fbType"
-                                            checked={feedbackForm.type === 'INTERNAL'}
-                                            onChange={() => setFeedbackForm({ ...feedbackForm, type: 'INTERNAL' })}
-                                            className="hidden"
-                                        />
-                                        <span>🏢 Nội bộ</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleFeedbackSubmit}
-                                className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg"
-                            >
-                                Xác nhận Revision
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {/* FEEDBACK MODAL (MANAGER CHECKLIST) */}
+            {feedbackModal.isOpen && feedbackModal.taskId && (
+                <ManagerReviewChecklist
+                    taskId={feedbackModal.taskId}
+                    workspaceId={workspaceId}
+                    onClose={() => setFeedbackModal({ isOpen: false, taskId: null })}
+                    onSuccess={() => {
+                        setFeedbackModal({ isOpen: false, taskId: null })
+                        handleStatusChange(feedbackModal.taskId!, 'Revision')
+                    }}
+                />
             )}
         </>
     )

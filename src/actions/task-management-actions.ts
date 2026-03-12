@@ -103,6 +103,16 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
             // 1. Check Availability (Nếu không phải Super Admin)
             // Assigned without schedule constraint
 
+            if (!assignmentId.startsWith('agency:')) {
+                const latestRank = await workspacePrisma.monthlyRank.findFirst({
+                    where: { userId: assignmentId, workspaceId },
+                    orderBy: { createdAt: 'desc' }
+                })
+                if (latestRank && latestRank.rank === 'D') {
+                    return { error: 'Không thể giao Task: Nhân sự đang bị Phạt thẻ đỏ (Rank D).' }
+                }
+            }
+
             updateData = {
                 assigneeId: assignmentId,
                 assignedAgencyId: null, // Clear any agency link

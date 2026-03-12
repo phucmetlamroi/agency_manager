@@ -28,6 +28,8 @@ model Profile {
   payrollLocks PayrollLock[]
   metrics      PerformanceMetric[]
   agencies     Agency[]
+  errorLogs    ErrorLog[]
+  monthlyRanks MonthlyRank[]
 }
 
 model Workspace {
@@ -48,7 +50,8 @@ model Workspace {
   payrollLocks PayrollLock[]
   metrics      PerformanceMetric[]
   feedbacks    Feedback[]
-  mediaTasks   MediaTask[]
+  errorLogs    ErrorLog[]
+  monthlyRanks MonthlyRank[]
   ratings      Rating[]
   sessions     Session[]
 
@@ -80,6 +83,7 @@ model User {
   createdAt         DateTime            @default(now())
   reputation        Int                 @default(100)
   isTreasurer       Boolean             @default(false)
+  hasAcceptedTerms  Boolean             @default(false)
   email             String?
   nickname          String?
   phoneNumber       String?
@@ -94,7 +98,7 @@ model User {
   payrolls          Payroll[]
   metrics           PerformanceMetric[]
   tasks             Task[]              @relation("AssigneeTasks")
-  mediaTasks        MediaTask[]
+
   agency            Agency?             @relation("AgencyMembers", fields: [agencyId], references: [id])
   workspaces        WorkspaceMember[]
   clientTasks       Task[]              @relation("UserClientTasks")
@@ -102,6 +106,9 @@ model User {
   clientInvoices    Invoice[]           @relation("UserClientInvoices")
   clientRatings     Rating[]            @relation("ClientRatings")
   staffRatings      Rating[]            @relation("StaffRatings")
+  errorLogs         ErrorLog[]          @relation("UserErrorLogs")
+  detectedErrors    ErrorLog[]          @relation("UserDetectedErrors")
+  monthlyRanks      MonthlyRank[]       @relation("UserMonthlyRanks")
   sessions          Session[]
   events            Event[]
   presence          UserPresence?
@@ -164,6 +171,7 @@ model Task {
   invoiceStatus    InvoiceTaskStatus @default(UNBILLED)
   isArchived       Boolean           @default(false)
   feedbacks        Feedback[]
+  errorLogs        ErrorLog[]
   invoiceItems     InvoiceItem[]
   assignedAgency   Agency?           @relation(fields: [assignedAgencyId], references: [id])
   assignee         User?             @relation("AssigneeTasks", fields: [assigneeId], references: [id])
@@ -212,6 +220,7 @@ model PayrollLock {
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
   profileId   String?
   profile     Profile?  @relation(fields: [profileId], references: [id])
+  monthlyRanks MonthlyRank[]
 
   @@unique([month, year, workspaceId], name: "month_year_workspaceId")
 }
@@ -400,30 +409,7 @@ enum InvoiceTaskStatus {
   INVOICED
 }
 
-enum MediaTaskStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
 
-model MediaTask {
-  id            String          @id @default(uuid())
-  workspaceId   String
-  requestedById String
-  originalUrl   String          @db.Text
-  platform      String
-  fileSizeBytes BigInt?
-  formatType    String
-  status        MediaTaskStatus @default(PENDING)
-  createdAt     DateTime        @default(now())
-
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  requestedBy User      @relation(fields: [requestedById], references: [id])
-
-  @@index([workspaceId, status])
-  @@index([requestedById, status])
-}
 
 model Rating {
   id                  String   @id @default(cuid())
@@ -496,4 +482,71 @@ model UserPresence {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status, lastHeartbeat])
+}
+
+// ----------------------------------------------------------------------
+// Quality & Error Rating Models
+// ----------------------------------------------------------------------
+
+model ErrorDictionary {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  description String
+  severity    Int      @default(3) // 1: Đặc biệt nghiêm trọng, 2: Trung bình, 3: Nhẹ
+  penalty     Int      @default(1) // Trọng số điểm phạt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isActive    Boolean  @default(true)
+
+  logs ErrorLog[]
+}
+
+model ErrorLog {
+  id              String   @id @default(uuid())
+  taskId          String
+  userId          String
+  errorId         String
+  frequency       Int      @default(1) // Số lần vi phạm lỗi này trong 1 task
+  calculatedScore Int      // frequency * ErrorDictionary.penalty
+  detectedById    String   // Manager người bắt lỗi
+  createdAt       DateTime @default(now())
+  workspaceId     String
+
+  task        Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User            @relation("UserErrorLogs", fields: [userId], references: [id], onDelete: Cascade)
+  error       ErrorDictionary @relation(fields: [errorId], references: [id])
+  detectedBy  User            @relation("UserDetectedErrors", fields: [detectedById], references: [id])
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  profile     Profile?        @relation(fields: [profileId], references: [id])
+  profileId   String?
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([createdAt])
+}
+
+model MonthlyRank {
+  id             String   @id @default(uuid())
+  userId         String
+  month          Int
+  year           Int
+  workspaceId    String
+  totalTasks     Int      @default(0)
+  totalPenalty   Int      @default(0)
+  errorRate      Float    @default(0)
+  rank           String   @default("UNRANKED") // S, A, B, C, D, UNRANKED
+  isLocked       Boolean  @default(false)
+  payrollLockId  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user        User         @relation("UserMonthlyRanks", fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payrollLock PayrollLock? @relation(fields: [payrollLockId], references: [id])
+  profile     Profile?     @relation(fields: [profileId], references: [id])
+  profileId   String?
+
+  @@unique([userId, month, year, workspaceId])
+  @@index([rank])
 }

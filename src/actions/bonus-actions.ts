@@ -46,8 +46,15 @@ export async function revertMonthlyBonus(workspaceId: string) {
         const currentMonth = now.getMonth() + 1
         const currentYear = now.getFullYear()
 
-        // 2. Delete all bonuses for this month
+        // 2. Delete all bonuses and ranks for this month
         await workspacePrisma.monthlyBonus.deleteMany({
+            where: {
+                workspaceId,
+                month: currentMonth,
+                year: currentYear
+            }
+        })
+        await workspacePrisma.monthlyRank.deleteMany({
             where: {
                 workspaceId,
                 month: currentMonth,
@@ -143,6 +150,16 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                             lte: endOfMonth
                         }
                     }
+                },
+                errorLogs: {
+                    where: {
+                        workspaceId,
+                        createdAt: {
+                            gte: startOfMonth,
+                            lte: endOfMonth
+                        }
+                    },
+                    include: { error: true }
                 }
             }
         })
@@ -164,6 +181,9 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             revenue: number
             tasksCompleted: number
             monthlySalary: number
+            totalPenalty: number
+            errorRate: number
+            rankScore: string
         }
 
         const rankings: UserRanking[] = []
@@ -179,72 +199,51 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                 return sum + val
             }, 0)
 
+            const totalTasks = user.tasks.length
+            const totalPenalty = user.errorLogs.reduce((sum, log) => sum + (log.error?.penalty || 0), 0)
+            const errorRate = totalTasks >= 8 ? Number((totalPenalty / totalTasks).toFixed(2)) : 0
+            
+            let rankScore = 'UNRANKED'
+            if (totalTasks >= 8) {
+                if (errorRate < 0.3) rankScore = 'S'
+                else if (errorRate <= 0.6) rankScore = 'A'
+                else if (errorRate <= 1.0) rankScore = 'B'
+                else if (errorRate <= 1.5) rankScore = 'C'
+                else rankScore = 'D'
+            }
+
             rankings.push({
                 userId: user.id,
                 username: user.username,
                 revenue,
-                tasksCompleted: user.tasks.length,
-                monthlySalary: revenue // Using revenue as salary for bonus calculation
+                tasksCompleted: totalTasks,
+                monthlySalary: revenue, // Using revenue as salary for bonus calculation
+                totalPenalty,
+                errorRate,
+                rankScore
             })
         }
 
-        // 5. Rank by revenue DESC, then by tasksCompleted DESC (Tie-breaker)
+        // 5. Rank by revenue DESC
         rankings.sort((a, b) => {
-            // Primary: Revenue (higher is better)
-            if (Math.abs(b.revenue - a.revenue) > 0.01) {
-                return b.revenue - a.revenue
-            }
-
-            // Tie-breaker: Who did more tasks to get that revenue
+            if (Math.abs(b.revenue - a.revenue) > 0.01) return b.revenue - a.revenue
             return b.tasksCompleted - a.tasksCompleted
         })
 
-        // 6. Award Top 1-3 with bonuses
-        const bonusPercentages = [0.15, 0.10, 0.05] // 15%, 10%, 5%
-        const awardedBonuses = []
+        // Filter out eligible Rank S for Bonuses
+        const eligibleForBonus = rankings.filter(r => r.rankScore === 'S')
+        const bonusPercentages = [0.10, 0.05] // Top 1: 10%, Top 2: 5%
 
-        for (let i = 0; i < Math.min(3, rankings.length); i++) {
-            const user = rankings[i]
-            const rank = i + 1
-            const bonusPercentage = bonusPercentages[i]
-            const bonusAmount = user.monthlySalary * bonusPercentage
+        // Delete existing data to recalculate safely
+        await workspacePrisma.monthlyBonus.deleteMany({
+            where: { month: currentMonth, year: currentYear, workspaceId }
+        })
+        await workspacePrisma.monthlyRank.deleteMany({
+            where: { month: currentMonth, year: currentYear, workspaceId }
+        })
 
-            // 7. Delete existing bonus for this month (if recalculating)
-            await workspacePrisma.monthlyBonus.deleteMany({
-                where: {
-                    userId: user.userId,
-                    month: currentMonth,
-                    year: currentYear,
-                    workspaceId
-                }
-            })
-
-            // 8. Save to MonthlyBonus table
-            await workspacePrisma.monthlyBonus.create({
-                data: {
-                    userId: user.userId,
-                    month: currentMonth,
-                    year: currentYear,
-                    workspaceId,
-                    rank,
-                    revenue: user.revenue,
-                    executionTimeHours: 0, // Migrated/Deprecating field, default 0
-                    bonusAmount
-                }
-            })
-
-            awardedBonuses.push({
-                userId: user.userId,
-                username: user.username,
-                rank,
-                revenue: user.revenue,
-                bonusAmount,
-                bonusPercentage: bonusPercentage * 100
-            })
-        }
-
-        // 9. Create Lock Record
-        await workspacePrisma.payrollLock.upsert({
+        // 6. Create Lock Record First (to attach payrollLockId to MonthlyRanks)
+        const payrollLock = await workspacePrisma.payrollLock.upsert({
             where: {
                 month_year_workspaceId: {
                     month: currentMonth,
@@ -261,6 +260,58 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                 lockedBy: session.user.id
             }
         })
+
+        const awardedBonuses = []
+
+        // Award Top 1-2 Rank S with bonuses
+        for (let i = 0; i < Math.min(2, eligibleForBonus.length); i++) {
+            const user = eligibleForBonus[i]
+            const leaderboardRank = i + 1
+            const bonusPercentage = bonusPercentages[i]
+            const bonusAmount = user.monthlySalary * bonusPercentage
+
+            await workspacePrisma.monthlyBonus.create({
+                data: {
+                    userId: user.userId,
+                    month: currentMonth,
+                    year: currentYear,
+                    workspaceId,
+                    rank: leaderboardRank,
+                    revenue: user.revenue,
+                    executionTimeHours: 0,
+                    bonusAmount
+                }
+            })
+
+            awardedBonuses.push({
+                userId: user.userId,
+                username: user.username,
+                rank: leaderboardRank,
+                revenue: user.revenue,
+                bonusAmount,
+                bonusPercentage: bonusPercentage * 100
+            })
+        }
+
+        // Save ALL Monthly Ranks
+        const monthlyRankData = rankings.map(u => ({
+            userId: u.userId,
+            month: currentMonth,
+            year: currentYear,
+            workspaceId,
+            totalTasks: u.tasksCompleted,
+            totalPenalty: u.totalPenalty,
+            errorRate: u.errorRate,
+            rank: u.rankScore,
+            isLocked: true,
+            payrollLockId: payrollLock.id
+        }))
+
+        if (monthlyRankData.length > 0) {
+            await workspacePrisma.monthlyRank.createMany({
+                data: monthlyRankData
+            })
+        }
 
         // 10. Revalidate payroll page to show updated bonuses
         revalidatePath(`/${workspaceId}/admin/payroll`)

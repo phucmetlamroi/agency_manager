@@ -6,7 +6,7 @@ import { isMobileDevice } from '@/lib/device'
 import { serializeDecimal } from '@/lib/serialization'
 import { UserRole } from '@prisma/client'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
-import { VideoDownloader } from '@/components/video/VideoDownloader'
+
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +46,18 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
     const tasks = await workspacePrisma.task.findMany({
         where: { assigneeId: userId },
-        include: { client: { include: { parent: true } } },
+        include: { 
+            client: { include: { parent: true } },
+            assignee: {
+                include: {
+                    monthlyRanks: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 1,
+                        select: { rank: true }
+                    }
+                }
+            }
+        },
         orderBy: { createdAt: 'desc' }
     })
 
@@ -136,9 +147,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                     </div>
                 </div>
 
-                <div className="glass-panel w-full" style={{ padding: '0', overflow: 'hidden' }}>
-                    <VideoDownloader />
-                </div>
+                {/* Gamification Leaderboard Space*/}
             </div>
 
 

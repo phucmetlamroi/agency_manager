@@ -43,6 +43,15 @@ export async function middleware(request: NextRequest) {
                 return NextResponse.redirect(new URL('/portal/en', request.url))
             }
 
+            // Mandatory ToS Check
+            if (session.user.hasAcceptedTerms === false) {
+                if (pathname !== '/user-agreement' && !pathname.startsWith('/api')) {
+                    return NextResponse.redirect(new URL('/user-agreement', request.url))
+                }
+            } else if (pathname === '/user-agreement') {
+                return NextResponse.redirect(new URL('/profile', request.url))
+            }
+
             // VERCEL FIX 4: CHECK EMBEDDED PROFILE ID
             // If they are trying to access a workspace or admin panel but haven't selected a profile
             const requiresProfilePaths = ['/workspace', '/admin', '/dashboard', '/agency'];

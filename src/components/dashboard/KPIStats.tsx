@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, AreaChart, Metric, Text, Flex, Grid, Color } from "@tremor/react"
-import { VideoDownloader } from "@/components/video/VideoDownloader"
+
 import NoSSR from "@/components/ui/NoSSR"
 
 interface KPIStatsProps {
@@ -71,9 +71,7 @@ export function KPIStats({ tasks }: KPIStatsProps) {
                 </Flex>
             </Card>
 
-            <div className="h-full">
-                <VideoDownloader />
-            </div>
+                {/* Gamification Leaderboard Space */}
         </Grid>
     )
 }

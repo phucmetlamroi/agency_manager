@@ -11,6 +11,7 @@ import dynamic from 'next/dynamic'
 import DOMPurify from 'isomorphic-dompurify'
 import { ensureExternalLinks } from "@/lib/utils"
 import { Copy } from "lucide-react"
+import ManagerReviewChecklist from "./ManagerReviewChecklist"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
 
@@ -28,6 +29,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     const [isEditingLink, setIsEditingLink] = useState(false)
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
     const [isFrameExpanded, setIsFrameExpanded] = useState(false)
+    const [showChecklist, setShowChecklist] = useState(false)
     const [frameAccount, setFrameAccount] = useState({ account: '', password: '' })
     const [form, setForm] = useState({
         resources: '',
@@ -364,6 +366,16 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                             >
                                                 <span className="mr-2">Frame.io</span> {isFrameExpanded ? '🔽' : '▶️'}
                                             </button>
+                                            
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={() => setShowChecklist(true)}
+                                                    className="px-4 bg-red-50 hover:bg-red-100 border-l border-blue-200 transition-colors flex items-center justify-center text-red-600 font-bold tracking-wider"
+                                                    title="Đánh giá & Bắt lỗi (Manager Review)"
+                                                >
+                                                    <span className="mr-2">Checklist</span> 📝
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -563,6 +575,19 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             Save Changes
                         </button>
                     </div>
+                )}
+
+                {showChecklist && (
+                    <ManagerReviewChecklist 
+                        taskId={localTask.id}
+                        workspaceId={workspaceId}
+                        onClose={() => setShowChecklist(false)}
+                        onSuccess={() => {
+                            setShowChecklist(false);
+                            onClose();
+                            window.location.reload();
+                        }}
+                    />
                 )}
             </DialogContent>
         </Dialog>

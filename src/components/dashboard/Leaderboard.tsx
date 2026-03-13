@@ -52,7 +52,9 @@ export const getLeaderboardData = unstable_cache(
             const taskCount = completedTasksAggregate.find(t => t.assigneeId === u.id)?._count.id || 0
             const revenue = Number(completedTasksAggregate.find(t => t.assigneeId === u.id)?._sum.value || 0)
             const totalPenalty = errorLogsAggregate.find((e: any) => e.userId === u.id)?._sum.calculatedScore || 0
-            const errorRate = taskCount >= 8 ? Number((totalPenalty / taskCount).toFixed(2)) : 0
+            
+            // Sync with Analytics logic: if 0 tasks but errors exist, highlight it
+            const errorRate = taskCount > 0 ? Number((totalPenalty / taskCount).toFixed(2)) : (totalPenalty > 0 ? totalPenalty : 0)
             
             let rank = 'S' 
             if (taskCount >= 8) {
@@ -61,8 +63,13 @@ export const getLeaderboardData = unstable_cache(
                  else if (errorRate < 1.0) rank = 'B'
                  else if (errorRate < 1.5) rank = 'C'
                  else rank = 'D'
+            } else if (taskCount > 0) {
+                 if (errorRate < 1.0) rank = 'N/A'
+                 else rank = 'D'
+            } else if (totalPenalty > 0) {
+                 rank = 'D'
             } else {
-                 rank = 'N/A' 
+                 rank = 'N/A'
             }
 
             // Calculate Score for sorting. 

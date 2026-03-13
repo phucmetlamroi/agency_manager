@@ -58,16 +58,16 @@ export default function ManagerReviewChecklist({ taskId, workspaceId, onClose, o
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 10000
         }} onClick={onClose}>
-        <div style={{
-            background: '#121214', color: 'white',
-            width: '95%', maxWidth: '600px',
-            borderRadius: '20px', padding: '1.5rem',
-            border: '1px solid #27272a',
-            maxHeight: '90vh',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden'
-        }} onClick={e => e.stopPropagation()}>
+            <div style={{
+                background: '#121214', color: 'white',
+                width: '95%', maxWidth: '600px',
+                borderRadius: '20px', padding: '1.5rem',
+                border: '1px solid #27272a',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+            }} onClick={e => e.stopPropagation()}>
 
                 <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xl font-bold title-gradient">Đánh Giá & Bắt Lỗi (Review)</h3>
@@ -112,7 +112,8 @@ export default function ManagerReviewChecklist({ taskId, workspaceId, onClose, o
                                 </div>
                             )
                         })}
-                )}
+                        </div>
+                    )}
 
                 <div className="mt-6 space-y-2 flex-shrink-0">
                     <label className="text-sm font-semibold text-zinc-300">Ghi chú sửa đổi bổ sung (Sẽ được nối vào Task Notes)</label>

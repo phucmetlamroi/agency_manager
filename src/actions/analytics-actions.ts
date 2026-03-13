@@ -99,21 +99,27 @@ export async function getUserErrorDetails(workspaceId: string, userId: string) {
     const dictMap = new Map(dict.map((entry: any) => [entry.id, entry]))
     const logMap = new Map(errorLogsGrouped.map((entry: any) => [entry.errorId, entry]))
     
-    // CRITICAL FIX: Ensure we only iterate over IDs that actually exist in the log for this user
-    const loggedErrorIds = errorLogsGrouped.map((e: any) => e.errorId)
-
-    const details = loggedErrorIds.map((errorId: string) => {
-        const dictionaryEntry = dictMap.get(errorId) as { code: string; description: string } | undefined
-        const logEntry = logMap.get(errorId) as { _sum: { frequency: number; calculatedScore: number } } | undefined
+    // Logic: Duyệt qua TOÀN BỘ từ điển lỗi để đảm bảo mọi loại lỗi đều xuất hiện
+    const details = dict.map((d: any) => {
+        const logEntry = logMap.get(d.id) as { _sum: { frequency: number; calculatedScore: number } } | undefined
 
         return {
-            errorId,
-            code: dictionaryEntry?.code ?? `#${errorId.toString().slice(0, 6).toUpperCase()}`,
-            description: dictionaryEntry?.description ?? 'Lỗi chưa được định nghĩa',
+            errorId: d.id,
+            code: d.code,
+            description: d.description,
             totalFrequency: logEntry?._sum.frequency || 0,
             totalPenalty: logEntry?._sum.calculatedScore || 0
         }
     })
 
-    return details.sort((a: any, b: any) => b.totalFrequency - a.totalFrequency)
+    return details.sort((a: any, b: any) => {
+        // Ưu tiên lỗi có vi phạm (frequency > 0) lên đầu
+        if ((b.totalFrequency > 0 ? 1 : 0) !== (a.totalFrequency > 0 ? 1 : 0)) {
+            return (b.totalFrequency > 0 ? 1 : 0) - (a.totalFrequency > 0 ? 1 : 0)
+        }
+        // Sau đó sắp xếp theo tần suất giảm dần
+        if (b.totalFrequency !== a.totalFrequency) return b.totalFrequency - a.totalFrequency
+        // Cuối cùng theo mã lỗi
+        return a.code.localeCompare(b.code)
+    })
 }

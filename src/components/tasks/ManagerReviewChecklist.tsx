@@ -58,13 +58,16 @@ export default function ManagerReviewChecklist({ taskId, workspaceId, onClose, o
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 10000
         }} onClick={onClose}>
-            <div style={{
-                background: '#121214', color: 'white',
-                width: '95%', maxWidth: '600px',
-                borderRadius: '20px', padding: '1.5rem',
-                border: '1px solid #27272a',
-                maxHeight: '90vh', overflowY: 'auto'
-            }} onClick={e => e.stopPropagation()} className="custom-scrollbar">
+        <div style={{
+            background: '#121214', color: 'white',
+            width: '95%', maxWidth: '600px',
+            borderRadius: '20px', padding: '1.5rem',
+            border: '1px solid #27272a',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+        }} onClick={e => e.stopPropagation()}>
 
                 <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xl font-bold title-gradient">Đánh Giá & Bắt Lỗi (Review)</h3>
@@ -75,7 +78,7 @@ export default function ManagerReviewChecklist({ taskId, workspaceId, onClose, o
                 {isLoading ? (
                     <div className="py-8 text-center text-zinc-500 animate-pulse">Đang tải từ điển lỗi...</div>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
                         {dictionary.map(err => {
                             const count = counts[err.id] || 0
                             const isSelected = count > 0
@@ -109,10 +112,9 @@ export default function ManagerReviewChecklist({ taskId, workspaceId, onClose, o
                                 </div>
                             )
                         })}
-                    </div>
                 )}
 
-                <div className="mt-6 space-y-2">
+                <div className="mt-6 space-y-2 flex-shrink-0">
                     <label className="text-sm font-semibold text-zinc-300">Ghi chú sửa đổi bổ sung (Sẽ được nối vào Task Notes)</label>
                     <textarea 
                         className="w-full bg-black/50 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 focus:outline-none focus:border-red-500/50"
@@ -123,7 +125,7 @@ export default function ManagerReviewChecklist({ taskId, workspaceId, onClose, o
                     />
                 </div>
 
-                <div className="mt-6 flex justify-end gap-3">
+                <div className="mt-6 flex justify-end gap-3 flex-shrink-0">
                     <button disabled={isPending} onClick={onClose} className="px-5 py-2.5 rounded-xl font-bold text-sm bg-zinc-800 hover:bg-zinc-700 text-white transition-colors">
                         Hủy Bỏ
                     </button>

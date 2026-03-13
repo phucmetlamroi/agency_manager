@@ -84,11 +84,11 @@ export async function getUserErrorDetails(workspaceId: string, userId: string) {
 
     const dictMap = new Map(dict.map((entry: any) => [entry.id, entry]))
     const logMap = new Map(errorLogsGrouped.map((entry: any) => [entry.errorId, entry]))
-    const uniqueErrorIds = Array.from(new Set([...dictMap.keys(), ...logMap.keys()]))
+    const uniqueErrorIds = Array.from(new Set([...dictMap.keys(), ...logMap.keys()])) as string[]
 
     const details = uniqueErrorIds.map((errorId) => {
-        const dictionaryEntry = dictMap.get(errorId)
-        const logEntry = logMap.get(errorId)
+        const dictionaryEntry = dictMap.get(errorId) as { code: string; description: string } | undefined
+        const logEntry = logMap.get(errorId) as { _sum: { frequency: number; calculatedScore: number } } | undefined
 
         return {
             errorId,

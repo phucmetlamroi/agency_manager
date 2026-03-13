@@ -52,22 +52,14 @@ export default function ManagerReviewChecklist({ taskId, workspaceId, onClose, o
     }
 
     return (
-        <div style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 10000
-        }} onClick={onClose}>
-            <div style={{
-                background: '#121214', color: 'white',
-                width: '95%', maxWidth: '600px',
-                borderRadius: '20px', padding: '1.5rem',
-                border: '1px solid #27272a',
-                maxHeight: '90vh',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-            }} onClick={e => e.stopPropagation()}>
+        <div 
+            className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[10000] p-4"
+            onClick={onClose}
+        >
+            <div 
+                className="bg-[#121214] text-white w-full max-w-[600px] rounded-[20px] p-6 border border-zinc-800 flex flex-col max-h-[90dvh] overflow-hidden shadow-2xl"
+                onClick={e => e.stopPropagation()}
+            >
 
                 <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xl font-bold title-gradient">Đánh Giá & Bắt Lỗi (Review)</h3>

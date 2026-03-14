@@ -2,6 +2,7 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import AnalyticsTable from '@/components/admin/analytics/AnalyticsTable'
 import { getAnalyticsData } from '@/actions/analytics-actions'
+import LivePresenceBoard from '@/components/admin/analytics/LivePresenceBoard'
 
 export default async function AdminAnalyticsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const session = await getSession()
@@ -12,7 +13,7 @@ export default async function AdminAnalyticsPage({ params }: { params: Promise<{
     const analyticsData = await getAnalyticsData(workspaceId)
 
     return (
-        <div className="h-full flex flex-col p-6 w-full max-w-[1600px] mx-auto space-y-6">
+        <div className="h-full flex flex-col p-6 w-full max-w-[1700px] mx-auto space-y-6">
             <div className="flex items-center justify-between shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-red-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent drop-shadow-sm">
@@ -27,8 +28,16 @@ export default async function AdminAnalyticsPage({ params }: { params: Promise<{
                 </div>
             </div>
 
-            <div className="flex-1 min-h-0 bg-transparent rounded-2xl">
-                <AnalyticsTable data={analyticsData} workspaceId={workspaceId} />
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 flex-1 min-h-0">
+                {/* Statistics Table - Take 3/4 width */}
+                <div className="xl:col-span-3 min-h-[500px]">
+                    <AnalyticsTable data={analyticsData} workspaceId={workspaceId} />
+                </div>
+
+                {/* Live Presence - Take 1/4 width */}
+                <div className="xl:col-span-1 h-full min-h-[500px]">
+                    <LivePresenceBoard />
+                </div>
             </div>
         </div>
     )

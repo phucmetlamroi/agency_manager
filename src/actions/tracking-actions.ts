@@ -160,7 +160,7 @@ export async function getSessionTrends() {
         const sessions = await prisma.session.findMany({
             where: {
                 startTime: { gte: twentyFourHoursAgo },
-                ...(authSession?.user?.username !== 'admin' ? { workspace: { profileId } } : {})
+                ...(profileId ? { workspace: { profileId } } : {})
             },
             select: {
                 startTime: true
@@ -202,7 +202,7 @@ export async function getRecentEventLogs(limit = 20) {
         const logs = await prisma.event.findMany({
             take: limit,
             where: {
-                ...(authSession?.user?.username !== 'admin' ? { session: { workspace: { profileId } } } : {})
+                ...(profileId ? { session: { workspace: { profileId } } } : {})
             },
             orderBy: { createdAt: 'desc' },
             include: {
@@ -243,7 +243,7 @@ export async function getFrictionData() {
         const events = await prisma.event.findMany({
             where: {
                 createdAt: { gte: sevenDaysAgo },
-                ...(authSession?.user?.username !== 'admin' ? { session: { workspace: { profileId } } } : {})
+                ...(profileId ? { session: { workspace: { profileId } } } : {})
             },
             select: {
                 createdAt: true,
@@ -290,7 +290,7 @@ export async function getLivePresence() {
         const presence = await prisma.userPresence.findMany({
             where: {
                 lastHeartbeat: { gte: fiveMinutesAgo },
-                ...(authSession?.user?.username !== 'admin' ? { user: { profileId } } : {})
+                ...(profileId ? { user: { profileId } } : {})
             },
             include: {
                 user: {

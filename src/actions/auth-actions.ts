@@ -45,7 +45,7 @@ export async function loginAction(prevState: any, formData: FormData) {
     } catch (err) {
         if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
         console.error('[Login] ERROR:', err)
-        return { error: 'Something went wrong. Please try again later.' }
+        return { error: `Lỗi: ${err instanceof Error ? err.message : 'Unknown'}` }
     }
 
     console.log(`[Login] Redirecting ${username} based on role: ${role}`)

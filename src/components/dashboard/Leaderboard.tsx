@@ -2,6 +2,7 @@ import { getWorkspacePrisma } from "@/lib/prisma-workspace"
 import { unstable_cache } from "next/cache"
 import { SALARY_PENDING_STATUSES } from "@/lib/task-statuses"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import RefreshLeaderboardButton from "./RefreshLeaderboardButton"
 
 // Caching leaderboard for 15 minutes (900 seconds) 
 // To avoid continuous live queries which overload CPU DB
@@ -122,7 +123,7 @@ export const getLeaderboardData = unstable_cache(
     },
     ['leaderboard-v2'],
     { 
-        revalidate: 300, // 5 mins
+        revalidate: 86400, // 24 hours (manual only practically)
         tags: ['leaderboard']
     }
 )
@@ -154,7 +155,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                 <h3 className="font-bold text-lg text-white flex items-center gap-2">
                     <span className="text-2xl">🏆</span> Bảng Xếp Hạng Tháng
                 </h3>
-                <span className="text-xs font-mono text-zinc-500 bg-zinc-900 px-2 py-1 rounded-full border border-zinc-800">Cập nhật lúc: {new Date().toLocaleTimeString('vi-VN')}</span>
+                <RefreshLeaderboardButton isAdmin={session?.user?.role === 'ADMIN'} />
             </div>
 
             {leaderboard.length === 0 ? (

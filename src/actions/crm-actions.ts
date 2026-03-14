@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { getSession } from '@/lib/auth'
 
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
@@ -9,7 +10,9 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 export async function getClients(workspaceId: string) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         const clients = await workspacePrisma.client.findMany({
             where: { parentId: null }, // Only fetch top-level to start tree
             include: {
@@ -33,7 +36,9 @@ export async function getClients(workspaceId: string) {
 
 export async function getTopClients(workspaceId: string, limit = 5) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         const topClients = await workspacePrisma.client.findMany({
             orderBy: { aiScore: 'desc' },
             take: limit,
@@ -69,7 +74,9 @@ export async function getTopClients(workspaceId: string, limit = 5) {
 
 export async function createClient(data: { name: string, parentId?: number }, workspaceId: string) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.client.create({
             data: {
                 name: data.name,
@@ -85,7 +92,9 @@ export async function createClient(data: { name: string, parentId?: number }, wo
 
 export async function updateClient(id: number, data: { name: string }, workspaceId: string) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.client.update({
             where: { id },
             data: { name: data.name }
@@ -101,7 +110,9 @@ export async function updateClient(id: number, data: { name: string }, workspace
 
 export async function createProject(data: { name: string, clientId: number, code?: string }, workspaceId: string) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.project.create({
             data: {
                 name: data.name,
@@ -120,8 +131,9 @@ export async function createProject(data: { name: string, clientId: number, code
 
 export async function createFeedback(data: { projectId: number, content: string, type: 'CLIENT' | 'INTERNAL', severity: number }, workspaceId: string) {
     try {
-        // Feedback model may need workspace isolation double check, but assumed linked via project
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.feedback.create({
             data: {
                 projectId: data.projectId,
@@ -141,7 +153,9 @@ export async function createFeedback(data: { projectId: number, content: string,
 
 export async function deleteClient(id: number, workspaceId: string) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.client.delete({
             where: { id }
         })

@@ -22,7 +22,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     const session = await getSession()
     if (!session) redirect('/login')
 
-    const workspacePrisma = getWorkspacePrisma(workspaceId)
+    const profileId = (session.user as any).sessionProfileId
+    const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
     const currentUser = await workspacePrisma.user.findUnique({
         where: { id: session.user.id },

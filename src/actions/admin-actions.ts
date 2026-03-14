@@ -5,10 +5,13 @@ import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getSession } from '@/lib/auth'
 
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.user.update({
             where: { id: userId },
             data: { role: newRole as UserRole }
@@ -23,7 +26,9 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
 
 export async function updateUserReputation(userId: string, change: number, workspaceId: string) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // Fetch current to check bounds
         const user = await workspacePrisma.user.findUnique({ where: { id: userId } })
         if (!user) return { error: 'User not found' }
@@ -92,7 +97,9 @@ export async function createTask(formData: FormData, workspaceId: string) {
             assignedAgencyId = assignee?.agencyId || null
         }
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
         await workspacePrisma.task.create({
             data: {

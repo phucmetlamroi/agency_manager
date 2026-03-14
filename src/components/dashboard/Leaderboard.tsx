@@ -6,8 +6,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 // Caching leaderboard for 15 minutes (900 seconds) 
 // To avoid continuous live queries which overload CPU DB
 export const getLeaderboardData = unstable_cache(
-    async (workspaceId: string) => {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+    async (workspaceId: string, profileId?: string) => {
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         const now = new Date()
         const currentMonth = now.getMonth() + 1
         const currentYear = now.getFullYear()
@@ -125,7 +125,10 @@ export const getLeaderboardData = unstable_cache(
 )
 
 export default async function Leaderboard({ workspaceId }: { workspaceId: string }) {
-    const leaderboard = await getLeaderboardData(workspaceId)
+    const { getSession } = await import("@/lib/auth")
+    const session = await getSession()
+    const profileId = (session?.user as any)?.sessionProfileId
+    const leaderboard = await getLeaderboardData(workspaceId, profileId)
 
     const getRankColor = (rank: string) => {
         if (rank === 'S') return 'from-yellow-400 to-purple-500 text-yellow-500 border-yellow-500/50 bg-yellow-500/10'

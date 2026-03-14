@@ -45,6 +45,11 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
 
 
 
+        // Get current profile ID for isolation
+        const { getSession } = await import('@/lib/auth')
+        const session = await getSession()
+        const currentProfileId = (session?.user as any)?.sessionProfileId
+
         // Use standard prisma instead of extension for this complex transaction
         await prisma.$transaction(async (tx) => {
             for (const title of data.titles) {
@@ -71,7 +76,8 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         exchangeRate: data.exchangeRate,
                         profitVND: profitVND,
                         clientId: data.clientId,
-                        workspaceId: workspaceId // Manual injection
+                        workspaceId: workspaceId, // Manual injection
+                        profileId: currentProfileId // Manual isolation
                     }
                 })
             }

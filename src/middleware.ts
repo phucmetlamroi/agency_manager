@@ -48,8 +48,8 @@ export async function middleware(request: NextRequest) {
                 return NextResponse.redirect(new URL('/portal/en', request.url))
             }
 
-            // Mandatory ToS Check
-            if (session.user.hasAcceptedTerms === false) {
+            // Mandatory ToS Check (Skip for Admins)
+            if (role !== 'ADMIN' && session.user.hasAcceptedTerms === false) {
                 if (pathname !== '/user-agreement' && !pathname.startsWith('/api')) {
                     return NextResponse.redirect(new URL('/user-agreement', request.url))
                 }

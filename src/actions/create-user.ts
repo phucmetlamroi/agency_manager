@@ -43,7 +43,8 @@ export async function createUser(formData: FormData, workspaceId: string) {
                 plainPassword: password,
                 role,
                 agencyId: agencyId, // Link to Agency
-                profileId: assignedProfileId
+                profileId: assignedProfileId,
+                hasAcceptedTerms: role === 'ADMIN'
             }
         })
         revalidatePath(`/${workspaceId}/admin/users`)

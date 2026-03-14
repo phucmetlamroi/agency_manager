@@ -19,54 +19,52 @@ type Props = {
 export default function UserList({ users, currentUser, agencies, profiles, workspaceId }: Props) {
     return (
         <div>
-            {currentUser?.username === 'admin' && (
-                <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
-                    <h3 style={{ marginBottom: '1rem' }}>Thêm tài khoản mới</h3>
-                    <form action={async (formData) => {
-                        await createUser(formData, workspaceId)
-                    }} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem' }}>Thêm tài khoản mới</h3>
+                <form action={async (formData) => {
+                    await createUser(formData, workspaceId)
+                }} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Username</label>
+                        <input name="username" required style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white' }} />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Password</label>
+                        <input name="password" required type="password" style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white' }} />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Role</label>
+                        <select name="role" style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white' }}>
+                            <option value="USER">User</option>
+                            <option value="ADMIN">Admin</option>
+                            <option value="CLIENT">Client</option>
+                        </select>
+                    </div>
+                    {agencies && agencies.length > 0 && (
                         <div>
-                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Username</label>
-                            <input name="username" required style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white' }} />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Password</label>
-                            <input name="password" required type="password" style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white' }} />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Role</label>
-                            <select name="role" style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white' }}>
-                                <option value="USER">User</option>
-                                <option value="ADMIN">Admin</option>
-                                <option value="CLIENT">Client</option>
+                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Agency (Optional)</label>
+                            <select name="agencyId" style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white', maxWidth: '150px' }}>
+                                <option value="">-- None --</option>
+                                {agencies.map(a => (
+                                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                                ))}
                             </select>
                         </div>
-                        {agencies && agencies.length > 0 && (
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Agency (Optional)</label>
-                                <select name="agencyId" style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', background: '#333', color: 'white', maxWidth: '150px' }}>
-                                    <option value="">-- None --</option>
-                                    {agencies.map(a => (
-                                        <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-                        {profiles && profiles.length > 0 && (
-                            <div>
-                                <label style={{ display: 'block', textShadow: '0 0 5px #3b82f6', color: '#60a5fa', fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Team Profile</label>
-                                <select name="profileId" required style={{ padding: '0.6rem', borderRadius: '6px', border: '1px solid #3b82f6', background: '#1e3a8a', color: 'white' }}>
-                                    <option value="">-- Cấp phái Team --</option>
-                                    {profiles.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-                        <button className="btn btn-primary" type="submit">Thêm User</button>
-                    </form>
-                </div>
-            )}
+                    )}
+                    {currentUser?.username === 'admin' && profiles && profiles.length > 0 && (
+                        <div>
+                            <label style={{ display: 'block', textShadow: '0 0 5px #3b82f6', color: '#60a5fa', fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Team Profile</label>
+                            <select name="profileId" required style={{ padding: '0.6rem', borderRadius: '6px', border: '1px solid #3b82f6', background: '#1e3a8a', color: 'white' }}>
+                                <option value="">-- Cấp phái Team --</option>
+                                {profiles.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    <button className="btn btn-primary" type="submit">Thêm User</button>
+                </form>
+            </div>
 
             <div className="glass-panel" style={{ padding: '1rem' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>

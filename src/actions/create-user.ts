@@ -25,12 +25,15 @@ export async function createUser(formData: FormData, workspaceId: string) {
 
         if (!creator) return { error: 'Creator not found' }
 
-        if (creator.username !== 'admin') {
-            return { error: 'Forbidden: Chỉ Admin tối thượng mới có quyền tạo tài khoản.' }
+        // Super Admin check for Profile choice
+        let assignedProfileId = null
+        if (creator.username === 'admin') {
+            assignedProfileId = incomingProfileId
+        } else {
+            // Normal Admin creates users within their own profile
+            if (!creator.profileId) return { error: 'Admin không thuộc về Team nào nên không thể tạo nhân sự.' }
+            assignedProfileId = creator.profileId
         }
-
-        // Logic for Profile Assignment - Super Admin MUST provide a profileId
-        let assignedProfileId = incomingProfileId
 
         const hashedPassword = await bcrypt.hash(password, 10)
         await prisma.user.create({

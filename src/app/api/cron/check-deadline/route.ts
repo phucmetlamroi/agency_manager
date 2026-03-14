@@ -4,6 +4,23 @@ import { UserRole } from '@prisma/client'
 
 // Call this route via Cron Job (e.g. Vercel Cron) every hour
 export async function GET(request: Request) {
+    const authHeader = request.headers.get('authorization')
+    const headerKey =
+        request.headers.get('x-cron-secret') ||
+        request.headers.get('x-cron-key') ||
+        null
+    const bearerKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    const key = headerKey || bearerKey
+    const secret = process.env.CRON_SECRET
+
+    if (!secret) {
+        return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
+    }
+
+    if (key !== secret) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     try {
         const now = new Date()
 

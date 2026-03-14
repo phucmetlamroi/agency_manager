@@ -133,9 +133,7 @@ export async function changePassword(userId: string, currentPass: string, newPas
         await prisma.user.update({
             where: { id: userId },
             data: {
-                password: hashedPassword,
-                // If we want to clear plainPassword for security after user changes it manually:
-                plainPassword: null
+                password: hashedPassword
             }
         })
 

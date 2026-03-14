@@ -39,7 +39,6 @@ export async function createUser(formData: FormData, workspaceId: string) {
             data: {
                 username,
                 password: hashedPassword,
-                plainPassword: password,
                 role,
                 profileId: assignedProfileId,
                 hasAcceptedTerms: role === 'ADMIN'

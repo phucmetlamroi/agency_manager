@@ -10,6 +10,7 @@ import { getSession } from '@/lib/auth'
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
         const session = await getSession()
+        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.user.update({
@@ -27,6 +28,7 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
 export async function updateUserReputation(userId: string, change: number, workspaceId: string) {
     try {
         const session = await getSession()
+        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // Fetch current to check bounds
@@ -88,6 +90,7 @@ export async function createTask(formData: FormData, workspaceId: string) {
         const clientId = formData.get('clientId') ? parseInt(formData.get('clientId') as string) : null
 
         const session = await getSession()
+        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 

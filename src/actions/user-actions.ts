@@ -22,8 +22,7 @@ export async function changePassword(formData: FormData, workspaceId: string) {
         await prisma.user.update({
             where: { id: session.user.id },
             data: {
-                password: hashedPassword,
-                plainPassword: newPassword // Sync back to admin
+                password: hashedPassword
             }
         })
 
@@ -37,6 +36,10 @@ export async function changePassword(formData: FormData, workspaceId: string) {
 
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
+        const session = await getSession()
+        if (session?.user?.role !== 'ADMIN') {
+            return { success: false, error: 'Unauthorized' }
+        }
         // Super Admin Protection
         const targetUser = await prisma.user.findUnique({ where: { id: userId } })
         if (targetUser?.username === 'admin') {
@@ -56,6 +59,10 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
 
 export async function deleteUser(userId: string, workspaceId: string) {
     try {
+        const session = await getSession()
+        if (session?.user?.role !== 'ADMIN') {
+            return { success: false, error: 'Unauthorized' }
+        }
         // Super Admin Protection
         const targetUser = await prisma.user.findUnique({ where: { id: userId } })
         if (targetUser?.username === 'admin') {
@@ -95,8 +102,7 @@ export async function adminResetPassword(userId: string, newPassword: string, wo
         await prisma.user.update({
             where: { id: userId },
             data: {
-                password: hashedPassword,
-                plainPassword: newPassword
+                password: hashedPassword
             }
         })
         revalidatePath(`/${workspaceId}/admin/users`)

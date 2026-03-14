@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
+import { getSession } from '@/lib/auth'
 
 type BatchTaskInput = {
     titles: string[]
@@ -34,8 +35,8 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
         const deadlineDate = data.deadline ? parseVietnamDate(data.deadline) : null
 
         // Get current profile ID for isolation
-        const { getSession } = await import('@/lib/auth')
         const session = await getSession()
+        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
         const currentProfileId = (session?.user as any)?.sessionProfileId
 
         // Use standard prisma instead of extension for this complex transaction
@@ -87,6 +88,9 @@ export async function bulkDeleteTasks(taskIds: string[], workspaceId: string) {
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
+        const session = await getSession()
+        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
+
         await prisma.task.deleteMany({
             where: {
                 id: { in: taskIds },
@@ -107,6 +111,9 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
+        const session = await getSession()
+        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
+
         // Filter out undefined/null values
         const updateData: any = {}
         if (data.resources !== undefined) updateData.resources = data.resources
@@ -149,6 +156,9 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
+        const session = await getSession()
+        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
+
         if (assigneeId && assigneeId.startsWith('agency:')) {
             return { error: 'Agency assignment is no longer supported.' }
         }

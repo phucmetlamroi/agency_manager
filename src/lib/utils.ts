@@ -26,14 +26,20 @@ export function formatCurrency(amount: number | string | any) {
     }).format(value)
 }
 
+import DOMPurify from 'isomorphic-dompurify';
+
 /**
  * Ensures all <a> tags in an HTML string have target="_blank" and rel="noopener noreferrer"
+ * and sanitizes the HTML to prevent XSS.
  */
 export function ensureExternalLinks(html: string | null | undefined): string {
     if (!html) return '';
 
+    // First, sanitize the HTML
+    const sanitized = DOMPurify.sanitize(html);
+
     // Step 1: Add target="_blank" if missing
-    let processed = html.replace(/<a\s+(?![^>]*\btarget\s*=)([^>]+)>/gi, '<a $1 target="_blank">');
+    let processed = sanitized.replace(/<a\s+(?![^>]*\btarget\s*=)([^>]+)>/gi, '<a $1 target="_blank">');
 
     // Step 2: Add rel="noopener noreferrer" if missing
     processed = processed.replace(/<a\s+(?![^>]*\brel\s*=)([^>]+)>/gi, '<a $1 rel="noopener noreferrer">');

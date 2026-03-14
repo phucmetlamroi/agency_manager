@@ -11,6 +11,9 @@ type Profile = {
     name: string;
     bannerUrl: string | null;
     logoUrl: string | null;
+    _count?: {
+        users: number;
+    };
 }
 
 export default function ProfileManagement({ initialProfiles }: { initialProfiles: Profile[] }) {
@@ -154,6 +157,13 @@ export default function ProfileManagement({ initialProfiles }: { initialProfiles
                                 </div>
                                 
                                 <h4 className="text-lg font-bold text-white mb-1">{profile.name}</h4>
+                                
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
+                                        {profile._count?.users || 0} Thành viên
+                                    </div>
+                                </div>
+
                                 <div className="text-xs text-neutral-500 font-mono mt-auto">ID: {profile.id}</div>
                             </div>
                         </div>

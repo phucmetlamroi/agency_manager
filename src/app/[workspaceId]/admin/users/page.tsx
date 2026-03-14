@@ -57,7 +57,16 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
 
     // Fetch Profiles for Super Admin user creation
     const profiles = currentUser?.username === 'admin' ? 
-        await prisma.profile.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }) : 
+        await prisma.profile.findMany({ 
+            select: { 
+                id: true, 
+                name: true, 
+                bannerUrl: true, 
+                logoUrl: true,
+                _count: { select: { users: true } }
+            }, 
+            orderBy: { name: 'asc' } 
+        }) : 
         []
 
     return (

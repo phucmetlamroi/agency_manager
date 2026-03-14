@@ -93,8 +93,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
 
-                {/* Column 1: Task Workflow (6/12 width) */}
-                <div className="xl:col-span-6 space-y-6">
+                {/* Column 1: Task Workflow (7/12 width) */}
+                <div className="xl:col-span-7 space-y-6">
                     {/* Bottleneck Alert */}
                     <BottleneckAlert tasks={serializeDecimal(tasks) as any} />
 
@@ -115,8 +115,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                     <TaskCreationManager users={users} workspaceId={workspaceId} />
                 </div>
 
-                {/* Column 3: Leaderboard & Queue (3/12 width) */}
-                <div className="xl:col-span-3 space-y-6">
+                {/* Column 3: Leaderboard & Queue (2/12 width) */}
+                <div className="xl:col-span-2 space-y-6">
                     {/* Leaderboard */}
                     <div className="min-h-[400px]">
                         <Suspense fallback={<div className="glass-panel w-full h-[300px] flex items-center justify-center text-zinc-500 animate-pulse">Đang tải Bảng Xếp Hạng...</div>}>

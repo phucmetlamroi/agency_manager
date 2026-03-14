@@ -3,6 +3,7 @@
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
 
 export async function getPayrollLockStatus(workspaceId: string) {
     const now = new Date()
@@ -174,16 +175,39 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             return { success: false, error: 'Không có dữ liệu Task hoặc Doanh thu nào trong tháng này để tính toán.' }
         }
 
+        const pendingTasksAggregate = await workspacePrisma.task.groupBy({
+            by: ['assigneeId'],
+            where: {
+                status: { in: SALARY_PENDING_STATUSES },
+                assigneeId: { not: null },
+                updatedAt: { gte: startOfMonth, lte: endOfMonth },
+                workspaceId
+            },
+            _sum: { value: true }
+        })
+
         // 4. Calculate revenue and execution time for each user
         interface UserRanking {
             userId: string
             username: string
             revenue: number
+            pendingRevenue: number
+            tentativeRevenue: number
             tasksCompleted: number
             monthlySalary: number
             totalPenalty: number
             errorRate: number
             rankScore: string
+            incomeScore: number
+        }
+
+        const rankPriority = (rank: string) => {
+            if (rank === 'S') return 5
+            if (rank === 'A') return 4
+            if (rank === 'B') return 3
+            if (rank === 'C') return 2
+            if (rank === 'D') return 1
+            return 0
         }
 
         const rankings: UserRanking[] = []
@@ -202,7 +226,9 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             const totalTasks = user.tasks.length
             const totalPenalty = user.errorLogs.reduce((sum, log) => sum + (log.error?.penalty || 0), 0)
             const errorRate = totalTasks >= 8 ? Number((totalPenalty / totalTasks).toFixed(2)) : 0
-            
+            const pendingRevenue = Number(pendingTasksAggregate.find((p: any) => p.assigneeId === user.id)?._sum.value || 0)
+            const tentativeRevenue = revenue + pendingRevenue
+           
             let rankScore = 'UNRANKED'
             if (totalTasks >= 8) {
                 if (errorRate < 0.3) rankScore = 'S'
@@ -212,20 +238,29 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                 else rankScore = 'D'
             }
 
+            const incomeScore = Math.max(0, tentativeRevenue - totalPenalty)
             rankings.push({
                 userId: user.id,
                 username: user.username,
                 revenue,
+                pendingRevenue,
+                tentativeRevenue,
                 tasksCompleted: totalTasks,
                 monthlySalary: revenue, // Using revenue as salary for bonus calculation
                 totalPenalty,
                 errorRate,
-                rankScore
+                rankScore,
+                incomeScore
             })
         }
 
-        // 5. Rank by revenue DESC
+        // 5. Rank by net income (desc), then error rate (asc), then rank priority, revenue, completed tasks
         rankings.sort((a, b) => {
+            if (Math.abs(b.incomeScore - a.incomeScore) > 0.01) return b.incomeScore - a.incomeScore
+            if (a.errorRate !== b.errorRate) return a.errorRate - b.errorRate
+            const aRank = rankPriority(a.rankScore)
+            const bRank = rankPriority(b.rankScore)
+            if (aRank !== bRank) return bRank - aRank
             if (Math.abs(b.revenue - a.revenue) > 0.01) return b.revenue - a.revenue
             return b.tasksCompleted - a.tasksCompleted
         })

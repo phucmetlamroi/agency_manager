@@ -1,5 +1,6 @@
 import { getWorkspacePrisma } from "@/lib/prisma-workspace"
 import { unstable_cache } from "next/cache"
+import { SALARY_PENDING_STATUSES } from "@/lib/task-statuses"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 // Caching leaderboard for 15 minutes (900 seconds) 
@@ -26,6 +27,16 @@ export const getLeaderboardData = unstable_cache(
             _sum: { value: true }
         })
 
+        const pendingTasksAggregate = await workspacePrisma.task.groupBy({
+            by: ['assigneeId'],
+            where: {
+                status: { in: SALARY_PENDING_STATUSES },
+                assigneeId: { not: null },
+                updatedAt: { gte: thisMonthStart, lte: thisMonthEnd }
+            },
+            _sum: { value: true }
+        })
+
         // Fetch sum of penalties by user for this month
         const errorLogsAggregate = await (workspacePrisma as any).errorLog.groupBy({
             by: ['userId'],
@@ -37,7 +48,8 @@ export const getLeaderboardData = unstable_cache(
 
         const userIds = Array.from(new Set([
             ...completedTasksAggregate.map(t => t.assigneeId as string),
-            ...errorLogsAggregate.map((e: any) => e.userId)
+            ...errorLogsAggregate.map((e: any) => e.userId),
+            ...pendingTasksAggregate.map((p: any) => p.assigneeId as string)
         ]))
 
         if (userIds.length === 0) return []
@@ -52,7 +64,9 @@ export const getLeaderboardData = unstable_cache(
             const taskCount = completedTasksAggregate.find(t => t.assigneeId === u.id)?._count.id || 0
             const revenue = Number(completedTasksAggregate.find(t => t.assigneeId === u.id)?._sum.value || 0)
             const totalPenalty = errorLogsAggregate.find((e: any) => e.userId === u.id)?._sum.calculatedScore || 0
-            
+           
+            const pendingRevenue = Number(pendingTasksAggregate.find((p: any) => p.assigneeId === u.id)?._sum.value || 0)
+            const tentativeRevenue = revenue + pendingRevenue
             // Sync with Analytics logic: if 0 tasks but errors exist, highlight it
             const errorRate = taskCount > 0 ? Number((totalPenalty / taskCount).toFixed(2)) : (totalPenalty > 0 ? totalPenalty : 0)
             
@@ -81,22 +95,29 @@ export const getLeaderboardData = unstable_cache(
             if (rank === 'C') rankScore = 2
             if (rank === 'D') rankScore = 1
 
+            const incomeScore = Math.max(0, tentativeRevenue - totalPenalty)
+
             return {
                 id: u.id,
                 username: u.username,
                 taskCount,
                 errorRate,
                 revenue,
+                pendingRevenue,
+                tentativeRevenue,
                 rank,
-                rankScore
+                rankScore,
+                incomeScore
             }
-        }).filter(u => u.rank !== 'N/A') // Only show ranked users
+        })
 
-        // Sort by RankScore (desc), then Revenue (desc), then ErrorRate (asc)
+        // Sort by Net Income (desc) -> Error Rate (asc) -> Rank -> Revenue -> Task Count
         return rawData.sort((a, b) => {
-            if (a.rankScore !== b.rankScore) return b.rankScore - a.rankScore
-            if (a.revenue !== b.revenue) return b.revenue - a.revenue
-            return a.errorRate - b.errorRate
+            if (b.incomeScore !== a.incomeScore) return b.incomeScore - a.incomeScore
+            if (a.errorRate !== b.errorRate) return a.errorRate - b.errorRate
+            if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore
+            if (b.revenue !== a.revenue) return b.revenue - a.revenue
+            return b.taskCount - a.taskCount
         }).slice(0, 10) // Top 10
     },
     ['leaderboard-cache'], 
@@ -157,6 +178,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                     <div className="w-full h-24 bg-gradient-to-t from-zinc-800 to-zinc-800/50 rounded-t-lg mt-3 border-t-2 border-zinc-600/50 flex flex-col items-center justify-end pb-2 relative overflow-hidden">
                                         <div className="absolute inset-0 bg-white/5"></div>
                                         <span className="text-xs text-zinc-400 font-mono z-10">{top3[1].taskCount} tasks</span>
+                                        <span className="text-[10px] text-zinc-500 font-mono z-10">Tentative: {top3[1].tentativeRevenue.toLocaleString('vi-VN')}đ</span>
                                     </div>
                                 </div>
                             )}
@@ -179,6 +201,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                     <div className="absolute inset-0 bg-gradient-to-b from-yellow-400/10 to-transparent"></div>
                                     <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:10px_10px]"></div>
                                     <span className="text-xs text-yellow-200/80 font-mono z-10">{top3[0].taskCount} tasks</span>
+                                    <span className="text-[10px] text-yellow-200/60 font-mono z-10">Tentative: {top3[0].tentativeRevenue.toLocaleString('vi-VN')}đ</span>
                                 </div>
                             </div>
 
@@ -199,6 +222,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                     <div className="w-full h-20 bg-gradient-to-t from-zinc-800 to-zinc-800/40 rounded-t-lg mt-3 border-t-2 border-zinc-700/50 flex flex-col items-center justify-end pb-2 relative overflow-hidden">
                                         <div className="absolute inset-0 bg-white/5"></div>
                                         <span className="text-xs text-zinc-500 font-mono z-10">{top3[2].taskCount} tasks</span>
+                                        <span className="text-[10px] text-zinc-400 font-mono z-10">Tentative: {top3[2].tentativeRevenue.toLocaleString('vi-VN')}đ</span>
                                     </div>
                                 </div>
                             )}
@@ -219,10 +243,11 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                         <span className="text-sm font-medium text-zinc-300">{r.username}</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <div className="hidden sm:block text-right">
-                                            <div className="text-xs text-zinc-500"><span className="text-zinc-300">{r.taskCount}</span> tasks</div>
-                                            <div className="text-[10px] text-zinc-600">{r.errorRate}% err</div>
-                                        </div>
+                                    <div className="hidden sm:block text-right">
+                                        <div className="text-xs text-zinc-500"><span className="text-zinc-300">{r.taskCount}</span> tasks</div>
+                                        <div className="text-[10px] text-zinc-600">{r.errorRate}% err</div>
+                                        <div className="text-[10px] text-zinc-500">Tentative: {r.tentativeRevenue.toLocaleString('vi-VN')}đ</div>
+                                    </div>
                                         <span className={`text-xs px-2 py-1 rounded font-bold font-mono border ${getRankColor(r.rank).split(' ').slice(2).join(' ')}`}>
                                             {r.rank}
                                         </span>

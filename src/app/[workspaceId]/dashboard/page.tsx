@@ -8,6 +8,7 @@ import { Suspense } from 'react'
 import { serializeDecimal } from '@/lib/serialization'
 import { UserRole } from '@prisma/client'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
 
 
 export const dynamic = 'force-dynamic'
@@ -62,6 +63,9 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         },
         orderBy: { createdAt: 'desc' }
     })
+
+    const pendingTasks = tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status))
+    const pendingSalary = pendingTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
 
     // Dynamic month boundaries
     const thisMonthStart = new Date(currentYear, currentMonth - 1, 1)
@@ -146,6 +150,10 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
                     <div style={{ marginTop: '1rem', display: 'inline-block', padding: '0.3rem 0.8rem', borderRadius: '20px', background: percentage >= 0 ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: percentage >= 0 ? '#22c55e' : '#ef4444', fontSize: '0.9rem', fontWeight: 'bold' }}>
                         {percentage > 0 && '▲'} {percentage < 0 && '▼'} {Math.abs(percentage)}% so với tháng trước
+                    </div>
+
+                    <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+                        Số tiền dự kiến: {pendingSalary.toLocaleString()}đ <span style={{ fontSize: '0.75rem', color: '#cbd5f5' }}>({pendingTasks.length} task đang nhận/đang thực hiện/Revision)</span>
                     </div>
                 </div>
 

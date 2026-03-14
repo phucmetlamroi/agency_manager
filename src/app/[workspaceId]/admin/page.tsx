@@ -91,14 +91,14 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             <KPIStats tasks={serializeDecimal(tasks)} />
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
 
-                {/* Left Column: Task Workflow (3/4 width) */}
-                <div className="xl:col-span-3 space-y-6">
+                {/* Column 1: Task Workflow (6/12 width) */}
+                <div className="xl:col-span-6 space-y-6">
                     {/* Bottleneck Alert */}
                     <BottleneckAlert tasks={serializeDecimal(tasks) as any} />
 
-                    {/* Tabs */}
+                    {/* Tabs / Table */}
                     <div className="glass-panel p-6 min-h-[500px]">
                         <TaskWorkflowTabs
                             tasks={serializeDecimal(assignedTasks.concat(unassignedTasks)) as any}
@@ -110,22 +110,18 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                     </div>
                 </div>
 
-                {/* Right Column: Leaderboard & Quick Actions (1/4 width) */}
-                <div className="space-y-6">
-                    {/* Leaderboard - Top Right position */}
+                {/* Column 2: Quick Create Task (3/12 width) */}
+                <div className="xl:col-span-3 space-y-6">
+                    <TaskCreationManager users={users} workspaceId={workspaceId} />
+                </div>
+
+                {/* Column 3: Leaderboard & Queue (3/12 width) */}
+                <div className="xl:col-span-3 space-y-6">
+                    {/* Leaderboard */}
                     <div className="min-h-[400px]">
                         <Suspense fallback={<div className="glass-panel w-full h-[300px] flex items-center justify-center text-zinc-500 animate-pulse">Đang tải Bảng Xếp Hạng...</div>}>
                             <Leaderboard workspaceId={workspaceId} />
                         </Suspense>
-                    </div>
-
-                    {/* Quick Create Task */}
-                    <div className="glass-panel p-4">
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="text-xl">⚡</span>
-                            <h3 className="font-bold text-white">Quick Create</h3>
-                        </div>
-                        <TaskCreationManager users={users} workspaceId={workspaceId} />
                     </div>
 
                     {/* Pending Queue Summary */}

@@ -54,9 +54,9 @@ export async function middleware(request: NextRequest) {
                 return NextResponse.redirect(new URL(target, request.url));
             }
             
-            // 3. Mandatory ToS Check (Skip for Admins)
+            // 3. Mandatory ToS Check (Skip for Admins and Clients)
             // If they haven't accepted, force them to the agreement page.
-            if (role !== 'ADMIN' && !session.user.hasAcceptedTerms) {
+            if (role !== 'ADMIN' && role !== 'CLIENT' && !session.user.hasAcceptedTerms) {
                 if (!pathname.startsWith('/api')) {
                     return NextResponse.redirect(new URL('/user-agreement', request.url));
                 }

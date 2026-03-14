@@ -19,6 +19,17 @@ const bypassModels = [
 ]
 
 /**
+ * Models that strictly do NOT have a profileId column.
+ */
+const noProfileModels = [
+    'Profile',
+    'WorkspaceMember',
+    'ErrorDictionary',
+    'BillingProfile',
+    'Feedback'
+]
+
+/**
  * Creates an extended PrismaClient that automatically injects `workspaceId`
  * into the `where` and `data` objects of queries for isolated models.
  *
@@ -40,13 +51,14 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
                     }
 
                     const isBypassed = bypassModels.includes(model)
+                    const hasNoProfile = noProfileModels.includes(model)
 
                     // 1. READ & DELETE Operations (Inject into `where`)
                     if (['findUnique', 'findUniqueOrThrow', 'findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'delete', 'deleteMany'].includes(operation)) {
                         (args as any).where = {
                             ...((args as any).where || {}),
                             ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
-                            ...(currentProfileId ? { profileId: currentProfileId } : {})
+                            ...(currentProfileId && !hasNoProfile ? { profileId: currentProfileId } : {})
                         }
                     }
 
@@ -55,22 +67,23 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
                         (args as any).data = {
                             ...((args as any).data || {}),
                             ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
-                            ...(currentProfileId ? { profileId: currentProfileId } : {})
+                            ...(currentProfileId && !hasNoProfile ? { profileId: currentProfileId } : {})
                         }
                     }
+
 
                     if (['createMany'].includes(operation)) {
                         if (Array.isArray((args as any).data)) {
                             (args as any).data = (args as any).data.map((item: any) => ({
                                 ...item,
                                 ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
-                                ...(currentProfileId ? { profileId: currentProfileId } : {})
+                                ...(currentProfileId && !hasNoProfile ? { profileId: currentProfileId } : {})
                             }))
                         } else {
                             (args as any).data = {
                                 ...((args as any).data || {}),
                                 ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
-                                ...(currentProfileId ? { profileId: currentProfileId } : {})
+                                ...(currentProfileId && !hasNoProfile ? { profileId: currentProfileId } : {})
                             }
                         }
                     }
@@ -80,13 +93,13 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
                         (args as any).where = {
                             ...((args as any).where || {}),
                             ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
-                            ...(currentProfileId ? { profileId: currentProfileId } : {})
+                            ...(currentProfileId && !hasNoProfile ? { profileId: currentProfileId } : {})
                         }
 
                         (args as any).create = {
                             ...((args as any).create || {}),
                             ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
-                            ...(currentProfileId ? { profileId: currentProfileId } : {})
+                            ...(currentProfileId && !hasNoProfile ? { profileId: currentProfileId } : {})
                         }
                     }
 

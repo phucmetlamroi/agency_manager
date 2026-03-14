@@ -26,7 +26,11 @@ const noProfileModels = [
     'WorkspaceMember',
     'ErrorDictionary',
     'BillingProfile',
-    'Feedback'
+    'Feedback',
+    'Rating',
+    'Session',
+    'Event',
+    'UserPresence'
 ]
 
 /**

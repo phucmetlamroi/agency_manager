@@ -177,8 +177,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                     </span>
                                     <div className="w-full h-24 bg-gradient-to-t from-zinc-800 to-zinc-800/50 rounded-t-lg mt-3 border-t-2 border-zinc-600/50 flex flex-col items-center justify-end pb-2 relative overflow-hidden">
                                         <div className="absolute inset-0 bg-white/5"></div>
-                                        <span className="text-xs text-zinc-400 font-mono z-10">{top3[1].taskCount} tasks</span>
-                                        <span className="text-[10px] text-zinc-500 font-mono z-10">Tentative: {top3[1].tentativeRevenue.toLocaleString('vi-VN')}đ</span>
+                                        {/* Sensitive info removed */}
                                     </div>
                                 </div>
                             )}
@@ -200,8 +199,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                 <div className="w-full h-32 bg-gradient-to-t from-yellow-900/40 to-yellow-600/20 rounded-t-xl mt-3 border-t-2 border-yellow-500/50 flex flex-col items-center justify-end pb-2 relative overflow-hidden">
                                     <div className="absolute inset-0 bg-gradient-to-b from-yellow-400/10 to-transparent"></div>
                                     <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:10px_10px]"></div>
-                                    <span className="text-xs text-yellow-200/80 font-mono z-10">{top3[0].taskCount} tasks</span>
-                                    <span className="text-[10px] text-yellow-200/60 font-mono z-10">Tentative: {top3[0].tentativeRevenue.toLocaleString('vi-VN')}đ</span>
+                                    {/* Sensitive info removed */}
                                 </div>
                             </div>
 
@@ -221,8 +219,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                     </span>
                                     <div className="w-full h-20 bg-gradient-to-t from-zinc-800 to-zinc-800/40 rounded-t-lg mt-3 border-t-2 border-zinc-700/50 flex flex-col items-center justify-end pb-2 relative overflow-hidden">
                                         <div className="absolute inset-0 bg-white/5"></div>
-                                        <span className="text-xs text-zinc-500 font-mono z-10">{top3[2].taskCount} tasks</span>
-                                        <span className="text-[10px] text-zinc-400 font-mono z-10">Tentative: {top3[2].tentativeRevenue.toLocaleString('vi-VN')}đ</span>
+                                        {/* Sensitive info removed */}
                                     </div>
                                 </div>
                             )}
@@ -243,11 +240,9 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                         <span className="text-sm font-medium text-zinc-300">{r.username}</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                    <div className="hidden sm:block text-right">
-                                        <div className="text-xs text-zinc-500"><span className="text-zinc-300">{r.taskCount}</span> tasks</div>
-                                        <div className="text-[10px] text-zinc-600">{r.errorRate}% err</div>
-                                        <div className="text-[10px] text-zinc-500">Tentative: {r.tentativeRevenue.toLocaleString('vi-VN')}đ</div>
-                                    </div>
+                                        <div className="hidden sm:block text-right">
+                                            <div className="text-[10px] text-zinc-600">{r.errorRate}% err</div>
+                                        </div>
                                         <span className={`text-xs px-2 py-1 rounded font-bold font-mono border ${getRankColor(r.rank).split(' ').slice(2).join(' ')}`}>
                                             {r.rank}
                                         </span>

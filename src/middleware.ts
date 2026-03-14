@@ -35,26 +35,39 @@ export async function middleware(request: NextRequest) {
             const session = await decrypt(sessionCookie.value)
             if (!session?.user) throw new Error('Invalid session')
             
-            const role = session.user.role
+            const role = session.user.role;
+            const isToSPage = pathname.includes('/user-agreement');
 
-            // Handle Root and Login direct access
+            // 1. HIGH PRIORITY EXEMPTION: User Agreement Page
+            // If they are on the ToS page, let them be there UNLESS they already accepted.
+            if (isToSPage) {
+                if (session.user.hasAcceptedTerms) {
+                    const target = role === 'CLIENT' ? '/portal/en' : '/profile';
+                    return NextResponse.redirect(new URL(target, request.url));
+                }
+                return NextResponse.next();
+            }
+
+            // 2. Auth Redirects for /login and /
             if (pathname === '/login' || pathname === '/') {
-                const target = role === 'CLIENT' ? '/portal/en' : '/profile'
-                return NextResponse.redirect(new URL(target, request.url))
+                const target = role === 'CLIENT' ? '/portal/en' : '/profile';
+                return NextResponse.redirect(new URL(target, request.url));
             }
             
-            // Basic role isolation
-            if (role === 'CLIENT' && !pathname.startsWith('/portal') && !pathname.startsWith('/api')) {
-                return NextResponse.redirect(new URL('/portal/en', request.url))
+            // 3. Mandatory ToS Check (Skip for Admins)
+            // If they haven't accepted, force them to the agreement page.
+            if (role !== 'ADMIN' && !session.user.hasAcceptedTerms) {
+                if (!pathname.startsWith('/api')) {
+                    return NextResponse.redirect(new URL('/user-agreement', request.url));
+                }
+                return NextResponse.next();
             }
 
-            // Mandatory ToS Check (Skip for Admins)
-            if (role !== 'ADMIN' && session.user.hasAcceptedTerms === false) {
-                if (pathname !== '/user-agreement' && !pathname.startsWith('/api')) {
-                    return NextResponse.redirect(new URL('/user-agreement', request.url))
-                }
-            } else if (pathname === '/user-agreement') {
-                return NextResponse.redirect(new URL('/profile', request.url))
+            // 4. Basic role isolation for CLIENT
+            // Clients are ONLY allowed in /portal or /api.
+            // (Agreement page already handled by exemption above).
+            if (role === 'CLIENT' && !pathname.startsWith('/portal') && !pathname.startsWith('/api')) {
+                return NextResponse.redirect(new URL('/portal/en', request.url));
             }
 
             // VERCEL FIX 4: CHECK EMBEDDED PROFILE ID

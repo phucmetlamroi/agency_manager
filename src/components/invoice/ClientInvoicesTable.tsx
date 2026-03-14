@@ -41,19 +41,31 @@ export function ClientInvoicesTable({ invoices, clientId, workspaceId }: { invoi
     }
 
     const handleDownload = async (invoice: Invoice) => {
-        // Re-generate PDF logic (or fetch if we stored it, currently we generate on fly based on DB record)
-        // Since we didn't implement a "Download Existing" API endpoint that takes ID, we might need to rely on the Generate API again 
-        // OR we can implement a simple "Download" button if we stored the file path. 
-        // The Schema has `filePath` but we are not using S3 yet.
-        // So we need to re-generate from DB data.
-        // TODO: Implement Re-download. For now, disable or show "Contact Admin".
-        // Actually, the user asked for "Re-generation". So let's implement a simple fetch to /api/invoices/[id]/download if we can, 
-        // BUT we don't have that endpoint.
+        try {
+            toast.info('Đang chuẩn bị bản PDF...')
+            const url = `/api/invoices/${invoice.id}/download?workspaceId=${workspaceId}`
+            const response = await fetch(url)
+            
+            if (!response.ok) {
+                const errorText = await response.text()
+                throw new Error(errorText || 'Failed to download')
+            }
 
-        // For this iteration, let's just show the list and Void button. Download can be "Coming Soon" or left out if not critical.
-        // Or we can construct the payload again and hit /generate. 
-        // That requires `items` to be full.
-        toast.info('Re-download feature coming soon.')
+            const blob = await response.blob()
+            const blobUrl = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = blobUrl
+            a.download = `Invoice-${invoice.invoiceNumber}.pdf`
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            window.URL.revokeObjectURL(blobUrl)
+            
+            toast.success('Hóa đơn đã được tải về!')
+        } catch (error: any) {
+            console.error(error)
+            toast.error(`Lỗi tải xuống: ${error.message}`)
+        }
     }
 
     if (invoices.length === 0) {
@@ -89,9 +101,9 @@ export function ClientInvoicesTable({ invoices, clientId, workspaceId }: { invoi
                                 </Badge>
                             </td>
                             <td className="py-3 text-right flex justify-end gap-2">
-                                {/* <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => handleDownload(inv)}>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => handleDownload(inv)}>
                                     <Download size={16} />
-                                </Button> */}
+                                </Button>
                                 {inv.status !== 'VOID' && (
                                     <Button
                                         size="icon"

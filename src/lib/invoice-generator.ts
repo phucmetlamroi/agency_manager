@@ -210,9 +210,9 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
 
         if (isVercel) {
             browser = await puppeteer.launch({
-                args: chromium.args,
-                defaultViewport: { width: 1920, height: 1080 },
-                executablePath: await chromium.executablePath(),
+                args: [...(chromium as any).args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+                defaultViewport: (chromium as any).defaultViewport,
+                executablePath: await (chromium as any).executablePath(),
                 headless: (chromium as any).headless,
                 ignoreHTTPSErrors: true,
             } as any)
@@ -250,7 +250,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         }
 
         const page = await browser.newPage()
-        await page.setContent(html, { waitUntil: 'networkidle0' })
+        await page.setContent(html, { waitUntil: 'domcontentloaded' })
 
         const pdf = await page.pdf({
             format: 'A4',
@@ -260,9 +260,9 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
 
         return Buffer.from(pdf)
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('PDF Generation Error:', error)
-        throw new Error('Failed to generate PDF')
+        throw new Error(`Failed to generate PDF: ${error.message || 'Unknown'}`)
     } finally {
         if (browser) await browser.close()
     }

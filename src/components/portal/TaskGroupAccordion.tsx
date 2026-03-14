@@ -74,17 +74,6 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
                     </p>
                 </div>
 
-                {/* Progress bar */}
-                <div className="hidden sm:block w-24 shrink-0">
-                    <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-indigo-500 rounded-full transition-all"
-                            style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
-                        />
-                    </div>
-                    <p className="text-zinc-600 text-xs mt-1 text-right">{total > 0 ? Math.round((done / total) * 100) : 0}%</p>
-                </div>
-
                 <ChevronDown
                     size={18}
                     className={`text-zinc-500 transition-transform duration-300 shrink-0 ${open ? 'rotate-180' : ''}`}
@@ -102,11 +91,10 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
                                 <div className="flex-1 min-w-0">
                                     <Link
                                         href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
-                                        className="block truncate text-sm text-zinc-200 font-medium group-hover:text-white transition-colors underline decoration-zinc-700/50 underline-offset-4"
+                                        className="block truncate text-sm text-zinc-200 font-medium group-hover:text-white transition-colors"
                                     >
                                         {task.title}
                                     </Link>
-                                    <p className="text-zinc-600 text-[10px] uppercase tracking-wider mt-0.5">{task.type}</p>
                                 </div>
 
                                 <div className="flex items-center gap-4">

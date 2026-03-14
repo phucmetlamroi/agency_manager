@@ -113,28 +113,6 @@ export default function ContextualTaskDrawer({ task, isOpen, onClose, locale }: 
                                     </div>
                                 )}
 
-                                {/* Assignee */}
-                                {task.assignee && (
-                                    <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-5">
-                                        <h3 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
-                                            <User size={16} className="text-pink-400" /> {t('assignee')}
-                                        </h3>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400 font-bold">
-                                                {(task.assignee.nickname || task.assignee.username).charAt(0).toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <p className="text-white font-medium">
-                                                    {locale === 'vi'
-                                                        ? (task.assignee.nickname || task.assignee.username)
-                                                        : removeAccents(task.assignee.nickname || task.assignee.username)
-                                                    }
-                                                </p>
-                                                <p className="text-zinc-500 text-[10px] uppercase tracking-tighter">Verified Studio Editor</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
 
                                 {/* Rating Survey embedded directly in modal */}
                                 <div className="pt-4 border-t border-white/5">

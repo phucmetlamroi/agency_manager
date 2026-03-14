@@ -2,8 +2,6 @@
 
 import { useState } from 'react'
 import ProjectHealthWidget from './ProjectHealthWidget'
-import ActiveFocusWidget from './ActiveFocusWidget'
-import ActivityFeedWidget from './ActivityFeedWidget'
 import AssetDocumentHubWidget from './AssetDocumentHubWidget'
 import PortalActionCenter from './PortalActionCenter'
 import ContextualTaskDrawer from './ContextualTaskDrawer'
@@ -49,13 +47,7 @@ export default function PortalDashboardBento({
                 </div>
 
                 {/* Row 2 */}
-                <div className="md:col-span-5 md:row-span-2 min-h-[400px]">
-                    <ActiveFocusWidget tasks={tasks} onSelectTask={setSelectedTaskId} />
-                </div>
-                <div className="md:col-span-4 md:row-span-2 min-h-[400px]">
-                    <ActivityFeedWidget tasks={tasks} />
-                </div>
-                <div className="md:col-span-3 md:row-span-2 min-h-[400px]">
+                <div className="md:col-span-12 md:row-span-1 min-h-[320px]">
                     <AssetDocumentHubWidget tasks={tasks} />
                 </div>
 

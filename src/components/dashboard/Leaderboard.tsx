@@ -120,8 +120,11 @@ export const getLeaderboardData = unstable_cache(
             return b.taskCount - a.taskCount
         }).slice(0, 10) // Top 10
     },
-    ['leaderboard-cache'], 
-    { revalidate: 900 } // 15 mins
+    ['leaderboard-v2'],
+    { 
+        revalidate: 300, // 5 mins
+        tags: ['leaderboard']
+    }
 )
 
 export default async function Leaderboard({ workspaceId }: { workspaceId: string }) {

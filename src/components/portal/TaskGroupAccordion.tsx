@@ -102,7 +102,7 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
                                         {task.clientStatus}
                                     </span>
 
-                                    <span className="text-zinc-600 text-[10px] shrink-0 hidden sm:block">
+                                    <span className="hidden">
                                         {task.deadline ? new Date(task.deadline).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US') : '—'}
                                     </span>
 
@@ -115,26 +115,6 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
                                 </div>
                             </div>
 
-                            {/* Inline Info to satisfy "no need to wait until click" */}
-                            <div className="mt-3 pl-8 flex flex-col gap-2">
-                                {task.productLink && (
-                                    <div className="flex items-center gap-2">
-                                        <a
-                                            href={task.productLink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-[11px] text-emerald-400 bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/20 hover:bg-emerald-500/10 transition-colors flex items-center gap-1.5"
-                                        >
-                                            <PlayCircle size={12} /> View Content
-                                        </a>
-                                    </div>
-                                )}
-                                {(task.notes_en || task.notes_vi) && (
-                                    <div className="text-[11px] text-zinc-500 line-clamp-1 italic max-w-2xl">
-                                        {(task.notes_en || task.notes_vi)?.replace(/<[^>]*>?/gm, '')}
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     ))}
                 </div>
@@ -185,7 +165,7 @@ export default function TaskGroupAccordion({
                     group={group}
                     locale={locale}
                     workspaceId={workspaceId}
-                    defaultOpen={groups.length === 1 || i === 0}
+                    defaultOpen={i === 0}
                 />
             ))}
         </div>

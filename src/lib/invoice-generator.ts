@@ -209,8 +209,11 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION
 
         if (isVercel) {
+            // Optimized for Vercel Serverless
+            (chromium as any).setGraphicsMode = false;
+            
             browser = await puppeteer.launch({
-                args: [...(chromium as any).args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+                args: (chromium as any).args,
                 defaultViewport: (chromium as any).defaultViewport,
                 executablePath: await (chromium as any).executablePath(),
                 headless: (chromium as any).headless,

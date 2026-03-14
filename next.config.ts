@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
       }
     ],
   },
-  serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "youtube-dl-exec"],
+  serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "youtube-dl-exec", "@sparticuz/chromium"],
   async redirects() {
     return [
       {

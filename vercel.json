@@ -2,6 +2,12 @@
     "functions": {
         "api/*.py": {
             "maxDuration": 10
+        },
+        "src/app/api/**/*.ts": {
+            "maxDuration": 30
+        },
+        "src/app/api/invoices/**/*.ts": {
+            "maxDuration": 60
         }
     }
 }

@@ -55,7 +55,7 @@ export const getLeaderboardData = unstable_cache(
         if (userIds.length === 0) return []
 
         const users = await workspacePrisma.user.findMany({
-            where: { id: { in: userIds }, role: { notIn: ['LOCKED', 'CLIENT'] } },
+            where: { id: { in: userIds }, role: 'USER' },
             select: { id: true, username: true, reputation: true }
         })
 

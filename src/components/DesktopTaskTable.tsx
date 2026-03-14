@@ -41,7 +41,7 @@ const statusBg: Record<string, string> = {
     "Sửa frame": "rgba(244, 114, 182, 0.2)"
 }
 
-export default function TaskTable({ tasks, isAdmin = false, users = [], agencies = [], workspaceId }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[], agencies?: { id: string, name: string, code: string }[], workspaceId: string }) {
+export default function TaskTable({ tasks, isAdmin = false, users = [], workspaceId }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[], workspaceId: string }) {
     const router = useRouter()
     const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
@@ -255,7 +255,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                         {isAdmin && (
                                             <div onClick={(e) => e.stopPropagation()}>
                                                 <select
-                                                    value={task.assignee?.id || (task.assignedAgencyId ? `agency:${task.assignedAgencyId}` : '')}
+                                                    value={task.assignee?.id || ''}
                                                     onChange={async (e) => {
                                                         const val = e.target.value
                                                         if (val) {
@@ -268,21 +268,11 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], agencies
                                                 >
                                                     <option value="sys:revoke" className="text-red-500 font-bold">⛔ Thu hồi về System</option>
                                                     <option value="" className="text-gray-500">-- Hủy giao (Unassign User) --</option>
-                                                    {agencies && agencies.length > 0 && (
-                                                        <optgroup label="Đại Lý (Agencies)">
-                                                            {agencies.map(a => (
-                                                                <option key={a.id} value={`agency:${a.id}`} className="text-purple-600 font-bold">
-                                                                    🏢 {a.code} - {a.name}
-                                                                </option>
-                                                            ))}
-                                                        </optgroup>
-                                                    )}
                                                     <optgroup label="Nhân viên">
                                                         {users
                                                             .filter(u => {
                                                                 const role = (u as any).role
-                                                                const isAgencyOwner = (u as any).ownedAgency && (u as any).ownedAgency.length > 0
-                                                                return role !== 'CLIENT' && role !== 'LOCKED' && !isAgencyOwner
+                                                                return role !== 'CLIENT' && role !== 'LOCKED'
                                                             })
                                                             .map(u => {
                                                                 return (

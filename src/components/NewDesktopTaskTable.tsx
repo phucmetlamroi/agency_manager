@@ -13,11 +13,10 @@ interface DesktopTaskTableProps {
     tasks: TaskWithUser[]
     isAdmin?: boolean
     users?: any[]
-    agencies?: any[]
     workspaceId: string
 }
 
-export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], agencies = [], workspaceId }: DesktopTaskTableProps) {
+export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], workspaceId }: DesktopTaskTableProps) {
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
     const [rowSelection, setRowSelection] = useState({})
     const { confirm } = useConfirm()
@@ -56,7 +55,6 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], a
 
     const columns = getColumns(
         users,
-        agencies,
         isAdmin,
         (task) => {
             if (!isAdmin && task.status === 'Đã nhận task') {

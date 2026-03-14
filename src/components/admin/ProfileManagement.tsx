@@ -100,7 +100,7 @@ export default function ProfileManagement({ initialProfiles }: { initialProfiles
             <div className="flex justify-between items-center">
                 <div>
                     <h3 className="text-xl font-bold text-white">Quản lý Team (Profiles)</h3>
-                    <p className="text-sm text-neutral-400">Tạo và cấu hình không gian làm việc cho các Agency.</p>
+                    <p className="text-sm text-neutral-400">Tạo và cấu hình không gian làm việc cho các Team.</p>
                 </div>
                 <button
                     onClick={openCreateModal}

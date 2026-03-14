@@ -42,17 +42,8 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
             },
             payrolls: {
                 where: { month, year }
-            },
-            ownedAgency: true, // Fetch owned agencies
-            agency: true // Fetch assigned agency
+            }
         }
-    })
-
-    // Fetch Agencies for selection - MUST ALSO FILTER BY PROFILE
-    const agencies = await prisma.agency.findMany({ 
-        // @ts-ignore
-        where: { profileId: session.user.sessionProfileId },
-        select: { id: true, name: true, code: true } 
     })
 
     // Fetch Profiles for Super Admin user creation
@@ -72,7 +63,7 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
             <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Staff Management</h2>
-            <UserPageTabs users={serializeDecimal(users)} currentUser={currentUser} agencies={agencies} profiles={profiles} workspaceId={workspaceId} />
+            <UserPageTabs users={serializeDecimal(users)} currentUser={currentUser} profiles={profiles} workspaceId={workspaceId} />
         </div>
     )
 }

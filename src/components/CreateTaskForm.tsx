@@ -292,7 +292,7 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
                     }}
                     style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}>
                     <option value="">-- Để trống (Vào Kho Task Đợi) --</option>
-                    {users.filter((u: any) => !u.ownedAgency || u.ownedAgency.length === 0).map((u: any) => {
+                    {users.filter((u: any) => u.role !== 'LOCKED').map((u: any) => {
                         const score = u.reputation ?? 100
                         let badge = ''
                         if (score >= 90) badge = '🟣 Chuyên gia tin cậy'

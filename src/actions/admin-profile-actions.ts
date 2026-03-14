@@ -72,7 +72,6 @@ export async function deleteProfile(id: string) {
         prisma.monthlyBonus.updateMany({ where: { profileId: id }, data: { profileId: null } }),
         prisma.payrollLock.updateMany({ where: { profileId: id }, data: { profileId: null } }),
         prisma.performanceMetric.updateMany({ where: { profileId: id }, data: { profileId: null } }),
-        prisma.agency.updateMany({ where: { profileId: id }, data: { profileId: null } }),
         prisma.profile.delete({ where: { id } })
     ])
 

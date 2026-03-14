@@ -4,7 +4,7 @@
  */
 
 export enum TaskState {
-    PENDING = 'Đang đợi giao',      // Initial State (Global/Agency Pool)
+    PENDING = 'Đang đợi giao',      // Initial State (Global Pool)
     ASSIGNED = 'Đã nhận task',      // User assigned but not started
     IN_PROGRESS = 'Đang thực hiện', // User working (Timer Running)
     REVIEW = 'Review',              // Submitted, Waiting for Admin/Client
@@ -16,7 +16,7 @@ export enum TaskState {
 }
 
 export type TaskEvent =
-    | 'assign'          // Admin assigns to User/Agency
+    | 'assign'          // Admin assigns to User
     | 'start'           // User starts working
     | 'submit'          // User submits for review
     | 'reject'          // Admin sends feedback

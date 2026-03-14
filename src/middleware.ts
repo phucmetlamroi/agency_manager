@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
 
     // 2. Auth Guard ONLY
     if (!sessionCookie) {
-        const protectedPaths = ['/workspace', '/portal', '/admin', '/dashboard', '/agency', '/profile']
+        const protectedPaths = ['/workspace', '/portal', '/admin', '/dashboard', '/profile']
         if (protectedPaths.some(p => pathname.startsWith(p))) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
@@ -72,7 +72,7 @@ export async function middleware(request: NextRequest) {
 
             // VERCEL FIX 4: CHECK EMBEDDED PROFILE ID
             // If they are trying to access a workspace or admin panel but haven't selected a profile
-            const requiresProfilePaths = ['/workspace', '/admin', '/dashboard', '/agency'];
+            const requiresProfilePaths = ['/workspace', '/admin', '/dashboard'];
             if (requiresProfilePaths.some(p => pathname.startsWith(p))) {
                 if (!session.user.sessionProfileId) {
                     console.log(`[Middleware] Missing sessionProfileId for path ${pathname}. Redirecting to /profile`);

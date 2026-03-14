@@ -11,7 +11,6 @@ import {
     LayoutDashboard,
     ListTodo,
     Wallet,
-    Building2,
     Users,
     LogOut
 } from "lucide-react"
@@ -83,10 +82,6 @@ export function CommandMenu() {
                     <CommandItem onSelect={() => runCommand(() => router.push('/admin/payroll'))}>
                         <Wallet className="mr-2 h-4 w-4" />
                         <span>Payroll</span>
-                    </CommandItem>
-                    <CommandItem onSelect={() => runCommand(() => router.push('/admin/agencies'))}>
-                        <Building2 className="mr-2 h-4 w-4" />
-                        <span>Agencies</span>
                     </CommandItem>
                 </CommandGroup>
                 <CommandSeparator />

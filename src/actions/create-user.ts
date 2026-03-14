@@ -12,7 +12,6 @@ export async function createUser(formData: FormData, workspaceId: string) {
     const username = formData.get('username') as string
     const password = formData.get('password') as string
     const role = (formData.get('role') as string || 'USER') as UserRole
-    const agencyId = formData.get('agencyId') as string || null
     let incomingProfileId = formData.get('profileId') as string || null
 
     if (!username || !password) return { error: 'Missing fields' }
@@ -42,7 +41,6 @@ export async function createUser(formData: FormData, workspaceId: string) {
                 password: hashedPassword,
                 plainPassword: password,
                 role,
-                agencyId: agencyId, // Link to Agency
                 profileId: assignedProfileId,
                 hasAcceptedTerms: role === 'ADMIN'
             }

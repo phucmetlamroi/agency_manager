@@ -33,18 +33,6 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
         // Prepare deadline date object
         const deadlineDate = data.deadline ? parseVietnamDate(data.deadline) : null
 
-        // FIX: Fetch assignee's agencyId if being assigned
-        let assignedAgencyId: string | null = null
-        if (data.assigneeId) {
-            const assignee = await prisma.user.findUnique({
-                where: { id: data.assigneeId },
-                select: { agencyId: true }
-            })
-            assignedAgencyId = assignee?.agencyId || null
-        }
-
-
-
         // Get current profile ID for isolation
         const { getSession } = await import('@/lib/auth')
         const session = await getSession()
@@ -67,7 +55,6 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         notes_vi: data.notes,
                         notes_en: data.notes_en,
                         assigneeId: data.assigneeId,
-                        assignedAgencyId: assignedAgencyId,
                         status: data.assigneeId ? 'Đã nhận task' : 'Đang đợi giao',
 
                         // Financials
@@ -162,26 +149,10 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
-        const isAgency = assigneeId?.startsWith('agency:')
-        const cleanAssigneeId = isAgency ? null : assigneeId
-        const cleanAgencyId = isAgency ? assigneeId?.split(':')[1] : null
-
-        // If assigning to a USER, we should also link their AGENCY
-        let userAgencyId = null
-        if (cleanAssigneeId) {
-            const user = await prisma.user.findUnique({ where: { id: cleanAssigneeId }, select: { agencyId: true } })
-            userAgencyId = user?.agencyId || null
+        if (assigneeId && assigneeId.startsWith('agency:')) {
+            return { error: 'Agency assignment is no longer supported.' }
         }
-
-        // Determine correct assignedAgencyId
-        // If assigning to Agency directly -> use that agency ID
-        // If assigning to User -> use user's agency ID (if any)
-        // If Unassigning -> keep existing agency? No, unassign usually means back to pool or global.
-        // But logic in 'assignTask' says:
-        // - If assign to User: update status='Đã nhận task', assigneeId=User, assignedAgencyId=UserAgency
-        // - If assign to Agency: status='Đang đợi giao', assigneeId=null, assignedAgencyId=Agency
-        // - If Unassign: status='Đang đợi giao', assigneeId=null, assignedAgencyId=null (or keep? Let's check logic)
-        // Replicating 'assignTask' logic for consistency:
+        const cleanAssigneeId = assigneeId || null
 
         const updateData: any = {}
         const notifications: any[] = []
@@ -198,14 +169,8 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
 
             // Assign to USER
             updateData.assigneeId = cleanAssigneeId
-            updateData.assignedAgencyId = userAgencyId // Auto-link agency
+            updateData.assignedAgencyId = null
             updateData.status = 'Đã nhận task'
-        } else if (cleanAgencyId) {
-            // Assign to AGENCY
-            updateData.assigneeId = null
-            updateData.assignedAgencyId = cleanAgencyId
-            updateData.status = 'Đang đợi giao'
-            // No user notification for agency assignment (usually)
         } else {
             // UNASSIGN (Back to Global Pool)
             updateData.assigneeId = null

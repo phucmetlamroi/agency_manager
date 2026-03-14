@@ -27,8 +27,7 @@ export const getCurrentUser = cache(async (): Promise<AuthContext> => {
 
     // 2. Fetch User Context
     const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        include: { ownedAgency: true }
+        where: { id: session.user.id }
     })
 
     if (!user) throw new Error('Unauthorized: User không tồn tại.')

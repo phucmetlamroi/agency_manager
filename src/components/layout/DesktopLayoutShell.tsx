@@ -23,7 +23,7 @@ export default function DesktopLayoutShell({
             <aside className="w-64 border-r border-gray-800 p-6 flex-col hidden md:flex sticky top-0 h-screen">
                 <div className="mb-8">
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                        AGENCY TOP 1
+                        TOP 1
                     </h1>
                 </div>
 
@@ -47,9 +47,6 @@ export default function DesktopLayoutShell({
                             </Link>
                             <Link href={`/${workspaceId}/admin/queue`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/queue` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>🎁</span> Queue
-                            </Link>
-                            <Link href={`/${workspaceId}/admin/agencies`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/agencies` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
-                                <span>🏢</span> Agencies
                             </Link>
                         </>
                     )}

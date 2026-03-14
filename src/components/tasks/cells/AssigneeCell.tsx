@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { TaskWithUser } from "@/types/admin"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { assignTask } from "@/actions/task-management-actions"
 
@@ -22,18 +21,17 @@ import {
 interface AssigneeCellProps {
     task: TaskWithUser
     users: { id: string; username: string; reputation?: number }[]
-    agencies: { id: string; name: string; code: string }[]
     isAdmin: boolean
     selectedIds?: string[]
     workspaceId: string
 }
 
-export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [], workspaceId }: AssigneeCellProps) {
+export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspaceId }: AssigneeCellProps) {
     const router = useRouter()
     const { confirm } = useConfirm()
 
     // Current Value Logic
-    const currentValue = task.assignee?.id || (task.assignedAgencyId ? `agency:${task.assignedAgencyId}` : "unassigned")
+    const currentValue = task.assignee?.id || "unassigned"
 
     const handleAssign = async (val: string) => {
         if (!val) return
@@ -98,16 +96,6 @@ export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [],
                 </div>
             )
         }
-        if (task.assignedAgencyId) {
-            const agency = agencies.find(a => a.id === task.assignedAgencyId)
-            return (
-                <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-purple-400 border-purple-400">
-                        AGENCY {agency ? `- ${agency.code}` : ''}
-                    </Badge>
-                </div>
-            )
-        }
         return <span className="text-muted-foreground text-xs italic">Unassigned</span>
     }
 
@@ -121,24 +109,12 @@ export function AssigneeCell({ task, users, agencies, isAdmin, selectedIds = [],
                 <SelectItem value="sys:revoke" className="text-red-500 font-bold">⛔ Thu hồi về System</SelectItem>
                 <SelectItem value="unassigned">-- Hủy giao (Unassign User) --</SelectItem>
 
-                {agencies && agencies.length > 0 && (
-                    <SelectGroup>
-                        <SelectLabel>Agencies</SelectLabel>
-                        {agencies.map(a => (
-                            <SelectItem key={a.id} value={`agency:${a.id}`} className="text-purple-600 font-bold">
-                                🏢 {a.code} - {a.name}
-                            </SelectItem>
-                        ))}
-                    </SelectGroup>
-                )}
-
                 <SelectGroup>
                     <SelectLabel>Team Members</SelectLabel>
                     {users
                         .filter(u => {
                             const role = (u as any).role
-                            const isAgencyOwner = (u as any).ownedAgency && (u as any).ownedAgency.length > 0
-                            return role !== 'CLIENT' && role !== 'LOCKED' && !isAgencyOwner
+                            return role !== 'CLIENT' && role !== 'LOCKED'
                         })
                         .map(u => {
                             const latestRank = (u as any).monthlyRanks?.[0]?.rank

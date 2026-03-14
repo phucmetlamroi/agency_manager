@@ -78,10 +78,10 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
         let updateData: any = {}
 
         if (!assignmentId || assignmentId === 'unassigned') {
-            // CASE: UNASSIGN MEMBER (Hủy giao User, giữ lại Agency)
+            // CASE: UNASSIGN MEMBER (Hủy giao User)
             updateData = {
                 assigneeId: null,
-                // assignedAgencyId: NO CHANGE (Keep it with the agency)
+                assignedAgencyId: null,
                 status: 'Đang đợi giao',
                 isPenalized: false,
                 deadline: null
@@ -103,19 +103,20 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
             // 1. Check Availability (Nếu không phải Super Admin)
             // Assigned without schedule constraint
 
-            if (!assignmentId.startsWith('agency:')) {
-                const latestRank = await workspacePrisma.monthlyRank.findFirst({
-                    where: { userId: assignmentId, workspaceId },
-                    orderBy: { createdAt: 'desc' }
-                })
-                if (latestRank && latestRank.rank === 'D') {
-                    return { error: 'Không thể giao Task: Nhân sự đang bị Phạt thẻ đỏ (Rank D).' }
-                }
+            if (assignmentId.startsWith('agency:')) {
+                return { error: 'Agency assignment is no longer supported.' }
+            }
+            const latestRank = await workspacePrisma.monthlyRank.findFirst({
+                where: { userId: assignmentId, workspaceId },
+                orderBy: { createdAt: 'desc' }
+            })
+            if (latestRank && latestRank.rank === 'D') {
+                return { error: 'Không thể giao Task: Nhân sự đang bị Phạt thẻ đỏ (Rank D).' }
             }
 
             updateData = {
                 assigneeId: assignmentId,
-                assignedAgencyId: null, // Clear any agency link
+                assignedAgencyId: null,
                 status: 'Đã nhận task',
                 isPenalized: false
             }
@@ -129,7 +130,7 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
         })
 
         // D. SIDE EFFECTS (Email & Schedule)
-        if (assignmentId && updatedTask.assignee && !assignmentId.startsWith('agency:')) {
+        if (assignmentId && updatedTask.assignee) {
 
             // 1. Gửi Email (Fire-and-forget, không await để tránh lag UI)
             if (updatedTask.assignee.email) {
@@ -150,7 +151,7 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
         }
 
         // E. REVALIDATE
-        const paths = [`/${workspaceId}/admin`, `/${workspaceId}/dashboard`, '/agency', `/${workspaceId}/admin/queue`]
+        const paths = [`/${workspaceId}/admin`, `/${workspaceId}/dashboard`, `/${workspaceId}/admin/queue`]
         paths.forEach(p => revalidatePath(p))
 
         return { success: true }

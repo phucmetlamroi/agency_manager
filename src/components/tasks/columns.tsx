@@ -23,7 +23,6 @@ import { TitleCell } from "./cells/TitleCell"
 
 export const getColumns = (
     users: any[],
-    agencies: any[],
     isAdmin: boolean,
     onTaskClick: (task: TaskWithUser) => void,
     workspaceId: string,
@@ -87,7 +86,6 @@ export const getColumns = (
                 <AssigneeCell
                     task={row.original}
                     users={users}
-                    agencies={agencies}
                     isAdmin={isAdmin}
                     selectedIds={selectedIds}
                     workspaceId={workspaceId}

@@ -43,7 +43,6 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
         },
         orderBy: { username: 'asc' },
         include: { 
-            ownedAgency: true,
             monthlyRanks: {
                 orderBy: { createdAt: 'desc' },
                 take: 1,
@@ -51,12 +50,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
             }
         }
     })
-
-    const agencies = await workspacePrisma.agency.findMany({
-        select: { id: true, name: true, code: true }
-    })
-
-    const unassignedTasks = tasks.filter(t => !t.assigneeId && !t.assignedAgencyId)
+    const unassignedTasks = tasks.filter(t => !t.assigneeId)
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -77,7 +71,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                 </div>
 
                 {unassignedTasks.length > 0 ? (
-                    <TaskTable tasks={serializeDecimal(unassignedTasks) as any} isAdmin={true} users={users} agencies={agencies} workspaceId={workspaceId} />
+                    <TaskTable tasks={serializeDecimal(unassignedTasks) as any} isAdmin={true} users={users} workspaceId={workspaceId} />
                 ) : (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#666', border: '1px dashed #444', borderRadius: '12px' }}>
                         <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Kho đang trống!</p>

@@ -23,46 +23,7 @@ async function main() {
     })
     console.log('✅ Super Admin created/verified.')
 
-    // 2. Create Default Agency
-    const agency = await prisma.agency.upsert({
-        where: { code: 'AGC-DEFAULT' },
-        update: {},
-        create: {
-            name: 'Blazing Agency',
-            code: 'AGC-DEFAULT',
-            status: 'ACTIVE'
-        }
-    })
-    console.log('✅ Default Agency created.')
-
-    // 3. Create Agency Owner (if not exists)
-    const ownerPass = await bcrypt.hash('owner123', 10)
-    const owner = await prisma.user.upsert({
-        where: { username: 'owner' },
-        update: {},
-        create: {
-            username: 'owner',
-            password: ownerPass,
-            plainPassword: 'owner123',
-            role: UserRole.AGENCY_ADMIN,
-            nickname: 'Agency Boss',
-            ownedAgency: {
-                connect: { id: agency.id }
-            },
-            agencyId: agency.id
-        }
-    })
-    console.log('✅ Agency Owner created.')
-
-    // Link Owner to Agency explicitly if not done by relation
-    if (!agency.ownerId) {
-        await prisma.agency.update({
-            where: { id: agency.id },
-            data: { ownerId: owner.id }
-        })
-    }
-
-    // 4. Create Staff Member
+    // 2. Create Staff Member
     const staffPass = await bcrypt.hash('staff123', 10)
     await prisma.user.upsert({
         where: { username: 'staff' },
@@ -72,8 +33,7 @@ async function main() {
             password: staffPass,
             plainPassword: 'staff123',
             role: UserRole.USER,
-            nickname: 'Staff One',
-            agencyId: agency.id
+            nickname: 'Staff One'
         }
     })
     console.log('✅ Staff created.')

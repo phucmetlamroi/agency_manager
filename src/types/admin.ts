@@ -13,7 +13,6 @@ export type TaskWithUser = { // Updated with Client Info
     notes_vi: string | null
     notes_en: string | null
     assigneeId?: string | null
-    assignedAgencyId?: string | null // For tasks assigned to agency queue
     assignee: { id: string; username: string; reputation?: number } | null
     createdAt: Date
     // Removed Stopwatch fields

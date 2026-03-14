@@ -13,7 +13,7 @@ const TAB_CONFIG = [
     { id: 'COMPLETED', label: '🟢 Hoàn tất', color: 'text-green-400 border-green-500' },
 ]
 
-export default function TaskWorkflowTabs({ tasks, users, agencies, isMobile, isAdmin, workspaceId }: { tasks: TaskWithUser[], users: any[], agencies?: any[] | undefined, isMobile: boolean, isAdmin?: boolean, workspaceId: string }) {
+export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, workspaceId }: { tasks: TaskWithUser[], users: any[], isMobile: boolean, isAdmin?: boolean, workspaceId: string }) {
     const [activeTab, setActiveTab] = useState<TabState>('IN_PROGRESS')
 
     // In Progress: User is working
@@ -36,7 +36,7 @@ export default function TaskWorkflowTabs({ tasks, users, agencies, isMobile, isA
     // Tạm ngưng -> Maybe put in Assigned (Waiting) or a separate bucket?
     // Let's put 'Tạm ngưng' in Assigned for now as it's "On Hold"
     const assignedTasks = tasks.filter(t =>
-        (t.status === 'Đã nhận task' || t.status === 'Đang đợi giao' || t.status === 'Tạm ngưng') && (t.assignee || t.assignedAgencyId)
+        (t.status === 'Đã nhận task' || t.status === 'Đang đợi giao' || t.status === 'Tạm ngưng') && t.assignee
     )
 
     const getTasksByTab = (tab: TabState) => {
@@ -88,7 +88,6 @@ export default function TaskWorkflowTabs({ tasks, users, agencies, isMobile, isA
                         tasks={currentTasks}
                         isAdmin={isAdmin ?? true}
                         users={users}
-                        agencies={agencies}
                         isMobile={isMobile}
                         workspaceId={workspaceId}
                     />

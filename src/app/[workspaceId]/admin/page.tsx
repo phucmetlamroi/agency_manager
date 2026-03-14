@@ -64,7 +64,6 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             { username: 'asc' }
         ],
         include: {
-            ownedAgency: true,
             monthlyRanks: {
                 orderBy: { createdAt: 'desc' },
                 take: 1,
@@ -72,8 +71,6 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             }
         }
     })
-
-    const agencies = await workspacePrisma.agency.findMany({ select: { id: true, name: true, code: true } })
 
     const unassignedTasks = tasks.filter(t => !t.assigneeId)
     const assignedTasks = tasks.filter(t => t.assigneeId)
@@ -103,7 +100,6 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                         <TaskWorkflowTabs
                             tasks={serializeDecimal(assignedTasks.concat(unassignedTasks)) as any}
                             users={users}
-                            agencies={agencies}
                             isMobile={await isMobileDevice()}
                             workspaceId={workspaceId}
                         />

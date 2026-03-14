@@ -65,7 +65,7 @@ export async function checkOverdueTasks(workspaceId: string) {
                     data: {
                         isPenalized: true, // Mark as "failed" history
                         assigneeId: null, // Kick user
-                        assignedAgencyId: null, // FIX: Also remove from agency pool
+                        assignedAgencyId: null,
                         status: 'Đang đợi giao',
                         notes_vi: (task.notes_vi || '') + `\n[System] Thu hồi do quá hạn (Deadline: ${task.deadline?.toLocaleString('vi-VN')})`,
                         deadline: null // Reset deadline so it's fresh for next assignee

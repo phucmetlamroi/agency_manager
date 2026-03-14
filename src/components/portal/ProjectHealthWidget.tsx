@@ -14,6 +14,14 @@ export default function ProjectHealthWidget({ tasks }: { tasks: Task[] }) {
     const total = tasks.length
     const done = tasks.filter(t => t.clientStatus === 'Completed').length
     const percentage = total > 0 ? Math.round((done / total) * 100) : 0
+    const now = new Date()
+    const attentionCount = tasks.filter(t => t.clientStatus === 'Action Required' || t.clientStatus === 'Revising').length
+    const dueSoonCount = tasks.filter(t => {
+        if (!t.deadline) return false
+        const deadline = new Date(t.deadline)
+        const diffDays = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        return diffDays >= 0 && diffDays <= 3 && t.clientStatus !== 'Completed'
+    }).length
 
     return (
         <div className="bg-zinc-950/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 h-full flex flex-col justify-between group hover:-translate-y-1 transition-transform duration-300">
@@ -33,6 +41,16 @@ export default function ProjectHealthWidget({ tasks }: { tasks: Task[] }) {
                         {percentage}<span className="text-2xl text-zinc-500">%</span>
                     </span>
                     <span className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Progress</span>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] text-zinc-500 mb-3">
+                    <span className="inline-flex items-center gap-1 text-rose-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                        {attentionCount} attention
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-amber-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        {dueSoonCount} due soon
+                    </span>
                 </div>
                 <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden border border-white/5 relative">
                     <div

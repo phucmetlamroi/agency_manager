@@ -41,11 +41,11 @@ export default function PortalDashboardBento({
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 auto-rows-fr">
 
                 {/* Row 1 */}
-                <div className="md:col-span-8 md:row-span-1 min-h-[180px]">
-                    <ProjectHealthWidget tasks={tasks} />
+                <div className="md:col-span-8 md:row-span-1 min-h-[220px]">
+                    <PortalActionCenter tasks={tasks} onSelectTask={setSelectedTaskId} />
                 </div>
-                <div className="md:col-span-4 md:row-span-1 min-h-[180px]">
-                    <PortalActionCenter />
+                <div className="md:col-span-4 md:row-span-1 min-h-[220px]">
+                    <ProjectHealthWidget tasks={tasks} />
                 </div>
 
                 {/* Row 2 */}

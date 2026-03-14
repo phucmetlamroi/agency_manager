@@ -30,6 +30,14 @@ export default function ActivityFeedWidget({ tasks }: { tasks: Task[] }) {
         }
     }
 
+    const getCopy = (status: string) => {
+        if (status === 'Action Required') return 'needs your review'
+        if (status === 'Revising') return 'is in revision'
+        if (status === 'In Progress') return 'is in progress'
+        if (status === 'Completed') return 'was delivered'
+        return `is now ${status}`
+    }
+
     return (
         <div className="bg-zinc-950/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 h-full flex flex-col group hover:-translate-y-1 transition-transform duration-300">
             <div className="flex items-center gap-3 mb-6">
@@ -57,8 +65,7 @@ export default function ActivityFeedWidget({ tasks }: { tasks: Task[] }) {
                                     <p className="text-xs text-zinc-300 font-medium group-hover/item:text-white transition-colors truncate">
                                         <span className="opacity-60 font-normal">Task </span>
                                         "{activity.title}"
-                                        <span className="opacity-60 font-normal"> is now </span>
-                                        <span className={info.color}>{activity.clientStatus}</span>
+                                        <span className="opacity-60 font-normal"> {getCopy(activity.clientStatus)} </span>
                                     </p>
                                     <span className="text-[10px] text-zinc-600 font-mono mt-1">
                                         {new Date(activity.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(activity.updatedAt).toLocaleDateString()}

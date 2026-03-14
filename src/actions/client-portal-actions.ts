@@ -99,6 +99,7 @@ export async function getClientTasks(workspaceId: string) {
             status: true,
             deadline: true,
             createdAt: true,
+            updatedAt: true,
             type: true,
             productLink: true,
             jobPriceUSD: true,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Search, Filter, MoreVertical, CreditCard, Download, ExternalLink, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -18,22 +18,32 @@ export default function InvoiceDashboard({
         inv.invoiceNumber.toLowerCase().includes(search.toLowerCase())
     );
 
+    const summary = useMemo(() => {
+        const totalOutstanding = initialInvoices
+            .filter(inv => inv.status !== 'PAID')
+            .reduce((acc, inv) => acc + Number(inv.totalDue || 0), 0);
+        const pending = initialInvoices.filter(inv => inv.status === 'PENDING').length;
+        const overdue = initialInvoices.filter(inv => inv.status === 'OVERDUE').length;
+        const paid = initialInvoices.filter(inv => inv.status === 'PAID').length;
+        return { totalOutstanding, pending, overdue, paid };
+    }, [initialInvoices]);
+
     return (
         <div className="flex-1 flex gap-6 min-h-0 relative">
 
             {/* Left Panel: Project Navigation (Hidden on small screens) */}
             <div className="hidden lg:flex w-64 flex-col gap-4">
                 <div className="bg-zinc-900/50 backdrop-blur border border-zinc-800 rounded-xl p-4">
-                    <h3 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-4">Collections</h3>
+                    <h3 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-4">Invoice Vault</h3>
                     <ul className="space-y-2">
-                        <li className="text-zinc-200 text-sm py-1 px-2 bg-zinc-800/80 rounded cursor-pointer">All Invoices</li>
-                        <li className="text-zinc-500 text-sm py-1 px-2 hover:text-zinc-300 cursor-pointer transition-colors">Pending Payment</li>
-                        <li className="text-zinc-500 text-sm py-1 px-2 hover:text-zinc-300 cursor-pointer transition-colors">Paid</li>
+                        <li className="text-zinc-200 text-sm py-1 px-2 bg-zinc-800/80 rounded cursor-pointer">All Statements</li>
+                        <li className="text-zinc-500 text-sm py-1 px-2 hover:text-zinc-300 cursor-pointer transition-colors">Pending</li>
+                        <li className="text-zinc-500 text-sm py-1 px-2 hover:text-zinc-300 cursor-pointer transition-colors">Settled</li>
                     </ul>
                 </div>
 
                 <div className="bg-zinc-900/50 backdrop-blur border border-zinc-800 rounded-xl p-4 flex-1">
-                    <h3 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-4">Projects</h3>
+                    <h3 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-4">Accounts</h3>
                     <ul className="space-y-2">
                         {initialProjects.length === 0 && <li className="text-zinc-500 text-sm py-1 px-2 italic">No projects</li>}
                         {initialProjects.map(proj => (
@@ -47,25 +57,44 @@ export default function InvoiceDashboard({
 
             {/* Center Panel: Grid */}
             <div className="flex-1 flex flex-col min-w-0">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-500">Outstanding</p>
+                        <p className="text-lg font-semibold text-amber-300">${summary.totalOutstanding.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-500">Pending</p>
+                        <p className="text-lg font-semibold text-amber-400">{summary.pending}</p>
+                    </div>
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-500">Overdue</p>
+                        <p className="text-lg font-semibold text-rose-400">{summary.overdue}</p>
+                    </div>
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-500">Settled</p>
+                        <p className="text-lg font-semibold text-emerald-400">{summary.paid}</p>
+                    </div>
+                </div>
+
                 <div className="flex items-center justify-between mb-4">
                     <div className="relative w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
                         <input
                             type="text"
-                            placeholder="Search invoices..."
+                            placeholder="Search statements..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="w-full bg-zinc-900/80 border border-zinc-800 rounded-lg pl-9 pr-4 py-2 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-zinc-600"
                         />
                     </div>
                     <button className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg hover:bg-zinc-800 text-sm text-zinc-300 transition-colors">
-                        <Filter size={16} /> Filter
+                        <Filter size={16} /> Refine
                     </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-20 aspect-auto text-left">
                     {filteredInvoices.length === 0 ? (
-                        <div className="col-span-full py-20 text-center text-zinc-500">No invoices found.</div>
+                        <div className="col-span-full py-20 text-center text-zinc-500">No statements found.</div>
                     ) : (
                         filteredInvoices.map(inv => (
                             <InvoiceCard
@@ -98,7 +127,7 @@ export default function InvoiceDashboard({
 
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             <div className="space-y-1">
-                                <p className="text-zinc-500 text-xs uppercase tracking-wider">Total Due</p>
+                                <p className="text-zinc-500 text-xs uppercase tracking-wider">Outstanding</p>
                                 <p className="text-3xl font-light text-white">${Number(selectedInvoice.totalDue).toLocaleString()}</p>
                                 <div className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${selectedInvoice.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                                     selectedInvoice.status === 'OVERDUE' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
@@ -109,29 +138,29 @@ export default function InvoiceDashboard({
                             </div>
 
                             <div className="space-y-3">
-                                <h3 className="text-sm font-medium text-zinc-300 border-b border-zinc-800 pb-2">Quick Actions</h3>
+                                <h3 className="text-sm font-medium text-zinc-300 border-b border-zinc-800 pb-2">Vault Actions</h3>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-950 border border-zinc-800 hover:border-indigo-500 hover:text-indigo-400 text-zinc-400 rounded-xl transition-all group">
                                         <CreditCard size={20} className="group-hover:scale-110 transition-transform" />
-                                        <span className="text-xs font-medium">Pay via QR</span>
+                                        <span className="text-xs font-medium">Settle via QR</span>
                                     </button>
                                     <button className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-950 border border-zinc-800 hover:border-zinc-700 hover:text-white text-zinc-400 rounded-xl transition-all group">
                                         <Download size={20} className="group-hover:scale-110 transition-transform" />
-                                        <span className="text-xs font-medium">Download PDF</span>
+                                        <span className="text-xs font-medium">Export Ledger</span>
                                     </button>
                                 </div>
                             </div>
 
                             <div className="space-y-3">
-                                <h3 className="text-sm font-medium text-zinc-300 border-b border-zinc-800 pb-2">Details</h3>
+                                <h3 className="text-sm font-medium text-zinc-300 border-b border-zinc-800 pb-2">Statement</h3>
                                 <dl className="space-y-2 text-sm">
                                     <div className="flex justify-between">
-                                        <dt className="text-zinc-500">Date Issued</dt>
+                                        <dt className="text-zinc-500">Issued</dt>
                                         <dd className="text-zinc-300">{new Date(selectedInvoice.issueDate).toLocaleDateString()}</dd>
                                     </div>
                                     {selectedInvoice.dueDate && (
                                         <div className="flex justify-between">
-                                            <dt className="text-zinc-500">Due Date</dt>
+                                            <dt className="text-zinc-500">Due</dt>
                                             <dd className="text-zinc-300">{new Date(selectedInvoice.dueDate).toLocaleDateString()}</dd>
                                         </div>
                                     )}

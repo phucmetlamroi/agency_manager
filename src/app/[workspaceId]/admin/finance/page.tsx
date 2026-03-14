@@ -5,7 +5,8 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 export default async function FinanceDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
     const session = await getSession()
-    const workspacePrisma = getWorkspacePrisma(workspaceId)
+    const profileId = (session?.user as any)?.sessionProfileId
+    const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
     // Authorization Check
     // Must be Admin. Specific "Treasurer" check can be added if we strictly enforce it.

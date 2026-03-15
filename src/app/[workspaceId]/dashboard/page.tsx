@@ -1,4 +1,5 @@
 import { getSession } from '@/lib/auth'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import TaskTable from '@/components/TaskTable'
 import { isMobileDevice } from '@/lib/device'
@@ -182,6 +183,24 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                 </div>
             </div>
 
+
+            {/* Daily Availability Quick Access */}
+            <div className="glass-panel mb-8 p-6 flex items-center justify-between border-l-4 border-indigo-500 bg-gradient-to-r from-indigo-500/10 to-transparent">
+                <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        📅 Lịch làm việc của bạn
+                    </h3>
+                    <p className="text-zinc-400 text-sm mt-1">
+                        Đừng quên cập nhật lịch rảnh/bận để Team nắm bắt thông tin nhé!
+                    </p>
+                </div>
+                <Link 
+                    href={`/${workspaceId}/dashboard/schedule`}
+                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg shadow-indigo-500/20"
+                >
+                    Cập nhật ngay
+                </Link>
+            </div>
 
             <h3 className="title-gradient" style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Danh sách Task của tôi</h3>
 

@@ -19,7 +19,8 @@ import {
     Search,
     UserCircle,
     Activity,
-    Menu
+    Menu,
+    Calendar
 } from "lucide-react"
 
 import {
@@ -58,6 +59,7 @@ const getNavItems = (workspaceId: string) => [
     { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet },
     { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2 },
     { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users },
+    { label: "Staff Schedule", href: `/${workspaceId}/admin/schedule`, icon: Calendar },
     { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity },
 ]
 
@@ -213,39 +215,55 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                         if (item.href.includes('/admin/finance')) return user.role === 'ADMIN' || user.isTreasurer
                         if (item.href.includes('/admin/analytics')) return user.role === 'ADMIN'
                         return true
-                    }).map((item) => {
+                    }).map((item, index, filteredItems) => {
                         const isActive = pathname === item.href
-                        if (collapsed) {
-                            return (
-                                <Tooltip key={item.href}>
-                                    <TooltipTrigger asChild>
-                                        <Link href={item.href} className={cn(
-                                            "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
-                                            isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                                        )}>
-                                            <item.icon className="h-5 w-5" />
-                                        </Link>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right">
-                                        {item.label}
-                                    </TooltipContent>
-                                </Tooltip>
-                            )
-                        }
+                        
+                        // Add a separator before "Staff" or "Staff Schedule"
+                        const isStaffStart = item.label === "Staff" && index > 0;
+                        
                         return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={cn(
-                                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium mx-1",
-                                    isActive
-                                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 translate-x-1"
-                                        : "text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-1"
+                            <React.Fragment key={item.href}>
+                                {isStaffStart && !collapsed && (
+                                    <div className="px-4 pt-4 pb-2">
+                                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                            Nhân sự & Lịch
+                                        </p>
+                                    </div>
                                 )}
-                            >
-                                <item.icon className="h-5 w-5" />
-                                {item.label}
-                            </Link>
+                                {isStaffStart && collapsed && (
+                                    <div className="mx-2 my-2 border-t border-zinc-800" />
+                                )}
+
+                                {collapsed ? (
+                                    <Tooltip key={item.href}>
+                                        <TooltipTrigger asChild>
+                                            <Link href={item.href} className={cn(
+                                                "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
+                                                isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            )}>
+                                                <item.icon className="h-5 w-5" />
+                                            </Link>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="right">
+                                            {item.label}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                ) : (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className={cn(
+                                            "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium mx-1",
+                                            isActive
+                                                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 translate-x-1"
+                                                : "text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-1"
+                                        )}
+                                    >
+                                        <item.icon className="h-5 w-5" />
+                                        {item.label}
+                                    </Link>
+                                )}
+                            </React.Fragment>
                         )
                     })}
                 </div>

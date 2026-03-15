@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import AvailabilityWeekEditor from '@/components/schedule/AvailabilityWeekEditor'
 import { addVietnamDays, getVietnamDateKey } from '@/lib/date-utils'
 import { ChevronLeft, ChevronRight, Calendar, Paintbrush, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
@@ -62,61 +62,55 @@ export default function AvailabilityScheduleClient({ workspaceId, dateKey, weekS
                     </div>
                     <button
                         onClick={handleToday}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-semibold transition-all shadow-lg shadow-indigo-500/20"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm font-semibold transition-all"
                     >
                         <Calendar className="w-4 h-4" />
                         Hôm nay
                     </button>
                 </div>
 
-                {/* Status Divider */}
-                <div className="h-8 w-px bg-slate-800 hidden md:block" />
-
-                {/* Status Brush Picker */}
-                <div className="flex items-center gap-3">
-                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                        <Paintbrush className="w-3.5 h-3.5" />
-                        Tool:
-                    </div>
-                    <div className="flex items-center gap-2 p-1 bg-slate-800/30 rounded-full border border-slate-800/50">
+                {/* Legend & Brush Selector */}
+                <div className="ml-auto flex items-center gap-6">
+                    <div className="flex items-center gap-1 p-1 bg-slate-800/30 rounded-xl border border-slate-800/50">
                         <button
                             onClick={() => setActiveTool('FREE')}
-                            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
                                 activeTool === 'FREE' 
                                 ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' 
                                 : 'text-emerald-500/60 hover:text-emerald-400 hover:bg-emerald-500/10'
                             }`}
                         >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <div className={`w-2 h-2 rounded-full ${activeTool === 'FREE' ? 'bg-white' : 'bg-emerald-500'}`} />
                             Rảnh
                         </button>
                         <button
                             onClick={() => setActiveTool('BUSY')}
-                            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
                                 activeTool === 'BUSY' 
                                 ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' 
                                 : 'text-rose-500/60 hover:text-rose-400 hover:bg-rose-500/10'
                             }`}
                         >
-                            <XCircle className="w-3.5 h-3.5" />
+                            <div className={`w-2 h-2 rounded-full ${activeTool === 'BUSY' ? 'bg-white' : 'bg-rose-500'}`} />
                             Bận
                         </button>
                         <button
                             onClick={() => setActiveTool('TENTATIVE')}
-                            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
                                 activeTool === 'TENTATIVE' 
                                 ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' 
                                 : 'text-amber-500/60 hover:text-amber-400 hover:bg-amber-500/10'
                             }`}
                         >
-                            <AlertCircle className="w-3.5 h-3.5" />
+                            <div className={`w-2 h-2 rounded-full ${activeTool === 'TENTATIVE' ? 'bg-white' : 'bg-amber-500'}`} />
                             Bận tạm
                         </button>
                     </div>
-                </div>
-                
-                <div className="ml-auto text-xs text-slate-500 bg-slate-800/20 px-3 py-1.5 rounded-md border border-slate-800">
-                    Bấm & Kéo để bôi lịch
+
+                    <div className="hidden lg:flex items-center gap-2 text-[10px] uppercase tracking-widest text-slate-500 font-bold bg-slate-800/20 px-3 py-2 rounded-lg border border-slate-800">
+                        <Paintbrush className="w-3 h-3" />
+                        Bấm & Kéo để bôi lịch
+                    </div>
                 </div>
             </div>
 

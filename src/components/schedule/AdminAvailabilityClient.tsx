@@ -97,14 +97,28 @@ export default function AdminAvailabilityClient({ workspaceId, dateKey, weekStar
                     </select>
                 </div>
 
-                <div className="ml-auto flex items-center gap-4">
+                {/* Legend & Stats */}
+                <div className="ml-auto flex items-center gap-6">
+                    <div className="flex items-center gap-4 bg-slate-800/30 px-4 py-2 rounded-xl border border-slate-800/50">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                            <span className="text-[10px] font-bold text-slate-400 capitalize whitespace-nowrap">Rảnh</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                            <span className="text-[10px] font-bold text-slate-400 capitalize whitespace-nowrap">Bận</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                            <span className="text-[10px] font-bold text-slate-400 capitalize whitespace-nowrap">Bận tạm</span>
+                        </div>
+                    </div>
+                    
+                    <div className="h-6 w-px bg-slate-800 hidden xl:block" />
+
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-xs font-bold">
                         <Users className="w-3.5 h-3.5" />
                         {users.length} Nhân sự
-                    </div>
-                    <div className="text-xs text-slate-500 hidden xl:flex items-center gap-1.5">
-                        <Info className="w-3.5 h-3.5" />
-                        Di chuột vào ô để xem chi tiết trạng thái của từng người
                     </div>
                 </div>
             </div>

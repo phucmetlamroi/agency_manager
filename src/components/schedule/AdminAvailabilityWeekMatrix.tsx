@@ -52,23 +52,6 @@ export default function AdminAvailabilityWeekMatrix({
 
     return (
         <div className="flex flex-col h-[calc(100vh-80px)] bg-slate-950 overflow-hidden relative">
-            {/* Legend Overlay */}
-            <div className="absolute bottom-6 right-6 z-50 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-4 rounded-2xl shadow-2xl flex flex-col gap-3 pointer-events-none lg:pointer-events-auto">
-                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Chú thích</div>
-                <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-sm bg-emerald-500 opacity-60" />
-                    <span className="text-xs text-slate-300">Rảnh</span>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-sm bg-rose-500 opacity-60" />
-                    <span className="text-xs text-slate-300">Bận</span>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-sm bg-amber-500 opacity-60" />
-                    <span className="text-xs text-slate-300">Bận tạm</span>
-                </div>
-            </div>
-
             {/* Grid Container */}
             <div className="flex-1 overflow-auto custom-scrollbar pt-2">
                 <div className="inline-grid grid-cols-[70px_repeat(7,1fr)] min-w-[1000px] w-full border-collapse">

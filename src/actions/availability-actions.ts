@@ -18,13 +18,28 @@ const isValidDateKey = (dateKey: string): boolean => {
     return /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
 }
 
-const ensureWorkspaceAccess = async (userId: string, workspaceId: string) => {
+const ensureWorkspaceAccess = async (userId: string, workspaceId: string, userRole?: string, userProfileId?: string | null) => {
+    // 1. Admin bypass
+    if (userRole === 'ADMIN') return
+
+    // 2. Check explicit membership
     const membership = await globalPrisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId, workspaceId } }
     })
-    if (!membership) {
-        throw new Error('Unauthorized workspace access')
+    if (membership) return
+
+    // 3. Fallback: Check if user belongs to the same Profile as the workspace
+    // This allows staff of an agency to see all its workspaces (months).
+    const workspace = await globalPrisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true }
+    })
+
+    if (workspace && userProfileId && workspace.profileId === userProfileId) {
+        return
     }
+
+    throw new Error('Unauthorized workspace access')
 }
 
 export async function getMyAvailability(dateKey: string, workspaceId: string) {
@@ -32,7 +47,7 @@ export async function getMyAvailability(dateKey: string, workspaceId: string) {
         const user = await getCurrentUser()
         if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
 
-        await ensureWorkspaceAccess(user.id, workspaceId)
+        await ensureWorkspaceAccess(user.id, workspaceId, user.role, user.profileId)
         
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const date = getVietnamDayStart(dateKey)
@@ -55,7 +70,7 @@ export async function getMyAvailabilityWeek(dateKey: string, workspaceId: string
         const user = await getCurrentUser()
         if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
 
-        await ensureWorkspaceAccess(user.id, workspaceId)
+        await ensureWorkspaceAccess(user.id, workspaceId, user.role, user.profileId)
 
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const weekKeys = getVietnamWeekKeys(dateKey)
@@ -93,7 +108,7 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
         if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
         if (!Array.isArray(schedule) || schedule.length !== 24) return { error: 'Invalid schedule length' }
 
-        await ensureWorkspaceAccess(user.id, workspaceId)
+        await ensureWorkspaceAccess(user.id, workspaceId, user.role, user.profileId)
         const workspacePrisma = getWorkspacePrisma(workspaceId)
 
         const cleanSchedule = schedule.map(s => (VALID_STATUSES.has(s) ? s : 'EMPTY'))

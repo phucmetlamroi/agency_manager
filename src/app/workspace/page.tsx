@@ -23,20 +23,25 @@ export default async function WorkspacePage() {
         redirect('/profile')
     }
 
-    // Fetch workspaces filtered by profileId
-    const allWorkspaces = await (prisma as any).workspace.findMany({
-        where: { profileId },
-        orderBy: {
-            createdAt: 'desc'
-        }
-    })
-
     // Fetch user's specific memberships
     const userMemberships = await prisma.workspaceMember.findMany({
         where: { userId }
     })
 
     const membershipMap = new Map(userMemberships.map(m => [m.workspaceId, m.role]))
+
+    // Fetch workspaces filtered by profileId
+    let allWorkspaces = await (prisma as any).workspace.findMany({
+        where: { profileId },
+        orderBy: {
+            createdAt: 'desc'
+        }
+    })
+
+    // Filter workspaces for non-admin users
+    if (session.user.role !== 'ADMIN') {
+        allWorkspaces = allWorkspaces.filter((ws: any) => membershipMap.has(ws.id))
+    }
 
     const serializedWorkspaces = allWorkspaces.map((ws: any) => ({
         id: ws.id,

@@ -7,10 +7,11 @@ export type AuthContext = {
     id: string
     role: UserRole
     isSuperAdmin: boolean
-    isTreasurer: boolean // Added
+    isTreasurer: boolean
     email: string | null
     username: string | null
     nickname: string | null
+    profileId: string | null
 }
 
 /**
@@ -39,6 +40,7 @@ export const getCurrentUser = cache(async (): Promise<AuthContext> => {
         isTreasurer: user.isTreasurer,
         email: user.email,
         username: user.username,
-        nickname: user.nickname
+        nickname: user.nickname,
+        profileId: user.profileId
     }
 })

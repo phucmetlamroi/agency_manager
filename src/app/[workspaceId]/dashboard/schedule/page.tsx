@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth-guard'
-import { getMyAvailability } from '@/actions/availability-actions'
+import { getMyAvailabilityWeek } from '@/actions/availability-actions'
 import AvailabilityScheduleClient from '@/components/schedule/AvailabilityScheduleClient'
 import { getVietnamDateKey } from '@/lib/date-utils'
 
@@ -22,7 +22,7 @@ export default async function SchedulePage({
     }
 
     const dateKey = query?.date || getVietnamDateKey()
-    const data = await getMyAvailability(dateKey, workspaceId)
+    const data = await getMyAvailabilityWeek(dateKey, workspaceId)
     
     if ('error' in data) {
         return (
@@ -33,7 +33,8 @@ export default async function SchedulePage({
         )
     }
 
-    const schedule = ('schedule' in data ? data.schedule : Array.from({ length: 24 }, () => 'EMPTY')) as string[]
+    const weekStartKey = 'weekStartKey' in data ? data.weekStartKey : dateKey
+    const days = 'days' in data ? data.days : []
 
     return (
         <div className="space-y-6">
@@ -44,8 +45,9 @@ export default async function SchedulePage({
 
             <AvailabilityScheduleClient
                 workspaceId={workspaceId}
-                dateKey={dateKey}
-                initialSchedule={schedule}
+                dateKey={weekStartKey}
+                weekStartKey={weekStartKey}
+                days={days}
             />
         </div>
     )

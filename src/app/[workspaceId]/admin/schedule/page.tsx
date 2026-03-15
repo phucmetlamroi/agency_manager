@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth-guard'
-import { getAdminAvailabilityMatrix } from '@/actions/availability-actions'
+import { getAdminAvailabilityWeek } from '@/actions/availability-actions'
 import AdminAvailabilityClient from '@/components/schedule/AdminAvailabilityClient'
 import { getVietnamDateKey } from '@/lib/date-utils'
 
@@ -22,7 +22,7 @@ export default async function AdminSchedulePage({
     }
 
     const dateKey = query?.date || getVietnamDateKey()
-    const data = await getAdminAvailabilityMatrix(dateKey, workspaceId)
+    const data = await getAdminAvailabilityWeek(dateKey, workspaceId)
     if ('error' in data) {
         return (
             <div className="p-8 text-center glass-panel">
@@ -33,6 +33,8 @@ export default async function AdminSchedulePage({
     }
 
     const users = 'users' in data ? data.users : []
+    const weekStartKey = 'weekStartKey' in data ? data.weekStartKey : dateKey
+    const days = 'days' in data ? data.days : []
 
     return (
         <div className="space-y-6">
@@ -43,7 +45,9 @@ export default async function AdminSchedulePage({
 
             <AdminAvailabilityClient
                 workspaceId={workspaceId}
-                dateKey={dateKey}
+                dateKey={weekStartKey}
+                weekStartKey={weekStartKey}
+                days={days}
                 users={users as any}
             />
         </div>

@@ -17,6 +17,16 @@ export function parseVietnamDate(dateStr: string): Date {
 
 const VIET_TZ = 'Asia/Ho_Chi_Minh'
 
+const VIET_WEEKDAY_MAP: Record<string, number> = {
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+    Sun: 7
+}
+
 type VietnamParts = {
     year: string
     month: string
@@ -59,4 +69,30 @@ export function getVietnamDayStart(dateKey: string): Date {
 export function getVietnamCurrentHour(date: Date = new Date()): number {
     const parts = getVietnamParts(date)
     return Number(parts.hour)
+}
+
+export function addVietnamDays(dateKey: string, delta: number): string {
+    const date = new Date(`${dateKey}T00:00:00+07:00`)
+    date.setUTCDate(date.getUTCDate() + delta)
+    return getVietnamDateKey(date)
+}
+
+export function getVietnamWeekdayIndex(date: Date = new Date()): number {
+    const weekday = new Intl.DateTimeFormat('en-US', {
+        timeZone: VIET_TZ,
+        weekday: 'short'
+    }).format(date)
+    return VIET_WEEKDAY_MAP[weekday] || 1
+}
+
+export function getVietnamWeekStartKey(date: Date = new Date()): string {
+    const dateKey = getVietnamDateKey(date)
+    const weekday = getVietnamWeekdayIndex(date)
+    return addVietnamDays(dateKey, -(weekday - 1))
+}
+
+export function getVietnamWeekKeys(dateKey: string): string[] {
+    const baseDate = new Date(`${dateKey}T00:00:00+07:00`)
+    const startKey = getVietnamWeekStartKey(baseDate)
+    return Array.from({ length: 7 }, (_, i) => addVietnamDays(startKey, i))
 }

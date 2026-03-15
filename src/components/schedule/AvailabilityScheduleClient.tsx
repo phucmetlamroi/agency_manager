@@ -1,24 +1,24 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { addDays, format } from 'date-fns'
-import AvailabilityEditor from '@/components/schedule/AvailabilityEditor'
-import { getVietnamDateKey } from '@/lib/date-utils'
+import { format } from 'date-fns'
+import AvailabilityWeekEditor from '@/components/schedule/AvailabilityWeekEditor'
+import { addVietnamDays, getVietnamDateKey } from '@/lib/date-utils'
 
 type Props = {
     workspaceId: string
     dateKey: string
-    initialSchedule: string[]
+    weekStartKey: string
+    days: { dateKey: string; schedule: string[] }[]
 }
 
 const toDate = (dateKey: string) => new Date(`${dateKey}T00:00:00+07:00`)
 
-export default function AvailabilityScheduleClient({ workspaceId, dateKey, initialSchedule }: Props) {
+export default function AvailabilityScheduleClient({ workspaceId, dateKey, weekStartKey, days }: Props) {
     const router = useRouter()
 
-    const handleShiftDate = (delta: number) => {
-        const next = addDays(toDate(dateKey), delta)
-        const nextKey = getVietnamDateKey(next)
+    const handleShiftWeek = (deltaWeeks: number) => {
+        const nextKey = addVietnamDays(weekStartKey, deltaWeeks * 7)
         router.push(`/${workspaceId}/dashboard/schedule?date=${nextKey}`)
     }
 
@@ -35,7 +35,7 @@ export default function AvailabilityScheduleClient({ workspaceId, dateKey, initi
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                     <button
-                        onClick={() => handleShiftDate(-1)}
+                        onClick={() => handleShiftWeek(-1)}
                         className="px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:border-zinc-600"
                     >
                         Hôm qua
@@ -47,7 +47,7 @@ export default function AvailabilityScheduleClient({ workspaceId, dateKey, initi
                         Hôm nay
                     </button>
                     <button
-                        onClick={() => handleShiftDate(1)}
+                        onClick={() => handleShiftWeek(1)}
                         className="px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:border-zinc-600"
                     >
                         Ngày mai
@@ -55,11 +55,7 @@ export default function AvailabilityScheduleClient({ workspaceId, dateKey, initi
                 </div>
             </div>
 
-            <AvailabilityEditor
-                workspaceId={workspaceId}
-                dateKey={dateKey}
-                initialSchedule={initialSchedule}
-            />
+            <AvailabilityWeekEditor workspaceId={workspaceId} days={days} />
         </div>
     )
 }

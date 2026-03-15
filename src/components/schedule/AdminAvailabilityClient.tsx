@@ -1,34 +1,35 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { addDays, format } from 'date-fns'
-import { getVietnamCurrentHour, getVietnamDateKey } from '@/lib/date-utils'
-import AdminAvailabilityMatrix from '@/components/schedule/AdminAvailabilityMatrix'
+import { format } from 'date-fns'
+import { addVietnamDays, getVietnamCurrentHour, getVietnamDateKey } from '@/lib/date-utils'
+import AdminAvailabilityWeekMatrix from '@/components/schedule/AdminAvailabilityWeekMatrix'
 
 type UserRow = {
     id: string
     username: string
     nickname: string | null
     role: any
-    schedule: any[]
+    schedules: Record<string, any[]>
 }
 
 type Props = {
     workspaceId: string
     dateKey: string
+    weekStartKey: string
+    days: string[]
     users: UserRow[]
 }
 
 const toDate = (dateKey: string) => new Date(`${dateKey}T00:00:00+07:00`)
 
-export default function AdminAvailabilityClient({ workspaceId, dateKey, users }: Props) {
+export default function AdminAvailabilityClient({ workspaceId, dateKey, weekStartKey, days, users }: Props) {
     const router = useRouter()
     const todayKey = getVietnamDateKey()
-    const currentHour = dateKey === todayKey ? getVietnamCurrentHour() : -1
+    const currentHour = getVietnamCurrentHour()
 
-    const handleShiftDate = (delta: number) => {
-        const next = addDays(toDate(dateKey), delta)
-        const nextKey = getVietnamDateKey(next)
+    const handleShiftWeek = (deltaWeeks: number) => {
+        const nextKey = addVietnamDays(weekStartKey, deltaWeeks * 7)
         router.push(`/${workspaceId}/admin/schedule?date=${nextKey}`)
     }
 
@@ -45,7 +46,7 @@ export default function AdminAvailabilityClient({ workspaceId, dateKey, users }:
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                     <button
-                        onClick={() => handleShiftDate(-1)}
+                        onClick={() => handleShiftWeek(-1)}
                         className="px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:border-zinc-600"
                     >
                         Hôm qua
@@ -57,7 +58,7 @@ export default function AdminAvailabilityClient({ workspaceId, dateKey, users }:
                         Hôm nay
                     </button>
                     <button
-                        onClick={() => handleShiftDate(1)}
+                        onClick={() => handleShiftWeek(1)}
                         className="px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:border-zinc-600"
                     >
                         Ngày mai
@@ -65,7 +66,7 @@ export default function AdminAvailabilityClient({ workspaceId, dateKey, users }:
                 </div>
             </div>
 
-            <AdminAvailabilityMatrix dateKey={dateKey} users={users} currentHour={currentHour} />
+            <AdminAvailabilityWeekMatrix days={days} users={users} todayKey={todayKey} currentHour={currentHour} />
         </div>
     )
 }

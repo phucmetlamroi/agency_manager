@@ -3,7 +3,7 @@
 import { prisma as globalPrisma } from '@/lib/db'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getCurrentUser } from '@/lib/auth-guard'
-import { getVietnamCurrentHour, getVietnamDateKey, getVietnamDayStart } from '@/lib/date-utils'
+import { getVietnamCurrentHour, getVietnamDateKey, getVietnamDayStart, getVietnamWeekKeys } from '@/lib/date-utils'
 import { revalidatePath } from 'next/cache'
 
 const VALID_STATUSES = new Set(['EMPTY', 'FREE', 'BUSY', 'TENTATIVE'])
@@ -46,6 +46,43 @@ export async function getMyAvailability(dateKey: string, workspaceId: string) {
         }
     } catch (error: any) {
         console.error('getMyAvailability error:', error)
+        return { error: `Server error: ${error.message || 'Unknown'}` }
+    }
+}
+
+export async function getMyAvailabilityWeek(dateKey: string, workspaceId: string) {
+    try {
+        const user = await getCurrentUser()
+        if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
+
+        await ensureWorkspaceAccess(user.id, workspaceId)
+
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const weekKeys = getVietnamWeekKeys(dateKey)
+        const dates = weekKeys.map(getVietnamDayStart)
+
+        const records = await workspacePrisma.dailyAvailability.findMany({
+            where: {
+                userId: user.id,
+                date: { in: dates }
+            }
+        })
+
+        const scheduleMap = new Map<string, string[]>()
+        for (const record of records) {
+            const key = getVietnamDateKey(record.date)
+            scheduleMap.set(key, normalizeSchedule(record?.schedule as string[] | null))
+        }
+
+        return {
+            weekStartKey: weekKeys[0],
+            days: weekKeys.map(key => ({
+                dateKey: key,
+                schedule: scheduleMap.get(key) || [...DEFAULT_SCHEDULE]
+            }))
+        }
+    } catch (error: any) {
+        console.error('getMyAvailabilityWeek error:', error)
         return { error: `Server error: ${error.message || 'Unknown'}` }
     }
 }
@@ -151,6 +188,58 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
         return { date: dateKey, users: rows }
     } catch (error: any) {
         console.error('getAdminAvailabilityMatrix error:', error)
+        return { error: `Server error: ${error.message || 'Unknown'}` }
+    }
+}
+
+export async function getAdminAvailabilityWeek(dateKey: string, workspaceId: string) {
+    try {
+        const user = await getCurrentUser()
+        if (user.role !== 'ADMIN') return { error: 'Unauthorized' }
+        if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
+
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const weekKeys = getVietnamWeekKeys(dateKey)
+        const dates = weekKeys.map(getVietnamDayStart)
+
+        const members = await globalPrisma.workspaceMember.findMany({
+            where: { workspaceId },
+            include: {
+                user: {
+                    select: { id: true, username: true, nickname: true, role: true }
+                }
+            }
+        })
+
+        const availabilities = await workspacePrisma.dailyAvailability.findMany({
+            where: { workspaceId, date: { in: dates } }
+        })
+
+        const scheduleMap = new Map<string, Record<string, string[]>>()
+        for (const record of availabilities) {
+            const key = getVietnamDateKey(record.date)
+            const existing = scheduleMap.get(record.userId) || {}
+            existing[key] = normalizeSchedule(record?.schedule as string[] | null)
+            scheduleMap.set(record.userId, existing)
+        }
+
+        const rows = members
+            .map(m => ({
+                id: m.user.id,
+                username: m.user.username,
+                nickname: m.user.nickname,
+                role: m.user.role,
+                schedules: scheduleMap.get(m.user.id) || {}
+            }))
+            .filter(u => u.role !== 'CLIENT' && u.role !== 'LOCKED')
+
+        return {
+            weekStartKey: weekKeys[0],
+            days: weekKeys,
+            users: rows
+        }
+    } catch (error: any) {
+        console.error('getAdminAvailabilityWeek error:', error)
         return { error: `Server error: ${error.message || 'Unknown'}` }
     }
 }

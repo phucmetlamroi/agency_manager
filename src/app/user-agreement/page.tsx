@@ -38,8 +38,19 @@ export default function UserAgreementPage() {
     const handleAccept = () => {
         startTransition(async () => {
             try {
-                await acceptTermsAction()
+                const res = await acceptTermsAction()
+                if (res?.success) {
+                    toast.success('Ký kết thỏa thuận thành công!')
+                    // Wait a tiny bit so the toast is visible
+                    setTimeout(() => {
+                        window.location.href = '/profile'
+                    }, 500)
+                } else {
+                    toast.error('Có lỗi xảy ra, vui lòng thử lại sau.')
+                }
             } catch (error) {
+                // If it's an actual error (not a redirect which we removed from the action anyway)
+                console.error(error)
                 toast.error('Có lỗi xảy ra, vui lòng thử lại sau.')
             }
         })

@@ -27,6 +27,6 @@ export async function acceptTermsAction() {
         hasAcceptedTerms: true
     })
 
-    // Redirect to profile selection (or workspace if already selected via role logic, middleware will handle it)
-    redirect('/profile')
+    // Return success instead of redirecting directly to avoid catching redirect as error on client
+    return { success: true }
 }

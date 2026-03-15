@@ -178,13 +178,16 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
         const workspacePrisma = getWorkspacePrisma(workspaceId) as any
         const date = getVietnamDayStart(dateKey)
 
-        const members = await globalPrisma.workspaceMember.findMany({
-            where: { workspaceId },
-            include: {
-                user: {
-                    select: { id: true, username: true, nickname: true, role: true }
-                }
-            }
+        const workspace = await globalPrisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true }
+        })
+
+        if (!workspace) return { error: 'Workspace not found' }
+
+        const profileUsers = await globalPrisma.user.findMany({
+            where: { profileId: workspace.profileId },
+            select: { id: true, username: true, nickname: true, role: true }
         })
 
         const availabilities = await (workspacePrisma.dailyAvailability.findMany({
@@ -195,15 +198,15 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
             availabilities.map((a: any) => [a.userId, normalizeSchedule(a.schedule as string[] | null)])
         )
 
-        const rows = members
-            .map(m => ({
-                id: m.user.id,
-                username: m.user.username,
-                nickname: m.user.nickname,
-                role: m.user.role,
-                schedule: availabilityMap.get(m.user.id) || [...DEFAULT_SCHEDULE]
+        const rows = profileUsers
+            .map((u: any) => ({
+                id: u.id,
+                username: u.username,
+                nickname: u.nickname,
+                role: u.role,
+                schedule: availabilityMap.get(u.id) || [...DEFAULT_SCHEDULE]
             }))
-            .filter(u => u.role !== 'CLIENT' && u.role !== 'LOCKED')
+            .filter((u: any) => u.role !== 'CLIENT' && u.role !== 'LOCKED')
 
         return { date: dateKey, users: rows }
     } catch (error: any) {
@@ -222,13 +225,16 @@ export async function getAdminAvailabilityWeek(dateKey: string, workspaceId: str
         const weekKeys = getVietnamWeekKeys(dateKey)
         const dates = weekKeys.map(getVietnamDayStart)
 
-        const members = await globalPrisma.workspaceMember.findMany({
-            where: { workspaceId },
-            include: {
-                user: {
-                    select: { id: true, username: true, nickname: true, role: true }
-                }
-            }
+        const workspace = await globalPrisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true }
+        })
+
+        if (!workspace) return { error: 'Workspace not found' }
+
+        const profileUsers = await globalPrisma.user.findMany({
+            where: { profileId: workspace.profileId },
+            select: { id: true, username: true, nickname: true, role: true }
         })
 
         const availabilities = await (workspacePrisma.dailyAvailability.findMany({
@@ -243,15 +249,15 @@ export async function getAdminAvailabilityWeek(dateKey: string, workspaceId: str
             scheduleMap.set(record.userId, existing)
         }
 
-        const rows = members
-            .map(m => ({
-                id: m.user.id,
-                username: m.user.username,
-                nickname: m.user.nickname,
-                role: m.user.role,
-                schedules: scheduleMap.get(m.user.id) || {}
+        const rows = profileUsers
+            .map((u: any) => ({
+                id: u.id,
+                username: u.username,
+                nickname: u.nickname,
+                role: u.role,
+                schedules: scheduleMap.get(u.id) || {}
             }))
-            .filter(u => u.role !== 'CLIENT' && u.role !== 'LOCKED')
+            .filter((u: any) => u.role !== 'CLIENT' && u.role !== 'LOCKED')
 
         return {
             weekStartKey: weekKeys[0],

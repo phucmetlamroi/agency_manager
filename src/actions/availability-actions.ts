@@ -46,7 +46,7 @@ export async function getMyAvailability(dateKey: string, workspaceId: string) {
         await ensureWorkspaceAccess(user.id, workspaceId, user.role, user.profileId)
         
         const date = getVietnamDayStart(dateKey)
-        const record = await globalPrisma.dailyAvailability.findUnique({
+        const record = await (globalPrisma as any).dailyAvailability.findUnique({
             where: { userId_date: { userId: user.id, date } }
         })
 
@@ -75,7 +75,7 @@ export async function getMyAvailabilityWeek(dateKey: string, workspaceId: string
         const weekKeys = getVietnamWeekKeys(dateKey)
         const dates = weekKeys.map(getVietnamDayStart)
 
-        const records = await globalPrisma.dailyAvailability.findMany({
+        const records = await (globalPrisma as any).dailyAvailability.findMany({
             where: {
                 userId: user.id,
                 date: { in: dates },
@@ -119,7 +119,7 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
             return { error: 'Không thể chỉnh sửa lịch trong quá khứ.' }
         }
 
-        const existing = await globalPrisma.dailyAvailability.findUnique({
+        const existing = await (globalPrisma as any).dailyAvailability.findUnique({
             where: { userId_date: { userId: user.id, date: targetDate } }
         })
 
@@ -143,7 +143,7 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
                 throw new Error("Security violation: Profile mismatch")
             }
 
-            await globalPrisma.dailyAvailability.update({
+            await (globalPrisma as any).dailyAvailability.update({
                 where: { id: existing.id },
                 data: {
                     schedule: cleanSchedule as any,
@@ -152,7 +152,7 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
                 }
             })
         } else {
-            await globalPrisma.dailyAvailability.create({
+            await (globalPrisma as any).dailyAvailability.create({
                 data: {
                     userId: user.id,
                     workspaceId,
@@ -193,7 +193,7 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
             select: { id: true, username: true, nickname: true, role: true }
         })
 
-        const availabilities = await globalPrisma.dailyAvailability.findMany({
+        const availabilities = await (globalPrisma as any).dailyAvailability.findMany({
             where: { 
                 profileId: workspace.profileId,
                 date 
@@ -242,7 +242,7 @@ export async function getAdminAvailabilityWeek(dateKey: string, workspaceId: str
             select: { id: true, username: true, nickname: true, role: true }
         })
 
-        const availabilities = await globalPrisma.dailyAvailability.findMany({
+        const availabilities = await (globalPrisma as any).dailyAvailability.findMany({
             where: { 
                 profileId: workspace.profileId,
                 date: { in: dates } 

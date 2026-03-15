@@ -237,10 +237,19 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                 {collapsed ? (
                                     <Tooltip key={item.href}>
                                         <TooltipTrigger asChild>
-                                            <Link href={item.href} className={cn(
-                                                "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
-                                                isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                                            )}>
+                                            <Link 
+                                                href={item.href} 
+                                                onClick={(e) => {
+                                                    if (item.label === "Staff Schedule" && user.role !== 'ADMIN') {
+                                                        e.preventDefault();
+                                                        alert('Tính năng Lịch làm việc cho nhân sự hiện đang được phát triển. Vui lòng quay lại sau!');
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
+                                                    isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                )}
+                                            >
                                                 <item.icon className="h-5 w-5" />
                                             </Link>
                                         </TooltipTrigger>
@@ -252,6 +261,12 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                     <Link
                                         key={item.href}
                                         href={item.href}
+                                        onClick={(e) => {
+                                            if (item.label === "Staff Schedule" && user.role !== 'ADMIN') {
+                                                e.preventDefault();
+                                                alert('Tính năng Lịch làm việc cho nhân sự hiện đang được phát triển. Vui lòng quay lại sau!');
+                                            }
+                                        }}
                                         className={cn(
                                             "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium mx-1",
                                             isActive

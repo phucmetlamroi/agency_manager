@@ -31,8 +31,17 @@ export default function DesktopLayoutShell({
                     <Link href={`/${workspaceId}/dashboard`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                         <span>🏠</span> Tổng quan
                     </Link>
-                    <Link href={`/${workspaceId}/dashboard/schedule`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard/schedule` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
-                        <span>ðŸ—“</span> Schedule
+                    <Link 
+                        href={`/${workspaceId}/dashboard/schedule`} 
+                        onClick={(e) => {
+                            if (user?.role !== 'ADMIN') {
+                                e.preventDefault();
+                                alert('Tính năng Lịch làm việc cho nhân sự hiện đang được phát triển. Vui lòng quay lại sau!');
+                            }
+                        }}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard/schedule` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}
+                    >
+                        <span>📅</span> Schedule
                     </Link>
                     {user?.role === 'ADMIN' && (
                         <>

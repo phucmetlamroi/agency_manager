@@ -187,12 +187,12 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
             }
         })
 
-        const availabilities = await workspacePrisma.dailyAvailability.findMany({
+        const availabilities = await (workspacePrisma.dailyAvailability.findMany({
             where: { workspaceId, date }
-        })
+        }) as Promise<any[]>)
 
-        const availabilityMap = new Map(
-            availabilities.map(a => [a.userId, normalizeSchedule(a.schedule as string[] | null)])
+        const availabilityMap = new Map<string, string[]>(
+            availabilities.map((a: any) => [a.userId, normalizeSchedule(a.schedule as string[] | null)])
         )
 
         const rows = members
@@ -231,12 +231,12 @@ export async function getAdminAvailabilityWeek(dateKey: string, workspaceId: str
             }
         })
 
-        const availabilities = await workspacePrisma.dailyAvailability.findMany({
+        const availabilities = await (workspacePrisma.dailyAvailability.findMany({
             where: { workspaceId, date: { in: dates } }
-        })
+        }) as Promise<any[]>)
 
         const scheduleMap = new Map<string, Record<string, string[]>>()
-        for (const record of availabilities) {
+        for (const record of availabilities as any[]) {
             const key = getVietnamDateKey(record.date)
             const existing = scheduleMap.get(record.userId) || {}
             existing[key] = normalizeSchedule(record?.schedule as string[] | null)

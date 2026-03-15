@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import PresenceTracker from '@/components/tracking/PresenceTracker'
 import ImpersonationBanner from '@/components/layout/ImpersonationBanner'
+import ToSRevisitButton from '@/components/ToSRevisitButton'
 
 export default async function WorkspaceLayout({
     children,
@@ -40,6 +41,10 @@ export default async function WorkspaceLayout({
             <div className="flex-1 min-h-0 overflow-hidden relative">
                 {children}
             </div>
+            <ToSRevisitButton 
+                role={session.user.role} 
+                hasAccepted={session.user.hasAcceptedTerms} 
+            />
         </div>
     )
 }

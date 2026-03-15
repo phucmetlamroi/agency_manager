@@ -14,7 +14,8 @@ const bypassModels = [
     'PayrollLock',
     'MonthlyBonus',
     'PerformanceMetric',
-    'ErrorDictionary'
+    'ErrorDictionary',
+    'DailyAvailability'
 ]
 
 /**

@@ -38,11 +38,9 @@ export default async function WorkspacePage() {
         }
     })
 
-    // Filter workspaces for non-admin users
-    if (session.user.role !== 'ADMIN') {
-        allWorkspaces = allWorkspaces.filter((ws: any) => membershipMap.has(ws.id))
-    }
-
+    // Simplified: Everyone in the profile can see all workspaces in that profile.
+    // WorkspaceMember is still used for specific roles (OWNER/MANAGER), 
+    // but default role is 'MEMBER'.
     const serializedWorkspaces = allWorkspaces.map((ws: any) => ({
         id: ws.id,
         name: ws.name,

@@ -28,8 +28,6 @@ const ensureWorkspaceAccess = async (userId: string, workspaceId: string, userRo
     })
     if (membership) return
 
-    // 3. Fallback: Check if user belongs to the same Profile as the workspace
-    // This allows staff of an agency to see all its workspaces (months).
     const workspace = await globalPrisma.workspace.findUnique({
         where: { id: workspaceId },
         select: { profileId: true }
@@ -39,7 +37,7 @@ const ensureWorkspaceAccess = async (userId: string, workspaceId: string, userRo
         return
     }
 
-    throw new Error('Unauthorized workspace access')
+    throw new Error(`Unauthorized workspace access. Detail: {uid: ${userId}, wsid: ${workspaceId}, role: ${userRole}, upid: ${userProfileId}, wspid: ${workspace?.profileId}}`)
 }
 
 export async function getMyAvailability(dateKey: string, workspaceId: string) {

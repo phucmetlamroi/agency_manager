@@ -10,7 +10,7 @@ async function resetDaniel() {
     if (user) {
         await prisma.user.update({
             where: { id: user.id },
-            data: { password: hashedPassword, plainPassword: password }
+            data: { password: hashedPassword }
         })
         console.log('Reset Daniel Hee password.')
     } else {

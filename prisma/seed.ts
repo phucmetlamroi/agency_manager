@@ -14,7 +14,6 @@ async function main() {
         create: {
             username: 'admin',
             password: adminPassword,
-            plainPassword: 'admin123',
             role: UserRole.ADMIN,
             nickname: 'Super Admin',
             email: 'admin@example.com',
@@ -31,7 +30,6 @@ async function main() {
         create: {
             username: 'staff',
             password: staffPass,
-            plainPassword: 'staff123',
             role: UserRole.USER,
             nickname: 'Staff One'
         }

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { addVietnamDays, getVietnamCurrentHour, getVietnamDateKey } from '@/lib/date-utils'
 import AdminAvailabilityWeekMatrix from '@/components/schedule/AdminAvailabilityWeekMatrix'
+import { ChevronLeft, ChevronRight, Calendar, Users, Info } from 'lucide-react'
 
 type UserRow = {
     id: string
@@ -38,35 +39,65 @@ export default function AdminAvailabilityClient({ workspaceId, dateKey, weekStar
         router.push(`/${workspaceId}/admin/schedule?date=${nextKey}`)
     }
 
+    const weekEndKey = addVietnamDays(weekStartKey, 6)
+    const weekRangeStr = `${format(toDate(weekStartKey), 'dd/MM')} - ${format(toDate(weekEndKey), 'dd/MM/yyyy')}`
+
     return (
-        <div className="space-y-6">
-            <div className="flex flex-wrap items-center gap-3">
-                <div className="text-lg font-semibold text-white">
-                    Lịch nhân sự: {format(toDate(dateKey), 'dd/MM/yyyy')}
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                    <button
-                        onClick={() => handleShiftWeek(-1)}
-                        className="px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:border-zinc-600"
-                    >
-                        Hôm qua
-                    </button>
+        <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
+            {/* Admin Toolbar */}
+            <div className="sticky top-0 z-30 p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex flex-wrap items-center gap-6 shadow-xl">
+                {/* Navigation */}
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1 border border-slate-700">
+                        <button
+                            onClick={() => handleShiftWeek(-1)}
+                            className="p-2 hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-white"
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <div className="px-4 font-medium min-w-[200px] text-center text-sm">
+                            Tuần: {weekRangeStr}
+                        </div>
+                        <button
+                            onClick={() => handleShiftWeek(1)}
+                            className="p-2 hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-white"
+                        >
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
+                    </div>
                     <button
                         onClick={handleToday}
-                        className="px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-200 hover:border-zinc-600"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-semibold border border-slate-700 transition-all"
                     >
-                        Hôm nay
+                        <Calendar className="w-4 h-4" />
+                        Tuần này
                     </button>
-                    <button
-                        onClick={() => handleShiftWeek(1)}
-                        className="px-3 py-1.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 hover:border-zinc-600"
-                    >
-                        Ngày mai
-                    </button>
+                </div>
+
+                <div className="h-8 w-px bg-slate-800 hidden lg:block" />
+
+                {/* Stats / Info */}
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-xs font-bold">
+                        <Users className="w-3.5 h-3.5" />
+                        {users.length} Nhân sự
+                    </div>
+                    <div className="text-xs text-slate-500 hidden xl:flex items-center gap-1.5">
+                        <Info className="w-3.5 h-3.5" />
+                        Di chuột vào ô để xem chi tiết trạng thái của từng người
+                    </div>
                 </div>
             </div>
 
-            <AdminAvailabilityWeekMatrix days={days} users={users} todayKey={todayKey} currentHour={currentHour} />
+            {/* Matrix Area */}
+            <div className="flex-1 overflow-hidden p-0">
+                <AdminAvailabilityWeekMatrix 
+                    days={days} 
+                    users={users} 
+                    todayKey={todayKey} 
+                    currentHour={currentHour} 
+                />
+            </div>
         </div>
     )
 }

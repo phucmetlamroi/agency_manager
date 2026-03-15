@@ -37,12 +37,7 @@ export default async function AdminSchedulePage({
     const days = 'days' in data ? data.days : []
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-semibold text-white">Lịch nhân sự</h1>
-                <p className="text-sm text-zinc-500">Ma trận 24 giờ cho toàn bộ nhân sự trong workspace.</p>
-            </div>
-
+        <div className="h-full flex flex-col p-0">
             <AdminAvailabilityClient
                 workspaceId={workspaceId}
                 dateKey={weekStartKey}

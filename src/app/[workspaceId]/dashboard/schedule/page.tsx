@@ -23,6 +23,16 @@ export default async function SchedulePage({
 
     const dateKey = query?.date || getVietnamDateKey()
     const data = await getMyAvailability(dateKey, workspaceId)
+    
+    if ('error' in data) {
+        return (
+            <div className="p-8 text-center glass-panel">
+                <h2 className="text-xl font-bold text-rose-500 mb-2">Đã xảy ra lỗi hệ thống</h2>
+                <p className="text-zinc-400">{(data as any).error}</p>
+            </div>
+        )
+    }
+
     const schedule = ('schedule' in data ? data.schedule : Array.from({ length: 24 }, () => 'EMPTY')) as string[]
 
     return (

@@ -1,6 +1,7 @@
 'use server'
 
-import { prisma } from '@/lib/db'
+import { prisma as globalPrisma } from '@/lib/db'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getCurrentUser } from '@/lib/auth-guard'
 import { getVietnamCurrentHour, getVietnamDateKey, getVietnamDayStart } from '@/lib/date-utils'
 import { revalidatePath } from 'next/cache'
@@ -18,7 +19,7 @@ const isValidDateKey = (dateKey: string): boolean => {
 }
 
 const ensureWorkspaceAccess = async (userId: string, workspaceId: string) => {
-    const membership = await prisma.workspaceMember.findUnique({
+    const membership = await globalPrisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId, workspaceId } }
     })
     if (!membership) {
@@ -32,9 +33,10 @@ export async function getMyAvailability(dateKey: string, workspaceId: string) {
         if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
 
         await ensureWorkspaceAccess(user.id, workspaceId)
-
+        
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
         const date = getVietnamDayStart(dateKey)
-        const record = await prisma.dailyAvailability.findUnique({
+        const record = await workspacePrisma.dailyAvailability.findUnique({
             where: { userId_date: { userId: user.id, date } }
         })
 
@@ -44,7 +46,7 @@ export async function getMyAvailability(dateKey: string, workspaceId: string) {
         }
     } catch (error: any) {
         console.error('getMyAvailability error:', error)
-        return { error: error.message || 'Internal Server Error' }
+        return { error: `Server error: ${error.message || 'Unknown'}` }
     }
 }
 
@@ -55,6 +57,7 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
         if (!Array.isArray(schedule) || schedule.length !== 24) return { error: 'Invalid schedule length' }
 
         await ensureWorkspaceAccess(user.id, workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
 
         const cleanSchedule = schedule.map(s => (VALID_STATUSES.has(s) ? s : 'EMPTY'))
         const todayKey = getVietnamDateKey()
@@ -67,7 +70,7 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
 
         if (dateKey === todayKey) {
             const currentHour = getVietnamCurrentHour()
-            const existing = await prisma.dailyAvailability.findUnique({
+            const existing = await workspacePrisma.dailyAvailability.findUnique({
                 where: { userId_date: { userId: user.id, date: targetDate } }
             })
             const existingSchedule = normalizeSchedule(existing?.schedule as string[] | null)
@@ -79,10 +82,10 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
             }
         }
 
-        const userRecord = await prisma.user.findUnique({ where: { id: user.id } })
+        const userRecord = await globalPrisma.user.findUnique({ where: { id: user.id } })
         const profileId = userRecord?.profileId || null
 
-        await prisma.dailyAvailability.upsert({
+        await workspacePrisma.dailyAvailability.upsert({
             where: { userId_date: { userId: user.id, date: targetDate } },
             create: {
                 userId: user.id,
@@ -105,7 +108,7 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
         return { success: true }
     } catch (error: any) {
         console.error('saveMyAvailability error:', error)
-        return { error: error.message || 'Internal Server Error' }
+        return { error: `Server error: ${error.message || 'Unknown'}` }
     }
 }
 
@@ -115,9 +118,10 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
         if (user.role !== 'ADMIN') return { error: 'Unauthorized' }
         if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
 
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
         const date = getVietnamDayStart(dateKey)
 
-        const members = await prisma.workspaceMember.findMany({
+        const members = await globalPrisma.workspaceMember.findMany({
             where: { workspaceId },
             include: {
                 user: {
@@ -126,7 +130,7 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
             }
         })
 
-        const availabilities = await prisma.dailyAvailability.findMany({
+        const availabilities = await workspacePrisma.dailyAvailability.findMany({
             where: { workspaceId, date }
         })
 
@@ -147,6 +151,6 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
         return { date: dateKey, users: rows }
     } catch (error: any) {
         console.error('getAdminAvailabilityMatrix error:', error)
-        return { error: error.message || 'Internal Server Error' }
+        return { error: `Server error: ${error.message || 'Unknown'}` }
     }
 }

@@ -55,7 +55,7 @@ export default function AvailabilityScheduleClient({ workspaceId, dateKey, weekS
                 </div>
             </div>
 
-            <AvailabilityWeekEditor workspaceId={workspaceId} days={days} />
+            <AvailabilityWeekEditor workspaceId={workspaceId} days={days as any} />
         </div>
     )
 }

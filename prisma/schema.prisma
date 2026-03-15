@@ -30,6 +30,7 @@ model Profile {
   agencies     Agency[]
   errorLogs    ErrorLog[]
   monthlyRanks MonthlyRank[]
+  availabilities DailyAvailability[]
 }
 
 model Workspace {
@@ -54,6 +55,7 @@ model Workspace {
   monthlyRanks MonthlyRank[]
   ratings      Rating[]
   sessions     Session[]
+  availabilities DailyAvailability[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 
@@ -112,8 +114,27 @@ model User {
   sessions          Session[]
   events            Event[]
   presence          UserPresence?
+  availabilities    DailyAvailability[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
+}
+
+model DailyAvailability {
+  id          String               @id @default(uuid())
+  userId      String
+  workspaceId String
+  profileId   String?
+  date        DateTime
+  schedule    AvailabilityStatus[] @default([])
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  profile   Profile?  @relation(fields: [profileId], references: [id])
+
+  @@unique([userId, date])
+  @@index([workspaceId, date])
 }
 
 model Payroll {
@@ -407,6 +428,13 @@ enum InvoiceStatus {
 enum InvoiceTaskStatus {
   UNBILLED
   INVOICED
+}
+
+enum AvailabilityStatus {
+  EMPTY
+  FREE
+  BUSY
+  TENTATIVE
 }
 
 

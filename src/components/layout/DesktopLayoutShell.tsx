@@ -31,6 +31,9 @@ export default function DesktopLayoutShell({
                     <Link href={`/${workspaceId}/dashboard`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                         <span>🏠</span> Tổng quan
                     </Link>
+                    <Link href={`/${workspaceId}/dashboard/schedule`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard/schedule` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                        <span>ðŸ—“</span> Schedule
+                    </Link>
                     {user?.role === 'ADMIN' && (
                         <>
                             <Link href={`/${workspaceId}/admin`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
@@ -47,6 +50,9 @@ export default function DesktopLayoutShell({
                             </Link>
                             <Link href={`/${workspaceId}/admin/queue`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/queue` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>🎁</span> Queue
+                            </Link>
+                            <Link href={`/${workspaceId}/admin/schedule`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/schedule` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                                <span>ðŸ•’</span> Admin Schedule
                             </Link>
                         </>
                     )}

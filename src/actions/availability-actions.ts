@@ -48,7 +48,7 @@ export async function getMyAvailability(dateKey: string, workspaceId: string) {
 
         await ensureWorkspaceAccess(user.id, workspaceId, user.role, user.profileId)
         
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId) as any
         const date = getVietnamDayStart(dateKey)
         const record = await workspacePrisma.dailyAvailability.findUnique({
             where: { userId_date: { userId: user.id, date } }
@@ -71,7 +71,7 @@ export async function getMyAvailabilityWeek(dateKey: string, workspaceId: string
 
         await ensureWorkspaceAccess(user.id, workspaceId, user.role, user.profileId)
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId) as any
         const weekKeys = getVietnamWeekKeys(dateKey)
         const dates = weekKeys.map(getVietnamDayStart)
 
@@ -108,7 +108,7 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
         if (!Array.isArray(schedule) || schedule.length !== 24) return { error: 'Invalid schedule length' }
 
         await ensureWorkspaceAccess(user.id, workspaceId, user.role, user.profileId)
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId) as any
 
         const cleanSchedule = schedule.map(s => (VALID_STATUSES.has(s) ? s : 'EMPTY'))
         const todayKey = getVietnamDateKey()
@@ -119,11 +119,12 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
             return { error: 'Không thể chỉnh sửa lịch trong quá khứ.' }
         }
 
+        const existing = await workspacePrisma.dailyAvailability.findUnique({
+            where: { userId_date: { userId: user.id, date: targetDate } }
+        })
+
         if (dateKey === todayKey) {
             const currentHour = getVietnamCurrentHour()
-            const existing = await workspacePrisma.dailyAvailability.findUnique({
-                where: { userId_date: { userId: user.id, date: targetDate } }
-            })
             const existingSchedule = normalizeSchedule(existing?.schedule as string[] | null)
 
             for (let i = 0; i < currentHour; i += 1) {
@@ -136,21 +137,26 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
         const userRecord = await globalPrisma.user.findUnique({ where: { id: user.id } })
         const profileId = userRecord?.profileId || null
 
-        await workspacePrisma.dailyAvailability.upsert({
-            where: { userId_date: { userId: user.id, date: targetDate } },
-            create: {
-                userId: user.id,
-                workspaceId,
-                profileId,
-                date: targetDate,
-                schedule: cleanSchedule as any
-            },
-            update: {
-                schedule: cleanSchedule as any,
-                workspaceId,
-                profileId
-            }
-        })
+        if (existing) {
+            await workspacePrisma.dailyAvailability.update({
+                where: { id: existing.id },
+                data: {
+                    schedule: cleanSchedule as any,
+                    workspaceId,
+                    profileId
+                }
+            })
+        } else {
+            await workspacePrisma.dailyAvailability.create({
+                data: {
+                    userId: user.id,
+                    workspaceId,
+                    profileId,
+                    date: targetDate,
+                    schedule: cleanSchedule as any
+                }
+            })
+        }
 
         revalidatePath(`/${workspaceId}/dashboard/schedule`)
         revalidatePath(`/${workspaceId}/admin/schedule`)
@@ -169,7 +175,7 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
         if (user.role !== 'ADMIN') return { error: 'Unauthorized' }
         if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId) as any
         const date = getVietnamDayStart(dateKey)
 
         const members = await globalPrisma.workspaceMember.findMany({
@@ -212,7 +218,7 @@ export async function getAdminAvailabilityWeek(dateKey: string, workspaceId: str
         if (user.role !== 'ADMIN') return { error: 'Unauthorized' }
         if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId) as any
         const weekKeys = getVietnamWeekKeys(dateKey)
         const dates = weekKeys.map(getVietnamDayStart)
 

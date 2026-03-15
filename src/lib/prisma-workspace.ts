@@ -29,7 +29,8 @@ const noProfileModels = [
     'Rating',
     'Session',
     'Event',
-    'UserPresence'
+    'UserPresence',
+    'Agency'
 ]
 
 /**
@@ -74,7 +75,6 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
                         }
                     }
 
-
                     if (['createMany'].includes(operation)) {
                         if (Array.isArray((args as any).data)) {
                             (args as any).data = (args as any).data.map((item: any) => ({
@@ -104,11 +104,17 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
                             ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
                             ...(currentProfileId && !hasNoProfile ? { profileId: currentProfileId } : {})
                         }
+
+                        (args as any).update = {
+                            ...((args as any).update || {}),
+                            ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
+                            ...(currentProfileId && !hasNoProfile ? { profileId: currentProfileId } : {})
+                        }
                     }
 
                     return query(args)
                 },
             },
         },
-    }) as unknown as PrismaClient
+    })
 }

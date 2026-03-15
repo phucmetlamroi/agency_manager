@@ -9,8 +9,8 @@ type UserRow = {
     id: string
     username: string
     nickname: string | null
-    role: string
-    schedule: ('EMPTY' | 'FREE' | 'BUSY' | 'TENTATIVE')[]
+    role: any
+    schedule: any[]
 }
 
 type Props = {

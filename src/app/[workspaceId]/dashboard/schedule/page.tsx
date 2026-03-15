@@ -23,7 +23,7 @@ export default async function SchedulePage({
 
     const dateKey = query?.date || getVietnamDateKey()
     const data = await getMyAvailability(dateKey, workspaceId)
-    const schedule = 'schedule' in data ? data.schedule : Array.from({ length: 24 }, () => 'EMPTY')
+    const schedule = ('schedule' in data ? data.schedule : Array.from({ length: 24 }, () => 'EMPTY')) as string[]
 
     return (
         <div className="space-y-6">

@@ -35,7 +35,7 @@ export default async function AdminSchedulePage({
             <AdminAvailabilityClient
                 workspaceId={workspaceId}
                 dateKey={dateKey}
-                users={users}
+                users={users as any}
             />
         </div>
     )

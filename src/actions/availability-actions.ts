@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth-guard'
+import { AvailabilityStatus } from '@prisma/client'
 import { getVietnamCurrentHour, getVietnamDateKey, getVietnamDayStart } from '@/lib/date-utils'
 import { revalidatePath } from 'next/cache'
 
@@ -83,10 +84,10 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
             workspaceId,
             profileId,
             date: targetDate,
-            schedule: cleanSchedule
+            schedule: cleanSchedule as AvailabilityStatus[]
         },
         update: {
-            schedule: cleanSchedule,
+            schedule: cleanSchedule as AvailabilityStatus[],
             workspaceId,
             profileId
         }

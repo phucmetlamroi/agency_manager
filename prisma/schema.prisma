@@ -83,6 +83,7 @@ model User {
   reputation        Int                 @default(100)
   isTreasurer       Boolean             @default(false)
   hasAcceptedTerms  Boolean             @default(false)
+  termsAcceptedAt   DateTime?
   email             String?
   nickname          String?
   phoneNumber       String?

@@ -15,7 +15,10 @@ export async function acceptTermsAction() {
     // Update the database
     await prisma.user.update({
         where: { id: userId },
-        data: { hasAcceptedTerms: true }
+        data: { 
+            hasAcceptedTerms: true,
+            termsAcceptedAt: new Date()
+        }
     })
 
     // Resign the JWT token with the new payload

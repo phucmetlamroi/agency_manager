@@ -9,6 +9,7 @@ import { serializeDecimal } from '@/lib/serialization'
 import { UserRole } from '@prisma/client'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
+import { getUserPerformanceScore } from '@/actions/analytics-actions'
 
 
 export const dynamic = 'force-dynamic'
@@ -20,6 +21,9 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
     const workspacePrisma = getWorkspacePrisma(workspaceId)
     const userId = session.user.id
+
+    // Fetch Performance Data
+    const perfData = await getUserPerformanceScore(workspaceId, userId)
 
     // Use actual month/year
     const now = new Date()
@@ -141,6 +145,19 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                     <div style={{ fontSize: '2.5rem', fontWeight: '800', background: 'linear-gradient(to right, #4ade80, #22c55e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                         {totalThisMonthSalary.toLocaleString()} <span style={{ fontSize: '1.5rem', WebkitTextFillColor: '#22c55e' }}>đ</span>
                     </div>
+
+                    {perfData && (
+                        <div style={{ position: 'absolute', bottom: '2rem', right: '2rem', textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.7rem', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Tỉ lệ lỗi (Rank {perfData.rank})</div>
+                            <div style={{ 
+                                fontSize: '1.5rem', 
+                                fontWeight: 'bold', 
+                                color: perfData.errorRate < 0.6 ? '#4ade80' : perfData.errorRate < 1.0 ? '#fbbf24' : '#f87171' 
+                            }}>
+                                {perfData.errorRate}%
+                            </div>
+                        </div>
+                    )}
 
                     {bonusData && (
                         <div style={{ fontSize: '0.9rem', color: '#f59e0b', marginTop: '0.5rem', fontWeight: '500' }}>

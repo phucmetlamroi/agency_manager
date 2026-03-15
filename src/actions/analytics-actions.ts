@@ -11,7 +11,7 @@ export async function getAnalyticsData(workspaceId: string) {
     const completedTasksAggregate = await workspacePrisma.task.groupBy({
         by: ['assigneeId'],
         where: {
-            status: 'Hoàn tất',
+            status: { in: ['Hoàn tất', 'Revision'] },
             assigneeId: { not: null }
         },
         _count: {
@@ -129,4 +129,49 @@ export async function getUserErrorDetails(workspaceId: string, userId: string) {
         // Cuối cùng theo mã lỗi
         return a.code.localeCompare(b.code)
     })
+}
+
+export async function getUserPerformanceScore(workspaceId: string, userId: string) {
+    const session = await getSession()
+    if (!session || !session.user) return null
+    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
+
+    const taskCount = await workspacePrisma.task.count({
+        where: {
+            assigneeId: userId,
+            status: { in: ['Hoàn tất', 'Revision'] }
+        }
+    })
+
+    const errorSum = await (workspacePrisma as any).errorLog.aggregate({
+        _sum: { calculatedScore: true },
+        where: { userId }
+    })
+
+    const totalPenalty = errorSum._sum.calculatedScore || 0
+    const errorRate = taskCount > 0 ? Number((totalPenalty / taskCount).toFixed(2)) : (totalPenalty > 0 ? totalPenalty : 0)
+
+    // Match the rank logic from getAnalyticsData
+    let rank = 'S'
+    if (taskCount >= 8) {
+        if (errorRate < 0.3) rank = 'S'
+        else if (errorRate < 0.6) rank = 'A'
+        else if (errorRate < 1.0) rank = 'B'
+        else if (errorRate < 1.5) rank = 'C'
+        else rank = 'D'
+    } else if (taskCount > 0) {
+        if (errorRate < 1.0) rank = 'N/A' 
+        else rank = 'D'
+    } else if (totalPenalty > 0) {
+        rank = 'D'
+    } else {
+        rank = 'N/A'
+    }
+
+    return {
+        taskCount,
+        totalPenalty,
+        errorRate,
+        rank
+    }
 }

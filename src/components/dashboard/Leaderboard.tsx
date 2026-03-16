@@ -9,20 +9,14 @@ import RefreshLeaderboardButton from "./RefreshLeaderboardButton"
 export const getLeaderboardData = unstable_cache(
     async (workspaceId: string, profileId?: string) => {
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
-        const now = new Date()
-        const currentMonth = now.getMonth() + 1
-        const currentYear = now.getFullYear()
-
-        const thisMonthStart = new Date(currentYear, currentMonth - 1, 1)
-        const thisMonthEnd = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999)
-
-        // Fetch completed tasks aggregation by assignee for this month
+        // Fetch completed tasks aggregation by assignee
+        // Included 'Revision' to match Analytics logic and removed hardcoded Month filter 
+        // to respect Workspace context isolation.
         const completedTasksAggregate = await workspacePrisma.task.groupBy({
             by: ['assigneeId'],
             where: {
-                status: 'Hoàn tất',
-                assigneeId: { not: null },
-                updatedAt: { gte: thisMonthStart, lte: thisMonthEnd }
+                status: { in: ['Hoàn tất', 'Revision'] },
+                assigneeId: { not: null }
             },
             _count: { id: true },
             _sum: { value: true }
@@ -32,18 +26,14 @@ export const getLeaderboardData = unstable_cache(
             by: ['assigneeId'],
             where: {
                 status: { in: SALARY_PENDING_STATUSES },
-                assigneeId: { not: null },
-                updatedAt: { gte: thisMonthStart, lte: thisMonthEnd }
+                assigneeId: { not: null }
             },
             _sum: { value: true }
         })
 
-        // Fetch sum of penalties by user for this month
+        // Fetch sum of penalties by user
         const errorLogsAggregate = await (workspacePrisma as any).errorLog.groupBy({
             by: ['userId'],
-            where: {
-                createdAt: { gte: thisMonthStart, lte: thisMonthEnd }
-            },
             _sum: { calculatedScore: true }
         })
 

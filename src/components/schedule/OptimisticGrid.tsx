@@ -1,11 +1,13 @@
 'use client'
 
-import React, { useTransition, useRef, useState, useOptimistic, useCallback } from 'react'
-import { format, addHours, startOfDay, isSameMinute, parseISO } from 'date-fns'
+import React, { useTransition, useRef, useState, useOptimistic } from 'react'
+import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks, parseISO, startOfMonth, getWeeksInMonth, eachWeekOfInterval, endOfMonth } from 'date-fns'
+import { vi } from 'date-fns/locale'
 import { createScheduleException } from '@/actions/schedule-actions'
-import { DndContext, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { ChevronLeft, ChevronRight, CalendarDays, Users } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 export type ScheduleItem = {
   id: string
@@ -13,186 +15,257 @@ export type ScheduleItem = {
   end: string   // HH:mm
   reason: string | null
   type: 'RULE' | 'BLOCK' | 'ADD'
+  date?: Date   // which day this item is for (for multi-day grids)
 }
 
 export type GridUser = {
   id: string
   name: string
-  items: ScheduleItem[]
+  items: ScheduleItem[] // items now have a .date field too
 }
 
 interface OptimisticGridProps {
   workspaceId: string
   profileId?: string
-  date: Date
+  date: Date           // starting reference date (today or selected)
   users: GridUser[]
 }
 
-const HOURS = Array.from({ length: 15 }, (_, i) => i + 8) // 8:00 to 22:00
+const HOURS = Array.from({ length: 16 }, (_, i) => i + 7) // 07:00 to 22:00
+
+const DAY_NAMES = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7']
+
+function getWeekDays(baseDate: Date): Date[] {
+  const start = startOfWeek(baseDate, { weekStartsOn: 1 }) // Monday first
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i))
+}
+
+type Selection = { day: Date; startHour: number; endHour: number } | null
 
 export function OptimisticGrid({ workspaceId, profileId, date, users }: OptimisticGridProps) {
+  const [weekBase, setWeekBase] = useState(date)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(users[0]?.id ?? null)
   const [isPending, startTransition] = useTransition()
-  
-  // Optimistic state updates
-  const [optimisticUsers, addOptimisticException] = useOptimistic(
-    users,
-    (state, newException: { userId: string, start: string, end: string, type: 'BLOCK'|'ADD', reason?: string }) => {
-      return state.map(user => {
-        if (user.id === newException.userId) {
-          return {
-            ...user,
-            items: [...user.items, {
-              id: Math.random().toString(), // temp ID
-              start: newException.start,
-              end: newException.end,
-              type: newException.type,
-              reason: newException.reason || null
-            }]
-          }
-        }
-        return user
-      })
-    }
+
+  const weekDays = getWeekDays(weekBase)
+  const selectedUser = users.find(u => u.id === selectedUserId) ?? users[0]
+
+  // Optimistic state
+  const [optimisticItems, addOptimisticItem] = useOptimistic(
+    selectedUser?.items ?? [],
+    (state, newItem: ScheduleItem) => [...state, newItem]
   )
 
-  const [selection, setSelection] = useState<{ userId: string, startHour: number, endHour: number } | null>(null)
+  // Drag selection
   const isDragging = useRef(false)
-  const startSelection = useRef<{ userId: string, hour: number } | null>(null)
+  const [selection, setSelection] = useState<Selection>(null)
+  const dragStart = useRef<{ day: Date; hour: number } | null>(null)
 
-  const handlePointerDown = (userId: string, hour: number) => {
+  const handlePointerDown = (day: Date, hour: number) => {
     isDragging.current = true
-    startSelection.current = { userId, hour }
-    setSelection({ userId, startHour: hour, endHour: hour })
+    dragStart.current = { day, hour }
+    setSelection({ day, startHour: hour, endHour: hour })
   }
 
-  const handlePointerEnter = (userId: string, hour: number) => {
-    if (!isDragging.current || !startSelection.current) return
-    if (startSelection.current.userId !== userId) return // restrict to single row
-    
-    const startHour = Math.min(startSelection.current.hour, hour)
-    const endHour = Math.max(startSelection.current.hour, hour)
-    setSelection({ userId, startHour, endHour })
+  const handlePointerEnter = (day: Date, hour: number) => {
+    if (!isDragging.current || !dragStart.current) return
+    if (!isSameDay(day, dragStart.current.day)) return
+    const startHour = Math.min(dragStart.current.hour, hour)
+    const endHour = Math.max(dragStart.current.hour, hour)
+    setSelection({ day, startHour, endHour })
   }
 
   const handlePointerUp = () => {
-    if (!isDragging.current || !selection) return
-    
+    if (!isDragging.current || !selection || !selectedUser) return
     isDragging.current = false
-    const finalSelection = { ...selection }
+    const finalSel = { ...selection }
     setSelection(null)
-    startSelection.current = null
+    dragStart.current = null
 
-    // Fire Server Action using drag selection
-    handleAction(finalSelection)
-  }
+    const startStr = `${finalSel.startHour.toString().padStart(2, '0')}:00`
+    const endStr = `${(finalSel.endHour + 1).toString().padStart(2, '0')}:00`
 
-  const handleAction = (sel: { userId: string, startHour: number, endHour: number }) => {
-    const startStr = `${sel.startHour.toString().padStart(2, '0')}:00`
-    const endStr = `${(sel.endHour + 1).toString().padStart(2, '0')}:00`
-    
-    // We assume dragging creates a BLOCK (e.g., admin marks user as busy)
     startTransition(async () => {
-      addOptimisticException({ userId: sel.userId, start: startStr, end: endStr, type: 'BLOCK', reason: 'Admin override' })
+      addOptimisticItem({
+        id: Math.random().toString(),
+        start: startStr,
+        end: endStr,
+        type: 'BLOCK',
+        reason: 'Admin đánh dấu bận',
+        date: finalSel.day
+      })
       try {
-        await createScheduleException(
-          workspaceId,
-          profileId,
-          sel.userId,
-          date,
-          startStr,
-          endStr,
-          'BLOCK',
-          'Admin override',
-          'Asia/Ho_Chi_Minh'
-        )
-        toast.success("Đã đánh dấu lịch thành công")
+        await createScheduleException(workspaceId, profileId, selectedUser.id, finalSel.day, startStr, endStr, 'BLOCK', 'Admin đánh dấu bận', 'Asia/Ho_Chi_Minh')
+        toast.success(`Đã đánh dấu ${format(finalSel.day, 'dd/MM')} ${startStr}–${endStr} là bận`)
       } catch (e: any) {
-        toast.error("Lỗi khi cập nhật lịch: " + e.message)
+        toast.error('Lỗi cập nhật lịch: ' + e.message)
       }
     })
   }
 
-  // Render a cell for a specific hour
-  const renderCell = (user: GridUser, hour: number) => {
-    // Determine if this cell falls into any existing items
-    const hourStr = `${hour.toString().padStart(2, '0')}:00`
-    
-    // Simplistic check for overlapping hour blocks (assumes exact hour matching for simplicity in this artifact)
-    const matchingItems = user.items.filter(item => {
-      const sH = parseInt(item.start.split(':')[0])
-      const eH = parseInt(item.end.split(':')[0])
+  // --- Cell status for a given (day, hour) ---
+  const getCellStatus = (day: Date, hour: number) => {
+    if (!selectedUser) return null
+    const itemsForDay = optimisticItems.filter(it => {
+      if (!it.date) return false
+      return isSameDay(it.date, day)
+    })
+    const active = itemsForDay.find(it => {
+      const sH = parseInt(it.start.split(':')[0])
+      const eH = parseInt(it.end.split(':')[0])
       return hour >= sH && hour < eH
     })
-
-    const isRule = matchingItems.some(i => i.type === 'RULE')
-    const isBlock = matchingItems.some(i => i.type === 'BLOCK')
-    const isAdd = matchingItems.some(i => i.type === 'ADD')
-
-    let bgColor = "bg-background"
-    if (isBlock) bgColor = "bg-red-500/20 border-red-500/50"
-    else if (isAdd) bgColor = "bg-green-500/20 border-green-500/50"
-    else if (isRule) bgColor = "bg-primary/10 border-primary/20"
-
-    const isSelected = selection && selection.userId === user.id && hour >= selection.startHour && hour <= selection.endHour
-
-    return (
-      <div 
-        key={hour}
-        className={cn(
-          "w-20 min-w-20 pl-2 border-r  h-12 flex items-center justify-center transition-colors cursor-crosshair select-none relative",
-          bgColor,
-          isSelected ? "bg-blue-500/40" : ""
-        )}
-        onPointerDown={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); handlePointerDown(user.id, hour) }}
-        onPointerEnter={() => handlePointerEnter(user.id, hour)}
-      >
-         {/* Optional: Add content inside blocks */}
-      </div>
-    )
+    return active ?? null
   }
 
+  // --- Week navigation months ---
+  const monthLabel = format(weekDays[0], 'MMMM yyyy', { locale: vi })
+  const weekStart = format(weekDays[0], 'dd/MM')
+  const weekEnd = format(weekDays[6], 'dd/MM')
+
   return (
-    <div 
-      className="max-w-full overflow-x-auto overflow-y-auto border border-border/50 rounded-lg shadow-sm"
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-      style={{ maxHeight: '70vh' }}
-    >
-      <table className="w-full border-collapse relative">
-        <thead className="sticky top-0 z-20 bg-background/95 backdrop-blur shadow-sm">
-          <tr>
-            <th className="sticky left-0 min-w-40 w-40 z-30 bg-background/95 border-b border-r px-4 py-3 text-left text-sm font-semibold text-muted-foreground">
-              Nhân sự
-            </th>
-            {HOURS.map(hour => (
-              <th key={hour} className="min-w-20 w-20 border-b border-r px-2 py-3 text-center text-xs font-medium text-muted-foreground whitespace-nowrap">
-                {`${hour.toString().padStart(2, '0')}:00`}
-              </th>
+    <div className="space-y-4">
+      {/* ─── TOOLBAR ─── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Staff Selector */}
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">Nhân sự:</span>
+          <div className="flex flex-wrap gap-1">
+            {users.map(u => (
+              <button
+                key={u.id}
+                onClick={() => setSelectedUserId(u.id)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-xs font-semibold transition-all',
+                  selectedUserId === u.id
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'bg-muted text-muted-foreground hover:bg-primary/20 hover:text-primary'
+                )}
+              >
+                {u.name}
+              </button>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {optimisticUsers.map(user => (
-            <tr key={user.id} className="group hover:bg-muted/30 transition-colors">
-              <td className="sticky left-0 min-w-40 w-40 z-10 bg-background/95 border-b border-r px-4 py-3 text-sm font-medium">
-                {user.name}
-              </td>
-              {HOURS.map(hour => (
-                <td key={hour} className="border-b p-0">
-                  {renderCell(user, hour)}
-                </td>
-              ))}
-            </tr>
-          ))}
-          {users.length === 0 && (
+          </div>
+        </div>
+
+        {/* Week Navigation */}
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setWeekBase(w => subWeeks(w, 1))}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="text-sm font-medium px-2 text-center min-w-[160px]">
+            <div className="text-foreground font-bold capitalize">{monthLabel}</div>
+            <div className="text-xs text-muted-foreground">{weekStart} – {weekEnd}</div>
+          </div>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setWeekBase(w => addWeeks(w, 1))}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setWeekBase(new Date())}>
+            Hôm nay
+          </Button>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-primary/25 border border-primary/40 inline-block" /> Lịch cố định</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-500/30 border border-red-500/50 inline-block" /> Bận / Khóa</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-green-500/25 border border-green-500/40 inline-block" /> Làm thêm</span>
+        <span className="flex items-center gap-1.5 ml-auto italic">💡 Kéo rê để đánh dấu bận</span>
+      </div>
+
+      {/* ─── GRID ─── */}
+      <div
+        className="relative border border-border/50 rounded-xl overflow-auto shadow-sm select-none"
+        style={{ maxHeight: '72vh' }}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      >
+        <table className="w-full border-collapse" style={{ minWidth: 680 }}>
+          {/* HEADER ROW: Day columns */}
+          <thead className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm">
             <tr>
-              <td colSpan={HOURS.length + 1} className="p-8 text-center text-muted-foreground">
-                Không tìm thấy nhân sự phù hợp
-              </td>
+              {/* Corner cell */}
+              <th className="sticky left-0 z-30 bg-background/95 border-b border-r w-16 min-w-16 px-2 py-3 text-xs text-muted-foreground font-medium">
+                Giờ
+              </th>
+              {weekDays.map((day, i) => {
+                const isToday = isSameDay(day, new Date())
+                return (
+                  <th key={i} className={cn(
+                    'border-b border-r px-2 py-3 text-center min-w-[120px]',
+                    isToday ? 'bg-primary/10' : ''
+                  )}>
+                    <div className={cn('text-xs font-semibold', isToday ? 'text-primary' : 'text-muted-foreground')}>
+                      {DAY_NAMES[day.getDay()]}
+                    </div>
+                    <div className={cn(
+                      'text-sm font-bold mt-0.5',
+                      isToday ? 'text-primary' : 'text-foreground'
+                    )}>
+                      {format(day, 'dd/MM')}
+                    </div>
+                  </th>
+                )
+              })}
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+
+          {/* BODY: Hour rows */}
+          <tbody>
+            {HOURS.map(hour => (
+              <tr key={hour} className="group">
+                {/* Hour label — sticky left */}
+                <td className="sticky left-0 z-10 bg-background/95 border-b border-r px-2 py-0 text-xs text-muted-foreground font-mono text-right pr-3 h-12 align-top pt-1.5">
+                  {`${hour.toString().padStart(2, '0')}:00`}
+                </td>
+
+                {/* Day cells */}
+                {weekDays.map((day, dayIdx) => {
+                  const cellStatus = getCellStatus(day, hour)
+                  const isToday = isSameDay(day, new Date())
+                  const isSelected = selection &&
+                    isSameDay(selection.day, day) &&
+                    hour >= selection.startHour &&
+                    hour <= selection.endHour
+
+                  let cellClass = 'bg-transparent'
+                  if (cellStatus?.type === 'BLOCK') cellClass = 'bg-red-500/20 border-red-500/30'
+                  else if (cellStatus?.type === 'ADD') cellClass = 'bg-green-500/15 border-green-500/30'
+                  else if (cellStatus?.type === 'RULE') cellClass = 'bg-primary/10 border-primary/20'
+                  if (isToday && !cellStatus) cellClass = 'bg-primary/5'
+
+                  return (
+                    <td
+                      key={dayIdx}
+                      className={cn(
+                        'border-b border-r h-12 cursor-crosshair transition-colors p-0 relative',
+                        cellClass,
+                        isSelected ? '!bg-blue-500/35 border-blue-400/50' : '',
+                        'hover:bg-muted/40'
+                      )}
+                      onPointerDown={e => { e.currentTarget.releasePointerCapture(e.pointerId); handlePointerDown(day, hour) }}
+                      onPointerEnter={() => handlePointerEnter(day, hour)}
+                    >
+                      {cellStatus && hour === parseInt(cellStatus.start.split(':')[0]) && (
+                        <div className="absolute inset-x-1 top-0.5 text-[9px] font-semibold truncate px-1 leading-tight">
+                          {cellStatus.type === 'BLOCK' ? '🔴' : '🟢'} {cellStatus.reason ?? cellStatus.type}
+                        </div>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {isPending && (
+        <div className="text-xs text-muted-foreground animate-pulse text-center">Đang lưu...</div>
+      )}
     </div>
   )
 }

@@ -32,10 +32,10 @@ async function main() {
         console.log('\nNo Smile white client found. Searching for parent jacob...')
         const jacobs = await prisma.client.findMany({ 
             where: { name: { contains: 'jacob', mode: 'insensitive' } },
-            include: { subClients: true }
+            include: { subsidiaries: true }
         })
         for (const j of jacobs) {
-            console.log(`- Parent ID: ${j.id}, Name: "${j.name}", SubClients: ${j.subClients.map(sc => sc.name).join(', ')}`)
+            console.log(`- Parent ID: ${j.id}, Name: "${j.name}", SubClients: ${j.subsidiaries.map(sc => sc.name).join(', ')}`)
             const jTasks = await prisma.task.findMany({
                 where: { clientId: j.id },
                 include: { workspace: true }

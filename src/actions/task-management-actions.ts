@@ -19,7 +19,6 @@ export async function deleteTask(id: string, workspaceId: string) {
             return { error: 'Forbidden: Bạn không có quyền xóa Task này.' }
         }
 
-        // Nhờ onDelete: Cascade trong Prisma, UserSchedule liên quan sẽ tự mất
         await workspacePrisma.task.delete({ where: { id } })
 
         revalidatePath(`/${workspaceId}/admin`)
@@ -100,9 +99,6 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
 
         else {
             // CASE: ASSIGN TO USER
-            // 1. Check Availability (Nếu không phải Super Admin)
-            // Assigned without schedule constraint
-
             if (assignmentId.startsWith('agency:')) {
                 return { error: 'Agency assignment is no longer supported.' }
             }
@@ -129,10 +125,8 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
             include: { assignee: true }
         })
 
-        // D. SIDE EFFECTS (Email & Schedule)
+        // D. SIDE EFFECTS (Email)
         if (assignmentId && updatedTask.assignee) {
-
-            // 1. Gửi Email (Fire-and-forget, không await để tránh lag UI)
             if (updatedTask.assignee.email) {
                 const { sendEmail } = await import('@/lib/email')
                 const { emailTemplates } = await import('@/lib/email-templates')

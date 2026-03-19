@@ -19,8 +19,7 @@ import {
     Search,
     UserCircle,
     Activity,
-    Menu,
-    Calendar
+    Menu
 } from "lucide-react"
 
 import {
@@ -59,7 +58,6 @@ const getNavItems = (workspaceId: string) => [
     { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet },
     { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2 },
     { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users },
-    { label: "Staff Schedule", href: `/${workspaceId}/admin/schedule`, icon: Calendar },
     { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity },
 ]
 
@@ -226,7 +224,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                 {isStaffStart && !collapsed && (
                                     <div className="px-4 pt-4 pb-2">
                                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                                            Nhân sự & Lịch
+                                            Nhân sự
                                         </p>
                                     </div>
                                 )}
@@ -239,12 +237,6 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                         <TooltipTrigger asChild>
                                             <Link 
                                                 href={item.href} 
-                                                onClick={(e) => {
-                                                    if (item.label === "Staff Schedule" && user.role !== 'ADMIN') {
-                                                        e.preventDefault();
-                                                        alert('Tính năng Lịch làm việc cho nhân sự hiện đang được phát triển. Vui lòng quay lại sau!');
-                                                    }
-                                                }}
                                                 className={cn(
                                                     "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
                                                     isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30" : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -261,12 +253,6 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                     <Link
                                         key={item.href}
                                         href={item.href}
-                                        onClick={(e) => {
-                                            if (item.label === "Staff Schedule" && user.role !== 'ADMIN') {
-                                                e.preventDefault();
-                                                alert('Tính năng Lịch làm việc cho nhân sự hiện đang được phát triển. Vui lòng quay lại sau!');
-                                            }
-                                        }}
                                         className={cn(
                                             "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium mx-1",
                                             isActive

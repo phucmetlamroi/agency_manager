@@ -27,20 +27,6 @@ export default function BottomNav({ role, workspaceId }: { role: string, workspa
                 </Link>
             )}
 
-            <Link 
-                href={role === 'ADMIN' ? `/${workspaceId}/admin/schedule` : `/${workspaceId}/dashboard/schedule`} 
-                onClick={(e) => {
-                    if (role !== 'ADMIN') {
-                        e.preventDefault();
-                        alert('Tính năng Lịch làm việc cho nhân sự hiện đang được phát triển. Vui lòng quay lại sau!');
-                    }
-                }}
-                className={`flex flex-col items-center gap-1 ${isActive(`/${workspaceId}/dashboard/schedule`) || isActive(`/${workspaceId}/admin/schedule`) ? 'text-blue-400' : 'text-gray-400'}`}
-            >
-                <span className="text-xl">📅</span>
-                <span className="text-[10px] font-bold">Schedule</span>
-            </Link>
-
             <Link href={role === 'ADMIN' ? `/${workspaceId}/admin/payroll` : `/${workspaceId}/dashboard`} className={`flex flex-col items-center gap-1 ${isActive(`/${workspaceId}/admin/payroll`) ? 'text-blue-400' : 'text-gray-400'}`}>
                 <span className="text-xl">💰</span>
                 <span className="text-[10px] font-bold">{role === 'ADMIN' ? 'Payroll' : 'Income'}</span>

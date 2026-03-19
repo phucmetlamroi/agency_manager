@@ -3,7 +3,6 @@
 import * as React from "react"
 import {
     Calculator,
-    Calendar,
     CreditCard,
     Settings,
     Smile,
@@ -63,10 +62,6 @@ export function CommandMenu() {
                         <ListTodo className="mr-2 h-4 w-4" />
                         <span>Task Queue</span>
                     </CommandItem>
-                    <CommandItem onSelect={() => runCommand(() => router.push('/dashboard/schedule'))}>
-                        <Calendar className="mr-2 h-4 w-4" />
-                        <span>Calendar</span>
-                    </CommandItem>
                 </CommandGroup>
                 <CommandSeparator />
                 <CommandGroup heading="Management">
@@ -97,9 +92,6 @@ export function CommandMenu() {
                         <CommandShortcut>⌘S</CommandShortcut>
                     </CommandItem>
                     <CommandItem onSelect={() => runCommand(async () => {
-                        // We can't call server action directly here easily cleanly without wrapping.
-                        // For now, redirect to logout API or click hidden button?
-                        // Let's use window location for full refresh logout
                         window.location.href = '/api/auth/logout'
                     })}>
                         <LogOut className="mr-2 h-4 w-4" />

@@ -1,71 +1,76 @@
-import { redirect } from 'next/navigation'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getCurrentUser } from '@/lib/auth-guard'
-import { getMyAvailabilityWeek } from '@/actions/availability-actions'
-import AvailabilityScheduleClient from '@/components/schedule/AvailabilityScheduleClient'
-import { getVietnamDateKey } from '@/lib/date-utils'
+import { redirect } from 'next/navigation'
+import { OptimisticGrid, GridUser, ScheduleItem } from '@/components/schedule/OptimisticGrid'
+import { format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SchedulePage({
-    params,
-    searchParams
+export default async function UserSchedulePage({
+  params,
+  searchParams
 }: {
-    params: Promise<{ workspaceId: string }>
-    searchParams?: Promise<{ date?: string }>
+  params: Promise<{ workspaceId: string }>
+  searchParams?: Promise<{ date?: string }>
 }) {
-    const { workspaceId } = await params
-    const query = await searchParams
-    const user = await getCurrentUser()
+  const { workspaceId } = await params
+  const query = await searchParams
+  const user = await getCurrentUser()
+  
+  if (!user || user.role === 'CLIENT') redirect(`/${workspaceId}/dashboard`)
 
-    if (user.role === 'CLIENT') {
-        redirect('/portal/en')
+  // Parse date or use today
+  const targetDate = query?.date ? new Date(query.date) : new Date()
+  const normalizedDateStr = format(targetDate, 'yyyy-MM-dd')
+  const normalizeDate = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate()))
+  const dayOfWeek = targetDate.getUTCDay()
+
+  const prisma = getWorkspacePrisma(workspaceId)
+
+  // 1. Fetch Rules & Exceptions for this specific date for current user
+  const rules = await prisma.scheduleRule.findMany({
+    where: { 
+      dayOfWeek,
+      userId: user.id
     }
+  })
 
-    if (user.role !== 'ADMIN') {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center glass-panel">
-                <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center mb-6 animate-pulse border border-indigo-500/20">
-                    <span className="text-4xl">🚧</span>
-                </div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-4 italic uppercase tracking-widest">
-                    Tính năng đang phát triển
-                </h2>
-                <p className="text-zinc-400 max-w-md leading-relaxed font-medium">
-                    Tính năng Lịch làm việc cho nhân sự hiện đang được nâng cấp để mang lại trải nghiệm tốt nhất. 
-                    Vui lòng quay lại sau!
-                </p>
-                <div className="mt-8 flex gap-4">
-                    <div className="px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700 text-xs text-slate-500 font-bold">
-                        Đang bảo trì
-                    </div>
-                </div>
-            </div>
-        )
+  const exceptions = await prisma.scheduleException.findMany({
+    where: {
+      date: normalizeDate,
+      userId: user.id
     }
+  })
 
-    const dateKey = query?.date || getVietnamDateKey()
-    const data = await getMyAvailabilityWeek(dateKey, workspaceId)
-    
-    if ('error' in data) {
-        return (
-            <div className="p-8 text-center glass-panel">
-                <h2 className="text-xl font-bold text-rose-500 mb-2">Đã xảy ra lỗi hệ thống</h2>
-                <p className="text-zinc-400">{(data as any).error}</p>
-            </div>
-        )
-    }
+  // 3. Transform to GridUser format (Only 1 user)
+  const items: ScheduleItem[] = []
+  
+  rules.forEach(r => items.push({ id: r.id, start: r.startTime, end: r.endTime, reason: 'Lịch cố định', type: 'RULE' }))
+  exceptions.forEach(e => items.push({ id: e.id, start: e.startTime, end: e.endTime, reason: e.reason, type: e.type as "BLOCK" | "ADD" }))
 
-    const weekStartKey = 'weekStartKey' in data ? data.weekStartKey : dateKey
-    const days = 'days' in data ? data.days : []
+  const gridUser: GridUser = {
+    id: user.id,
+    name: user.nickname || user.username || 'Me',
+    items
+  }
 
-    return (
-        <div className="h-full flex flex-col p-0">
-            <AvailabilityScheduleClient
-                workspaceId={workspaceId}
-                dateKey={weekStartKey}
-                weekStartKey={weekStartKey}
-                days={days}
-            />
-        </div>
-    )
+  return (
+    <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">Lịch làm việc của tôi</h2>
+      </div>
+      <p className="text-muted-foreground">
+        Ngày đang xem: <span className="font-semibold text-foreground">{normalizedDateStr}</span>
+      </p>
+
+      <div className="bg-card w-full rounded-lg border shadow-sm p-4 mt-6">
+        <p className="mb-4 text-sm text-muted-foreground">Kéo thả trên lưới thời gian bên dưới để báo cáo trạng thái Khả dụng/Bận.</p>
+        <OptimisticGrid 
+          workspaceId={workspaceId} 
+          date={normalizeDate}
+          users={[gridUser]}
+        />
+      </div>
+    </div>
+  )
 }

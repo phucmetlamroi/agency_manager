@@ -39,6 +39,9 @@ export default function DesktopLayoutShell({
                             <Link href={`/${workspaceId}/admin/users`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/users` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>👥</span> Nhân sự
                             </Link>
+                            <Link href={`/${workspaceId}/admin/schedule`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/schedule` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                                <span>📅</span> Lịch điều phối
+                            </Link>
                             <Link href={`/${workspaceId}/admin/finance`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/finance` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>💰</span> Tài chính
                             </Link>
@@ -50,6 +53,9 @@ export default function DesktopLayoutShell({
                             </Link>
                         </>
                     )}
+                    <Link href={`/${workspaceId}/dashboard/schedule`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard/schedule` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                        <span>🗓️</span> Lịch làm việc
+                    </Link>
                 </nav>
 
                 <div className="pt-6 border-t border-gray-800">

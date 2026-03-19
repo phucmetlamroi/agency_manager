@@ -19,7 +19,8 @@ import {
     Search,
     UserCircle,
     Activity,
-    Menu
+    Menu,
+    CalendarDays
 } from "lucide-react"
 
 import {
@@ -55,6 +56,7 @@ const getNavItems = (workspaceId: string) => [
     { label: "Dashboard", href: `/${workspaceId}/admin`, icon: LayoutDashboard },
     { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo },
     { label: "CRM & Clients", href: `/${workspaceId}/admin/crm`, icon: Smile },
+    { label: "Schedule", href: `/${workspaceId}/admin/schedule`, icon: CalendarDays },
     { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet },
     { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2 },
     { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users },

@@ -27,9 +27,11 @@ model Profile {
   bonuses      MonthlyBonus[]
   payrollLocks PayrollLock[]
   metrics      PerformanceMetric[]
-  agencies     Agency[]
-  errorLogs    ErrorLog[]
-  monthlyRanks MonthlyRank[]
+  agencies           Agency[]
+  errorLogs          ErrorLog[]
+  monthlyRanks       MonthlyRank[]
+  scheduleRules      ScheduleRule[]
+  scheduleExceptions ScheduleException[]
 }
 
 model Workspace {
@@ -40,9 +42,11 @@ model Workspace {
   updatedAt   DateTime @updatedAt
   profileId   String?
 
-  members      WorkspaceMember[]
-  tasks        Task[]
-  clients      Client[]
+  members            WorkspaceMember[]
+  tasks              Task[]
+  clients            Client[]
+  scheduleRules      ScheduleRule[]
+  scheduleExceptions ScheduleException[]
   projects     Project[]
   invoices     Invoice[]
   payrolls     Payroll[]
@@ -112,6 +116,8 @@ model User {
   sessions          Session[]
   events            Event[]
   presence          UserPresence?
+  scheduleRules      ScheduleRule[]
+  scheduleExceptions ScheduleException[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 }
@@ -553,4 +559,56 @@ model MonthlyRank {
 
   @@unique([userId, month, year, workspaceId])
   @@index([rank])
+}
+
+model ScheduleRule {
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String?
+  profileId   String?
+  dayOfWeek   Int      // 0=Sun, 1=Mon, ... 6=Sat
+  startTime   String   // HH:mm
+  endTime     String   // HH:mm
+  timezone    String   @default("Asia/Ho_Chi_Minh")
+  isActive    Boolean  @default(true)
+  updatedById String?
+  version     Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  profile   Profile?   @relation(fields: [profileId], references: [id])
+
+  @@index([userId, dayOfWeek])
+  @@index([workspaceId])
+}
+
+model ScheduleException {
+  id          String                @id @default(uuid())
+  userId      String
+  workspaceId String?
+  profileId   String?
+  date        DateTime              // Normalized to UTC midnight
+  startTime   String                // HH:mm
+  endTime     String                // HH:mm
+  type        ScheduleExceptionType
+  reason      String?
+  timezone    String                @default("Asia/Ho_Chi_Minh")
+  updatedById String?
+  version     Int                   @default(0)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  profile   Profile?   @relation(fields: [profileId], references: [id])
+
+  @@index([userId, date])
+  @@index([workspaceId])
+}
+
+enum ScheduleExceptionType {
+  BLOCK
+  ADD
 }

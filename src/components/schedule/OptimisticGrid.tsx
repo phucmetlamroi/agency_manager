@@ -27,7 +27,7 @@ export type GridUser = {
 interface OptimisticGridProps {
   workspaceId: string
   profileId?: string
-  date: Date
+  dateStr: string   // "YYYY-MM-DD" — timezone-safe, client parses as local
   users: GridUser[]
   readOnly?: boolean
 }
@@ -55,8 +55,12 @@ const STATUS_OPTIONS = [
   { type: 'ADD' as const,   label: 'Làm thêm / Online', emoji: '🟢', color: 'bg-green-600 hover:bg-green-700 text-white' },
 ]
 
-export function OptimisticGrid({ workspaceId, profileId, date, users, readOnly = false }: OptimisticGridProps) {
-  const [weekBase, setWeekBase] = useState(date)
+export function OptimisticGrid({ workspaceId, profileId, dateStr, users, readOnly = false }: OptimisticGridProps) {
+  // Parse dateStr as LOCAL midnight to avoid UTC timezone drift
+  // 'new Date("2026-03-19")' would parse as UTC! So we split and use Date constructor with parts
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const parsedDate = new Date(y, m - 1, d) // local midnight
+  const [weekBase, setWeekBase] = useState(parsedDate)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(users[0]?.id ?? null)
   const [isPending, startTransition] = useTransition()
 
@@ -116,9 +120,13 @@ export function OptimisticGrid({ workspaceId, profileId, date, users, readOnly =
   const handleSelectStatus = (type: 'BLOCK' | 'ADD') => {
     if (!popup || !selectedUser) return
     const { day, startHour, endHour } = popup
+    // endHour = last selected row (e.g. row 21:00), block covers up to (endHour+1):00
     const startStr = `${startHour.toString().padStart(2, '0')}:00`
-    const endStr = `${(endHour + 1).toString().padStart(2, '0')}:00`
+    const endStr   = `${(endHour + 1).toString().padStart(2, '0')}:00`
     const label = type === 'BLOCK' ? 'Bận / Khóa' : 'Làm thêm'
+    // ✅ Build a timezone-safe date string "YYYY-MM-DD" from LOCAL date parts
+    // Using format() from date-fns reads the local (client) date, not UTC
+    const dateStr = format(day, 'yyyy-MM-dd')
     setPopup(null)
 
     startTransition(async () => {
@@ -131,13 +139,14 @@ export function OptimisticGrid({ workspaceId, profileId, date, users, readOnly =
         date: day
       })
       try {
+        // Pass dateStr (string) not day (Date) → avoids Next.js server-action UTC serialization bug
         await createScheduleException(
           workspaceId, profileId, selectedUser.id,
-          day, startStr, endStr, type, label, 'Asia/Ho_Chi_Minh'
+          dateStr, startStr, endStr, type, label, 'Asia/Ho_Chi_Minh'
         )
-        toast.success(`${format(day, 'dd/MM')} ${startStr}–${endStr} → ${label}`)
+        toast.success(`${format(day, 'EEEE dd/MM', { locale: vi })} ${startStr}–${endStr} → ${label}`)
       } catch (e: any) {
-        toast.error('Lỗi cập nhật lịch: ' + e.message)
+        toast.error('Lỗi cập nhật lịch: ' + (e as Error).message)
       }
     })
   }

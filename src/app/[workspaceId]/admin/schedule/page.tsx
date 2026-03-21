@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { redirect } from 'next/navigation'
 import { OptimisticGrid, GridUser, ScheduleItem } from '@/components/schedule/OptimisticGrid'
-import { startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
+import { startOfWeek, endOfWeek, eachDayOfInterval, format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
@@ -127,7 +127,7 @@ export default async function AdminSchedulePage({
           <OptimisticGrid
             workspaceId={workspaceId}
             profileId={profileId}
-            date={baseDate}
+            dateStr={format(baseDate, 'yyyy-MM-dd')}
             users={gridUsers}
             readOnly={true}
           />

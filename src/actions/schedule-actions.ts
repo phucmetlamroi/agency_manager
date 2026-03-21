@@ -73,12 +73,13 @@ export async function deleteScheduleRule(
 
 /**
  * Creates an exception (BLOCK or ADD) for a specific date.
+ * @param dateStr - Date in "YYYY-MM-DD" format (timezone-neutral). Do NOT pass a Date object.
  */
 export async function createScheduleException(
   workspaceId: string,
   profileId: string | undefined,
   userId: string,
-  date: Date,
+  dateStr: string,   // ← "YYYY-MM-DD" string, e.g. "2026-03-19"
   startTime: string,
   endTime: string,
   type: ScheduleExceptionType,
@@ -88,10 +89,9 @@ export async function createScheduleException(
 ) {
   const prisma = getWorkspacePrisma(workspaceId, profileId)
 
-  // Normalize date to midnight UTC using LOCAL date parts (not UTC parts) to prevent timezone shift.
-  // e.g. UTC+7: "2026-03-17 00:00 +07:00" → UTC "2026-03-16 17:00" → getUTCDate()=16 ❌ (wrong)
-  //            → getFullYear/Month/Date = 2026/2/16 → Date.UTC → "2026-03-17 00:00 UTC" ✅
-  const normalizeDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  // Parse "YYYY-MM-DD" directly as UTC midnight → no timezone drift
+  // e.g. "2026-03-19" → 2026-03-19T00:00:00.000Z regardless of server timezone
+  const normalizeDate = new Date(dateStr + 'T00:00:00.000Z')
 
   const created = await prisma.scheduleException.create({
     data: {

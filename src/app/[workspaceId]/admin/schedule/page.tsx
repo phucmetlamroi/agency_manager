@@ -1,5 +1,6 @@
+import { prisma } from '@/lib/db'
+import { getSession } from '@/lib/auth'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
-import { getCurrentUser } from '@/lib/auth-guard'
 import { redirect } from 'next/navigation'
 import { OptimisticGrid, GridUser, ScheduleItem } from '@/components/schedule/OptimisticGrid'
 import { startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
@@ -15,9 +16,16 @@ export default async function AdminSchedulePage({
 }) {
   const { workspaceId } = await params
   const query = await searchParams
-  const user = await getCurrentUser()
 
-  if (!user || user.role === 'CLIENT') redirect(`/${workspaceId}/dashboard`)
+  const session = await getSession()
+  if (!session) redirect('/login')
+
+  const user = session.user
+  if ((user as any).role === 'CLIENT') redirect(`/${workspaceId}/dashboard`)
+
+  // Get the current profile — crucial for data isolation
+  const profileId = (user as any).sessionProfileId as string | undefined
+  if (!profileId) redirect('/profile')
 
   const baseDate = query?.date ? new Date(query.date) : new Date()
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 })
@@ -28,28 +36,23 @@ export default async function AdminSchedulePage({
     new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
   )
 
-  const prisma = getWorkspacePrisma(workspaceId)
-
-  // Fetch all workspace members via WorkspaceMember join table, excluding CLIENT role
-  const workspaceMembers = await prisma.workspaceMember.findMany({
-    where: { workspaceId },
-    include: {
-      user: {
-        select: { id: true, nickname: true, username: true, role: true }
-      }
-    }
+  // Fetch all staff members of THIS profile (same pattern as admin/users page)
+  const staffMembers = await prisma.user.findMany({
+    where: {
+      profileId: profileId,
+      role: { not: 'CLIENT' }
+    },
+    select: { id: true, nickname: true, username: true },
+    orderBy: { username: 'asc' }
   })
 
-  const staffMembers = workspaceMembers
-    .map(m => m.user)
-    .filter(u => u.role !== 'CLIENT')
-
   const staffIds = staffMembers.map(s => s.id)
-
   const daysOfWeek = weekDays.map(d => d.getDay())
 
-  // Fetch ScheduleRules for the full week
-  const rules = await prisma.scheduleRule.findMany({
+  // Use workspace-scoped prisma WITH profileId for schedule data
+  const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+
+  const rules = await workspacePrisma.scheduleRule.findMany({
     where: {
       dayOfWeek: { in: daysOfWeek },
       userId: { in: staffIds },
@@ -57,15 +60,14 @@ export default async function AdminSchedulePage({
     }
   })
 
-  // Fetch ScheduleExceptions for the full week
-  const exceptions = await prisma.scheduleException.findMany({
+  const exceptions = await workspacePrisma.scheduleException.findMany({
     where: {
       date: { gte: normalizedDays[0], lte: normalizedDays[6] },
       userId: { in: staffIds }
     }
   })
 
-  // Build GridUser[] with date-enriched ScheduleItems
+  // Build GridUser[]
   const gridUsers: GridUser[] = staffMembers.map(staff => {
     const items: ScheduleItem[] = []
 
@@ -112,18 +114,19 @@ export default async function AdminSchedulePage({
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Lịch điều phối nhân sự</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Xem lịch làm việc của từng nhân sự theo tuần — chỉ nhân sự tự đăng ký lịch của mình
+          Xem lịch làm việc của từng nhân sự trong team — chỉ xem, không can thiệp
         </p>
       </div>
 
       {gridUsers.length === 0 ? (
         <div className="flex items-center justify-center h-48 border border-dashed border-border rounded-xl text-muted-foreground text-sm">
-          Chưa có nhân sự nào trong workspace này.
+          Chưa có nhân sự nào trong profile này.
         </div>
       ) : (
         <div className="bg-card w-full rounded-xl border shadow-sm p-4">
           <OptimisticGrid
             workspaceId={workspaceId}
+            profileId={profileId}
             date={baseDate}
             users={gridUsers}
             readOnly={true}

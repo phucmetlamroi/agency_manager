@@ -1,5 +1,5 @@
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
-import { getCurrentUser } from '@/lib/auth-guard'
+import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { OptimisticGrid, GridUser, ScheduleItem } from '@/components/schedule/OptimisticGrid'
 import { startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
@@ -15,9 +15,15 @@ export default async function UserSchedulePage({
 }) {
   const { workspaceId } = await params
   const query = await searchParams
-  const user = await getCurrentUser()
 
-  if (!user || user.role === 'CLIENT') redirect(`/${workspaceId}/dashboard`)
+  const session = await getSession()
+  if (!session) redirect('/login')
+
+  const user = session.user
+  if ((user as any).role === 'CLIENT') redirect(`/${workspaceId}/dashboard`)
+
+  const profileId = (user as any).sessionProfileId as string | undefined
+  if (!profileId) redirect('/profile')
 
   const baseDate = query?.date ? new Date(query.date) : new Date()
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 })
@@ -28,14 +34,14 @@ export default async function UserSchedulePage({
     new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
   )
 
-  const prisma = getWorkspacePrisma(workspaceId)
+  const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
   const daysOfWeek = weekDays.map(d => d.getDay())
 
-  const rules = await prisma.scheduleRule.findMany({
+  const rules = await workspacePrisma.scheduleRule.findMany({
     where: { dayOfWeek: { in: daysOfWeek }, userId: user.id, isActive: true }
   })
 
-  const exceptions = await prisma.scheduleException.findMany({
+  const exceptions = await workspacePrisma.scheduleException.findMany({
     where: {
       date: { gte: normalizedDays[0], lte: normalizedDays[6] },
       userId: user.id
@@ -63,7 +69,7 @@ export default async function UserSchedulePage({
 
   const gridUser: GridUser = {
     id: user.id,
-    name: user.nickname || user.username || 'Tôi',
+    name: (user as any).nickname || user.name || user.email || 'Tôi',
     items
   }
 
@@ -71,12 +77,13 @@ export default async function UserSchedulePage({
     <div className="flex-1 space-y-4 p-6 pt-4">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Lịch làm việc của tôi</h2>
-        <p className="text-sm text-muted-foreground mt-1">Kéo rê để báo cáo thời gian bận của bạn trong tuần</p>
+        <p className="text-sm text-muted-foreground mt-1">Kéo rê để đánh dấu thời gian bận của bạn trong tuần</p>
       </div>
 
       <div className="bg-card w-full rounded-xl border shadow-sm p-4">
         <OptimisticGrid
           workspaceId={workspaceId}
+          profileId={profileId}
           date={baseDate}
           users={[gridUser]}
         />

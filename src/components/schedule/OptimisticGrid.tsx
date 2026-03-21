@@ -1,16 +1,16 @@
 'use client'
 
 import React, { useTransition, useRef, useState, useOptimistic, useCallback, useEffect } from 'react'
-import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay, isWithinInterval, setHours, setMinutes } from 'date-fns'
+import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay, isWithinInterval, eachDayOfInterval } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import {
-  createScheduleException,
+  createBatchScheduleExceptions,
   deleteScheduleExceptionsByIds,
   deleteScheduleExceptionsForDay
 } from '@/actions/schedule-actions'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, CalendarDays, Users, Trash2, X, Clock, LayoutGrid, User } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays, Users, Trash2, X, Clock, LayoutGrid, User, Copy, ClipboardCheck, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -48,9 +48,11 @@ function getWeekDays(base: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => addDays(start, i))
 }
 
-const STATUS_OPTIONS = [
-  { type: 'BLOCK' as const, label: 'Bận / Không thể nhận', emoji: '🔴', color: 'bg-red-500 hover:bg-red-600 text-white' },
-  { type: 'ADD' as const,   label: 'Sẵn sàng / Online',   emoji: '🟢', color: 'bg-green-600 hover:bg-green-700 text-white' },
+const PRESETS = [
+  { label: '8:00 - 17:00 (Hành chính)', start: 8, end: 17, icon: '⏰' },
+  { label: '8:00 - 12:00 (Sáng)',      start: 8, end: 12, icon: '☀️' },
+  { label: '13:00 - 18:00 (Chiều)',    start: 13, end: 18, icon: '🌇' },
+  { label: '18:00 - 22:00 (Tối)',      start: 18, end: 22, icon: '🌙' },
 ]
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -61,53 +63,43 @@ export function OptimisticGrid({
   const [y, m, d] = dateStr.split('-').map(Number)
   const initialDate = new Date(y, m - 1, d)
 
-  // View state
   const [viewMode, setViewMode] = useState<'SINGLE_WEEK' | 'TEAM_DAY'>('SINGLE_WEEK')
   const [weekBase, setWeekBase] = useState(initialDate)
   const [selectedDay, setSelectedDay] = useState(initialDate)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(users[0]?.id ?? null)
   const [isPending, startTransition] = useTransition()
 
-  // Real-time markers
-  const [now, setNow] = useState(new Date())
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000)
-    return () => clearInterval(timer)
-  }, [])
+  // Copy/Paste state
+  const [copyData, setCopyData] = useState<ScheduleItem[] | null>(null)
 
   const weekDays = getWeekDays(weekBase)
   const selectedUser = users.find(u => u.id === selectedUserId) ?? users[0]
 
-  // Optimistic updates (we filter based on selected user in Single mode)
+  // Optimistic updates
   const [optimisticItems, dispatch] = useOptimistic(
     selectedUser?.items ?? [],
-    (state, action: any) => {
-      if (action.op === 'ADD') return [...state, action.item]
-      if (action.op === 'REMOVE') return state.filter((it: any) => !action.ids.includes(it.id))
+    (state: ScheduleItem[], action: any) => {
+      if (action.op === 'ADD') return [...state, ...action.items]
+      if (action.op === 'REMOVE') return state.filter(it => !action.ids.includes(it.id))
       return state
     }
   )
 
-  // For TEAM VIEW, we need items for ALL users. 
-  // Since useOptimistic is scoped to one user currently, 
-  // we'll just use raw items for Team Mode for now (read-only for team mode anyway usually)
-  // or we could make the whole users list optimistic. Let's keep it simple for now.
-
+  // Multi-day Drag state
   const isDragging = useRef(false)
-  const [dragSel, setDragSel] = useState<{ day: Date; startHour: number; endHour: number } | null>(null)
+  const [dragSel, setDragSel] = useState<{ startDay: Date; endDay: Date; startHour: number; endHour: number } | null>(null)
   const dragStart = useRef<{ day: Date; hour: number } | null>(null)
-  const [popup, setPopup] = useState<{ day: Date; startHour: number; endHour: number; x: number; y: number } | null>(null)
-  const gridRef = useRef<HTMLDivElement>(null)
+  
+  const [popup, setPopup] = useState<{ 
+    startDay: Date; 
+    endDay: Date; 
+    startHour: number; 
+    endHour: number; 
+    x: number; 
+    y: number 
+  } | null>(null)
 
-  // ─── Helper: Get Current Time Indicator Position ───────────────────────────
-  const getTimeIndicatorY = () => {
-    const h = now.getHours()
-    const min = now.getMinutes()
-    if (h < 7 || h >= 23) return null
-    const topOffset = (h - 7) * 48 // 48px per row
-    const minOffset = (min / 60) * 48
-    return topOffset + minOffset
-  }
+  const gridRef = useRef<HTMLDivElement>(null)
 
   // ─── Cell Helpers ─────────────────────────────────────────────────────────
 
@@ -120,20 +112,42 @@ export function OptimisticGrid({
     }) ?? null
   }, [])
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────
+  const getDayStats = useCallback((day: Date) => {
+    const dayItems = optimisticItems.filter(it => it.date && isSameDay(it.date, day))
+    let busyTotal = 0
+    let addTotal = 0
+    dayItems.forEach(it => {
+      const hours = parseInt(it.end) - parseInt(it.start)
+      if (it.type === 'BLOCK') busyTotal += hours
+      else if (it.type === 'ADD') addTotal += hours
+    })
+    return { busyTotal, addTotal }
+  }, [optimisticItems])
+
+  const isInDrag = (day: Date, hour: number) => {
+    if (!dragSel) return false
+    const dSorted = [dragSel.startDay, dragSel.endDay].sort((a, b) => a.getTime() - b.getTime())
+    const hSorted = [dragSel.startHour, dragSel.endHour].sort((a,b) => a-b)
+    const inDayRange = day >= dSorted[0] && day <= dSorted[1]
+    const inHourRange = hour >= hSorted[0] && hour <= hSorted[1]
+    return inDayRange && inHourRange
+  }
+
+  // ─── Drag Handlers ────────────────────────────────────────────────────────
 
   const handlePointerDown = (day: Date, hour: number) => {
     if (readOnly || viewMode === 'TEAM_DAY') return
     isDragging.current = true
     dragStart.current = { day, hour }
-    setDragSel({ day, startHour: hour, endHour: hour })
+    setDragSel({ startDay: day, endDay: day, startHour: hour, endHour: hour })
     setPopup(null)
   }
 
   const handlePointerEnter = (day: Date, hour: number) => {
     if (readOnly || !isDragging.current || !dragStart.current) return
     setDragSel({
-      day,
+      startDay: dragStart.current.day,
+      endDay: day,
       startHour: Math.min(dragStart.current.hour, hour),
       endHour: Math.max(dragStart.current.hour, hour)
     })
@@ -144,225 +158,276 @@ export function OptimisticGrid({
     isDragging.current = false
     const rect = gridRef.current?.getBoundingClientRect()
     const x = rect ? Math.min(e.clientX - rect.left, rect.width - 250) : e.clientX
-    const y = rect ? e.clientY - rect.top + 12 : e.clientY
-    setPopup({ ...dragSel, x: Math.max(0, x), y })
+    const y = rect ? Math.min(e.clientY - rect.top + 12, (rect.height - 300)) : e.clientY
+    
+    // Sort coordinates for the popup
+    const startDay = dragSel.startDay < dragSel.endDay ? dragSel.startDay : dragSel.endDay
+    const endDay = dragSel.startDay > dragSel.endDay ? dragSel.startDay : dragSel.endDay
+
+    setPopup({ 
+      startDay, 
+      endDay, 
+      startHour: dragSel.startHour, 
+      endHour: dragSel.endHour, 
+      x: Math.max(0, x), 
+      y 
+    })
     setDragSel(null)
   }
 
-  const handleApplyStatus = (type: 'BLOCK' | 'ADD') => {
+  // ─── Save Logic ───────────────────────────────────────────────────────────
+
+  const applyStatusRange = async (type: 'BLOCK' | 'ADD', preset?: typeof PRESETS[0]) => {
     if (!popup || !selectedUser) return
-    const { day, startHour, endHour } = popup
-    const startStr = `${startHour.toString().padStart(2, '0')}:00`
-    const endStr   = `${(endHour + 1).toString().padStart(2, '0')}:00`
-    const dateStr  = format(day, 'yyyy-MM-dd')
+    const { startDay, endDay, startHour, endHour } = popup
+    
+    const finalStartHour = preset ? preset.start : startHour
+    const finalEndHour = preset ? preset.end - 1 : endHour
+    const startStr = `${finalStartHour.toString().padStart(2, '0')}:00`
+    const endStr   = `${(finalEndHour + 1).toString().padStart(2, '0')}:00`
+    
+    const days = eachDayOfInterval({ start: startDay, end: endDay })
+    const entries = days.map(d => ({
+      dateStr: format(d, 'yyyy-MM-dd'),
+      startTime: startStr,
+      endTime: endStr,
+      type,
+      reason: preset?.label || ''
+    }))
+
     setPopup(null)
 
     startTransition(async () => {
-      dispatch({ op: 'ADD', item: { id: `opt-${Math.random()}`, start: startStr, end: endStr, type, reason: '', date: day } })
+      dispatch({ 
+        op: 'ADD', 
+        items: days.map(d => ({ 
+          id: `opt-${Math.random()}`, 
+          start: startStr, 
+          end: endStr, 
+          type, 
+          reason: preset?.label || '', 
+          date: d 
+        })) 
+      })
+
       try {
-        await createScheduleException(workspaceId, profileId, selectedUser.id, dateStr, startStr, endStr, type)
-      } catch (err: any) { toast.error('Lỗi: ' + err.message) }
+        await createBatchScheduleExceptions(workspaceId, profileId, selectedUser.id, entries)
+        toast.success(`Đã áp dụng cho ${days.length} ngày thành công!`)
+      } catch (err: any) {
+        toast.error('Lỗi: ' + err.message)
+      }
     })
   }
 
-  const handleClearRange = () => {
-    if (!popup || !selectedUser) return
-    const { day, startHour, endHour } = popup
-    setPopup(null)
-    const ids = selectedUser.items.filter(it => it.type !== 'RULE' && it.date && isSameDay(it.date, day) && parseInt(it.start) <= endHour && parseInt(it.end) > startHour).map(it => it.id)
-    if (!ids.length) return
+  const handleCopyDay = (day: Date) => {
+    const items = optimisticItems.filter(it => it.date && isSameDay(it.date, day) && it.type !== 'RULE')
+    if (items.length === 0) { toast.error('Ngày này trống, không có gì để copy!'); return }
+    setCopyData(items)
+    toast.success(`Đã sao chép lịch ngày ${format(day, 'dd/MM')}. Bạn có thể Dán (Paste) vào các ngày khác.`, { duration: 4000 })
+  }
+
+  const handlePasteDay = (day: Date, mode: 'ONE' | 'WEEK' | 'WEEKDAYS') => {
+    if (!copyData || !selectedUser) return
+    
+    let targetDays: Date[] = []
+    if (mode === 'ONE') targetDays = [day]
+    else if (mode === 'WEEK') targetDays = weekDays
+    else if (mode === 'WEEKDAYS') targetDays = weekDays.slice(0, 5)
+
+    const entries = targetDays.flatMap(d => copyData.map(it => ({
+      dateStr: format(d, 'yyyy-MM-dd'),
+      startTime: it.start,
+      endTime: it.end,
+      type: it.type,
+      reason: it.reason || ''
+    })))
+
     startTransition(async () => {
-      dispatch({ op: 'REMOVE', ids })
-      try { await deleteScheduleExceptionsByIds(workspaceId, profileId, ids) } catch (err: any) { toast.error(err.message) }
+      dispatch({ op: 'ADD', items: targetDays.flatMap(d => copyData.map(it => ({ ...it, id: `opt-${Math.random()}`, date: d }))) })
+      try {
+        await createBatchScheduleExceptions(workspaceId, profileId, selectedUser.id, entries)
+        toast.success(`Đã dán lịch vào ${targetDays.length} ngày!`)
+      } catch (err: any) { toast.error(err.message) }
     })
   }
 
-  // ─── Toolbar UI ───────────────────────────────────────────────────────────
+  // ─── UI Rendering ─────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4">
-      {/* ── HEADER TOOLBAR ── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-muted/30 p-2 rounded-xl border border-border/50">
-        <div className="flex items-center gap-3">
-          <div className="flex bg-background border border-border p-0.5 rounded-lg shadow-sm">
-            <button
-              onClick={() => setViewMode('SINGLE_WEEK')}
-              className={cn('flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all', viewMode === 'SINGLE_WEEK' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-muted-foreground')}
-            >
-              <User className="h-3.5 w-3.5" /> Cá nhân
-            </button>
-            <button
-              onClick={() => setViewMode('TEAM_DAY')}
-              className={cn('flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all', viewMode === 'TEAM_DAY' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-muted-foreground')}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" /> Theo Nhóm
-            </button>
+    <div className="space-y-4 font-sans">
+      {/* ── HEADER ── */}
+      <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-card/50 backdrop-blur-xl border border-border shadow-2xl rounded-2xl">
+        <div className="flex items-center gap-4">
+          <div className="flex bg-muted/50 p-1 rounded-xl">
+             <button onClick={() => setViewMode('SINGLE_WEEK')} className={cn('flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-black transition-all', viewMode === 'SINGLE_WEEK' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground hover:bg-muted')}>
+                <User className="h-4 w-4" /> CÁ NHÂN
+             </button>
+             <button onClick={() => setViewMode('TEAM_DAY')} className={cn('flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-black transition-all', viewMode === 'TEAM_DAY' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground hover:bg-muted')}>
+                <LayoutGrid className="h-4 w-4" /> NHÓM
+             </button>
           </div>
-
-          <div className="h-8 w-px bg-border/60 mx-1" />
+          
+          <div className="h-10 w-px bg-border/60" />
 
           {viewMode === 'SINGLE_WEEK' ? (
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <select
-                value={selectedUserId ?? ''}
-                onChange={e => setSelectedUserId(e.target.value)}
-                className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm font-semibold focus:ring-2 focus:ring-primary/20 outline-none"
-              >
-                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+            <div className="flex items-center gap-2 bg-background border border-border px-3 py-1.5 rounded-xl shadow-sm">
+               <Users className="h-4 w-4 text-primary" />
+               <select value={selectedUserId ?? ''} onChange={e => setSelectedUserId(e.target.value)} className="bg-transparent text-sm font-bold outline-none border-none cursor-pointer">
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+               </select>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <input 
-                type="date"
-                value={format(selectedDay, 'yyyy-MM-dd')}
-                onChange={e => setSelectedDay(new Date(e.target.value))}
-                className="px-2 py-1.5 rounded-lg border border-border bg-background text-xs font-bold"
-              />
+               <input type="date" value={format(selectedDay, 'yyyy-MM-dd')} onChange={e => setSelectedDay(new Date(e.target.value))} className="px-3 py-2 rounded-xl border border-border bg-background text-xs font-black outline-none shadow-sm" />
             </div>
           )}
         </div>
 
         {/* Date Nav */}
-        <div className="flex items-center gap-1.5">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => (viewMode === 'SINGLE_WEEK' ? setWeekBase(subWeeks(weekBase, 1)) : setSelectedDay(addDays(selectedDay, -1)))}>
-            <ChevronLeft className="h-4 w-4" />
+        <div className="flex items-center gap-1.5 px-2 bg-muted/30 rounded-2xl p-1">
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => (viewMode === 'SINGLE_WEEK' ? setWeekBase(subWeeks(weekBase, 1)) : setSelectedDay(addDays(selectedDay, -1)))}>
+            <ChevronLeft className="h-5 w-5" />
           </Button>
-          <div className="min-w-[140px] text-center">
-            <div className="text-xs font-bold uppercase tracking-tight text-primary">
-              {viewMode === 'SINGLE_WEEK' ? format(weekBase, 'MMMM yyyy', { locale: vi }) : format(selectedDay, 'EEEE dd/MM', { locale: vi })}
-            </div>
-            {viewMode === 'SINGLE_WEEK' && (
-              <div className="text-[10px] text-muted-foreground font-medium">Week {format(weekDays[0], 'dd/MM')} – {format(weekDays[6], 'dd/MM')}</div>
-            )}
+          <div className="min-w-[150px] text-center">
+             <div className="text-[12px] font-black uppercase text-primary tracking-tighter">
+                {viewMode === 'SINGLE_WEEK' ? format(weekBase, 'MMMM yyyy', { locale: vi }) : format(selectedDay, 'EEEE dd/MM', { locale: vi })}
+             </div>
+             {viewMode === 'SINGLE_WEEK' && <div className="text-[10px] text-muted-foreground font-black opacity-60">Tuần {format(weekDays[0], 'dd/MM')} – {format(weekDays[6], 'dd/MM')}</div>}
           </div>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => (viewMode === 'SINGLE_WEEK' ? setWeekBase(addWeeks(weekBase, 1)) : setSelectedDay(addDays(selectedDay, 1)))}>
-            <ChevronRight className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => (viewMode === 'SINGLE_WEEK' ? setWeekBase(addWeeks(weekBase, 1)) : setSelectedDay(addDays(selectedDay, 1)))}>
+            <ChevronRight className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-[10px] font-bold h-8 px-2" onClick={() => { setWeekBase(new Date()); setSelectedDay(new Date()) }}>
-            Hôm nay
-          </Button>
+          <Button variant="ghost" className="text-[10px] font-black h-9 px-3 rounded-xl hover:bg-primary/10 hover:text-primary" onClick={() => { setWeekBase(new Date()); setSelectedDay(new Date()) }}>TIẾP THEO</Button>
         </div>
       </div>
 
-      {/* Grid */}
-      <div 
-        ref={gridRef}
-        className="relative border border-border/60 rounded-2xl overflow-auto shadow-xl bg-background select-none transition-all"
-        style={{ maxHeight: '74vh' }}
-        onPointerUp={handlePointerUp}
-      >
-        <table className="w-full border-collapse" style={{ minWidth: viewMode === 'TEAM_DAY' ? 200 * users.length : 800 }}>
-          <thead className="sticky top-0 z-40 bg-background/90 backdrop-blur-md">
-            <tr>
-              <th className="sticky left-0 z-50 bg-background/90 border-b border-r w-16 p-2 text-[10px] uppercase font-black text-muted-foreground tracking-widest">
-                Giờ
-              </th>
-              {(viewMode === 'SINGLE_WEEK' ? weekDays : users).map((obj, i) => {
-                const label = viewMode === 'SINGLE_WEEK' ? DAY_NAMES[(obj as Date).getDay()] : (obj as GridUser).name
-                const subLabel = viewMode === 'SINGLE_WEEK' ? format(obj as Date, 'dd/MM') : 'Member'
-                const isHighlight = viewMode === 'SINGLE_WEEK' ? isSameDay(obj as Date, now) : false
-                
-                return (
-                  <th key={i} className={cn('border-b border-r px-2 py-3 text-center transition-colors', isHighlight && 'bg-primary/5')}>
-                    <div className={cn('text-[10px] font-black uppercase tracking-tighter', isHighlight ? 'text-primary' : 'text-muted-foreground/70')}>
-                      {label}
-                    </div>
-                    <div className={cn('text-sm font-bold', isHighlight ? 'text-primary scale-110' : 'text-foreground')}>
-                      {subLabel}
-                    </div>
-                    {viewMode === 'SINGLE_WEEK' && !readOnly && (
-                      <button onClick={(e) => { e.stopPropagation(); handleClearDay(obj as Date) }} className="mt-1 p-1 hover:bg-red-50 text-muted-foreground/20 hover:text-red-500 rounded transition-all">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
-                  </th>
-                )
-              })}
-            </tr>
-          </thead>
-
-          <tbody className="relative">
-            {/* Timeline Cursor */}
-            {getTimeIndicatorY() !== null && viewMode === 'SINGLE_WEEK' && isWithinInterval(now, { start: weekDays[0], end: addDays(weekDays[6], 1) }) && (
-              <div 
-                className="absolute left-0 right-0 z-30 pointer-events-none flex items-center"
-                style={{ top: getTimeIndicatorY()! + 40 }} // 40px offsets header
-              >
-                <div className="w-16 h-[1.5px] bg-red-500/80 flex items-center justify-end pr-1">
-                   <div className="w-2 h-2 rounded-full bg-red-500 shadow-sm" />
+      {/* Stats Preview Bar */}
+      {viewMode === 'SINGLE_WEEK' && (
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+           <div className="flex-1 min-w-[64px]" /> {/* Spacer for hour col */}
+           {weekDays.map((day, i) => {
+              const { busyTotal, addTotal } = getDayStats(day)
+              return (
+                <div key={i} className="flex-1 min-w-[100px] flex gap-1.5 items-center justify-center p-2 bg-card rounded-xl border border-border/50 text-[10px] font-bold">
+                   <span className="flex items-center gap-1 text-red-500"><div className="w-2 h-2 rounded-full bg-red-500" /> {busyTotal}h</span>
+                   <span className="flex items-center gap-1 text-green-600"><div className="w-2 h-2 rounded-full bg-green-600" /> {addTotal}h</span>
                 </div>
-                <div className="flex-1 h-[1.5px] bg-red-500/30" />
-              </div>
-            )}
+              )
+           })}
+        </div>
+      )}
 
-            {HOURS.map(hour => (
-              <tr key={hour}>
-                <td className="sticky left-0 z-20 bg-background/90 border-b border-r p-2 text-[11px] font-black text-muted-foreground text-right pr-4 h-12 leading-none align-top pt-2">
-                  {hour < 10 ? `0${hour}` : hour}:00
-                </td>
-                {(viewMode === 'SINGLE_WEEK' ? weekDays : users).map((col, idx) => {
-                  const day = viewMode === 'SINGLE_WEEK' ? (col as Date) : selectedDay
-                  const items = viewMode === 'SINGLE_WEEK' ? optimisticItems : (col as GridUser).items
-                  const item = getCellItem(items, day, hour)
-                  const drag = isInDrag(day, hour)
-                  
-                  let cellBg = ''
-                  if (item?.type === 'BLOCK') cellBg = 'bg-red-500/15'
-                  else if (item?.type === 'ADD') cellBg = 'bg-green-500/10'
-                  else if (item?.type === 'RULE') cellBg = 'bg-blue-500/5 border-l-2 border-blue-500/20'
-
-                  return (
-                    <td
-                      key={idx}
-                      className={cn(
-                        'border-b border-r h-12 relative transition-all',
-                        cellBg,
-                        drag && '!bg-primary/20 !border-primary/50',
-                        !readOnly && viewMode === 'SINGLE_WEEK' && !drag && 'hover:bg-muted/30 cursor-crosshair'
-                      )}
-                      onPointerDown={() => handlePointerDown(day, hour)}
-                      onPointerEnter={() => handlePointerEnter(day, hour)}
-                      onContextMenu={(e) => { e.preventDefault(); /* quick delete item id */ }}
-                    >
-                      {item && hour === parseInt(item.start) && (
-                        <div className="absolute inset-x-1 top-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold truncate leading-tight flex items-center gap-1">
-                           {item.type === 'BLOCK' ? '🔴' : item.type === 'ADD' ? '🟢' : '🔵'}
-                           <span className="opacity-70">{item.reason || item.type}</span>
+      {/* Main Grid */}
+      <div ref={gridRef} className="relative border border-border/80 rounded-[28px] overflow-auto shadow-2xl bg-background/50 backdrop-blur-3xl select-none" style={{ maxHeight: '70vh' }} onPointerUp={handlePointerUp}>
+        <table className="w-full border-separate border-spacing-0" style={{ minWidth: viewMode === 'TEAM_DAY' ? 220 * users.length : 900 }}>
+           <thead className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl">
+              <tr>
+                 <th className="sticky left-0 z-50 bg-background border-b border-r py-3 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">TIME</th>
+                 {(viewMode === 'SINGLE_WEEK' ? weekDays : users).map((obj, i) => {
+                    const isWeek = viewMode === 'SINGLE_WEEK'
+                    const day = isWeek ? (obj as Date) : selectedDay
+                    const isToday = isSameDay(day, new Date())
+                    return (
+                      <th key={i} className={cn('border-b border-r px-4 py-4 text-center transition-all min-w-[120px]', isToday && 'bg-primary/5')}>
+                        <div className={cn('text-[11px] font-black uppercase tracking-widest mb-1', isToday ? 'text-primary' : 'text-muted-foreground/50')}>
+                           {isWeek ? DAY_NAMES[day.getDay()] : (obj as GridUser).name}
                         </div>
-                      )}
-                    </td>
-                  )
-                })}
+                        <div className="flex items-center justify-center gap-2">
+                           <span className={cn('text-lg font-black tracking-tighter', isToday ? 'text-primary' : 'text-foreground')}>{isWeek ? format(day, 'dd/MM') : 'Member'}</span>
+                           {isWeek && !readOnly && (
+                             <div className="flex gap-1 group">
+                                <button title="Copy day" onClick={() => handleCopyDay(day)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground/30 hover:text-primary transition-all"><Copy className="h-3.5 w-3.5" /></button>
+                                {copyData && <button title="Paste here" onClick={() => handlePasteDay(day, 'ONE')} className="p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20"><ClipboardCheck className="h-3.5 w-3.5" /></button>}
+                                <button title="Clear day" onClick={() => deleteScheduleExceptionsForDay(workspaceId, profileId, selectedUser.id, format(day, 'yyyy-MM-dd'))} className="p-1.5 hover:bg-red-50 rounded-lg text-muted-foreground/30 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                             </div>
+                           )}
+                        </div>
+                      </th>
+                    )
+                 })}
               </tr>
-            ))}
-          </tbody>
+           </thead>
+
+           <tbody>
+              {HOURS.map(hour => (
+                <tr key={hour} className="group/row">
+                   <td className="sticky left-0 z-20 bg-background border-b border-r p-4 text-[12px] font-black text-muted-foreground text-right align-top h-14 group-hover/row:text-foreground group-hover/row:bg-muted/50 transition-all">
+                      {hour < 10 ? `0${hour}` : hour}:00
+                   </td>
+                   {(viewMode === 'SINGLE_WEEK' ? weekDays : users).map((col, idx) => {
+                      const day = viewMode === 'SINGLE_WEEK' ? (col as Date) : selectedDay
+                      const items = viewMode === 'SINGLE_WEEK' ? optimisticItems : (col as GridUser).items
+                      const item = getCellItem(items, day, hour)
+                      const dragging = isInDrag(day, hour)
+                      
+                      let cellClass = ''
+                      if (item?.type === 'BLOCK') cellClass = 'bg-red-500/15 border-l-4 border-red-500'
+                      else if (item?.type === 'ADD') cellClass = 'bg-green-500/10 border-l-4 border-green-500'
+                      else if (item?.type === 'RULE') cellClass = 'bg-primary/5 border-l-4 border-primary/30'
+
+                      return (
+                        <td key={idx} className={cn('border-b border-r h-14 relative transition-all', cellClass, dragging && '!bg-primary/10 !border-primary/40', !readOnly && viewMode === 'SINGLE_WEEK' && !item && 'hover:bg-muted/50 cursor-crosshair')} onPointerDown={() => handlePointerDown(day, hour)} onPointerEnter={() => handlePointerEnter(day, hour)}>
+                           {item && hour === parseInt(item.start) && (
+                              <div className="absolute inset-x-2 top-1.5 z-10 px-2 py-1.5 bg-background shadow-lg border border-border/50 rounded-lg text-[9px] font-black truncate flex items-center gap-2">
+                                 {item.type === 'BLOCK' ? '🔴' : item.type === 'ADD' ? '🟢' : '🔵'}
+                                 <span className="uppercase tracking-tight opacity-70">{item.reason || item.type}</span>
+                              </div>
+                           )}
+                        </td>
+                      )
+                   })}
+                </tr>
+              ))}
+           </tbody>
         </table>
 
-        {/* Status Popup */}
+        {/* Status Popup Upgrade */}
         {popup && (
-          <div className="absolute z-[100] bg-popover border border-border shadow-2xl rounded-2xl p-4 w-60 animate-in zoom-in-95" style={{ left: popup.x, top: popup.y }}>
-            <div className="flex justify-between items-start mb-3">
-               <div>
-                 <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">Chọn trạng thái</div>
-                 <div className="text-sm font-bold">{format(popup.day, 'dd/MM')} @ {popup.startHour}:00 - {popup.endHour+1}:00</div>
-               </div>
-               <button onClick={() => setPopup(null)}><X className="h-4 w-4" /></button>
-            </div>
-            <div className="flex flex-col gap-2">
-               {STATUS_OPTIONS.map(opt => (
-                 <button key={opt.type} onClick={() => handleApplyStatus(opt.type)} className={cn('flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-xs font-black transition-all active:scale-95', opt.color)}>
-                    <span>{opt.emoji}</span> {opt.label}
-                 </button>
-               ))}
-               <button onClick={handleClearRange} className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-xs font-black text-red-500 border border-red-500/20 hover:bg-red-50 transition-all">
-                  <Trash2 className="h-4 w-4" /> Xóa trạng thái
-               </button>
-            </div>
+          <div className="absolute z-[100] bg-background border border-border shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] rounded-[32px] p-5 w-[280px] animate-in zoom-in-95 ease-out duration-200" style={{ left: popup.x, top: popup.y }}>
+             <div className="flex justify-between items-start mb-4">
+                <div className="space-y-1">
+                   <div className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">CẬP NHẬT LỊCH</div>
+                   <div className="text-sm font-black tracking-tighter">
+                      {format(popup.startDay, 'dd/MM')} {!isSameDay(popup.startDay, popup.endDay) && `- ${format(popup.endDay, 'dd/MM')}`}
+                      <span className="text-muted-foreground font-normal ml-2">{popup.startHour}:00 - {popup.endHour+1}:00</span>
+                   </div>
+                </div>
+                <button onClick={() => setPopup(null)} className="p-1.5 hover:bg-muted rounded-full transition-all"><X className="h-5 w-5" /></button>
+             </div>
+
+             <div className="space-y-4">
+                <div className="space-y-1.5">
+                   <div className="text-[9px] font-black text-muted-foreground uppercase pl-1">PRESETS</div>
+                   <div className="grid grid-cols-2 gap-1.5">
+                      {PRESETS.map(p => (
+                        <button key={p.label} onClick={() => applyStatusRange('ADD', p)} className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/50 hover:bg-primary/10 hover:text-primary text-[10px] font-black transition-all text-left leading-none">
+                           <span>{p.icon}</span> <span>{p.label.split(' ')[0]}</span>
+                        </button>
+                      ))}
+                   </div>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2 border-t border-border/50">
+                   <button onClick={() => applyStatusRange('BLOCK')} className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-xl shadow-red-500/20 transition-all active:scale-95">
+                      🔴 BẬN / KHÔNG ONLINE
+                   </button>
+                   <button onClick={() => applyStatusRange('ADD')} className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white text-xs font-black shadow-xl shadow-green-500/20 transition-all active:scale-95">
+                      🟢 SẴN SÀNG / ĐI LÀM
+                   </button>
+                   <button onClick={handleClearRange} className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] font-black text-red-500 hover:bg-red-50 transition-all">
+                      <Trash2 className="h-4 w-4" /> XÓA LỊCH
+                   </button>
+                </div>
+             </div>
           </div>
         )}
+      </div>
+
+      <div className="flex justify-center p-2 bg-primary/5 border border-primary/20 rounded-2xl">
+         <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-primary/60">
+            <Info className="h-5 w-5" />
+            <span>TIPS: Kéo từ T2-T6 để áp dụng hàng loạt | Chuột phải để xóa nhanh | Bật "Theo Nhóm" để xem ai đang rảnh</span>
+         </div>
       </div>
     </div>
   )

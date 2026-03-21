@@ -112,6 +112,41 @@ export async function createScheduleException(
 }
 
 /**
+ * Creates multiple schedule exceptions in one transaction.
+ * Useful for dragging across multiple days.
+ */
+export async function createBatchScheduleExceptions(
+  workspaceId: string,
+  profileId: string | undefined,
+  userId: string,
+  entries: { dateStr: string; startTime: string; endTime: string; type: ScheduleExceptionType; reason?: string }[],
+  timezone: string = 'Asia/Ho_Chi_Minh',
+  creatorId?: string
+) {
+  if (!entries.length) return { count: 0 }
+  const prisma = getWorkspacePrisma(workspaceId, profileId)
+  
+  const created = await prisma.$transaction(
+    entries.map(e => prisma.scheduleException.create({
+      data: {
+        userId,
+        date: new Date(e.dateStr + 'T00:00:00.000Z'),
+        startTime: e.startTime,
+        endTime: e.endTime,
+        type: e.type,
+        reason: e.reason,
+        timezone,
+        updatedById: creatorId
+      }
+    }))
+  )
+
+  revalidatePath(`/${workspaceId}/admin/schedule`)
+  revalidatePath(`/${workspaceId}/dashboard/schedule`)
+  return { count: created.length }
+}
+
+/**
  * Deletes a schedule exception.
  */
 export async function deleteScheduleException(

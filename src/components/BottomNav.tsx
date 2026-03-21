@@ -27,6 +27,20 @@ export default function BottomNav({ role, workspaceId }: { role: string, workspa
                 </Link>
             )}
 
+            {role === 'ADMIN' && (
+                <Link href={`/${workspaceId}/admin/schedule`} className={`flex flex-col items-center gap-1 ${isActive(`/${workspaceId}/admin/schedule`) ? 'text-blue-400' : 'text-gray-400'}`}>
+                    <span className="text-xl">📅</span>
+                    <span className="text-[10px] font-bold">Lịch</span>
+                </Link>
+            )}
+
+            {role !== 'ADMIN' && (
+                <Link href={`/${workspaceId}/dashboard/schedule`} className={`flex flex-col items-center gap-1 ${isActive(`/${workspaceId}/dashboard/schedule`) ? 'text-blue-400' : 'text-gray-400'}`}>
+                    <span className="text-xl">🗓️</span>
+                    <span className="text-[10px] font-bold">Lịch làm</span>
+                </Link>
+            )}
+
             <Link href={role === 'ADMIN' ? `/${workspaceId}/admin/payroll` : `/${workspaceId}/dashboard`} className={`flex flex-col items-center gap-1 ${isActive(`/${workspaceId}/admin/payroll`) ? 'text-blue-400' : 'text-gray-400'}`}>
                 <span className="text-xl">💰</span>
                 <span className="text-[10px] font-bold">{role === 'ADMIN' ? 'Payroll' : 'Income'}</span>

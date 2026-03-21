@@ -234,19 +234,86 @@ export function OptimisticGrid({
     else if (mode === 'WEEK') targetDays = weekDays
     else if (mode === 'WEEKDAYS') targetDays = weekDays.slice(0, 5)
 
-    const entries = targetDays.flatMap(d => copyData.map(it => ({
+    // Filter out 'RULE' items because they cannot be pasted as exceptions
+    const pasteableItems = copyData.filter(it => it.type === 'BLOCK' || it.type === 'ADD')
+
+    if (pasteableItems.length === 0) {
+      toast.error('Không tìm thấy trạng thái Bận hoặc Sẵn sàng để dán. Lịch cố định không được copy.')
+      return
+    }
+
+    const entries = targetDays.flatMap(d => pasteableItems.map(it => ({
       dateStr: format(d, 'yyyy-MM-dd'),
       startTime: it.start,
       endTime: it.end,
-      type: it.type,
+      type: it.type as 'BLOCK' | 'ADD',
       reason: it.reason || ''
     })))
 
     startTransition(async () => {
-      dispatch({ op: 'ADD', items: targetDays.flatMap(d => copyData.map(it => ({ ...it, id: `opt-${Math.random()}`, date: d }))) })
+      dispatch({ op: 'ADD', items: targetDays.flatMap(d => pasteableItems.map(it => ({ ...it, id: `opt-${Math.random()}`, date: d }))) })
       try {
         await createBatchScheduleExceptions(workspaceId, profileId, selectedUser.id, entries)
         toast.success(`Đã dán lịch vào ${targetDays.length} ngày!`)
+      } catch (err: any) { toast.error(err.message) }
+    })
+  }
+
+  const handleClearRange = () => {
+    if (!popup || !selectedUser) return
+    const { startDay, endDay, startHour, endHour } = popup
+    setPopup(null)
+
+    const days = eachDayOfInterval({ start: startDay, end: endDay })
+    const overlapping = (selectedUser.items).filter(it => {
+      if (it.type === 'RULE' || !it.date) return false
+      const isInDayRange = days.some(d => isSameDay(it.date!, d))
+      if (!isInDayRange) return false
+      const sH = parseInt(it.start)
+      const eH = parseInt(it.end)
+      return sH <= endHour && eH > startHour
+    })
+    
+    if (!overlapping.length) { toast('Không có trạng thái nào để xóa trong vùng này'); return }
+    const ids = overlapping.map(it => it.id)
+
+    startTransition(async () => {
+      dispatch({ op: 'REMOVE', ids })
+      try {
+        await deleteScheduleExceptionsByIds(workspaceId, profileId, ids)
+        toast.success(`Đã xóa ${ids.length} mục lịch.`)
+      } catch (err: any) { toast.error(err.message) }
+    })
+  }
+
+  const handleContextMenu = (e: React.PointerEvent | React.MouseEvent, day: Date, hour: number) => {
+    if (readOnly) return
+    e.preventDefault()
+    const item = getCellItem(selectedUser.items, day, hour)
+    if (!item || item.type === 'RULE') return
+
+    startTransition(async () => {
+      dispatch({ op: 'REMOVE', ids: [item.id] })
+      try {
+        await deleteScheduleExceptionsByIds(workspaceId, profileId, [item.id])
+        toast.success(`Đã xóa trạng thái ${format(day, 'dd/MM')} ${hour}:00`)
+      } catch (err: any) { toast.error(err.message) }
+    })
+  }
+
+  const handleClearDay = (day: Date) => {
+    if (readOnly || !selectedUser) return
+    if (!confirm(`Bạn có chắc muốn xóa toàn bộ lịch ngoại lệ ngày ${format(day, 'dd/MM')}?`)) return
+    
+    const dayStr = format(day, 'yyyy-MM-dd')
+    const ids = selectedUser.items.filter(it => it.date && isSameDay(it.date, day) && it.type !== 'RULE').map(it => it.id)
+    if (!ids.length) return
+
+    startTransition(async () => {
+      dispatch({ op: 'REMOVE', ids })
+      try {
+        await deleteScheduleExceptionsForDay(workspaceId, profileId, selectedUser.id, dayStr)
+        toast.success(`Đã xóa lịch ngày ${format(day, 'dd/MM')}`)
       } catch (err: any) { toast.error(err.message) }
     })
   }
@@ -338,7 +405,7 @@ export function OptimisticGrid({
                              <div className="flex gap-1 group">
                                 <button title="Copy day" onClick={() => handleCopyDay(day)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground/30 hover:text-primary transition-all"><Copy className="h-3.5 w-3.5" /></button>
                                 {copyData && <button title="Paste here" onClick={() => handlePasteDay(day, 'ONE')} className="p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20"><ClipboardCheck className="h-3.5 w-3.5" /></button>}
-                                <button title="Clear day" onClick={() => deleteScheduleExceptionsForDay(workspaceId, profileId, selectedUser.id, format(day, 'yyyy-MM-dd'))} className="p-1.5 hover:bg-red-50 rounded-lg text-muted-foreground/30 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                                <button title="Clear day" onClick={() => handleClearDay(day)} className="p-1.5 hover:bg-red-50 rounded-lg text-muted-foreground/30 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
                              </div>
                            )}
                         </div>
@@ -366,7 +433,7 @@ export function OptimisticGrid({
                       else if (item?.type === 'RULE') cellClass = 'bg-primary/5 border-l-4 border-primary/30'
 
                       return (
-                        <td key={idx} className={cn('border-b border-r h-14 relative transition-all', cellClass, dragging && '!bg-primary/10 !border-primary/40', !readOnly && viewMode === 'SINGLE_WEEK' && !item && 'hover:bg-muted/50 cursor-crosshair')} onPointerDown={() => handlePointerDown(day, hour)} onPointerEnter={() => handlePointerEnter(day, hour)}>
+                        <td key={idx} className={cn('border-b border-r h-14 relative transition-all', cellClass, dragging && '!bg-primary/10 !border-primary/40', !readOnly && viewMode === 'SINGLE_WEEK' && !item && 'hover:bg-muted/50 cursor-crosshair')} onPointerDown={() => handlePointerDown(day, hour)} onPointerEnter={() => handlePointerEnter(day, hour)} onContextMenu={(e) => handleContextMenu(e, day, hour)}>
                            {item && hour === parseInt(item.start) && (
                               <div className="absolute inset-x-2 top-1.5 z-10 px-2 py-1.5 bg-background shadow-lg border border-border/50 rounded-lg text-[9px] font-black truncate flex items-center gap-2">
                                  {item.type === 'BLOCK' ? '🔴' : item.type === 'ADD' ? '🟢' : '🔵'}

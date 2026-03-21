@@ -29,6 +29,7 @@ interface OptimisticGridProps {
   profileId?: string
   date: Date           // starting reference date (today or selected)
   users: GridUser[]
+  readOnly?: boolean   // admin view: no drag, just observe
 }
 
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 7) // 07:00 to 22:00
@@ -42,7 +43,7 @@ function getWeekDays(baseDate: Date): Date[] {
 
 type Selection = { day: Date; startHour: number; endHour: number } | null
 
-export function OptimisticGrid({ workspaceId, profileId, date, users }: OptimisticGridProps) {
+export function OptimisticGrid({ workspaceId, profileId, date, users, readOnly = false }: OptimisticGridProps) {
   const [weekBase, setWeekBase] = useState(date)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(users[0]?.id ?? null)
   const [isPending, startTransition] = useTransition()
@@ -62,12 +63,14 @@ export function OptimisticGrid({ workspaceId, profileId, date, users }: Optimist
   const dragStart = useRef<{ day: Date; hour: number } | null>(null)
 
   const handlePointerDown = (day: Date, hour: number) => {
+    if (readOnly) return
     isDragging.current = true
     dragStart.current = { day, hour }
     setSelection({ day, startHour: hour, endHour: hour })
   }
 
   const handlePointerEnter = (day: Date, hour: number) => {
+    if (readOnly) return
     if (!isDragging.current || !dragStart.current) return
     if (!isSameDay(day, dragStart.current.day)) return
     const startHour = Math.min(dragStart.current.hour, hour)
@@ -76,6 +79,7 @@ export function OptimisticGrid({ workspaceId, profileId, date, users }: Optimist
   }
 
   const handlePointerUp = () => {
+    if (readOnly) return
     if (!isDragging.current || !selection || !selectedUser) return
     isDragging.current = false
     const finalSel = { ...selection }
@@ -127,26 +131,24 @@ export function OptimisticGrid({ workspaceId, profileId, date, users }: Optimist
     <div className="space-y-4">
       {/* ─── TOOLBAR ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Staff Selector */}
+        {/* Staff Dropdown Selector */}
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium text-muted-foreground">Nhân sự:</span>
-          <div className="flex flex-wrap gap-1">
+          <select
+            value={selectedUserId ?? ''}
+            onChange={e => setSelectedUserId(e.target.value)}
+            className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
+          >
             {users.map(u => (
-              <button
-                key={u.id}
-                onClick={() => setSelectedUserId(u.id)}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-semibold transition-all',
-                  selectedUserId === u.id
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'bg-muted text-muted-foreground hover:bg-primary/20 hover:text-primary'
-                )}
-              >
-                {u.name}
-              </button>
+              <option key={u.id} value={u.id}>{u.name}</option>
             ))}
-          </div>
+          </select>
+          {readOnly && (
+            <span className="ml-2 px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1">
+              👁 Chỉ xem
+            </span>
+          )}
         </div>
 
         {/* Week Navigation */}
@@ -173,7 +175,9 @@ export function OptimisticGrid({ workspaceId, profileId, date, users }: Optimist
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-primary/25 border border-primary/40 inline-block" /> Lịch cố định</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-500/30 border border-red-500/50 inline-block" /> Bận / Khóa</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-green-500/25 border border-green-500/40 inline-block" /> Làm thêm</span>
-        <span className="flex items-center gap-1.5 ml-auto italic">💡 Kéo rê để đánh dấu bận</span>
+        {!readOnly && (
+          <span className="flex items-center gap-1.5 ml-auto italic">💡 Kéo rê để đánh dấu bận</span>
+        )}
       </div>
 
       {/* ─── GRID ─── */}
@@ -241,13 +245,18 @@ export function OptimisticGrid({ workspaceId, profileId, date, users }: Optimist
                     <td
                       key={dayIdx}
                       className={cn(
-                        'border-b border-r h-12 cursor-crosshair transition-colors p-0 relative',
+                        'border-b border-r h-12 transition-colors p-0 relative',
+                        readOnly ? 'cursor-default' : 'cursor-crosshair',
                         cellClass,
-                        isSelected ? '!bg-blue-500/35 border-blue-400/50' : '',
-                        'hover:bg-muted/40'
+                        isSelected && !readOnly ? '!bg-blue-500/35 border-blue-400/50' : '',
+                        !readOnly && 'hover:bg-muted/40'
                       )}
-                      onPointerDown={e => { e.currentTarget.releasePointerCapture(e.pointerId); handlePointerDown(day, hour) }}
-                      onPointerEnter={() => handlePointerEnter(day, hour)}
+                      onPointerDown={e => {
+                        if (readOnly) return
+                        e.currentTarget.releasePointerCapture(e.pointerId)
+                        handlePointerDown(day, hour)
+                      }}
+                      onPointerEnter={() => !readOnly && handlePointerEnter(day, hour)}
                     >
                       {cellStatus && hour === parseInt(cellStatus.start.split(':')[0]) && (
                         <div className="absolute inset-x-1 top-0.5 text-[9px] font-semibold truncate px-1 leading-tight">

@@ -2,7 +2,7 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getCurrentUser } from '@/lib/auth-guard'
 import { redirect } from 'next/navigation'
 import { OptimisticGrid, GridUser, ScheduleItem } from '@/components/schedule/OptimisticGrid'
-import { startOfWeek, endOfWeek, eachDayOfInterval, addDays } from 'date-fns'
+import { startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,34 +19,36 @@ export default async function AdminSchedulePage({
 
   if (!user || user.role === 'CLIENT') redirect(`/${workspaceId}/dashboard`)
 
-  // Base date (today or from query)
   const baseDate = query?.date ? new Date(query.date) : new Date()
-
-  // Get the full week (Mon–Sun)
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 })
   const weekEnd = endOfWeek(baseDate, { weekStartsOn: 1 })
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
 
-  // Normalize each day to UTC midnight for DB query
   const normalizedDays = weekDays.map(d =>
     new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
   )
 
   const prisma = getWorkspacePrisma(workspaceId)
 
-  // 1. Get all active staff in workspace
-  const staffMembers = await prisma.user.findMany({
-    where: {
-      workspaces: { some: { workspaceId } },
-      role: { notIn: ['CLIENT'] }
-    },
-    select: { id: true, nickname: true, username: true }
+  // Fetch all workspace members via WorkspaceMember join table, excluding CLIENT role
+  const workspaceMembers = await prisma.workspaceMember.findMany({
+    where: { workspaceId },
+    include: {
+      user: {
+        select: { id: true, nickname: true, username: true, role: true }
+      }
+    }
   })
+
+  const staffMembers = workspaceMembers
+    .map(m => m.user)
+    .filter(u => u.role !== 'CLIENT')
 
   const staffIds = staffMembers.map(s => s.id)
 
-  // 2. Fetch recurring ScheduleRules for all days of this week
-  const daysOfWeek = weekDays.map(d => d.getDay()) // [1,2,3,4,5,6,0]
+  const daysOfWeek = weekDays.map(d => d.getDay())
+
+  // Fetch ScheduleRules for the full week
   const rules = await prisma.scheduleRule.findMany({
     where: {
       dayOfWeek: { in: daysOfWeek },
@@ -55,7 +57,7 @@ export default async function AdminSchedulePage({
     }
   })
 
-  // 3. Fetch ScheduleExceptions for the whole week
+  // Fetch ScheduleExceptions for the full week
   const exceptions = await prisma.scheduleException.findMany({
     where: {
       date: { gte: normalizedDays[0], lte: normalizedDays[6] },
@@ -63,15 +65,13 @@ export default async function AdminSchedulePage({
     }
   })
 
-  // 4. Build GridUser[] with ScheduleItem[] that each have a .date
+  // Build GridUser[] with date-enriched ScheduleItems
   const gridUsers: GridUser[] = staffMembers.map(staff => {
     const items: ScheduleItem[] = []
 
-    // Rules: map recurring rules to each matching weekday
     weekDays.forEach(day => {
       const dow = day.getDay()
-      const staffRules = rules.filter(r => r.userId === staff.id && r.dayOfWeek === dow)
-      staffRules.forEach(r => {
+      rules.filter(r => r.userId === staff.id && r.dayOfWeek === dow).forEach(r => {
         items.push({
           id: r.id + '_' + day.toISOString(),
           start: r.startTime,
@@ -83,10 +83,7 @@ export default async function AdminSchedulePage({
       })
     })
 
-    // Exceptions: attach real date
-    const staffEx = exceptions.filter(e => e.userId === staff.id)
-    staffEx.forEach(e => {
-      // find matching weekday Date
+    exceptions.filter(e => e.userId === staff.id).forEach(e => {
       const matchDay = weekDays.find(d =>
         d.getDate() === e.date.getUTCDate() &&
         d.getMonth() === e.date.getUTCMonth() &&
@@ -114,16 +111,25 @@ export default async function AdminSchedulePage({
     <div className="flex-1 space-y-4 p-6 pt-4">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Lịch điều phối nhân sự</h2>
-        <p className="text-sm text-muted-foreground mt-1">Xem và quản lý lịch làm việc của từng nhân sự theo tuần</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Xem lịch làm việc của từng nhân sự theo tuần — chỉ nhân sự tự đăng ký lịch của mình
+        </p>
       </div>
 
-      <div className="bg-card w-full rounded-xl border shadow-sm p-4">
-        <OptimisticGrid
-          workspaceId={workspaceId}
-          date={baseDate}
-          users={gridUsers}
-        />
-      </div>
+      {gridUsers.length === 0 ? (
+        <div className="flex items-center justify-center h-48 border border-dashed border-border rounded-xl text-muted-foreground text-sm">
+          Chưa có nhân sự nào trong workspace này.
+        </div>
+      ) : (
+        <div className="bg-card w-full rounded-xl border shadow-sm p-4">
+          <OptimisticGrid
+            workspaceId={workspaceId}
+            date={baseDate}
+            users={gridUsers}
+            readOnly={true}
+          />
+        </div>
+      )}
     </div>
   )
 }

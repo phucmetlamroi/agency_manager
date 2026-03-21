@@ -64,10 +64,18 @@ export function OptimisticGrid({
   const initialDate = new Date(y, m - 1, d)
 
   const [viewMode, setViewMode] = useState<'SINGLE_WEEK' | 'TEAM_DAY'>('SINGLE_WEEK')
+  const [isCompact, setIsCompact] = useState(false)
   const [weekBase, setWeekBase] = useState(initialDate)
   const [selectedDay, setSelectedDay] = useState(initialDate)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(users[0]?.id ?? null)
   const [isPending, startTransition] = useTransition()
+
+  // Real-time markers
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(timer)
+  }, [])
 
   // Copy/Paste state
   const [copyData, setCopyData] = useState<ScheduleItem[] | null>(null)
@@ -97,6 +105,14 @@ export function OptimisticGrid({
     endHour: number; 
     x: number; 
     y: number 
+  } | null>(null)
+
+  const [hoverTooltip, setHoverTooltip] = useState<{
+    day: Date;
+    hour: number;
+    x: number;
+    y: number;
+    stats: { free: number; busy: number; tentative: number; busyUsers: string[] };
   } | null>(null)
 
   const gridRef = useRef<HTMLDivElement>(null)
@@ -131,6 +147,54 @@ export function OptimisticGrid({
     const inDayRange = day >= dSorted[0] && day <= dSorted[1]
     const inHourRange = hour >= hSorted[0] && hour <= hSorted[1]
     return inDayRange && inHourRange
+  }
+
+  // Calculate Now Snapshot Stats
+  const getNowStats = useCallback(() => {
+    let free = 0, busy = 0, tentative = 0
+    const currentHour = now.getHours()
+    
+    users.forEach(u => {
+      const item = getCellItem(u.items, now, currentHour)
+      if (!item) tentative++ // No status = tentative/unknown
+      else if (item.type === 'BLOCK') busy++
+      else if (item.type === 'ADD' || item.type === 'RULE') free++
+    })
+    
+    return { free, busy, tentative }
+  }, [now, users, getCellItem])
+
+  const getCellStats = useCallback((day: Date, hour: number) => {
+    let free = 0, busy = 0, tentative = 0
+    const busyUsers: string[] = []
+
+    users.forEach(u => {
+      const item = getCellItem(u.items, day, hour)
+      if (!item) {
+        tentative++
+      } else if (item.type === 'BLOCK') {
+        busy++
+        if (busyUsers.length < 5) busyUsers.push(u.name)
+      } else if (item.type === 'ADD' || item.type === 'RULE') {
+        free++
+      }
+    })
+
+    return { free, busy, tentative, busyUsers }
+  }, [users, getCellItem])
+
+  // ─── Hover Handlers ───────────────────────────────────────────────────────
+
+  const handleCellHover = (e: React.MouseEvent, day: Date, hour: number) => {
+    if (viewMode !== 'TEAM_DAY' || isDragging.current || popup) return
+
+    const rect = gridRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = Math.min(e.clientX - rect.left + 15, rect.width - 200)
+    const y = Math.min(e.clientY - rect.top + 15, rect.height - 150)
+
+    const stats = getCellStats(day, hour)
+    setHoverTooltip({ day, hour, x, y, stats })
   }
 
   // ─── Drag Handlers ────────────────────────────────────────────────────────
@@ -344,8 +408,24 @@ export function OptimisticGrid({
                </select>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-               <input type="date" value={format(selectedDay, 'yyyy-MM-dd')} onChange={e => setSelectedDay(new Date(e.target.value))} className="px-3 py-2 rounded-xl border border-border bg-background text-xs font-black outline-none shadow-sm" />
+            <div className="flex items-center gap-3">
+               <div className="flex items-center gap-2 bg-background border border-border px-3 py-1.5 rounded-xl shadow-sm">
+                 <CalendarDays className="h-4 w-4 text-primary" />
+                 <input type="date" value={format(selectedDay, 'yyyy-MM-dd')} onChange={e => setSelectedDay(new Date(e.target.value))} className="bg-transparent text-sm font-bold outline-none border-none" />
+               </div>
+               
+               {/* Now Snapshot */}
+               <div className="hidden md:flex items-center gap-3 px-3 py-1.5 bg-background border border-border rounded-xl shadow-sm text-[11px] font-bold">
+                 <span className="flex items-center gap-1.5 text-muted-foreground uppercase tracking-widest border-r pr-3"><Clock className="h-3.5 w-3.5"/> NOW</span>
+                 <span className="flex items-center gap-1 text-green-600" title="Sẵn sàng"><div className="w-1.5 h-1.5 rounded-full bg-green-600"/> {getNowStats().free}</span>
+                 <span className="flex items-center gap-1 text-red-500" title="Bận"><div className="w-1.5 h-1.5 rounded-full bg-red-500"/> {getNowStats().busy}</span>
+                 <span className="flex items-center gap-1 text-muted-foreground/60" title="Chưa rõ"><div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30"/> {getNowStats().tentative}</span>
+               </div>
+               
+               {/* Compact Toggle */}
+               <button onClick={() => setIsCompact(!isCompact)} className={cn('px-3 py-1.5 rounded-xl border text-xs font-bold transition-all', isCompact ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-background border-border text-muted-foreground')}>
+                 {isCompact ? 'THU GỌN' : 'MẶC ĐỊNH'}
+               </button>
             </div>
           )}
         </div>
@@ -395,12 +475,12 @@ export function OptimisticGrid({
                     const day = isWeek ? (obj as Date) : selectedDay
                     const isToday = isSameDay(day, new Date())
                     return (
-                      <th key={i} className={cn('border-b border-r px-4 py-4 text-center transition-all min-w-[120px]', isToday && 'bg-primary/5')}>
+                      <th key={i} className={cn('border-b border-r px-4 py-4 text-center transition-all min-w-[120px]', isToday && 'bg-primary/5', isCompact && 'py-2 px-2')}>
                         <div className={cn('text-[11px] font-black uppercase tracking-widest mb-1', isToday ? 'text-primary' : 'text-muted-foreground/50')}>
                            {isWeek ? DAY_NAMES[day.getDay()] : (obj as GridUser).name}
                         </div>
                         <div className="flex items-center justify-center gap-2">
-                           <span className={cn('text-lg font-black tracking-tighter', isToday ? 'text-primary' : 'text-foreground')}>{isWeek ? format(day, 'dd/MM') : 'Member'}</span>
+                           <span className={cn('font-black tracking-tighter', isToday ? 'text-primary' : 'text-foreground', isCompact ? 'text-sm' : 'text-lg')}>{isWeek ? format(day, 'dd/MM') : 'Member'}</span>
                            {isWeek && !readOnly && (
                              <div className="flex gap-1 group">
                                 <button title="Copy day" onClick={() => handleCopyDay(day)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground/30 hover:text-primary transition-all"><Copy className="h-3.5 w-3.5" /></button>
@@ -418,7 +498,7 @@ export function OptimisticGrid({
            <tbody>
               {HOURS.map(hour => (
                 <tr key={hour} className="group/row">
-                   <td className="sticky left-0 z-20 bg-background border-b border-r p-4 text-[12px] font-black text-muted-foreground text-right align-top h-14 group-hover/row:text-foreground group-hover/row:bg-muted/50 transition-all">
+                   <td className={cn('sticky left-0 z-20 bg-background border-b border-r p-4 text-[12px] font-black text-muted-foreground text-right align-top group-hover/row:text-foreground group-hover/row:bg-muted/50 transition-all', isCompact ? 'h-10 p-2 text-[10px]' : 'h-14')}>
                       {hour < 10 ? `0${hour}` : hour}:00
                    </td>
                    {(viewMode === 'SINGLE_WEEK' ? weekDays : users).map((col, idx) => {
@@ -433,9 +513,9 @@ export function OptimisticGrid({
                       else if (item?.type === 'RULE') cellClass = 'bg-primary/5 border-l-4 border-primary/30'
 
                       return (
-                        <td key={idx} className={cn('border-b border-r h-14 relative transition-all', cellClass, dragging && '!bg-primary/10 !border-primary/40', !readOnly && viewMode === 'SINGLE_WEEK' && !item && 'hover:bg-muted/50 cursor-crosshair')} onPointerDown={() => handlePointerDown(day, hour)} onPointerEnter={() => handlePointerEnter(day, hour)} onContextMenu={(e) => handleContextMenu(e, day, hour)}>
+                        <td key={idx} className={cn('border-b border-r relative transition-all', isCompact ? 'h-10' : 'h-14', cellClass, dragging && '!bg-primary/10 !border-primary/40', !readOnly && viewMode === 'SINGLE_WEEK' && !item && 'hover:bg-muted/50 cursor-crosshair')} onPointerDown={() => handlePointerDown(day, hour)} onPointerEnter={() => handlePointerEnter(day, hour)} onMouseOver={(e) => handleCellHover(e, day, hour)} onMouseLeave={() => setHoverTooltip(null)} onContextMenu={(e) => handleContextMenu(e, day, hour)}>
                            {item && hour === parseInt(item.start) && (
-                              <div className="absolute inset-x-2 top-1.5 z-10 px-2 py-1.5 bg-background shadow-lg border border-border/50 rounded-lg text-[9px] font-black truncate flex items-center gap-2">
+                              <div className={cn("absolute inset-x-2 z-10 bg-background shadow-lg border border-border/50 font-black truncate flex items-center gap-2", isCompact ? 'top-0.5 px-1 py-0.5 text-[8px] rounded' : 'top-1.5 px-2 py-1.5 text-[9px] rounded-lg')}>
                                  {item.type === 'BLOCK' ? '🔴' : item.type === 'ADD' ? '🟢' : '🔵'}
                                  <span className="uppercase tracking-tight opacity-70">{item.reason || item.type}</span>
                               </div>
@@ -489,6 +569,37 @@ export function OptimisticGrid({
           </div>
         )}
       </div>
+
+      {/* Hover Tooltip cho Team View */}
+      {hoverTooltip && viewMode === 'TEAM_DAY' && !popup && (
+        <div 
+          className="absolute z-[120] bg-background border border-border shadow-xl rounded-xl p-3 w-48 pointer-events-none animate-in fade-in duration-100"
+          style={{ left: hoverTooltip.x, top: hoverTooltip.y }}
+        >
+          <div className="text-[10px] font-black text-muted-foreground uppercase mb-2">
+            {format(hoverTooltip.day, 'dd/MM')} @ {hoverTooltip.hour}:00
+          </div>
+          <div className="flex justify-between text-xs font-bold mb-1">
+            <span className="text-green-600">Sẵn sàng: {hoverTooltip.stats.free}</span>
+            <span className="text-red-500">Bận: {hoverTooltip.stats.busy}</span>
+          </div>
+          <div className="text-xs font-bold text-muted-foreground mb-2">
+            Chưa rõ: {hoverTooltip.stats.tentative}
+          </div>
+          
+          {hoverTooltip.stats.busyUsers.length > 0 && (
+            <div className="pt-2 border-t border-border/50">
+              <div className="text-[9px] font-black text-muted-foreground/70 uppercase mb-1">Đang bận:</div>
+              <ul className="text-[10px] font-bold text-foreground space-y-0.5">
+                {hoverTooltip.stats.busyUsers.map((name, i) => (
+                  <li key={i} className="flex items-center gap-1.5"><div className="w-1 h-1 rounded-full bg-red-500"/> {name}</li>
+                ))}
+                {hoverTooltip.stats.busy > 5 && <li><span className="text-muted-foreground">+{hoverTooltip.stats.busy - 5} người khác</span></li>}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex justify-center p-2 bg-primary/5 border border-primary/20 rounded-2xl">
          <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-primary/60">

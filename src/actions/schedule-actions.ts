@@ -167,3 +167,44 @@ export async function getEffectiveAvailability(
     blocks: blocks.map(b => ({ start: b.startTime, end: b.endTime, reason: b.reason, id: b.id }))
   }
 }
+
+/**
+ * Deletes specific ScheduleException records by their IDs.
+ * Used for right-click clear and drag-select clear.
+ * ONLY deletes exceptions (BLOCK/ADD), never recurring ScheduleRules.
+ */
+export async function deleteScheduleExceptionsByIds(
+  workspaceId: string,
+  profileId: string | undefined,
+  exceptionIds: string[]
+) {
+  if (!exceptionIds.length) return { deleted: 0 }
+  const prisma = getWorkspacePrisma(workspaceId, profileId)
+  const result = await prisma.scheduleException.deleteMany({
+    where: { id: { in: exceptionIds } }
+  })
+  revalidatePath(`/${workspaceId}/admin/schedule`)
+  revalidatePath(`/${workspaceId}/dashboard/schedule`)
+  return { deleted: result.count }
+}
+
+/**
+ * Deletes ALL ScheduleExceptions for a specific user on a specific day.
+ * Used for the "Clear All" trash button on each day column.
+ * @param dateStr - "YYYY-MM-DD" string, timezone-neutral
+ */
+export async function deleteScheduleExceptionsForDay(
+  workspaceId: string,
+  profileId: string | undefined,
+  userId: string,
+  dateStr: string
+) {
+  const prisma = getWorkspacePrisma(workspaceId, profileId)
+  const date = new Date(dateStr + 'T00:00:00.000Z')
+  const result = await prisma.scheduleException.deleteMany({
+    where: { userId, date }
+  })
+  revalidatePath(`/${workspaceId}/admin/schedule`)
+  revalidatePath(`/${workspaceId}/dashboard/schedule`)
+  return { deleted: result.count }
+}

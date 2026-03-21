@@ -9,7 +9,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
 import DOMPurify from 'isomorphic-dompurify'
-import { ensureExternalLinks } from "@/lib/utils"
+import { ensureExternalLinks, cn } from "@/lib/utils"
 import { Copy } from "lucide-react"
 import ManagerReviewChecklist from "./ManagerReviewChecklist"
 
@@ -30,6 +30,9 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
     const [isFrameExpanded, setIsFrameExpanded] = useState(false)
     const [showChecklist, setShowChecklist] = useState(false)
+    // Bulk Mode: which fields are enabled for overwrite
+    const [enabledFields, setEnabledFields] = useState<Record<string, boolean>>({})
+    const toggleField = (field: string) => setEnabledFields(prev => ({ ...prev, [field]: !prev[field] }))
     const [frameAccount, setFrameAccount] = useState({ account: '', password: '' })
     const [form, setForm] = useState({
         resources: '',
@@ -130,17 +133,21 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         if (isBulk) {
             const { bulkUpdateTaskDetails } = await import('@/actions/bulk-task-actions')
 
-            // Prepare data (exclude title)
-            const bulkData = {
-                resources: combinedResources,
-                references: form.references,
-                notes: cleanNotesVi,
-                notes_en: cleanNotesEn,
-                productLink: form.productLink,
-                deadline: form.deadline || undefined,
-                jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
-                value: isAdmin ? Number(form.value) : undefined,
-                collectFilesLink: form.collectFilesLink
+            // Only include fields that the admin explicitly enabled via checkboxes
+            const bulkData: any = {}
+            if (enabledFields['resources']) bulkData.resources = combinedResources
+            if (enabledFields['references']) bulkData.references = form.references
+            if (enabledFields['notes']) bulkData.notes = cleanNotesVi
+            if (enabledFields['notes_en']) bulkData.notes_en = cleanNotesEn
+            if (enabledFields['productLink']) bulkData.productLink = form.productLink
+            if (enabledFields['deadline']) bulkData.deadline = form.deadline || undefined
+            if (enabledFields['jobPriceUSD'] && isAdmin) bulkData.jobPriceUSD = Number(form.jobPriceUSD)
+            if (enabledFields['value'] && isAdmin) bulkData.value = Number(form.value)
+            if (enabledFields['collectFilesLink']) bulkData.collectFilesLink = form.collectFilesLink
+
+            if (Object.keys(bulkData).length === 0) {
+                toast.warning('Vui lòng bật ít nhất 1 trường để cập nhật hàng loạt!')
+                return
             }
 
             const res = await bulkUpdateTaskDetails(bulkSelectedIds, bulkData, workspaceId)
@@ -148,8 +155,9 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             if (res.error) {
                 toast.error(res.error)
             } else {
-                toast.success(`Bulk updated ${res.count} tasks successfully`)
+                toast.success(`Đã cập nhật ${Object.keys(bulkData).length} trường cho ${res.count} tasks`)
                 setIsEditing(false)
+                setEnabledFields({})
                 onClose()
                 window.location.reload()
             }
@@ -196,6 +204,26 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
 
 
+    const isBulkMode = bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id)
+
+    // Helper: Checkbox toggle for Bulk Mode fields
+    const BulkToggle = ({ field, label }: { field: string; label: string }) => {
+        if (!isBulkMode || !isEditing) return null
+        return (
+            <label className="inline-flex items-center gap-1.5 cursor-pointer ml-2">
+                <input
+                    type="checkbox"
+                    className="w-3.5 h-3.5 accent-amber-500"
+                    checked={!!enabledFields[field]}
+                    onChange={() => toggleField(field)}
+                />
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${ enabledFields[field] ? 'text-amber-600' : 'text-zinc-400'}`}>
+                    {enabledFields[field] ? 'SẼ GHI ĐÈ' : 'GIỮ NGUYÊN'}
+                </span>
+            </label>
+        )
+    }
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="p-0 border-none bg-white text-zinc-950 sm:rounded-[28px] max-w-2xl overflow-hidden shadow-2xl transition-all">
@@ -209,10 +237,17 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             {localTask.title}
                         </h2>
                         {bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id) && (
-                            <div className="mt-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-700 flex items-center gap-1.5 w-fit">
-                                <span className="animate-pulse">⚠️</span>
-                                <span className="font-bold">BULK MODE:</span>
-                                <span>Modify {bulkSelectedIds.length} tasks</span>
+                            <div className="mt-2 flex flex-col gap-1.5">
+                                <div className="px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-700 flex items-center gap-1.5 w-fit">
+                                    <span className="animate-pulse">⚠️</span>
+                                    <span className="font-bold">BULK MODE:</span>
+                                    <span>Chỉnh sửa {bulkSelectedIds.length} tasks</span>
+                                </div>
+                                {isEditing && (
+                                    <div className="px-2 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-[10px] text-blue-700 w-fit max-w-xs">
+                                        ☑️ <span className="font-bold">Bật checkbox</span> bên cạnh field để đưa vào cập nhật hàng loạt. Fields <b>không bật</b> sẽ được giữ nguyên.
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -295,9 +330,12 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                         {/* RESOURCES SECTION */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-3">
-                                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-1">Resources</label>
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-1 flex items-center">
+                                    Resources
+                                    <BulkToggle field="resources" label="Resources" />
+                                </label>
                                 {isEditing && isAdmin ? (
-                                    <div className="space-y-2">
+                                    <div className={cn("space-y-2", isBulkMode && !enabledFields['resources'] ? 'opacity-40 pointer-events-none' : '')}>
                                         <input
                                             value={form.linkRaw}
                                             onChange={(e) => setForm({ ...form, linkRaw: e.target.value })}
@@ -433,13 +471,19 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             </div>
 
                             <div className="space-y-3">
-                                <label className="text-[11px] font-bold text-purple-500 uppercase tracking-widest px-1">References</label>
+                                <label className="text-[11px] font-bold text-purple-500 uppercase tracking-widest px-1 flex items-center">
+                                    References
+                                    <BulkToggle field="references" label="References" />
+                                </label>
                                 {isEditing ? (
                                     <input
                                         value={form.references}
                                         onChange={(e) => setForm({ ...form, references: e.target.value })}
                                         placeholder="Reference Links..."
-                                        className="w-full p-2.5 bg-purple-50/30 border border-purple-100 rounded-xl text-sm outline-none focus:border-purple-300"
+                                        disabled={!!(isBulkMode && !enabledFields['references'])}
+                                        className={cn("w-full p-2.5 bg-purple-50/30 border border-purple-100 rounded-xl text-sm outline-none focus:border-purple-300",
+                                            isBulkMode && !enabledFields['references'] ? 'opacity-40 cursor-not-allowed' : ''
+                                        )}
                                     />
                                 ) : (
                                     localTask.references ? (
@@ -454,13 +498,19 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                         {/* DEADLINE & FINANCE */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                             <div className="p-4 rounded-2xl bg-rose-50/30 border border-rose-100 space-y-2">
-                                <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Deadline</label>
+                                <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center">
+                                    Deadline
+                                    <BulkToggle field="deadline" label="Deadline" />
+                                </label>
                                 {isEditing && isAdmin ? (
                                     <input
                                         type="datetime-local"
                                         value={form.deadline}
                                         onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                                        className="w-full bg-white p-2 border border-rose-200 rounded-lg text-sm font-bold text-rose-600"
+                                        disabled={!!(isBulkMode && !enabledFields['deadline'])}
+                                        className={cn("w-full bg-white p-2 border border-rose-200 rounded-lg text-sm font-bold text-rose-600",
+                                            isBulkMode && !enabledFields['deadline'] ? 'opacity-40 cursor-not-allowed' : ''
+                                        )}
                                     />
                                 ) : (
                                     <div className="flex items-center gap-2">
@@ -508,7 +558,10 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                         <div className="space-y-3">
                             <div className="flex items-center justify-between px-1">
-                                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Ghi chú (Tiếng Việt)</label>
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest flex items-center">
+                                    Ghi chú (Tiếng Việt)
+                                    <BulkToggle field="notes" label="Notes VI" />
+                                </label>
                                 <button
                                     onClick={() => {
                                         const cleanText = form.notes_vi.replace(/<[^>]*>/g, '').trim();
@@ -538,7 +591,10 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                         <div className="space-y-3">
                             <div className="flex justify-between items-center px-1">
-                                <label className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">Notes (English Translation for Client)</label>
+                                <label className="text-[11px] font-bold text-blue-400 uppercase tracking-widest flex items-center">
+                                    Notes (English Translation for Client)
+                                    <BulkToggle field="notes_en" label="Notes EN" />
+                                </label>
                             </div>
 
                             {isEditing ? (

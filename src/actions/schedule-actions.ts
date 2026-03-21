@@ -88,8 +88,10 @@ export async function createScheduleException(
 ) {
   const prisma = getWorkspacePrisma(workspaceId, profileId)
 
-  // Ensure date is at midnight UTC to prevent tz shift issues in DB
-  const normalizeDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  // Normalize date to midnight UTC using LOCAL date parts (not UTC parts) to prevent timezone shift.
+  // e.g. UTC+7: "2026-03-17 00:00 +07:00" → UTC "2026-03-16 17:00" → getUTCDate()=16 ❌ (wrong)
+  //            → getFullYear/Month/Date = 2026/2/16 → Date.UTC → "2026-03-17 00:00 UTC" ✅
+  const normalizeDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
 
   const created = await prisma.scheduleException.create({
     data: {

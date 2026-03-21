@@ -47,13 +47,15 @@ export async function getMyAvailability(dateKey: string, workspaceId: string) {
         
         const date = getVietnamDayStart(dateKey)
         const record = await (globalPrisma as any).dailyAvailability.findUnique({
-            where: { userId_date: { userId: user.id, date } }
+            where: { 
+                userId_date_workspaceId_profileId: { 
+                    userId: user.id, 
+                    date,
+                    workspaceId,
+                    profileId: user.profileId || ''
+                } 
+            }
         })
-
-        // Verify profile isolation even if bypassed
-        if (record && record.profileId && record.profileId !== user.profileId) {
-            return { date: dateKey, schedule: [...DEFAULT_SCHEDULE] }
-        }
 
         return {
             date: dateKey,
@@ -79,7 +81,8 @@ export async function getMyAvailabilityWeek(dateKey: string, workspaceId: string
             where: {
                 userId: user.id,
                 date: { in: dates },
-                profileId: user.profileId // Security: profile isolation
+                workspaceId,
+                profileId: user.profileId ?? ''
             }
         })
 
@@ -119,49 +122,29 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
             return { error: 'Không thể chỉnh sửa lịch trong quá khứ.' }
         }
 
-        const existing = await (globalPrisma as any).dailyAvailability.findUnique({
-            where: { userId_date: { userId: user.id, date: targetDate } }
-        })
-
-        if (dateKey === todayKey) {
-            const currentHour = getVietnamCurrentHour()
-            const existingSchedule = normalizeSchedule(existing?.schedule as string[] | null)
-
-            for (let i = 0; i < currentHour; i += 1) {
-                if (cleanSchedule[i] !== existingSchedule[i]) {
-                    return { error: 'Không thể chỉnh sửa giờ đã qua.' }
-                }
-            }
-        }
-
         const userRecord = await globalPrisma.user.findUnique({ where: { id: user.id } })
-        const profileId = userRecord?.profileId || null
+        const profileId = userRecord?.profileId || ''
 
-        if (existing) {
-            // Check security: user can only update their own profile's record
-            if (existing.profileId && existing.profileId !== profileId) {
-                throw new Error("Security violation: Profile mismatch")
-            }
-
-            await (globalPrisma as any).dailyAvailability.update({
-                where: { id: existing.id },
-                data: {
-                    schedule: cleanSchedule as any,
+        await (globalPrisma as any).dailyAvailability.upsert({
+            where: {
+                userId_date_workspaceId_profileId: {
+                    userId: user.id,
+                    date: targetDate,
                     workspaceId,
                     profileId
                 }
-            })
-        } else {
-            await (globalPrisma as any).dailyAvailability.create({
-                data: {
-                    userId: user.id,
-                    workspaceId,
-                    profileId,
-                    date: targetDate,
-                    schedule: cleanSchedule as any
-                }
-            })
-        }
+            },
+            update: {
+                schedule: cleanSchedule as any,
+            },
+            create: {
+                userId: user.id,
+                workspaceId,
+                profileId,
+                date: targetDate,
+                schedule: cleanSchedule as any
+            }
+        })
 
         revalidatePath(`/${workspaceId}/dashboard/schedule`)
         revalidatePath(`/${workspaceId}/admin/schedule`)
@@ -195,7 +178,8 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
 
         const availabilities = await (globalPrisma as any).dailyAvailability.findMany({
             where: { 
-                profileId: workspace.profileId,
+                profileId: workspace.profileId || '',
+                workspaceId,
                 date 
             }
         })
@@ -244,7 +228,8 @@ export async function getAdminAvailabilityWeek(dateKey: string, workspaceId: str
 
         const availabilities = await (globalPrisma as any).dailyAvailability.findMany({
             where: { 
-                profileId: workspace.profileId,
+                profileId: workspace.profileId || '',
+                workspaceId,
                 date: { in: dates } 
             }
         })

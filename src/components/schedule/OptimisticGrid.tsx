@@ -401,10 +401,18 @@ export function OptimisticGrid({
           <div className="h-10 w-px bg-border/60" />
 
           {viewMode === 'SINGLE_WEEK' ? (
-            <div className="flex items-center gap-2 bg-background border border-border px-3 py-1.5 rounded-xl shadow-sm">
+            <div className="flex items-center gap-2 bg-background/80 backdrop-blur-md border border-border px-3 py-1.5 rounded-xl shadow-sm">
                <Users className="h-4 w-4 text-primary" />
-               <select value={selectedUserId ?? ''} onChange={e => setSelectedUserId(e.target.value)} className="bg-transparent text-sm font-bold outline-none border-none cursor-pointer">
-                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+               <select 
+                 value={selectedUserId ?? ''} 
+                 onChange={e => setSelectedUserId(e.target.value)} 
+                 className="bg-transparent text-sm font-bold text-foreground outline-none border-none cursor-pointer appearance-none pr-4"
+               >
+                  {users.map(u => (
+                    <option key={u.id} value={u.id} className="bg-slate-900 text-white">
+                      {u.name}
+                    </option>
+                  ))}
                </select>
             </div>
           ) : (

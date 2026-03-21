@@ -3,6 +3,20 @@
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { revalidatePath } from 'next/cache'
 import { ScheduleExceptionType } from '@prisma/client'
+import { getCurrentUser } from '@/lib/auth-guard'
+
+/**
+ * Validates that the current user has permission to modify the target user's schedule.
+ */
+async function validateAccess(targetUserId: string, targetProfileId: string | undefined) {
+  const user = await getCurrentUser()
+  if (user.role === 'ADMIN') return user
+  
+  if (user.id !== targetUserId || user.profileId !== targetProfileId) {
+    throw new Error('Bạn không có quyền thay đổi lịch của người khác hoặc profile khác.')
+  }
+  return user
+}
 
 /**
  * Creates or updates a recurring schedule rule for a user.
@@ -17,6 +31,8 @@ export async function upsertScheduleRule(
   timezone: string = 'Asia/Ho_Chi_Minh',
   updaterId?: string
 ) {
+  if (!profileId) throw new Error("profileId is required")
+  await validateAccess(userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
   
   // Find existing rule
@@ -46,7 +62,9 @@ export async function upsertScheduleRule(
         startTime,
         endTime,
         timezone,
-        updatedById: updaterId
+        updatedById: updaterId,
+        workspaceId,
+        profileId
       }
     })
     revalidatePath(`/${workspaceId}/admin/schedule`)
@@ -63,10 +81,15 @@ export async function deleteScheduleRule(
   profileId: string | undefined,
   ruleId: string
 ) {
+  if (!profileId) throw new Error("profileId is required")
   const prisma = getWorkspacePrisma(workspaceId, profileId)
-  await prisma.scheduleRule.delete({
-    where: { id: ruleId }
-  })
+  const existing = await prisma.scheduleRule.findUnique({ where: { id: ruleId } })
+  if (existing) {
+    await validateAccess(existing.userId, profileId)
+    await prisma.scheduleRule.delete({
+      where: { id: ruleId }
+    })
+  }
   revalidatePath(`/${workspaceId}/admin/schedule`)
   revalidatePath(`/${workspaceId}/dashboard/schedule`)
 }
@@ -87,6 +110,8 @@ export async function createScheduleException(
   timezone: string = 'Asia/Ho_Chi_Minh',
   creatorId?: string
 ) {
+  if (!profileId) throw new Error("profileId is required")
+  await validateAccess(userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
 
   // Parse "YYYY-MM-DD" directly as UTC midnight → no timezone drift
@@ -102,7 +127,9 @@ export async function createScheduleException(
       type,
       reason,
       timezone,
-      updatedById: creatorId
+      updatedById: creatorId,
+      workspaceId,
+      profileId
     }
   })
 
@@ -124,6 +151,8 @@ export async function createBatchScheduleExceptions(
   creatorId?: string
 ) {
   if (!entries.length) return { count: 0 }
+  if (!profileId) throw new Error("profileId is required")
+  await validateAccess(userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
   
   const created = await prisma.$transaction(
@@ -136,7 +165,9 @@ export async function createBatchScheduleExceptions(
         type: e.type,
         reason: e.reason,
         timezone,
-        updatedById: creatorId
+        updatedById: creatorId,
+        workspaceId,
+        profileId
       }
     }))
   )
@@ -154,10 +185,15 @@ export async function deleteScheduleException(
   profileId: string | undefined,
   exceptionId: string
 ) {
+  if (!profileId) throw new Error("profileId is required")
   const prisma = getWorkspacePrisma(workspaceId, profileId)
-  await prisma.scheduleException.delete({
-    where: { id: exceptionId }
-  })
+  const existing = await prisma.scheduleException.findUnique({ where: { id: exceptionId } })
+  if (existing) {
+    await validateAccess(existing.userId, profileId)
+    await prisma.scheduleException.delete({
+      where: { id: exceptionId }
+    })
+  }
   revalidatePath(`/${workspaceId}/admin/schedule`)
   revalidatePath(`/${workspaceId}/dashboard/schedule`)
 }
@@ -214,7 +250,17 @@ export async function deleteScheduleExceptionsByIds(
   exceptionIds: string[]
 ) {
   if (!exceptionIds.length) return { deleted: 0 }
+  if (!profileId) throw new Error("profileId is required")
+  
   const prisma = getWorkspacePrisma(workspaceId, profileId)
+  const samples = await prisma.scheduleException.findMany({ 
+    where: { id: { in: exceptionIds } },
+    take: 1
+  })
+  if (samples.length) {
+    await validateAccess(samples[0].userId, profileId)
+  }
+
   const result = await prisma.scheduleException.deleteMany({
     where: { id: { in: exceptionIds } }
   })
@@ -234,6 +280,9 @@ export async function deleteScheduleExceptionsForDay(
   userId: string,
   dateStr: string
 ) {
+  if (!profileId) throw new Error("profileId is required")
+  await validateAccess(userId, profileId)
+  
   const prisma = getWorkspacePrisma(workspaceId, profileId)
   const date = new Date(dateStr + 'T00:00:00.000Z')
   const result = await prisma.scheduleException.deleteMany({

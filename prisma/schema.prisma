@@ -32,6 +32,7 @@ model Profile {
   monthlyRanks       MonthlyRank[]
   scheduleRules      ScheduleRule[]
   scheduleExceptions ScheduleException[]
+  dailyAvailabilities DailyAvailability[]
 }
 
 model Workspace {
@@ -47,6 +48,7 @@ model Workspace {
   clients            Client[]
   scheduleRules      ScheduleRule[]
   scheduleExceptions ScheduleException[]
+  dailyAvailabilities DailyAvailability[]
   projects     Project[]
   invoices     Invoice[]
   payrolls     Payroll[]
@@ -118,6 +120,7 @@ model User {
   presence          UserPresence?
   scheduleRules      ScheduleRule[]
   scheduleExceptions ScheduleException[]
+  dailyAvailabilities DailyAvailability[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 }
@@ -564,8 +567,8 @@ model MonthlyRank {
 model ScheduleRule {
   id          String   @id @default(uuid())
   userId      String
-  workspaceId String?
-  profileId   String?
+  workspaceId String
+  profileId   String
   dayOfWeek   Int      // 0=Sun, 1=Mon, ... 6=Sat
   startTime   String   // HH:mm
   endTime     String   // HH:mm
@@ -576,10 +579,11 @@ model ScheduleRule {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace Workspace? @relation(fields: [workspaceId], references: [id])
-  profile   Profile?   @relation(fields: [profileId], references: [id])
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  profile   Profile   @relation(fields: [profileId], references: [id])
 
+  @@unique([userId, dayOfWeek, workspaceId, profileId])
   @@index([userId, dayOfWeek])
   @@index([workspaceId])
 }
@@ -587,8 +591,8 @@ model ScheduleRule {
 model ScheduleException {
   id          String                @id @default(uuid())
   userId      String
-  workspaceId String?
-  profileId   String?
+  workspaceId String
+  profileId   String
   date        DateTime              // Normalized to UTC midnight
   startTime   String                // HH:mm
   endTime     String                // HH:mm
@@ -600,10 +604,29 @@ model ScheduleException {
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
 
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace Workspace? @relation(fields: [workspaceId], references: [id])
-  profile   Profile?   @relation(fields: [profileId], references: [id])
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  profile   Profile   @relation(fields: [profileId], references: [id])
 
+  @@index([userId, date])
+  @@index([workspaceId])
+}
+
+model DailyAvailability {
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String
+  profileId   String
+  date        DateTime // Normalized to UTC midnight
+  schedule    Json     // Array of 24 strings
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  profile   Profile   @relation(fields: [profileId], references: [id])
+
+  @@unique([userId, date, workspaceId, profileId])
   @@index([userId, date])
   @@index([workspaceId])
 }

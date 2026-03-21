@@ -7,20 +7,34 @@ import { CheckCircle2, CircleDashed, RotateCcw } from 'lucide-react'
 import { revertPayment } from '@/actions/payroll-actions'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
 
 type PayrollCardProps = {
     user: any
     currentMonth: number
     currentYear: number
     workspaceId: string
+    startOfMonth: Date
+    endOfMonth: Date
 }
 
-export default function PayrollCard({ user, currentMonth, currentYear, workspaceId }: PayrollCardProps) {
+export default function PayrollCard({ user, currentMonth, currentYear, workspaceId, startOfMonth, endOfMonth }: PayrollCardProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
+    const [showPending, setShowPending] = useState(false)
 
-    // Calculate Financials
-    const taskIncome = user.tasks.reduce((sum: number, task: any) => sum + task.value, 0)
+    // 1. Calculate REAL income (ONLY completed in THIS month)
+    const completedTasks = user.tasks.filter((t: any) => 
+        t.status === 'Hoàn tất' && 
+        new Date(t.updatedAt) >= startOfMonth && 
+        new Date(t.updatedAt) <= endOfMonth
+    )
+    const taskIncome = completedTasks.reduce((sum: number, task: any) => sum + task.value, 0)
+    
+    // 2. Calculate PENDING income (Future money - based on user specifying statuses)
+    const pendingTasks = user.tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status))
+    const pendingIncome = pendingTasks.reduce((sum: number, task: any) => sum + task.value, 0)
+
     const bonusData = user.bonuses?.[0]
     const bonusAmount = bonusData ? bonusData.bonusAmount : 0
     const totalIncome = taskIncome + bonusAmount
@@ -93,10 +107,19 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                     </div>
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.9rem', color: '#aaa', marginBottom: '4px' }}>Tổng thực nhận</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981', marginBottom: '8px' }}>
-                        {totalIncome.toLocaleString()} VNĐ
+                <div style={{ textAlign: 'right', display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+                    <div>
+                        <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '4px' }}>Lương dự kiến</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#6366f1', opacity: 0.8 }}>
+                            {pendingIncome.toLocaleString()} đ
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div style={{ fontSize: '0.9rem', color: '#aaa', marginBottom: '4px' }}>Tổng thực nhận</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981', marginBottom: '8px' }}>
+                            {totalIncome.toLocaleString()} đ
+                        </div>
                     </div>
 
                     {/* Payment Button / Status */}
@@ -128,6 +151,31 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                     )}
                 </div>
             </div>
+            {/* Quick Filter Tabs */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                <button 
+                    onClick={() => setShowPending(false)}
+                    style={{ 
+                        fontSize: '0.8rem', padding: '4px 12px', borderRadius: '8px',
+                        background: !showPending ? '#10b98122' : 'transparent',
+                        color: !showPending ? '#10b981' : '#666',
+                        border: !showPending ? '1px solid #10b98144' : '1px solid #333'
+                    }}
+                >
+                    Đã hoàn tất ({completedTasks.length})
+                </button>
+                <button 
+                    onClick={() => setShowPending(true)}
+                    style={{ 
+                        fontSize: '0.8rem', padding: '4px 12px', borderRadius: '8px',
+                        background: showPending ? '#6366f122' : 'transparent',
+                        color: showPending ? '#6366f1' : '#666',
+                        border: showPending ? '1px solid #6366f144' : '1px solid #333'
+                    }}
+                >
+                    Dự kiến ({pendingTasks.length})
+                </button>
+            </div>
 
             {/* Simple Task List Table */}
             <div>
@@ -139,10 +187,17 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                         </tr>
                     </thead>
                     <tbody>
-                        {user.tasks.map((task: any) => (
+                        {(showPending ? pendingTasks : completedTasks).map((task: any) => (
                             <tr key={task.id} style={{ borderBottom: '1px solid #222', color: '#e5e5e5' }}>
                                 <td style={{ padding: '0.75rem 0.5rem' }}>
-                                    <div style={{ fontWeight: '500' }}>Task: {task.title}</div>
+                                    <div style={{ fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        Task: {task.title}
+                                        {showPending && (
+                                            <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#6366f122', color: '#818cf8', border: '1px solid #6366f133' }}>
+                                                {task.status}
+                                            </span>
+                                        )}
+                                    </div>
                                     <div style={{ fontSize: '0.75rem', color: '#666' }}>
                                         {new Date(task.updatedAt).toLocaleDateString()}
                                     </div>

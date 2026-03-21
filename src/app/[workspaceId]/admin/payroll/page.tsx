@@ -5,6 +5,7 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import BonusCalculator from './BonusCalculator'
 import PayrollCard from '@/components/admin/PayrollCard'
 import { serializeDecimal } from '@/lib/serialization'
+import { SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,11 +30,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
             tasks: {
                 where: {
                     workspaceId,
-                    status: 'Hoàn tất', // Only completed tasks
-                    updatedAt: {
-                        gte: startOfMonth,
-                        lte: endOfMonth
-                    }
+                    status: { in: ['Hoàn tất', ...SALARY_PENDING_STATUSES] }
                 },
                 orderBy: { updatedAt: 'desc' },
                 include: { assignee: true }
@@ -59,7 +56,13 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
     })
 
     // Filter out users with 0 income AND no bonus (active users only)
-    const activeUsers = users.filter(user => user.tasks.length > 0 || user.bonuses.length > 0)
+    // Filter out users with 0 activity (either completed tasks, pending tasks, or bonus)
+    const activeUsers = users.filter(user => {
+        const hasCompleted = user.tasks.some(t => t.status === 'Hoàn tất' && t.updatedAt >= startOfMonth && t.updatedAt <= endOfMonth)
+        const hasPending = user.tasks.some(t => SALARY_PENDING_STATUSES.includes(t.status))
+        const hasBonus = user.bonuses.length > 0
+        return hasCompleted || hasPending || hasBonus
+    })
 
     // Sort active users: Top 1, 2, 3 first based on bonus.rank, then alphabetically by username
     activeUsers.sort((a, b) => {
@@ -114,6 +117,8 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                         currentMonth={currentMonth}
                         currentYear={currentYear}
                         workspaceId={workspaceId}
+                        startOfMonth={startOfMonth}
+                        endOfMonth={endOfMonth}
                     />
                 ))}
 

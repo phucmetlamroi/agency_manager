@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { deleteClient, updateClient, mergeClientIntoParent, unmergeClient } from '@/actions/crm-actions'
 import { useConfirm } from '@/components/ui/ConfirmModal'
@@ -51,7 +51,6 @@ export default function ClientList({ clients, workspaceId }: { clients: Client[]
             toast.error('Tên không được để trống')
             return
         }
-
         const res = await updateClient(editingClient.id, { name: newName }, workspaceId)
         if (res.success) {
             toast.success('Đã cập nhật tên khách hàng')
@@ -61,25 +60,16 @@ export default function ClientList({ clients, workspaceId }: { clients: Client[]
         }
     }
 
-    const handleDragStart = (id: number) => setDraggingId(id)
-    const handleDragEnd = () => {
-        setDraggingId(null)
-        setDragOverId(null)
-    }
-
     const handleDrop = async (targetId: number) => {
         if (!draggingId || draggingId === targetId) return
-
         toast.loading('Đang gộp khách hàng...')
         const res = await mergeClientIntoParent(draggingId, targetId, workspaceId)
         toast.dismiss()
-
         if (res.success) {
             toast.success('✅ Đã gộp khách hàng thành công!')
         } else {
             toast.error(res.error)
         }
-
         setDraggingId(null)
         setDragOverId(null)
     }
@@ -88,9 +78,10 @@ export default function ClientList({ clients, workspaceId }: { clients: Client[]
         <div className="space-y-3">
             {draggingId !== null && (
                 <div className="text-xs text-center text-purple-400 py-2 px-4 bg-purple-900/20 rounded-lg border border-purple-500/30 animate-pulse">
-                    🔗 Kéo và thả vào một <strong>khách hàng chính khác</strong> để gộp làm khách hàng trực thuộc
+                    🔗 Kéo và thả vào một <strong>khách hàng chính khác</strong> để gộp thành khách hàng trực thuộc
                 </div>
             )}
+
             {clients.length === 0 && (
                 <div className="text-center py-8 text-gray-500">Chưa có dữ liệu khách hàng.</div>
             )}
@@ -103,8 +94,8 @@ export default function ClientList({ clients, workspaceId }: { clients: Client[]
                     workspaceId={workspaceId}
                     draggingId={draggingId}
                     dragOverId={dragOverId}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
+                    onDragStart={(id) => setDraggingId(id)}
+                    onDragEnd={() => { setDraggingId(null); setDragOverId(null) }}
                     onDragOver={(id) => setDragOverId(id)}
                     onDrop={handleDrop}
                 />
@@ -148,7 +139,12 @@ type ClientItemProps = {
     isSubsidiary?: boolean
 }
 
-function ClientItem({ client, onEdit, workspaceId, draggingId, dragOverId, onDragStart, onDragEnd, onDragOver, onDrop, isSubsidiary = false }: ClientItemProps) {
+function ClientItem({
+    client, onEdit, workspaceId,
+    draggingId, dragOverId,
+    onDragStart, onDragEnd, onDragOver, onDrop,
+    isSubsidiary = false
+}: ClientItemProps) {
     const { confirm } = useConfirm()
     const [isExpanded, setIsExpanded] = useState(false)
 
@@ -163,11 +159,8 @@ function ClientItem({ client, onEdit, workspaceId, draggingId, dragOverId, onDra
         }))) return
 
         const res = await deleteClient(client.id, workspaceId)
-        if (!res.success) {
-            toast.error(res.error)
-        } else {
-            toast.success('Đã xóa khách hàng')
-        }
+        if (!res.success) toast.error(res.error)
+        else toast.success('Đã xóa khách hàng')
     }
 
     const handleUnmerge = async (e: React.MouseEvent) => {
@@ -181,11 +174,8 @@ function ClientItem({ client, onEdit, workspaceId, draggingId, dragOverId, onDra
         }))) return
 
         const res = await unmergeClient(client.id, workspaceId)
-        if (!res.success) {
-            toast.error(res.error)
-        } else {
-            toast.success('Đã tách khách hàng thành công')
-        }
+        if (!res.success) toast.error(res.error)
+        else toast.success('Đã tách khách hàng thành công')
     }
 
     const getScoreColor = (score: number) => {
@@ -195,48 +185,67 @@ function ClientItem({ client, onEdit, workspaceId, draggingId, dragOverId, onDra
     }
 
     const ownTasks = client.tasks || []
-    const subTasks = client.subsidiaries?.flatMap(s => s.tasks.map(t => ({ ...t, title: `[${s.name}] ${t.title}` }))) || []
+    const subTasks = (client.subsidiaries || []).flatMap(s =>
+        s.tasks.map(t => ({ ...t, title: `[${s.name}] ${t.title}` }))
+    )
     const allTasks = [...ownTasks, ...subTasks]
     const taskCount = allTasks.length
 
-    const isDragTarget = dragOverId === client.id && draggingId !== client.id && !isSubsidiary
+    const isDragTarget = dragOverId === client.id && draggingId !== null && draggingId !== client.id && !isSubsidiary
     const isDragging = draggingId === client.id
 
     return (
         <div
-            className={`border rounded-lg overflow-hidden transition-all duration-200 ${
-                isDragTarget
-                    ? 'border-purple-400 bg-purple-900/30 shadow-lg shadow-purple-500/20 scale-[1.01]'
-                    : 'border-white/10 bg-white/5'
-            } ${isDragging ? 'opacity-50 ring-2 ring-purple-500/60' : ''}`}
-            onDragOver={(e) => {
+            // The entire card is draggable for root clients — HTML5 DnD requires
+            // draggable on the element that fires onDragStart
+            draggable={!isSubsidiary}
+            onDragStart={(e) => {
+                if (isSubsidiary) return
+                // CRITICAL: setData is required by HTML5 DnD API for drag to actually work
+                e.dataTransfer.setData('application/client-id', String(client.id))
+                e.dataTransfer.effectAllowed = 'move'
+                // Defer state update so ghost image renders first
+                setTimeout(() => onDragStart(client.id), 0)
+            }}
+            onDragEnd={(e) => {
                 e.preventDefault()
-                if (!isSubsidiary) onDragOver(client.id)
+                onDragEnd()
+            }}
+            onDragOver={(e) => {
+                // Must preventDefault to allow drop
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                if (!isSubsidiary && draggingId !== null && draggingId !== client.id) {
+                    onDragOver(client.id)
+                }
+            }}
+            onDragLeave={(e) => {
+                // Only clear if leaving the card itself (not a child element)
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    onDragOver(-1)
+                }
             }}
             onDrop={(e) => {
                 e.preventDefault()
                 if (!isSubsidiary) onDrop(client.id)
             }}
+            className={`border rounded-lg overflow-hidden transition-all duration-200 select-none ${
+                isDragTarget
+                    ? 'border-purple-400 bg-purple-900/30 shadow-lg shadow-purple-500/20 scale-[1.01]'
+                    : 'border-white/10 bg-white/5'
+            } ${isDragging ? 'opacity-40 ring-2 ring-purple-500/60' : ''} ${
+                !isSubsidiary ? 'cursor-grab active:cursor-grabbing' : ''
+            }`}
         >
             <div
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
+                className="p-4 flex items-center justify-between"
             >
                 <div className="flex items-center gap-3">
-                    {/* Drag Handle - only for root-level clients */}
+                    {/* Grip icon — visual indicator that the card is draggable */}
                     {!isSubsidiary && (
                         <div
-                            draggable
-                            onDragStart={(e) => {
-                                e.stopPropagation()
-                                onDragStart(client.id)
-                            }}
-                            onDragEnd={(e) => {
-                                e.stopPropagation()
-                                onDragEnd()
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-purple-400 transition-colors px-1 py-2 rounded hover:bg-purple-500/10"
+                            className="text-gray-500 hover:text-purple-400 transition-colors select-none px-0.5"
                             title="Kéo để gộp vào khách hàng khác"
                         >
                             ⠿
@@ -260,7 +269,6 @@ function ClientItem({ client, onEdit, workspaceId, draggingId, dragOverId, onDra
                             >
                                 ↗ Chi tiết
                             </Link>
-                            {/* Unmerge button - only for subsidiaries */}
                             {isSubsidiary && (
                                 <button
                                     onClick={handleUnmerge}
@@ -279,7 +287,7 @@ function ClientItem({ client, onEdit, workspaceId, draggingId, dragOverId, onDra
                             </button>
                         </div>
                         <div className="text-xs text-gray-500">
-                            {client.subsidiaries?.length || 0} Brands • {taskCount} Videos
+                            {(client.subsidiaries || []).length} Brands • {taskCount} Videos
                         </div>
                     </div>
                 </div>
@@ -303,10 +311,11 @@ function ClientItem({ client, onEdit, workspaceId, draggingId, dragOverId, onDra
                                 {allTasks.slice(0, 5).map((t, idx) => (
                                     <div key={`${t.id}-${idx}`} className="bg-white/5 p-2 rounded text-sm flex justify-between items-center hover:bg-white/10">
                                         <span className="truncate max-w-[200px]">{t.title}</span>
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${t.status === 'Hoàn tất'
-                                            ? 'border-green-500 text-green-400 bg-green-900/20'
-                                            : 'border-yellow-500 text-yellow-500 bg-yellow-900/20'
-                                            }`}>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                                            t.status === 'Hoàn tất'
+                                                ? 'border-green-500 text-green-400 bg-green-900/20'
+                                                : 'border-yellow-500 text-yellow-500 bg-yellow-900/20'
+                                        }`}>
                                             {t.status}
                                         </span>
                                     </div>
@@ -320,11 +329,11 @@ function ClientItem({ client, onEdit, workspaceId, draggingId, dragOverId, onDra
                         </div>
                     )}
 
-                    {client.subsidiaries && client.subsidiaries.length > 0 && (
+                    {(client.subsidiaries || []).length > 0 && (
                         <div>
                             <div className="text-xs text-blue-400 font-bold uppercase mb-2">Brands / Subsidiaries</div>
                             <div className="space-y-2">
-                                {client.subsidiaries.map(sub => (
+                                {(client.subsidiaries || []).map(sub => (
                                     <ClientItem
                                         key={sub.id}
                                         client={sub}
@@ -343,7 +352,7 @@ function ClientItem({ client, onEdit, workspaceId, draggingId, dragOverId, onDra
                         </div>
                     )}
 
-                    {(!client.tasks || client.tasks.length === 0) && (!client.subsidiaries || client.subsidiaries.length === 0) && (
+                    {ownTasks.length === 0 && (client.subsidiaries || []).length === 0 && (
                         <div className="text-sm text-gray-600 italic">Trống</div>
                     )}
                 </div>

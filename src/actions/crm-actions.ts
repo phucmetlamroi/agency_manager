@@ -166,3 +166,60 @@ export async function deleteClient(id: number, workspaceId: string) {
         return { success: false, error: 'Không thể xóa khách hàng này (có thể do đang chứa Task/Project/Brand con).' }
     }
 }
+
+/**
+ * Merges a standalone (root-level) client INTO another root-level client,
+ * making it a subsidiary. Both must have parentId === null.
+ */
+export async function mergeClientIntoParent(childId: number, parentId: number, workspaceId: string) {
+    try {
+        if (childId === parentId) return { success: false, error: 'Không thể gộp khách hàng vào chính nó.' }
+
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+
+        // Safety: ensure both are root-level clients
+        const [child, parent] = await Promise.all([
+            workspacePrisma.client.findUnique({ where: { id: childId }, select: { parentId: true } }),
+            workspacePrisma.client.findUnique({ where: { id: parentId }, select: { parentId: true } })
+        ])
+
+        if (!child || !parent) return { success: false, error: 'Không tìm thấy khách hàng.' }
+        if (child.parentId !== null) return { success: false, error: 'Khách hàng được kéo đã là khách hàng trực thuộc, không thể gộp.' }
+        if (parent.parentId !== null) return { success: false, error: 'Khách hàng đích đến đã là khách hàng trực thuộc, không thể dùng làm khách hàng chính.' }
+
+        await workspacePrisma.client.update({
+            where: { id: childId },
+            data: { parentId }
+        })
+
+        revalidatePath(`/${workspaceId}/admin/crm`)
+        return { success: true }
+    } catch (error) {
+        console.error('Merge failed:', error)
+        return { success: false, error: 'Thất bại khi gộp khách hàng.' }
+    }
+}
+
+/**
+ * Removes the parentId of a subsidiary, making it a standalone root-level client again.
+ */
+export async function unmergeClient(clientId: number, workspaceId: string) {
+    try {
+        const session = await getSession()
+        const profileId = (session?.user as any)?.sessionProfileId
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+
+        await workspacePrisma.client.update({
+            where: { id: clientId },
+            data: { parentId: null }
+        })
+
+        revalidatePath(`/${workspaceId}/admin/crm`)
+        return { success: true }
+    } catch (error) {
+        console.error('Unmerge failed:', error)
+        return { success: false, error: 'Thất bại khi tách khách hàng.' }
+    }
+}

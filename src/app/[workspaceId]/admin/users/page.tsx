@@ -25,8 +25,10 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
 
     const users = await prisma.user.findMany({
         where: {
-            // @ts-ignore
-            profileId: profileId,
+            OR: [
+                { profileId: profileId },
+                { profileAccesses: { some: { profileId: profileId } } }
+            ],
             ...(currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } })
         },
         orderBy: { username: 'asc' },

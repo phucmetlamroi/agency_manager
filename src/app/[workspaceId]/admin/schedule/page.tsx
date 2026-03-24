@@ -39,7 +39,10 @@ export default async function AdminSchedulePage({
   // Fetch all staff members of THIS profile (same pattern as admin/users page)
   const staffMembers = await prisma.user.findMany({
     where: {
-      profileId: profileId,
+      OR: [
+        { profileId: profileId },
+        { profileAccesses: { some: { profileId: profileId } } }
+      ],
       role: { not: 'CLIENT' }
     },
     select: { id: true, nickname: true, username: true },

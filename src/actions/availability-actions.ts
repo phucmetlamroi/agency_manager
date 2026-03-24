@@ -172,7 +172,12 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
         if (!workspace) return { error: 'Workspace not found' }
 
         const profileUsers = await globalPrisma.user.findMany({
-            where: { profileId: workspace.profileId },
+            where: {
+                OR: [
+                    { profileId: workspace.profileId },
+                    { profileAccesses: { some: { profileId: workspace.profileId || '' } } }
+                ]
+            },
             select: { id: true, username: true, nickname: true, role: true }
         })
 
@@ -222,7 +227,12 @@ export async function getAdminAvailabilityWeek(dateKey: string, workspaceId: str
         if (!workspace) return { error: 'Workspace not found' }
 
         const profileUsers = await globalPrisma.user.findMany({
-            where: { profileId: workspace.profileId },
+            where: {
+                OR: [
+                    { profileId: workspace.profileId },
+                    { profileAccesses: { some: { profileId: workspace.profileId || '' } } }
+                ]
+            },
             select: { id: true, username: true, nickname: true, role: true }
         })
 

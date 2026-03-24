@@ -59,11 +59,32 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
 
                     // 1. READ & DELETE Operations (Inject into `where`)
                     if (['findUnique', 'findUniqueOrThrow', 'findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'delete', 'deleteMany'].includes(operation)) {
-                        (args as any).where = {
-                            ...((args as any).where || {}),
-                            ...(!isBypassed ? { workspaceId: currentWorkspaceId } : {}),
-                            ...(currentProfileId && !hasNoProfile ? { profileId: currentProfileId } : {})
+                        let baseWhere: any = { ...((args as any).where || {}) }
+
+                        if (!isBypassed) baseWhere.workspaceId = currentWorkspaceId
+
+                        if (currentProfileId && !hasNoProfile) {
+                            if (model === 'User') {
+                                // Cho phép tài khoản thuộc Profile này HOẶC được cấp quyền truy cập "Du Học" vào Profile này
+                                delete baseWhere.profileId
+                                baseWhere = {
+                                    ...baseWhere,
+                                    AND: [
+                                        ...(baseWhere.AND || []),
+                                        {
+                                            OR: [
+                                                { profileId: currentProfileId },
+                                                { profileAccesses: { some: { profileId: currentProfileId } } }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            } else {
+                                baseWhere.profileId = currentProfileId
+                            }
                         }
+
+                        (args as any).where = baseWhere
                     }
 
                     // 2. CREATE Operations (Inject into `data`)

@@ -74,6 +74,12 @@ export default function DesktopLayoutShell({
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 mb-2">
+                        <Link
+                            href="/profile"
+                            className="col-span-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-sm font-bold transition-all"
+                        >
+                            🏢 Đổi Team / Workspace
+                        </Link>
                         <button
                             onClick={handleLogout}
                             className="col-span-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-bold transition-all"

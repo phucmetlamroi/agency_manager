@@ -97,7 +97,7 @@ export default async function UserLayout({
                         <Link href={`/${workspaceId}/dashboard`} className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Overview</Link>
                         <Link href={`/${workspaceId}/dashboard/schedule`} className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>🗓️ Lịch làm</Link>
                         <Link href={`/${workspaceId}/dashboard/profile`} className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Profile</Link>
-                        <Link href="/workspace" className="btn" style={{ color: '#60a5fa', background: 'transparent', padding: '0.5rem 1rem', fontWeight: 'bold' }}>Switch Workspace</Link>
+                        <Link href="/profile" className="btn" style={{ color: '#60a5fa', background: 'transparent', padding: '0.5rem 1rem', fontWeight: 'bold' }}>🏢 Đổi Team / Workspace</Link>
                     </nav>
                 </div>
 

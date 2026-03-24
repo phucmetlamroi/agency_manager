@@ -41,6 +41,16 @@ export async function POST(req: Request) {
         }
 
         if (!hasAccess) {
+            // Check cross-team 'Du học' access
+            const crossTeamAccess = await prisma.profileAccess.findUnique({
+                where: { userId_profileId: { userId: user.id, profileId } }
+            });
+            if (crossTeamAccess) {
+                hasAccess = true;
+            }
+        }
+
+        if (!hasAccess) {
             return NextResponse.json({ success: false, error: 'Bạn không có quyền truy cập vào Team này.' }, { status: 403 });
         }
 

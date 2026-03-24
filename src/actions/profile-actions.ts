@@ -26,6 +26,15 @@ export async function checkProfileAccess(profileId: string) {
         return { success: true }
     }
 
+    // Kiểm tra xem User có được cấp quyền Du Học vào Profile này không
+    const hasAccess = await prisma.profileAccess.findUnique({
+        where: { userId_profileId: { userId: user.id, profileId } }
+    })
+    
+    if (hasAccess) {
+        return { success: true }
+    }
+
     return { success: false, error: 'Bạn không có quyền truy cập vào Team này. Vui lòng liên hệ Admin tối thượng.' }
 }
 
@@ -68,17 +77,31 @@ export async function getAvailableProfiles() {
         })
     }
 
-    // For any other user (including other ADMINs), fetch only their linked profile
+    // For any other user, fetch their home profile + any profiles they have cross-team access to
+    const accessibleProfiles = []
+
     if (user.profileId) {
-        return prisma.profile.findMany({
+        const homeProfile = await prisma.profile.findFirst({
             where: { id: user.profileId },
-            include: {
-                _count: {
-                    select: { users: true, workspaces: true }
-                }
-            }
+            include: { _count: { select: { users: true, workspaces: true } } }
         })
+        if (homeProfile) accessibleProfiles.push(homeProfile)
     }
+
+    const crossTeamAccesses = await prisma.profileAccess.findMany({
+        where: { userId: user.id },
+        include: {
+            profile: {
+                include: { _count: { select: { users: true, workspaces: true } } }
+            }
+        }
+    })
+
+    crossTeamAccesses.forEach((acc: any) => {
+        if (acc.profile) accessibleProfiles.push(acc.profile)
+    })
+
+    return accessibleProfiles
 
     return []
 }

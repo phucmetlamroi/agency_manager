@@ -42,29 +42,44 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
             },
             payrolls: {
                 where: { month, year }
-            }
+            },
+            profileAccesses: true,
+            accessRequests: true
         }
     })
 
-    // Fetch Profiles for Super Admin user creation
-    const profiles = currentUser?.username === 'admin' ? 
-        await prisma.profile.findMany({ 
-            select: { 
-                id: true, 
-                name: true, 
-                bannerUrl: true, 
-                logoUrl: true,
-                _count: { select: { users: true } }
-            }, 
-            orderBy: { name: 'asc' } 
-        }) : 
-        []
+    // Fetch ALL Profiles so admin can send users to other teams
+    const profiles = await prisma.profile.findMany({ 
+        select: { 
+            id: true, 
+            name: true, 
+            bannerUrl: true, 
+            logoUrl: true,
+            _count: { select: { users: true } }
+        }, 
+        orderBy: { name: 'asc' } 
+    })
+
+    // Lấy danh sách yêu cầu "Du học" (Những người từ team khác xin vào team của Admin này)
+    const incomingRequests = await prisma.profileAccessRequest.findMany({
+        where: { targetProfileId: profileId, status: 'PENDING' },
+        include: {
+            user: { select: { id: true, username: true, nickname: true, email: true } },
+            requestedBy: { select: { id: true, username: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+    })
 
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
             <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Staff Management</h2>
-            <UserPageTabs users={serializeDecimal(users)} currentUser={currentUser} profiles={profiles} workspaceId={workspaceId} />
+            <UserPageTabs 
+                users={serializeDecimal(users)} 
+                currentUser={currentUser} 
+                profiles={profiles} 
+                incomingRequests={incomingRequests}
+                workspaceId={workspaceId} 
+            />
         </div>
     )
 }
-

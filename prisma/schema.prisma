@@ -33,6 +33,8 @@ model Profile {
   scheduleRules      ScheduleRule[]
   scheduleExceptions ScheduleException[]
   dailyAvailabilities DailyAvailability[]
+  profileAccesses     ProfileAccess[]
+  accessRequests      ProfileAccessRequest[] @relation("TargetProfileRequests")
 }
 
 model Workspace {
@@ -121,8 +123,42 @@ model User {
   scheduleRules      ScheduleRule[]
   scheduleExceptions ScheduleException[]
   dailyAvailabilities DailyAvailability[]
+  profileAccesses     ProfileAccess[]
+  accessRequests      ProfileAccessRequest[]
+  approvedRequests    ProfileAccessRequest[] @relation("ApprovedBy")
+  requestedRequests   ProfileAccessRequest[] @relation("RequestedBy")
 
   profile Profile? @relation(fields: [profileId], references: [id])
+}
+
+model ProfileAccess {
+  id        String   @id @default(uuid())
+  userId    String
+  profileId String
+  grantedAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profileId])
+}
+
+model ProfileAccessRequest {
+  id              String   @id @default(uuid())
+  userId          String
+  targetProfileId String
+  requestedById   String
+  approvedById    String?
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetProfile   Profile  @relation("TargetProfileRequests", fields: [targetProfileId], references: [id], onDelete: Cascade)
+  requestedBy     User     @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  approvedBy      User?    @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, targetProfileId])
 }
 
 

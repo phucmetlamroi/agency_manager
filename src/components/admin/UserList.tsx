@@ -7,15 +7,18 @@ import ReputationManager from '@/components/ReputationManager'
 import TreasurerToggle from '@/components/TreasurerToggle'
 import { createUser } from '@/actions/create-user'
 import ProfileSwitcher from '@/components/admin/ProfileSwitcher'
+import PendingCrossTeamRequests from '@/components/admin/PendingCrossTeamRequests'
+import CrossTeamManager from '@/components/admin/CrossTeamManager'
 
 type Props = {
     users: any[]
     currentUser: any
     profiles?: any[]
+    incomingRequests?: any[]
     workspaceId: string
 }
 
-export default function UserList({ users, currentUser, profiles, workspaceId }: Props) {
+export default function UserList({ users, currentUser, profiles, incomingRequests, workspaceId }: Props) {
     return (
         <div>
             <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
@@ -54,6 +57,11 @@ export default function UserList({ users, currentUser, profiles, workspaceId }: 
                 </form>
             </div>
 
+            {/* HIỂN THỊ YÊU CẦU CROSS TEAM */}
+            {incomingRequests && incomingRequests.length > 0 && (
+                <PendingCrossTeamRequests requests={incomingRequests} workspaceId={workspaceId} />
+            )}
+
             <div className="glass-panel" style={{ padding: '1rem' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
@@ -62,7 +70,7 @@ export default function UserList({ users, currentUser, profiles, workspaceId }: 
                             <th style={{ padding: '0.8rem', color: '#888' }}>Thành viên</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Liên hệ</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Reputation</th>
-                            <th style={{ padding: '0.8rem', color: '#888' }}>Role</th>
+                            <th style={{ padding: '0.8rem', color: '#888' }}>Role & Team</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Actions</th>
                         </tr>
                     </thead>
@@ -117,7 +125,7 @@ export default function UserList({ users, currentUser, profiles, workspaceId }: 
 
                                     <td style={{ padding: '0.8rem' }}>
                                         {!isSuperAdminRow ? (
-                                            <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', gap: '0.75rem' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                     <RoleSwitcher userId={u.id} initialRole={u.role} workspaceId={workspaceId} />
                                                     {currentUser?.username === 'admin' && u.role === 'ADMIN' && (
@@ -127,6 +135,16 @@ export default function UserList({ users, currentUser, profiles, workspaceId }: 
                                                 {currentUser?.username === 'admin' && profiles && profiles.length > 0 && (
                                                     <ProfileSwitcher userId={u.id} currentProfileId={u.profileId} profiles={profiles} workspaceId={workspaceId} />
                                                 )}
+
+                                                <CrossTeamManager 
+                                                    userId={u.id} 
+                                                    currentProfileId={u.profileId} 
+                                                    profiles={profiles || []} 
+                                                    accesses={u.profileAccesses || []} 
+                                                    requests={u.accessRequests || []} 
+                                                    workspaceId={workspaceId} 
+                                                    isSuperAdmin={currentUser?.username === 'admin'}
+                                                />
                                             </div>
                                         ) : <span style={{ color: '#666', fontSize: '0.8rem' }}>Locked</span>}
                                     </td>

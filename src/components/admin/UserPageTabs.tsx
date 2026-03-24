@@ -5,7 +5,7 @@ import UserList from '@/components/admin/UserList'
 import PayrollTable from '@/components/admin/PayrollTable'
 import ProfileManagement from '@/components/admin/ProfileManagement'
 
-export default function UserPageTabs({ users, currentUser, profiles, workspaceId }: { users: any[], currentUser: any, profiles?: any[], workspaceId: string }) {
+export default function UserPageTabs({ users, currentUser, profiles, incomingRequests, workspaceId }: { users: any[], currentUser: any, profiles?: any[], incomingRequests?: any[], workspaceId: string }) {
     const [activeTab, setActiveTab] = useState<'users' | 'payroll' | 'profiles'>('users')
     const isSuperAdmin = currentUser?.username === 'admin'
 
@@ -38,7 +38,13 @@ export default function UserPageTabs({ users, currentUser, profiles, workspaceId
             {/* CONTENT */}
             <div className="min-h-[600px]">
                 {activeTab === 'users' && (
-                    <UserList users={users} currentUser={currentUser} profiles={profiles} workspaceId={workspaceId} />
+                    <UserList 
+                        users={users} 
+                        currentUser={currentUser} 
+                        profiles={profiles} 
+                        incomingRequests={incomingRequests} 
+                        workspaceId={workspaceId} 
+                    />
                 )}
 
                 {activeTab === 'payroll' && (

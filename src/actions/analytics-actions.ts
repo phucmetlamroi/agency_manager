@@ -175,3 +175,58 @@ export async function getUserPerformanceScore(workspaceId: string, userId: strin
         rank
     }
 }
+
+export async function getStaffErrorLogsDetail(workspaceId: string, userId: string) {
+    const session = await getSession()
+    if (!session || !session.user) return []
+    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
+
+    const logs = await (workspacePrisma as any).errorLog.findMany({
+        where: { userId },
+        include: {
+            task: {
+                select: { id: true, title: true, client: { select: { name: true } }, project: { select: { name: true } } }
+            },
+            error: {
+                select: { code: true, description: true }
+            },
+            detectedBy: {
+                select: { username: true, nickname: true }
+            }
+        },
+        orderBy: { createdAt: 'desc' }
+    })
+
+    // Group logs by taskId
+    const taskMap = new Map<string, any>()
+
+    for (const log of logs) {
+        if (!log.task) continue
+
+        if (!taskMap.has(log.taskId)) {
+            taskMap.set(log.taskId, {
+                taskId: log.taskId,
+                taskTitle: log.task.title,
+                clientName: log.task.client?.name || null,
+                projectName: log.task.project?.name || null,
+                latestErrorAt: log.createdAt.toISOString(),
+                totalPenalty: 0,
+                errors: []
+            })
+        }
+
+        const taskEntry = taskMap.get(log.taskId)
+        taskEntry.totalPenalty += log.calculatedScore
+        taskEntry.errors.push({
+            id: log.id,
+            errorCode: log.error.code,
+            errorDescription: log.error.description,
+            frequency: log.frequency,
+            penalty: log.calculatedScore,
+            detectedBy: log.detectedBy?.nickname || log.detectedBy?.username || 'Hệ thống',
+            createdAt: log.createdAt.toISOString()
+        })
+    }
+
+    return Array.from(taskMap.values())
+}

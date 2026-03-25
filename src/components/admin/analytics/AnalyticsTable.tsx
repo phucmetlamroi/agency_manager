@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,6 +13,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getUserErrorDetails } from '@/actions/analytics-actions'
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
+import { Eye } from 'lucide-react'
 
 type UserAnalytics = {
   id: string
@@ -116,6 +118,20 @@ const columns = [
         </div>
       )
     }
+  }),
+  columnHelper.display({
+    id: 'actions',
+    header: 'Hành Động',
+    cell: info => {
+      const row = info.row.original;
+      // We pass workspaceId as a prop to the Table, but columns define statically.
+      // So workspaceId is retrieved from the pathname window or passed in via meta?
+      // Since columns is static, we can inject workspaceId inside the cell using a tricky way or use cell context.
+      // A better way is using cell context meta, but here we can just use a relative link if safe, 
+      // OR we just use `loadDetails` hook differently.
+      // Wait, we can't easily access workspaceId from static column define unless we pass it via meta.
+      return null; // Will override this in a useMemo below!
+    }
   })
 ]
 
@@ -126,9 +142,31 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
   const [errorDetails, setErrorDetails] = useState<any[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
 
+  const tableColumns = React.useMemo(() => {
+    return [
+      ...columns.slice(0, -1), // remove static dummy placeholder
+      columnHelper.display({
+        id: 'actions',
+        header: 'Hành Động',
+        cell: info => {
+          const row = info.row.original;
+          return (
+            <div className="text-center flex justify-center">
+               <Link href={`/${workspaceId}/admin/analytics/staff/${row.id}`} onClick={e => e.stopPropagation()}>
+                 <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors border border-indigo-500/20 text-xs font-semibold">
+                   <Eye className="w-3.5 h-3.5" /> Chi tiết
+                 </div>
+               </Link>
+            </div>
+          )
+        }
+      })
+    ];
+  }, [workspaceId]);
+
   const table = useReactTable({
     data,
-    columns,
+    columns: tableColumns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,

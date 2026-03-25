@@ -86,6 +86,9 @@ export default function MobileLayoutShell({
 
                         <div className="flex-1 flex flex-col gap-2">
                             {/* Menu Items */}
+                            <Link href={`/${workspaceId}/dashboard/errors`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold transition-colors flex items-center gap-3">
+                                <span>⚠️</span> Hồ sơ vi phạm
+                            </Link>
                             <Link href={`/${workspaceId}/dashboard/profile`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
                                 <span>👤</span> Profile
                             </Link>

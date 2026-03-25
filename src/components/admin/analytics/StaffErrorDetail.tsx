@@ -33,9 +33,10 @@ interface Props {
     performance: any
     errorDetails: TaskErrorData[]
     workspaceId: string
+    isUserView?: boolean
 }
 
-export default function StaffErrorDetail({ staff, performance, errorDetails, workspaceId }: Props) {
+export default function StaffErrorDetail({ staff, performance, errorDetails, workspaceId, isUserView = false }: Props) {
     const [searchTerm, setSearchTerm] = useState('')
 
     const filteredData = errorDetails.filter(t => 
@@ -124,7 +125,7 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                                 <div>
                                     <div className="flex items-center gap-3 mb-1">
                                         <CardTitle className="text-lg">
-                                            <Link href={`/${workspaceId}/admin/tasks/${taskData.taskId}`} className="hover:text-blue-400 transition-colors">
+                                            <Link href={isUserView ? `/${workspaceId}/dashboard/tasks/${taskData.taskId}` : `/${workspaceId}/admin/tasks/${taskData.taskId}`} className="hover:text-blue-400 transition-colors">
                                                 {taskData.taskTitle}
                                             </Link>
                                         </CardTitle>

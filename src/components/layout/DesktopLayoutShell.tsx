@@ -39,6 +39,10 @@ export default function DesktopLayoutShell({
                             <Link href={`/${workspaceId}/admin/users`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/users` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>👥</span> Nhân sự
                             </Link>
+                            <Link href={`/${workspaceId}/admin/dashboard`} className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all ${pathname === `/${workspaceId}/admin/dashboard` ? 'bg-indigo-600/10 text-indigo-400 font-bold border border-indigo-500/20' : 'text-gray-400 hover:bg-white/5 border border-transparent'}`}>
+                            <span className="text-xl mb-1">👑</span>
+                            <span className="text-xs">Chủ quản</span>
+                        </Link>
                             <Link href={`/${workspaceId}/admin/schedule`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/schedule` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>📅</span> Lịch điều phối
                             </Link>
@@ -48,6 +52,17 @@ export default function DesktopLayoutShell({
                             <Link href={`/${workspaceId}/admin/payroll`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/payroll` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>💸</span> Payroll
                             </Link>
+                        </>
+                    )}
+                </nav>
+
+                <nav className="flex-1 flex flex-col gap-2 p-4">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest pl-2 mb-2">Workspace</p>
+                    <Link href={`/${workspaceId}/dashboard`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                        <span>📋</span> Overview
+                    </Link>
+                    {user?.role === 'ADMIN' && (
+                        <>
                             <Link href={`/${workspaceId}/admin/queue`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/admin/queue` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                                 <span>🎁</span> Queue
                             </Link>
@@ -55,6 +70,9 @@ export default function DesktopLayoutShell({
                     )}
                     <Link href={`/${workspaceId}/dashboard/schedule`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard/schedule` ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
                         <span>🗓️</span> Lịch làm việc
+                    </Link>
+                    <Link href={`/${workspaceId}/dashboard/errors`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${pathname === `/${workspaceId}/dashboard/errors` ? 'bg-red-600/10 text-red-500 font-bold' : 'text-gray-400 hover:bg-white/5'}`}>
+                        <span>⚠️</span> Hồ sơ vi phạm
                     </Link>
                 </nav>
 

@@ -34,7 +34,7 @@ export default function UserAgreementContent() {
                 </h2>
                 <ul className="list-disc pl-6 space-y-2 text-zinc-400 marker:text-yellow-500">
                     <li><strong className="text-yellow-300">PRESET MISMATCH:</strong> Khởi tạo project sai cấu hình, sai tỷ lệ khung hình, hoặc dùng sai Preset xuất tệp.</li>
-                    <li><strong className="text-yellow-300">TEXT JUMP/TYPO:</strong> Lỗi nhảy chữ cơ bản, sai chính tả, sai font chữ hoặc màu sắc quy định.</li>
+                    <li><strong className="text-yellow-300">TEXT JUMP/TYPO:</strong> Lỗi phụ đề bị tràn sang cảnh sau hoặc xuất hiện sớm ở cảnh trước do không khớp với điểm cắt, đồng thời nội dung chữ bị lệch nhịp, hiển thị trước hoặc sau so với giọng nói thực tế trong video.</li>
                     <li><strong className="text-yellow-300">BLACK FRAME:</strong> Bỏ sót các khung hình đen chớp giật (Black frame) giữa các cut.</li>
                     <li><strong className="text-yellow-300">NAMING & OUTSOURCE:</strong> Đặt sai định dạng tên tệp xuất, hoặc không lưu versioning v2, v3 hợp lệ.</li>
                 </ul>

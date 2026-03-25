@@ -10,7 +10,7 @@ const ERROR_DICTIONARY = [
   { code: 'ERR_SPAWN_NEW_BUGS', description: 'Quá trình chỉnh sửa đẻ thêm các lỗi mới không có trong bản gốc', severity: 1, penalty: 7 },
   { code: 'ERR_REPEAT_FEEDBACK', description: 'Cố tình lặp lại các lỗi kỹ thuật đã được Manager feedback trước đó', severity: 1, penalty: 7 },
   { code: 'ERR_PRESET_MISMATCH', description: 'Sử dụng sai bộ cấu hình xuất tệp (Preset) yêu cầu', severity: 2, penalty: 3 },
-  { code: 'ERR_TEXT_JUMP_BUG', description: 'Nhảy chữ sai (văn bản bị nhảy vị trí không phải subtext theo layout)', severity: 2, penalty: 3 },
+  { code: 'ERR_TEXT_JUMP_BUG', description: 'Lỗi phụ đề bị tràn sang cảnh sau hoặc xuất hiện sớm ở cảnh trước do không khớp với điểm cắt, đồng thời nội dung chữ bị lệch nhịp, hiển thị trước hoặc sau so với giọng nói thực tế trong video.', severity: 2, penalty: 3 },
   { code: 'ERR_SCRIPT_TYPO', description: 'Sai lỗi chính tả hoặc văn phạm trong script', severity: 3, penalty: 1 },
   { code: 'ERR_BLACK_FRAME', description: 'Bỏ sót khung hình đen (Black frame) trong dải băng hình', severity: 3, penalty: 1 },
   { code: 'ERR_NAMING_CONV', description: 'Đặt sai định dạng tên tệp tin video đầu ra', severity: 3, penalty: 1 },

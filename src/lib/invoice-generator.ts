@@ -210,14 +210,16 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
 
         if (isVercel) {
             // Optimized for Vercel Serverless
-            (chromium as any).setGraphicsMode = false;
+            const chromiumAny = chromium as any;
+            
+            // Set graphics mode to false for serverless environments
+            chromiumAny.setGraphicsMode = false;
             
             browser = await puppeteer.launch({
-                args: (chromium as any).args,
-                defaultViewport: (chromium as any).defaultViewport,
-                executablePath: await (chromium as any).executablePath(),
-                headless: (chromium as any).headless,
-                ignoreHTTPSErrors: true,
+                args: chromiumAny.args,
+                defaultViewport: chromiumAny.defaultViewport,
+                executablePath: await chromiumAny.executablePath(),
+                headless: chromiumAny.headless,
             } as any)
         } else {
             // Local development or Local Production (Windows/Mac/Linux)
@@ -231,6 +233,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
                     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
                     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
                     process.env.LOCALAPPDATA + '\\Google\\Chrome\\Application\\chrome.exe',
+                    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
                 ]
 
                 for (const p of paths) {
@@ -246,25 +249,26 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
             }
 
             browser = await puppeteer.launch({
-                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
                 executablePath: executablePath || undefined,
                 headless: true
             })
         }
 
         const page = await browser.newPage()
-        await page.setContent(html, { waitUntil: 'domcontentloaded' })
+        await page.setContent(html, { waitUntil: 'networkidle0' }) // networkidle0 ensures all resources are loaded
 
-        const pdf = await page.pdf({
+        const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
-            margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' }
+            margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' },
+            preferCSSPageSize: true
         })
 
-        return Buffer.from(pdf)
+        return Buffer.from(pdfBuffer)
 
     } catch (error: any) {
-        console.error('PDF Generation Error:', error)
+        console.error('PDF Generation Error Status:', error)
         throw new Error(`Failed to generate PDF: ${error.message || 'Unknown'}`)
     } finally {
         if (browser) await browser.close()

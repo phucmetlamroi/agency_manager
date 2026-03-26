@@ -1,12 +1,14 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useTransition } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Search, AlertTriangle, Calendar, Award, CheckCircle2 } from 'lucide-react'
+import { Search, AlertTriangle, Calendar, Award, CheckCircle2, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import { toast } from 'sonner'
+import { removeErrorLog } from '@/actions/analytics-actions'
 
 interface ErrorItem {
     id: string
@@ -38,6 +40,20 @@ interface Props {
 
 export default function StaffErrorDetail({ staff, performance, errorDetails, workspaceId, isUserView = false }: Props) {
     const [searchTerm, setSearchTerm] = useState('')
+    const [isPending, startTransition] = useTransition()
+
+    const handleDeleteError = (errorId: string) => {
+        if (!confirm('Bạn có chắc chắn muốn xóa bản ghi lỗi này không? Thao tác này sẽ hiển thị ngay trong tổng điểm phạt.')) return
+
+        startTransition(async () => {
+            const res = await removeErrorLog(workspaceId, errorId)
+            if (res.success) {
+                toast.success('Đã gỡ lỗi thành công!')
+            } else {
+                toast.error(res.error || 'Có lỗi xảy ra khi gỡ lỗi')
+            }
+        })
+    }
 
     const filteredData = errorDetails.filter(t => 
         t.taskTitle.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -163,10 +179,20 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                                                     <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Vi phạm</p>
                                                     <p className="text-sm font-bold text-zinc-300">{error.frequency} lần</p>
                                                 </div>
-                                                <div className="text-center w-16">
+                                                <div className="text-center min-w-[3rem]">
                                                     <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Phạt</p>
                                                     <p className="text-sm font-bold text-red-400">-{error.penalty}</p>
                                                 </div>
+                                                {!isUserView && (
+                                                    <button
+                                                        disabled={isPending}
+                                                        onClick={() => handleDeleteError(error.id)}
+                                                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors border border-transparent hover:border-red-500/20 disabled:opacity-50"
+                                                        title="Gỡ bỏ lỗi này"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

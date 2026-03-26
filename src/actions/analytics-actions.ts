@@ -2,6 +2,7 @@
 
 import { getWorkspacePrisma } from "@/lib/prisma-workspace"
 import { getSession } from "@/lib/auth"
+import { revalidatePath } from 'next/cache'
 
 export async function getAnalyticsData(workspaceId: string) {
     const session = await getSession()
@@ -229,4 +230,27 @@ export async function getStaffErrorLogsDetail(workspaceId: string, userId: strin
     }
 
     return Array.from(taskMap.values())
+}
+
+export async function removeErrorLog(workspaceId: string, errorLogId: string) {
+    const session = await getSession()
+    // Chỉ Admin / Super Admin mới có quyền xóa lỗi
+    if (!session || !session.user || (session.user.role !== 'ADMIN' && session.user.role !== 'SUPER_ADMIN')) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
+
+    try {
+        await (workspacePrisma as any).errorLog.delete({
+            where: { id: errorLogId }
+        })
+        
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/dashboard`)
+        return { success: true }
+    } catch (e: any) {
+        console.error('[Remove ErrorLog Error]', e)
+        return { success: false, error: 'Database error' }
+    }
 }

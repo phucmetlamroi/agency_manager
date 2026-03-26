@@ -215,10 +215,14 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
             // Set graphics mode to false for serverless environments
             chromiumAny.setGraphicsMode = false;
             
+            // Use remote pack to ensure chromium is available even if Vercel doesn't bundle it correctly
+            // This is the most robust way to handle missing binaries on Vercel
+            const remotePackUrl = 'https://github.com/Sparticuz/chromium/releases/download/v123.0.1/chromium-v123.0.1-pack.tar';
+            
             browser = await puppeteer.launch({
                 args: chromiumAny.args,
                 defaultViewport: chromiumAny.defaultViewport,
-                executablePath: await chromiumAny.executablePath(),
+                executablePath: await chromiumAny.executablePath(remotePackUrl),
                 headless: chromiumAny.headless,
             } as any)
         } else {

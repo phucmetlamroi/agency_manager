@@ -41,7 +41,7 @@ const statusBg: Record<string, string> = {
     "Sửa frame": "rgba(244, 114, 182, 0.2)"
 }
 
-export default function TaskTable({ tasks, isAdmin = false, users = [], workspaceId }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string, reputation?: number }[], workspaceId: string }) {
+export default function TaskTable({ tasks, isAdmin = false, users = [], workspaceId }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string }[], workspaceId: string }) {
     const router = useRouter()
     const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
@@ -277,7 +277,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                                             .map(u => {
                                                                 return (
                                                                     <option key={u.id} value={u.id} className="text-black">
-                                                                        {u.username} ({u.reputation ?? 100}đ)
+                                                                        {u.username}
                                                                     </option>
                                                                 )
                                                             })}

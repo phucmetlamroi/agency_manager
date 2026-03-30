@@ -17,7 +17,7 @@ export default async function UserErrorsPage({ params }: { params: Promise<{ wor
     
     const staff = await workspacePrisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, username: true, nickname: true, reputation: true, role: true }
+        select: { id: true, username: true, nickname: true, role: true }
     })
 
     if (!staff) redirect('/login')

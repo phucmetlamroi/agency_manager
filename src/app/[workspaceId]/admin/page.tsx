@@ -6,6 +6,7 @@ import TaskTable from '@/components/TaskTable'
 import CreateTaskForm from '@/components/CreateTaskForm'
 import { isMobileDevice } from '@/lib/device'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
+
 import { getSession } from '@/lib/auth'
 import BottleneckAlert from '@/components/BottleneckAlert'
 import AutoRefresh from '@/components/AutoRefresh'
@@ -30,14 +31,17 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         select: { username: true }
     })
 
-    // 1. Run Logic to Deduct Points for Overdue Tasks
-    const checkResult = await checkOverdueTasks(workspaceId)
-    // In a real app we might show a toast with checkResult.notifications
+    // 1. Run Logic to Recall Overdue Tasks
+    await checkOverdueTasks(workspaceId)
 
     const tasks = await workspacePrisma.task.findMany({
         include: {
             assignee: {
-                include: {
+                select: {
+                    id: true,
+                    username: true,
+                    role: true,
+                    nickname: true,
                     monthlyRanks: {
                         orderBy: { createdAt: 'desc' },
                         take: 1,
@@ -60,10 +64,13 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             ]
         },
         orderBy: [
-            { reputation: 'desc' },
             { username: 'asc' }
         ],
-        include: {
+        select: {
+            id: true,
+            username: true,
+            role: true,
+            nickname: true,
             monthlyRanks: {
                 orderBy: { createdAt: 'desc' },
                 take: 1,

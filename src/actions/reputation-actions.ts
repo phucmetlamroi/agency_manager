@@ -9,15 +9,22 @@ export async function checkOverdueTasks(workspaceId: string) {
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const now = new Date()
 
-        // Find tasks that are overdue, not completed, and are STILL assigned
+        // Tìm các task đã quá hạn, chưa hoàn tất và vẫn đang được giao
         const overdueTasks = await workspacePrisma.task.findMany({
             where: {
-                deadline: { lt: now }, // Deadline has passed
-                status: { notIn: ['Hoàn tất'] }, // Not done
-                assigneeId: { not: null } // Must be assigned
+                deadline: { lt: now }, // Hết hạn
+                status: { notIn: ['Hoàn tất'] }, // Chưa xong
+                assigneeId: { not: null } // Đang có người nhận
             },
             include: {
-                assignee: true
+                assignee: {
+                    select: {
+                        id: true,
+                        username: true,
+                        role: true,
+                        nickname: true
+                    }
+                }
             }
         })
 
@@ -26,58 +33,26 @@ export async function checkOverdueTasks(workspaceId: string) {
         for (const task of overdueTasks) {
             if (!task.assignee) continue
 
-            // Determine if valid for penalty
-            const isRecycle = task.isPenalized // If already true, it's a "stuck" task or double-check.
-
-            let newRep = task.assignee.reputation || 100
-            let statusMsg = 'Bình thường'
-            let notifMessage = ''
-
-            if (!isRecycle) {
-                // FRESH PENALTY
-                newRep = newRep - 10
-
-                // Check Lock
-                let newRole = task.assignee.role
-                if (newRep <= 0) {
-                    newRole = 'LOCKED'
-                    statusMsg = 'Đã xóa (LOCKED)'
-                } else if (newRep < 50) {
-                    statusMsg = 'Cảnh báo'
-                }
-
-                await workspacePrisma.user.update({
-                    where: { id: task.assignee.id },
-                    data: { reputation: newRep, role: newRole }
-                })
-
-                notifMessage = `THU HỒI TASK: "${task.title}" từ @${task.assignee.username} do quá hạn. (Đã trừ 10đ)`
-            } else {
-                // ALREADY PENALIZED BUT STILL ASSIGNED (Stuck state cleanup)
-                // Just recall, no double penalty.
-                notifMessage = `THU HỒI LẠI TASK: "${task.title}" từ @${task.assignee.username} (Đã phạt trước đó)`
-            }
-
-            // Common Recall Logic
+            // Logic Thu Hồi Task (Recall) - Giữ lại theo yêu cầu người dùng
             await workspacePrisma.$transaction([
                 workspacePrisma.task.update({
                     where: { id: task.id },
                     data: {
-                        isPenalized: true, // Mark as "failed" history
-                        assigneeId: null, // Kick user
+                        isPenalized: true, // Đánh dấu lịch sử trễ
+                        assigneeId: null, // Gỡ người nhận
                         assignedAgencyId: null,
                         status: 'Đang đợi giao',
                         notes_vi: (task.notes_vi || '') + `\n[System] Thu hồi do quá hạn (Deadline: ${task.deadline?.toLocaleString('vi-VN')})`,
-                        deadline: null // Reset deadline so it's fresh for next assignee
+                        deadline: null // Reset deadline để giao mới
                     }
                 })
             ])
 
             notifications.push({
                 editor: task.assignee.username,
-                score: isRecycle ? 'No Change' : `${newRep}/100 (-10)`,
+                score: 'N/A',
                 reason: `Trễ Task [${task.title}] - ĐÃ THU HỒI`,
-                status: statusMsg,
+                status: 'Thu hồi',
                 taskId: task.id
             })
         }

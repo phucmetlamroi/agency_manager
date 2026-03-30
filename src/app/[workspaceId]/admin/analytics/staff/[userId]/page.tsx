@@ -16,7 +16,7 @@ export default async function StaffAnalyticsDetailPage({ params }: { params: Pro
     
     const staff = await workspacePrisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, username: true, nickname: true, reputation: true }
+        select: { id: true, username: true, nickname: true }
     })
 
     if (!staff) redirect(`/${workspaceId}/admin/analytics`)

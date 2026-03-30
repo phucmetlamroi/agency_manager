@@ -45,7 +45,6 @@ interface SidebarProps {
     user: {
         username: string
         role: string
-        reputation?: number
         isTreasurer?: boolean
     }
     workspaceId: string
@@ -292,7 +291,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                             <DropdownMenuLabel className="font-normal">
                                 <div className="flex flex-col space-y-1">
                                     <p className="text-sm font-medium leading-none">{user.username}</p>
-                                    <p className="text-xs leading-none text-muted-foreground">Reputation: {user.reputation ?? 100}</p>
+
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />

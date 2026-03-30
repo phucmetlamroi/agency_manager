@@ -33,9 +33,13 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
     // Fetch Tasks & Bonus in parallel or single query pattern
     // Fetch user to get bonus
-    const userWithBonus = await workspacePrisma.user.findUnique({
+    const userWithBonus = await (workspacePrisma as any).user.findUnique({
         where: { id: userId },
-        include: {
+        select: {
+            id: true,
+            username: true,
+            role: true,
+            nickname: true,
             bonuses: {
                 where: {
                     workspaceId,
@@ -57,7 +61,11 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         include: { 
             client: { include: { parent: true } },
             assignee: {
-                include: {
+                select: {
+                    id: true,
+                    username: true,
+                    role: true,
+                    nickname: true,
                     monthlyRanks: {
                         orderBy: { createdAt: 'desc' },
                         take: 1,

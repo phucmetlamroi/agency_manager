@@ -13,7 +13,7 @@ export type TaskWithUser = { // Updated with Client Info
     notes_vi: string | null
     notes_en: string | null
     assigneeId?: string | null
-    assignee: { id: string; username: string; reputation?: number } | null
+    assignee: { id: string; username: string } | null
     createdAt: Date
     // Removed Stopwatch fields
     client?: {

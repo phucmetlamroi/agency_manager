@@ -34,14 +34,32 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
     // Fetch Financial Data (Completed Tasks Only)
     const tasks = await workspacePrisma.task.findMany({
         where: { status: 'Hoàn tất' },
-        include: { assignee: true },
+        include: {
+            assignee: {
+                select: {
+                    id: true,
+                    username: true,
+                    role: true,
+                    nickname: true
+                }
+            }
+        },
         orderBy: { updatedAt: 'desc' }
     })
 
     // Fetch ALL tasks (for projected/expected numbers)
     const allTasks = await workspacePrisma.task.findMany({
         where: { isArchived: false },
-        include: { assignee: true },
+        include: {
+            assignee: {
+                select: {
+                    id: true,
+                    username: true,
+                    role: true,
+                    nickname: true
+                }
+            }
+        },
         orderBy: { updatedAt: 'desc' }
     })
 

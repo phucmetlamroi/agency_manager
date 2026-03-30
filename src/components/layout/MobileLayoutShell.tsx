@@ -78,10 +78,6 @@ export default function MobileLayoutShell({
                             <h2 className="text-xl font-bold">{user.username}</h2>
                             <p className="text-sm text-gray-400 uppercase tracking-widest">{user.role}</p>
 
-                            <div className="mt-4 px-4 py-2 bg-white/5 rounded-full border border-white/10 flex items-center gap-2">
-                                <span className="text-yellow-400">★</span>
-                                <span className="font-bold">{user.reputation ?? 100} Reputation</span>
-                            </div>
                         </div>
 
                         <div className="flex-1 flex flex-col gap-2">

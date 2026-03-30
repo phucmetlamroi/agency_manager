@@ -33,7 +33,16 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                     status: { in: ['Hoàn tất', ...SALARY_PENDING_STATUSES] }
                 },
                 orderBy: { updatedAt: 'desc' },
-                include: { assignee: true }
+                include: {
+                    assignee: {
+                        select: {
+                            id: true,
+                            username: true,
+                            role: true,
+                            nickname: true
+                        }
+                    }
+                }
             },
             // Include bonuses for this month
             bonuses: {

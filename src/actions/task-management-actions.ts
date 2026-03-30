@@ -122,7 +122,17 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
         const updatedTask = await workspacePrisma.task.update({
             where: { id: taskId },
             data: updateData,
-            include: { assignee: true }
+            include: {
+                assignee: {
+                    select: {
+                        id: true,
+                        username: true,
+                        role: true,
+                        nickname: true,
+                        email: true
+                    }
+                }
+            }
         })
 
         // D. SIDE EFFECTS (Email)

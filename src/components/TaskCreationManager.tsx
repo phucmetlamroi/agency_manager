@@ -7,7 +7,6 @@ import BulkCreateTaskForm from '@/components/BulkCreateTaskForm'
 type User = {
     id: string
     username: string
-    reputation: number
     role: string
 }
 

@@ -11,7 +11,16 @@ export async function getPerformanceReport(month: number, year: number, workspac
         // Try to fetch existing snapshot first
         const metrics = await workspacePrisma.performanceMetric.findMany({
             where: { month, year },
-            include: { user: true },
+            include: { 
+                user: {
+                    select: {
+                        id: true,
+                        username: true,
+                        role: true,
+                        nickname: true
+                    }
+                }
+            },
             orderBy: { revenue: 'desc' }
         })
 
@@ -37,7 +46,11 @@ export async function calculatePerformance(month: number, year: number, workspac
 
         const users = await workspacePrisma.user.findMany({
             where: { role: 'USER' },
-            include: {
+            select: {
+                id: true,
+                username: true,
+                role: true,
+                nickname: true,
                 tasks: {
                     where: {
                         status: 'Hoàn tất',
@@ -152,7 +165,16 @@ export async function calculatePerformance(month: number, year: number, workspac
         // Fetch fresh data to return
         const freshData = await workspacePrisma.performanceMetric.findMany({
             where: { month, year },
-            include: { user: true },
+            include: { 
+                user: {
+                    select: {
+                        id: true,
+                        username: true,
+                        role: true,
+                        nickname: true
+                    }
+                }
+            },
             orderBy: { revenue: 'desc' }
         })
 

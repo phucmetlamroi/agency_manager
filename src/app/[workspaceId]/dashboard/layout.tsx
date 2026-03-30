@@ -30,7 +30,7 @@ export default async function UserLayout({
     // Fetch fresh role from DB
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { role: true, username: true, nickname: true, reputation: true, isTreasurer: true }
+        select: { role: true, username: true, nickname: true, isTreasurer: true }
     })
 
     if (!user) {
@@ -116,13 +116,7 @@ export default async function UserLayout({
                             {displayName?.[0]?.toUpperCase()}
                         </div>
                         <span style={{ fontWeight: 600 }}>{displayName}</span>
-                        <span style={{ color: '#444' }}>|</span>
-                        <span style={{
-                            fontWeight: 'bold',
-                            color: (user.reputation || 100) >= 90 ? '#a855f7' : '#facc15'
-                        }}>
-                            {user.reputation ?? 100}đ
-                        </span>
+
                     </Link>
 
                     <form action={handleLogout}>

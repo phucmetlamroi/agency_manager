@@ -20,7 +20,11 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
     const tasks = await workspacePrisma.task.findMany({
         include: {
             assignee: {
-                include: {
+                select: {
+                    id: true,
+                    username: true,
+                    role: true,
+                    nickname: true,
                     monthlyRanks: {
                         orderBy: { createdAt: 'desc' },
                         take: 1,
@@ -42,7 +46,11 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
             }
         },
         orderBy: { username: 'asc' },
-        include: { 
+        select: {
+            id: true,
+            username: true,
+            role: true,
+            nickname: true,
             monthlyRanks: {
                 orderBy: { createdAt: 'desc' },
                 take: 1,

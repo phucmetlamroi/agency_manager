@@ -19,7 +19,7 @@ export default function TaskTable({
 }: {
     tasks: TaskWithUser[],
     isAdmin?: boolean,
-    users?: { id: string, username: string, reputation?: number }[],
+    users?: { id: string, username: string }[],
     isMobile?: boolean,
     workspaceId: string
 }) {

@@ -25,41 +25,6 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
     }
 }
 
-export async function updateUserReputation(userId: string, change: number, workspaceId: string) {
-    try {
-        const session = await getSession()
-        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
-        const profileId = (session?.user as any)?.sessionProfileId
-        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
-        // Fetch current to check bounds
-        const user = await workspacePrisma.user.findUnique({ where: { id: userId } })
-        if (!user) return { error: 'User not found' }
-
-        let newRep = (user.reputation || 100) + change
-        if (newRep > 100) newRep = 100
-        // We allow manual override below 0? Maybe not automatically lock here, leave that to the auto-checker 
-        // or strictly follow rule "Points <= 0 => Lock".
-        // Let's enforce the lock if score drops <= 0
-
-        let newRole = user.role
-        if (newRep <= 0 && user.role !== 'ADMIN') {
-            newRole = 'LOCKED' as UserRole
-        }
-
-        await workspacePrisma.user.update({
-            where: { id: userId },
-            data: {
-                reputation: newRep,
-                role: newRole
-            }
-        })
-        revalidatePath(`/${workspaceId}/admin/users`)
-        return { success: true }
-    } catch (e) {
-        return { error: 'Failed to update reputation' }
-    }
-}
-
 export async function createTask(formData: FormData, workspaceId: string) {
     try {
         const title = formData.get('title') as string

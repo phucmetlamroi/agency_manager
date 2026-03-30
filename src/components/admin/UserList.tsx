@@ -3,7 +3,6 @@
 import RoleSwitcher from '@/components/RoleSwitcher'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import DeleteUserButton from '@/components/DeleteUserButton'
-import ReputationManager from '@/components/ReputationManager'
 import TreasurerToggle from '@/components/TreasurerToggle'
 import { createUser } from '@/actions/create-user'
 import ProfileSwitcher from '@/components/admin/ProfileSwitcher'
@@ -69,7 +68,6 @@ export default function UserList({ users, currentUser, profiles, incomingRequest
                             <th style={{ padding: '0.8rem', color: '#888' }}>ID</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Thành viên</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Liên hệ</th>
-                            <th style={{ padding: '0.8rem', color: '#888' }}>Reputation</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Role & Team</th>
                             <th style={{ padding: '0.8rem', color: '#888' }}>Actions</th>
                         </tr>
@@ -117,11 +115,7 @@ export default function UserList({ users, currentUser, profiles, incomingRequest
                                         ) : <div style={{ color: '#4b5563', fontSize: '0.8rem', fontStyle: 'italic' }}>Chưa có SĐT</div>}
                                     </td>
 
-                                    <td style={{ padding: '0.8rem' }}>
-                                        {!isSuperAdminRow ? (
-                                            <ReputationManager userId={u.id} initialReputation={u.reputation ?? 100} workspaceId={workspaceId} />
-                                        ) : <span className="text-purple-400 font-bold">MAX</span>}
-                                    </td>
+
 
                                     <td style={{ padding: '0.8rem' }}>
                                         {!isSuperAdminRow ? (

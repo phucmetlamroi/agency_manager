@@ -8,7 +8,6 @@ import { toast } from 'sonner'
 type User = {
     id: string
     username: string
-    reputation: number
     role: string
 }
 
@@ -230,17 +229,9 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
                     style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}>
                     <option value="">-- Để trống (Vào Kho Task Đợi) --</option>
                     {users.filter((u: any) => u.role !== 'LOCKED').map((u: any) => {
-                        const score = u.reputation ?? 100
-                        let badge = ''
-                        if (score >= 90) badge = '🟣 Chuyên gia tin cậy'
-                        else if (score < 50) badge = '⚠️ Cần giám sát'
-                        else badge = '⚪ Thành viên tích cực'
-
-                        if (u.role === 'LOCKED') badge = '❌ ĐÃ KHÓA'
-
                         return (
                             <option key={u.id} value={u.id} disabled={u.role === 'LOCKED'}>
-                                {u.username} ({score}đ) - {badge}
+                                {u.username}
                             </option>
                         )
                     })}

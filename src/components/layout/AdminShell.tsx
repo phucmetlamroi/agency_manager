@@ -11,7 +11,6 @@ interface AdminShellProps {
     user: {
         username: string
         role: string
-        reputation?: number
         isTreasurer?: boolean
     }
     workspaceId: string

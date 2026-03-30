@@ -17,7 +17,17 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const task = await workspacePrisma.task.findUnique({
             where: { id },
-            include: { assignee: true }
+            include: {
+                assignee: {
+                    select: {
+                        id: true,
+                        username: true,
+                        role: true,
+                        nickname: true,
+                        email: true
+                    }
+                }
+            }
         })
 
         if (!task) return { error: 'Task not found' }
@@ -54,7 +64,7 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
 
 
         // --- TRANSACTION BLOCK ---
-        // Ensure Atomicity: Feedback + Reputation + Task Status must succeed or fail together.
+        // Ensure Atomicity: Feedback + Task Status must succeed or fail together.
         const transactionResult = await workspacePrisma.$transaction(async (tx) => {
             // 1. Create Feedback (if applicable)
             if (newStatus === 'Revision' && feedbackData) {
@@ -68,19 +78,8 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
                 })
             }
 
-            // 2. Logic: Reward if Completed Early/On-Time (Reputation)
-            if (newStatus === 'Hoàn tất' && task.status !== 'Hoàn tất' && task.deadline && task.assignee) {
-                const now = new Date()
-                if (now <= task.deadline) {
-                    if (task.assignee.reputation < 100) {
-                        const newRep = Math.min(task.assignee.reputation + 5, 100)
-                        await tx.user.update({
-                            where: { id: task.assignee.id },
-                            data: { reputation: newRep }
-                        })
-                    }
-                }
-            }
+            // 2. [REMOVED] Logic: Reward if Completed Early/On-Time (Reputation)
+
 
             // 3. Update Task Status
             const updateData = {
@@ -119,7 +118,17 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         // Fetch updated task for Emails & Return
         const updatedTaskResult = await workspacePrisma.task.findUnique({
             where: { id },
-            include: { assignee: true }
+            include: {
+                assignee: {
+                    select: {
+                        id: true,
+                        username: true,
+                        role: true,
+                        nickname: true,
+                        email: true
+                    }
+                }
+            }
         })
 
         if (!updatedTaskResult) return { error: 'Error fetching updated task' }

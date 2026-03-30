@@ -79,8 +79,6 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                         </h1>
                         <p className="text-zinc-400 mt-1 flex items-center justify-center md:justify-start gap-2">
                             <span>@{staff.username}</span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
-                            <span>Uy tín: <span className="font-bold text-yellow-400">{staff.reputation}đ</span></span>
                         </p>
                     </div>
 

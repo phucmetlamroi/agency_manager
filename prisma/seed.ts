@@ -17,7 +17,6 @@ async function main() {
             role: UserRole.ADMIN,
             nickname: 'Super Admin',
             email: 'admin@example.com',
-            reputation: 100,
         },
     })
     console.log('✅ Super Admin created/verified.')

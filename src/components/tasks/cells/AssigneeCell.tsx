@@ -20,7 +20,7 @@ import {
 
 interface AssigneeCellProps {
     task: TaskWithUser
-    users: { id: string; username: string; reputation?: number }[]
+    users: { id: string; username: string }[]
     isAdmin: boolean
     selectedIds?: string[]
     workspaceId: string
@@ -133,7 +133,6 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                             )}
                                         </div>
                                         <span>{u.username}</span>
-                                        <span className="text-xs text-muted-foreground">({u.reputation ?? 100}đ)</span>
                                     </div>
                                 </SelectItem>
                             )

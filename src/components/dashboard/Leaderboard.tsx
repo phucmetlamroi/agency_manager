@@ -47,7 +47,7 @@ export const getLeaderboardData = unstable_cache(
 
         const users = await workspacePrisma.user.findMany({
             where: { id: { in: userIds }, role: 'USER' },
-            select: { id: true, username: true, reputation: true }
+            select: { id: true, username: true }
         })
 
         // Combine data and calculate Error Rate & Rank

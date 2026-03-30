@@ -9,7 +9,6 @@ import { Copy } from 'lucide-react'
 type User = {
     id: string
     username: string
-    reputation: number
     role: string
 }
 
@@ -245,7 +244,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                             .filter(u => u.role !== 'CLIENT' && u.role !== 'LOCKED')
                             .map((u) => (
                                 <option key={u.id} value={u.id}>
-                                    {u.username} ({u.reputation ?? 100}đ)
+                                    {u.username}
                                 </option>
                             ))}
                     </select>

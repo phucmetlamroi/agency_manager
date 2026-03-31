@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { AlertTriangle, UserCircle, ArrowLeftRight, Bell, Settings, LogOut, Monitor, X } from 'lucide-react'
 
 export default function MobileLayoutShell({
     children,
@@ -22,23 +23,25 @@ export default function MobileLayoutShell({
     // User requested "Slim Header" with "Left: Logo/PageName" and "Right: Avatar -> Drawer"
 
     return (
-        <div className="flex min-h-dvh bg-[#111111] text-white flex-col overflow-x-hidden">
-            {/* SLIM HEADER - Improved for iOS Safe Areas */}
-            <header className="flex items-center justify-between px-4 pb-3 pt-[calc(12px+env(safe-area-inset-top))] bg-black/90 backdrop-blur-xl sticky top-0 z-50 border-b border-white/5">
+        <div className="flex min-h-dvh bg-zinc-950 text-zinc-100 flex-col overflow-x-hidden font-sans">
+            {/* SLIM HEADER */}
+            <header className="flex items-center justify-between px-4 pb-3 pt-[calc(12px+env(safe-area-inset-top))] bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-50 border-b border-white/8">
                 <div className="flex items-center gap-2">
-                    <span className="text-xl">🚀</span>
-                    <h1 className="font-bold text-lg leading-none bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                        Agency<span className="text-white">Manager</span>
+                    <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-xs shadow-md shadow-indigo-500/30">
+                        A
+                    </div>
+                    <h1 className="font-heading font-bold text-lg leading-none text-zinc-100">
+                        Agency<span className="text-indigo-400">Manager</span>
                     </h1>
                 </div>
 
                 {/* Avatar Trigger */}
-                <button onClick={() => setIsDrawerOpen(true)} className="relative">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center font-bold text-xs ring-2 ring-white/10">
+                <button onClick={() => setIsDrawerOpen(true)} className="relative cursor-pointer group">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-xs ring-2 ring-white/10 group-hover:ring-indigo-500/50 transition-all duration-300 shadow-md shadow-indigo-500/20">
                         {user.username?.[0]?.toUpperCase()}
                     </div>
-                    {/* Status Dot */}
-                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-black"></div>
+                    {/* Online Status Dot */}
+                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-zinc-950 shadow-sm shadow-emerald-500/50"></div>
                 </button>
             </header>
 
@@ -51,72 +54,69 @@ export default function MobileLayoutShell({
             {/* BOTTOM NAV */}
             <BottomNav role={user.role} workspaceId={workspaceId} />
 
-            {/* USER DRAWER (Slide from Right or Bottom?) 
-                User requested "Menu trượt (Drawer/Modal)". Slide from Right is standard for Profile.
-            */}
+            {/* USER DRAWER */}
             {isDrawerOpen && (
                 <div className="fixed inset-0 z-[100] flex justify-end">
                     {/* Backdrop */}
                     <div
-                        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+                        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
                         onClick={() => setIsDrawerOpen(false)}
                     ></div>
 
                     {/* Drawer Content */}
-                    <div className="relative w-4/5 max-w-[300px] bg-[#1a1a1a] h-full shadow-2xl border-l border-white/10 animate-slide-in-right p-6 flex flex-col">
+                    <div className="relative w-4/5 max-w-[300px] bg-zinc-950/95 backdrop-blur-xl h-full shadow-2xl border-l border-white/10 p-6 flex flex-col">
                         <button
                             onClick={() => setIsDrawerOpen(false)}
-                            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-gray-400"
+                            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer"
                         >
-                            ×
+                            <X className="w-4 h-4" />
                         </button>
 
                         <div className="flex flex-col items-center mt-8 mb-8">
-                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold mb-4 shadow-lg shadow-purple-500/20">
+                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-black mb-4 shadow-xl shadow-indigo-500/30 ring-4 ring-indigo-500/20">
                                 {user.username?.[0]?.toUpperCase()}
                             </div>
-                            <h2 className="text-xl font-bold">{user.username}</h2>
-                            <p className="text-sm text-gray-400 uppercase tracking-widest">{user.role}</p>
-
+                            <h2 className="text-xl font-bold text-zinc-100">{user.username}</h2>
+                            <p className="text-sm text-zinc-500 uppercase tracking-widest font-sans">{user.role}</p>
                         </div>
 
                         <div className="flex-1 flex flex-col gap-2">
                             {/* Menu Items */}
-                            <Link href={`/${workspaceId}/dashboard/errors`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold transition-colors flex items-center gap-3">
-                                <span>⚠️</span> Hồ sơ vi phạm
+                            <Link href={`/${workspaceId}/dashboard/errors`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold transition-all duration-300 flex items-center gap-3 border border-red-500/20">
+                                <AlertTriangle className="w-4 h-4" /> Hồ sơ vi phạm
                             </Link>
-                            <Link href={`/${workspaceId}/dashboard/profile`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
-                                <span>👤</span> Profile
+                            <Link href={`/${workspaceId}/dashboard/profile`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
+                                <UserCircle className="w-4 h-4" /> Profile
                             </Link>
-                            <Link href="/profile" onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors flex items-center gap-3 border border-blue-500/20">
-                                <span>🔄</span> Đổi Team / Workspace
+                            <Link href="/profile" onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all duration-300 flex items-center gap-3 border border-indigo-500/20">
+                                <ArrowLeftRight className="w-4 h-4" /> Đổi Team / Workspace
                             </Link>
-                            <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
-                                <span>🔔</span> Notifications
+                            <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-400 border border-white/5 cursor-pointer">
+                                <Bell className="w-4 h-4" /> Notifications
                             </button>
-                            <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-3">
-                                <span>⚙️</span> Settings
+                            <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-400 border border-white/5 cursor-pointer">
+                                <Settings className="w-4 h-4" /> Settings
                             </button>
                         </div>
 
                         <button
                             onClick={handleLogout}
-                            className="w-full py-4 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 active:scale-95 transition-transform mt-auto"
+                            className="w-full py-4 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-bold rounded-xl shadow-lg shadow-red-900/30 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer mt-auto"
                         >
-                            Log out
+                            <LogOut className="w-4 h-4" /> Log out
                         </button>
 
                         <form action={async () => {
                             const { toggleMobileView } = await import('@/actions/ui-actions')
                             await toggleMobileView(false)
                         }}>
-                            <button className="w-full mt-4 py-2 bg-gray-800 text-gray-400 text-xs rounded-lg border border-gray-700">
-                                🖥️ Switch to PC View
+                            <button className="w-full mt-4 py-2 bg-white/5 text-zinc-400 text-xs rounded-lg border border-white/10 hover:bg-white/10 hover:text-zinc-200 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer">
+                                <Monitor className="w-3 h-3" /> Switch to PC View
                             </button>
                         </form>
 
-                        <div className="text-center text-xs text-gray-600 mt-4">
-                            Version 1.3.0 (Live - 17:45)
+                        <div className="text-center text-xs text-zinc-700 mt-4 font-mono">
+                            Version 1.3.0
                         </div>
                     </div>
                 </div>

@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache"
 import { SALARY_PENDING_STATUSES } from "@/lib/task-statuses"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import RefreshLeaderboardButton from "./RefreshLeaderboardButton"
+import { Trophy, Crown } from "lucide-react"
 
 // Caching leaderboard for 15 minutes (900 seconds) 
 // To avoid continuous live queries which overload CPU DB
@@ -137,86 +138,86 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
     const rest = leaderboard.slice(3)
 
     return (
-        <div className="glass-panel p-6 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl shadow-xl flex flex-col h-full relative overflow-hidden">
-            {/* Subtle background glow */}
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
+        <div className="relative overflow-hidden rounded-2xl bg-zinc-950/60 backdrop-blur-md border border-white/10 shadow-2xl shadow-black/50 flex flex-col h-full">
+            {/* Ambient Glow */}
+            <div className="absolute -top-24 -right-24 w-72 h-72 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-purple-500/8 blur-3xl rounded-full pointer-events-none" />
 
-            <div className="flex items-center justify-between mb-6 relative z-10">
-                <h3 className="font-bold text-lg text-white flex items-center gap-2">
-                    <span className="text-2xl">🏆</span> Bảng Xếp Hạng Tháng
-                </h3>
-                <RefreshLeaderboardButton isAdmin={session?.user?.role === 'ADMIN'} />
-            </div>
+            <div className="relative z-10 p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="font-bold text-lg text-zinc-100 flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-yellow-400 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
+                        Bảng Xếp Hạng Tháng
+                    </h3>
+                    <RefreshLeaderboardButton isAdmin={session?.user?.role === 'ADMIN'} />
+                </div>
 
-            {leaderboard.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 py-10">
-                    <span className="text-4xl mb-3">😴</span>
-                    <p>Chưa có đủ dữ liệu xếp hạng tháng này.</p>
+                {leaderboard.length === 0 ? (
+                <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-zinc-500 py-10">
+                    <Trophy className="w-12 h-12 text-zinc-700 mb-3" />
+                    <p className="text-sm">Chưa có đủ dữ liệu xếp hạng tháng này.</p>
                 </div>
             ) : (
-                <div className="flex-1 flex flex-col relative z-10">
+                <div className="relative z-10 flex-1 flex flex-col">
                     {/* PODIUM TOP 3 */}
                     {top3.length > 0 && (
                         <div className="flex items-end justify-center gap-2 md:gap-4 mb-8 pt-4">
                             {/* TOP 2 */}
                             {top3[1] && (
-                                <div className="flex flex-col items-center animate-in slide-in-from-bottom flex-1 max-w-[120px]">
+                                <div className="flex flex-col items-center flex-1 max-w-[120px]">
                                     <div className="relative mb-2">
-                                        <Avatar className={`h-12 w-12 md:h-16 md:w-16 border-2 shadow-[0_0_15px_rgba(250,204,21,0.3)] ${getRankColor(top3[1].rank).split(' ')[1]}`}>
+                                        <Avatar className={`h-12 w-12 md:h-16 md:w-16 border-2 ${getRankColor(top3[1].rank).split(' ')[1]} ring-2 ring-zinc-700/50`}>
                                             <AvatarImage src={`https://avatar.vercel.sh/${top3[1].username}`} />
                                             <AvatarFallback className="bg-zinc-800 text-zinc-300">{top3[1].username[0]}</AvatarFallback>
                                         </Avatar>
-                                        <div className="absolute -bottom-2 -right-2 bg-zinc-900 border border-zinc-700 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">2</div>
+                                        <div className="absolute -bottom-2 -right-2 bg-zinc-800 border border-zinc-600 text-zinc-300 text-xs font-black w-6 h-6 flex items-center justify-center rounded-full">2</div>
                                     </div>
                                     <span className="text-sm font-bold text-zinc-200 truncate w-full text-center">{top3[1].username}</span>
                                     <span className={`text-xs px-2 py-0.5 rounded-full mt-1 font-mono border ${getRankColor(top3[1].rank).split(' ').slice(2).join(' ')}`}>
                                         {top3[1].rank}
                                     </span>
-                                    <div className="w-full h-24 bg-gradient-to-t from-zinc-800 to-zinc-800/50 rounded-t-lg mt-3 border-t-2 border-zinc-600/50 flex flex-col items-center justify-end pb-2 relative overflow-hidden">
-                                        <div className="absolute inset-0 bg-white/5"></div>
-                                        {/* Sensitive info removed */}
+                                    <div className="w-full h-24 bg-gradient-to-t from-zinc-800/80 to-zinc-800/20 rounded-t-xl mt-3 border-t-2 border-zinc-600/50 relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-white/[0.03]"></div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* TOP 1 */}
-                            <div className="flex flex-col items-center animate-in slide-in-from-bottom zoom-in-95 flex-1 max-w-[140px] z-10">
-                                <span className="text-3xl mb-1 drop-shadow-lg animate-bounce duration-1000">👑</span>
+                            {/* TOP 1 - Crown & Glow */}
+                            <div className="flex flex-col items-center flex-1 max-w-[140px] z-10">
+                                <Crown className="w-7 h-7 mb-1 text-yellow-400 drop-shadow-[0_0_12px_rgba(250,204,21,0.8)] animate-pulse" />
                                 <div className="relative mb-2">
-                                    <Avatar className={`h-16 w-16 md:h-20 md:w-20 border-4 shadow-[0_0_25px_rgba(234,179,8,0.5)] ${getRankColor(top3[0].rank).split(' ')[0]}`}>
+                                    <div className="absolute inset-0 rounded-full bg-yellow-400/25 blur-xl scale-125" />
+                                    <Avatar className="h-16 w-16 md:h-20 md:w-20 border-4 border-yellow-400/70 shadow-[0_0_30px_rgba(234,179,8,0.5)] relative z-10">
                                         <AvatarImage src={`https://avatar.vercel.sh/${top3[0].username}`} />
                                         <AvatarFallback className="bg-zinc-800 text-zinc-300">{top3[0].username[0]}</AvatarFallback>
                                     </Avatar>
-                                    <div className="absolute -bottom-2 -right-2 bg-gradient-to-br from-yellow-400 to-yellow-600 border border-yellow-300 text-black text-sm font-black w-8 h-8 flex items-center justify-center rounded-full shadow-lg">1</div>
+                                    <div className="absolute -bottom-2 -right-2 bg-gradient-to-br from-yellow-400 to-amber-500 border-2 border-yellow-300 text-black text-sm font-black w-8 h-8 flex items-center justify-center rounded-full shadow-lg z-10">1</div>
                                 </div>
-                                <span className="text-base font-black bg-gradient-to-r from-yellow-200 to-yellow-500 bg-clip-text text-transparent truncate w-full text-center">{top3[0].username}</span>
+                                <span className="text-base font-black bg-gradient-to-r from-yellow-200 to-yellow-500 bg-clip-text text-transparent truncate w-full text-center drop-shadow">{top3[0].username}</span>
                                 <span className={`text-xs px-2.5 py-0.5 rounded-full mt-1 font-bold font-mono border shadow-sm ${getRankColor(top3[0].rank).split(' ').slice(2).join(' ')}`}>
                                     {top3[0].rank}
                                 </span>
-                                <div className="w-full h-32 bg-gradient-to-t from-yellow-900/40 to-yellow-600/20 rounded-t-xl mt-3 border-t-2 border-yellow-500/50 flex flex-col items-center justify-end pb-2 relative overflow-hidden">
-                                    <div className="absolute inset-0 bg-gradient-to-b from-yellow-400/10 to-transparent"></div>
-                                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:10px_10px]"></div>
-                                    {/* Sensitive info removed */}
+                                <div className="w-full h-32 bg-gradient-to-t from-yellow-900/50 to-yellow-600/10 rounded-t-xl mt-3 border-t-2 border-yellow-500/60 relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-b from-yellow-400/15 to-transparent"></div>
                                 </div>
                             </div>
 
                             {/* TOP 3 */}
                             {top3[2] && (
-                                <div className="flex flex-col items-center animate-in slide-in-from-bottom flex-1 max-w-[120px]">
+                                <div className="flex flex-col items-center flex-1 max-w-[120px]">
                                     <div className="relative mb-2">
-                                        <Avatar className={`h-12 w-12 md:h-16 md:w-16 border-2 shadow-[0_0_15px_rgba(139,92,246,0.3)] ${getRankColor(top3[2].rank).split(' ')[1]}`}>
+                                        <Avatar className={`h-12 w-12 md:h-16 md:w-16 border-2 ${getRankColor(top3[2].rank).split(' ')[1]} ring-2 ring-purple-600/30`}>
                                             <AvatarImage src={`https://avatar.vercel.sh/${top3[2].username}`} />
                                             <AvatarFallback className="bg-zinc-800 text-zinc-300">{top3[2].username[0]}</AvatarFallback>
                                         </Avatar>
-                                        <div className="absolute -bottom-2 -right-2 bg-zinc-900 border border-zinc-700 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">3</div>
+                                        <div className="absolute -bottom-2 -right-2 bg-zinc-900 border border-purple-700/50 text-purple-300 text-xs font-black w-6 h-6 flex items-center justify-center rounded-full">3</div>
                                     </div>
                                     <span className="text-sm font-bold text-zinc-200 truncate w-full text-center">{top3[2].username}</span>
                                     <span className={`text-xs px-2 py-0.5 rounded-full mt-1 font-mono border ${getRankColor(top3[2].rank).split(' ').slice(2).join(' ')}`}>
                                         {top3[2].rank}
                                     </span>
-                                    <div className="w-full h-20 bg-gradient-to-t from-zinc-800 to-zinc-800/40 rounded-t-lg mt-3 border-t-2 border-zinc-700/50 flex flex-col items-center justify-end pb-2 relative overflow-hidden">
-                                        <div className="absolute inset-0 bg-white/5"></div>
-                                        {/* Sensitive info removed */}
+                                    <div className="w-full h-20 bg-gradient-to-t from-purple-900/30 to-purple-800/10 rounded-t-lg mt-3 border-t-2 border-purple-700/40 relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-white/[0.03]"></div>
                                     </div>
                                 </div>
                             )}
@@ -225,22 +226,22 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
 
                     {/* LIST VIEW 4-10 */}
                     {rest.length > 0 && (
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                        <div className="flex-1 overflow-y-auto pr-1 space-y-1.5">
                             {rest.map((r, i) => (
-                                <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/30 border border-white/5 hover:bg-zinc-900/60 transition-colors">
+                                <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/40 border border-white/5 hover:bg-zinc-800/50 hover:border-white/10 transition-all duration-300 group">
                                     <div className="flex items-center gap-3">
-                                        <span className="text-zinc-600 font-mono font-bold w-4 text-right">{i + 4}</span>
-                                        <Avatar className="h-8 w-8">
+                                        <span className="text-zinc-600 font-mono font-bold w-5 text-right text-sm">{i + 4}</span>
+                                        <Avatar className="h-8 w-8 border border-white/5">
                                             <AvatarImage src={`https://avatar.vercel.sh/${r.username}`} />
-                                            <AvatarFallback className="bg-zinc-800 text-xs">{r.username[0]}</AvatarFallback>
+                                            <AvatarFallback className="bg-zinc-800 text-zinc-400 text-xs">{r.username[0]}</AvatarFallback>
                                         </Avatar>
-                                        <span className="text-sm font-medium text-zinc-300">{r.username}</span>
+                                        <span className="text-sm font-medium text-zinc-300 group-hover:text-zinc-100 transition-colors">{r.username}</span>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <div className="hidden sm:block text-right">
-                                            <div className="text-[10px] text-zinc-600">{r.errorRate}% err</div>
+                                            <div className="text-[10px] text-zinc-600 font-mono">{r.errorRate}% err</div>
                                         </div>
-                                        <span className={`text-xs px-2 py-1 rounded font-bold font-mono border ${getRankColor(r.rank).split(' ').slice(2).join(' ')}`}>
+                                        <span className={`text-xs px-2 py-1 rounded-lg font-bold font-mono border ${getRankColor(r.rank).split(' ').slice(2).join(' ')}`}>
                                             {r.rank}
                                         </span>
                                     </div>
@@ -250,6 +251,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                     )}
                 </div>
             )}
+            </div>
         </div>
     )
 }

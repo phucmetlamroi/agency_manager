@@ -1,6 +1,7 @@
 'use server'
 
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { SALARY_COMPLETED_STATUS, SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
@@ -308,16 +309,17 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         const bonusPercentages = [0.1, 0.05]
 
         stage = 'persist-delete-bonus'
-        await workspacePrisma.monthlyBonus.deleteMany({
+        await prisma.monthlyBonus.deleteMany({
             where: { month: currentMonth, year: currentYear, workspaceId }
         })
         stage = 'persist-delete-rank'
-        await workspacePrisma.monthlyRank.deleteMany({
+        await prisma.monthlyRank.deleteMany({
             where: { month: currentMonth, year: currentYear, workspaceId }
         })
 
+
         stage = 'persist-upsert-lock'
-        const payrollLock = await workspacePrisma.payrollLock.upsert({
+        const payrollLock = await prisma.payrollLock.upsert({
             where: {
                 month_year_workspaceId: {
                     month: currentMonth,
@@ -341,6 +343,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             }
         })
 
+
         const awardedBonuses: Array<{
             userId: string
             username: string
@@ -353,7 +356,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             const user = eligibleForBonus[i]
             const bonusAmount = user.monthlySalary * bonusPercentages[i]
 
-            await workspacePrisma.monthlyBonus.create({
+            await prisma.monthlyBonus.create({
                 data: {
                     userId: user.userId,
                     month: currentMonth,
@@ -366,6 +369,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                     bonusAmount
                 }
             })
+
 
             awardedBonuses.push({
                 userId: user.userId,
@@ -391,8 +395,9 @@ export async function calculateMonthlyBonus(workspaceId: string) {
 
         if (monthlyRankData.length > 0) {
             stage = 'persist-create-ranks'
-            await workspacePrisma.monthlyRank.createMany({ data: monthlyRankData })
+            await prisma.monthlyRank.createMany({ data: monthlyRankData })
         }
+
 
         stage = 'revalidate'
         revalidatePath(`/${workspaceId}/admin/payroll`)

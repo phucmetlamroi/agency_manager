@@ -19,9 +19,19 @@ const toSafeNumber = (val: any) => {
 // BILLING PROFILES
 // ==========================
 
-export async function getBillingProfiles() {
+export async function getBillingProfiles(workspaceId?: string) {
     try {
+        let profileId: string | null = null;
+        if (workspaceId) {
+            const ws = await prisma.workspace.findUnique({
+                where: { id: workspaceId },
+                select: { profileId: true }
+            });
+            profileId = ws?.profileId || null;
+        }
+
         const profiles = await prisma.billingProfile.findMany({
+            where: { profileId },
             orderBy: { isDefault: 'desc' }
         })
         const safeProfiles = profiles.map(p => ({
@@ -43,17 +53,27 @@ export async function createBillingProfile(data: {
     accountNumber: string
     swiftCode?: string
     address?: string
-    notes?: string // Added
+    notes?: string
     isDefault?: boolean
+    workspaceId?: string
 }) {
     try {
         const user = await getCurrentUser()
         if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
 
+        let profileId: string | null = null;
+        if (data.workspaceId) {
+            const ws = await prisma.workspace.findUnique({
+                where: { id: data.workspaceId },
+                select: { profileId: true }
+            });
+            profileId = ws?.profileId || null;
+        }
+
         if (data.isDefault) {
-            // Unset other defaults
+            // Unset other defaults for THIS profile
             await prisma.billingProfile.updateMany({
-                where: { isDefault: true },
+                where: { isDefault: true, profileId },
                 data: { isDefault: false }
             })
         }
@@ -67,7 +87,8 @@ export async function createBillingProfile(data: {
                 swiftCode: data.swiftCode,
                 address: data.address,
                 notes: data.notes,
-                isDefault: data.isDefault || false
+                isDefault: data.isDefault || false,
+                profileId
             }
         })
 
@@ -92,10 +113,15 @@ export async function updateBillingProfile(id: string, data: {
         const user = await getCurrentUser()
         if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
 
+        const currentProfile = await prisma.billingProfile.findUnique({
+            where: { id },
+            select: { profileId: true }
+        });
+
         if (data.isDefault) {
-            // Unset other defaults
+            // Unset other defaults for THIS profile
             await prisma.billingProfile.updateMany({
-                where: { isDefault: true, id: { not: id } },
+                where: { isDefault: true, id: { not: id }, profileId: currentProfile?.profileId },
                 data: { isDefault: false }
             })
         }

@@ -35,6 +35,7 @@ model Profile {
   dailyAvailabilities DailyAvailability[]
   profileAccesses     ProfileAccess[]
   accessRequests      ProfileAccessRequest[] @relation("TargetProfileRequests")
+  billingProfiles     BillingProfile[]
 }
 
 model Workspace {
@@ -377,6 +378,8 @@ model BillingProfile {
   updatedAt       DateTime @updatedAt
   createdAt       DateTime @default(now())
   notes           String?
+  profileId       String?
+  profile         Profile? @relation(fields: [profileId], references: [id])
 }
 
 model Invoice {

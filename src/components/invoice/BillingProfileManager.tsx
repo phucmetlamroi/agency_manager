@@ -25,10 +25,12 @@ type BillingProfile = {
 
 export default function BillingProfileManager({
     onProfileSelect,
-    currentProfileId
+    currentProfileId,
+    workspaceId
 }: {
     onProfileSelect?: (profile: BillingProfile) => void
     currentProfileId?: string
+    workspaceId?: string
 }) {
     const [isOpen, setIsOpen] = useState(false)
     const [profiles, setProfiles] = useState<BillingProfile[]>([])
@@ -41,7 +43,7 @@ export default function BillingProfileManager({
 
     const fetchProfiles = async () => {
         setLoading(true)
-        const res = await getBillingProfiles()
+        const res = await getBillingProfiles(workspaceId)
         if (res.success && res.data) {
             setProfiles(res.data)
         }
@@ -89,7 +91,8 @@ export default function BillingProfileManager({
             swiftCode: formData.swiftCode || undefined,
             address: formData.address || undefined,
             notes: formData.notes || undefined,
-            isDefault: formData.isDefault
+            isDefault: formData.isDefault,
+            workspaceId
         }
 
         let res

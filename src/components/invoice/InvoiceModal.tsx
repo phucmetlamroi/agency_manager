@@ -74,7 +74,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
         try {
             const [tasksRes, profilesRes] = await Promise.all([
                 getUnbilledTasks(clientId, workspaceId),
-                getBillingProfiles()
+                getBillingProfiles(workspaceId)
             ])
 
             if (tasksRes.success) setTasks(tasksRes.data)
@@ -512,6 +512,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Hồ sơ thanh toán</label>
                                 <BillingProfileManager
                                     currentProfileId={billingProfileId}
+                                    workspaceId={workspaceId}
                                     onProfileSelect={(p) => {
                                         refreshProfiles()
                                         setBillingProfileId(p.id)

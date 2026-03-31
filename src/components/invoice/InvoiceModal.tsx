@@ -556,8 +556,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     </div>
 
                     {/* A4 Floating Sheet */}
-                    <div className="flex-1 overflow-y-auto p-10 flex justify-center custom-scrollbar">
-                        <div className="bg-white shadow-[0_30px_80px_rgba(0,0,0,0.7)] w-[760px] min-h-[1000px] p-12 flex flex-col relative text-gray-800 text-sm rounded-sm">
+                    <div className="flex-1 overflow-y-auto py-16 px-10 flex justify-center custom-scrollbar bg-zinc-950">
+                        {/* THE SINGLE UNIFIED SHEET */}
+                        <div className="bg-white shadow-[0_40px_100px_rgba(0,0,0,0.8)] w-[760px] min-h-[1050px] p-12 flex flex-col relative text-gray-900 text-sm rounded-sm mb-10">
 
                             {/* — Invoice Header — */}
                             <div className="flex justify-between mb-10">
@@ -566,7 +567,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         type="text"
                                         value={customAgencyName}
                                         onChange={e => setCustomAgencyName(e.target.value)}
-                                        className="font-bold border-b border-transparent hover:border-gray-300 focus:outline-none focus:border-indigo-400 bg-transparent transition-colors"
+                                        className="font-bold border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent transition-colors"
                                         style={{ width: `${Math.max(10, customAgencyName.length)}ch` }}
                                     />
                                 </div>
@@ -575,42 +576,42 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         type="text"
                                         value={customTitle}
                                         onChange={e => setCustomTitle(e.target.value.toUpperCase())}
-                                        className="text-4xl font-black text-gray-900 uppercase text-right border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent tracking-tight transition-colors"
+                                        className="text-4xl font-black text-gray-900 uppercase text-right border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent tracking-tight transition-colors leading-none"
                                         style={{ width: `${Math.max(6, customTitle.length)}ch` }}
                                     />
-                                    <div className="text-gray-400 text-sm mt-1 font-mono tracking-wide"># {invoiceNumber}</div>
+                                    <div className="text-gray-400 text-sm mt-2 font-mono tracking-wide"># {invoiceNumber}</div>
                                 </div>
                             </div>
 
                             {/* — Bill To & Dates — */}
-                            <div className="grid grid-cols-2 gap-12 mb-10">
+                            <div className="grid grid-cols-2 gap-12 mb-10 border-t border-gray-100 pt-8">
                                 <div>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Bill To</p>
-                                    <div className="font-bold text-xl text-gray-900 mb-2">{clientName}</div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Bill To</p>
+                                    <div className="font-bold text-xl text-gray-900 mb-1">{clientName}</div>
                                     <textarea
                                         value={customClientAddress}
                                         onChange={e => setCustomClientAddress(e.target.value)}
                                         placeholder="Thêm địa chỉ khách hàng..."
                                         rows={3}
-                                        className="w-full bg-transparent border border-transparent hover:border-gray-200 focus:border-indigo-300 focus:outline-none resize-none text-gray-500 text-sm rounded p-1 transition-colors"
+                                        className="w-full bg-transparent border border-transparent hover:border-gray-100 focus:border-indigo-200 focus:outline-none resize-none text-gray-500 text-sm rounded transition-colors"
                                     />
                                 </div>
                                 <div className="text-right space-y-4">
-                                    <div>
+                                    <div className="flex flex-col items-end">
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ngày xuất</p>
                                         <input
                                             type="date"
                                             value={issueDate}
                                             onChange={e => setIssueDate(e.target.value)}
-                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-300 focus:outline-none focus:border-indigo-400 bg-transparent"
+                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent"
                                         />
                                     </div>
-                                    <div>
+                                    <div className="flex flex-col items-end">
                                         <input
                                             type="text"
                                             value={dueDateLabel}
                                             onChange={e => setDueDateLabel(e.target.value)}
-                                            className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-right bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-300 block ml-auto transition-colors"
+                                            className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-right bg-transparent border-b border-transparent hover:border-gray-100 focus:outline-none focus:border-indigo-300 transition-colors"
                                             style={{ width: `${Math.max(8, dueDateLabel.length + 2)}ch` }}
                                         />
                                         <input
@@ -618,7 +619,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                             value={dueDate}
                                             onChange={e => setDueDate(e.target.value)}
                                             placeholder="e.g. On Request"
-                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-300 focus:outline-none focus:border-indigo-400 bg-transparent placeholder-gray-300 block ml-auto"
+                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent placeholder-gray-300"
                                             style={{ width: '10rem' }}
                                         />
                                     </div>
@@ -626,7 +627,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                             </div>
 
                             {/* — Items Table — */}
-                            <div className="flex-1 mb-8">
+                            <div className="flex-1 min-h-[400px]">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b-2 border-gray-900">
@@ -637,21 +638,21 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                             <th className="w-10" />
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody className="divide-y divide-gray-50">
                                         {activeItems.map(item => (
-                                            <tr key={item.id} className="border-b border-gray-100 group hover:bg-gray-50 transition-colors">
+                                            <tr key={item.id} className="group hover:bg-gray-50/50 transition-colors">
                                                 {editingItemId === item.id ? (
                                                     <>
                                                         <td className="py-3 pr-2">
-                                                            <Input value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} className="h-8 text-sm" />
+                                                            <Input value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} className="h-8 text-sm bg-white" />
                                                         </td>
                                                         <td className="py-3 text-center">
-                                                            <Input type="number" value={editForm.quantity} onChange={e => setEditForm({ ...editForm, quantity: Number(e.target.value) })} className="h-8 w-14 mx-auto text-center" />
+                                                            <Input type="number" value={editForm.quantity} onChange={e => setEditForm({ ...editForm, quantity: Number(e.target.value) })} className="h-8 w-14 mx-auto text-center bg-white" />
                                                         </td>
                                                         <td className="py-3 text-right">
-                                                            <Input type="number" value={editForm.unitPrice} onChange={e => setEditForm({ ...editForm, unitPrice: Number(e.target.value) })} className="h-8 w-24 ml-auto text-right" />
+                                                            <Input type="number" value={editForm.unitPrice} onChange={e => setEditForm({ ...editForm, unitPrice: Number(e.target.value) })} className="h-8 w-24 ml-auto text-right bg-white" />
                                                         </td>
-                                                        <td className="py-3 text-right font-bold font-mono text-gray-800">
+                                                        <td className="py-3 text-right font-bold font-mono text-gray-900">
                                                             ${(editForm.unitPrice * editForm.quantity).toFixed(2)}
                                                         </td>
                                                         <td className="py-3 text-center">
@@ -660,14 +661,14 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="py-3.5 pr-4">
-                                                            <div className="font-semibold text-gray-800">{item.description}</div>
-                                                            {item.note && <div className="text-xs text-gray-400 mt-0.5">{item.note}</div>}
+                                                        <td className="py-4 pr-4">
+                                                            <div className="font-bold text-gray-900">{item.description}</div>
+                                                            {item.note && <div className="text-[11px] text-gray-400 font-medium mt-0.5">{item.note}</div>}
                                                         </td>
-                                                        <td className="py-3.5 text-center text-gray-600">{item.quantity}</td>
-                                                        <td className="py-3.5 text-right text-gray-500 font-mono">${item.unitPrice.toFixed(2)}</td>
-                                                        <td className="py-3.5 text-right font-bold text-gray-800 font-mono">${item.amount.toFixed(2)}</td>
-                                                        <td className="py-3.5 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <td className="py-4 text-center text-gray-600 font-medium">{item.quantity}</td>
+                                                        <td className="py-4 text-right text-gray-500 font-mono">${item.unitPrice.toFixed(2)}</td>
+                                                        <td className="py-4 text-right font-bold text-gray-900 font-mono">${item.amount.toFixed(2)}</td>
+                                                        <td className="py-4 text-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <div className="flex items-center justify-center gap-1">
                                                                 <button onClick={() => handleEditItem(item)} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit2 size={13} /></button>
                                                                 {item.isManual && (
@@ -681,67 +682,82 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         ))}
                                         {activeItems.length === 0 && (
                                             <tr>
-                                                <td colSpan={5} className="py-12 text-center text-gray-300 italic text-sm">Chọn tasks ở bên trái hoặc thêm hạng mục thủ công</td>
+                                                <td colSpan={5} className="py-20 text-center text-gray-300 italic text-sm">Chọn tasks ở bên trái hoặc thêm hạng mục thủ công</td>
                                             </tr>
                                         )}
                                     </tbody>
                                 </table>
                             </div>
 
-                            {/* — Totals — */}
-                            <div className="flex justify-end mb-10">
-                                <div className="w-72 space-y-2">
-                                    <div className="flex justify-between text-gray-500 text-sm">
-                                        <span>Tạm tính</span>
-                                        <span className="font-mono">${activeSubtotal.toFixed(2)}</span>
+                            {/* — Totals & Payment Info — */}
+                            <div className="mt-12 border-t-2 border-gray-100 pt-10">
+                                <div className="flex flex-col md:flex-row gap-10">
+                                    {/* Left side: Payment Info */}
+                                    <div className="flex-1">
+                                        {(() => {
+                                            const p = billingProfiles.find(p => p.id === billingProfileId)
+                                            if (!p) return <div className="h-full border border-dashed border-gray-100 rounded-xl flex items-center justify-center text-gray-300 text-xs italic">Vui lòng chọn hồ sơ thanh toán</div>
+                                            return (
+                                                <div className="bg-gray-50/50 rounded-2xl p-6 border border-gray-100/50">
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Thông tin chuyển khoản</p>
+                                                    <div className="space-y-2 text-[13px]">
+                                                        <div className="flex justify-between items-start gap-4">
+                                                            <span className="text-gray-400 shrink-0">Chủ TK:</span>
+                                                            <span className="font-bold text-gray-900 text-right">{p.beneficiaryName}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-start gap-4">
+                                                            <span className="text-gray-400 shrink-0">Ngân hàng:</span>
+                                                            <span className="font-bold text-gray-900 text-right">{p.bankName}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-start gap-4">
+                                                            <span className="text-gray-400 shrink-0">Số TK:</span>
+                                                            <span className="font-mono font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded leading-none">{p.accountNumber}</span>
+                                                        </div>
+                                                        {(p.swiftCode || p.address) && <div className="pt-2 border-t border-gray-100 mt-2 space-y-2">
+                                                            {p.swiftCode && <div className="flex justify-between items-start gap-4 text-xs"><span className="text-gray-400">SWIFT:</span> <span className="font-mono text-gray-600">{p.swiftCode}</span></div>}
+                                                            {p.address && <div className="text-[11px] text-gray-400 leading-relaxed italic">{p.address}</div>}
+                                                        </div>}
+                                                        {p.notes && <div className="mt-3 p-3 bg-indigo-50/50 rounded-lg text-indigo-700 text-[11px] font-medium leading-relaxed">{p.notes}</div>}
+                                                        {paymentLink && (
+                                                            <div className="mt-3 text-xs flex flex-col gap-1">
+                                                                <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Link thanh toán</span>
+                                                                <span className="text-blue-600 break-all underline underline-offset-2">{paymentLink}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })()}
                                     </div>
-                                    {taxPercent > 0 && (
+
+                                    {/* Right side: Totals */}
+                                    <div className="w-72 space-y-3">
                                         <div className="flex justify-between text-gray-500 text-sm">
-                                            <span>Thuế ({taxPercent}%)</span>
-                                            <span className="font-mono">${activeTaxAmount.toFixed(2)}</span>
+                                            <span className="font-medium">Tạm tính</span>
+                                            <span className="font-mono font-semibold">${activeSubtotal.toFixed(2)}</span>
                                         </div>
-                                    )}
-                                    {totalDeducted > 0 && (
-                                        <div className="flex justify-between text-red-500 text-sm font-medium">
-                                            <span>Deposit / Trả trước</span>
-                                            <span className="font-mono">-${totalDeducted.toFixed(2)}</span>
+                                        {taxPercent > 0 && (
+                                            <div className="flex justify-between text-gray-500 text-sm">
+                                                <span className="font-medium">Thuế ({taxPercent}%)</span>
+                                                <span className="font-mono font-semibold">${activeTaxAmount.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        {totalDeducted > 0 && (
+                                            <div className="flex justify-between text-red-500 text-sm">
+                                                <span className="font-medium">Giảm trừ / Trả trước</span>
+                                                <span className="font-mono font-semibold">-${totalDeducted.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex flex-col items-end pt-5 mt-2 border-t-2 border-gray-900">
+                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tổng cộng thanh toán</span>
+                                            <div className="text-3xl font-black text-gray-900 font-mono tracking-tighter">
+                                                ${finalTotalDue.toFixed(2)}
+                                            </div>
                                         </div>
-                                    )}
-                                    <div className="flex justify-between text-gray-900 text-xl font-black border-t-2 border-gray-900 pt-3 mt-2">
-                                        <span>Tổng phải thu</span>
-                                        <span className="font-mono">${finalTotalDue.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* — Payment Info Footer — */}
-                            {(() => {
-                                const p = billingProfiles.find(p => p.id === billingProfileId)
-                                if (!p) return null
-                                return (
-                                    <div className="bg-gray-50 rounded-xl p-6 text-xs text-gray-600 border border-gray-100">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Thông tin thanh toán</p>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-1">
-                                                <div><span className="font-bold text-gray-700">Beneficiary:</span> {p.beneficiaryName}</div>
-                                                <div><span className="font-bold text-gray-700">Bank:</span> {p.bankName}</div>
-                                                <div><span className="font-bold text-gray-700">Account:</span> <span className="font-mono">{p.accountNumber}</span></div>
-                                                {p.notes && <div className="mt-2 text-indigo-600 whitespace-pre-line font-medium">{p.notes}</div>}
-                                            </div>
-                                            <div className="space-y-1">
-                                                {p.swiftCode && <div><span className="font-bold text-gray-700">SWIFT/BIC:</span> <span className="font-mono">{p.swiftCode}</span></div>}
-                                                {p.address && <div><span className="font-bold text-gray-700">Address:</span> {p.address}</div>}
-                                                {paymentLink && (
-                                                    <div className="mt-2">
-                                                        <span className="font-bold text-gray-700">Payment Link: </span>
-                                                        <span className="text-blue-600 break-all">{paymentLink}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )
-                            })()}
                         </div>
                     </div>
                 </div>

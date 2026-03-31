@@ -48,31 +48,8 @@ export default async function PortalTasksPage({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-                <div className="bg-zinc-950/60 border border-yellow-500/20 rounded-2xl p-4 backdrop-blur-2xl shadow-lg shadow-black/50 relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-500 to-amber-500 opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Action Required</p>
-                    <p className="text-2xl font-light text-yellow-500">{actionRequired}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Awaiting your input</p>
-                </div>
-                <div className="bg-zinc-950/60 border border-yellow-500/10 rounded-2xl p-4 backdrop-blur-2xl shadow-lg shadow-black/50 relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-yellow-600 opacity-0 group-hover:opacity-50 transition-opacity"></div>
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">In Progress</p>
-                    <p className="text-2xl font-light text-amber-500">{inProgress}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Active production</p>
-                </div>
-                <div className="bg-zinc-950/60 border border-white/5 rounded-2xl p-4 backdrop-blur-2xl shadow-lg shadow-black/50 relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-0 group-hover:opacity-50 transition-opacity"></div>
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Completed</p>
-                    <p className="text-2xl font-light text-emerald-400">{completed}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Delivered this cycle</p>
-                </div>
-                <div className="bg-zinc-950/60 border border-white/5 rounded-2xl p-4 backdrop-blur-2xl shadow-lg shadow-black/50 relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-zinc-500 to-zinc-400 opacity-0 group-hover:opacity-50 transition-opacity"></div>
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Next Deadline</p>
-                    <p className="text-2xl font-light text-zinc-300">{nextDeadlineLabel}</p>
-                    <p className="text-xs text-zinc-500 mt-1">{dueSoon} due within 3 days</p>
-                </div>
+            <div className="mb-10">
+                <TaskGroupAccordion tasks={tasks as any} locale={locale} workspaceId={workspaceId} />
             </div>
 
             <PortalDashboardBento
@@ -81,15 +58,7 @@ export default async function PortalTasksPage({
                 workspaceId={workspaceId}
             />
 
-            <div id="all-tasks" className="mt-10">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 className="text-xl font-semibold text-white">All Tasks</h2>
-                        <p className="text-xs text-zinc-500">Grouped by client for quick review</p>
-                    </div>
-                </div>
-                <TaskGroupAccordion tasks={tasks as any} locale={locale} workspaceId={workspaceId} />
-            </div>
+
         </div>
     );
 }

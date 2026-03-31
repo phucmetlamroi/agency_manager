@@ -63,6 +63,8 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
         value: 0,
         collectFilesLink: ''
     })
+    const [isUpdating, setIsUpdating] = useState(false)
+
 
     // Feedback Modal State
     const [feedbackModal, setFeedbackModal] = useState<{ isOpen: boolean, taskId: string | null }>({ isOpen: false, taskId: null })
@@ -130,6 +132,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
     const handleStatusChange = async (taskId: string, newStatus: string, notes?: string, feedback?: { type: 'INTERNAL' | 'CLIENT', content: string }) => {
         // Bulk Sync Logic: If the task being changed is part of a selection, update all selected tasks.
         const tasksToUpdate = selectedIds.includes(taskId) ? selectedIds : [taskId]
+        setIsUpdating(true)
 
         try {
             // Parallel updates for better performance in bulk
@@ -142,19 +145,24 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                 }
             }))
 
+
             const errors = results.filter(r => r.error)
             if (errors.length > 0) {
                 toast.error(`Cập nhật thất bại cho ${errors.length}/${tasksToUpdate.length} tasks.`)
             } else {
                 toast.success(`Đã cập nhật trạng thái cho ${tasksToUpdate.length} tasks.`)
-                if (selectedIds.includes(taskId)) setSelectedIds([]) // Clear selection after success
+                setSelectedIds([])
             }
             router.refresh()
         } catch (error) {
             console.error("Bulk update failed:", error)
             toast.error("Cập nhật thất bại. Vui lòng thử lại.")
+        } finally {
+            setIsUpdating(false)
         }
     }
+
+
 
     const handleSaveDetails = async () => {
         if (!selectedTask) return
@@ -211,14 +219,46 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
             <div className="flex flex-col gap-4 optimize-visibility">
                 {/* Bulk Actions Bar */}
                 {isAdmin && selectedIds.length > 0 && (
-                    <div className="sticky top-0 z-20 bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center justify-between shadow-xl animate-in slide-in-from-top duration-300">
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm font-bold"> Đã chọn {selectedIds.length} tasks</span>
-                            <button onClick={() => setSelectedIds([])} className="text-xs bg-indigo-500 hover:bg-indigo-400 px-2 py-1 rounded">Hủy chọn</button>
+                    <div className="sticky top-0 z-30 bg-indigo-700 text-white px-5 py-3 rounded-xl flex items-center justify-between shadow-[0_10px_40px_rgba(79,70,229,0.4)] animate-in slide-in-from-top duration-300 border border-indigo-500 mb-2">
+                        <div className="flex items-center gap-5">
+                            <div className="flex flex-col">
+                                <span className="text-sm font-black tracking-tight">ĐANG CHỌN {selectedIds.length} TÁC VỤ</span>
+                                <button onClick={() => setSelectedIds([])} className="text-[10px] text-indigo-300 hover:text-white underline text-left transition-colors">Hủy chọn tất cả</button>
+                            </div>
+                            
+                            <div className="h-8 w-px bg-indigo-500/50 mx-2" />
+
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">Đổi trạng thái lô:</span>
+                                <select
+                                    disabled={isUpdating}
+                                    onChange={(e) => {
+                                        const val = e.target.value
+                                        if (!val) return
+                                        if (val === 'Revision') {
+                                            toast.info("Bulk Revision requires individual feedback for better quality control. Please use the task row buttons.")
+                                            return
+                                        }
+                                        handleStatusChange(selectedIds[0], val)
+                                    }}
+                                    className="bg-indigo-900 border border-indigo-400 text-white font-bold text-xs px-3 py-2 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-white/20 transition-all disabled:opacity-50"
+                                >
+
+                                    <option value="">-- Chọn trạng thái --</option>
+                                    {['Đã nhận task', 'Đang thực hiện', 'Review', 'Hoàn tất', 'Tạm ngưng', 'Sửa frame'].map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                        <p className="text-[10px] opacity-80 uppercase tracking-widest font-black italic">Đổi trạng thái 1 task trong lô để áp dụng tất cả</p>
+                        
+                        <div className="hidden lg:block text-right">
+                            <p className="text-[10px] opacity-70 uppercase tracking-widest font-black italic">Hành động hàng loạt (Beta)</p>
+                            <p className="text-[9px] opacity-40">Áp dụng cho mọi task bạn đã tick</p>
+                        </div>
                     </div>
                 )}
+
 
                 {isAdmin && tasks.length > 0 && (
                   <div className="flex items-center gap-2 px-2">

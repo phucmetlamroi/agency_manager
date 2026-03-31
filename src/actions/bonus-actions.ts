@@ -36,7 +36,7 @@ export async function revertMonthlyBonus(workspaceId: string) {
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const currentUser = await workspacePrisma.user.findUnique({
             where: { id: session.user.id },
-            select: { role: true, isTreasurer: true }
+            select: { id: true, role: true, isTreasurer: true }
         })
 
         if (currentUser?.role !== 'ADMIN' && !currentUser?.isTreasurer) {
@@ -85,38 +85,30 @@ export async function revertMonthlyBonus(workspaceId: string) {
  * Calculate and award monthly bonuses based on revenue and efficiency ranking.
  * 
  * Ranking Algorithm:
- * 1. Primary: Total Revenue (DESC)
- * 2. Tie-breaker: Total Execution Time in hours (ASC - faster wins)
- * 
- * Awards:
- * - Top 1: 15% of monthly salary
- * - Top 2: 10% of monthly salary
- * - Top 3: 5% of monthly salary
+ * 1. Primary: Net Income (Revenue - Penalties) (DESC)
+ * 2. Tie-breaker: Error Rate (ASC)
  */
 export async function calculateMonthlyBonus(workspaceId: string) {
     try {
-        // 1. Permission Check: Only Admin or Treasurer can calculate bonuses
+        // 1. Permission Check
         const session = await getSession()
-        if (!session) {
-            return { success: false, error: 'Unauthorized' }
-        }
+        if (!session) return { success: false, error: 'Unauthorized' }
 
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const currentUser = await workspacePrisma.user.findUnique({
             where: { id: session.user.id },
-            select: { role: true, isTreasurer: true }
+            select: { id: true, role: true, isTreasurer: true }
         })
 
         if (currentUser?.role !== 'ADMIN' && !currentUser?.isTreasurer) {
-            return { success: false, error: 'Permission denied. Only Admin or Treasurer can calculate bonuses.' }
+            return { success: false, error: 'Permission denied.' }
         }
 
-        // Use actual current date
         const now = new Date()
         const currentMonth = now.getMonth() + 1
         const currentYear = now.getFullYear()
 
-        // Check if already locked
+        // Check Lock
         const existingLock = await workspacePrisma.payrollLock.findUnique({
             where: {
                 month_year_workspaceId: {
@@ -128,51 +120,47 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         })
 
         if (existingLock?.isLocked) {
-            return { success: false, error: 'Kỳ lương này ĐÃ BỊ KHÓA (Đã tính thưởng). Vui lòng Hoàn tác trước nếu muốn tính lại.' }
+            return { success: false, error: 'Kỳ lương này đã bị khóa.' }
         }
 
         const startOfMonth = new Date(currentYear, currentMonth - 1, 1)
-        // Expand endOfMonth to include early March tasks into Feb payroll
         const endOfMonth = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999)
 
-        // 3. Fetch all users with completed tasks this month
+        // 2. Fetch Users with tasks and errorLogs
         const users = await workspacePrisma.user.findMany({
             where: {
-                role: { not: 'ADMIN' }, // Exclude generic ADMIN role if desired
-                username: { not: 'admin' } // Only exclude the system 'admin' account
+                role: { not: 'ADMIN' },
+                username: { not: 'admin' }
             },
-            include: {
+            select: {
+                id: true,
+                username: true,
+                role: true,
+                nickname: true,
                 tasks: {
                     where: {
-                        workspaceId, // CRITICAL: Explicit filter
+                        workspaceId,
                         status: 'Hoàn tất',
-                        updatedAt: {
-                            gte: startOfMonth,
-                            lte: endOfMonth
-                        }
+                        updatedAt: { gte: startOfMonth, lte: endOfMonth }
                     }
                 },
                 errorLogs: {
                     where: {
                         workspaceId,
-                        createdAt: {
-                            gte: startOfMonth,
-                            lte: endOfMonth
-                        }
+                        createdAt: { gte: startOfMonth, lte: endOfMonth }
                     },
                     include: { error: true }
                 }
             }
         })
 
-        // Validation: Check if there is data to calculate
         if (!users || users.length === 0) {
-            return { success: false, error: 'Không tìm thấy nhân viên nào có hoạt động trong hệ thống.' }
+            return { success: false, error: 'Không tìm thấy nhân viên.' }
         }
 
         const totalTasksFound = users.reduce((acc, u) => acc + u.tasks.length, 0)
         if (totalTasksFound === 0) {
-            return { success: false, error: 'Không có dữ liệu Task hoặc Doanh thu nào trong tháng này để tính toán.' }
+            return { success: false, error: 'Không có dữ liệu task hoàn tất.' }
         }
 
         const pendingTasksAggregate = await workspacePrisma.task.groupBy({
@@ -186,7 +174,6 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             _sum: { value: true }
         })
 
-        // 4. Calculate revenue and execution time for each user
         interface UserRanking {
             userId: string
             username: string
@@ -213,16 +200,9 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         const rankings: UserRanking[] = []
 
         for (const user of users) {
-            // Skip users with no completed tasks
             if (user.tasks.length === 0) continue
 
-            // Calculate total revenue (sum of task values)
-            // FIX: Handle Decimal type safely
-            const revenue = user.tasks.reduce((sum, task) => {
-                const val = task.value ? Number(task.value) : 0
-                return sum + val
-            }, 0)
-
+            const revenue = user.tasks.reduce((sum, task) => sum + Number(task.value || 0), 0)
             const totalTasks = user.tasks.length
             const totalPenalty = user.errorLogs.reduce((sum, log) => sum + (log.error?.penalty || 0), 0)
             const errorRate = totalTasks >= 8 ? Number((totalPenalty / totalTasks).toFixed(2)) : 0
@@ -246,7 +226,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                 pendingRevenue,
                 tentativeRevenue,
                 tasksCompleted: totalTasks,
-                monthlySalary: revenue, // Using revenue as salary for bonus calculation
+                monthlySalary: revenue,
                 totalPenalty,
                 errorRate,
                 rankScore,
@@ -254,22 +234,19 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             })
         }
 
-        // 5. Rank by net income (desc), then error rate (asc), then rank priority, revenue, completed tasks
         rankings.sort((a, b) => {
             if (Math.abs(b.incomeScore - a.incomeScore) > 0.01) return b.incomeScore - a.incomeScore
             if (a.errorRate !== b.errorRate) return a.errorRate - b.errorRate
             const aRank = rankPriority(a.rankScore)
             const bRank = rankPriority(b.rankScore)
             if (aRank !== bRank) return bRank - aRank
-            if (Math.abs(b.revenue - a.revenue) > 0.01) return b.revenue - a.revenue
             return b.tasksCompleted - a.tasksCompleted
         })
 
-        // Filter out eligible Rank S for Bonuses
         const eligibleForBonus = rankings.filter(r => r.rankScore === 'S')
-        const bonusPercentages = [0.10, 0.05] // Top 1: 10%, Top 2: 5%
+        const bonusPercentages = [0.10, 0.05]
 
-        // Delete existing data to recalculate safely
+        // Persistence
         await workspacePrisma.monthlyBonus.deleteMany({
             where: { month: currentMonth, year: currentYear, workspaceId }
         })
@@ -277,7 +254,6 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             where: { month: currentMonth, year: currentYear, workspaceId }
         })
 
-        // 6. Create Lock Record First (to attach payrollLockId to MonthlyRanks)
         const payrollLock = await workspacePrisma.payrollLock.upsert({
             where: {
                 month_year_workspaceId: {
@@ -297,13 +273,9 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         })
 
         const awardedBonuses = []
-
-        // Award Top 1-2 Rank S with bonuses
         for (let i = 0; i < Math.min(2, eligibleForBonus.length); i++) {
             const user = eligibleForBonus[i]
-            const leaderboardRank = i + 1
-            const bonusPercentage = bonusPercentages[i]
-            const bonusAmount = user.monthlySalary * bonusPercentage
+            const bonusAmount = user.monthlySalary * bonusPercentages[i]
 
             await workspacePrisma.monthlyBonus.create({
                 data: {
@@ -311,7 +283,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                     month: currentMonth,
                     year: currentYear,
                     workspaceId,
-                    rank: leaderboardRank,
+                    rank: i + 1,
                     revenue: user.revenue,
                     executionTimeHours: 0,
                     bonusAmount
@@ -321,14 +293,11 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             awardedBonuses.push({
                 userId: user.userId,
                 username: user.username,
-                rank: leaderboardRank,
-                revenue: user.revenue,
-                bonusAmount,
-                bonusPercentage: bonusPercentage * 100
+                rank: i + 1,
+                bonusAmount
             })
         }
 
-        // Save ALL Monthly Ranks
         const monthlyRankData = rankings.map(u => ({
             userId: u.userId,
             month: currentMonth,
@@ -343,20 +312,11 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         }))
 
         if (monthlyRankData.length > 0) {
-            await workspacePrisma.monthlyRank.createMany({
-                data: monthlyRankData
-            })
+            await workspacePrisma.monthlyRank.createMany({ data: monthlyRankData })
         }
 
-        // 10. Revalidate payroll page to show updated bonuses
         revalidatePath(`/${workspaceId}/admin/payroll`)
-
-        return {
-            success: true,
-            bonuses: awardedBonuses,
-            month: currentMonth,
-            year: currentYear
-        }
+        return { success: true, bonuses: awardedBonuses }
 
     } catch (error) {
         console.error('Error calculating monthly bonus:', error)

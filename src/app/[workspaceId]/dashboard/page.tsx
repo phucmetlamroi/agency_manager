@@ -9,7 +9,10 @@ import { UserRole } from '@prisma/client'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
 import { getUserPerformanceScore } from '@/actions/analytics-actions'
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, ShieldCheck, Clock, ListChecks } from 'lucide-react'
+import {
+    TrendingUp, TrendingDown, Minus, AlertTriangle, ShieldCheck,
+    Clock, ListChecks, Flame, ArrowUp, ArrowDown, Zap
+} from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +26,6 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
     // ── Data Fetching (logic unchanged) ──────────────────────
     const perfData = await getUserPerformanceScore(workspaceId, userId)
-
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
@@ -52,7 +54,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         orderBy: { createdAt: 'desc' }
     })
 
-    // ── Salary Calculations (all logic unchanged) ─────────────
+    // ── Salary Calculations (logic unchanged) ─────────────────
     const pendingTasks = tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status))
     const pendingSalary = pendingTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
 
@@ -71,32 +73,36 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
     const bonusAmount = bonusData ? Number(bonusData.bonusAmount) : 0
     const totalThisMonthSalary = baseSalary + bonusAmount
 
+    // ── Comparison message — Lucide icons only, no emoji ──────
     let percentage = 0
     let comparisonMsg = ''
+    let CompareIcon: React.ElementType = Zap
     if (lastMonthSalary === 0) {
-        comparisonMsg = totalThisMonthSalary > 0 ? 'Khởi đầu quá cháy! 🔥' : 'Chưa có lúa về. Cày task mạnh lên nào!'
+        comparisonMsg = totalThisMonthSalary > 0 ? 'Khởi đầu tháng tốt!' : 'Cày task mạnh lên nào'
+        CompareIcon = totalThisMonthSalary > 0 ? Flame : Zap
     } else {
         percentage = Math.round(((totalThisMonthSalary - lastMonthSalary) / lastMonthSalary) * 100)
-        comparisonMsg = percentage > 0
-            ? `Bay cao ✈️ (+${percentage}% so tháng trước)`
-            : percentage < 0
-            ? `Thấp hơn ${Math.abs(percentage)}% tháng trước`
-            : 'Phong độ ổn định như bê tông 🏗️'
+        if (percentage > 0) { comparisonMsg = `Tăng ${percentage}% so tháng trước`; CompareIcon = ArrowUp }
+        else if (percentage < 0) { comparisonMsg = `Giảm ${Math.abs(percentage)}% so tháng trước`; CompareIcon = ArrowDown }
+        else { comparisonMsg = 'Phong độ ổn định'; CompareIcon = Minus }
     }
 
-    const rankConfig: Record<number, { emoji: string; color: string; shadow: string }> = {
-        1: { emoji: '🥇', color: 'from-amber-400 to-yellow-300', shadow: 'shadow-amber-500/30' },
-        2: { emoji: '🥈', color: 'from-slate-300 to-zinc-200', shadow: 'shadow-slate-400/20' },
-        3: { emoji: '🥉', color: 'from-orange-400 to-amber-600', shadow: 'shadow-orange-500/20' },
+    // ── Rank badge config — muted gradient, no emoji ──────────
+    const rankConfig: Record<number, { label: string; color: string; shadow: string; textColor: string }> = {
+        1: { label: 'Top 1', color: 'from-amber-400/20 to-yellow-300/10', shadow: 'shadow-amber-500/20', textColor: 'text-amber-300' },
+        2: { label: 'Top 2', color: 'from-slate-400/20 to-zinc-300/10', shadow: 'shadow-slate-400/15', textColor: 'text-slate-300' },
+        3: { label: 'Top 3', color: 'from-orange-500/20 to-amber-600/10', shadow: 'shadow-orange-500/15', textColor: 'text-orange-400' },
     }
     const rankCfg = bonusData ? rankConfig[bonusData.rank] : null
 
-    // ── Error Rate Color ──────────────────────────────────────
+    // ── Error Rate — dynamic color state ─────────────────────
     const errorRate = perfData?.errorRate ?? 0
-    const errColor = errorRate < 0.6 ? { text: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: ShieldCheck }
-        : errorRate < 1.0 ? { text: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: AlertTriangle }
-        : { text: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: AlertTriangle }
-    const ErrIcon = errColor.icon
+    const errConfig = errorRate < 0.6
+        ? { text: 'text-emerald-400', label: 'Xuất sắc', icon: ShieldCheck, desc: 'Phong độ hoàn hảo' }
+        : errorRate < 1.0
+        ? { text: 'text-amber-400', label: 'Cẩn thận', icon: AlertTriangle, desc: 'Cần chú ý thêm' }
+        : { text: 'text-red-400', label: 'Nguy hiểm', icon: AlertTriangle, desc: 'Cần cải thiện gấp' }
+    const ErrIcon = errConfig.icon
 
     const TrendIcon = percentage > 0 ? TrendingUp : percentage < 0 ? TrendingDown : Minus
     const trendColor = percentage > 0 ? 'text-emerald-400' : percentage < 0 ? 'text-red-400' : 'text-zinc-400'
@@ -104,87 +110,107 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
     return (
         <div className="max-w-5xl mx-auto space-y-8">
 
-            {/* ══════════════════════════════════════════════════ */}
-            {/* BENTO BOX GRID                                    */}
-            {/* ══════════════════════════════════════════════════ */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+            {/* ══════════════════════════════════════════════════
+                BENTO BOX GRID
+                lg:grid-cols-5 → salary (3) + stats (2)
+                items-stretch  → equal height columns
+            ══════════════════════════════════════════════════ */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
 
-                {/* ─── COL LEFT (span 2): Salary Hero Card ─── */}
-                <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-zinc-950/70 backdrop-blur-md shadow-xl shadow-black/40 p-6">
+                {/* ─── COL LEFT 3/5: Salary Hero Card ───────── */}
+                <div className="lg:col-span-3 relative overflow-hidden rounded-2xl border border-white/8 bg-zinc-950/70 backdrop-blur-md shadow-xl shadow-black/40 p-6 flex flex-col">
                     {/* Ambient glow */}
-                    <div className="absolute -bottom-12 -left-12 w-56 h-56 bg-emerald-500/8 blur-3xl rounded-full pointer-events-none" />
+                    <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-emerald-500/6 blur-3xl rounded-full pointer-events-none" />
 
-                    {/* Rank badge */}
+                    {/* Rank badge — muted glass, no bold gradient bg */}
                     {rankCfg && (
-                        <div className={`absolute top-4 right-4 px-3 py-1 rounded-full bg-gradient-to-r ${rankCfg.color} text-black text-xs font-black shadow-lg ${rankCfg.shadow}`}>
-                            {rankCfg.emoji} Top {bonusData.rank}
+                        <div className={`absolute top-4 right-4 px-3 py-1 rounded-full bg-gradient-to-r ${rankCfg.color} border border-white/10 shadow-md ${rankCfg.shadow}`}>
+                            <span className={`text-xs font-bold ${rankCfg.textColor}`}>{rankCfg.label}</span>
                         </div>
                     )}
 
+                    {/* Section label */}
                     <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Lương tháng này (Tạm tính)</p>
 
-                    {/* Big salary number */}
-                    <div className="flex items-end gap-2 mb-4">
+                    {/* Hero salary number */}
+                    <div className="flex items-end gap-2 mb-2">
                         <span className="text-5xl font-black bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(52,211,153,0.4)]">
                             {totalThisMonthSalary.toLocaleString('vi-VN')}
                         </span>
                         <span className="text-2xl font-bold text-emerald-400 mb-1">đ</span>
                     </div>
 
-                    {/* Bonus sub-label */}
+                    {/* Bonus note — accessible amber */}
                     {bonusData && (
-                        <p className="text-xs text-amber-400 mb-4">
-                            Đã bao gồm thưởng: <span className="font-bold">+{bonusAmount.toLocaleString('vi-VN')}đ</span>
+                        <p className="text-xs text-amber-400 mb-3">
+                            Bao gồm thưởng: <span className="font-bold">+{bonusAmount.toLocaleString('vi-VN')} đ</span>
                         </p>
                     )}
 
-                    {/* Divider */}
-                    <div className="border-t border-white/5 pt-4 flex items-center justify-between flex-wrap gap-3">
+                    {/* ── Bottom row: Trend + DỰ KIẾN block ──── */}
+                    <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between flex-wrap gap-3">
+
                         {/* Trend vs last month */}
-                        <div className={`flex items-center gap-2 text-sm font-semibold ${trendColor}`}>
-                            <TrendIcon className="w-4 h-4" />
+                        <div className={`flex items-center gap-1.5 text-sm font-semibold ${trendColor}`}>
+                            <TrendIcon className="w-4 h-4" strokeWidth={2} />
                             <span>{comparisonMsg}</span>
                         </div>
 
-                        {/* Pending salary pill */}
-                        <div className="flex items-center gap-2 text-xs text-zinc-500 bg-zinc-800/60 border border-white/5 px-3 py-1.5 rounded-xl">
-                            <Clock className="w-3 h-3 text-indigo-400" />
-                            Dự kiến: <span className="font-bold text-zinc-300 ml-1">{pendingSalary.toLocaleString('vi-VN')}đ</span>
-                            <span className="text-zinc-700">({pendingTasks.length} task)</span>
+                        {/* DỰ KIẾN — prominent indigo block, NOT a gray pill */}
+                        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                            <Clock className="w-4 h-4 text-indigo-400 flex-shrink-0" strokeWidth={1.5} />
+                            <div>
+                                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider leading-none mb-0.5">Thu nhập dự kiến</p>
+                                <p className="text-base font-black text-zinc-100 leading-none">
+                                    {pendingSalary.toLocaleString('vi-VN')}<span className="text-xs text-zinc-400 font-normal ml-0.5">đ</span>
+                                </p>
+                                <p className="text-[10px] text-zinc-400 mt-0.5">{pendingTasks.length} task đang xử lý</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* ─── COL RIGHT: Error Rate + Task Count ─── */}
-                <div className="flex flex-col gap-4">
-                    {/* Error Rate Box */}
-                    <div className={`relative rounded-2xl border ${errColor.border} ${errColor.bg} p-5 backdrop-blur-md shadow-lg`}>
-                        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-2">
-                            Tỉ lệ lỗi {perfData && <span>(Rank {perfData.rank})</span>}
+                {/* ─── COL RIGHT 2/5: Stacked mini cards ────── */}
+                <div className="lg:col-span-2 flex flex-col gap-4">
+
+                    {/* Error Rate Card */}
+                    <div className="flex-1 relative overflow-hidden rounded-2xl border border-white/8 bg-zinc-950/60 p-5 backdrop-blur-md flex flex-col">
+                        {/* Label row */}
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">
+                            Tỉ lệ lỗi
+                            {perfData && <span className="text-zinc-600 ml-1">· Rank {perfData.rank}</span>}
                         </p>
-                        <div className="flex items-center gap-3">
-                            <ErrIcon className={`w-8 h-8 ${errColor.text}`} />
-                            <span className={`text-3xl font-black ${errColor.text}`}>{errorRate}%</span>
+                        {/* Rate number */}
+                        <div className="flex items-center gap-3 mb-3">
+                            <ErrIcon className={`w-7 h-7 flex-shrink-0 ${errConfig.text}`} strokeWidth={1.5} />
+                            <span className={`text-4xl font-black ${errConfig.text}`}>{errorRate}%</span>
                         </div>
-                        <p className="text-[11px] text-zinc-600 mt-2">
-                            {errorRate < 0.6 ? 'Xuất sắc! Phong độ hoàn hảo.' : errorRate < 1.0 ? 'Cẩn thận hơn nhé!' : 'Cần cải thiện gấp!'}
-                        </p>
+                        {/* Status label — accessible text-zinc-400 for desc */}
+                        <p className={`text-xs font-bold mt-auto ${errConfig.text}`}>{errConfig.label}</p>
+                        <p className="text-xs text-zinc-400">{errConfig.desc}</p>
                     </div>
 
-                    {/* Task Stats Box */}
-                    <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-5 backdrop-blur-md">
-                        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Tasks tháng này</p>
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-zinc-500 flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5" />Hoàn tất</span>
-                                <span className="font-bold text-emerald-400">{thisMonthTasks.length}</span>
+                    {/* Task Stats Card */}
+                    <div className="flex-1 rounded-2xl border border-white/8 bg-zinc-950/60 p-5 backdrop-blur-md flex flex-col">
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-4">Tasks tháng này</p>
+                        <div className="flex flex-col gap-3 flex-1">
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm text-zinc-400 flex items-center gap-2">
+                                    <ListChecks className="w-4 h-4" strokeWidth={1.5} />
+                                    Hoàn tất
+                                </span>
+                                <span className="text-lg font-black text-emerald-400">{thisMonthTasks.length}</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-zinc-500 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Đang làm</span>
-                                <span className="font-bold text-indigo-400">{pendingTasks.length}</span>
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm text-zinc-400 flex items-center gap-2">
+                                    <Clock className="w-4 h-4" strokeWidth={1.5} />
+                                    Đang làm
+                                </span>
+                                <span className="text-lg font-black text-indigo-400">{pendingTasks.length}</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-zinc-500">Tổng cộng</span>
+                            <div className="h-px bg-white/5" />
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm text-zinc-500">Tổng cộng</span>
                                 <span className="font-mono font-bold text-zinc-300">{tasks.length}</span>
                             </div>
                         </div>
@@ -192,21 +218,25 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                 </div>
             </div>
 
-            {/* ═══════════════════════════════════════════════════ */}
-            {/* LEADERBOARD                                         */}
-            {/* ═══════════════════════════════════════════════════ */}
+            {/* ═══════════════════════════════════════════════════
+                LEADERBOARD
+            ═══════════════════════════════════════════════════ */}
             <div className="h-[340px]">
-                <Suspense fallback={<div className="h-full rounded-2xl bg-zinc-950/60 border border-white/5 animate-pulse flex items-center justify-center text-zinc-700 text-sm">Đang tải Bảng Xếp Hạng...</div>}>
+                <Suspense fallback={
+                    <div className="h-full rounded-2xl bg-zinc-950/60 border border-white/5 animate-pulse flex items-center justify-center text-zinc-500 text-sm">
+                        Đang tải Bảng Xếp Hạng...
+                    </div>
+                }>
                     <Leaderboard workspaceId={workspaceId} />
                 </Suspense>
             </div>
 
-            {/* ═══════════════════════════════════════════════════ */}
-            {/* TASK TABLE                                          */}
-            {/* ═══════════════════════════════════════════════════ */}
+            {/* ═══════════════════════════════════════════════════
+                TASK TABLE
+            ═══════════════════════════════════════════════════ */}
             <div>
                 <h3 className="text-xl font-heading font-bold text-zinc-100 mb-4 flex items-center gap-2">
-                    <ListChecks className="w-5 h-5 text-indigo-400" />
+                    <ListChecks className="w-5 h-5 text-indigo-400" strokeWidth={1.5} />
                     Danh sách Task của tôi
                 </h3>
                 <div className="rounded-2xl border border-white/8 bg-zinc-950/60 backdrop-blur-sm overflow-hidden shadow-lg">

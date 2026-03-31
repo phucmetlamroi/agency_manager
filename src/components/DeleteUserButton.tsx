@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
+import { Trash2 } from 'lucide-react'
 
 export default function DeleteUserButton({ userId, workspaceId }: { userId: string, workspaceId: string }) {
     const { confirm } = useConfirm()
@@ -35,17 +36,14 @@ export default function DeleteUserButton({ userId, workspaceId }: { userId: stri
         <button
             onClick={handleDelete}
             disabled={isDeleting}
-            style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#ef4444',
-                cursor: 'pointer',
-                fontSize: '1.2rem',
-                opacity: isDeleting ? 0.5 : 1
-            }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all disabled:opacity-50"
             title="Xóa User"
         >
-            {isDeleting ? '...' : '×'}
+            {isDeleting ? (
+                <div className="w-3.5 h-3.5 border-2 border-red-500/40 border-t-red-500 rounded-full animate-spin" />
+            ) : (
+                <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+            )}
         </button>
     )
 }

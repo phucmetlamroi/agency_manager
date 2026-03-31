@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Link2Off } from 'lucide-react'
+import { Link2Off, Pencil, Trash2, ExternalLink, GripVertical, ChevronDown, ChevronRight } from 'lucide-react'
 
 type Project = {
     id: number
@@ -178,10 +178,10 @@ function ClientItem({
         else toast.success('Đã tách khách hàng thành công')
     }
 
-    const getScoreColor = (score: number) => {
-        if (score >= 80) return 'text-green-400'
-        if (score >= 50) return 'text-yellow-400'
-        return 'text-red-400'
+    const getScoreConfig = (score: number) => {
+        if (score >= 30) return { color: '#34d399', glow: 'rgba(52,211,153,0.4)', label: 'HIGH', gradient: ['#10b981', '#34d399'] }
+        if (score >= 15) return { color: '#818cf8', glow: 'rgba(129,140,248,0.4)', label: 'MED', gradient: ['#6366f1', '#818cf8'] }
+        return { color: '#fb7185', glow: 'rgba(251,113,133,0.3)', label: 'LOW', gradient: ['#f43f5e', '#fb7185'] }
     }
 
     const ownTasks = client.tasks || []
@@ -229,76 +229,91 @@ function ClientItem({
                 e.preventDefault()
                 if (!isSubsidiary) onDrop(client.id)
             }}
-            className={`border rounded-lg overflow-hidden transition-all duration-200 select-none ${
+            className={`rounded-xl overflow-hidden transition-all duration-300 select-none border ${
                 isDragTarget
-                    ? 'border-purple-400 bg-purple-900/30 shadow-lg shadow-purple-500/20 scale-[1.01]'
-                    : 'border-white/10 bg-white/5'
+                    ? 'border-purple-400 bg-purple-900/20 shadow-xl shadow-purple-500/20 scale-[1.01]'
+                    : isSubsidiary
+                    ? 'border-white/5 bg-zinc-900/40'
+                    : 'border-white/10 bg-zinc-950/60 backdrop-blur-sm hover:border-white/20 hover:bg-zinc-900/60 shadow-lg shadow-black/30'
             } ${isDragging ? 'opacity-40 ring-2 ring-purple-500/60' : ''} ${
                 !isSubsidiary ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
         >
-            <div
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="p-4 flex items-center justify-between"
-            >
+            <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    {/* Grip icon — visual indicator that the card is draggable */}
+                    {/* Drag handle */}
                     {!isSubsidiary && (
-                        <div
-                            className="text-gray-500 hover:text-purple-400 transition-colors select-none px-0.5"
-                            title="Kéo để gộp vào khách hàng khác"
-                        >
-                            ⠿
+                        <div className="text-zinc-600 hover:text-purple-400 transition-colors select-none" title="Kéo để gộp">
+                            <GripVertical className="w-4 h-4" />
                         </div>
                     )}
-                    <span className="text-gray-400 text-sm">{isExpanded ? '▼' : '▶'}</span>
+                    <div className="text-zinc-500 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </div>
                     <div>
-                        <div className="font-semibold text-white flex items-center gap-2 flex-wrap">
+                        <div className="font-semibold text-zinc-100 flex items-center gap-2 flex-wrap">
                             {client.name}
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onEdit(client) }}
-                                className="text-gray-400 hover:text-white transition-colors"
-                                title="Sửa tên"
-                            >
-                                ✏️
+                            <button onClick={(e) => { e.stopPropagation(); onEdit(client) }}
+                                className="text-zinc-600 hover:text-zinc-200 transition-colors" title="Sửa tên">
+                                <Pencil className="w-3.5 h-3.5" />
                             </button>
-                            <Link
-                                href={`/${workspaceId}/admin/crm/${client.id}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-xs bg-purple-600/30 text-purple-400 px-2 py-0.5 rounded hover:bg-purple-600 hover:text-white transition-colors border border-purple-500/50"
-                            >
-                                ↗ Chi tiết
+                            <Link href={`/${workspaceId}/admin/crm/${client.id}`} onClick={(e) => e.stopPropagation()}
+                                className="text-[11px] bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all border border-indigo-500/40 flex items-center gap-1">
+                                <ExternalLink className="w-3 h-3" /> Chi tiết
                             </Link>
                             {isSubsidiary && (
-                                <button
-                                    onClick={handleUnmerge}
-                                    className="text-xs bg-orange-600/20 text-orange-400 px-2 py-0.5 rounded hover:bg-orange-600 hover:text-white transition-colors border border-orange-500/30 flex items-center gap-1"
-                                    title="Tách khỏi khách hàng chính"
-                                >
-                                    <Link2Off className="w-3 h-3" />
-                                    Tách ra
+                                <button onClick={handleUnmerge}
+                                    className="text-[11px] bg-amber-600/20 text-amber-400 px-2 py-0.5 rounded-lg hover:bg-amber-600 hover:text-white transition-all border border-amber-500/30 flex items-center gap-1">
+                                    <Link2Off className="w-3 h-3" /> Tách ra
                                 </button>
                             )}
-                            <button
-                                onClick={handleDelete}
-                                className="text-xs bg-red-600/20 text-red-400 px-2 py-0.5 rounded hover:bg-red-600 hover:text-white transition-colors border border-red-500/30"
-                            >
-                                🗑️ Xóa
+                            <button onClick={handleDelete}
+                                className="text-[11px] bg-red-600/15 text-red-400 px-2 py-0.5 rounded-lg hover:bg-red-600 hover:text-white transition-all border border-red-500/25 flex items-center gap-1">
+                                <Trash2 className="w-3 h-3" />
                             </button>
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-zinc-600 mt-0.5">
                             {(client.subsidiaries || []).length} Brands • {taskCount} Videos
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="text-right">
-                        <div className="text-xs text-gray-500 uppercase">AI Score</div>
-                        <div className={`font-mono font-bold ${getScoreColor(client.aiScore)}`}>
-                            {client.aiScore.toFixed(1)}
-                        </div>
-                    </div>
+                {/* AI Score — Circular Ring */}
+                <div className="flex-shrink-0 flex items-center gap-3">
+                    {(() => {
+                        const cfg = getScoreConfig(client.aiScore)
+                        const radius = 22
+                        const circ = 2 * Math.PI * radius
+                        const maxScore = 100
+                        const pct = Math.min(client.aiScore / maxScore, 1)
+                        const dash = pct * circ
+                        const id = `grad-${client.id}`
+                        return (
+                            <div className="relative" title={`AI Score: ${client.aiScore.toFixed(1)}`}>
+                                <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
+                                    <defs>
+                                        <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stopColor={cfg.gradient[0]} />
+                                            <stop offset="100%" stopColor={cfg.gradient[1]} />
+                                        </linearGradient>
+                                    </defs>
+                                    {/* Track */}
+                                    <circle cx="28" cy="28" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+                                    {/* Progress */}
+                                    <circle cx="28" cy="28" r={radius} fill="none"
+                                        stroke={`url(#${id})`} strokeWidth="4"
+                                        strokeLinecap="round"
+                                        strokeDasharray={`${dash} ${circ}`}
+                                        style={{ filter: `drop-shadow(0 0 4px ${cfg.glow})`, transition: 'stroke-dasharray 0.6s ease' }}
+                                    />
+                                </svg>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span className="text-[11px] font-black" style={{ color: cfg.color }}>{client.aiScore.toFixed(0)}</span>
+                                    <span className="text-[8px] font-bold" style={{ color: cfg.color, opacity: 0.7 }}>{cfg.label}</span>
+                                </div>
+                            </div>
+                        )
+                    })()}
                 </div>
             </div>
 

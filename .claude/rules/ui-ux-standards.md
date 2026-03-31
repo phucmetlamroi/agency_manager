@@ -1,22 +1,23 @@
-# UI/UX Standards
+# UI/UX STANDARDS (AGENCYMANAGER V2.0)
 
-## Tổng Quan
-Dự án AgencyManager áp dụng phong cách Dark Mode High-End với hiệu ứng Glassmorphism tinh tế. Mọi thành phần Visual đều phải tuân theo nguyên tắc "Sang trọng, Mạch lạc và Ổn định".
+## 1. STYLE TỔNG QUAN
+- **Chủ đạo**: Dark Mode Glassmorphism (Soft UI Evolution).
+- **Phản hồi tương tác (Interactive)**: Mọi thao tác cuộn chuột, Click hoặc Hover ĐỀU phải có phản hồi mượt bằng Framer Motion (Transition: `150ms-200ms` hoặc lò xo `bounce`).
 
-## Padding & Margin
-- Tận dụng hệ thống lưới Flexbox/Grid của Tailwind.
-- Khoảng cách giữa các khối lớn (Section): `gap-8` (2rem) hoặc `gap-12` (3rem).
-- Khối nhỏ (Card content): `p-6` (1.5rem).
-- Chi tiết siêu vi: `gap-2` hoặc `gap-3`.
+## 2. PADDING & RADIUS KHUYẾN NGHỊ
+- **Card To (Master Box)**: `p-6 md:p-8`, bo góc `rounded-2xl` hoặc `rounded-3xl`.
+- **Thẻ Nhỏ (List Row/Pill)**: `p-3` hoặc `p-4`, bo góc `rounded-xl`.
+- **Form Input**: `px-4 py-3`, `rounded-xl`, nền mờ `bg-zinc-900/50`.
 
-## Gradient & Blur (Glassmorphism)
-- **Background**: `bg-zinc-950` chủ đạo.
-- **Card/Modal**: Kính mờ `bg-zinc-900/40 backdrop-blur-md` hoặc `bg-white/5 backdrop-blur-lg`.
-- **Borders**: Sử dụng border trong suốt như `border border-white/10`.
-- **Gradients (Dành cho Tiêu đề hoặc Điểm nhấn)**: `bg-gradient-to-r from-emerald-400 to-indigo-500 bg-clip-text text-transparent`.
+## 3. COLOR PALETTE (CỐT LÕI)
+- Lấy thông báo từ MASTER.md.
+- **Nền chính**: `bg-zinc-950`
+- **Thành phần nổi (Glass Card)**: `bg-zinc-950/60` (hoặc `bg-black/40`), `backdrop-blur-xl`.
+- **Trạng thái (Status/Glow)**:
+  - Thành công / Tổng thực nhận: `text-emerald-400`, `drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]`.
+  - Dự báo / Pending / Form Step Active: `text-indigo-400`, phát sáng dịu.
+  - Lỗi / Khẩn cấp: `text-red-400`.
 
-## Framer Motion & Transitions
-- Thời gian chạy animation vàng: `200ms - 300ms`.
-- Tailwind: Luôn thêm `transition-all duration-300 ease-in-out` cho trạng thái hover của nút bấm/Card.
-- Framer Motion: Thường dùng `initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}` để load layout.
-- Thay đổi mượt mà màu chữ & border trên thẻ trạng thái (Ví dụ: `hover:border-indigo-500/50`).
+## 4. CHI TIẾT TỪNG TRANG (REFERENCE)
+- **Cấm giao diện "phẳng"**: Mọi dòng, thẻ, card đều có lớp gradient chìm (ví dụ: `hover:bg-zinc-800/50`), và một lớp viền mỏng vô cùng tinh tế `border-white/5` hoặc `border-white/10`.
+- **Đổ bóng đa tầng**: `shadow-xl`, `shadow-black/60` hoặc glow nhẹ từ sau lưng Card.

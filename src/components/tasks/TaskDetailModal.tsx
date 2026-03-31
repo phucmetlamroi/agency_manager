@@ -10,7 +10,12 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
 import DOMPurify from 'isomorphic-dompurify'
 import { ensureExternalLinks, cn } from "@/lib/utils"
-import { Copy } from "lucide-react"
+import {
+    Copy, ExternalLink, FolderOpen, Film, MonitorPlay, FolderInput,
+    ChevronRight, ChevronDown, Clock, DollarSign, ClipboardList, 
+    FileText, AlertTriangle, Pencil, CheckCircle, Target, BookOpen,
+    Link2, Layers
+} from "lucide-react"
 import ManagerReviewChecklist from "./ManagerReviewChecklist"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
@@ -49,19 +54,16 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         submissionFolder: ''
     })
 
-    // Helper: Parse content for Tiptap
+    // Helper: Parse content for Tiptap (logic unchanged)
     const parseContent = (content: string | null) => {
         if (!content) return ''
-        // Check if content looks like HTML
-        if (/<[a-z][\s\S]*>/i.test(content)) return content
-        // Legacy: Convert newlines to paragraphs for initial migration
+        if (/&lt;[a-z][\s\S]*>/i.test(content)) return content
         return content.split('\n').filter(line => line.trim() !== '').map(line => `<p>${line}</p>`).join('')
     }
 
     useEffect(() => {
         if (task) {
             setLocalTask(task)
-            // Parse Resources
             const resString = task.resources || task.fileLink || ''
             let raw = ''
             let broll = ''
@@ -106,20 +108,18 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
     useEffect(() => {
         if (isOpen) {
-            getFrameAccount().then(data => {
-                setFrameAccount(data)
-            })
+            getFrameAccount().then(data => { setFrameAccount(data) })
         }
     }, [isOpen])
 
     if (!isOpen || !localTask) return null
 
+    // ── handleSave (logic 100% unchanged) ────────────────────
     const handleSave = async () => {
         const combinedResources = (form.linkRaw || form.linkBroll || form.submissionFolder)
             ? `RAW: ${form.linkRaw.trim()} | BROLL: ${form.linkBroll.trim()} | SUBMISSION: ${form.submissionFolder.trim()}`
             : form.resources
 
-        // Sanitize notes before saving
         const cleanNotesVi = DOMPurify.sanitize(form.notes_vi)
         const cleanNotesEn = DOMPurify.sanitize(form.notes_en)
 
@@ -127,13 +127,10 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             await updateFrameAccount(frameAccount.account, frameAccount.password)
         }
 
-        // Check for Bulk Mode
         const isBulk = bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id)
 
         if (isBulk) {
             const { bulkUpdateTaskDetails } = await import('@/actions/bulk-task-actions')
-
-            // Only include fields that the admin explicitly enabled via checkboxes
             const bulkData: any = {}
             if (enabledFields['resources']) bulkData.resources = combinedResources
             if (enabledFields['references']) bulkData.references = form.references
@@ -151,15 +148,10 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             }
 
             const res = await bulkUpdateTaskDetails(bulkSelectedIds, bulkData, workspaceId)
-
-            if (res.error) {
-                toast.error(res.error)
-            } else {
+            if (res.error) { toast.error(res.error) } 
+            else {
                 toast.success(`Đã cập nhật ${Object.keys(bulkData).length} trường cho ${res.count} tasks`)
-                setIsEditing(false)
-                setEnabledFields({})
-                onClose()
-                window.location.reload()
+                setIsEditing(false); setEnabledFields({}); onClose(); window.location.reload()
             }
             return
         }
@@ -188,7 +180,6 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : prev.jobPriceUSD,
                 collectFilesLink: form.collectFilesLink
             }) : null)
-
             setIsEditing(false)
             toast.success('Task updated')
         } else {
@@ -202,11 +193,9 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         return `https://${link}`
     }
 
-
-
     const isBulkMode = bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id)
 
-    // Helper: Checkbox toggle for Bulk Mode fields
+    // ── Bulk Toggle — dark themed ─────────────────────────────
     const BulkToggle = ({ field, label }: { field: string; label: string }) => {
         if (!isBulkMode || !isEditing) return null
         return (
@@ -217,424 +206,483 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                     checked={!!enabledFields[field]}
                     onChange={() => toggleField(field)}
                 />
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${ enabledFields[field] ? 'text-amber-600' : 'text-zinc-400'}`}>
-                    {enabledFields[field] ? 'SẼ GHI ĐÈ' : 'GIỮ NGUYÊN'}
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${enabledFields[field] ? 'text-amber-400' : 'text-zinc-600'}`}>
+                    {enabledFields[field] ? 'GHI ĐÈ' : 'GIỮ'}
                 </span>
             </label>
         )
     }
 
+    // ── Deadline status ───────────────────────────────────────
+    const isOverdue = form.deadline && new Date() > new Date(form.deadline) && localTask?.status !== 'Hoàn tất'
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="p-0 border-none bg-white text-zinc-950 sm:rounded-[28px] max-w-2xl overflow-hidden shadow-2xl transition-all">
-                {/* STICKY HEADER */}
-                <div className="sticky top-0 z-[60] bg-white/80 backdrop-blur-xl border-b border-zinc-100 px-8 py-6 flex items-start justify-between gap-4">
+            {/* ══ DARK GLASS MODAL SHELL ══════════════════════ */}
+            <DialogContent className="p-0 border border-white/10 bg-zinc-950/95 backdrop-blur-2xl text-zinc-100 sm:rounded-[24px] max-w-2xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] transition-all">
+
+                {/* ── STICKY HEADER ─────────────────────────── */}
+                <div className="sticky top-0 z-[60] bg-zinc-950/90 backdrop-blur-xl border-b border-white/5 px-6 py-4 flex items-start justify-between gap-4">
                     <div className="flex flex-col gap-1 pr-12">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-600">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 flex items-center gap-1.5">
+                            <Layers className="w-3 h-3" strokeWidth={2} />
                             Task Details & Actions
                         </span>
-                        <h2 className="text-xl font-black text-zinc-900 leading-tight">
+                        <h2 className="text-lg font-black text-zinc-100 leading-tight line-clamp-2">
                             {localTask.title}
                         </h2>
+
+                        {/* Bulk mode indicator */}
                         {bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id) && (
-                            <div className="mt-2 flex flex-col gap-1.5">
-                                <div className="px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-700 flex items-center gap-1.5 w-fit">
-                                    <span className="animate-pulse">⚠️</span>
+                            <div className="mt-1.5 flex flex-col gap-1.5">
+                                <div className="px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/25 rounded-lg text-[10px] text-amber-400 flex items-center gap-1.5 w-fit">
+                                    <AlertTriangle className="w-3 h-3" strokeWidth={2} />
                                     <span className="font-bold">BULK MODE:</span>
                                     <span>Chỉnh sửa {bulkSelectedIds.length} tasks</span>
                                 </div>
                                 {isEditing && (
-                                    <div className="px-2 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-[10px] text-blue-700 w-fit max-w-xs">
-                                        ☑️ <span className="font-bold">Bật checkbox</span> bên cạnh field để đưa vào cập nhật hàng loạt. Fields <b>không bật</b> sẽ được giữ nguyên.
+                                    <div className="px-2.5 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-[10px] text-indigo-300 w-fit max-w-xs">
+                                        Bật checkbox cạnh mỗi field để đưa vào cập nhật hàng loạt.
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-shrink-0">
                         {(isAdmin || !isEditing) && (
                             <button
                                 onClick={() => setIsEditing(!isEditing)}
-                                className={`whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-sm ${isEditing ? 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200' : 'bg-zinc-900 text-white hover:bg-zinc-800'}`}
+                                className={cn(
+                                    "whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all",
+                                    isEditing
+                                        ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 border border-white/5"
+                                        : "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20 hover:brightness-110"
+                                )}
                             >
-                                {isEditing ? 'Cancel' : (isAdmin ? 'Edit All' : 'Submit / Note')}
+                                {isEditing ? 'Huỷ' : (isAdmin ? 'Edit All' : 'Submit / Note')}
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* SCROLLABLE BODY */}
-                <div className="max-h-[75vh] overflow-y-auto px-8 py-6 space-y-8 custom-scrollbar">
-                    <div className="flex flex-col gap-8">
+                {/* ── SCROLLABLE BODY ───────────────────────── */}
+                <div className="max-h-[75vh] overflow-y-auto px-6 py-5 space-y-6 custom-scrollbar">
 
-                        {/* PRODUCT DELIVERY */}
-                        <div className="space-y-3">
-                            <label className="text-[11px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                                <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px]">🎯</span>
-                                THÀNH PHẨM (Delivery)
-                            </label>
+                    {/* ════════════════════════════════════════
+                        1. THÀNH PHẨM (DELIVERY)
+                    ════════════════════════════════════════ */}
+                    <div className="space-y-3">
+                        <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                            <Target className="w-3.5 h-3.5" strokeWidth={2} />
+                            Thành Phẩm (Delivery)
+                        </label>
 
-                            {(!localTask.productLink && !isAdmin) || isEditingLink ? (
-                                <div className="flex flex-col gap-3 p-4 bg-blue-50/30 rounded-2xl border border-blue-100 shadow-inner">
-                                    <input
-                                        value={form.productLink}
-                                        onChange={(e) => setForm({ ...form, productLink: e.target.value })}
-                                        placeholder="Dán link sản phẩm (Google Drive, Youtube, ...)"
-                                        className="w-full bg-white p-3 rounded-xl text-sm border border-blue-200 focus:ring-2 focus:ring-blue-400 outline-none shadow-sm transition-all"
-                                    />
-                                    <button
-                                        onClick={async () => {
-                                            await handleSave();
-                                            if (!isAdmin) {
-                                                const res = await updateTaskStatus(localTask.id, 'Review', workspaceId, undefined, undefined, localTask.version)
-                                                if (res?.error) {
-                                                    toast.error(res.error)
-                                                } else {
-                                                    toast.success('Đã nộp bài (Sent to Review)')
-                                                }
-                                            }
-                                            setIsEditingLink(false);
-                                        }}
-                                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                        {(!localTask.productLink && !isAdmin) || isEditingLink ? (
+                            /* ── Input mode ── */
+                            <div className="flex flex-col gap-3 p-4 bg-zinc-900/60 rounded-2xl border border-white/5 shadow-inner">
+                                <input
+                                    value={form.productLink}
+                                    onChange={(e) => setForm({ ...form, productLink: e.target.value })}
+                                    placeholder="Dán link sản phẩm (Google Drive, Youtube, ...)"
+                                    className="w-full bg-zinc-800/60 p-3 rounded-xl text-sm border border-white/10 focus:border-indigo-500/50 outline-none text-zinc-200 placeholder:text-zinc-600 shadow-sm transition-all"
+                                />
+                                <button
+                                    onClick={async () => {
+                                        await handleSave();
+                                        if (!isAdmin) {
+                                            const res = await updateTaskStatus(localTask.id, 'Review', workspaceId, undefined, undefined, localTask.version)
+                                            if (res?.error) toast.error(res.error)
+                                            else toast.success('Đã nộp bài (Sent to Review)')
+                                        }
+                                        setIsEditingLink(false);
+                                    }}
+                                    className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-emerald-900/30"
+                                >
+                                    <CheckCircle className="w-4 h-4" strokeWidth={2} />
+                                    Xác nhận Nộp Bài
+                                </button>
+                            </div>
+                        ) : (
+                            localTask.productLink ? (
+                                <div className="group relative">
+                                    <a
+                                        href={formatLink(localTask.productLink)}
+                                        target="_blank"
+                                        className="flex items-center justify-between p-4 bg-gradient-to-r from-indigo-600/20 to-purple-600/15 border border-indigo-500/25 text-indigo-200 rounded-2xl font-bold hover:border-indigo-400/40 hover:from-indigo-600/25 hover:to-purple-600/20 group transition-all shadow-lg shadow-black/20"
                                     >
-                                        ✓ Xác nhận Nộp Bài
+                                        <span className="flex items-center gap-2.5">
+                                            <Link2 className="w-5 h-5 text-indigo-400" strokeWidth={1.5} />
+                                            <span className="text-sm font-bold text-zinc-100">Mở Link Sản Phẩm</span>
+                                        </span>
+                                        <ExternalLink className="w-4 h-4 text-indigo-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" strokeWidth={1.5} />
+                                    </a>
+                                    <button
+                                        onClick={() => setIsEditingLink(true)}
+                                        className="absolute -top-2 -right-2 w-7 h-7 bg-zinc-800 border border-white/10 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-zinc-700"
+                                        title="Edit link"
+                                    >
+                                        <Pencil className="w-3 h-3 text-zinc-400" strokeWidth={1.5} />
                                     </button>
                                 </div>
                             ) : (
-                                localTask.productLink ? (
-                                    <div className="group relative">
-                                        <a
-                                            href={formatLink(localTask.productLink)}
-                                            target="_blank"
-                                            className="flex items-center justify-between p-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 group"
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <span className="text-xl">🔗</span>
-                                                Mở Link Sản Phẩm
-                                            </span>
-                                            <span className="text-blue-200 group-hover:translate-x-1 transition-transform">→</span>
-                                        </a>
+                                <div className="p-4 bg-zinc-900/40 rounded-2xl border border-dashed border-white/10 text-zinc-600 italic text-sm text-center">
+                                    Chưa có link thành phẩm.
+                                </div>
+                            )
+                        )}
+                    </div>
+
+                    {/* ════════════════════════════════════════
+                        2. RESOURCES + REFERENCES
+                    ════════════════════════════════════════ */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* RESOURCES */}
+                        <div className="space-y-2.5">
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                                <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+                                Resources
+                                <BulkToggle field="resources" label="Resources" />
+                            </label>
+
+                            {isEditing && isAdmin ? (
+                                /* ── Edit inputs ── */
+                                <div className={cn("space-y-2", isBulkMode && !enabledFields['resources'] ? 'opacity-40 pointer-events-none' : '')}>
+                                    {[
+                                        { value: form.linkRaw, key: 'linkRaw', placeholder: 'Link RAW Source...' },
+                                        { value: form.linkBroll, key: 'linkBroll', placeholder: 'Link B-Roll...' },
+                                    ].map(({ value, key, placeholder }) => (
+                                        <input
+                                            key={key}
+                                            value={value}
+                                            onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                                            placeholder={placeholder}
+                                            className="w-full p-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-sm outline-none focus:border-indigo-500/50 text-zinc-300 placeholder:text-zinc-600 transition-all"
+                                        />
+                                    ))}
+                                    <input
+                                        value={form.collectFilesLink || ''}
+                                        onChange={(e) => setForm({ ...form, collectFilesLink: e.target.value })}
+                                        placeholder="Link Project Mẫu..."
+                                        className="w-full p-2.5 bg-amber-500/5 border border-amber-500/15 rounded-xl text-sm outline-none font-bold text-amber-300 placeholder:text-zinc-600 transition-all focus:border-amber-500/30"
+                                    />
+                                    <div className="flex rounded-xl overflow-hidden">
+                                        <input
+                                            value={form.submissionFolder || ''}
+                                            onChange={(e) => setForm({ ...form, submissionFolder: e.target.value })}
+                                            placeholder="Link Folder Nộp File..."
+                                            className="flex-1 p-2.5 bg-indigo-500/5 border border-indigo-500/15 border-r-0 text-sm outline-none font-bold text-indigo-300 placeholder:text-zinc-600 transition-all"
+                                        />
                                         <button
-                                            onClick={() => setIsEditingLink(true)}
-                                            className="absolute -top-2 -right-2 w-8 h-8 bg-white border border-blue-100 rounded-full shadow-md flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                                            title="Edit link"
+                                            onClick={() => setIsFrameExpanded(!isFrameExpanded)}
+                                            className="px-3 bg-zinc-800/80 hover:bg-zinc-700/80 border border-indigo-500/15 flex items-center text-zinc-400 text-xs font-bold transition-colors gap-1.5"
+                                            title="Frame.io (Global)"
                                         >
-                                            ✏️
+                                            Frame.io
+                                            {isFrameExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                                         </button>
                                     </div>
-                                ) : <div className="p-4 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200 text-zinc-400 italic text-sm text-center">Chưa có link thành phẩm.</div>
-                            )}
-                        </div>
-
-                        {/* RESOURCES SECTION */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-1 flex items-center">
-                                    Resources
-                                    <BulkToggle field="resources" label="Resources" />
-                                </label>
-                                {isEditing && isAdmin ? (
-                                    <div className={cn("space-y-2", isBulkMode && !enabledFields['resources'] ? 'opacity-40 pointer-events-none' : '')}>
-                                        <input
-                                            value={form.linkRaw}
-                                            onChange={(e) => setForm({ ...form, linkRaw: e.target.value })}
-                                            placeholder="Link RAW Source..."
-                                            className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm outline-none focus:border-zinc-400"
-                                        />
-                                        <input
-                                            value={form.linkBroll}
-                                            onChange={(e) => setForm({ ...form, linkBroll: e.target.value })}
-                                            placeholder="Link B-Roll..."
-                                            className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm outline-none focus:border-zinc-400"
-                                        />
-                                        <input
-                                            value={form.collectFilesLink || ''}
-                                            onChange={(e) => setForm({ ...form, collectFilesLink: e.target.value })}
-                                            placeholder="Link Project Mẫu..."
-                                            className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm outline-none font-bold text-amber-900"
-                                        />
-                                        <div className="flex rounded-xl overflow-hidden mt-1 shadow-sm">
-                                            <input
-                                                value={form.submissionFolder || ''}
-                                                onChange={(e) => setForm({ ...form, submissionFolder: e.target.value })}
-                                                placeholder="Link Folder Nộp File..."
-                                                className="flex-1 p-2.5 bg-blue-50 border border-blue-200 border-r-0 text-sm outline-none font-bold text-blue-900"
-                                            />
-                                            <button
-                                                onClick={() => setIsFrameExpanded(!isFrameExpanded)}
-                                                className="px-4 bg-violet-50 hover:bg-violet-100 border border-blue-200 transition-colors flex items-center justify-center text-violet-700 font-bold"
-                                                title="Cài đặt Frame.io (Global)"
-                                            >
-                                                <span className="mr-1">Frame.io</span> {isFrameExpanded ? '🔽' : '▶️'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col gap-2">
-                                        {form.linkRaw && (
-                                            <a href={formatLink(form.linkRaw)} target="_blank" className="flex items-center gap-2 p-3 bg-zinc-50 rounded-xl text-sm font-bold text-zinc-900 hover:bg-zinc-100 border border-transparent hover:border-zinc-200 transition-all">
-                                                <span className="text-blue-500">📁</span> RAW Assets ↗
-                                            </a>
-                                        )}
-                                        {form.linkBroll && (
-                                            <a href={formatLink(form.linkBroll)} target="_blank" className="flex items-center gap-2 p-3 bg-zinc-50 rounded-xl text-sm font-bold text-zinc-900 hover:bg-zinc-100 border border-transparent hover:border-zinc-200 transition-all">
-                                                <span className="text-purple-500">🎨</span> B-Roll Assets ↗
-                                            </a>
-                                        )}
-                                        {localTask.collectFilesLink && (
-                                            <a href={formatLink(localTask.collectFilesLink)} target="_blank" className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl text-sm font-black text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all">
-                                                <span>✨</span> PROJECT MẪU ↗
-                                            </a>
-                                        )}
-                                        <div className="flex border border-blue-200 rounded-xl overflow-hidden shadow-sm mt-1">
-                                            {form.submissionFolder ? (
-                                                <a href={formatLink(form.submissionFolder)} target="_blank" className="flex-1 flex items-center gap-2 p-3 bg-blue-50 text-sm font-black text-blue-700 hover:bg-blue-100 transition-all">
-                                                    <span>📂</span> FOLDER NỘP FILE ↗
-                                                </a>
-                                            ) : (
-                                                <div className="flex-1 flex items-center gap-2 p-3 bg-zinc-50 text-sm font-bold text-zinc-400">
-                                                    <span>📂</span> CHƯA CÓ FOLDER NỘP FILE
-                                                </div>
-                                            )}
-                                            <button
-                                                onClick={() => setIsFrameExpanded(!isFrameExpanded)}
-                                                className="px-4 bg-violet-50 hover:bg-violet-100 border-l border-blue-200 transition-colors flex items-center justify-center text-violet-700 font-bold tracking-wider"
-                                                title="Thông tin Frame.io (Global)"
-                                            >
-                                                <span className="mr-2">Frame.io</span> {isFrameExpanded ? '🔽' : '▶️'}
-                                            </button>
-                                            
-                                            {isAdmin && (
-                                                <button
-                                                    onClick={() => setShowChecklist(true)}
-                                                    className="px-4 bg-red-50 hover:bg-red-100 border-l border-blue-200 transition-colors flex items-center justify-center text-red-600 font-bold tracking-wider"
-                                                    title="Đánh giá & Bắt lỗi (Manager Review)"
-                                                >
-                                                    <span className="mr-2">Checklist</span> 📝
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* FRAME.IO GLOBAL PANEL */}
-                                {isFrameExpanded && (
-                                    <div className="p-4 bg-violet-50/50 border border-violet-100 rounded-xl mt-3 animate-in fade-in slide-in-from-top-1 flex flex-col gap-3 shadow-inner">
-                                        <p className="text-[11px] text-violet-600 font-medium italic">ℹ️ Thông tin tài khoản frame dành cho trường hợp bạn bị out ra khỏi frame của team</p>
-
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-violet-900 w-20">Tài khoản:</span>
-                                            {isEditing && isAdmin ? (
-                                                <input
-                                                    value={frameAccount.account}
-                                                    onChange={e => setFrameAccount({ ...frameAccount, account: e.target.value })}
-                                                    placeholder="Email / Username"
-                                                    className="flex-1 p-2 text-sm bg-white border border-violet-200 rounded-lg outline-none focus:border-violet-400 font-mono"
-                                                />
-                                            ) : (
-                                                <div className="flex-1 p-2 text-sm bg-white/60 border border-violet-100 rounded-lg text-zinc-700 font-mono">
-                                                    {frameAccount.account || '---'}
-                                                </div>
-                                            )}
-                                            <button
-                                                onClick={() => { navigator.clipboard.writeText(frameAccount.account); toast.success('Đã copy tài khoản'); }}
-                                                className="px-3 py-2 bg-white hover:bg-violet-100 text-violet-700 text-xs font-bold rounded-lg border border-violet-200 transition-colors shadow-sm whitespace-nowrap active:scale-95"
-                                            >
-                                                Copy
-                                            </button>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-violet-900 w-20">Mật khẩu:</span>
-                                            {isEditing && isAdmin ? (
-                                                <input
-                                                    value={frameAccount.password}
-                                                    onChange={e => setFrameAccount({ ...frameAccount, password: e.target.value })}
-                                                    placeholder="Password"
-                                                    className="flex-1 p-2 text-sm bg-white border border-violet-200 rounded-lg outline-none focus:border-violet-400 font-mono"
-                                                />
-                                            ) : (
-                                                <div className="flex-1 p-2 text-sm bg-white/60 border border-violet-100 rounded-lg text-zinc-700 font-mono">
-                                                    {frameAccount.password || '---'}
-                                                </div>
-                                            )}
-                                            <button
-                                                onClick={() => { navigator.clipboard.writeText(frameAccount.password); toast.success('Đã copy mật khẩu'); }}
-                                                className="px-3 py-2 bg-white hover:bg-violet-100 text-violet-700 text-xs font-bold rounded-lg border border-violet-200 transition-colors shadow-sm whitespace-nowrap active:scale-95"
-                                            >
-                                                Copy
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-bold text-purple-500 uppercase tracking-widest px-1 flex items-center">
-                                    References
-                                    <BulkToggle field="references" label="References" />
-                                </label>
-                                {isEditing ? (
-                                    <input
-                                        value={form.references}
-                                        onChange={(e) => setForm({ ...form, references: e.target.value })}
-                                        placeholder="Reference Links..."
-                                        disabled={!!(isBulkMode && !enabledFields['references'])}
-                                        className={cn("w-full p-2.5 bg-purple-50/30 border border-purple-100 rounded-xl text-sm outline-none focus:border-purple-300",
-                                            isBulkMode && !enabledFields['references'] ? 'opacity-40 cursor-not-allowed' : ''
-                                        )}
-                                    />
-                                ) : (
-                                    localTask.references ? (
-                                        <a href={formatLink(localTask.references)} target="_blank" className="flex items-center gap-2 p-3 bg-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all">
-                                            <span>📺</span> View Reference ↗
+                                </div>
+                            ) : (
+                                /* ── View mode ── */
+                                <div className="flex flex-col gap-2">
+                                    {form.linkRaw && (
+                                        <a href={formatLink(form.linkRaw)} target="_blank" className="group flex items-center gap-2.5 p-3 bg-zinc-900/60 rounded-xl text-sm font-bold text-zinc-300 hover:text-white hover:bg-zinc-800/60 border border-white/5 hover:border-white/10 transition-all">
+                                            <FolderOpen className="w-4 h-4 text-blue-400 flex-shrink-0" strokeWidth={1.5} />
+                                            RAW Assets
+                                            <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 ml-auto" strokeWidth={1.5} />
                                         </a>
-                                    ) : <div className="text-zinc-400 italic text-xs p-3 bg-zinc-50 rounded-xl border border-zinc-100">None provided</div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* DEADLINE & FINANCE */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                            <div className="p-4 rounded-2xl bg-rose-50/30 border border-rose-100 space-y-2">
-                                <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center">
-                                    Deadline
-                                    <BulkToggle field="deadline" label="Deadline" />
-                                </label>
-                                {isEditing && isAdmin ? (
-                                    <input
-                                        type="datetime-local"
-                                        value={form.deadline}
-                                        onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                                        disabled={!!(isBulkMode && !enabledFields['deadline'])}
-                                        className={cn("w-full bg-white p-2 border border-rose-200 rounded-lg text-sm font-bold text-rose-600",
-                                            isBulkMode && !enabledFields['deadline'] ? 'opacity-40 cursor-not-allowed' : ''
-                                        )}
-                                    />
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <span className={`text-lg font-black ${form.deadline && new Date() > new Date(form.deadline) && localTask?.status !== 'Hoàn tất' ? "text-rose-600" : "text-zinc-800"}`}>
-                                            {form.deadline ? `${new Date(form.deadline).toLocaleDateString('vi-VN')} @ ${new Date(form.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : 'No Limit'}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {isAdmin && (
-                                <div className="p-4 rounded-2xl bg-zinc-900 text-white space-y-3 shadow-xl">
-                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Finance info</label>
-                                    <div className="flex justify-between items-end">
-                                        <div>
-                                            <p className="text-[9px] text-zinc-500 uppercase font-bold">Client ($)</p>
-                                            {isEditing ? (
-                                                <input
-                                                    type="number"
-                                                    value={form.jobPriceUSD}
-                                                    onChange={(e) => setForm({ ...form, jobPriceUSD: parseFloat(e.target.value) || 0 })}
-                                                    className="bg-zinc-800 border-none rounded p-1 text-sm w-16 font-mono text-emerald-400"
-                                                />
-                                            ) : (
-                                                <p className="text-lg font-mono font-black text-emerald-400">${form.jobPriceUSD}</p>
-                                            )}
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[9px] text-zinc-500 uppercase font-bold">Staff (VND)</p>
-                                            {isEditing ? (
-                                                <input
-                                                    type="number"
-                                                    value={form.value}
-                                                    onChange={(e) => setForm({ ...form, value: parseFloat(e.target.value) || 0 })}
-                                                    className="bg-zinc-800 border-none rounded p-1 text-sm w-24 font-mono text-amber-400 text-right"
-                                                />
-                                            ) : (
-                                                <p className="text-lg font-mono font-black text-amber-400">{form.value.toLocaleString()}₫</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between px-1">
-                                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest flex items-center">
-                                    Ghi chú (Tiếng Việt)
-                                    <BulkToggle field="notes" label="Notes VI" />
-                                </label>
-                                <button
-                                    onClick={() => {
-                                        const cleanText = form.notes_vi.replace(/<[^>]*>/g, '').trim();
-                                        navigator.clipboard.writeText(cleanText);
-                                        toast.success('Đã copy nội dung tiếng Việt');
-                                    }}
-                                    className="p-1.5 hover:bg-zinc-100 rounded-lg transition-colors text-zinc-400 hover:text-zinc-600"
-                                    title="Copy nội dung Tiếng Việt"
-                                >
-                                    <Copy className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
-                            {isEditing ? (
-                                <div className="h-[250px] border border-zinc-200 rounded-2xl overflow-hidden shadow-inner">
-                                    <TiptapEditor
-                                        content={form.notes_vi}
-                                        onChange={(html) => setForm({ ...form, notes_vi: html })}
-                                    />
-                                </div>
-                            ) : (
-                                <div
-                                    className="bg-zinc-50 p-6 rounded-2xl text-zinc-800 text-[14px] leading-[1.6] prose prose-zinc max-w-none border border-zinc-100"
-                                    dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_vi || form.notes_vi || "No specific instructions.")) }}
-                                />
-                            )}
-                        </div>
-
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center px-1">
-                                <label className="text-[11px] font-bold text-blue-400 uppercase tracking-widest flex items-center">
-                                    Notes (English Translation for Client)
-                                    <BulkToggle field="notes_en" label="Notes EN" />
-                                </label>
-                            </div>
-
-                            {isEditing ? (
-                                <div className="h-[250px] border border-blue-200 rounded-2xl overflow-hidden shadow-inner bg-blue-50/10">
-                                    <TiptapEditor
-                                        content={form.notes_en}
-                                        onChange={(html) => setForm({ ...form, notes_en: html })}
-                                    />
-                                </div>
-                            ) : (
-                                <div className="bg-blue-50/30 p-6 rounded-2xl border border-blue-100 relative">
-                                    {(!localTask.notes_en || localTask.notes_en.trim() === '' || localTask.notes_en === '<p></p>') ? (
-                                        <div className="flex flex-col items-center justify-center py-4 gap-2">
-                                            <span className="text-zinc-400 text-sm italic">⚠️ Chưa có bản dịch Tiếng Anh. Hãy bấm <b>"Edit"</b> để nhập thủ công.</span>
-                                        </div>
-                                    ) : (
-                                        <div
-                                            className="text-zinc-800 text-[14px] leading-[1.6] prose prose-zinc max-w-none"
-                                            dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_en)) }}
-                                        />
                                     )}
+                                    {form.linkBroll && (
+                                        <a href={formatLink(form.linkBroll)} target="_blank" className="group flex items-center gap-2.5 p-3 bg-zinc-900/60 rounded-xl text-sm font-bold text-zinc-300 hover:text-white hover:bg-zinc-800/60 border border-white/5 hover:border-white/10 transition-all">
+                                            <Film className="w-4 h-4 text-purple-400 flex-shrink-0" strokeWidth={1.5} />
+                                            B-Roll Assets
+                                            <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 ml-auto" strokeWidth={1.5} />
+                                        </a>
+                                    )}
+                                    {localTask.collectFilesLink && (
+                                        <a href={formatLink(localTask.collectFilesLink)} target="_blank" className="group flex items-center gap-2.5 p-3 bg-amber-500/8 rounded-xl text-sm font-black text-amber-300 border border-amber-500/15 hover:bg-amber-500/12 hover:border-amber-500/25 transition-all">
+                                            <Layers className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
+                                            Project Mẫu
+                                            <ExternalLink className="w-3 h-3 text-amber-600 group-hover:text-amber-400 ml-auto" strokeWidth={1.5} />
+                                        </a>
+                                    )}
+
+                                    {/* Submission Folder + Frame.io + Checklist row */}
+                                    <div className="flex rounded-xl overflow-hidden border border-white/8 shadow-sm">
+                                        {form.submissionFolder ? (
+                                            <a href={formatLink(form.submissionFolder)} target="_blank" className="flex-1 flex items-center gap-2.5 p-3 bg-indigo-500/8 text-sm font-black text-indigo-300 hover:bg-indigo-500/12 transition-all">
+                                                <FolderInput className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
+                                                Folder Nộp File
+                                            </a>
+                                        ) : (
+                                            <div className="flex-1 flex items-center gap-2.5 p-3 bg-zinc-900/40 text-sm font-bold text-zinc-600">
+                                                <FolderInput className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
+                                                Chưa có Folder Nộp
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={() => setIsFrameExpanded(!isFrameExpanded)}
+                                            className="px-3 bg-zinc-800/60 hover:bg-zinc-700/60 border-l border-white/5 flex items-center text-zinc-400 text-xs font-bold transition-colors gap-1.5 whitespace-nowrap"
+                                            title="Frame.io (Global)"
+                                        >
+                                            Frame.io
+                                            {isFrameExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                        </button>
+                                        {isAdmin && (
+                                            <button
+                                                onClick={() => setShowChecklist(true)}
+                                                className="px-3 bg-red-500/8 hover:bg-red-500/15 border-l border-white/5 flex items-center text-red-400 text-xs font-bold transition-colors gap-1.5 whitespace-nowrap"
+                                                title="Manager Review Checklist"
+                                            >
+                                                <ClipboardList className="w-3.5 h-3.5" strokeWidth={1.5} />
+                                                Checklist
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
+                            )}
+
+                            {/* FRAME.IO PANEL */}
+                            {isFrameExpanded && (
+                                <div className="p-4 bg-indigo-500/5 border border-indigo-500/15 rounded-xl mt-1 animate-in fade-in slide-in-from-top-1 flex flex-col gap-3">
+                                    <p className="text-[11px] text-indigo-400/80 italic flex items-center gap-1.5">
+                                        <AlertTriangle className="w-3 h-3 flex-shrink-0" strokeWidth={2} />
+                                        Tài khoản dành cho trường hợp bị out khỏi Frame team
+                                    </p>
+                                    {[
+                                        { label: 'Tài khoản', key: 'account', val: frameAccount.account, onCopy: () => { navigator.clipboard.writeText(frameAccount.account); toast.success('Đã copy tài khoản') } },
+                                        { label: 'Mật khẩu', key: 'password', val: frameAccount.password, onCopy: () => { navigator.clipboard.writeText(frameAccount.password); toast.success('Đã copy mật khẩu') } },
+                                    ].map(({ label, key, val, onCopy }) => (
+                                        <div key={key} className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-zinc-500 w-20 flex-shrink-0">{label}:</span>
+                                            {isEditing && isAdmin ? (
+                                                <input
+                                                    value={key === 'account' ? frameAccount.account : frameAccount.password}
+                                                    onChange={e => setFrameAccount({ ...frameAccount, [key]: e.target.value })}
+                                                    placeholder={label}
+                                                    className="flex-1 p-2 text-sm bg-zinc-900/60 border border-white/8 rounded-lg outline-none focus:border-indigo-500/40 font-mono text-zinc-300"
+                                                />
+                                            ) : (
+                                                <div className="flex-1 p-2 text-sm bg-zinc-900/40 border border-white/5 rounded-lg text-zinc-400 font-mono">
+                                                    {val || '---'}
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={onCopy}
+                                                className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-bold rounded-lg border border-white/8 transition-colors shadow-sm whitespace-nowrap active:scale-95"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* REFERENCES */}
+                        <div className="space-y-2.5">
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                                <MonitorPlay className="w-3.5 h-3.5" strokeWidth={1.5} />
+                                References
+                                <BulkToggle field="references" label="References" />
+                            </label>
+                            {isEditing ? (
+                                <input
+                                    value={form.references}
+                                    onChange={(e) => setForm({ ...form, references: e.target.value })}
+                                    placeholder="Reference Links..."
+                                    disabled={!!(isBulkMode && !enabledFields['references'])}
+                                    className={cn(
+                                        "w-full p-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-sm outline-none focus:border-purple-500/50 text-zinc-300 placeholder:text-zinc-600 transition-all",
+                                        isBulkMode && !enabledFields['references'] ? 'opacity-40 cursor-not-allowed' : ''
+                                    )}
+                                />
+                            ) : (
+                                localTask.references ? (
+                                    <a href={formatLink(localTask.references)} target="_blank"
+                                        className="group flex items-center gap-2.5 p-4 bg-gradient-to-r from-purple-600/15 to-violet-600/10 border border-purple-500/20 text-purple-200 rounded-xl text-sm font-bold hover:border-purple-400/35 hover:from-purple-600/20 transition-all"
+                                    >
+                                        <MonitorPlay className="w-4 h-4 text-purple-400 flex-shrink-0" strokeWidth={1.5} />
+                                        View Reference
+                                        <ExternalLink className="w-3.5 h-3.5 text-purple-500 group-hover:text-purple-300 ml-auto group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" strokeWidth={1.5} />
+                                    </a>
+                                ) : (
+                                    <div className="text-zinc-600 italic text-xs p-3 bg-zinc-900/40 rounded-xl border border-white/5">Không có reference</div>
+                                )
                             )}
                         </div>
                     </div>
+
+                    {/* ════════════════════════════════════════
+                        3. DEADLINE & FINANCE
+                    ════════════════════════════════════════ */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* DEADLINE */}
+                        <div className={cn(
+                            "p-4 rounded-2xl border space-y-2 transition-all",
+                            isOverdue
+                                ? "bg-red-500/8 border-red-500/25 shadow-[0_0_20px_rgba(239,68,68,0.08)]"
+                                : "bg-zinc-900/50 border-white/8"
+                        )}>
+                            <label className={cn(
+                                "text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5",
+                                isOverdue ? "text-red-400" : "text-zinc-500"
+                            )}>
+                                <Clock className="w-3.5 h-3.5" strokeWidth={2} />
+                                Deadline
+                                {isOverdue && <span className="ml-1 text-red-400 animate-pulse">— QUÁ HẠN</span>}
+                                <BulkToggle field="deadline" label="Deadline" />
+                            </label>
+                            {isEditing && isAdmin ? (
+                                <input
+                                    type="datetime-local"
+                                    value={form.deadline}
+                                    onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                                    disabled={!!(isBulkMode && !enabledFields['deadline'])}
+                                    className={cn(
+                                        "w-full bg-zinc-800/60 p-2 border border-white/10 rounded-lg text-sm font-bold text-zinc-200 outline-none focus:border-indigo-500/40 transition-all",
+                                        isBulkMode && !enabledFields['deadline'] ? 'opacity-40 cursor-not-allowed' : ''
+                                    )}
+                                />
+                            ) : (
+                                <p className={cn("text-base font-black", isOverdue ? "text-red-400" : "text-zinc-100")}>
+                                    {form.deadline
+                                        ? `${new Date(form.deadline).toLocaleDateString('vi-VN')} @ ${new Date(form.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+                                        : <span className="text-zinc-500 font-medium">No Limit</span>}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* FINANCE (admin only) */}
+                        {isAdmin && (
+                            <div className="p-4 rounded-2xl bg-zinc-900/60 border border-white/8 space-y-3 shadow-inner relative overflow-hidden">
+                                {/* Ambient glow */}
+                                <div className="absolute -top-6 -right-6 w-24 h-24 bg-emerald-500/6 blur-2xl rounded-full pointer-events-none" />
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                                    <DollarSign className="w-3.5 h-3.5" strokeWidth={2} />
+                                    Finance Info
+                                </label>
+                                <div className="flex justify-between items-end gap-4">
+                                    <div>
+                                        <p className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Client ($)</p>
+                                        {isEditing ? (
+                                            <input
+                                                type="number"
+                                                value={form.jobPriceUSD}
+                                                onChange={(e) => setForm({ ...form, jobPriceUSD: parseFloat(e.target.value) || 0 })}
+                                                className="bg-zinc-800/60 border border-white/8 rounded-lg p-1.5 text-sm w-20 font-mono text-emerald-400 outline-none focus:border-emerald-500/40 transition-all"
+                                            />
+                                        ) : (
+                                            <p className="text-lg font-mono font-black text-emerald-400">${form.jobPriceUSD}</p>
+                                        )}
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Staff (VND)</p>
+                                        {isEditing ? (
+                                            <input
+                                                type="number"
+                                                value={form.value}
+                                                onChange={(e) => setForm({ ...form, value: parseFloat(e.target.value) || 0 })}
+                                                className="bg-zinc-800/60 border border-white/8 rounded-lg p-1.5 text-sm w-28 font-mono text-amber-400 text-right outline-none focus:border-amber-500/40 transition-all"
+                                            />
+                                        ) : (
+                                            <p className="text-lg font-mono font-black text-amber-400">{form.value.toLocaleString()}₫</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ════════════════════════════════════════
+                        4. GHI CHÚ TIẾNG VIỆT
+                    ════════════════════════════════════════ */}
+                    <div className="space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                                <FileText className="w-3.5 h-3.5" strokeWidth={1.5} />
+                                Ghi chú (Tiếng Việt)
+                                <BulkToggle field="notes" label="Notes VI" />
+                            </label>
+                            <button
+                                onClick={() => {
+                                    const cleanText = form.notes_vi.replace(/<[^>]*>/g, '').trim();
+                                    navigator.clipboard.writeText(cleanText);
+                                    toast.success('Đã copy nội dung tiếng Việt');
+                                }}
+                                className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-600 hover:text-zinc-300"
+                                title="Copy nội dung Tiếng Việt"
+                            >
+                                <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
+                            </button>
+                        </div>
+                        {isEditing ? (
+                            <div className="h-[250px] border border-white/8 rounded-2xl overflow-hidden shadow-inner">
+                                <TiptapEditor
+                                    content={form.notes_vi}
+                                    onChange={(html) => setForm({ ...form, notes_vi: html })}
+                                />
+                            </div>
+                        ) : (
+                            <div
+                                className="bg-zinc-900/50 p-5 rounded-2xl text-zinc-300 text-[14px] leading-[1.7] prose prose-invert prose-sm max-w-none border border-white/5"
+                                dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_vi || form.notes_vi || "Chưa có hướng dẫn cụ thể.")) }}
+                            />
+                        )}
+                    </div>
+
+                    {/* ════════════════════════════════════════
+                        5. NOTES (ENGLISH)
+                    ════════════════════════════════════════ */}
+                    <div className="space-y-2.5">
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                            <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+                            Notes (English Translation for Client)
+                            <BulkToggle field="notes_en" label="Notes EN" />
+                        </label>
+                        {isEditing ? (
+                            <div className="h-[250px] border border-indigo-500/15 rounded-2xl overflow-hidden shadow-inner bg-indigo-500/3">
+                                <TiptapEditor
+                                    content={form.notes_en}
+                                    onChange={(html) => setForm({ ...form, notes_en: html })}
+                                />
+                            </div>
+                        ) : (
+                            <div className="bg-zinc-900/40 p-5 rounded-2xl border border-white/5">
+                                {(!localTask.notes_en || localTask.notes_en.trim() === '' || localTask.notes_en === '<p></p>') ? (
+                                    <div className="flex items-center gap-2 text-zinc-600 text-sm italic py-2">
+                                        <AlertTriangle className="w-4 h-4 text-zinc-700 flex-shrink-0" strokeWidth={1.5} />
+                                        Chưa có bản dịch Tiếng Anh. Bấm Edit để nhập thủ công.
+                                    </div>
+                                ) : (
+                                    <div
+                                        className="text-zinc-300 text-[14px] leading-[1.7] prose prose-invert prose-sm max-w-none"
+                                        dangerouslySetInnerHTML={{ __html: ensureExternalLinks(DOMPurify.sanitize(localTask.notes_en)) }}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
+                {/* ── SAVE FOOTER ───────────────────────────── */}
                 {isEditing && (
-                    <div className="p-6 bg-zinc-50 border-t border-zinc-100">
+                    <div className="p-5 bg-zinc-900/80 border-t border-white/5 backdrop-blur-sm">
                         <button
                             onClick={handleSave}
-                            className="w-full py-4 bg-zinc-900 text-white font-black text-sm uppercase tracking-widest rounded-2xl hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-200 active:scale-[0.98]"
+                            className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-black text-sm uppercase tracking-widest rounded-2xl transition-all shadow-xl shadow-indigo-900/40 active:scale-[0.98]"
                         >
-                            Save Changes
+                            Lưu thay đổi
                         </button>
                     </div>
                 )}
 
+                {/* ── CHECKLIST OVERLAY ─────────────────────── */}
                 {showChecklist && (
-                    <ManagerReviewChecklist 
+                    <ManagerReviewChecklist
                         taskId={localTask.id}
                         workspaceId={workspaceId}
                         onClose={() => setShowChecklist(false)}

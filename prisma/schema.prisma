@@ -374,6 +374,7 @@ model BillingProfile {
   accountNumber   String
   swiftCode       String?
   address         String?
+  currency        String?  @default("$")
   isDefault       Boolean  @default(false)
   updatedAt       DateTime @updatedAt
   createdAt       DateTime @default(now())
@@ -381,6 +382,7 @@ model BillingProfile {
   profileId       String?
   profile         Profile? @relation(fields: [profileId], references: [id])
 }
+
 
 model Invoice {
   id              String        @id @default(uuid())

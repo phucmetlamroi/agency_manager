@@ -55,8 +55,10 @@ export async function createBillingProfile(data: {
     address?: string
     notes?: string
     isDefault?: boolean
+    currency?: string
     workspaceId?: string
 }) {
+
     try {
         const user = await getCurrentUser()
         if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
@@ -87,10 +89,12 @@ export async function createBillingProfile(data: {
                 swiftCode: data.swiftCode,
                 address: data.address,
                 notes: data.notes,
+                currency: data.currency || '$',
                 isDefault: data.isDefault || false,
                 profileId
             }
         })
+
 
         revalidatePath('/admin/finance')
         return { success: true, data: profile }
@@ -108,7 +112,9 @@ export async function updateBillingProfile(id: string, data: {
     address?: string
     notes?: string
     isDefault?: boolean
+    currency?: string
 }) {
+
     try {
         const user = await getCurrentUser()
         if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
@@ -136,9 +142,11 @@ export async function updateBillingProfile(id: string, data: {
                 swiftCode: data.swiftCode,
                 address: data.address,
                 notes: data.notes,
+                currency: data.currency || '$',
                 isDefault: data.isDefault || false
             }
         })
+
         revalidatePath('/admin/crm')
         return { success: true, data: profile }
     } catch (error) {

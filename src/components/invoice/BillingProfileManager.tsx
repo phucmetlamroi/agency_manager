@@ -20,8 +20,10 @@ type BillingProfile = {
     swiftCode?: string | null
     address?: string | null
     notes?: string | null
+    currency?: string | null
     isDefault: boolean
 }
+
 
 export default function BillingProfileManager({
     onProfileSelect,
@@ -72,8 +74,10 @@ export default function BillingProfileManager({
             swiftCode: '',
             address: '',
             notes: '',
+            currency: '$',
             isDefault: false
         })
+
         setIsEditing(true)
     }
 
@@ -91,9 +95,11 @@ export default function BillingProfileManager({
             swiftCode: formData.swiftCode || undefined,
             address: formData.address || undefined,
             notes: formData.notes || undefined,
+            currency: formData.currency || '$',
             isDefault: formData.isDefault,
             workspaceId
         }
+
 
         let res
         if (editingId) {
@@ -207,7 +213,20 @@ export default function BillingProfileManager({
                                     className="bg-gray-800 border-gray-700"
                                 />
                             </div>
+                            <div className="space-y-4 pt-2">
+                                <div className="space-y-2">
+                                    <Label className="text-amber-300">Currency Symbol (Manual Entry)</Label>
+                                    <Input
+                                        value={formData.currency || ''}
+                                        onChange={e => setFormData({ ...formData, currency: e.target.value })}
+                                        placeholder="e.g. $, ₫, €, total due:"
+                                        className="bg-gray-800 border-amber-900/50 text-amber-100 font-bold w-full"
+                                    />
+                                    <p className="text-[10px] text-gray-500">This symbol will be used on the invoice for all amounts.</p>
+                                </div>
+                            </div>
                             <div className="space-y-2">
+
                                 <Label>Notes / Delivery Info</Label>
                                 <Textarea
                                     value={formData.notes || ''}

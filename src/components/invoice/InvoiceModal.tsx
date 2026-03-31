@@ -51,6 +51,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     const [taxPercent, setTaxPercent] = useState(0) // Default 0
     const [applyDeposit, setApplyDeposit] = useState(false)
     const [groupByBrand, setGroupByBrand] = useState(true) // Default to Grouped View
+    const [currency, setCurrency] = useState('$')
+
 
     // Customizable Fields
     const [customAgencyName, setCustomAgencyName] = useState('Agency Manager')
@@ -106,6 +108,15 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
             }
         }
     }
+
+    // Effect to update currency when profile changes
+    useEffect(() => {
+        const profile = billingProfiles.find(p => p.id === billingProfileId)
+        if (profile) {
+            setCurrency(profile.currency || '$')
+        }
+    }, [billingProfileId, billingProfiles])
+
 
     // Auto-select all tasks when loaded
     useEffect(() => {
@@ -308,7 +319,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 customTitle,
                 dueDateLabel,
                 paymentLink,
+                currency,
                 issueDate: issueDate || new Date().toLocaleDateString(),
+
                 dueDate: dueDate || 'On Receipt',
                 subtotal: activeSubtotal.toFixed(2),
                 taxAmount: activeTaxAmount.toFixed(2),
@@ -318,9 +331,10 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     description: i.description,
                     note: i.note,
                     quantity: i.quantity,
-                    unitPrice: i.unitPrice.toFixed(2),
-                    amount: i.amount.toFixed(2)
+                    unitPrice: `${currency}${i.unitPrice.toFixed(2)}`,
+                    amount: `${currency}${i.amount.toFixed(2)}`
                 })),
+
                 bank: {
                     beneficiaryName: profile.beneficiaryName,
                     bankName: profile.bankName,
@@ -385,7 +399,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                 />
                             </div>
                             <div className="flex-1 bg-zinc-900/50 rounded-xl border border-zinc-700 px-3 py-2 flex items-center gap-2">
-                                <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Prepaid $</span>
+                                <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Prepaid {currency}</span>
                                 <input
                                     type="number"
                                     className="flex-1 bg-transparent text-right text-red-400 font-bold text-sm focus:outline-none min-w-0"
@@ -393,6 +407,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                     onChange={e => setCustomPrepaid(Number(e.target.value))}
                                 />
                             </div>
+
                         </div>
 
                         <div className="bg-zinc-900/50 rounded-xl border border-zinc-700 px-3 py-2 flex items-center gap-2">
@@ -624,7 +639,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                             <Input type="number" value={editForm.unitPrice} onChange={e => setEditForm({ ...editForm, unitPrice: Number(e.target.value) })} className="h-8 w-24 ml-auto text-right bg-white" />
                                                         </td>
                                                         <td className="py-3 text-right font-bold font-mono text-gray-900">
-                                                            ${(editForm.unitPrice * editForm.quantity).toFixed(2)}
+                                                            {currency}{(editForm.unitPrice * editForm.quantity).toFixed(2)}
                                                         </td>
                                                         <td className="py-3 text-center">
                                                             <button onClick={saveEditItem} className="text-emerald-600 hover:text-emerald-800 p-1"><Edit2 size={15} /></button>
@@ -637,8 +652,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                             {item.note && <div className="text-[11px] text-gray-400 font-medium mt-0.5">{item.note}</div>}
                                                         </td>
                                                         <td className="py-4 text-center text-gray-600 font-medium">{item.quantity}</td>
-                                                        <td className="py-4 text-right text-gray-500 font-mono">${item.unitPrice.toFixed(2)}</td>
-                                                        <td className="py-4 text-right font-bold text-gray-900 font-mono">${item.amount.toFixed(2)}</td>
+                                                        <td className="py-4 text-right text-gray-500 font-mono">{currency}{item.unitPrice.toFixed(2)}</td>
+                                                        <td className="py-4 text-right font-bold text-gray-900 font-mono">{currency}{item.amount.toFixed(2)}</td>
                                                         <td className="py-4 text-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <div className="flex items-center justify-center gap-1">
                                                                 <button onClick={() => handleEditItem(item)} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit2 size={13} /></button>
@@ -710,24 +725,24 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                     <div className="w-72 space-y-3">
                                         <div className="flex justify-between text-gray-500 text-sm">
                                             <span className="font-medium">Tạm tính</span>
-                                            <span className="font-mono font-semibold">${activeSubtotal.toFixed(2)}</span>
+                                            <span className="font-mono font-semibold">{currency}{activeSubtotal.toFixed(2)}</span>
                                         </div>
                                         {taxPercent > 0 && (
                                             <div className="flex justify-between text-gray-500 text-sm">
                                                 <span className="font-medium">Thuế ({taxPercent}%)</span>
-                                                <span className="font-mono font-semibold">${activeTaxAmount.toFixed(2)}</span>
+                                                <span className="font-mono font-semibold">{currency}{activeTaxAmount.toFixed(2)}</span>
                                             </div>
                                         )}
                                         {totalDeducted > 0 && (
                                             <div className="flex justify-between text-red-500 text-sm">
                                                 <span className="font-medium">Giảm trừ / Trả trước</span>
-                                                <span className="font-mono font-semibold">-${totalDeducted.toFixed(2)}</span>
+                                                <span className="font-mono font-semibold">-{currency}{totalDeducted.toFixed(2)}</span>
                                             </div>
                                         )}
                                         <div className="flex flex-col items-end pt-5 mt-2 border-t-2 border-gray-900">
                                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tổng cộng thanh toán</span>
                                             <div className="text-3xl font-black text-gray-900 font-mono tracking-tighter">
-                                                ${finalTotalDue.toFixed(2)}
+                                                {currency}{finalTotalDue.toFixed(2)}
                                             </div>
                                         </div>
                                     </div>

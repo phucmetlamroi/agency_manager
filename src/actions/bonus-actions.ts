@@ -316,7 +316,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         }
 
         revalidatePath(`/${workspaceId}/admin/payroll`)
-        return { success: true, bonuses: awardedBonuses }
+        return { success: true, bonuses: awardedBonuses, month: currentMonth, year: currentYear }
 
     } catch (error) {
         console.error('Error calculating monthly bonus:', error)

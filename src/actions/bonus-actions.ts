@@ -101,17 +101,22 @@ export async function revertMonthlyBonus(workspaceId: string) {
  * 4. Tie-breaker #3: tasksCompleted (DESC), then revenue (DESC), then username (ASC)
  */
 export async function calculateMonthlyBonus(workspaceId: string) {
+    let stage = 'init'
     try {
+        stage = 'session'
         const session = await getSession()
         if (!session) return { success: false, error: 'Unauthorized' }
 
+        stage = 'prisma-workspace'
         const workspacePrisma = getWorkspacePrisma(workspaceId)
+        stage = 'workspace-find'
         const workspace = await workspacePrisma.workspace.findUnique({
             where: { id: workspaceId },
             select: { id: true, profileId: true }
         })
         if (!workspace) return { success: false, error: 'Workspace not found.' }
 
+        stage = 'permission-find-user'
         const currentUser = await workspacePrisma.user.findUnique({
             where: { id: session.user.id },
             select: { id: true, role: true, isTreasurer: true }
@@ -126,6 +131,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         const startOfMonth = new Date(currentYear, currentMonth - 1, 1)
         const endOfMonth = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999)
 
+        stage = 'lock-check'
         const existingLock = await workspacePrisma.payrollLock.findUnique({
             where: {
                 month_year_workspaceId: {
@@ -139,6 +145,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             return { success: false, error: 'Ky luong nay da bi khoa.' }
         }
 
+        stage = 'aggregate-completed'
         const completedTaskAggregates = await workspacePrisma.task.groupBy({
             by: ['assigneeId'],
             where: {
@@ -156,6 +163,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             return { success: false, error: 'Khong co du lieu task hoan tat.' }
         }
 
+        stage = 'aggregate-pending'
         const pendingTaskAggregates = await workspacePrisma.task.groupBy({
             by: ['assigneeId'],
             where: {
@@ -168,6 +176,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         })
 
         // Use calculatedScore directly to avoid fragile relation join with ErrorDictionary.
+        stage = 'aggregate-penalty'
         const penaltyAggregates = await workspacePrisma.errorLog.groupBy({
             by: ['userId'],
             where: {
@@ -184,6 +193,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             return { success: false, error: 'Khong tim thay nhan su hop le.' }
         }
 
+        stage = 'users-find-many'
         const users = await workspacePrisma.user.findMany({
             where: {
                 id: { in: candidateUserIds },
@@ -280,6 +290,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             return { success: false, error: 'Khong co nhan su hop le de xep hang.' }
         }
 
+        stage = 'sort-rankings'
         rankings.sort((a, b) => {
             if (Math.abs(b.incomeScore - a.incomeScore) > 0.01) return b.incomeScore - a.incomeScore
             if (a.errorRate !== b.errorRate) return a.errorRate - b.errorRate
@@ -296,13 +307,16 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         const eligibleForBonus = rankings.filter(r => r.rankScore === 'S')
         const bonusPercentages = [0.1, 0.05]
 
+        stage = 'persist-delete-bonus'
         await workspacePrisma.monthlyBonus.deleteMany({
             where: { month: currentMonth, year: currentYear, workspaceId }
         })
+        stage = 'persist-delete-rank'
         await workspacePrisma.monthlyRank.deleteMany({
             where: { month: currentMonth, year: currentYear, workspaceId }
         })
 
+        stage = 'persist-upsert-lock'
         const payrollLock = await workspacePrisma.payrollLock.upsert({
             where: {
                 month_year_workspaceId: {
@@ -334,6 +348,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             bonusAmount: number
         }> = []
 
+        stage = 'persist-create-bonuses'
         for (let i = 0; i < Math.min(2, eligibleForBonus.length); i++) {
             const user = eligibleForBonus[i]
             const bonusAmount = user.monthlySalary * bonusPercentages[i]
@@ -375,9 +390,11 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         }))
 
         if (monthlyRankData.length > 0) {
+            stage = 'persist-create-ranks'
             await workspacePrisma.monthlyRank.createMany({ data: monthlyRankData })
         }
 
+        stage = 'revalidate'
         revalidatePath(`/${workspaceId}/admin/payroll`)
         return {
             success: true,
@@ -387,7 +404,8 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         }
     } catch (error: any) {
         const detail = error?.message || 'Unknown error'
-        console.error('Error calculating monthly bonus:', detail, error)
-        return { success: false, error: `Failed to calculate bonuses: ${detail}` }
+        const stackLine = typeof error?.stack === 'string' ? error.stack.split('\n').slice(0, 2).join(' | ') : ''
+        console.error('Error calculating monthly bonus:', { stage, detail, stack: stackLine, error })
+        return { success: false, error: `Failed to calculate bonuses [${stage}]: ${detail}` }
     }
 }

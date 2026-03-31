@@ -506,20 +506,10 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     </div>
 
                     {/* — Sticky Footer: Billing Profile + Generate — */}
-                    <div className="px-5 py-4 border-t border-zinc-700 bg-zinc-800 space-y-3 shrink-0">
-                        <div className="flex flex-col gap-2">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Hồ sơ thanh toán</label>
-                            <div className="flex gap-2 items-center">
-                                <select
-                                    className="flex-1 h-10 rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    value={billingProfileId}
-                                    onChange={e => setBillingProfileId(e.target.value)}
-                                >
-                                    <option value="">Chọn hồ sơ...</option>
-                                    {billingProfiles.map(p => (
-                                        <option key={p.id} value={p.id}>{p.profileName} ({p.bankName})</option>
-                                    ))}
-                                </select>
+                    <div className="px-5 py-5 border-t border-zinc-700 bg-zinc-800 space-y-4 shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.1)]">
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center px-1">
+                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Hồ sơ thanh toán</label>
                                 <BillingProfileManager
                                     currentProfileId={billingProfileId}
                                     onProfileSelect={(p) => {
@@ -528,15 +518,26 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                     }}
                                 />
                             </div>
+                            
+                            <select
+                                className="w-full h-11 rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer hover:border-zinc-500"
+                                value={billingProfileId}
+                                onChange={e => setBillingProfileId(e.target.value)}
+                            >
+                                <option value="">-- Chọn hồ sơ thanh toán --</option>
+                                {billingProfiles.map(p => (
+                                    <option key={p.id} value={p.id}>{p.profileName} ({p.bankName})</option>
+                                ))}
+                            </select>
                         </div>
 
                         <button
                             onClick={handleGenerate}
                             disabled={isGenerating || activeItems.length === 0}
-                            className="w-full h-12 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="w-full h-12 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:scale-[1.02] active:scale-[0.98] text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/40 disabled:opacity-40 disabled:cursor-not-allowed group"
                         >
-                            {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileDown size={18} />}
-                            {isGenerating ? 'Đang tạo...' : 'Xuất & Lưu Hóa Đơn'}
+                            {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileDown size={18} className="group-hover:translate-y-0.5 transition-transform" />}
+                            {isGenerating ? 'Đang tạo...' : 'Xuất & Lưu'}
                         </button>
                     </div>
                 </div>
@@ -694,40 +695,48 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                 <div className="flex flex-col md:flex-row gap-10">
                                     {/* Left side: Payment Info */}
                                     <div className="flex-1">
-                                        {(() => {
-                                            const p = billingProfiles.find(p => p.id === billingProfileId)
-                                            if (!p) return <div className="h-full border border-dashed border-gray-100 rounded-xl flex items-center justify-center text-gray-300 text-xs italic">Vui lòng chọn hồ sơ thanh toán</div>
-                                            return (
-                                                <div className="bg-gray-50/50 rounded-2xl p-6 border border-gray-100/50">
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Thông tin chuyển khoản</p>
-                                                    <div className="space-y-2 text-[13px]">
-                                                        <div className="flex justify-between items-start gap-4">
-                                                            <span className="text-gray-400 shrink-0">Chủ TK:</span>
-                                                            <span className="font-bold text-gray-900 text-right">{p.beneficiaryName}</span>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                            Chi tiết thanh toán
+                                            <span className="text-[11px] font-normal text-gray-300 normal-case italic">(Có thể sửa nhanh trực tiếp)</span>
+                                        </p>
+                                        <div className="bg-gray-50/80 rounded-2xl p-6 border border-gray-100 space-y-4">
+                                            {(() => {
+                                                const p = billingProfiles.find(p => p.id === billingProfileId)
+                                                return (
+                                                    <div className="space-y-4 text-[13px]">
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">Beneficiary Name</span>
+                                                            <input 
+                                                                className="font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 w-full px-1 py-0.5 transition-all"
+                                                                defaultValue={p?.beneficiaryName || ''}
+                                                            />
                                                         </div>
-                                                        <div className="flex justify-between items-start gap-4">
-                                                            <span className="text-gray-400 shrink-0">Ngân hàng:</span>
-                                                            <span className="font-bold text-gray-900 text-right">{p.bankName}</span>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Bank Name</span>
+                                                                <input 
+                                                                    className="font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 w-full px-1 py-0.5 transition-all"
+                                                                    defaultValue={p?.bankName || ''}
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Account Number</span>
+                                                                <input 
+                                                                    className="font-mono font-bold text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-indigo-400 w-full transition-all"
+                                                                    defaultValue={p?.accountNumber || ''}
+                                                                />
+                                                            </div>
                                                         </div>
-                                                        <div className="flex justify-between items-start gap-4">
-                                                            <span className="text-gray-400 shrink-0">Số TK:</span>
-                                                            <span className="font-mono font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded leading-none">{p.accountNumber}</span>
-                                                        </div>
-                                                        {(p.swiftCode || p.address) && <div className="pt-2 border-t border-gray-100 mt-2 space-y-2">
-                                                            {p.swiftCode && <div className="flex justify-between items-start gap-4 text-xs"><span className="text-gray-400">SWIFT:</span> <span className="font-mono text-gray-600">{p.swiftCode}</span></div>}
-                                                            {p.address && <div className="text-[11px] text-gray-400 leading-relaxed italic">{p.address}</div>}
-                                                        </div>}
-                                                        {p.notes && <div className="mt-3 p-3 bg-indigo-50/50 rounded-lg text-indigo-700 text-[11px] font-medium leading-relaxed">{p.notes}</div>}
                                                         {paymentLink && (
-                                                            <div className="mt-3 text-xs flex flex-col gap-1">
-                                                                <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Link thanh toán</span>
-                                                                <span className="text-blue-600 break-all underline underline-offset-2">{paymentLink}</span>
+                                                            <div className="mt-2 p-3 bg-white rounded-xl border border-blue-50 shadow-sm flex flex-col gap-1">
+                                                                <span className="text-[9px] font-black text-blue-400 uppercase tracking-tight">Payment Link</span>
+                                                                <span className="text-blue-600 font-medium break-all text-xs">{paymentLink}</span>
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
-                                            )
-                                        })()}
+                                                )
+                                            })()}
+                                        </div>
                                     </div>
 
                                     {/* Right side: Totals */}

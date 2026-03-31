@@ -371,65 +371,127 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 gap-0 overflow-hidden flex flex-row">
+            <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 gap-0 overflow-hidden flex flex-row bg-zinc-900 border border-zinc-700">
 
-                {/* LEFT PANEL: SELECTOR (30%) */}
-                <div className="w-[350px] bg-gray-50 border-r border-gray-200 flex flex-col h-full">
-                    <div className="p-4 border-b border-gray-200 bg-white">
-                        <h2 className="font-bold text-lg">Create Invoice</h2>
-                        <p className="text-xs text-gray-500">Select unbilled tasks to include</p>
+                {/* ═══════════════════════════════════════════════
+                    LEFT PANEL: CONTROL (zinc-800) — 420px wide
+                ═══════════════════════════════════════════════ */}
+                <div className="w-[420px] shrink-0 bg-zinc-800 border-r border-zinc-700 flex flex-col h-full">
+
+                    {/* — Header — */}
+                    <div className="px-5 py-4 border-b border-zinc-700">
+                        <h2 className="font-extrabold text-lg text-white tracking-tight">Tạo Hóa Đơn</h2>
+                        <p className="text-xs text-zinc-400 mt-0.5">Chọn tasks chưa xuất hóa đơn</p>
                     </div>
 
+                    {/* — Settings Card — */}
+                    <div className="px-5 pt-4 pb-3 border-b border-zinc-700 space-y-3">
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Cấu hình</p>
 
+                        {/* Row 1: Tax & Prepaid */}
+                        <div className="flex gap-3">
+                            <div className="flex-1 bg-zinc-900/50 rounded-xl border border-zinc-700 px-3 py-2 flex items-center gap-2">
+                                <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Tax %</span>
+                                <input
+                                    type="number"
+                                    className="flex-1 bg-transparent text-right text-white font-bold text-sm focus:outline-none min-w-0"
+                                    value={taxPercent}
+                                    onChange={e => setTaxPercent(Number(e.target.value))}
+                                />
+                            </div>
+                            <div className="flex-1 bg-zinc-900/50 rounded-xl border border-zinc-700 px-3 py-2 flex items-center gap-2">
+                                <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Prepaid $</span>
+                                <input
+                                    type="number"
+                                    className="flex-1 bg-transparent text-right text-red-400 font-bold text-sm focus:outline-none min-w-0"
+                                    value={customPrepaid}
+                                    onChange={e => setCustomPrepaid(Number(e.target.value))}
+                                />
+                            </div>
+                        </div>
 
-                    // ... inside return ...
+                        {/* Row 2: Payment Link */}
+                        <div className="bg-zinc-900/50 rounded-xl border border-zinc-700 px-3 py-2 flex items-center gap-2">
+                            <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Payment Link</span>
+                            <input
+                                type="text"
+                                placeholder="https://..."
+                                className="flex-1 bg-transparent text-blue-400 text-xs font-medium focus:outline-none placeholder-zinc-600 min-w-0"
+                                value={paymentLink}
+                                onChange={e => setPaymentLink(e.target.value)}
+                            />
+                        </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                        {isLoading ? <Loader2 className="animate-spin text-gray-400 mx-auto mt-10" /> : (
-                            tasks.length === 0 ? (
-                                <p className="text-sm text-gray-400 text-center mt-10">No unbilled tasks found.</p>
-                            ) : (
-                                <Accordion type="multiple" defaultValue={Object.keys(groupedTasks)} className="space-y-2">
-                                    {Object.entries(groupedTasks).map(([brand, brandTasks]) => (
-                                        <AccordionItem key={brand} value={brand} className="border rounded-lg bg-white px-0">
-                                            <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-gray-50 rounded-t-lg">
-                                                <div className="flex justify-between items-center w-full mr-2">
-                                                    <span className="font-bold text-sm text-gray-700">{brand}</span>
-                                                    <span className="text-xs text-gray-400 font-normal">{brandTasks.length} tasks</span>
-                                                </div>
-                                            </AccordionTrigger>
-                                            <AccordionContent className="px-3 pb-2 pt-0">
-                                                <div className="space-y-1 mt-2">
-                                                    {brandTasks.map(task => (
-                                                        <div
-                                                            key={task.id}
-                                                            onClick={() => toggleTask(task.id)}
-                                                            className={`p-2 rounded border cursor-pointer transition-all flex items-center justify-between group ${selectedTaskIds.includes(task.id) ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100 hover:border-blue-300'}`}
-                                                        >
-                                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedTaskIds.includes(task.id) ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'}`}>
-                                                                    {selectedTaskIds.includes(task.id) && <Plus className="text-white rotate-45" size={10} />}
-                                                                </div>
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <div className="text-xs font-medium text-gray-700 truncate w-full">{task.title}</div>
-                                                                    <div className="text-[10px] text-gray-400">{new Date(task.createdAt).toLocaleDateString()}</div>
-                                                                </div>
+                        {/* Row 3: Toggles */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Group by Brand Toggle */}
+                            <button
+                                onClick={() => setGroupByBrand(v => !v)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all duration-200 ${groupByBrand ? 'bg-indigo-500/20 border-indigo-500/60 text-indigo-300' : 'bg-zinc-700 border-zinc-600 text-zinc-400'}`}
+                            >
+                                <span className={`w-2 h-2 rounded-full ${groupByBrand ? 'bg-indigo-400' : 'bg-zinc-500'}`} />
+                                Gộp theo Brand
+                            </button>
+
+                            {/* Use Deposit Toggle */}
+                            {depositBalance > 0 && (
+                                <button
+                                    onClick={() => setApplyDeposit(v => !v)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all duration-200 ${applyDeposit ? 'bg-amber-500/20 border-amber-500/60 text-amber-300' : 'bg-zinc-700 border-zinc-600 text-zinc-400'}`}
+                                >
+                                    <span className={`w-2 h-2 rounded-full ${applyDeposit ? 'bg-amber-400' : 'bg-zinc-500'}`} />
+                                    Dùng Deposit (-${maxDeductible})
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* — Task List (flex-1, scrollable) — */}
+                    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 custom-scrollbar">
+                        {isLoading ? (
+                            <div className="flex justify-center mt-10"><Loader2 className="animate-spin text-zinc-500" size={28} /></div>
+                        ) : tasks.length === 0 ? (
+                            <p className="text-sm text-zinc-500 text-center mt-10 italic">Không có task chưa xuất hóa đơn.</p>
+                        ) : (
+                            <Accordion type="multiple" defaultValue={Object.keys(groupedTasks)} className="space-y-2">
+                                {Object.entries(groupedTasks).map(([brand, brandTasks]) => (
+                                    <AccordionItem key={brand} value={brand} className="border border-zinc-700 rounded-xl bg-zinc-900/40 px-0 overflow-hidden">
+                                        <AccordionTrigger className="px-4 py-2.5 hover:no-underline hover:bg-zinc-700/30 transition-colors">
+                                            <div className="flex justify-between items-center w-full mr-2">
+                                                <span className="font-bold text-sm text-zinc-200">{brand}</span>
+                                                <span className="text-[11px] text-zinc-500 font-normal bg-zinc-800 px-2 py-0.5 rounded-full">{brandTasks.length} tasks</span>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="px-3 pb-3 pt-0">
+                                            <div className="space-y-1.5 mt-2">
+                                                {brandTasks.map(task => (
+                                                    <div
+                                                        key={task.id}
+                                                        onClick={() => toggleTask(task.id)}
+                                                        className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${selectedTaskIds.includes(task.id) ? 'bg-indigo-500/15 border-indigo-500/40' : 'bg-zinc-800/60 border-zinc-700 hover:border-indigo-500/30'}`}
+                                                    >
+                                                        <div className="flex items-center gap-3 overflow-hidden">
+                                                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0 ${selectedTaskIds.includes(task.id) ? 'bg-indigo-500 border-indigo-500' : 'border-zinc-600 bg-transparent'}`}>
+                                                                {selectedTaskIds.includes(task.id) && <Plus className="text-white rotate-45" size={10} />}
                                                             </div>
-                                                            <div className="text-xs font-bold text-green-600 whitespace-nowrap ml-2">
-                                                                {formatCurrency(task.jobPriceUSD)}
+                                                            <div className="flex flex-col min-w-0">
+                                                                <div className="text-xs font-semibold text-zinc-200 truncate">{task.title}</div>
+                                                                <div className="text-[10px] text-zinc-500 mt-0.5">{new Date(task.createdAt).toLocaleDateString('vi-VN')}</div>
                                                             </div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            </AccordionContent>
-                                        </AccordionItem>
-                                    ))}
-                                </Accordion>
-                            )
+                                                        <div className="text-xs font-bold text-emerald-400 whitespace-nowrap ml-2 shrink-0">
+                                                            {formatCurrency(task.jobPriceUSD)}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
                         )}
 
-
-                        {/* Manual Item Button */}
+                        {/* Add Manual Item */}
                         <button
                             onClick={() => {
                                 const newItem = { id: `man-${Date.now()}`, description: 'Extra Service', quantity: 1, unitPrice: 0, amount: 0, isManual: true }
@@ -437,23 +499,23 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                 setEditingItemId(newItem.id)
                                 setEditForm({ description: newItem.description, unitPrice: 0, quantity: 1 })
                             }}
-                            className="w-full py-2 border border-dashed border-gray-300 rounded text-sm text-gray-500 hover:bg-gray-100 flex items-center justify-center gap-2"
+                            className="w-full py-2.5 border border-dashed border-zinc-700 rounded-xl text-sm text-zinc-500 hover:border-indigo-500/50 hover:text-indigo-400 hover:bg-indigo-500/5 flex items-center justify-center gap-2 transition-all"
                         >
-                            <Plus size={14} /> Add Manual Item
+                            <Plus size={14} /> Thêm hạng mục thủ công
                         </button>
                     </div>
 
-                    <div className="p-4 border-t border-gray-200 bg-white space-y-3">
-                        {/* BILLING PROFILE SELECTOR */}
-                        <div className="mb-6 flex flex-col gap-2">
-                            <label className="block text-xs font-bold text-gray-500 uppercase">Billing Profile</label>
+                    {/* — Sticky Footer: Billing Profile + Generate — */}
+                    <div className="px-5 py-4 border-t border-zinc-700 bg-zinc-800 space-y-3 shrink-0">
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Hồ sơ thanh toán</label>
                             <div className="flex gap-2 items-center">
                                 <select
-                                    className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    className="flex-1 h-10 rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     value={billingProfileId}
                                     onChange={e => setBillingProfileId(e.target.value)}
                                 >
-                                    <option value="">Select Profile...</option>
+                                    <option value="">Chọn hồ sơ...</option>
                                     {billingProfiles.map(p => (
                                         <option key={p.id} value={p.id}>{p.profileName} ({p.bankName})</option>
                                     ))}
@@ -468,85 +530,43 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                             </div>
                         </div>
 
-                        <Button onClick={handleGenerate} disabled={isGenerating || activeItems.length === 0} className="w-full gap-2">
-                            {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <FileDown size={16} />}
-                            Generate & Save
-                        </Button>
+                        <button
+                            onClick={handleGenerate}
+                            disabled={isGenerating || activeItems.length === 0}
+                            className="w-full h-12 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileDown size={18} />}
+                            {isGenerating ? 'Đang tạo...' : 'Xuất & Lưu Hóa Đơn'}
+                        </button>
                     </div>
                 </div>
 
-                {/* RIGHT PANEL: PREVIEW (70%) */}
-                <div className="flex-1 bg-gray-100 flex flex-col h-full overflow-hidden">
-                    <div className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-6">
-                        <span className="font-bold text-gray-500 text-sm">LIVE PREVIEW</span>
-                        <div className="flex items-center gap-4 flex-wrap pb-2 md:pb-0">
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
-                                <span className="text-xs font-bold text-gray-600">Tax:</span>
-                                <Input
-                                    type="number"
-                                    className="w-16 h-7 text-right bg-white border-gray-300 text-gray-900 font-bold focus:ring-blue-500"
-                                    value={taxPercent}
-                                    onChange={e => setTaxPercent(Number(e.target.value))}
-                                />
-                                <span className="text-xs text-gray-600 font-bold">%</span>
-                            </div>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
-                                <span className="text-xs font-bold text-gray-600 whitespace-nowrap">Prepaid ($):</span>
-                                <Input
-                                    type="number"
-                                    className="w-20 h-7 text-right bg-white border-gray-300 text-red-600 font-bold focus:ring-red-500"
-                                    value={customPrepaid}
-                                    onChange={e => setCustomPrepaid(Number(e.target.value))}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
-                                <span className="text-xs font-bold text-gray-600 whitespace-nowrap">Payment Link:</span>
-                                <Input
-                                    type="text"
-                                    placeholder="https://..."
-                                    className="w-48 h-7 text-xs bg-white border-gray-300 text-blue-600 font-medium focus:ring-blue-500 placeholder-gray-400"
-                                    value={paymentLink}
-                                    onChange={e => setPaymentLink(e.target.value)}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded border border-blue-200">
-                                <input
-                                    type="checkbox"
-                                    checked={groupByBrand}
-                                    onChange={e => setGroupByBrand(e.target.checked)}
-                                    id="group-brand"
-                                />
-                                <label htmlFor="group-brand" className="text-xs font-bold text-blue-700 cursor-pointer">
-                                    Group by Brand
-                                </label>
-                            </div>
-                            {depositBalance > 0 && (
-                                <div className="flex items-center gap-2 bg-yellow-50 px-3 py-1 rounded border border-yellow-200">
-                                    <input
-                                        type="checkbox"
-                                        checked={applyDeposit}
-                                        onChange={e => setApplyDeposit(e.target.checked)}
-                                        id="use-deposit"
-                                    />
-                                    <label htmlFor="use-deposit" className="text-xs font-bold text-yellow-700 cursor-pointer">
-                                        Use Deposit (-${maxDeductible})
-                                    </label>
-                                </div>
-                            )}
+                {/* ═══════════════════════════════════════════════
+                    RIGHT PANEL: LIVE PREVIEW (zinc-950)
+                ═══════════════════════════════════════════════ */}
+                <div className="flex-1 bg-zinc-950 flex flex-col h-full overflow-hidden">
+
+                    {/* Topbar */}
+                    <div className="h-12 border-b border-zinc-800 flex items-center px-6 gap-4 shrink-0">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Live Preview</span>
                         </div>
+                        <span className="ml-auto text-[11px] text-zinc-600 font-mono">{invoiceNumber}</span>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-8 flex justify-center">
-                        <div className="bg-white shadow-xl w-[800px] min-h-[1000px] p-10 flex flex-col relative animate-fade-in text-gray-800 text-sm">
+                    {/* A4 Floating Sheet */}
+                    <div className="flex-1 overflow-y-auto p-10 flex justify-center custom-scrollbar">
+                        <div className="bg-white shadow-[0_30px_80px_rgba(0,0,0,0.7)] w-[760px] min-h-[1000px] p-12 flex flex-col relative text-gray-800 text-sm rounded-sm">
 
-                            {/* HEADER */}
+                            {/* — Invoice Header — */}
                             <div className="flex justify-between mb-10">
-                                <div className="text-2xl font-bold">
+                                <div className="text-2xl font-bold text-gray-900">
                                     <input
                                         type="text"
                                         value={customAgencyName}
                                         onChange={e => setCustomAgencyName(e.target.value)}
-                                        className="font-bold border-b border-transparent hover:border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent"
+                                        className="font-bold border-b border-transparent hover:border-gray-300 focus:outline-none focus:border-indigo-400 bg-transparent transition-colors"
                                         style={{ width: `${Math.max(10, customAgencyName.length)}ch` }}
                                     />
                                 </div>
@@ -555,33 +575,34 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         type="text"
                                         value={customTitle}
                                         onChange={e => setCustomTitle(e.target.value.toUpperCase())}
-                                        className="text-4xl font-bold text-gray-900 uppercase text-right border-b border-transparent hover:border-gray-300 focus:outline-none focus:border-blue-500 bg-transparent"
+                                        className="text-4xl font-black text-gray-900 uppercase text-right border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent tracking-tight transition-colors"
                                         style={{ width: `${Math.max(6, customTitle.length)}ch` }}
                                     />
-                                    <div className="text-gray-500 mt-1"># {invoiceNumber}</div>
+                                    <div className="text-gray-400 text-sm mt-1 font-mono tracking-wide"># {invoiceNumber}</div>
                                 </div>
                             </div>
 
-                            {/* META */}
-                            <div className="grid grid-cols-2 gap-10 mb-10">
+                            {/* — Bill To & Dates — */}
+                            <div className="grid grid-cols-2 gap-12 mb-10">
                                 <div>
-                                    <h3 className="text-xs font-bold text-gray-400 uppercase mb-1">Bill To</h3>
-                                    <div className="font-bold text-lg text-black mb-1">{clientName}</div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Bill To</p>
+                                    <div className="font-bold text-xl text-gray-900 mb-2">{clientName}</div>
                                     <textarea
                                         value={customClientAddress}
                                         onChange={e => setCustomClientAddress(e.target.value)}
-                                        placeholder="No address on file. Click to add..."
-                                        className="w-full bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 focus:outline-none resize-none text-gray-600 h-16"
+                                        placeholder="Thêm địa chỉ khách hàng..."
+                                        rows={3}
+                                        className="w-full bg-transparent border border-transparent hover:border-gray-200 focus:border-indigo-300 focus:outline-none resize-none text-gray-500 text-sm rounded p-1 transition-colors"
                                     />
                                 </div>
-                                <div className="text-right">
-                                    <div className="mb-4">
-                                        <h3 className="text-xs font-bold text-gray-400 uppercase mb-1">Date</h3>
+                                <div className="text-right space-y-4">
+                                    <div>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ngày xuất</p>
                                         <input
                                             type="date"
                                             value={issueDate}
                                             onChange={e => setIssueDate(e.target.value)}
-                                            className="text-right font-bold border-b border-dashed border-gray-300 focus:outline-none focus:border-blue-500 w-32"
+                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-300 focus:outline-none focus:border-indigo-400 bg-transparent"
                                         />
                                     </div>
                                     <div>
@@ -589,83 +610,70 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                             type="text"
                                             value={dueDateLabel}
                                             onChange={e => setDueDateLabel(e.target.value)}
-                                            className="text-xs font-bold text-gray-400 uppercase mb-1 text-right bg-transparent border-b border-transparent hover:border-gray-300 focus:outline-none focus:border-blue-500 w-32"
+                                            className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-right bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-300 block ml-auto transition-colors"
+                                            style={{ width: `${Math.max(8, dueDateLabel.length + 2)}ch` }}
                                         />
-                                        <br />
                                         <input
                                             type="text"
                                             value={dueDate}
                                             onChange={e => setDueDate(e.target.value)}
                                             placeholder="e.g. On Request"
-                                            className="text-right font-bold border-b border-dashed border-gray-300 focus:outline-none focus:border-blue-500 w-32 bg-transparent"
+                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-300 focus:outline-none focus:border-indigo-400 bg-transparent placeholder-gray-300 block ml-auto"
+                                            style={{ width: '10rem' }}
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* TABLE */}
-                            <div className="flex-1">
-                                <table className="w-full mb-8">
+                            {/* — Items Table — */}
+                            <div className="flex-1 mb-8">
+                                <table className="w-full">
                                     <thead>
-                                        <tr className="border-b-2 border-gray-100">
-                                            <th className="text-left py-2 text-xs font-bold text-gray-400 uppercase w-1/2">Description</th>
-                                            <th className="text-right py-2 text-xs font-bold text-gray-400 uppercase">Qty</th>
-                                            <th className="text-right py-2 text-xs font-bold text-gray-400 uppercase">Rate</th>
-                                            <th className="text-right py-2 text-xs font-bold text-gray-400 uppercase">Amount</th>
-                                            <th className="w-8"></th>
+                                        <tr className="border-b-2 border-gray-900">
+                                            <th className="text-left pb-3 text-[11px] font-black text-gray-500 uppercase tracking-wider w-[45%]">Mô tả</th>
+                                            <th className="text-center pb-3 text-[11px] font-black text-gray-500 uppercase tracking-wider w-14">SL</th>
+                                            <th className="text-right pb-3 text-[11px] font-black text-gray-500 uppercase tracking-wider">Đơn giá</th>
+                                            <th className="text-right pb-3 text-[11px] font-black text-gray-500 uppercase tracking-wider">Thành tiền</th>
+                                            <th className="w-10" />
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {activeItems.map((item) => (
-                                            <tr key={item.id} className="border-b border-gray-50 group hover:bg-gray-50 transition-colors">
+                                        {activeItems.map(item => (
+                                            <tr key={item.id} className="border-b border-gray-100 group hover:bg-gray-50 transition-colors">
                                                 {editingItemId === item.id ? (
-                                                    // EDIT MODE
                                                     <>
-                                                        <td className="py-3">
-                                                            <Input
-                                                                value={editForm.description}
-                                                                onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                                                                className="h-8 mb-1"
-                                                            />
+                                                        <td className="py-3 pr-2">
+                                                            <Input value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} className="h-8 text-sm" />
+                                                        </td>
+                                                        <td className="py-3 text-center">
+                                                            <Input type="number" value={editForm.quantity} onChange={e => setEditForm({ ...editForm, quantity: Number(e.target.value) })} className="h-8 w-14 mx-auto text-center" />
                                                         </td>
                                                         <td className="py-3 text-right">
-                                                            <Input
-                                                                type="number"
-                                                                value={editForm.quantity}
-                                                                onChange={e => setEditForm({ ...editForm, quantity: Number(e.target.value) })}
-                                                                className="h-8 w-16 ml-auto"
-                                                            />
+                                                            <Input type="number" value={editForm.unitPrice} onChange={e => setEditForm({ ...editForm, unitPrice: Number(e.target.value) })} className="h-8 w-24 ml-auto text-right" />
                                                         </td>
-                                                        <td className="py-3 text-right">
-                                                            <Input
-                                                                type="number"
-                                                                value={editForm.unitPrice}
-                                                                onChange={e => setEditForm({ ...editForm, unitPrice: Number(e.target.value) })}
-                                                                className="h-8 w-24 ml-auto"
-                                                            />
-                                                        </td>
-                                                        <td className="py-3 text-right font-bold font-mono">
+                                                        <td className="py-3 text-right font-bold font-mono text-gray-800">
                                                             ${(editForm.unitPrice * editForm.quantity).toFixed(2)}
                                                         </td>
-                                                        <td className="py-3 text-right">
-                                                            <button onClick={saveEditItem} className="text-green-600 hover:text-green-800"><Edit2 size={16} /></button>
+                                                        <td className="py-3 text-center">
+                                                            <button onClick={saveEditItem} className="text-emerald-600 hover:text-emerald-800 p-1"><Edit2 size={15} /></button>
                                                         </td>
                                                     </>
                                                 ) : (
-                                                    // VIEW MODE
                                                     <>
-                                                        <td className="py-3 pr-4">
-                                                            <div className="font-bold text-gray-800">{item.description}</div>
-                                                            {item.note && <div className="text-xs text-gray-400 mt-1">{item.note}</div>}
+                                                        <td className="py-3.5 pr-4">
+                                                            <div className="font-semibold text-gray-800">{item.description}</div>
+                                                            {item.note && <div className="text-xs text-gray-400 mt-0.5">{item.note}</div>}
                                                         </td>
-                                                        <td className="py-3 text-right">{item.quantity}</td>
-                                                        <td className="py-3 text-right text-gray-500">${item.unitPrice.toFixed(2)}</td>
-                                                        <td className="py-3 text-right font-bold text-gray-800 font-mono">${item.amount.toFixed(2)}</td>
-                                                        <td className="py-3 text-right opacity-0 group-hover:opacity-100 flex gap-2 justify-end items-center h-full">
-                                                            <button onClick={() => handleEditItem(item)} className="text-blue-500 hover:text-blue-700 p-1"><Edit2 size={14} /></button>
-                                                            {item.isManual && (
-                                                                <button onClick={() => setManualItems(prev => prev.filter(m => m.id !== item.id))} className="text-red-500 hover:text-red-700 p-1"><Trash2 size={14} /></button>
-                                                            )}
+                                                        <td className="py-3.5 text-center text-gray-600">{item.quantity}</td>
+                                                        <td className="py-3.5 text-right text-gray-500 font-mono">${item.unitPrice.toFixed(2)}</td>
+                                                        <td className="py-3.5 text-right font-bold text-gray-800 font-mono">${item.amount.toFixed(2)}</td>
+                                                        <td className="py-3.5 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                <button onClick={() => handleEditItem(item)} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit2 size={13} /></button>
+                                                                {item.isManual && (
+                                                                    <button onClick={() => setManualItems(prev => prev.filter(m => m.id !== item.id))} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={13} /></button>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </>
                                                 )}
@@ -673,67 +681,71 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         ))}
                                         {activeItems.length === 0 && (
                                             <tr>
-                                                <td colSpan={5} className="py-10 text-center text-gray-300 italic">Select tasks from the left or add manual items</td>
+                                                <td colSpan={5} className="py-12 text-center text-gray-300 italic text-sm">Chọn tasks ở bên trái hoặc thêm hạng mục thủ công</td>
                                             </tr>
                                         )}
                                     </tbody>
                                 </table>
                             </div>
 
-                            {/* TOTALS */}
+                            {/* — Totals — */}
                             <div className="flex justify-end mb-10">
-                                <div className="w-64 space-y-2">
-                                    <div className="flex justify-between text-gray-600">
-                                        <span>Subtotal</span>
-                                        <span>${activeSubtotal.toFixed(2)}</span>
+                                <div className="w-72 space-y-2">
+                                    <div className="flex justify-between text-gray-500 text-sm">
+                                        <span>Tạm tính</span>
+                                        <span className="font-mono">${activeSubtotal.toFixed(2)}</span>
                                     </div>
                                     {taxPercent > 0 && (
-                                        <div className="flex justify-between text-gray-600">
-                                            <span>Tax ({taxPercent}%)</span>
-                                            <span>${activeTaxAmount.toFixed(2)}</span>
+                                        <div className="flex justify-between text-gray-500 text-sm">
+                                            <span>Thuế ({taxPercent}%)</span>
+                                            <span className="font-mono">${activeTaxAmount.toFixed(2)}</span>
                                         </div>
                                     )}
                                     {totalDeducted > 0 && (
-                                        <div className="flex justify-between text-red-600 font-medium">
-                                            <span>Less Deposit / Prepaid</span>
-                                            <span>-${totalDeducted.toFixed(2)}</span>
+                                        <div className="flex justify-between text-red-500 text-sm font-medium">
+                                            <span>Deposit / Trả trước</span>
+                                            <span className="font-mono">-${totalDeducted.toFixed(2)}</span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between text-xl font-bold border-t-2 border-gray-900 pt-3 mt-3">
-                                        <span>Total Due</span>
-                                        <span>${finalTotalDue.toFixed(2)}</span>
+                                    <div className="flex justify-between text-gray-900 text-xl font-black border-t-2 border-gray-900 pt-3 mt-2">
+                                        <span>Tổng phải thu</span>
+                                        <span className="font-mono">${finalTotalDue.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* FOOTER */}
-                            {billingProfiles.find(p => p.id === billingProfileId) && (
-                                <div className="bg-gray-50 p-6 rounded-lg text-xs text-gray-600">
-                                    <h4 className="font-bold uppercase text-gray-400 mb-2">Payment Information</h4>
-                                    {(() => {
-                                        const p = billingProfiles.find(p => p.id === billingProfileId)
-                                        if (!p) return null
-                                        return (
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <span className="font-bold">Beneficiary:</span> {p.beneficiaryName} <br />
-                                                    <span className="font-bold">Bank:</span> {p.bankName} <br />
-                                                    <span className="font-bold">Account:</span> {p.accountNumber} <br />
-                                                    {p.notes && <div className="mt-2 text-blue-600 whitespace-pre-line font-medium">{p.notes}</div>}
-                                                </div>
-                                                <div>
-                                                    {p.swiftCode && <><span className="font-bold">SWIFT/BIC:</span> {p.swiftCode} <br /></>}
-                                                    {p.address && <><span className="font-bold">Address:</span> {p.address}</>}
-                                                </div>
+                            {/* — Payment Info Footer — */}
+                            {(() => {
+                                const p = billingProfiles.find(p => p.id === billingProfileId)
+                                if (!p) return null
+                                return (
+                                    <div className="bg-gray-50 rounded-xl p-6 text-xs text-gray-600 border border-gray-100">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Thông tin thanh toán</p>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="space-y-1">
+                                                <div><span className="font-bold text-gray-700">Beneficiary:</span> {p.beneficiaryName}</div>
+                                                <div><span className="font-bold text-gray-700">Bank:</span> {p.bankName}</div>
+                                                <div><span className="font-bold text-gray-700">Account:</span> <span className="font-mono">{p.accountNumber}</span></div>
+                                                {p.notes && <div className="mt-2 text-indigo-600 whitespace-pre-line font-medium">{p.notes}</div>}
                                             </div>
-                                        )
-                                    })()}
-                                </div>
-                            )}
-
+                                            <div className="space-y-1">
+                                                {p.swiftCode && <div><span className="font-bold text-gray-700">SWIFT/BIC:</span> <span className="font-mono">{p.swiftCode}</span></div>}
+                                                {p.address && <div><span className="font-bold text-gray-700">Address:</span> {p.address}</div>}
+                                                {paymentLink && (
+                                                    <div className="mt-2">
+                                                        <span className="font-bold text-gray-700">Payment Link: </span>
+                                                        <span className="text-blue-600 break-all">{paymentLink}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })()}
                         </div>
                     </div>
                 </div>
+
             </DialogContent>
         </Dialog>
     )

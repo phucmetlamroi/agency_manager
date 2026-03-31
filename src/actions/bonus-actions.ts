@@ -305,8 +305,10 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             return a.username.localeCompare(b.username, 'vi')
         })
 
-        const eligibleForBonus = rankings.filter(r => r.rankScore === 'S')
+        // Top 2 earners receive the monetary bonus, regardless of the strict 'S' rank (8 tasks min)
+        const eligibleForBonus = rankings.filter(r => r.incomeScore > 0)
         const bonusPercentages = [0.1, 0.05]
+
 
         stage = 'persist-delete-bonus'
         await prisma.monthlyBonus.deleteMany({

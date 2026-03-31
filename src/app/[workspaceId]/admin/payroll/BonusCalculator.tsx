@@ -33,12 +33,18 @@ export default function BonusCalculator({ workspaceId }: { workspaceId: string }
         try {
             const res = await calculateMonthlyBonus(workspaceId)
             if (res.success) {
-                toast.success(`Đã tính xong thưởng tháng ${res.month}/${res.year}! Top 1, 2, 3 đã được cập nhật thưởng. Kỳ lương ĐÃ KHÓA.`)
+                const awardedCount = res.bonuses?.length || 0;
+                const topText = awardedCount > 0 
+                  ? `Đã thưởng cho Top ${awardedCount} nhân sự.` 
+                  : 'Không có nhân sự nào đủ điều kiện thưởng.'
+
+                toast.success(`Đã tính xong thưởng tháng ${res.month}/${res.year}! ${topText} Kỳ lương ĐÃ KHÓA.`)
                 setIsLocked(true)
                 router.refresh()
             } else {
                 toast.error('Lỗi: ' + res.error)
             }
+
         } catch (error) {
             console.error(error)
             toast.error('Có lỗi xảy ra khi tính thưởng.')

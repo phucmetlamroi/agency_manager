@@ -51,7 +51,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         jobPriceUSD: 0,
         value: 0,
         collectFilesLink: '',
-        submissionFolder: ''
+        submissionFolder: '',
+        scriptLink: ''
     })
 
     // Helper: Parse content for Tiptap (logic unchanged)
@@ -88,11 +89,23 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 deadlineStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
             }
 
+            // Parse references: supports plain URL or "REF:url|SCRIPT:url" format
+            let refUrl = task.references || ''
+            let scriptUrl = ''
+            if (refUrl.startsWith('REF:')) {
+                const refParts = refUrl.split('|')
+                refParts.forEach(p => {
+                    const t = p.trim()
+                    if (t.startsWith('REF:')) refUrl = t.replace('REF:', '').trim()
+                    if (t.startsWith('SCRIPT:')) scriptUrl = t.replace('SCRIPT:', '').trim()
+                })
+            }
+
             setForm({
                 resources: resString,
                 linkRaw: raw,
                 linkBroll: broll,
-                references: task.references || '',
+                references: refUrl,
                 notes_vi: parseContent(task.notes_vi),
                 notes_en: parseContent(task.notes_en),
                 productLink: task.productLink || '',
@@ -100,7 +113,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 jobPriceUSD: task.jobPriceUSD || 0,
                 value: task.value || 0,
                 collectFilesLink: task.collectFilesLink || '',
-                submissionFolder: submission
+                submissionFolder: submission,
+                scriptLink: scriptUrl
             })
             setIsEditing(false)
         }
@@ -123,6 +137,11 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         const cleanNotesVi = DOMPurify.sanitize(form.notes_vi)
         const cleanNotesEn = DOMPurify.sanitize(form.notes_en)
 
+        // Encode references + scriptLink into one field
+        const combinedReferences = form.scriptLink
+            ? `REF:${form.references.trim()} | SCRIPT:${form.scriptLink.trim()}`
+            : form.references
+
         if (isAdmin) {
             await updateFrameAccount(frameAccount.account, frameAccount.password)
         }
@@ -133,7 +152,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             const { bulkUpdateTaskDetails } = await import('@/actions/bulk-task-actions')
             const bulkData: any = {}
             if (enabledFields['resources']) bulkData.resources = combinedResources
-            if (enabledFields['references']) bulkData.references = form.references
+            if (enabledFields['references']) bulkData.references = combinedReferences
             if (enabledFields['notes']) bulkData.notes = cleanNotesVi
             if (enabledFields['notes_en']) bulkData.notes_en = cleanNotesEn
             if (enabledFields['productLink']) bulkData.productLink = form.productLink
@@ -172,7 +191,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             setLocalTask(prev => prev ? ({
                 ...prev,
                 resources: combinedResources,
-                references: form.references,
+                references: combinedReferences,
                 notes_vi: cleanNotesVi,
                 notes_en: cleanNotesEn,
                 productLink: form.productLink,
@@ -481,7 +500,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             )}
                         </div>
 
-                        {/* REFERENCES */}
+                        {/* REFERENCES + SCRIPT */}
                         <div className="space-y-2.5">
                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                                 <MonitorPlay className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -489,28 +508,47 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                 <BulkToggle field="references" label="References" />
                             </label>
                             {isEditing ? (
-                                <input
-                                    value={form.references}
-                                    onChange={(e) => setForm({ ...form, references: e.target.value })}
-                                    placeholder="Reference Links..."
-                                    disabled={!!(isBulkMode && !enabledFields['references'])}
-                                    className={cn(
-                                        "w-full p-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-sm outline-none focus:border-purple-500/50 text-zinc-300 placeholder:text-zinc-600 transition-all",
-                                        isBulkMode && !enabledFields['references'] ? 'opacity-40 cursor-not-allowed' : ''
-                                    )}
-                                />
+                                <div className={cn("space-y-2", isBulkMode && !enabledFields['references'] ? 'opacity-40 pointer-events-none' : '')}>
+                                    <input
+                                        value={form.references}
+                                        onChange={(e) => setForm({ ...form, references: e.target.value })}
+                                        placeholder="Reference link..."
+                                        className="w-full p-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-sm outline-none focus:border-purple-500/50 text-zinc-300 placeholder:text-zinc-600 transition-all"
+                                    />
+                                    {/* Script input */}
+                                    <input
+                                        value={form.scriptLink}
+                                        onChange={(e) => setForm({ ...form, scriptLink: e.target.value })}
+                                        placeholder="Script / Transcript / Kịch bản link..."
+                                        className="w-full p-2.5 bg-teal-500/5 border border-teal-500/20 rounded-xl text-sm outline-none focus:border-teal-500/40 text-teal-300 placeholder:text-zinc-600 transition-all"
+                                    />
+                                </div>
                             ) : (
-                                localTask.references ? (
-                                    <a href={formatLink(localTask.references)} target="_blank"
-                                        className="group flex items-center gap-2.5 p-4 bg-gradient-to-r from-purple-600/15 to-violet-600/10 border border-purple-500/20 text-purple-200 rounded-xl text-sm font-bold hover:border-purple-400/35 hover:from-purple-600/20 transition-all"
-                                    >
-                                        <MonitorPlay className="w-4 h-4 text-purple-400 flex-shrink-0" strokeWidth={1.5} />
-                                        View Reference
-                                        <ExternalLink className="w-3.5 h-3.5 text-purple-500 group-hover:text-purple-300 ml-auto group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" strokeWidth={1.5} />
-                                    </a>
-                                ) : (
-                                    <div className="text-zinc-600 italic text-xs p-3 bg-zinc-900/40 rounded-xl border border-white/5">Không có reference</div>
-                                )
+                                <div className="flex flex-col gap-2">
+                                    {/* View Reference button */}
+                                    {form.references ? (
+                                        <a href={formatLink(form.references)} target="_blank"
+                                            className="group flex items-center gap-2.5 p-4 bg-gradient-to-r from-purple-600/15 to-violet-600/10 border border-purple-500/20 text-purple-200 rounded-xl text-sm font-bold hover:border-purple-400/35 hover:from-purple-600/20 transition-all"
+                                        >
+                                            <MonitorPlay className="w-4 h-4 text-purple-400 flex-shrink-0" strokeWidth={1.5} />
+                                            View Reference
+                                            <ExternalLink className="w-3.5 h-3.5 text-purple-500 group-hover:text-purple-300 ml-auto group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" strokeWidth={1.5} />
+                                        </a>
+                                    ) : (
+                                        <div className="text-zinc-600 italic text-xs p-3 bg-zinc-900/40 rounded-xl border border-white/5">Không có reference</div>
+                                    )}
+
+                                    {/* View Script button */}
+                                    {form.scriptLink ? (
+                                        <a href={formatLink(form.scriptLink)} target="_blank"
+                                            className="group flex items-center gap-2.5 p-4 bg-gradient-to-r from-teal-600/15 to-cyan-600/10 border border-teal-500/20 text-teal-200 rounded-xl text-sm font-bold hover:border-teal-400/35 hover:from-teal-600/20 transition-all"
+                                        >
+                                            <FileText className="w-4 h-4 text-teal-400 flex-shrink-0" strokeWidth={1.5} />
+                                            Xem Script / Kịch Bản
+                                            <ExternalLink className="w-3.5 h-3.5 text-teal-500 group-hover:text-teal-300 ml-auto group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" strokeWidth={1.5} />
+                                        </a>
+                                    ) : null}
+                                </div>
                             )}
                         </div>
                     </div>

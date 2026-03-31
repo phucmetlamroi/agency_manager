@@ -7,6 +7,7 @@ import { decrypt } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import RoleWatcher from '@/components/RoleWatcher'
 import BottomNav from '@/components/BottomNav'
+import UserTopNav from '@/components/layout/UserTopNav'
 
 // Standardized User Layout (Top Navigation)
 // Matches specific stability of Admin Layout
@@ -86,20 +87,8 @@ export default async function UserLayout({
                         Agency<span style={{ WebkitTextFillColor: 'white' }}>Manager</span>
                     </h1>
 
-                    {/* Desktop Menu - Hidden on Mobile */}
-                    <nav className="desktop-menu" style={{ display: 'none', gap: '1rem', marginLeft: '2rem' }}>
-                        <style dangerouslySetInnerHTML={{
-                            __html: `
-                            @media (min-width: 768px) {
-                                .desktop-menu { display: flex !important; }
-                            }
-                        `}} />
-                        <Link href={`/${workspaceId}/dashboard`} className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Overview</Link>
-                        <Link href={`/${workspaceId}/dashboard/schedule`} className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>🗓️ Lịch làm</Link>
-                        <Link href={`/${workspaceId}/dashboard/errors`} className="btn" style={{ color: '#f87171', background: 'transparent', padding: '0.5rem 1rem', fontWeight: 'bold' }}>⚠️ Lỗi cá nhân</Link>
-                        <Link href={`/${workspaceId}/dashboard/profile`} className="btn" style={{ color: '#ccc', background: 'transparent', padding: '0.5rem 1rem' }}>Profile</Link>
-                        <Link href="/profile" className="btn" style={{ color: '#60a5fa', background: 'transparent', padding: '0.5rem 1rem', fontWeight: 'bold' }}>🏢 Đổi Team / Workspace</Link>
-                    </nav>
+                    {/* Desktop Menu — Lucide Icons with Active State */}
+                    <UserTopNav workspaceId={workspaceId} />
                 </div>
 
                 {/* RIGHT: User Info & Actions */}

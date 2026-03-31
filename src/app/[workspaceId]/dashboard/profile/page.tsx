@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import ProfileForm from '@/components/ProfileForm'
 import PaymentQrUpload from '@/components/profile/PaymentQrUpload'
+import { UserCircle, CreditCard } from 'lucide-react'
 
 export default async function ProfilePage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -23,18 +24,37 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
     if (!user) redirect('/login')
 
     return (
-        <div className="max-w-4xl mx-auto p-4 md:p-8">
-            <h1 className="text-2xl font-bold mb-6 text-white flex items-center gap-2">
-                <span>👤</span> Personal Information
-            </h1>
+        <div className="max-w-3xl mx-auto space-y-6">
 
-            <div className="glass-panel p-6 mb-8">
-                <h2 className="text-xl font-semibold mb-4 text-purple-300">General Settings</h2>
-                <ProfileForm user={user} />
+            {/* ── Page Header ───────────────────────────── */}
+            <div>
+                <h1 className="text-2xl font-heading font-bold text-zinc-100 flex items-center gap-3">
+                    <UserCircle className="w-7 h-7 text-indigo-400 drop-shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                    Cài đặt cá nhân
+                </h1>
+                <p className="text-zinc-600 text-sm mt-1">Quản lý thông tin tài khoản và bảo mật của bạn.</p>
             </div>
 
-            <div className="glass-panel p-6">
-                <PaymentQrUpload user={user} />
+            {/* ── Profile Info + Password ──────────────── */}
+            <ProfileForm user={user} />
+
+            {/* ── Payment / QR Info ─────────────────────── */}
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-500/15 bg-emerald-500/5 backdrop-blur-md shadow-xl shadow-black/30">
+                <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/6 blur-3xl rounded-full pointer-events-none" />
+                <div className="relative z-10">
+                    <div className="px-6 py-4 border-b border-white/5 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                            <CreditCard className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-zinc-200 text-sm">Thông tin nhận lương</h3>
+                            <p className="text-zinc-600 text-xs">Cập nhật tài khoản ngân hàng để nhận thanh toán lương.</p>
+                        </div>
+                    </div>
+                    <div className="px-6 py-5">
+                        <PaymentQrUpload user={user} />
+                    </div>
+                </div>
             </div>
         </div>
     )

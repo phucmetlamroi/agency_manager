@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { OptimisticGrid, GridUser, ScheduleItem } from '@/components/schedule/OptimisticGrid'
 import { startOfWeek, endOfWeek, eachDayOfInterval, format } from 'date-fns'
+import { CalendarDays, Info } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,7 @@ export default async function UserSchedulePage({
   const profileId = (user as any).sessionProfileId as string | undefined
   if (!profileId) redirect('/profile')
 
+  // ── Date logic (unchanged) ────────────────────────────────
   const baseDate = query?.date ? new Date(query.date) : new Date()
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 })
   const weekEnd = endOfWeek(baseDate, { weekStartsOn: 1 })
@@ -48,15 +50,14 @@ export default async function UserSchedulePage({
     }
   })
 
+  // ── Build schedule items (logic unchanged) ────────────────
   const items: ScheduleItem[] = []
-
   weekDays.forEach(day => {
     const dow = day.getDay()
     rules.filter(r => r.dayOfWeek === dow).forEach(r => {
       items.push({ id: r.id + '_' + day.toISOString(), start: r.startTime, end: r.endTime, reason: 'Lịch cố định', type: 'RULE', date: day })
     })
   })
-
   exceptions.forEach(e => {
     const matchDay = weekDays.find(d =>
       d.getDate() === e.date.getUTCDate() &&
@@ -74,19 +75,36 @@ export default async function UserSchedulePage({
   }
 
   return (
-    <div className="flex-1 space-y-4 p-6 pt-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Lịch làm việc của tôi</h2>
-        <p className="text-sm text-muted-foreground mt-1">Kéo rê để đánh dấu thời gian bận của bạn trong tuần</p>
+    <div className="max-w-5xl mx-auto space-y-5">
+
+      {/* ── Page Header ──────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-heading font-bold text-zinc-100 flex items-center gap-3">
+            <CalendarDays className="w-6 h-6 text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
+            Lịch làm việc của tôi
+          </h1>
+          <p className="text-zinc-600 text-sm mt-1">Kéo rê để đánh dấu thời gian bận của bạn trong tuần</p>
+        </div>
+        {/* Hint chip */}
+        <div className="hidden md:flex items-center gap-2 text-xs text-zinc-600 bg-zinc-900/60 border border-white/5 px-3 py-2 rounded-xl">
+          <Info className="w-3.5 h-3.5 text-indigo-400" />
+          Nhấn giữ &amp; kéo để đặt lịch
+        </div>
       </div>
 
-      <div className="bg-card w-full rounded-xl border shadow-sm p-4">
-        <OptimisticGrid
-          workspaceId={workspaceId}
-          profileId={profileId}
-          dateStr={format(baseDate, 'yyyy-MM-dd')}
-          users={[gridUser]}
-        />
+      {/* ── Schedule Grid Card ───────────────────────────── */}
+      <div className="relative rounded-2xl border border-purple-500/15 bg-zinc-950/70 backdrop-blur-md shadow-xl shadow-black/40 overflow-hidden">
+        {/* Ambient top glow */}
+        <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-96 h-40 bg-purple-500/6 blur-3xl rounded-full pointer-events-none" />
+        <div className="relative z-10 p-4">
+          <OptimisticGrid
+            workspaceId={workspaceId}
+            profileId={profileId}
+            dateStr={format(baseDate, 'yyyy-MM-dd')}
+            users={[gridUser]}
+          />
+        </div>
       </div>
     </div>
   )

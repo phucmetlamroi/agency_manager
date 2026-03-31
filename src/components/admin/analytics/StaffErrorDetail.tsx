@@ -4,7 +4,7 @@ import React, { useState, useTransition } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Search, AlertTriangle, Calendar, Award, CheckCircle2, Trash2 } from 'lucide-react'
+import { Search, AlertTriangle, Calendar, Award, CheckCircle2, Trash2, ShieldCheck } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -124,12 +124,24 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
 
             {/* Task Error List */}
             {filteredData.length === 0 ? (
-                <div className="py-20 text-center border border-dashed border-zinc-800 rounded-2xl bg-zinc-900/20">
-                    <div className="mx-auto w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mb-4">
-                        <CheckCircle2 className="w-8 h-8 text-green-400" />
+                <div className="py-20 text-center rounded-2xl border border-emerald-500/20 bg-emerald-500/5 backdrop-blur-md">
+                    {/* Animated shield orb */}
+                    <div className="relative mx-auto flex items-center justify-center mb-6 w-32 h-32">
+                        {/* Outer glow pulse */}
+                        <div className="absolute inset-0 rounded-full bg-emerald-500/15 blur-2xl animate-pulse" />
+                        {/* Rotating ring */}
+                        <div className="absolute w-28 h-28 rounded-full border-2 border-dashed border-emerald-500/30 animate-spin" style={{ animationDuration: '10s' }} />
+                        {/* Inner ring static */}
+                        <div className="absolute w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30" />
+                        {/* Center icon */}
+                        <ShieldCheck className="relative z-10 w-10 h-10 text-emerald-400 drop-shadow-[0_0_16px_rgba(52,211,153,0.8)]" />
                     </div>
-                    <h3 className="text-lg font-bold text-green-400">Không tìm thấy lỗi!</h3>
-                    <p className="text-zinc-500 mt-2 text-sm">Nhân viên này chưa bị ghi nhận lỗi nào phù hợp với tìm kiếm cùa bạn.</p>
+                    <h3 className="text-xl font-bold text-emerald-400 mb-2">Không tìm thấy lỗi!</h3>
+                    <p className="text-zinc-500 text-sm max-w-xs mx-auto">Nhân viên này chưa bị ghi nhận lỗi nào phù hợp với tìm kiếm của bạn.</p>
+                    <div className="flex items-center justify-center gap-2 mt-4 text-xs text-emerald-500/60">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        Duy trì phong độ hoàn hảo!
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-4">

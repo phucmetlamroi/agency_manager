@@ -15,6 +15,7 @@ import ManagerReviewChecklist from './tasks/ManagerReviewChecklist'
 import { TaskWithUser } from '@/types/admin'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
+import { Plus } from 'lucide-react'
 
 
 const statusColors: Record<string, string> = {
@@ -45,6 +46,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
     const router = useRouter()
     const { confirm } = useConfirm()
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
+    const [selectedIds, setSelectedIds] = useState<string[]>([])
 
     // Edit State
     const [isEditing, setIsEditing] = useState(false)
@@ -126,20 +128,30 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
     }
 
     const handleStatusChange = async (taskId: string, newStatus: string, notes?: string, feedback?: { type: 'INTERNAL' | 'CLIENT', content: string }) => {
-        // Optimistic UI Update
-        const optimisticTasks = tasks.map(t =>
-            t.id === taskId ? { ...t, status: newStatus } : t
-        )
-        // Assuming 'mutate' is available in scope, e.g., from useSWR
-        // mutate(optimisticTasks, false) // Commented out as 'mutate' is not defined in the provided context
+        // Bulk Sync Logic: If the task being changed is part of a selection, update all selected tasks.
+        const tasksToUpdate = selectedIds.includes(taskId) ? selectedIds : [taskId]
 
         try {
-            // @ts-ignore - feedback type mismatch fix later if needed, passing string is fine for enum usually if matching
-            await updateTaskStatus(taskId, newStatus, workspaceId, notes, feedback)
-            // mutate() // Commented out as 'mutate' is not defined in the provided context
+            // Parallel updates for better performance in bulk
+            const results = await Promise.all(tasksToUpdate.map(async (id) => {
+                try {
+                    // @ts-ignore
+                    return await updateTaskStatus(id, newStatus, workspaceId, notes, feedback)
+                } catch (e) {
+                    return { error: 'Failed' }
+                }
+            }))
+
+            const errors = results.filter(r => r.error)
+            if (errors.length > 0) {
+                toast.error(`Cập nhật thất bại cho ${errors.length}/${tasksToUpdate.length} tasks.`)
+            } else {
+                toast.success(`Đã cập nhật trạng thái cho ${tasksToUpdate.length} tasks.`)
+                if (selectedIds.includes(taskId)) setSelectedIds([]) // Clear selection after success
+            }
+            router.refresh()
         } catch (error) {
-            console.error("Optimistic update failed:", error)
-            // mutate(tasks, false)
+            console.error("Bulk update failed:", error)
             toast.error("Cập nhật thất bại. Vui lòng thử lại.")
         }
     }
@@ -166,7 +178,6 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
         if (res?.success) {
             setSelectedTask({
                 ...selectedTask,
-                ...selectedTask,
                 resources: combinedResources,
                 references: editForm.references,
                 notes_vi: editForm.notes_vi,
@@ -184,7 +195,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
         const allOptions = ["Đã nhận task", "Đang thực hiện", "Revision", "Sửa frame", "Tạm ngưng", "Hoàn tất", "Đang đợi giao"]
 
         if (!isAdmin) {
-            // User limited view (Legacy logic maintained for safety, though FSM handles this too)
+            // User limited view
             return ["Đã nhận task", "Đang thực hiện"]
         }
 
@@ -198,15 +209,57 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
     return (
         <>
             <div className="flex flex-col gap-4 optimize-visibility">
+                {/* Bulk Actions Bar */}
+                {isAdmin && selectedIds.length > 0 && (
+                    <div className="sticky top-0 z-20 bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center justify-between shadow-xl animate-in slide-in-from-top duration-300">
+                        <div className="flex items-center gap-4">
+                            <span className="text-sm font-bold"> Đã chọn {selectedIds.length} tasks</span>
+                            <button onClick={() => setSelectedIds([])} className="text-xs bg-indigo-500 hover:bg-indigo-400 px-2 py-1 rounded">Hủy chọn</button>
+                        </div>
+                        <p className="text-[10px] opacity-80 uppercase tracking-widest font-black italic">Đổi trạng thái 1 task trong lô để áp dụng tất cả</p>
+                    </div>
+                )}
+
+                {isAdmin && tasks.length > 0 && (
+                  <div className="flex items-center gap-2 px-2">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-gray-700 bg-zinc-800"
+                      checked={selectedIds.length === tasks.length && tasks.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(tasks.map(t => t.id))
+                        else setSelectedIds([])
+                      }}
+                    />
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Chọn tất cả</span>
+                  </div>
+                )}
+
                 {tasks.map(task => {
                     const isLocked = !isAdmin && task.status === 'Đã nhận task';
+                    const isSelected = selectedIds.includes(task.id);
                     return (
                         <div key={task.id}
-                            className="glass-panel group relative p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-transform border-l-4"
+                            className={`glass-panel group relative p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-all border-l-4 ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-500/5' : ''}`}
                             style={{
-                                borderLeftColor: statusColors[task.status] || '#ccc'
+                                borderLeftColor: isSelected ? '#6366f1' : (statusColors[task.status] || '#ccc')
                             }}
                         >
+                            {/* Checkbox for Admin */}
+                            {isAdmin && (
+                              <div className="absolute -left-3 top-1/2 -translate-y-1/2 z-10" onClick={(e) => e.stopPropagation()}>
+                                <input 
+                                  type="checkbox" 
+                                  className="w-5 h-5 rounded-md border-2 border-indigo-500/50 bg-zinc-900 checked:bg-indigo-500 cursor-pointer shadow-lg transition-all hover:scale-110"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setSelectedIds(prev => [...prev, task.id])
+                                    else setSelectedIds(prev => prev.filter(id => id !== task.id))
+                                  }}
+                                />
+                              </div>
+                            )}
+
                             <div className={`flex-1 ${isLocked ? 'opacity-50 grayscale pointer-events-none' : 'cursor-pointer'}`} onClick={() => openTask(task)}>
                                 {/* Header: Type + Title */}
                                 <div className="flex flex-col gap-1 mb-2">
@@ -248,7 +301,6 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                         ) : <span className="italic text-gray-600">No Deadline</span>}
                                     </div>
 
-                                    {/* Timer - Removed */}
                                     {/* Mobile-Optimized Status/Assignee info */}
                                     <div className="flex items-center gap-4 mt-1 md:mt-0">
                                         {/* Assignee */}
@@ -258,9 +310,6 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                                     value={task.assignee?.id || ''}
                                                     onChange={async (e) => {
                                                         const val = e.target.value
-                                                        if (val) {
-
-                                                        }
                                                         const resAssign = await assignTask(task.id, val || null, workspaceId)
                                                         if (resAssign?.success) router.refresh()
                                                     }}

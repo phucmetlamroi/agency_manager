@@ -19,10 +19,10 @@ export default function AssetDocumentHubWidget({ tasks }: { tasks: Task[] }) {
         .slice(0, 4)
 
     return (
-        <div className="bg-zinc-950/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 h-full flex flex-col group hover:-translate-y-1 transition-transform duration-300">
+        <div className="bg-zinc-950/60 backdrop-blur-2xl border border-yellow-500/20 shadow-2xl shadow-black/50 rounded-3xl p-6 h-full flex flex-col group hover:-translate-y-1 hover:shadow-yellow-500/10 hover:border-yellow-500/30 transition-all duration-300">
             <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
-                    <FolderGit2 size={20} className="text-purple-400" />
+                <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20">
+                    <FolderGit2 size={20} className="text-yellow-500" />
                 </div>
                 <div>
                     <h2 className="text-white font-medium">Asset Hub</h2>
@@ -37,9 +37,9 @@ export default function AssetDocumentHubWidget({ tasks }: { tasks: Task[] }) {
                         href={asset.productLink!}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="bg-zinc-900/50 hover:bg-zinc-800 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center gap-3 transition-colors text-center group/btn"
+                        className="bg-zinc-900/50 hover:bg-zinc-800/80 border border-white/5 hover:border-yellow-500/30 rounded-2xl p-4 flex flex-col items-center justify-center gap-3 transition-all text-center group/btn"
                     >
-                        <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover/btn:scale-110 transition-transform">
+                        <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 group-hover/btn:scale-110 group-hover/btn:shadow-[0_0_15px_rgba(234,179,8,0.4)] transition-all">
                             {asset.productLink?.includes('drive') ? <FolderGit2 size={18} /> :
                                 asset.productLink?.includes('doc') ? <FileText size={18} /> :
                                     <FileVideo size={18} />}

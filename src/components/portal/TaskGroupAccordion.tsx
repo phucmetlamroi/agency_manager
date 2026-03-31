@@ -31,12 +31,12 @@ function StatusIcon({ status }: { status: string }) {
     return <Clock size={15} className="text-zinc-500 shrink-0" />
 }
 
-function statusColor(status: string) {
-    if (status === 'Completed') return 'text-emerald-400'
-    if (status === 'Revising') return 'text-orange-400'
-    if (status === 'Action Required') return 'text-rose-400'
-    if (status === 'In Progress') return 'text-amber-400'
-    return 'text-zinc-500'
+function statusColorBadge(status: string) {
+    if (status === 'Completed') return 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-md'
+    if (status === 'Revising') return 'bg-amber-500/10 border border-amber-500/20 text-amber-500 px-2 py-0.5 rounded-md'
+    if (status === 'Action Required') return 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-md'
+    if (status === 'In Progress') return 'bg-zinc-500/10 border border-zinc-500/20 text-zinc-300 px-2 py-0.5 rounded-md'
+    return 'bg-zinc-800/50 border border-zinc-700/50 text-zinc-400 px-2 py-0.5 rounded-md'
 }
 
 function groupStatusSummary(tasks: Task[]) {
@@ -53,24 +53,24 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
     const allDone = done === total
 
     return (
-        <div className="border border-zinc-800/70 rounded-2xl overflow-hidden">
+        <div className="border border-yellow-500/10 rounded-3xl overflow-hidden shadow-lg shadow-black/20 backdrop-blur-md">
             {/* Group header / accordion trigger */}
             <button
                 onClick={() => setOpen(o => !o)}
-                className="w-full flex items-center gap-4 px-6 py-4 bg-zinc-900/60 hover:bg-zinc-900/90 transition-colors text-left"
+                className="w-full flex items-center gap-4 px-6 py-4 bg-zinc-950/80 hover:bg-zinc-900 transition-colors text-left"
             >
-                <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0">
-                    <Users size={16} className="text-indigo-400" />
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-500/10 to-amber-500/5 flex items-center justify-center border border-yellow-500/20 shrink-0">
+                    <Users size={16} className="text-yellow-500" />
                 </div>
 
                 <div className="flex-1 min-w-0">
-                    <p className="text-white font-semibold truncate">{group.groupName}</p>
+                    <p className="text-white font-medium truncate">{group.groupName}</p>
                     <p className="text-zinc-500 text-xs">
                         {t('task_count', { count: total })} &bull;{' '}
-                        <span className={allDone ? 'text-emerald-400' : 'text-zinc-400'}>
+                        <span className={allDone ? 'text-yellow-500' : 'text-zinc-400'}>
                             {done} {t('completed_label')}
                         </span>
-                        {inProgress > 0 && <span className="text-amber-400"> &bull; {inProgress} {t('in_progress_label')}</span>}
+                        {inProgress > 0 && <span className="text-amber-500"> &bull; {inProgress} {t('in_progress_label')}</span>}
                     </p>
                 </div>
 
@@ -84,21 +84,21 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
             {open && (
                 <div className="divide-y divide-zinc-800/50">
                     {group.tasks.map(task => (
-                        <div key={task.id} className="flex flex-col px-6 py-4 bg-zinc-950/40 hover:bg-zinc-900/30 transition-colors group">
+                        <div key={task.id} className="flex flex-col px-6 py-4 bg-zinc-950/40 hover:bg-zinc-900/60 transition-colors group">
                             <div className="flex items-center gap-4">
                                 <StatusIcon status={task.clientStatus} />
 
                                 <div className="flex-1 min-w-0">
                                     <Link
                                         href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
-                                        className="block truncate text-sm text-zinc-200 font-medium group-hover:text-white transition-colors"
+                                        className="block truncate text-sm text-zinc-300 font-medium group-hover:text-yellow-500 transition-colors"
                                     >
                                         {task.title}
                                     </Link>
                                 </div>
 
                                 <div className="flex items-center gap-4">
-                                    <span className={`text-[10px] font-bold uppercase tracking-tight shrink-0 ${statusColor(task.clientStatus)}`}>
+                                    <span className={`text-[10px] font-bold uppercase tracking-tight shrink-0 ${statusColorBadge(task.clientStatus)}`}>
                                         {task.clientStatus}
                                     </span>
 
@@ -108,7 +108,7 @@ function GroupRow({ group, locale, workspaceId, defaultOpen }: { group: TaskGrou
 
                                     <Link
                                         href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
-                                        className="text-[10px] font-bold uppercase text-indigo-400 hover:text-indigo-300 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="text-[10px] font-bold uppercase text-yellow-600 hover:text-yellow-400 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                     >
                                         {t('details')} →
                                     </Link>
@@ -134,7 +134,6 @@ export default function TaskGroupAccordion({
     workspaceId: string
     rootClientName?: string
 }) {
-    // Group tasks by client name; tasks with no client go under rootClientName or "Khác"
     const t = useTranslations('TaskGroup')
     const groupMap = new Map<string, Task[]>()
 

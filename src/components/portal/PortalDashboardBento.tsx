@@ -1,10 +1,8 @@
 'use client'
 
-import { useState } from 'react'
 import ProjectHealthWidget from './ProjectHealthWidget'
 import AssetDocumentHubWidget from './AssetDocumentHubWidget'
 import PortalActionCenter from './PortalActionCenter'
-import ContextualTaskDrawer from './ContextualTaskDrawer'
 
 type Task = {
     id: string
@@ -30,9 +28,6 @@ export default function PortalDashboardBento({
     locale: string
     workspaceId: string
 }) {
-    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-    const selectedTask = tasks.find(t => t.id === selectedTaskId)
-
     return (
         <div className="w-full">
             {/* Bento Grid Container */}
@@ -40,7 +35,7 @@ export default function PortalDashboardBento({
 
                 {/* Row 1 */}
                 <div className="md:col-span-8 md:row-span-1 min-h-[220px]">
-                    <PortalActionCenter tasks={tasks} onSelectTask={setSelectedTaskId} />
+                    <PortalActionCenter tasks={tasks} workspaceId={workspaceId} locale={locale} />
                 </div>
                 <div className="md:col-span-4 md:row-span-1 min-h-[220px]">
                     <ProjectHealthWidget tasks={tasks} />
@@ -52,14 +47,6 @@ export default function PortalDashboardBento({
                 </div>
 
             </div>
-
-            {/* Contextual Slider */}
-            <ContextualTaskDrawer
-                task={selectedTask}
-                isOpen={!!selectedTaskId}
-                onClose={() => setSelectedTaskId(null)}
-                locale={locale}
-            />
         </div>
     )
 }

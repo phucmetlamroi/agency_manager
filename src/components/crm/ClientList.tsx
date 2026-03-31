@@ -27,7 +27,6 @@ type Task = {
 type Client = {
     id: number
     name: string
-    aiScore: number
     parentId?: number | null
     subsidiaries?: Client[]
     projects: Project[]
@@ -178,11 +177,6 @@ function ClientItem({
         else toast.success('Đã tách khách hàng thành công')
     }
 
-    const getScoreConfig = (score: number) => {
-        if (score >= 30) return { color: '#34d399', glow: 'rgba(52,211,153,0.4)', label: 'HIGH', gradient: ['#10b981', '#34d399'] }
-        if (score >= 15) return { color: '#818cf8', glow: 'rgba(129,140,248,0.4)', label: 'MED', gradient: ['#6366f1', '#818cf8'] }
-        return { color: '#fb7185', glow: 'rgba(251,113,133,0.3)', label: 'LOW', gradient: ['#f43f5e', '#fb7185'] }
-    }
 
     const ownTasks = client.tasks || []
     const subTasks = (client.subsidiaries || []).flatMap(s =>
@@ -278,43 +272,7 @@ function ClientItem({
                     </div>
                 </div>
 
-                {/* AI Score — Circular Ring */}
-                <div className="flex-shrink-0 flex items-center gap-3">
-                    {(() => {
-                        const cfg = getScoreConfig(client.aiScore)
-                        const radius = 22
-                        const circ = 2 * Math.PI * radius
-                        const maxScore = 100
-                        const pct = Math.min(client.aiScore / maxScore, 1)
-                        const dash = pct * circ
-                        const id = `grad-${client.id}`
-                        return (
-                            <div className="relative" title={`AI Score: ${client.aiScore.toFixed(1)}`}>
-                                <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
-                                    <defs>
-                                        <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="0%">
-                                            <stop offset="0%" stopColor={cfg.gradient[0]} />
-                                            <stop offset="100%" stopColor={cfg.gradient[1]} />
-                                        </linearGradient>
-                                    </defs>
-                                    {/* Track */}
-                                    <circle cx="28" cy="28" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
-                                    {/* Progress */}
-                                    <circle cx="28" cy="28" r={radius} fill="none"
-                                        stroke={`url(#${id})`} strokeWidth="4"
-                                        strokeLinecap="round"
-                                        strokeDasharray={`${dash} ${circ}`}
-                                        style={{ filter: `drop-shadow(0 0 4px ${cfg.glow})`, transition: 'stroke-dasharray 0.6s ease' }}
-                                    />
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-[11px] font-black" style={{ color: cfg.color }}>{client.aiScore.toFixed(0)}</span>
-                                    <span className="text-[8px] font-bold" style={{ color: cfg.color, opacity: 0.7 }}>{cfg.label}</span>
-                                </div>
-                            </div>
-                        )
-                    })()}
-                </div>
+
             </div>
 
             {isExpanded && (

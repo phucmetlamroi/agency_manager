@@ -23,10 +23,6 @@ type ClientData = {
     id: number
     name: string
     tier: string
-    aiScore: number
-    frictionIndex: number
-    inputQuality: number
-    paymentRating: number
     depositBalance: number
     subsidiaries: any[]
     tasks: any[]
@@ -86,65 +82,10 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                     >
                         <FileText size={16} /> Create Invoice
                     </Button>
-                    <div>
-                        <div className="text-sm text-gray-400 uppercase tracking-wider">AI Score</div>
-                        <div className="text-4xl font-mono font-bold text-white text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-500">
-                            {client.aiScore.toFixed(0)}
-                        </div>
-                    </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* AI INSIGHTS CARD */}
-                <div className="glass-panel p-6 lg:col-span-2">
-                    <h3 className="text-lg font-bold mb-4 text-purple-300 flex items-center gap-2">
-                        <span>🤖</span> AI Analysis & Suggestions
-                    </h3>
-
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-white/5 p-4 rounded-lg">
-                            <div className="text-xs text-gray-400">Operational Friction</div>
-                            <div className={`text-xl font-bold ${client.frictionIndex > 0.3 ? 'text-red-400' : 'text-green-400'}`}>
-                                {(client.frictionIndex * 100).toFixed(0)}% <span className="text-xs font-normal text-gray-500">(Revision Rate)</span>
-                            </div>
-                        </div>
-                        <div className="bg-white/5 p-4 rounded-lg">
-                            <div className="text-xs text-gray-400">Ratings (Manual)</div>
-                            <div className="flex gap-4 mt-1">
-                                <span className={client.inputQuality >= 4 ? 'text-green-400' : 'text-yellow-400'}>
-                                    Quality: {client.inputQuality}/5
-                                </span>
-                                <span className={client.paymentRating >= 4 ? 'text-green-400' : 'text-red-400'}>
-                                    Payment: {client.paymentRating}/5
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="border-t border-gray-700 pt-4">
-                        <h4 className="font-bold text-white text-sm mb-2">Suggestion Engine:</h4>
-                        <ul className="space-y-2 text-sm text-gray-300">
-                            {client.tier === 'DIAMOND' && (
-                                <li className="flex items-center gap-2 text-green-300">
-                                    ★ Gửi quà tri ân / Đề xuất gói Annual Plan ưu đãi.
-                                </li>
-                            )}
-                            {client.tier === 'WARNING' && (
-                                <li className="flex items-center gap-2 text-red-300">
-                                    ⚠️ Cảnh báo: Khách hàng High-Maintenance / Rủi ro thanh toán. Cân nhắc tăng giá hoặc yêu cầu cọc.
-                                </li>
-                            )}
-                            {client.inputQuality < 3 && (
-                                <li className="flex items-center gap-2 text-yellow-300">
-                                    ⚡ Source kém: Đề xuất khách upgrade thiết bị hoặc tính thêm phí xử lý source.
-                                </li>
-                            )}
-                            {client.tier === 'standard' && <li className="italic text-gray-500">Chưa có đề xuất đặc biệt.</li>}
-                        </ul>
-                    </div>
-                </div>
-
+            <div className="grid grid-cols-1 gap-6">
                 {/* DISTRIBUTION CHART */}
                 <div className="glass-panel p-6 flex flex-col">
                     <h3 className="text-lg font-bold mb-4 text-gray-300">📊 Workload Distribution</h3>

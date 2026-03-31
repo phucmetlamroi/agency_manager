@@ -34,43 +34,6 @@ export async function getClients(workspaceId: string) {
     }
 }
 
-export async function getTopClients(workspaceId: string, limit = 5) {
-    try {
-        const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
-        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
-        const topClients = await workspacePrisma.client.findMany({
-            orderBy: { aiScore: 'desc' },
-            take: limit,
-            where: {
-                aiScore: { gt: 0 } // Only show scored clients
-            },
-            include: {
-                _count: {
-                    select: { tasks: true }
-                },
-                subsidiaries: {
-                    include: {
-                        _count: { select: { tasks: true } }
-                    }
-                }
-            }
-        })
-
-        // Aggregate total tasks (Parent + Subsidiaries)
-        const safeTopClients = topClients.map(c => {
-            const subTasks = c.subsidiaries.reduce((sum, sub) => sum + sub._count.tasks, 0)
-            return {
-                ...c,
-                totalTaskCount: c._count.tasks + subTasks
-            }
-        })
-
-        return { success: true, data: safeTopClients }
-    } catch (error) {
-        return { success: false, error: 'Failed to fetch top clients' }
-    }
-}
 
 export async function createClient(data: { name: string, parentId?: number }, workspaceId: string) {
     try {

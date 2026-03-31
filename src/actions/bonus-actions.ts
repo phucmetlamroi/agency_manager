@@ -142,6 +142,11 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                         workspaceId,
                         status: 'Hoàn tất',
                         updatedAt: { gte: startOfMonth, lte: endOfMonth }
+                    },
+                    select: {
+                        id: true,
+                        value: true,
+                        status: true
                     }
                 },
                 errorLogs: {
@@ -149,7 +154,18 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                         workspaceId,
                         createdAt: { gte: startOfMonth, lte: endOfMonth }
                     },
-                    include: { error: true }
+                    select: {
+                        id: true,
+                        frequency: true,
+                        calculatedScore: true,
+                        error: {
+                            select: {
+                                id: true,
+                                penalty: true,
+                                code: true
+                            }
+                        }
+                    }
                 }
             }
         })

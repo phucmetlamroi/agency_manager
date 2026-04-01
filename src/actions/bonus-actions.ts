@@ -310,41 +310,44 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         const bonusPercentages = [0.1, 0.05]
 
 
-        stage = 'persist-delete-bonus'
-        await prisma.monthlyBonus.deleteMany({
-            where: { month: currentMonth, year: currentYear, workspaceId }
-        })
-        stage = 'persist-delete-rank'
-        await prisma.monthlyRank.deleteMany({
-            where: { month: currentMonth, year: currentYear, workspaceId }
-        })
-
-
-        stage = 'persist-upsert-lock'
-        const payrollLock = await prisma.payrollLock.upsert({
-            where: {
-                month_year_workspaceId: {
+        // ── 5. PERSISTENCE ───────────────────────────────────────────
+        // We do this in a single "pseudo-transaction" block: delete then create.
+        // If calculation reached here, it's safe to clear old records.
+        stage = 'persist-transaction'
+        
+        await prisma.$transaction([
+            // Clear old data for this month/workspace
+            prisma.monthlyBonus.deleteMany({
+                where: { month: currentMonth, year: currentYear, workspaceId }
+            }),
+            prisma.monthlyRank.deleteMany({
+                where: { month: currentMonth, year: currentYear, workspaceId }
+            }),
+            // Upsert the Lock
+            prisma.payrollLock.upsert({
+                where: {
+                    month_year_workspaceId: {
+                        month: currentMonth,
+                        year: currentYear,
+                        workspaceId
+                    }
+                } as any,
+                update: {
+                    isLocked: true,
+                    lockedAt: new Date(),
+                    lockedBy: session.user.id,
+                    profileId: workspace.profileId ?? null
+                },
+                create: {
                     month: currentMonth,
                     year: currentYear,
-                    workspaceId
+                    workspaceId,
+                    profileId: workspace.profileId ?? null,
+                    isLocked: true,
+                    lockedBy: session.user.id
                 }
-            } as any,
-            update: {
-                isLocked: true,
-                lockedAt: new Date(),
-                lockedBy: session.user.id,
-                profileId: workspace.profileId ?? null
-            },
-            create: {
-                month: currentMonth,
-                year: currentYear,
-                workspaceId,
-                profileId: workspace.profileId ?? null,
-                isLocked: true,
-                lockedBy: session.user.id
-            }
-        })
-
+            })
+        ])
 
         const awardedBonuses: Array<{
             userId: string
@@ -353,34 +356,37 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             bonusAmount: number
         }> = []
 
-        stage = 'persist-create-bonuses'
-        for (let i = 0; i < Math.min(2, eligibleForBonus.length); i++) {
-            const user = eligibleForBonus[i]
-            const bonusAmount = user.monthlySalary * bonusPercentages[i]
+        // Create new bonuses
+        if (eligibleForBonus.length > 0) {
+            stage = 'persist-create-bonuses'
+            for (let i = 0; i < Math.min(2, eligibleForBonus.length); i++) {
+                const user = eligibleForBonus[i]
+                const bonusAmount = user.monthlySalary * bonusPercentages[i]
 
-            await prisma.monthlyBonus.create({
-                data: {
+                await prisma.monthlyBonus.create({
+                    data: {
+                        userId: user.userId,
+                        month: currentMonth,
+                        year: currentYear,
+                        workspaceId,
+                        profileId: workspace.profileId ?? null,
+                        rank: i + 1,
+                        revenue: user.revenue,
+                        executionTimeHours: 0,
+                        bonusAmount
+                    }
+                })
+
+                awardedBonuses.push({
                     userId: user.userId,
-                    month: currentMonth,
-                    year: currentYear,
-                    workspaceId,
-                    profileId: workspace.profileId ?? null,
+                    username: user.username,
                     rank: i + 1,
-                    revenue: user.revenue,
-                    executionTimeHours: 0,
                     bonusAmount
-                }
-            })
-
-
-            awardedBonuses.push({
-                userId: user.userId,
-                username: user.username,
-                rank: i + 1,
-                bonusAmount
-            })
+                })
+            }
         }
 
+        // Create new ranks
         const monthlyRankData = rankings.map(user => ({
             userId: user.userId,
             month: currentMonth,
@@ -391,15 +397,13 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             totalPenalty: user.totalPenalty,
             errorRate: user.errorRate,
             rank: user.rankScore,
-            isLocked: true,
-            payrollLockId: payrollLock.id
+            isLocked: true
         }))
 
         if (monthlyRankData.length > 0) {
             stage = 'persist-create-ranks'
             await prisma.monthlyRank.createMany({ data: monthlyRankData })
         }
-
 
         stage = 'revalidate'
         revalidatePath(`/${workspaceId}/admin/payroll`)

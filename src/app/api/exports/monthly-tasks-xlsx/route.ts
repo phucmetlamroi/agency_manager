@@ -124,8 +124,7 @@ export async function GET(req: NextRequest) {
         const allWorkspaceTasks = await prisma.task.findMany({
             where: {
                 workspaceId: workspace.id,
-                profileId: workspace.profileId,
-                deadline: { not: null }
+                profileId: workspace.profileId
             },
             include: {
                 assignee: {
@@ -144,9 +143,23 @@ export async function GET(req: NextRequest) {
             orderBy: [{ deadline: 'asc' }, { createdAt: 'asc' }]
         })
 
-        const monthlyTasks = allWorkspaceTasks.filter((task) =>
+        const deadlineMatchedTasks = allWorkspaceTasks.filter((task) =>
             matchesVietnamMonth(task.deadline, targetMonth)
         )
+        const createdAtMatchedTasks = allWorkspaceTasks.filter((task) =>
+            matchesVietnamMonth(task.createdAt, targetMonth)
+        )
+
+        let monthlyTasks = deadlineMatchedTasks
+        let filterBasis = 'deadline'
+        if (monthlyTasks.length === 0) {
+            monthlyTasks = createdAtMatchedTasks
+            filterBasis = 'createdAt-fallback'
+        }
+        if (monthlyTasks.length === 0) {
+            monthlyTasks = allWorkspaceTasks
+            filterBasis = 'workspace-fallback'
+        }
 
         const workbook = new ExcelJS.Workbook()
         workbook.creator = 'AgencyManager'
@@ -226,9 +239,12 @@ export async function GET(req: NextRequest) {
         summarySheet.addRow(['Workspace ID', workspace.id])
         summarySheet.addRow(['Profile ID', workspace.profileId])
         summarySheet.addRow(['Month (deadline)', `${targetMonth.year}-${String(targetMonth.month).padStart(2, '0')}`])
+        summarySheet.addRow(['Filter Basis', filterBasis])
         summarySheet.addRow(['Exported At (VN)', formatDateTime(new Date())])
         summarySheet.addRow(['Exported By', user.username || user.email || user.id])
         summarySheet.addRow(['Total Tasks', monthlyTasks.length])
+        summarySheet.addRow(['Matched by Deadline', deadlineMatchedTasks.length])
+        summarySheet.addRow(['Matched by CreatedAt', createdAtMatchedTasks.length])
         summarySheet.addRow(['Archived Tasks', archivedCount])
         summarySheet.addRow(['Active Tasks', unarchivedCount])
         summarySheet.addRow(['Total Wage VND', totalWage])
@@ -245,7 +261,7 @@ export async function GET(req: NextRequest) {
         summarySheet.getColumn(1).width = 28
         summarySheet.getColumn(2).width = 26
         summarySheet.getRow(1).font = { bold: true, size: 14 }
-        summarySheet.getRow(14).font = { bold: true }
+        summarySheet.getRow(17).font = { bold: true }
 
         const rawBuffer = await workbook.xlsx.writeBuffer()
         const fileBuffer = Buffer.isBuffer(rawBuffer)
@@ -269,4 +285,3 @@ export async function GET(req: NextRequest) {
         return new NextResponse(`Export failed: ${error.message || 'unknown error'}`, { status: 500 })
     }
 }
-

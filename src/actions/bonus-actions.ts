@@ -39,8 +39,8 @@ export async function getPayrollLockStatus(workspaceId: string) {
         const lock = await workspacePrisma.payrollLock.findUnique({
             where: {
                 month_year_workspaceId: {
-                    month: currentMonth,
-                    year: currentYear,
+                    month: 0,
+                    year: 0,
                     workspaceId
                 }
             } as any
@@ -72,9 +72,8 @@ export async function revertMonthlyBonus(workspaceId: string) {
             return { success: false, error: 'Permission denied.' }
         }
 
-        const now = new Date()
-        const currentMonth = now.getMonth() + 1
-        const currentYear = now.getFullYear()
+        const currentMonth = 0
+        const currentYear = 0
 
         await workspacePrisma.monthlyBonus.deleteMany({
             where: { workspaceId, month: currentMonth, year: currentYear }

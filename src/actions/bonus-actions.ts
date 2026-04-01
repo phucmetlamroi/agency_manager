@@ -300,9 +300,15 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             return a.username.localeCompare(b.username, 'vi')
         })
 
-        // Top 2 earners receive the monetary bonus, regardless of the strict 'S' rank (8 tasks min)
-        const eligibleForBonus = rankings.filter(r => r.incomeScore > 0)
-        const bonusPercentages = [0.1, 0.05]
+        // Identify the 'Hustly Team' profile (for custom % bonus)
+        const isHustly = workspace.profileId === '61f25775-eb95-4ece-96e8-99ae97542af1'
+        const bonusPercentages = isHustly ? [0.15, 0.1] : [0.1, 0.05]
+        const maxWinners = 2
+
+        // Filter eligible users: 
+        // 1. Must have revenue > 0
+        // 2. Per new policy, users with Rank 'S' are EXCLUDED from the monetary bonus
+        const eligibleForBonus = rankings.filter(r => r.incomeScore > 0 && r.rankScore !== 'S')
 
 
         // ── 5. PERSISTENCE ───────────────────────────────────────────
@@ -354,7 +360,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         // Create new bonuses
         if (eligibleForBonus.length > 0) {
             stage = 'persist-create-bonuses'
-            for (let i = 0; i < Math.min(2, eligibleForBonus.length); i++) {
+            for (let i = 0; i < Math.min(maxWinners, eligibleForBonus.length); i++) {
                 const user = eligibleForBonus[i]
                 const bonusAmount = user.monthlySalary * bonusPercentages[i]
 

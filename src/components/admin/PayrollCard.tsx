@@ -14,11 +14,9 @@ type PayrollCardProps = {
     currentMonth: number
     currentYear: number
     workspaceId: string
-    startOfMonth: Date
-    endOfMonth: Date
 }
 
-export default function PayrollCard({ user, currentMonth, currentYear, workspaceId, startOfMonth, endOfMonth }: PayrollCardProps) {
+export default function PayrollCard({ user, currentMonth, currentYear, workspaceId }: PayrollCardProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
     const [showPending, setShowPending] = useState(false)
@@ -26,9 +24,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
 
     // ── Logic (unchanged) ──────────────────────────────────────
     const completedTasks = user.tasks.filter((t: any) =>
-        t.status === 'Hoàn tất' &&
-        new Date(t.updatedAt) >= startOfMonth &&
-        new Date(t.updatedAt) <= endOfMonth
+        t.status === 'Hoàn tất'
     )
     const taskIncome = completedTasks.reduce((sum: number, task: any) => sum + task.value, 0)
 
@@ -54,7 +50,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
     const handleRevert = () => {
         if (!confirm('Bạn có chắc chắn muốn hoàn tác (hủy) trạng thái thanh toán này?')) return
         startTransition(async () => {
-            const res = await revertPayment(user.id, currentMonth, currentYear, workspaceId)
+            const res = await revertPayment(user.id, 0, 0, workspaceId)
             if (res.error) { toast.error(res.error) }
             else { toast.success('Đã hủy trạng thái thanh toán') }
         })

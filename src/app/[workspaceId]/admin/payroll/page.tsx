@@ -11,13 +11,12 @@ export const dynamic = 'force-dynamic'
 export default async function PayrollPage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
 
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1
-    const currentYear = now.getFullYear()
-    const startOfMonth = new Date(currentYear, currentMonth - 1, 1)
-    const endOfMonth = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999)
-
     const workspacePrisma = getWorkspacePrisma(workspaceId)
+
+    const workspace = await workspacePrisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { name: true }
+    })
 
     const users = await workspacePrisma.user.findMany({
         where: {
@@ -43,16 +42,12 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
             },
             bonuses: {
                 where: {
-                    workspaceId,
-                    month: currentMonth,
-                    year: currentYear
+                    workspaceId
                 }
             },
             payrolls: {
                 where: {
-                    workspaceId,
-                    month: currentMonth,
-                    year: currentYear
+                    workspaceId
                 }
             }
         },
@@ -60,12 +55,11 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
     })
 
     const activeUsers = users.filter(user => {
-        const hasCompleted = user.tasks.some(
-            task => task.status === SALARY_COMPLETED_STATUS && task.updatedAt >= startOfMonth && task.updatedAt <= endOfMonth
-        )
+        const hasCompleted = user.tasks.some(task => task.status === SALARY_COMPLETED_STATUS)
         const hasPending = user.tasks.some(task => SALARY_PENDING_STATUSES.includes(task.status))
         const hasBonus = user.bonuses.length > 0
-        return hasCompleted || hasPending || hasBonus
+        const hasPayroll = user.payrolls.length > 0
+        return hasCompleted || hasPending || hasBonus || hasPayroll
     })
 
     activeUsers.sort((a, b) => {
@@ -92,13 +86,13 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                 <div>
                     <h2 className="title-gradient" style={{ fontSize: '2rem', margin: 0 }}>Bang Luong va Thu Nhap</h2>
                     <p style={{ color: '#888', marginTop: '0.5rem' }}>
-                        Thang {currentMonth}/{currentYear} - Tinh tren cac task da "{SALARY_COMPLETED_STATUS}".
+                        Workspace: <span style={{ color: '#fff' }}>{workspace?.name}</span> - Tinh tren cac task da "{SALARY_COMPLETED_STATUS}".
                     </p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     <div style={{ background: '#333', padding: '0.5rem 1rem', borderRadius: '12px', color: '#ccc', fontSize: '0.9rem' }}>
-                        Ky luong hien tai
+                        Workspace Mode: Isolated
                     </div>
                 </div>
             </div>
@@ -114,11 +108,9 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                     <PayrollCard
                         key={user.id}
                         user={user}
-                        currentMonth={currentMonth}
-                        currentYear={currentYear}
+                        currentMonth={0} // Irrelevant in workspace mode
+                        currentYear={0}
                         workspaceId={workspaceId}
-                        startOfMonth={startOfMonth}
-                        endOfMonth={endOfMonth}
                     />
                 ))}
 

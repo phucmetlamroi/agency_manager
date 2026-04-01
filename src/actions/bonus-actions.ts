@@ -126,11 +126,10 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             return { success: false, error: 'Permission denied.' }
         }
 
-        const now = new Date()
-        const currentMonth = now.getMonth() + 1
-        const currentYear = now.getFullYear()
-        const startOfMonth = new Date(currentYear, currentMonth - 1, 1)
-        const endOfMonth = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999)
+        // We no longer use currentMonth/Year for filtering tasks.
+        // Everything inside this workspace is considered one cycle.
+        const currentMonth = 0 
+        const currentYear = 0
 
         stage = 'lock-check'
         const existingLock = await workspacePrisma.payrollLock.findUnique({
@@ -152,8 +151,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             where: {
                 workspaceId,
                 assigneeId: { not: null },
-                status: SALARY_COMPLETED_STATUS,
-                updatedAt: { gte: startOfMonth, lte: endOfMonth }
+                status: SALARY_COMPLETED_STATUS
             },
             _sum: { value: true },
             _count: { _all: true }
@@ -170,8 +168,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             where: {
                 workspaceId,
                 assigneeId: { not: null },
-                status: { in: SALARY_PENDING_STATUSES },
-                updatedAt: { gte: startOfMonth, lte: endOfMonth }
+                status: { in: SALARY_PENDING_STATUSES }
             },
             _sum: { value: true }
         })
@@ -181,8 +178,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         const penaltyAggregates = await workspacePrisma.errorLog.groupBy({
             by: ['userId'],
             where: {
-                workspaceId,
-                createdAt: { gte: startOfMonth, lte: endOfMonth }
+                workspaceId
             },
             _sum: { calculatedScore: true }
         })

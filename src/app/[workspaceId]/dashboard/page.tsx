@@ -24,17 +24,15 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
     const workspacePrisma = getWorkspacePrisma(workspaceId)
     const userId = session.user.id
 
-    // ── Data Fetching (logic unchanged) ──────────────────────
+    // ── Data Fetching (workspace isolated) ──────────────────────
     const perfData = await getUserPerformanceScore(workspaceId, userId)
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1
-    const currentYear = now.getFullYear()
 
     const userWithBonus = await (workspacePrisma as any).user.findUnique({
         where: { id: userId },
         select: {
             id: true, username: true, role: true, nickname: true,
-            bonuses: { where: { workspaceId, month: currentMonth, year: currentYear } }
+            bonuses: { where: { workspaceId } },
+            payrolls: { where: { workspaceId } }
         }
     })
 
@@ -54,38 +52,22 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         orderBy: { createdAt: 'desc' }
     })
 
-    // ── Salary Calculations (logic unchanged) ─────────────────
+    // ── Salary Calculations (workspace scoped) ─────────────────
     const pendingTasks = tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status))
     const pendingSalary = pendingTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
 
-    const thisMonthStart = new Date(currentYear, currentMonth - 1, 1)
-    const lastMonthStart = new Date(currentYear, currentMonth - 2, 1)
-    const thisMonthEnd = new Date(currentYear, currentMonth, 5, 23, 59, 59, 999)
-
     const completedTasks = tasks.filter((t: any) => t.status === 'Hoàn tất')
-    const thisMonthTasks = completedTasks.filter((t: any) => t.updatedAt >= thisMonthStart && t.updatedAt <= thisMonthEnd)
-    const lastMonthTasks = completedTasks.filter((t: any) => t.updatedAt >= lastMonthStart && t.updatedAt < thisMonthStart)
-
-    const baseSalary = thisMonthTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
-    const lastMonthSalary = lastMonthTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
+    
+    // We display all workspace earnings instead of filtering by calendar dates
+    const baseSalary = completedTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
 
     const bonusData = userWithBonus?.bonuses[0]
     const bonusAmount = bonusData ? Number(bonusData.bonusAmount) : 0
-    const totalThisMonthSalary = baseSalary + bonusAmount
+    const totalWorkspaceSalary = baseSalary + bonusAmount
 
     // ── Comparison message — Lucide icons only, no emoji ──────
-    let percentage = 0
-    let comparisonMsg = ''
-    let CompareIcon: React.ElementType = Zap
-    if (lastMonthSalary === 0) {
-        comparisonMsg = totalThisMonthSalary > 0 ? 'Khởi đầu tháng tốt!' : 'Cày task mạnh lên nào'
-        CompareIcon = totalThisMonthSalary > 0 ? Flame : Zap
-    } else {
-        percentage = Math.round(((totalThisMonthSalary - lastMonthSalary) / lastMonthSalary) * 100)
-        if (percentage > 0) { comparisonMsg = `Tăng ${percentage}% so tháng trước`; CompareIcon = ArrowUp }
-        else if (percentage < 0) { comparisonMsg = `Giảm ${Math.abs(percentage)}% so tháng trước`; CompareIcon = ArrowDown }
-        else { comparisonMsg = 'Phong độ ổn định'; CompareIcon = Minus }
-    }
+    const comparisonMsg = totalWorkspaceSalary > 0 ? 'Phong độ tuyệt vời!' : 'Hãy bắt đầu hành trình mới'
+    const CompareIcon = totalWorkspaceSalary > 0 ? Flame : Zap
 
     // ── Rank badge config — muted gradient, no emoji ──────────
     const rankConfig: Record<number, { label: string; color: string; shadow: string; textColor: string }> = {
@@ -103,9 +85,8 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         ? { text: 'text-amber-400', label: 'Cẩn thận', icon: AlertTriangle, desc: 'Cần chú ý thêm' }
         : { text: 'text-red-400', label: 'Nguy hiểm', icon: AlertTriangle, desc: 'Cần cải thiện gấp' }
     const ErrIcon = errConfig.icon
-
-    const TrendIcon = percentage > 0 ? TrendingUp : percentage < 0 ? TrendingDown : Minus
-    const trendColor = percentage > 0 ? 'text-emerald-400' : percentage < 0 ? 'text-red-400' : 'text-zinc-400'
+    const CompareTrendIcon = totalWorkspaceSalary > 0 ? TrendingUp : Minus
+    const trendColor = totalWorkspaceSalary > 0 ? 'text-emerald-400' : 'text-zinc-400'
 
     return (
         <div className="max-w-5xl mx-auto space-y-8">
@@ -130,12 +111,12 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                     )}
 
                     {/* Section label */}
-                    <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Lương tháng này (Tạm tính)</p>
+                    <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Lương thực nhận (Workspace)</p>
 
                     {/* Hero salary number */}
                     <div className="flex items-end gap-2 mb-2">
                         <span className="text-5xl font-black bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(52,211,153,0.4)]">
-                            {totalThisMonthSalary.toLocaleString('vi-VN')}
+                            {totalWorkspaceSalary.toLocaleString('vi-VN')}
                         </span>
                         <span className="text-2xl font-bold text-emerald-400 mb-1">đ</span>
                     </div>
@@ -152,7 +133,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
                         {/* Trend vs last month */}
                         <div className={`flex items-center gap-1.5 text-sm font-semibold ${trendColor}`}>
-                            <TrendIcon className="w-4 h-4" strokeWidth={2} />
+                            <CompareTrendIcon className="w-4 h-4" strokeWidth={2} />
                             <span>{comparisonMsg}</span>
                         </div>
 
@@ -199,7 +180,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                                     <ListChecks className="w-4 h-4" strokeWidth={1.5} />
                                     Hoàn tất
                                 </span>
-                                <span className="text-lg font-black text-emerald-400">{thisMonthTasks.length}</span>
+                                <span className="text-lg font-black text-emerald-400">{completedTasks.length}</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-zinc-400 flex items-center gap-2">

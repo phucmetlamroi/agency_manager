@@ -5,6 +5,7 @@ import RatingMicroSurvey from '@/components/portal/RatingMicroSurvey';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ensureExternalLinks, removeAccents } from '@/lib/utils';
+import { formatClientHierarchy } from '@/lib/client-hierarchy';
 
 export default async function PortalTaskDetail({
     params
@@ -25,6 +26,7 @@ export default async function PortalTaskDetail({
         'Pending': 'border-zinc-500/30 bg-zinc-500/10 text-zinc-400',
     };
     const statusColor = statusColorMap[task.clientStatus] ?? statusColorMap['Pending'];
+    const clientPath = (task as any).clientPath || formatClientHierarchy(task.client as any);
 
     return (
         <div className="w-full max-w-4xl mx-auto p-8">
@@ -54,8 +56,8 @@ export default async function PortalTaskDetail({
                                 <Tag size={14} /> {task.type}
                             </span>
                         )}
-                        {task.client && (
-                            <span className="text-indigo-400">{task.client.name}</span>
+                        {clientPath && (
+                            <span className="text-indigo-400">{clientPath}</span>
                         )}
                     </div>
                 </div>

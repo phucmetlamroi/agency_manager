@@ -4,6 +4,7 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { prisma as globalPrisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { formatClientHierarchy } from '@/lib/client-hierarchy'
 
 /**
  * Ensures the caller is authenticated and has the CLIENT role.
@@ -113,7 +114,13 @@ export async function getClientTasks(workspaceId: string) {
             framePassword: true,
             frameNote: true,
             client: {
-                select: { id: true, name: true }
+                select: {
+                    id: true,
+                    name: true,
+                    parent: {
+                        select: { name: true }
+                    }
+                }
             },
             project: {
                 select: { id: true, name: true }
@@ -129,7 +136,8 @@ export async function getClientTasks(workspaceId: string) {
     return tasks.map(task => ({
         ...task,
         clientStatus: mapClientTaskStatus(task.status),
-        estimatedCost: calculateEstimatedCost(task)
+        estimatedCost: calculateEstimatedCost(task),
+        clientPath: formatClientHierarchy(task.client)
     }))
 }
 
@@ -269,7 +277,14 @@ export async function getTaskDetailForPortal(taskId: string) {
         include: {
             rating: true,
             assignee: { select: { username: true, nickname: true } },
-            client: { select: { name: true } },
+            client: {
+                select: {
+                    name: true,
+                    parent: {
+                        select: { name: true }
+                    }
+                }
+            },
             project: { select: { name: true } }
         }
     })
@@ -279,7 +294,8 @@ export async function getTaskDetailForPortal(taskId: string) {
     return {
         ...task,
         clientStatus: mapClientTaskStatus(task.status),
-        estimatedCost: calculateEstimatedCost(task)
+        estimatedCost: calculateEstimatedCost(task),
+        clientPath: formatClientHierarchy(task.client)
     }
 }
 

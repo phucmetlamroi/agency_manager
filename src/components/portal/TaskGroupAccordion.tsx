@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ChevronDown, Clock, PlayCircle, CheckCircle2, AlertCircle, RotateCcw, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { formatClientHierarchy } from '@/lib/client-hierarchy'
 
 type Task = {
     id: string
@@ -12,7 +13,8 @@ type Task = {
     status: string
     clientStatus: string
     deadline: Date | null
-    client: { id: number; name: string } | null
+    client: { id: number; name: string; parent?: { name: string } | null } | null
+    clientPath?: string | null
     productLink?: string | null
     notes_en?: string | null
     notes_vi?: string | null
@@ -138,7 +140,7 @@ export default function TaskGroupAccordion({
     const groupMap = new Map<string, Task[]>()
 
     for (const task of tasks) {
-        const key = task.client?.name ?? rootClientName ?? t('default_group_name')
+        const key = task.clientPath || formatClientHierarchy(task.client) || rootClientName || t('default_group_name')
         if (!groupMap.has(key)) groupMap.set(key, [])
         groupMap.get(key)!.push(task)
     }

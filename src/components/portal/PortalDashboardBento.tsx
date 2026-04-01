@@ -11,7 +11,8 @@ type Task = {
     status: string
     clientStatus: string
     deadline: Date | null
-    client: { id: number; name: string } | null
+    client: { id: number; name: string; parent?: { name: string } | null } | null
+    clientPath?: string | null
     productLink?: string | null
     notes_en?: string | null
     notes_vi?: string | null

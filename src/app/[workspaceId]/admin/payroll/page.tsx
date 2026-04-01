@@ -8,6 +8,15 @@ import { SALARY_COMPLETED_STATUS, SALARY_PENDING_STATUSES } from '@/lib/task-sta
 
 export const dynamic = 'force-dynamic'
 
+function extractMonthParam(workspaceName?: string | null): string | null {
+    if (!workspaceName) return null
+    const match = workspaceName.match(/(\d{1,2})\s*\/\s*(\d{4})/)
+    if (!match) return null
+    const month = match[1].padStart(2, '0')
+    const year = match[2]
+    return `${year}-${month}`
+}
+
 export default async function PayrollPage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
 
@@ -79,6 +88,11 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
         select: { role: true, isTreasurer: true }
     })
     const canCalculateBonus = currentUser?.role === 'ADMIN' || currentUser?.isTreasurer
+    const canExportMonthlyXlsx = currentUser?.role === 'ADMIN'
+    const monthParam = extractMonthParam(workspace?.name)
+    const exportUrl = monthParam
+        ? `/api/exports/monthly-tasks-xlsx?workspaceId=${workspaceId}&month=${monthParam}`
+        : `/api/exports/monthly-tasks-xlsx?workspaceId=${workspaceId}`
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -91,6 +105,23 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    {canExportMonthlyXlsx && (
+                        <a
+                            href={exportUrl}
+                            style={{
+                                background: '#0f172a',
+                                border: '1px solid #334155',
+                                color: '#e2e8f0',
+                                padding: '0.55rem 1rem',
+                                borderRadius: '12px',
+                                fontSize: '0.9rem',
+                                fontWeight: 700,
+                                textDecoration: 'none'
+                            }}
+                        >
+                            Export XLSX (Deadline Month)
+                        </a>
+                    )}
                     <div style={{ background: '#333', padding: '0.5rem 1rem', borderRadius: '12px', color: '#ccc', fontSize: '0.9rem' }}>
                         Workspace Mode: Isolated
                     </div>

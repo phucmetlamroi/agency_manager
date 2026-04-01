@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { Calendar, Clock, Link as LinkIcon, Edit, User } from "lucide-react"
 import DOMPurify from "isomorphic-dompurify"
 import { ensureExternalLinks } from "@/lib/utils"
+import { formatClientHierarchy } from "@/lib/client-hierarchy"
 
 interface TaskDrawerProps {
     open: boolean
@@ -20,6 +21,7 @@ interface TaskDrawerProps {
 
 export function TaskDrawer({ open, onOpenChange, task, isAdmin, onEdit }: TaskDrawerProps) {
     if (!task) return null
+    const clientLabel = formatClientHierarchy(task.client)
 
     return (
         <Drawer.Root open={open} onOpenChange={onOpenChange}>
@@ -37,8 +39,8 @@ export function TaskDrawer({ open, onOpenChange, task, isAdmin, onEdit }: TaskDr
                             <div className="flex items-center gap-2 mb-6">
                                 <Badge variant="outline">{task.status}</Badge>
                                 <Badge variant="secondary">{task.type}</Badge>
-                                {task.client && (
-                                    <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">{task.client.name}</Badge>
+                                {clientLabel && (
+                                    <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">{clientLabel}</Badge>
                                 )}
                             </div>
 

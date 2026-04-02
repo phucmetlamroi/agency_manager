@@ -177,7 +177,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
         const res = await updateTaskDetails(localTask.id, {
             resources: combinedResources,
-            references: form.references,
+            references: combinedReferences,
             notes: cleanNotesVi,
             notes_en: cleanNotesEn,
             productLink: form.productLink,

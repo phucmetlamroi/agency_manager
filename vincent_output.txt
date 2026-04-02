@@ -1,0 +1,26 @@
+Found Profile: Kẻ Cô Độc (0199089f-026d-48d1-b878-0aec51f228cc)
+Found User: Vincent (Nickname: null) - ID: ff893192-c862-4228-9146-dfde2e546c02
+Found 1 workspaces for this profile.
+
+--- Workspace: Kẻ Cô Độc (30f2833b-5dc7-42ed-8f4c-c7279a75210c) ---
+Total Tasks for Vincent: 12
+Status Counts: {
+  "Hoàn tất": 12
+}
+Total Value (ALL Tasks): 3.600.000 VND
+Total Value (Hoàn tất): 3.600.000 VND
+Total Value (Pending): 0 VND
+
+Top 30 tasks by value:
+  [Hoàn tất] 300.000 VND - Refuse some SMP Clients (Client: SMP)
+  [Hoàn tất] 300.000 VND - Why Your Billings Are Inconsis (Client: Liz)
+  [Hoàn tất] 300.000 VND - Followers Ads (Client: Liz)
+  [Hoàn tất] 300.000 VND - Vsl (Client: Leo)
+  [Hoàn tất] 300.000 VND - Testimonials (Client: Sam Martin)
+  [Hoàn tất] 300.000 VND - Ads (Client: Alex)
+  [Hoàn tất] 300.000 VND - Your Calendar Tells Me Everyth (Client: Liz)
+  [Hoàn tất] 300.000 VND - Protein (Client: Ryan)
+  [Hoàn tất] 300.000 VND - Cooking (Client: Ryan)
+  [Hoàn tất] 300.000 VND - FatLoss (Client: Ryan)
+  [Hoàn tất] 300.000 VND - 4092 (Client: Ryan)
+  [Hoàn tất] 300.000 VND - 4093 (Client: Ryan)

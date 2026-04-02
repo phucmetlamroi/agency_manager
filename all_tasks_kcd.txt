@@ -1,0 +1,10 @@
+--- ALL TASKS IN KẺ CÔ ĐỘC ---
+
+User: Lee (Nick: null) | Tasks: 2 | Expected Sum: 600.000 VND
+User: Mạnh Trần (Nick: null) | Tasks: 4 | Expected Sum: 1.200.000 VND
+User: Văn Ngữ (Nick: null) | Tasks: 4 | Expected Sum: 1.200.000 VND
+User: Vincent (Nick: null) | Tasks: 12 | Expected Sum: 3.600.000 VND
+User: Tiến Cương (Nick: null) | Tasks: 5 | Expected Sum: 1.500.000 VND
+User: Huỳnh Đỗ (Nick: null) | Tasks: 9 | Expected Sum: 2.700.000 VND
+User: Quốc Thắng (Nick: null) | Tasks: 2 | Expected Sum: 600.000 VND
+User: Phúc Phạm (Nick: Phúc Phạm) | Tasks: 1 | Expected Sum: 300.000 VND

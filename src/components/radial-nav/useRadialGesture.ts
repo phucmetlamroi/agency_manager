@@ -61,7 +61,9 @@ export function useRadialGesture({
         const target = e.target
         if (!(target instanceof Element)) return false
 
+        // Allow explicit triggers
         if (target.closest('[data-radial-trigger]')) return true
+        // Block explicit ignores
         if (target.closest('[data-radial-ignore]')) return false
 
         const BLOCKING_SELECTOR = [
@@ -98,32 +100,43 @@ export function useRadialGesture({
             '[onclick]',
         ].join(', ')
 
+        // 1. If any level in the hierarchy is interactive, block.
         if (target.closest(BLOCKING_SELECTOR)) return false
 
+        // 2. Check elements in the stack at the exact point
         const elementsAtPoint = document.elementsFromPoint(e.clientX, e.clientY)
         for (const el of elementsAtPoint) {
             if (!(el instanceof HTMLElement)) continue
-            if (el.closest('[data-radial-trigger]')) return true
+            
+            // Skip core layout containers
             if (el.matches('html, body')) continue
+            
+            // Block if we hit an interactive element in the stack
             if (el.matches(BLOCKING_SELECTOR)) return false
 
+            // Block on images and visual media
+            if (el.tagName === 'IMG' || el.tagName === 'SVG' || el.tagName === 'CANVAS') return false
+
             const style = window.getComputedStyle(el)
+            
+            // Skip elements that are effectively invisible to mouse
             if (style.pointerEvents === 'none' || style.visibility === 'hidden' || style.display === 'none') {
                 continue
             }
 
-            const hasBackground = style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent'
-            const hasBorder =
-                (parseFloat(style.borderTopWidth) > 0 ||
-                    parseFloat(style.borderRightWidth) > 0 ||
-                    parseFloat(style.borderBottomWidth) > 0 ||
-                    parseFloat(style.borderLeftWidth) > 0) &&
-                style.borderColor !== 'transparent'
-            const hasShadow = style.boxShadow !== 'none'
+            // Block on objects with 'pointer' cursor (indicator of interactivity)
+            if (style.cursor === 'pointer') return false
 
-            if (hasBackground || hasBorder || hasShadow) {
-                return false
-            }
+            // Block on elements containing direct text nodes (actual information)
+            const hasTextContent = Array.from(el.childNodes).some(
+                node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim() !== ''
+            )
+            if (hasTextContent) return false
+            
+            // NOTE: We no longer block on background/border/shadow here. 
+            // Most modern layout containers (main, div wrappers) have backgrounds.
+            // By checking for text, interactive elements, and cursor pointers,
+            // we isolate "information" from "structural empty space".
         }
 
         return true

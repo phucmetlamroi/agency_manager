@@ -24,7 +24,7 @@ import { TitleCell } from "./cells/TitleCell"
 
 // Status dot colors - using Unicode escapes to avoid encoding issues
 const STATUS_DOT: Record<string, string> = {
-    "\u0110\u00e3 nh\u1eadn task": "bg-blue-500",
+    "Nh\u1eadn task": "bg-blue-500",
     "\u0110ang \u0111\u1ee3i giao": "bg-purple-500",
     "\u0110ang th\u1ef1c hi\u1ec7n": "bg-yellow-500",
     "Revision": "bg-red-500",

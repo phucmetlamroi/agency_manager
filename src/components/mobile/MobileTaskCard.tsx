@@ -2,7 +2,7 @@
 
 import { TaskWithUser } from '@/types/admin'
 const statusColors: Record<string, string> = {
-    "Đã nhận task": "#60a5fa",
+    "Nhận task": "#60a5fa",
     "Đang đợi giao": "#a855f7",
     "Đang thực hiện": "#fbbf24",
     "Revision": "#ef4444",

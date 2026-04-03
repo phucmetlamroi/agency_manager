@@ -19,13 +19,13 @@ import { Plus } from 'lucide-react'
 
 
 const statusColors: Record<string, string> = {
-    "Đã nhận task": "#60a5fa",   // Blue
-    "Đang đợi giao": "#a855f7",  // Purple (Waiting for Assignment)
-    "Đang thực hiện": "#fbbf24", // Amber/Yellow
+    "Nh\u1eadn task": "#60a5fa",   // Blue
+    "\u0110ang \u0111\u1ee3i giao": "#a855f7",  // Purple (Waiting for Assignment)
+    "\u0110ang th\u1ef1c hi\u1ec7n": "#fbbf24", // Amber/Yellow
     "Revision": "#ef4444",       // Red
-    "Hoàn tất": "#10b981",       // Green
-    "Tạm ngưng": "#9ca3af",      // Gray
-    "Sửa frame": "#f472b6",      // Pink
+    "Ho\u00e0n t\u1ea5t": "#10b981",       // Green
+    "T\u1ea1m ng\u01b0ng": "#9ca3af",      // Gray
+    "S\u1eeda frame": "#f472b6",      // Pink
     "OPEN": "#7c3aed",
     "PENDING": "#f59e0b",
     "COMPLETED": "#10b981",
@@ -33,13 +33,13 @@ const statusColors: Record<string, string> = {
 }
 
 const statusBg: Record<string, string> = {
-    "Đã nhận task": "rgba(96, 165, 250, 0.2)",
-    "Đang đợi giao": "rgba(168, 85, 247, 0.2)",
-    "Đang thực hiện": "rgba(251, 191, 36, 0.2)",
+    "Nh\u1eadn task": "rgba(96, 165, 250, 0.2)",
+    "\u0110ang \u0111\u1ee3i giao": "rgba(168, 85, 247, 0.2)",
+    "\u0110ang th\u1ef1c hi\u1ec7n": "rgba(251, 191, 36, 0.2)",
     "Revision": "rgba(239, 68, 68, 0.2)",
-    "Hoàn tất": "rgba(16, 185, 129, 0.2)",
-    "Tạm ngưng": "rgba(156, 163, 175, 0.2)",
-    "Sửa frame": "rgba(244, 114, 182, 0.2)"
+    "Ho\u00e0n t\u1ea5t": "rgba(16, 185, 129, 0.2)",
+    "T\u1ea1m ng\u01b0ng": "rgba(156, 163, 175, 0.2)",
+    "S\u1eeda frame": "rgba(244, 114, 182, 0.2)"
 }
 
 export default function TaskTable({ tasks, isAdmin = false, users = [], workspaceId }: { tasks: TaskWithUser[], isAdmin?: boolean, users?: { id: string, username: string }[], workspaceId: string }) {
@@ -87,8 +87,8 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
             deadlineStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
         }
 
-        if (!isAdmin && task.status === 'Đã nhận task') {
-            toast.warning('Vui lòng bấm nút "Bắt đầu" để xem chi tiết task!')
+        if (!isAdmin && task.status === 'Nh\u1eadn task') {
+            toast.warning('Vui l\u00f2ng b\u1eaft n\u00fat "B\u1eaft \u0111\u1ea7u" \u0111\u1ec3 xem chi ti\u1ebft task!')
             return
         }
 
@@ -148,9 +148,9 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
 
             const errors = results.filter(r => r.error)
             if (errors.length > 0) {
-                toast.error(`Cập nhật thất bại cho ${errors.length}/${tasksToUpdate.length} tasks.`)
+                toast.error(`C\u1eadp nh\u1eadt th\u1ea5t b\u1ea1i cho ${errors.length}/${tasksToUpdate.length} tasks.`)
             } else {
-                toast.success(`Đã cập nhật trạng thái cho ${tasksToUpdate.length} tasks.`)
+                toast.success(`\u0110\u00e3 c\u1eadp nh\u1eadt tr\u1ea1ng th\u00e1i cho ${tasksToUpdate.length} tasks.`)
                 setSelectedIds([])
             }
             router.refresh()
@@ -192,7 +192,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                 productLink: editForm.productLink,
             })
             setIsEditing(false)
-            toast.success('Đã cập nhật chi tiết task')
+            toast.success('\u0110\u00e3 c\u1eadp nh\u1eadt chi ti\u1ebft task')
         } else {
             toast.error('Failed to update')
         }
@@ -200,11 +200,11 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
 
     // Filter options based on role and FSM
     const getStatusOptions = (currentStatus: string) => {
-        const allOptions = ["Đã nhận task", "Đang thực hiện", "Revision", "Sửa frame", "Tạm ngưng", "Hoàn tất", "Đang đợi giao"]
+        const allOptions = ["Nh\u1eadn task", "\u0110ang th\u1ef1c hi\u1ec7n", "Revision", "S\u1eeda frame", "T\u1ea1m ng\u01b0ng", "Ho\u00e0n t\u1ea5t", "\u0110ang \u0111\u1ee3i giao"]
 
         if (!isAdmin) {
             // User limited view
-            return ["Đã nhận task", "Đang thực hiện"]
+            return ["Nh\u1eadn task", "Đang thực hiện"]
         }
 
         // Admin: Filter by FSM validity
@@ -222,14 +222,14 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                     <div className="sticky top-0 z-30 bg-indigo-700 text-white px-5 py-3 rounded-xl flex items-center justify-between shadow-[0_10px_40px_rgba(79,70,229,0.4)] animate-in slide-in-from-top duration-300 border border-indigo-500 mb-2">
                         <div className="flex items-center gap-5">
                             <div className="flex flex-col">
-                                <span className="text-sm font-black tracking-tight">ĐANG CHỌN {selectedIds.length} TÁC VỤ</span>
-                                <button onClick={() => setSelectedIds([])} className="text-[10px] text-indigo-300 hover:text-white underline text-left transition-colors">Hủy chọn tất cả</button>
+                                <span className="text-sm font-black tracking-tight">\u0110ANG CH\u1eccN {selectedIds.length} T\u00c1C V\u1ee4</span>
+                                <button onClick={() => setSelectedIds([])} className="text-[10px] text-indigo-300 hover:text-white underline text-left transition-colors">H\u1ee7y ch\u1ecdn t\u1ea5t c\u1ea3</button>
                             </div>
                             
                             <div className="h-8 w-px bg-indigo-500/50 mx-2" />
 
                             <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">Đổi trạng thái lô:</span>
+                                <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">\u0110\u1ed5i tr\u1ea1ng th\u00e1i l\u00f4:</span>
                                 <select
                                     disabled={isUpdating}
                                     onChange={(e) => {
@@ -244,8 +244,8 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                     className="bg-indigo-900 border border-indigo-400 text-white font-bold text-xs px-3 py-2 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-white/20 transition-all disabled:opacity-50"
                                 >
 
-                                    <option value="">-- Chọn trạng thái --</option>
-                                    {['Đã nhận task', 'Đang thực hiện', 'Review', 'Hoàn tất', 'Tạm ngưng', 'Sửa frame'].map(opt => (
+                                    <option value="">-- Ch\u1ecdn tr\u1ea1ng th\u00e1i --</option>
+                                    {['Nh\u1eadn task', '\u0110ang th\u1ef1c hi\u1ec7n', 'Review', 'Ho\u00e0n t\u1ea5t', 'T\u1ea1m ng\u01b0ng', 'S\u1eeda frame'].map(opt => (
                                         <option key={opt} value={opt}>{opt}</option>
                                     ))}
                                 </select>
@@ -271,12 +271,12 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                         else setSelectedIds([])
                       }}
                     />
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Chọn tất cả</span>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Ch\u1ecdn t\u1ea5t c\u1ea3</span>
                   </div>
                 )}
 
                 {tasks.map(task => {
-                    const isLocked = !isAdmin && task.status === 'Đã nhận task';
+                    const isLocked = !isAdmin && task.status === 'Nh\u1eadn task';
                     const isSelected = selectedIds.includes(task.id);
                     return (
                         <div key={task.id}
@@ -335,7 +335,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                     <div className="flex items-center gap-2">
                                         <span className="opacity-60 text-xs uppercase">Deadline:</span>
                                         {task.deadline ? (
-                                            <span className={new Date() > new Date(task.deadline) && task.status !== 'Hoàn tất' ? 'text-red-400 font-bold' : 'text-gray-300'}>
+                                            <span className={new Date() > new Date(task.deadline) && task.status !== 'Ho\u00e0n t\u1ea5t' ? 'text-red-400 font-bold' : 'text-gray-300'}>
                                                 {new Date(task.deadline).toLocaleDateString('vi-VN')} {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         ) : <span className="italic text-gray-600">No Deadline</span>}
@@ -355,9 +355,9 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                                     }}
                                                     className="bg-transparent border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-blue-500 max-w-[120px]"
                                                 >
-                                                    <option value="sys:revoke" className="text-red-500 font-bold">⛔ Thu hồi về System</option>
-                                                    <option value="" className="text-gray-500">-- Hủy giao (Unassign User) --</option>
-                                                    <optgroup label="Nhân viên">
+                                                    <option value="sys:revoke" className="text-red-500 font-bold">\u26d4 Thu h\u1ed3i v\u1ec1 System</option>
+                                                    <option value="" className="text-gray-500">-- H\u1ee7y giao (Unassign User) --</option>
+                                                    <optgroup label="Nh\u00e2n vi\u00ean">
                                                         {users
                                                             .filter(u => {
                                                                 const role = (u as any).role
@@ -383,15 +383,15 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                 </div>
 
                                 {/* Warning Messages */}
-                                {task.deadline && task.status !== 'Hoàn tất' && (
+                                {task.deadline && task.status !== 'Ho\u00e0n t\u1ea5t' && (
                                     (() => {
                                         const start = task.createdAt ? new Date(task.createdAt).getTime() : new Date().getTime()
                                         const end = new Date(task.deadline).getTime()
                                         const now = new Date().getTime()
                                         const percent = (end - start) > 0 ? ((now - start) / (end - start)) * 100 : 100
 
-                                        if (percent > 100) return <div className="text-red-500 text-xs font-bold mt-1">GẤP: Đã quá hạn! (100%)</div>
-                                        if (percent >= 90) return <div className="text-orange-500 text-xs font-bold mt-1">CẢNH BÁO: Sắp hết giờ (90%)</div>
+                                        if (percent > 100) return <div className="text-red-500 text-xs font-bold mt-1">G\u1ea4P: \u0110\u00e3 qu\u00e1 h\u1ea1n! (100%)</div>
+                                        if (percent >= 90) return <div className="text-orange-500 text-xs font-bold mt-1">C\u1ea2NH B\u00c1O: S\u1eafp h\u1ebft gi\u1edd (90%)</div>
                                         return null
                                     })()
                                 )}
@@ -402,28 +402,28 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                 {/* Status Selector (Admin) or Buttons (User) */}
                                 {!isAdmin ? (
                                     <>
-                                        {task.status === 'Đã nhận task' && (
+                                        {task.status === 'Nh\u1eadn task' && (
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Đang thực hiện') }}
+                                                onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, '\u0110ang th\u1ef1c hi\u1ec7n') }}
                                                 className="px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg shadow-lg hover:bg-yellow-400 text-sm whitespace-nowrap"
                                             >
-                                                ▶ Bắt đầu
+                                                \u25b6 B\u1eaft \u0111\u1ea7u
                                             </button>
                                         )}
-                                        {task.status === 'Đang thực hiện' && (
+                                        {task.status === '\u0110ang th\u1ef1c hi\u1ec7n' && (
                                             <span className="px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-500 text-xs font-bold border border-yellow-500/30 flex items-center gap-2">
-                                                <span className="animate-pulse">●</span> Working...
+                                                <span className="animate-pulse">\u25cf</span> Working...
                                             </span>
                                         )}
-                                        {(task.status === 'Tạm ngưng' || task.status === 'Sửa frame' || task.status === 'Đang đợi giao' || task.status === 'Revision' || task.status === 'Review') && (
+                                        {(task.status === 'T\u1ea1m ng\u01b0ng' || task.status === 'S\u1eeda frame' || task.status === '\u0110ang \u0111\u1ee3i giao' || task.status === 'Revision' || task.status === 'Review') && (
                                             <span className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 text-xs italic border border-gray-700">
-                                                ⏳ Waiting...
+                                                \u23f3 Waiting...
                                             </span>
                                         )}
-                                        {task.status === 'Hoàn tất' && (
+                                        {task.status === 'Ho\u00e0n t\u1ea5t' && (
                                             <div className="flex flex-col gap-1 items-end">
                                                 <span className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/30">
-                                                    🏆 Done
+                                                    \ud83c\udfc6 Done
                                                 </span>
                                             </div>
                                         )}
@@ -455,12 +455,12 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                         {/* Admin Revision Controls */}
                                         {isAdmin && task.status === 'Revision' && (
                                             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                                                <button disabled className="px-2 py-1 text-[10px] bg-red-500/50 text-white rounded cursor-not-allowed">Chưa FB</button>
+                                                <button disabled className="px-2 py-1 text-[10px] bg-red-500/50 text-white rounded cursor-not-allowed">Ch\u01b0a FB</button>
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'Đang thực hiện') }}
+                                                    onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, '\u0110ang th\u1ef1c hi\u1ec7n') }}
                                                     className="px-2 py-1 text-[10px] bg-green-500 text-white font-bold rounded hover:bg-green-400"
                                                 >
-                                                    ✔ Đã FB
+                                                    \u2714 \u0110\u00e3 FB
                                                 </button>
                                             </div>
                                         )}
@@ -472,14 +472,14 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                         onClick={async (e) => {
                                             e.stopPropagation()
                                             if (await confirm({
-                                                title: 'Xóa Task?',
-                                                message: `Bạn có chắc chắn muốn xóa task "${task.title}" không? Hành động này không thể hoàn tác.`,
+                                                title: 'X\u00f3a Task?',
+                                                message: `B\u1ea1n c\u00f3 ch\u1eafc ch\u1eafn mu\u1ed1n x\u00f3a task "${task.title}" kh\u00f4ng? H\u00e0nh \u0111\u1ed9ng n\u00e0y kh\u00f4ng th\u1ec3 ho\u00e0n t\u00e1c.`,
                                                 type: 'danger',
-                                                confirmText: 'Xóa luôn',
-                                                cancelText: 'Thôi'
+                                                confirmText: 'X\u00f3a lu\u00f4n',
+                                                cancelText: 'Th\u00f4i'
                                             })) {
                                                 await deleteTask(task.id, workspaceId)
-                                                toast.success('Đã xóa task thành công')
+                                                toast.success('\u0110\u00e3 x\u00f3a task th\u00e0nh c\u00f4ng')
                                             }
                                         }}
                                         className="text-gray-500 hover:text-red-500 p-2 text-xl"

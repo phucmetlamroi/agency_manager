@@ -77,11 +77,10 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
         let updateData: any = {}
 
         if (!assignmentId || assignmentId === 'unassigned') {
-            // CASE: UNASSIGN MEMBER (Hủy giao User)
             updateData = {
                 assigneeId: null,
                 assignedAgencyId: null,
-                status: 'Đang đợi giao',
+                status: '\u0110ang \u0111\u1ee3i giao',
                 isPenalized: false,
                 deadline: null
             }
@@ -91,7 +90,7 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
             updateData = {
                 assigneeId: null,
                 assignedAgencyId: null,
-                status: 'Đang đợi giao',
+                status: '\u0110ang \u0111\u1ee3i giao',
                 isPenalized: false,
                 deadline: null
             }
@@ -113,7 +112,7 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
             updateData = {
                 assigneeId: assignmentId,
                 assignedAgencyId: null,
-                status: 'Đã nhận task',
+                status: 'Nh\u1eadn task',
                 isPenalized: false
             }
         }

@@ -57,10 +57,8 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
         users,
         isAdmin,
         (task) => {
-            if (!isAdmin && task.status === 'Đã nhận task') {
-                toast.warning('🔒 Vui lòng bấm "Bắt đầu" để mở khóa task!')
-                return
-            }
+            // Updated task click handler to remove restriction for 'Nh\u1eadn task' status
+            // per user request for a free-flow workflow.
             setSelectedTask(task)
         }, // onTaskClick
         workspaceId, // workspaceId

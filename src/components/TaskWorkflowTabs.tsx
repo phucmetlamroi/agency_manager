@@ -28,8 +28,8 @@ const TAB_CONFIG: TabConfig[] = [
     {
         id: 'ASSIGNED',
         label: 'Nh\u1eadn Task',
-        statusValues: ['\u0110\u00e3 nh\u1eadn task', '\u0110ang \u0111\u1ee3i giao', 'T\u1ea1m ng\u01b0ng'],
-        targetStatus: '\u0110\u00e3 nh\u1eadn task',
+        statusValues: ['Nh\u1eadn task', '\u0110\u00e3 nh\u1eadn task', '\u0110ang \u0111\u1ee3i giao', 'T\u1ea1m ng\u01b0ng'],
+        targetStatus: 'Nh\u1eadn task',
         dotColor: 'bg-blue-500',
         borderColor: 'border-blue-500',
         textColor: 'text-blue-400',
@@ -162,7 +162,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
         users,
         isAdmin ?? false,
         (task) => {
-            if (!isAdmin && task.status === '\u0110\u00e3 nh\u1eadn task') {
+            if (!isAdmin && (task.status === 'Nh\u1eadn task' || task.status === '\u0110\u00e3 nh\u1eadn task')) {
                 toast.warning('Vui l\u00f2ng b\u1ea5m "B\u1eaft \u0111\u1ea7u" \u0111\u1ec3 m\u1edf kh\u00f3a task!')
                 return
             }

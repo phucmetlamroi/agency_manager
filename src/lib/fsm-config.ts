@@ -4,15 +4,15 @@
  */
 
 export enum TaskState {
-    PENDING = 'Đang đợi giao',      // Initial State (Global Pool)
-    ASSIGNED = 'Đã nhận task',      // User assigned but not started
-    IN_PROGRESS = 'Đang thực hiện', // User working (Timer Running)
+    PENDING = '\u0110ang \u0111\u1ee3i giao',      // Initial State (Global Pool)
+    ASSIGNED = 'Nh\u1eadn task',          // User assigned but not started
+    IN_PROGRESS = '\u0110ang th\u1ef1c hi\u1ec7n', // User working (Timer Running)
     REVIEW = 'Review',              // Submitted, Waiting for Admin/Client
     REVISION = 'Revision',          // Feedback received, User needs to fix
-    FIXING_FRAME = 'Sửa frame',     // Specific active state for fixing frames
-    PAUSED = 'Tạm ngưng',           // Explicitly paused
-    COMPLETED = 'Hoàn tất',         // Final State
-    CANCELLED = 'Đã hủy'            // Dead State
+    FIXING_FRAME = 'S\u1eeda frame',     // Specific active state for fixing frames
+    PAUSED = 'T\u1ea1m ng\u01b0ng',           // Explicitly paused
+    COMPLETED = 'Ho\u00e0n t\u1ea5t',         // Final State
+    CANCELLED = '\u0110\u00e3 h\u1ee7y'            // Dead State
 }
 
 export type TaskEvent =
@@ -116,33 +116,6 @@ export const TRANSITIONS: Record<TaskEvent, TransitionRule> = {
  * @returns { isValid: boolean, error?: string }
  */
 export function validateTransition(current: string, target: string, event?: TaskEvent): { isValid: boolean, error?: string } {
-    // 1. If strict event provided, check table
-    if (event) {
-        const rule = TRANSITIONS[event]
-        if (!rule) return { isValid: false, error: `Invalid event: ${event}` }
-
-        // Check Source State
-        if (!rule.from.includes(current as TaskState)) {
-            return { isValid: false, error: `Cannot '${event}' from state '${current}'` }
-        }
-
-        // Check Target (if implicit in event, target must match. If loose, just check validity)
-        if (target !== rule.to) {
-            return { isValid: false, error: `Event '${event}' leads to '${rule.to}', not '${target}'` }
-        }
-
-        return { isValid: true }
-    }
-
-    // 2. Loose Mode (Check if ANY event allows Source -> Target)
-    // Useful for legacy UI where we just send "newStatus" without named event
-    const validEvents = Object.entries(TRANSITIONS).filter(([_, rule]) => {
-        return rule.from.includes(current as TaskState) && rule.to === target
-    })
-
-    if (validEvents.length === 0) {
-        return { isValid: false, error: `Illegal transition: '${current}' -> '${target}'` }
-    }
-
+    // FSM Disabled as per user request: "hãy bỏ logic này đi"
     return { isValid: true }
 }

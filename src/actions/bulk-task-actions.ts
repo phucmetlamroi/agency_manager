@@ -1,4 +1,4 @@
-﻿'use server'
+'use server'
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
@@ -24,7 +24,7 @@ type BatchTaskInput = {
 export async function createBatchTasks(data: BatchTaskInput, workspaceId: string) {
     try {
         if (!data.titles || data.titles.length === 0) {
-            return { error: 'Danh sÃ¡ch task trá»‘ng' }
+            return { error: 'Danh s\u00e1ch task tr\u1ed1ng' }
         }
 
         // Calculate financials once
@@ -56,7 +56,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         notes_vi: data.notes,
                         notes_en: data.notes_en,
                         assigneeId: data.assigneeId,
-                        status: data.assigneeId ? 'ÄÃ£ nháº­n task' : 'Äang Ä‘á»£i giao',
+                        status: data.assigneeId ? 'Nh\u1eadn task' : '\u0110ang \u0111\u1ee3i giao',
 
                         // Financials
                         jobPriceUSD: data.jobPriceUSD,
@@ -79,7 +79,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
 
     } catch (e) {
         console.error('Batch create error:', e)
-        return { error: 'Lá»—i khi táº¡o lÃ´ task. Vui lÃ²ng thá»­ láº¡i.' }
+        return { error: 'L\u1ed7i khi t\u1ea1o l\u00f4 task. Vui l\u00f2ng th\u1eed l\u1ea1i.' }
     }
 }
 
@@ -171,18 +171,18 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
                 orderBy: { createdAt: 'desc' }
             })
             if (latestRank && latestRank.rank === 'D') {
-                return { error: 'KhÃ´ng thá»ƒ giao Task: NhÃ¢n sá»± Ä‘ang bá»‹ Cáº£nh cÃ¡o Äá» (Rank D).' }
+                return { error: 'Kh\u00f4ng th\u1ec3 giao Task: Nh\u00e2n s\u1ef1 \u0111ang b\u1ecb C\u1ea3nh c\u00e1o \u0110\u1ecf (Rank D).' }
             }
 
             // Assign to USER
             updateData.assigneeId = cleanAssigneeId
             updateData.assignedAgencyId = null
-            updateData.status = 'ÄÃ£ nháº­n task'
+            updateData.status = 'Nh\u1eadn task'
         } else {
             // UNASSIGN (Back to Global Pool)
             updateData.assigneeId = null
             updateData.assignedAgencyId = null
-            updateData.status = 'Äang Ä‘á»£i giao'
+            updateData.status = '\u0110ang \u0111\u1ee3i giao'
         }
 
         // Execute Update

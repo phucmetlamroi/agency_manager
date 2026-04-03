@@ -72,7 +72,7 @@ export async function createTask(formData: FormData, workspaceId: string) {
                 assigneeId: assigneeId || null,
                 fileLink: fileLink || null,
                 collectFilesLink: collectFilesLink || null,
-                status: assigneeId ? 'Đã nhận task' : 'Đang đợi giao',
+                status: assigneeId ? 'Nh\u1eadn task' : '\u0110ang \u0111\u1ee3i giao',
 
                 // Financials
                 jobPriceUSD,

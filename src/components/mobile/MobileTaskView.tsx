@@ -23,16 +23,16 @@ export default function MobileTaskView({ tasks, isAdmin, users, workspaceId }: {
     // Filter Logic
     useEffect(() => {
         let res = tasks
-        if (activeTab === 'ASSIGNED') res = tasks.filter(t => t.status === 'Đã nhận task')
-        if (activeTab === 'DOING') res = tasks.filter(t => t.status === 'Đang thực hiện')
-        if (activeTab === 'review') res = tasks.filter(t => t.status === 'Review' || t.status === 'Revision' || t.status === 'Sửa frame')
+        if (activeTab === 'ASSIGNED') res = tasks.filter(t => t.status === 'Nh\u1eadn task')
+        if (activeTab === 'DOING') res = tasks.filter(t => t.status === '\u0110ang th\u1ef1c hi\u1ec7n')
+        if (activeTab === 'review') res = tasks.filter(t => t.status === 'Review' || t.status === 'Revision' || t.status === 'S\u1eeda frame')
         // ALL matches everything
         setFilteredTasks(res)
     }, [tasks, activeTab])
 
     const handleTaskClick = (task: TaskWithUser) => {
-        if (!isAdmin && task.status === 'Đã nhận task') {
-            toast.warning('🔒 Vui lòng bấm "Bắt đầu" để mở khóa task!')
+        if (!isAdmin && task.status === 'Nh\u1eadn task') {
+            toast.warning('\ud83d\udd12 Vui l\u00f2ng b\u1eaft "B\u1eaft \u0111\u1ea7u" \u0111\u1ec3 m\u1edf kh\u00f3a task!')
             return
         }
         setSelectedTask(task)

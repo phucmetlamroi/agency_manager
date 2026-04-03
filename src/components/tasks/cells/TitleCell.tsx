@@ -10,7 +10,7 @@ interface TitleCellProps {
 }
 
 export function TitleCell({ task, isAdmin, onClick }: TitleCellProps) {
-    const isLocked = !isAdmin && task.status === "Đã nhận task"
+    const isLocked = !isAdmin && task.status === "Nhận task"
     const clientLabel = formatClientHierarchy(task.client)
 
     return (

@@ -2,8 +2,10 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { parseVietnamDate } from '@/lib/date-utils'
+import { getSession } from '@/lib/auth'
+import { UserRole } from '@prisma/client'
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 export async function updateTaskDetails(id: string, data: {
     resources?: string
@@ -18,6 +20,9 @@ export async function updateTaskDetails(id: string, data: {
     collectFilesLink?: string
 }, workspaceId: string) {
     try {
+        const session = await getSession()
+        if (!session) return { error: 'Unauthorized' }
+        const isAdmin = session.user.role === UserRole.ADMIN || session.user.isTreasurer
         const workspacePrisma = getWorkspacePrisma(workspaceId)
 
         // Fetch current task first to compare notes and check financial locks
@@ -30,23 +35,26 @@ export async function updateTaskDetails(id: string, data: {
             return { error: 'Task not found' }
         }
 
-        const updateData: any = {
-            resources: data.resources,
-            references: data.references,
-            title: data.title,
-            productLink: data.productLink,
-            collectFilesLink: data.collectFilesLink
+        let updateData: any = {}
+
+        if (isAdmin) {
+            updateData = {
+                resources: data.resources,
+                references: data.references,
+                title: data.title,
+                collectFilesLink: data.collectFilesLink,
+                productLink: data.productLink
+            }
+            if (data.notes !== undefined) updateData.notes_vi = data.notes
+            if (data.notes_en !== undefined) updateData.notes_en = data.notes_en
+        } else {
+            // Non-admins are ONLY allowed to update their delivery/translation fields
+            if (data.productLink !== undefined) updateData.productLink = data.productLink
+            if (data.notes_en !== undefined) updateData.notes_en = data.notes_en
         }
 
-        if (data.notes !== undefined) {
-            updateData.notes_vi = data.notes
-        }
-        if (data.notes_en !== undefined) {
-            updateData.notes_en = data.notes_en
-        }
-
-        // Handle Price Updates (Financials) - FIXED
-        if (data.jobPriceUSD !== undefined || data.value !== undefined) {
+        // Handle Price Updates (Financials) - STRICTLY ADMIN ONLY
+        if (isAdmin && (data.jobPriceUSD !== undefined || data.value !== undefined)) {
             // FINANCIAL LOCK CHECK
             if (currentTask.assigneeId) {
                 const month = currentTask.createdAt.getMonth() + 1
@@ -80,8 +88,8 @@ export async function updateTaskDetails(id: string, data: {
             updateData.profitVND = (Number(newJobPriceUSD) * Number(rate)) - Number(newValue)
         }
 
-        // Handle Deadline Update + Timer Reset
-        if (data.deadline) {
+        // Handle Deadline Update - STRICTLY ADMIN ONLY
+        if (isAdmin && data.deadline) {
             // Force Vietnam parsing
             updateData.deadline = parseVietnamDate(data.deadline)
             // Reset createdAt to "restart" the Smart Reminder timer
@@ -89,9 +97,6 @@ export async function updateTaskDetails(id: string, data: {
 
             // Critical: Reset penalty flag so if they miss this NEW deadline, they get penalized again.
             updateData.isPenalized = false
-
-            // Also ensure status is NOT "Hoàn tất" if we are setting a deadline? 
-            // Maybe not needed, Admin controls status separately.
         }
 
         await workspacePrisma.task.update({

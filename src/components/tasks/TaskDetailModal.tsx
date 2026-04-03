@@ -507,7 +507,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                 References
                                 <BulkToggle field="references" label="References" />
                             </label>
-                            {isEditing ? (
+                            {isEditing && isAdmin ? (
                                 <div className={cn("space-y-2", isBulkMode && !enabledFields['references'] ? 'opacity-40 pointer-events-none' : '')}>
                                     <input
                                         value={form.references}
@@ -657,7 +657,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                 <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
                             </button>
                         </div>
-                        {isEditing ? (
+                        {isEditing && isAdmin ? (
                             <div className="h-[250px] border border-white/8 rounded-2xl overflow-hidden shadow-inner">
                                 <TiptapEditor
                                     content={form.notes_vi}

@@ -67,7 +67,7 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                     <span className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     </span>
-                    {isTeam ? 'B\u00e1o C\u00e1o T\u00e0i Ch\u00ednh' : 'Thu Nh\u1eadp C\u00e1 Nh\u00e2n'}
+                    {isTeam ? '{"B\u00e1o C\u00e1o T\u00e0i Ch\u00ednh"}' : '{"Thu Nh\u1eadp C\u00e1 Nh\u00e2n"}'}
                 </h2>
 
                 {/* TOGGLE CONTROLS */}
@@ -77,7 +77,7 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         {data.completedCount} completed
                     </span>
-                    <span className="text-zinc-600">{'\u2022'}</span>
+                    <span className="text-zinc-600">{"\u2022"}</span>
                     <span className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-3 py-1 rounded-full text-sm">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                         {data.allTasksCount} total ({data.pendingCount} pending)
@@ -137,7 +137,7 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                 <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
                     <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
-                        {isTeam ? 'Th\u1ef1c T\u1ebf \u2014 \u0110\u00e3 Ho\u00e0n Th\u00e0nh' : 'Thu Nh\u1eadp Th\u1ef1c T\u1ebf'}
+                        {isTeam ? '{"Th\u1ef1c T\u1ebf \u2014 \u0110\u00e3 Ho\u00e0n Th\u00e0nh"}' : '{"Thu Nh\u1eadp Th\u1ef1c T\u1ebf"}'}
                     </span>
                     <div className="flex-1 h-px bg-emerald-500/10" />
                 </div>
@@ -148,10 +148,10 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl" />
                         <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-1">
-                            {isTeam ? 'T\u1ed5ng Doanh Thu' : 'T\u1ed5ng Thu Nh\u1eadp'}
+                            {isTeam ? '{"T\u1ed5ng Doanh Thu"}' : '{"T\u1ed5ng Thu Nh\u1eadp"}'}
                         </p>
                         <p className="text-xs text-zinc-600 mb-3">
-                            {isTeam ? `Gross Revenue t\u1eeb ${data.completedCount} task` : `T\u1eeb ${data.completedCount} task ho\u00e0n th\u00e0nh`}
+                            {isTeam ? `{"Gross Revenue t\u1eeb ${data.completedCount} task"}` : `{"T\u1eeb ${data.completedCount} task ho\u00e0n th\u00e0nh"}`}
                         </p>
                         <div className="text-2xl font-bold text-blue-400 font-mono tabular-nums">
                             {fmt(data.totalRevenueVND)}
@@ -163,8 +163,8 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                         <div className="bg-zinc-950/50 border border-red-500/20 rounded-2xl p-5 relative overflow-hidden group hover:border-red-500/40 transition-all">
                             <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                             <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl" />
-                            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-1">T\u1ed5ng Chi Ph\u00ed</p>
-                            <p className="text-xs text-zinc-600 mb-3">Wages \u0111\u00e3 chi tr\u1ea3 cho nh\u00e2n vi\u00ean</p>
+                            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{"T\u1ed5ng Chi Ph\u00ed"}</p>
+                            <p className="text-xs text-zinc-600 mb-3">{"Wages \u0111\u00e3 chi tr\u1ea3 cho nh\u00e2vi\u00ean"}</p>
                             <div className="text-2xl font-bold text-red-400 font-mono tabular-nums">
                                 {fmt(data.totalWageVND)}
                             </div>
@@ -176,7 +176,7 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                         <div className="bg-zinc-950/50 border border-emerald-500/20 rounded-2xl p-5 relative overflow-hidden group hover:border-emerald-500/40 transition-all shadow-[0_0_30px_rgba(16,185,129,0.05)]">
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl" />
-                            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-1">L\u1ee3i Nhu\u1eadn R\u00f2ng</p>
+                            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{"L\u1ee3i Nhu\u1eadn R\u00f2ng"}</p>
                             <div className={`text-xs font-bold mb-3 ${data.profitMargin > 50 ? 'text-emerald-400' : data.profitMargin < 30 ? 'text-red-400' : 'text-yellow-400'}`}>
                                 Margin: {data.profitMargin.toFixed(1)}%
                             </div>
@@ -196,8 +196,8 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                     <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.6)] animate-pulse" />
                     <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest">
                         {isTeam
-                            ? `D\u1ef1 Ki\u1ebfn \u2014 To\u00e0n B\u1ed9 ${data.allTasksCount} Task`
-                            : `D\u1ef1 Ki\u1ebfn \u2014 ${data.allTasksCount} Task`}
+                            ? `{"D\u1ef1 Ki\u1ebfn \u2014 To\u00e0n B\u1ed9 ${data.allTasksCount} Task"}`
+                            : `{"D\u1ef1 Ki\u1ebfn \u2014 ${data.allTasksCount} Task"}`}
                     </span>
                     <div className="flex-1 h-px bg-indigo-500/10" />
                 </div>
@@ -206,7 +206,7 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                     {/* Projected Revenue */}
                     <div className="bg-zinc-900/30 border border-dashed border-indigo-500/20 rounded-2xl p-5 relative overflow-hidden group hover:border-indigo-500/40 transition-all">
                         <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
-                            {isTeam ? 'D\u1ef1 Ki\u1ebfn Doanh Thu' : 'D\u1ef1 Ki\u1ebfn Thu Nh\u1eadp'}
+                            {isTeam ? '{"D\u1ef1 Ki\u1ebfn Doanh Thu"}' : '{"D\u1ef1 Ki\u1ebfn Thu Nh\u1eadp"}'}
                         </p>
                         <p className="text-xs text-zinc-700 mb-3">+{fmt(data.projectedRevenueVND - data.totalRevenueVND)} pending</p>
                         <div className="text-2xl font-bold text-indigo-400/80 font-mono tabular-nums">
@@ -217,7 +217,7 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                     {/* Projected Cost - Team only */}
                     {isTeam && (
                         <div className="bg-zinc-900/30 border border-dashed border-rose-500/20 rounded-2xl p-5 relative overflow-hidden group hover:border-rose-500/40 transition-all">
-                            <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1">D\u1ef1 Ki\u1ebfn Chi Ph\u00ed</p>
+                            <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{"D\u1ef1 Ki\u1ebfn Chi Ph\u00ed"}</p>
                             <p className="text-xs text-zinc-700 mb-3">+{fmt(data.projectedWageVND - data.totalWageVND)} to pay</p>
                             <div className="text-2xl font-bold text-rose-400/80 font-mono tabular-nums">
                                 {fmt(data.projectedWageVND)}
@@ -228,7 +228,7 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                     {/* Projected Net - Team only */}
                     {isTeam && (
                         <div className="bg-zinc-900/30 border border-dashed border-teal-500/20 rounded-2xl p-5 relative overflow-hidden group hover:border-teal-500/40 transition-all">
-                            <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1">D\u1ef1 Ki\u1ebfn L\u1ee3i Nhu\u1eadn</p>
+                            <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{"D\u1ef1 Ki\u1ebfn L\u1ee3i Nhu\u1eadn"}</p>
                             <div className={`text-xs font-bold mb-3 opacity-70 ${data.projectedMargin > 50 ? 'text-emerald-400' : data.projectedMargin < 30 ? 'text-red-400' : 'text-yellow-400'}`}>
                                 Margin: {data.projectedMargin.toFixed(1)}%
                             </div>

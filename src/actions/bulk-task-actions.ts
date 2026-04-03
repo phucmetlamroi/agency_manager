@@ -1,4 +1,4 @@
-'use server'
+﻿'use server'
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
@@ -24,7 +24,7 @@ type BatchTaskInput = {
 export async function createBatchTasks(data: BatchTaskInput, workspaceId: string) {
     try {
         if (!data.titles || data.titles.length === 0) {
-            return { error: 'Danh sách task trống' }
+            return { error: 'Danh sÃ¡ch task trá»‘ng' }
         }
 
         // Calculate financials once
@@ -56,7 +56,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         notes_vi: data.notes,
                         notes_en: data.notes_en,
                         assigneeId: data.assigneeId,
-                        status: data.assigneeId ? 'Đã nhận task' : 'Đang đợi giao',
+                        status: data.assigneeId ? 'ÄÃ£ nháº­n task' : 'Äang Ä‘á»£i giao',
 
                         // Financials
                         jobPriceUSD: data.jobPriceUSD,
@@ -79,7 +79,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
 
     } catch (e) {
         console.error('Batch create error:', e)
-        return { error: 'Lỗi khi tạo lô task. Vui lòng thử lại.' }
+        return { error: 'Lá»—i khi táº¡o lÃ´ task. Vui lÃ²ng thá»­ láº¡i.' }
     }
 }
 
@@ -171,18 +171,18 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
                 orderBy: { createdAt: 'desc' }
             })
             if (latestRank && latestRank.rank === 'D') {
-                return { error: 'Không thể giao Task: Nhân sự đang bị Cảnh cáo Đỏ (Rank D).' }
+                return { error: 'KhÃ´ng thá»ƒ giao Task: NhÃ¢n sá»± Ä‘ang bá»‹ Cáº£nh cÃ¡o Äá» (Rank D).' }
             }
 
             // Assign to USER
             updateData.assigneeId = cleanAssigneeId
             updateData.assignedAgencyId = null
-            updateData.status = 'Đã nhận task'
+            updateData.status = 'ÄÃ£ nháº­n task'
         } else {
             // UNASSIGN (Back to Global Pool)
             updateData.assigneeId = null
             updateData.assignedAgencyId = null
-            updateData.status = 'Đang đợi giao'
+            updateData.status = 'Äang Ä‘á»£i giao'
         }
 
         // Execute Update
@@ -205,5 +205,37 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
     } catch (error) {
         console.error("Bulk Assign Error:", error)
         return { error: "Failed to bulk assign tasks" }
+    }
+}
+
+// BULK UPDATE STATUS (for Drag-and-Drop)
+export async function bulkUpdateStatus(taskIds: string[], newStatus: string, workspaceId: string) {
+    if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
+
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
+        await prisma.$transaction(async (tx) => {
+            for (const id of taskIds) {
+                await tx.task.update({
+                    where: {
+                        id,
+                        workspaceId: workspaceId
+                    },
+                    data: {
+                        status: newStatus,
+                        version: { increment: 1 }
+                    }
+                })
+            }
+        })
+
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/admin/queue`)
+        revalidatePath(`/${workspaceId}/dashboard`)
+        return { success: true, count: taskIds.length }
+    } catch (error) {
+        console.error("Bulk Status Update Error:", error)
+        return { error: "Failed to update task statuses" }
     }
 }

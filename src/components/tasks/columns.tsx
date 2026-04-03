@@ -1,11 +1,11 @@
-﻿"use client"
+"use client"
 
 import { ColumnDef } from "@tanstack/react-table"
 import { TaskWithUser } from "@/types/admin"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { ArrowUpDown, MoreHorizontal, Pen, Trash2 } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Pen, Trash2, GripVertical } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,6 +22,18 @@ import { AssigneeCell } from "./cells/AssigneeCell"
 import { StatusCell } from "./cells/StatusCell"
 import { TitleCell } from "./cells/TitleCell"
 
+// Status dot colors
+const STATUS_DOT: Record<string, string> = {
+    "Da nhan task": "bg-blue-500",
+    "Dang doi giao": "bg-purple-500",
+    "Dang thuc hien": "bg-yellow-500",
+    "Revision": "bg-red-500",
+    "Hoan tat": "bg-emerald-500",
+    "Tam ngung": "bg-gray-500",
+    "Sua frame": "bg-pink-500",
+    "Review": "bg-orange-500",
+}
+
 export const getColumns = (
     users: any[],
     isAdmin: boolean,
@@ -29,7 +41,8 @@ export const getColumns = (
     workspaceId: string,
     onDelete?: (id: string) => void,
     selectedIds: string[] = []
-): ColumnDef<TaskWithUser>[] => [
+): ColumnDef<TaskWithUser>[] => {
+    const cols: ColumnDef<TaskWithUser>[] = [
         {
             id: "select",
             header: ({ table }) => (
@@ -43,11 +56,14 @@ export const getColumns = (
                 />
             ),
             cell: ({ row }) => (
-                <Checkbox
-                    checked={row.getIsSelected()}
-                    onCheckedChange={(value) => row.toggleSelected(!!value)}
-                    aria-label="Select row"
-                />
+                <div className="flex items-center gap-1">
+                    {isAdmin && <GripVertical className="w-3 h-3 text-zinc-600 cursor-grab" />}
+                    <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        aria-label="Select row"
+                    />
+                </div>
             ),
             enableSorting: false,
             enableHiding: false,
@@ -66,20 +82,31 @@ export const getColumns = (
                 )
             },
             cell: ({ row }) => (
-                <TitleCell
-                    task={row.original}
-                    isAdmin={isAdmin}
-                    onClick={() => onTaskClick(row.original)}
-                />
+                <div className="flex items-center gap-2">
+                    {/* Status dot */}
+                    <div className={cn("w-2 h-2 rounded-full shrink-0", STATUS_DOT[row.original.status] || "bg-gray-500")} title={row.original.status} />
+                    <TitleCell
+                        task={row.original}
+                        isAdmin={isAdmin}
+                        onClick={() => onTaskClick(row.original)}
+                    />
+                </div>
             )
         },
-        {
+    ]
+
+    // Only show Status column for non-admin users (admin uses drag-and-drop)
+    if (!isAdmin) {
+        cols.push({
             accessorKey: "status",
             header: "Status",
             cell: ({ row }) => (
                 <StatusCell task={row.original} isAdmin={isAdmin} workspaceId={workspaceId} />
             ),
-        },
+        })
+    }
+
+    cols.push(
         {
             accessorKey: "assignee",
             header: "Assignee",
@@ -133,7 +160,7 @@ export const getColumns = (
                 const diffHours = (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60)
 
                 let colorClass = "text-muted-foreground"
-                if (row.original.status !== 'Hoarn tat') {
+                if (row.original.status !== 'Hoan tat') {
                     if (diffHours <= 0) colorClass = "text-red-500 font-bold animate-pulse"
                     else if (diffHours < 24) colorClass = "text-red-500 font-bold"
                     else if (diffHours < 48) colorClass = "text-amber-500 font-semibold"
@@ -200,4 +227,7 @@ export const getColumns = (
                 )
             },
         },
-    ]
+    )
+
+    return cols
+}

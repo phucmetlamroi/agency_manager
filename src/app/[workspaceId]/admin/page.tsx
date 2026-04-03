@@ -108,6 +108,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                             tasks={serializeDecimal(assignedTasks.concat(unassignedTasks)) as any}
                             users={users}
                             isMobile={await isMobileDevice()}
+                            isAdmin={true}
                             workspaceId={workspaceId}
                         />
                     </div>

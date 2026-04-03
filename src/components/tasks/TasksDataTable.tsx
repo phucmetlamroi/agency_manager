@@ -14,6 +14,7 @@ import {
     useReactTable,
 } from "@tanstack/react-table"
 import { ChevronDown, SlidersHorizontal } from "lucide-react"
+import { useDraggable } from "@dnd-kit/core"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -32,11 +33,38 @@ import {
     TableRow,
 } from "@/components/ui/table"
 
+// Draggable Row wrapper
+function DraggableRow({ id, children, isDragEnabled }: { id: string, children: React.ReactNode, isDragEnabled: boolean }) {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id })
+
+    if (!isDragEnabled) return <>{children}</>
+
+    const style = transform ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        opacity: isDragging ? 0.4 : 1,
+        zIndex: isDragging ? 50 : undefined,
+        position: isDragging ? 'relative' as const : undefined,
+    } : undefined
+
+    return (
+        <tr
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
+            {...listeners}
+            className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+        >
+            {children}
+        </tr>
+    )
+}
+
 interface TasksDataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
     rowSelection?: Record<string, boolean>
     setRowSelection?: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
+    enableDrag?: boolean
 }
 
 export function TasksDataTable<TData, TValue>({
@@ -44,13 +72,11 @@ export function TasksDataTable<TData, TValue>({
     data,
     rowSelection: externalRowSelection,
     setRowSelection: externalSetRowSelection,
+    enableDrag = false,
 }: TasksDataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-        []
-    )
-    const [columnVisibility, setColumnVisibility] =
-        React.useState<VisibilityState>({})
+    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
     const [internalRowSelection, setInternalRowSelection] = React.useState({})
     const [globalFilter, setGlobalFilter] = React.useState("")
 
@@ -60,7 +86,7 @@ export function TasksDataTable<TData, TValue>({
     const table = useReactTable({
         data,
         columns,
-        getRowId: (row: any) => row.id, // IMPORTANT: Use ID as key for selection
+        getRowId: (row: any) => row.id,
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onGlobalFilterChange: setGlobalFilter,
@@ -68,8 +94,11 @@ export function TasksDataTable<TData, TValue>({
             const client = row.original?.client
             const clientName = client?.name || ""
             const parentName = client?.parent?.name || ""
+            const taskTitle = row.original?.title || ""
             const searchStr = String(filterValue).toLowerCase()
-            return clientName.toLowerCase().includes(searchStr) || parentName.toLowerCase().includes(searchStr)
+            return clientName.toLowerCase().includes(searchStr) ||
+                   parentName.toLowerCase().includes(searchStr) ||
+                   taskTitle.toLowerCase().includes(searchStr)
         },
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
@@ -90,7 +119,7 @@ export function TasksDataTable<TData, TValue>({
         <div className="w-full">
             <div className="flex items-center py-4 gap-2">
                 <Input
-                    placeholder="Tìm theo Khách hàng / Brand..."
+                    placeholder="Tim theo ten task, khach hang..."
                     value={globalFilter ?? ""}
                     onChange={(event) => setGlobalFilter(event.target.value)}
                     className="max-w-sm"
@@ -144,21 +173,37 @@ export function TasksDataTable<TData, TValue>({
                     </TableHeader>
                     <TableBody>
                         {table.getRowModel().rows?.length ? (
-                            table.getRowModel().rows.map((row) => (
-                                <TableRow
-                                    key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(
-                                                cell.column.columnDef.cell,
-                                                cell.getContext()
-                                            )}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
+                            table.getRowModel().rows.map((row) => {
+                                const rowContent = (
+                                    <>
+                                        {row.getVisibleCells().map((cell) => (
+                                            <TableCell key={cell.id}>
+                                                {flexRender(
+                                                    cell.column.columnDef.cell,
+                                                    cell.getContext()
+                                                )}
+                                            </TableCell>
+                                        ))}
+                                    </>
+                                )
+
+                                if (enableDrag) {
+                                    return (
+                                        <DraggableRow key={row.id} id={row.id} isDragEnabled={true}>
+                                            {rowContent}
+                                        </DraggableRow>
+                                    )
+                                }
+
+                                return (
+                                    <TableRow
+                                        key={row.id}
+                                        data-state={row.getIsSelected() && "selected"}
+                                    >
+                                        {rowContent}
+                                    </TableRow>
+                                )
+                            })
                         ) : (
                             <TableRow>
                                 <TableCell

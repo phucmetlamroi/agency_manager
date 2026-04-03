@@ -39,12 +39,12 @@ export default function MobileActionSheet({
                         <>
                             {task.status === 'Nh\u1eadn task' && (
                                 <button onClick={() => onStatusChange('\u0110ang th\u1ef1c hi\u1ec7n')} className="w-full py-3 bg-yellow-500 text-black font-bold rounded-xl text-lg shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform">
-                                    \u25b6 B\u1eaft \u0111\u1ea7u l\u00e0m
+                                    {"\u25b6 B\u1eaft \u0111\u1ea7u l\u00e0m"}
                                 </button>
                             )}
                             {task.status === '\u0110ang th\u1ef1c hi\u1ec7n' && (
                                 <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-500 text-center font-bold">
-                                    \u25cf \u0110ang th\u1ef1c hi\u1ec7n...
+                                    {"\u25cf \u0110ang th\u1ef1c hi\u1ec7n..."}
                                 </div>
                             )}
                             {/* Only Admin can "Approve" or move to Done? Or User can mark as Done? 
@@ -52,7 +52,7 @@ export default function MobileActionSheet({
                                 Let's assume User can Nộp Báo Cáo via Edit Form.
                              */}
                             <button onClick={onEdit} className="w-full py-3 bg-gray-800 text-white font-bold rounded-xl border border-white/10 active:scale-95 transition-transform">
-                                \ud83d\udcdd N\u1ed9p b\u00e0i / Ghi ch\u00fa
+                                {"\ud83d\udcdd N\u1ed9p b\u00e0i / Ghi ch\u00fa"}
                             </button>
                         </>
                     )}
@@ -66,30 +66,30 @@ export default function MobileActionSheet({
 
                             <div className="grid grid-cols-2 gap-3">
                                 <button onClick={() => onStatusChange('\u0110ang th\u1ef1c hi\u1ec7n')} className="py-3 bg-gray-800 text-yellow-400 font-bold rounded-xl border border-white/10">
-                                    \u25b6 Resume
+                                    {"\u25b6 Resume"}
                                 </button>
                                 <button onClick={() => onStatusChange('T\u1ea1m ng\u01b0ng')} className="py-3 bg-gray-800 text-gray-400 font-bold rounded-xl border border-white/10">
-                                    \u23f8 Pause
+                                    {"\u23f8 Pause"}
                                 </button>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <button onClick={() => onStatusChange('Revision')} className="py-3 bg-red-500/20 text-red-400 font-bold rounded-xl border border-red-500/20">
-                                    \u26a0\ufe0f Revision
+                                    {"\u26a0\ufe0f Revision"}
                                 </button>
                                 <button onClick={() => onStatusChange('Ho\u00e0n t\u1ea5t')} className="py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg shadow-green-600/20">
-                                    \u2705 Ho\u00e0n t\u1ea5t
+                                    {"\u2705 Ho\u00e0n t\u1ea5t"}
                                 </button>
                             </div>
 
                             <button onClick={onDelete} className="w-full py-3 bg-red-600/10 text-red-500 font-bold rounded-xl border border-red-500/20 mt-2">
-                                \ud83d\uddd1\ufe0f X\u00f3a Task
+                                {"\ud83d\uddd1\ufe0f X\u00f3a Task"}
                             </button>
                         </>
                     )}
 
                     <button onClick={onClose} className="w-full py-3 mt-2 text-gray-500 font-bold">
-                        \u0110\u00f3ng
+                        {"\u0110\u00f3ng"}
                     </button>
                 </div>
             </div>

@@ -90,7 +90,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                     className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold h-8 px-4 shadow-lg shadow-yellow-500/20 ring-1 ring-yellow-400/50 transition-all hover:scale-105"
                     onClick={() => handleStatusChange('\u0110ang th\u1ef1c hi\u1ec7n')}
                 >
-                    \u25b6 B\u1eaft \u0111\u1ea7u
+                    {"\u25b6 B\u1eaft \u0111\u1ea7u"}
                 </Button>
             )
         }
@@ -144,9 +144,9 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
             <Dialog open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className="text-red-500">Ph\u00e2n lo\u1ea1i Revision</DialogTitle>
+                        <DialogTitle className="text-red-500">{"Ph\u00e2n lo\u1ea1i Revision"}</DialogTitle>
                         <DialogDescription>
-                            Vui l\u00f2ng ch\u1ecdn ngu\u1ed3n y\u00eau c\u1ea7u s\u1eeda \u0111\u1ed5i \u0111\u1ec3 t\u00ednh \u0111i\u1ec3m KPI.
+                            {"Vui l\u00f2ng ch\u1ecdn ngu\u1ed3n y\u00eau c\u1ea7u s\u1eeda \u0111\u1ed5i \u0111\u1ec3 t\u00ednh \u0111i\u1ec3m KPI."}
                         </DialogDescription>
                     </DialogHeader>
 

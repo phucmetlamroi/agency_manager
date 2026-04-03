@@ -2,8 +2,8 @@
 import { logout } from '@/lib/auth'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { cookies, headers } from 'next/headers'
-import { decrypt } from '@/lib/auth'
+import { headers } from 'next/headers'
+import { verifyActiveSession } from '@/lib/security'
 import { prisma } from '@/lib/db'
 import RoleWatcher from '@/components/RoleWatcher'
 import BottomNav from '@/components/BottomNav'
@@ -20,23 +20,19 @@ export default async function UserLayout({
     params: Promise<{ workspaceId: string }>
 }) {
     const { workspaceId } = await params
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('session')
+    const { status, session, dbUser } = await verifyActiveSession()
 
-    if (!sessionCookie) redirect('/login')
+    if (status === 'unauthorized') {
+        redirect('/login')
+    }
 
-    const session = await decrypt(sessionCookie.value)
-    if (!session?.user?.id) redirect('/login')
-
-    // Fetch fresh role from DB
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { role: true, username: true, nickname: true, isTreasurer: true }
-    })
-
-    if (!user) {
+    if (status === 'locked' || !dbUser) {
+        // Drop cookie and stop them immediately 
         redirect('/api/auth/logout')
     }
+
+    const { user } = session // To carry over the other JWT fields if needed
+    const dbUserRole = dbUser.role
 
     const headersList = await headers()
     const deviceType = headersList.get('x-device-type') || 'desktop'
@@ -48,23 +44,22 @@ export default async function UserLayout({
         redirect('/login') // This redirect happens on server
     }
 
-    /* --- MOBILE LAYOUT --- */
     if (isMobile) {
         const { default: MobileLayoutShell } = await import('@/components/layout/MobileLayoutShell')
         return (
             <MobileLayoutShell user={user} workspaceId={workspaceId} handleLogout={handleLogout}>
-                <RoleWatcher currentRole={user.role} isTreasurer={user.isTreasurer ?? false} />
+                <RoleWatcher currentRole={dbUserRole} isTreasurer={dbUser.isTreasurer ?? false} />
                 {children}
             </MobileLayoutShell>
         )
     }
 
     /* --- DESKTOP LAYOUT (Top Navigation) --- */
-    const displayName = user.nickname || user.username
+    const displayName = user.nickname || dbUser.username
 
     return (
         <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
-            <RoleWatcher currentRole={user.role} isTreasurer={user.isTreasurer ?? false} />
+            <RoleWatcher currentRole={dbUserRole} isTreasurer={dbUser.isTreasurer ?? false} />
 
             {/* --- TOP NAVIGATION BAR (Matches Admin) --- */}
             <header className="glass-panel" style={{
@@ -131,7 +126,7 @@ export default async function UserLayout({
             </main>
 
             {/* --- BOTTOM NAV (Mobile Only - Fallback if not Shell) --- */}
-            <BottomNav role={user.role || 'USER'} workspaceId={workspaceId} />
+            <BottomNav role={dbUserRole || 'USER'} workspaceId={workspaceId} />
         </div>
     )
 }

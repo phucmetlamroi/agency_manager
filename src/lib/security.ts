@@ -15,10 +15,21 @@ export async function verifyWorkspaceAccess(workspaceId: string, requiredRole: '
     }
 
     const userId = session.user.id
-    const globalRole = session.user.role
+
+    // REAL-TIME DB CHECK: Fetch genuine role, bypassing stateless JWT
+    const dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true, isTreasurer: true }
+    })
+
+    if (!dbUser || dbUser.role === 'LOCKED') {
+        throw new Error('SECURITY_VIOLATION: Tài khoản đã bị khóa hoặc không tồn tại.')
+    }
+
+    const globalRole = dbUser.role
 
     // Global ADMINs (hoặc Treasurer) có quyền ghi/đọc tất cả.
-    const isGlobalAdmin = globalRole === UserRole.ADMIN || session.user.isTreasurer
+    const isGlobalAdmin = globalRole === UserRole.ADMIN || dbUser.isTreasurer
     
     // Nếu không phải Global Admin, BẮT BUỘC phải check trong bảng WorkspaceMember
     let workspaceRole = 'MEMBER'
@@ -64,20 +75,21 @@ export async function verifyWorkspaceAccess(workspaceId: string, requiredRole: '
 export async function verifyActiveSession() {
     const session = await getSession()
     if (!session || !session.user || !session.user.id) {
-        throw new Error('SECURITY_VIOLATION: Unauthorized.')
+        return { status: 'unauthorized', session: null, dbUser: null, isAdmin: false }
     }
 
     // Hit DB để check role hiện hành, đề phòng bị Ban hôm qua nhưng Cookie vẫn còn sống 7 ngày.
     const dbUser = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { role: true, id: true, isTreasurer: true }
+        select: { role: true, id: true, isTreasurer: true, username: true }
     })
 
     if (!dbUser || dbUser.role === 'LOCKED') {
-        throw new Error('SECURITY_VIOLATION: Tài khoản của bạn đã bị khóa hoặc không tồn tại.')
+        return { status: 'locked', session: null, dbUser: null, isAdmin: false }
     }
 
     return {
+        status: 'active',
         session,
         dbUser,
         isAdmin: dbUser.role === 'ADMIN' || dbUser.isTreasurer

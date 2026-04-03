@@ -1,5 +1,5 @@
+import { verifyActiveSession } from '@/lib/security'
 import { getAvailableProfiles, selectProfile } from '@/actions/profile-actions'
-import { getSession } from '@/lib/auth'
 import { cookies } from 'next/headers'
 import Image from 'next/image'
 import { redirect } from 'next/navigation'
@@ -8,11 +8,20 @@ import Link from 'next/link'
 import ProfileActionClient from './ProfileActionClient' // We will create this
 
 export default async function ProfileSelectionPage() {
-    const session = await getSession()
+    const { status, session } = await verifyActiveSession()
+    
+    if (status === 'unauthorized') {
+        redirect('/login')
+    }
+
+    if (status === 'locked') {
+        redirect('/api/auth/logout')
+    }
+    
     const cookieStore = await cookies()
     const sessionToken = cookieStore.get('session')?.value
 
-    if (!session?.user || !sessionToken) {
+    if (!sessionToken) {
         redirect('/login')
     }
 

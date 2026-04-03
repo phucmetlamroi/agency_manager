@@ -2,9 +2,8 @@ import { logout } from '@/lib/auth'
 import Link from 'next/link'
 // Removed duplicate globals.css import
 import { redirect } from 'next/navigation'
-import { cookies, headers } from 'next/headers'
-import { decrypt } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { headers } from 'next/headers'
+import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 
@@ -16,31 +15,23 @@ export default async function AdminLayout({
     params: Promise<{ workspaceId: string }>
 }) {
     const { workspaceId } = await params
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('session')
+    const { status, session, dbUser, isAdmin } = await verifyActiveSession()
 
-    if (!sessionCookie) redirect('/login')
+    if (status === 'unauthorized') {
+        redirect('/login')
+    }
 
-    const session = await decrypt(sessionCookie.value)
-    if (!session?.user?.id) redirect('/login')
-
-    // Fetch fresh role from DB
-    const user = await prisma.user.findUnique({
-        where: { id: session?.user?.id },
-        select: { username: true, role: true, isTreasurer: true }
-    })
-
-    if (!user) {
-        // Cannot set cookies (logout) in Server Component. Redirect to Route Handler instead.
+    if (status === 'locked' || !dbUser) {
+        // Trực tiếp clear cookie và đuổi ra ngoài login 
         redirect('/api/auth/logout')
     }
 
     // Robust Authorization: Ensure user is strictly an ADMIN
-    const isActuallyAdmin = user.role === 'ADMIN' || session.user.role === 'ADMIN'
-
-    if (!isActuallyAdmin) {
+    if (!isAdmin) {
         redirect(`/${workspaceId}/dashboard`)
     }
+
+    const user = { username: dbUser.username, role: dbUser.role, isTreasurer: dbUser.isTreasurer, id: dbUser.id }
 
     const headersList = await headers()
     const deviceType = headersList.get('x-device-type') || 'desktop'

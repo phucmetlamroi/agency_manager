@@ -57,8 +57,10 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
         users,
         isAdmin,
         (task) => {
-            // Updated task click handler to remove restriction for 'Nh\u1eadn task' status
-            // per user request for a free-flow workflow.
+            if (!isAdmin && (task.status === 'Nh\u1eadn task' || task.status === '\u0110\u00e3 nh\u1eadn task')) {
+                toast.warning('Vui l\u00f2ng b\u1ea5m "B\u1eaft \u0111\u1ea7u" \u0111\u1ec3 m\u1edf kh\u00f3a task!')
+                return
+            }
             setSelectedTask(task)
         }, // onTaskClick
         workspaceId, // workspaceId

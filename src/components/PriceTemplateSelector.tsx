@@ -54,8 +54,6 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
         const [showDropdown, setShowDropdown] = useState(false)
         const [showCreate, setShowCreate] = useState(false)
         const [loading, setLoading] = useState(false)
-        const triggerRef = useRef<HTMLButtonElement>(null)
-        const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 })
 
         // ─── Radial menu state ───
         const [showRadial, setShowRadial] = useState(false)
@@ -79,18 +77,6 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
 
         // Keep ref in sync
         useEffect(() => { hoveredSlotRef.current = hoveredSlot }, [hoveredSlot])
-
-        // Handle dropdown toggle with position calc
-        const toggleDropdown = () => {
-            if (!showDropdown && triggerRef.current) {
-                const rect = triggerRef.current.getBoundingClientRect()
-                setDropdownPos({
-                    top: rect.bottom + window.scrollY,
-                    right: window.innerWidth - rect.right - window.scrollX
-                })
-            }
-            setShowDropdown(!showDropdown)
-        }
 
         // ─── Open radial ───
         const openRadial = useCallback((x: number, y: number) => {
@@ -175,85 +161,72 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
                 {/* ─── "+" Button + Dropdown ──────── */}
                 <div className="relative inline-block">
                     <button
-                        ref={triggerRef}
                         type="button"
-                        onClick={toggleDropdown}
+                        onClick={() => setShowDropdown(!showDropdown)}
                         className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center hover:bg-emerald-500/25 hover:scale-110 transition-all duration-150"
                         title="Price Templates (Ctrl+Click area for radial)"
                     >
                         <Plus className="w-4 h-4" />
                     </button>
 
-                    {showDropdown && createPortal(
-                        <>
-                            {/* Backdrop for click-away */}
-                            <div className="fixed inset-0 z-[9998]" onClick={() => setShowDropdown(false)} />
-                            
-                            <div 
-                                className="fixed w-72 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl shadow-black/50 z-[9999] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
-                                style={{
-                                    top: `${dropdownPos.top + 8}px`,
-                                    right: `${dropdownPos.right}px`,
-                                }}
-                            >
-                                <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-                                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Templates</span>
-                                    <button onClick={() => setShowDropdown(false)} className="text-zinc-600 hover:text-zinc-300">
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-
-                                <div className="max-h-[200px] overflow-y-auto">
-                                    {templates.length === 0 ? (
-                                        <div className="px-3 py-4 text-center text-xs text-zinc-600 italic">No templates yet</div>
-                                    ) : (
-                                        templates.map(t => (
-                                            <div key={t.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-white/5 transition-colors group">
-                                                <button type="button" onClick={() => handleSelect(t)} className="flex-1 text-left">
-                                                    <div className="text-sm font-medium text-zinc-200">{t.name}</div>
-                                                    <div className="text-[10px] text-zinc-500 font-mono">
-                                                        {t.priceUSD != null ? `$${t.priceUSD}` : ''}
-                                                        {t.priceUSD != null && t.wageVND != null ? ' / ' : ''}
-                                                        {t.wageVND != null ? `${t.wageVND.toLocaleString('vi-VN')}\u20ab` : ''}
-                                                    </div>
-                                                </button>
-                                                <button type="button" onClick={() => handleDelete(t.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 p-1 transition-opacity">
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                {/* Create inline form */}
-                                <div className="border-t border-white/5">
-                                    {!showCreate ? (
-                                        <button type="button" onClick={() => setShowCreate(true)} className="w-full px-3 py-2.5 text-xs text-indigo-400 hover:bg-indigo-500/10 transition-colors flex items-center gap-1.5 font-bold">
-                                            <Plus className="w-3.5 h-3.5" /> Create Template
-                                        </button>
-                                    ) : (
-                                        <div className="p-3 space-y-2">
-                                            <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Template name..." className="w-full px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50" />
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <input type="number" value={newUsd} onChange={e => setNewUsd(e.target.value)} placeholder="USD" className="px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50" />
-                                                <input type="text" value={newVnd} onChange={e => setNewVnd(e.target.value)} placeholder="VND" className="px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-yellow-500/50" />
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button type="button" onClick={handleCreate} disabled={loading} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors">
-                                                    {loading ? '...' : 'Save'}
-                                                </button>
-                                                <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-1.5 bg-zinc-800 text-zinc-400 text-xs rounded-lg hover:bg-zinc-700 transition-colors">Cancel</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="px-3 py-1.5 border-t border-white/5 text-[10px] text-zinc-700 text-center">
-                                    Tip: Ctrl + Click on finance area for radial menu
-                                </div>
+                    {showDropdown && (
+                        <div className="absolute top-full right-0 mt-2 w-72 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl shadow-black/50 z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                            <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
+                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Templates</span>
+                                <button onClick={() => setShowDropdown(false)} className="text-zinc-600 hover:text-zinc-300">
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
                             </div>
-                        </>,
-                        document.body
+
+                            <div className="max-h-[200px] overflow-y-auto">
+                                {templates.length === 0 ? (
+                                    <div className="px-3 py-4 text-center text-xs text-zinc-600 italic">No templates yet</div>
+                                ) : (
+                                    templates.map(t => (
+                                        <div key={t.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-white/5 transition-colors group">
+                                            <button type="button" onClick={() => handleSelect(t)} className="flex-1 text-left">
+                                                <div className="text-sm font-medium text-zinc-200">{t.name}</div>
+                                                <div className="text-[10px] text-zinc-500 font-mono">
+                                                    {t.priceUSD != null ? `$${t.priceUSD}` : ''}
+                                                    {t.priceUSD != null && t.wageVND != null ? ' / ' : ''}
+                                                    {t.wageVND != null ? `${t.wageVND.toLocaleString('vi-VN')}\u20ab` : ''}
+                                                </div>
+                                            </button>
+                                            <button type="button" onClick={() => handleDelete(t.id)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 p-1 transition-opacity">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Create inline form */}
+                            <div className="border-t border-white/5">
+                                {!showCreate ? (
+                                    <button type="button" onClick={() => setShowCreate(true)} className="w-full px-3 py-2.5 text-xs text-indigo-400 hover:bg-indigo-500/10 transition-colors flex items-center gap-1.5 font-bold">
+                                        <Plus className="w-3.5 h-3.5" /> Create Template
+                                    </button>
+                                ) : (
+                                    <div className="p-3 space-y-2">
+                                        <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Template name..." className="w-full px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50" />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <input type="number" value={newUsd} onChange={e => setNewUsd(e.target.value)} placeholder="USD" className="px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50" />
+                                            <input type="text" value={newVnd} onChange={e => setNewVnd(e.target.value)} placeholder="VND" className="px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-yellow-500/50" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button type="button" onClick={handleCreate} disabled={loading} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors">
+                                                {loading ? '...' : 'Save'}
+                                            </button>
+                                            <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-1.5 bg-zinc-800 text-zinc-400 text-xs rounded-lg hover:bg-zinc-700 transition-colors">Cancel</button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="px-3 py-1.5 border-t border-white/5 text-[10px] text-zinc-700 text-center">
+                                Tip: Ctrl + Click on finance area for radial menu
+                            </div>
+                        </div>
                     )}
                 </div>
 

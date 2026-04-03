@@ -100,6 +100,7 @@ export async function uploadAvatar(userId: string, formData: FormData) {
             }
         })
 
+        // @ts-ignore
         revalidateTag('leaderboard')
         revalidatePath('/', 'layout')
         

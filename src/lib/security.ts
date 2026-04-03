@@ -19,7 +19,7 @@ export async function verifyWorkspaceAccess(workspaceId: string, requiredRole: '
     // REAL-TIME DB CHECK: Fetch genuine role, bypassing stateless JWT
     const dbUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true, isTreasurer: true }
+        select: { role: true, isTreasurer: true, avatarUrl: true }
     })
 
     if (!dbUser || dbUser.role === 'LOCKED') {
@@ -81,7 +81,7 @@ export async function verifyActiveSession() {
     // Hit DB để check role hiện hành, đề phòng bị Ban hôm qua nhưng Cookie vẫn còn sống 7 ngày.
     const dbUser = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { role: true, id: true, isTreasurer: true, username: true }
+        select: { role: true, id: true, isTreasurer: true, username: true, avatarUrl: true }
     })
 
     if (!dbUser || dbUser.role === 'LOCKED') {

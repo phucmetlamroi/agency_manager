@@ -10,6 +10,7 @@ import PendingCrossTeamRequests from '@/components/admin/PendingCrossTeamRequest
 import CrossTeamManager from '@/components/admin/CrossTeamManager'
 import { UserPlus, Mail, AlertTriangle, Phone, Shield, Crown, Medal, PlusCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 type Props = {
     users: any[]
@@ -101,6 +102,14 @@ export default function UserList({ users, currentUser, profiles, incomingRequest
                             {/* Glow Effect cho Super Admin hoặc Users đặc biệt */}
                             {isSuperAdminRow && <div className="absolute top-0 left-0 w-1 h-full bg-violet-500 shadow-[0_0_15px_rgba(139,92,246,0.5)]" />}
                             {u.isTreasurer && !isSuperAdminRow && <div className="absolute top-0 left-0 w-1 h-full bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]" />}
+
+                            {/* Avatar Column */}
+                            <div className="shrink-0 flex items-center justify-center">
+                                <Avatar className="h-12 w-12 md:h-16 md:w-16 border-2 border-white/5 ring-1 ring-white/10 shadow-2xl relative">
+                                    <AvatarImage src={u.avatarUrl || `https://avatar.vercel.sh/${u.username}`} className="object-cover" />
+                                    <AvatarFallback className="bg-zinc-800 text-zinc-200 text-lg font-bold">{u.username[0].toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                            </div>
 
                             {/* Column 1: Core Info (Name, Nickname, ID) - Width Fixed/Grow */}
                             <div className="flex-1 xl:max-w-[300px] flex flex-col justify-center">

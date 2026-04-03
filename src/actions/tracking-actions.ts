@@ -209,7 +209,8 @@ export async function getRecentEventLogs(limit = 20) {
                 user: {
                     select: {
                         username: true,
-                        nickname: true
+                        nickname: true,
+                        avatarUrl: true
                     }
                 }
             }
@@ -219,6 +220,7 @@ export async function getRecentEventLogs(limit = 20) {
             id: l.id,
             time: l.createdAt.toLocaleTimeString('vi-VN'),
             user: l.user?.nickname || l.user?.username || 'Guest',
+            avatarUrl: l.user?.avatarUrl,
             event: l.eventType,
             feature: l.featureName
         }))
@@ -297,7 +299,8 @@ export async function getLivePresence() {
                     select: {
                         username: true,
                         nickname: true,
-                        role: true
+                        role: true,
+                        avatarUrl: true
                     }
                 }
             },
@@ -309,6 +312,7 @@ export async function getLivePresence() {
         return presence.map((p: any) => ({
             userId: p.userId,
             username: p.user?.nickname || p.user?.username || 'Unknown',
+            avatarUrl: p.user?.avatarUrl,
             role: p.user?.role || 'USER',
             status: p.status, // ONLINE or AWAY
             lastSeen: p.lastHeartbeat.toLocaleTimeString('vi-VN')

@@ -37,8 +37,14 @@ export default function MobileLayoutShell({
 
                 {/* Avatar Trigger */}
                 <button onClick={() => setIsDrawerOpen(true)} className="relative cursor-pointer group">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-xs ring-2 ring-white/10 group-hover:ring-indigo-500/50 transition-all duration-300 shadow-md shadow-indigo-500/20">
-                        {user.username?.[0]?.toUpperCase()}
+                    <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/10 group-hover:ring-indigo-500/50 transition-all duration-300 shadow-md shadow-indigo-500/20 bg-zinc-900">
+                        {user.avatarUrl ? (
+                            <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-xs text-white">
+                                {user.username?.[0]?.toUpperCase()}
+                            </div>
+                        )}
                     </div>
                     {/* Online Status Dot */}
                     <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-zinc-950 shadow-sm shadow-emerald-500/50"></div>
@@ -73,8 +79,14 @@ export default function MobileLayoutShell({
                         </button>
 
                         <div className="flex flex-col items-center mt-8 mb-8">
-                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-black mb-4 shadow-xl shadow-indigo-500/30 ring-4 ring-indigo-500/20">
-                                {user.username?.[0]?.toUpperCase()}
+                            <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center mb-4 shadow-xl shadow-indigo-500/30 ring-4 ring-indigo-500/20 bg-zinc-900">
+                                {user.avatarUrl ? (
+                                    <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-black text-white">
+                                        {user.username?.[0]?.toUpperCase()}
+                                    </div>
+                                )}
                             </div>
                             <h2 className="text-xl font-bold text-zinc-100">{user.username}</h2>
                             <p className="text-sm text-zinc-500 uppercase tracking-widest font-sans">{user.role}</p>

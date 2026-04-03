@@ -96,11 +96,18 @@ export default async function UserLayout({
                         textDecoration: 'none',
                         cursor: 'pointer'
                     }}>
-                        <div style={{ width: '24px', height: '24px', background: '#6d28d9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '10px' }}>
-                            {displayName?.[0]?.toUpperCase()}
-                        </div>
+                        {(dbUser as any).avatarUrl ? (
+                            <img 
+                                src={(dbUser as any).avatarUrl} 
+                                alt={displayName}
+                                style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }}
+                            />
+                        ) : (
+                            <div style={{ width: '24px', height: '24px', background: '#6d28d9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '10px' }}>
+                                {displayName?.[0]?.toUpperCase()}
+                            </div>
+                        )}
                         <span style={{ fontWeight: 600 }}>{displayName}</span>
-
                     </Link>
 
                     <form action={handleLogout}>

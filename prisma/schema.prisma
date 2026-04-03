@@ -88,6 +88,7 @@ model User {
   id                String              @id @default(uuid())
   username          String              @unique
   password          String
+  avatarUrl         String?
   createdAt         DateTime            @default(now())
   isTreasurer       Boolean             @default(false)
   hasAcceptedTerms  Boolean             @default(false)

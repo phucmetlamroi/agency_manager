@@ -31,7 +31,7 @@ export default async function AdminLayout({
         redirect(`/${workspaceId}/dashboard`)
     }
 
-    const user = { username: dbUser.username, role: dbUser.role, isTreasurer: dbUser.isTreasurer, id: dbUser.id }
+    const user = { username: dbUser.username, role: dbUser.role, isTreasurer: dbUser.isTreasurer, id: dbUser.id, avatarUrl: (dbUser as any).avatarUrl }
 
     const headersList = await headers()
     const deviceType = headersList.get('x-device-type') || 'desktop'

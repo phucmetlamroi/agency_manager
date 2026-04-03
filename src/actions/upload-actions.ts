@@ -61,3 +61,50 @@ export async function uploadPaymentQr(userId: string, formData: FormData) {
         return { error: error.message || 'Failed to upload image' }
     }
 }
+
+export async function uploadAvatar(userId: string, formData: FormData) {
+    try {
+        const file = formData.get('file') as File
+        if (!file) return { error: 'Không tìm thấy tệp tin' }
+
+        // 1. Validate Size (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            return { error: 'Dung lượng ảnh tối đa là 10MB' }
+        }
+
+        // 2. Optimization Pipeline with Sharp
+        // We crop to square (512x512) to ensure it fits perfectly in circular UI components
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const optimizedBuffer = await sharp(buffer)
+            .resize(512, 512, {
+                fit: 'cover',
+                position: 'center'
+            })
+            .webp({ quality: 85 })
+            .toBuffer()
+
+        // 3. Upload to Vercel Blob
+        const filename = `avatar-${userId}-${Date.now()}.webp`
+        const blob = await put(filename, optimizedBuffer, {
+            access: 'public',
+            contentType: 'image/webp'
+        })
+
+        // 4. Update Database
+        const { prisma } = await import('@/lib/db')
+        await prisma.user.update({
+            where: { id: userId },
+            data: { 
+                // @ts-ignore - prisma client might not have refreshed yet in some contexts
+                avatarUrl: blob.url 
+            }
+        })
+
+        revalidatePath('/')
+        return { success: true, url: blob.url }
+
+    } catch (error: any) {
+        console.error('Avatar upload error:', error)
+        return { error: error.message || 'Lỗi khi tải ảnh đại diện' }
+    }
+}

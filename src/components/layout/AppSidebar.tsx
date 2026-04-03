@@ -46,6 +46,7 @@ interface SidebarProps {
         username: string
         role: string
         isTreasurer?: boolean
+        avatarUrl?: string
     }
     workspaceId: string
     onCollapsedChange?: (collapsed: boolean) => void
@@ -127,7 +128,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                             <div className="border-t pt-4 mt-auto">
                                 <div className="flex items-center gap-3 px-2 mb-4">
                                     <Avatar>
-                                        <AvatarImage src={`https://avatar.vercel.sh/${user.username}`} />
+                                        <AvatarImage src={user.avatarUrl || `https://avatar.vercel.sh/${user.username}`} className="object-cover" />
                                         <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
                                     </Avatar>
                                     <div>
@@ -276,7 +277,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className={cn("w-full hover:bg-white/5", collapsed ? "h-12 w-12 rounded-full p-0" : "justify-start px-2")}>
                                 <Avatar className="h-8 w-8 border border-white/10 ring-2 ring-transparent transition-all hover:ring-indigo-500">
-                                    <AvatarImage src={`https://avatar.vercel.sh/${user.username}`} />
+                                    <AvatarImage src={user.avatarUrl || `https://avatar.vercel.sh/${user.username}`} className="object-cover" />
                                     <AvatarFallback className="bg-zinc-800 text-zinc-100">{user.username[0].toUpperCase()}</AvatarFallback>
                                 </Avatar>
                                 {!collapsed && (

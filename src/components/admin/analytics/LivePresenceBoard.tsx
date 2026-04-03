@@ -70,7 +70,7 @@ export default function LivePresenceBoard() {
                         <div className="flex items-center gap-4">
                             <div className="relative">
                                 <Avatar className="h-10 w-10 border border-white/10">
-                                    <AvatarImage src={`https://avatar.vercel.sh/${p.username}`} />
+                                    <AvatarImage src={p.avatarUrl || `https://avatar.vercel.sh/${p.username}`} className="object-cover" />
                                     <AvatarFallback>{p.username[0]}</AvatarFallback>
                                 </Avatar>
                                 <span className={clsx(

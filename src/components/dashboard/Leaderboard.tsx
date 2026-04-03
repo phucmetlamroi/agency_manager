@@ -48,7 +48,7 @@ export const getLeaderboardData = unstable_cache(
 
         const users = await workspacePrisma.user.findMany({
             where: { id: { in: userIds }, role: 'USER' },
-            select: { id: true, username: true }
+            select: { id: true, username: true, avatarUrl: true }
         })
 
         // Combine data and calculate Error Rate & Rank
@@ -99,7 +99,8 @@ export const getLeaderboardData = unstable_cache(
                 tentativeRevenue,
                 rank,
                 rankScore,
-                incomeScore
+                incomeScore,
+                avatarUrl: u.avatarUrl
             }
         })
 
@@ -167,7 +168,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                 <div className="flex flex-col items-center flex-1 max-w-[120px]">
                                     <div className="relative mb-2">
                                         <Avatar className={`h-12 w-12 md:h-16 md:w-16 border-2 ${getRankColor(top3[1].rank).split(' ')[1]} ring-2 ring-zinc-700/50`}>
-                                            <AvatarImage src={`https://avatar.vercel.sh/${top3[1].username}`} />
+                                            <AvatarImage src={top3[1].avatarUrl || `https://avatar.vercel.sh/${top3[1].username}`} className="object-cover" />
                                             <AvatarFallback className="bg-zinc-800 text-zinc-300">{top3[1].username[0]}</AvatarFallback>
                                         </Avatar>
                                         <div className="absolute -bottom-2 -right-2 bg-zinc-800 border border-zinc-600 text-zinc-300 text-xs font-black w-6 h-6 flex items-center justify-center rounded-full">2</div>
@@ -188,7 +189,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                 <div className="relative mb-2">
                                     <div className="absolute inset-0 rounded-full bg-yellow-400/25 blur-xl scale-125" />
                                     <Avatar className="h-16 w-16 md:h-20 md:w-20 border-4 border-yellow-400/70 shadow-[0_0_30px_rgba(234,179,8,0.5)] relative z-10">
-                                        <AvatarImage src={`https://avatar.vercel.sh/${top3[0].username}`} />
+                                        <AvatarImage src={top3[0].avatarUrl || `https://avatar.vercel.sh/${top3[0].username}`} className="object-cover" />
                                         <AvatarFallback className="bg-zinc-800 text-zinc-300">{top3[0].username[0]}</AvatarFallback>
                                     </Avatar>
                                     <div className="absolute -bottom-2 -right-2 bg-gradient-to-br from-yellow-400 to-amber-500 border-2 border-yellow-300 text-black text-sm font-black w-8 h-8 flex items-center justify-center rounded-full shadow-lg z-10">1</div>
@@ -207,7 +208,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                 <div className="flex flex-col items-center flex-1 max-w-[120px]">
                                     <div className="relative mb-2">
                                         <Avatar className={`h-12 w-12 md:h-16 md:w-16 border-2 ${getRankColor(top3[2].rank).split(' ')[1]} ring-2 ring-purple-600/30`}>
-                                            <AvatarImage src={`https://avatar.vercel.sh/${top3[2].username}`} />
+                                            <AvatarImage src={top3[2].avatarUrl || `https://avatar.vercel.sh/${top3[2].username}`} className="object-cover" />
                                             <AvatarFallback className="bg-zinc-800 text-zinc-300">{top3[2].username[0]}</AvatarFallback>
                                         </Avatar>
                                         <div className="absolute -bottom-2 -right-2 bg-zinc-900 border border-purple-700/50 text-purple-300 text-xs font-black w-6 h-6 flex items-center justify-center rounded-full">3</div>
@@ -232,7 +233,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                                     <div className="flex items-center gap-3">
                                         <span className="text-zinc-600 font-mono font-bold w-5 text-right text-sm">{i + 4}</span>
                                         <Avatar className="h-8 w-8 border border-white/5">
-                                            <AvatarImage src={`https://avatar.vercel.sh/${r.username}`} />
+                                            <AvatarImage src={r.avatarUrl || `https://avatar.vercel.sh/${r.username}`} className="object-cover" />
                                             <AvatarFallback className="bg-zinc-800 text-zinc-400 text-xs">{r.username[0]}</AvatarFallback>
                                         </Avatar>
                                         <span className="text-sm font-medium text-zinc-300 group-hover:text-zinc-100 transition-colors">{r.username}</span>

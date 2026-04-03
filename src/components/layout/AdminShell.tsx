@@ -12,6 +12,7 @@ interface AdminShellProps {
         username: string
         role: string
         isTreasurer?: boolean
+        avatarUrl?: string
     }
     workspaceId: string
 }

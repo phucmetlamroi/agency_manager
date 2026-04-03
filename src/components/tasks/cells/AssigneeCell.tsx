@@ -85,7 +85,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                 <div className="flex items-center gap-2">
                     <div className="relative">
                         <Avatar className="h-6 w-6">
-                            <AvatarImage src={`https://avatar.vercel.sh/${task.assignee.username}`} />
+                            <AvatarImage src={(task.assignee as any).avatarUrl || `https://avatar.vercel.sh/${task.assignee.username}`} className="object-cover" />
                             <AvatarFallback>{task.assignee.username[0]}</AvatarFallback>
                         </Avatar>
                         {flagColor && (
@@ -125,7 +125,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                     <div className="flex items-center gap-2">
                                         <div className="relative">
                                             <Avatar className="h-5 w-5">
-                                                <AvatarImage src={`https://avatar.vercel.sh/${u.username}`} />
+                                                <AvatarImage src={(u as any).avatarUrl || `https://avatar.vercel.sh/${u.username}`} className="object-cover" />
                                                 <AvatarFallback>{u.username[0]}</AvatarFallback>
                                             </Avatar>
                                             {flagColor && (

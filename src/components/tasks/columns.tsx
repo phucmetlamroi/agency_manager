@@ -1,4 +1,4 @@
-"use client"
+ï»¿"use client"
 
 import { ColumnDef } from "@tanstack/react-table"
 import { TaskWithUser } from "@/types/admin"
@@ -133,7 +133,7 @@ export const getColumns = (
                 const diffHours = (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60)
 
                 let colorClass = "text-muted-foreground"
-                if (row.original.status !== 'Hoàn t?t') {
+                if (row.original.status !== 'Hoarn tat') {
                     if (diffHours <= 0) colorClass = "text-red-500 font-bold animate-pulse"
                     else if (diffHours < 24) colorClass = "text-red-500 font-bold"
                     else if (diffHours < 48) colorClass = "text-amber-500 font-semibold"
@@ -152,7 +152,6 @@ export const getColumns = (
             accessorKey: "price",
             header: "Amount",
             cell: ({ row }) => {
-                // Ensure we handle both string and number inputs correctly
                 const val = row.getValue("price") ?? row.original.value ?? 0
                 const amount = Number(val)
 
@@ -202,4 +201,3 @@ export const getColumns = (
             },
         },
     ]
-

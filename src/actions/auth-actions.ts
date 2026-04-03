@@ -4,7 +4,8 @@ import { prisma } from '@/lib/db'
 import { login, logout } from '@/lib/auth'
 import { compare } from 'bcryptjs'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { rateLimit } from '@/lib/rate-limit'
 import { UserRole } from '@prisma/client'
 
 export async function loginAction(prevState: any, formData: FormData) {
@@ -13,6 +14,21 @@ export async function loginAction(prevState: any, formData: FormData) {
 
     if (!username || !password) {
         return { error: 'Please enter all required information' }
+    }
+
+    try {
+        const headersList = await headers()
+        const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown-ip'
+        
+        // 5 requests per 60 seconds allowed per IP for login to prevent brute force
+        const rl = await rateLimit(`login_${ip}`, 5, 60 * 1000)
+        
+        if (!rl.success) {
+            console.warn(`[SECURITY] Rate Limit Triggered for IP: ${ip} on username: ${username}`)
+            return { error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau 1 phút.' }
+        }
+    } catch (e) {
+        // Skip rate limiting if headers() throws (during build time or unsupported edge case)
     }
 
     console.log(`[Login] Attempt for user: ${username}`)

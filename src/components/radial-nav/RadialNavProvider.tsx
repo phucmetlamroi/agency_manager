@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useParams, useRouter } from 'next/navigation'
 import { RadialMenu } from './RadialMenu'
@@ -9,19 +9,20 @@ import { useRadialGesture } from './useRadialGesture'
 import {
     DEFAULT_CONFIG,
     STORAGE_KEY,
+    ROUTE_REGISTRY,
+    RADIAL_SLOT_COUNT,
+    createEmptySegment,
+    isRouteAllowedForRole,
+    toSegmentFromRoute,
 } from './radial-nav.constants'
-import type { RadialNavConfig, RadialNavContextValue, MenuState } from './radial-nav.types'
+import type { RadialNavConfig, RadialNavContextValue, MenuState, RadialSegment, RouteEntry } from './radial-nav.types'
 
-// ─────────────────────────────────────────────
-// Persistence helpers
-// ─────────────────────────────────────────────
 function loadConfig(): RadialNavConfig {
     try {
         const raw = localStorage.getItem(STORAGE_KEY)
         if (!raw) return DEFAULT_CONFIG
         const parsed = JSON.parse(raw) as RadialNavConfig
         if (parsed.version !== 1 || !Array.isArray(parsed.segments)) return DEFAULT_CONFIG
-        if (parsed.segments.length < 6 || parsed.segments.length > 10) return DEFAULT_CONFIG
         return parsed
     } catch {
         return DEFAULT_CONFIG
@@ -32,13 +33,38 @@ function saveConfig(config: RadialNavConfig) {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
     } catch {
-        // localStorage unavailable (private browsing / SSR)
+        // localStorage unavailable
     }
 }
 
-// ─────────────────────────────────────────────
-// Context
-// ─────────────────────────────────────────────
+function makeEmptySlot(index: number, id?: string): RadialSegment {
+    const empty = createEmptySegment(index)
+    return id ? { ...empty, id } : empty
+}
+
+function normalizeConfigByRole(config: RadialNavConfig, role: string | null): RadialNavConfig {
+    const normalizedSegments: RadialSegment[] = Array.from({ length: RADIAL_SLOT_COUNT }, (_, index) => {
+        const current = config.segments[index]
+        const fallbackId = current?.id || `seg-${index}`
+
+        if (!current || !current.path) {
+            return makeEmptySlot(index, fallbackId)
+        }
+
+        const matchedRoute = ROUTE_REGISTRY.find(route => route.path === current.path)
+        if (!matchedRoute || !isRouteAllowedForRole(matchedRoute, role)) {
+            return makeEmptySlot(index, fallbackId)
+        }
+
+        return toSegmentFromRoute(matchedRoute, index, fallbackId)
+    })
+
+    return {
+        version: 1,
+        segments: normalizedSegments,
+    }
+}
+
 const RadialNavContext = createContext<RadialNavContextValue | undefined>(undefined)
 
 export function useRadialNav() {
@@ -47,28 +73,46 @@ export function useRadialNav() {
     return ctx
 }
 
-// ─────────────────────────────────────────────
-// Provider
-// ─────────────────────────────────────────────
 export function RadialNavProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter()
     const params = useParams()
 
-    // Config state — starts with default, hydrates from localStorage on mount
-    const [config, setConfig] = useState<RadialNavConfig>(DEFAULT_CONFIG)
+    const [config, setConfig] = useState<RadialNavConfig>(() => {
+        if (typeof window === 'undefined') return DEFAULT_CONFIG
+        return loadConfig()
+    })
     const [isConfigOpen, setConfigOpen] = useState(false)
     const [menuState, setMenuState] = useState<MenuState>({ open: false })
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+    const [roleState, setRoleState] = useState<{ role: string | null; loaded: boolean }>({ role: 'USER', loaded: false })
 
-    // Track last known workspaceId for path resolution when on non-workspace pages
     const lastWorkspaceId = useRef<string | undefined>(undefined)
 
-    // Hydrate config from localStorage (after mount to avoid SSR mismatch)
     useEffect(() => {
-        setConfig(loadConfig())
+        let active = true
+
+        const fetchRole = async () => {
+            try {
+                const res = await fetch('/api/auth/role', { cache: 'no-store' })
+                if (!res.ok) {
+                    if (active) setRoleState({ role: 'USER', loaded: true })
+                    return
+                }
+                const data = await res.json()
+                const role = typeof data?.role === 'string' ? data.role : 'USER'
+                if (active) setRoleState({ role, loaded: true })
+            } catch {
+                if (active) setRoleState({ role: 'USER', loaded: true })
+            }
+        }
+
+        fetchRole()
+
+        return () => {
+            active = false
+        }
     }, [])
 
-    // Track workspaceId from route params
     useEffect(() => {
         const id = params?.workspaceId
         if (typeof id === 'string' && id) {
@@ -79,7 +123,6 @@ export function RadialNavProvider({ children }: { children: React.ReactNode }) {
         }
     }, [params?.workspaceId])
 
-    // Ctrl+Shift+K — open config modal
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if (e.key === 'K' && e.ctrlKey && e.shiftKey) {
@@ -91,11 +134,9 @@ export function RadialNavProvider({ children }: { children: React.ReactNode }) {
         return () => document.removeEventListener('keydown', handler)
     }, [])
 
-    // Resolve [workspaceId] token in path
     const resolvePath = useCallback((path: string): string | null => {
         if (!path.includes('[workspaceId]')) return path
 
-        // Prefer current route param
         const currentId = typeof params?.workspaceId === 'string' ? params.workspaceId : null
         const storedId = (() => {
             try { return localStorage.getItem('agency-manager:last-workspace') } catch { return null }
@@ -104,19 +145,26 @@ export function RadialNavProvider({ children }: { children: React.ReactNode }) {
 
         if (!workspaceId) return null
         return path.replace('[workspaceId]', workspaceId)
-    }, [params?.workspaceId])
+    }, [params])
 
-    // Navigate to segment
+    const availableRoutes = useMemo<RouteEntry[]>(() => {
+        return ROUTE_REGISTRY.filter(route => isRouteAllowedForRole(route, roleState.role))
+    }, [roleState.role])
+
+    const visibleConfig = useMemo(() => {
+        return normalizeConfigByRole(config, roleState.role)
+    }, [config, roleState.role])
+
     const navigateToSegment = useCallback((index: number) => {
-        const segment = config.segments[index]
-        if (!segment) return
+        const segment = visibleConfig.segments[index]
+        if (!segment || !segment.path) return
+
         const resolved = resolvePath(segment.path)
         if (resolved) {
             router.push(resolved)
         }
-    }, [config.segments, resolvePath, router])
+    }, [visibleConfig.segments, resolvePath, router])
 
-    // Gesture handlers
     const handleOpen = useCallback((origin: { x: number; y: number }) => {
         setMenuState({ open: true, origin })
         setHoveredIndex(null)
@@ -135,29 +183,29 @@ export function RadialNavProvider({ children }: { children: React.ReactNode }) {
         navigateToSegment(index)
     }, [navigateToSegment])
 
-    // Wire up gesture detection
     useRadialGesture({
         onOpen: handleOpen,
         onClose: handleClose,
         onHover: handleHover,
         onSelect: handleSelect,
-        segmentCount: config.segments.length,
-        disabled: isConfigOpen,
+        segmentCount: visibleConfig.segments.length,
+        disabled: isConfigOpen || !roleState.loaded,
     })
 
-    // Config actions
     const updateConfig = useCallback((newConfig: RadialNavConfig) => {
-        setConfig(newConfig)
-        saveConfig(newConfig)
-    }, [])
+        const normalized = normalizeConfigByRole(newConfig, roleState.role)
+        setConfig(normalized)
+        saveConfig(normalized)
+    }, [roleState.role])
 
     const resetConfig = useCallback(() => {
-        setConfig(DEFAULT_CONFIG)
-        saveConfig(DEFAULT_CONFIG)
-    }, [])
+        const normalized = normalizeConfigByRole(DEFAULT_CONFIG, roleState.role)
+        setConfig(normalized)
+        saveConfig(normalized)
+    }, [roleState.role])
 
     const contextValue: RadialNavContextValue = {
-        config,
+        config: visibleConfig,
         updateConfig,
         resetConfig,
         isConfigOpen,
@@ -168,12 +216,11 @@ export function RadialNavProvider({ children }: { children: React.ReactNode }) {
         <RadialNavContext.Provider value={contextValue}>
             {children}
 
-            {/* Radial Menu — rendered via Portal to document.body */}
             <AnimatePresence>
                 {menuState.open && (
                     <RadialMenu
                         key="radial-menu"
-                        segments={config.segments}
+                        segments={visibleConfig.segments}
                         origin={menuState.origin}
                         hoveredIndex={hoveredIndex}
                         onSelect={(i) => { handleSelect(i); handleClose() }}
@@ -183,12 +230,12 @@ export function RadialNavProvider({ children }: { children: React.ReactNode }) {
                 )}
             </AnimatePresence>
 
-            {/* Config Modal */}
             <RadialConfigModal
                 open={isConfigOpen}
                 onOpenChange={setConfigOpen}
-                config={config}
+                config={visibleConfig}
                 onSave={updateConfig}
+                availableRoutes={availableRoutes}
             />
         </RadialNavContext.Provider>
     )

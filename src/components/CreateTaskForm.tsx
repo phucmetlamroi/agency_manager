@@ -14,7 +14,7 @@ type User = {
 import ClientSelector from '@/components/crm/ClientSelector'
 
 export default function CreateTaskForm({ users, workspaceId }: { users: User[], workspaceId: string }) {
-    const [rate, setRate] = useState<number>(25300)
+    const [rate, setRate] = useState<number>(26300)
     const [usd, setUsd] = useState<number>(0)
     const [usdDisplay, setUsdDisplay] = useState<string>('')
 
@@ -28,16 +28,16 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
     const notesViRef = useRef<HTMLTextAreaElement>(null)
 
     useEffect(() => {
-        // Fetch Exchange Rate
+        // Fetch Exchange Rate from our centralized API
         async function fetchRate() {
             try {
-                const res = await fetch('https://open.er-api.com/v6/latest/USD')
+                const res = await fetch('/api/exchange-rate')
                 const data = await res.json()
-                if (data && data.rates && data.rates.VND) {
-                    setRate(data.rates.VND)
+                if (data && data.rate) {
+                    setRate(Math.round(data.rate))
                 }
             } catch (e) {
-                console.error("Failed to fetch rate, using default 25300")
+                console.error("Failed to fetch rate, using default 26300")
             }
         }
         fetchRate()

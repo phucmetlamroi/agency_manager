@@ -45,7 +45,7 @@ export async function createTask(formData: FormData, workspaceId: string) {
         const collectFilesLink = formData.get('collectFilesLink') as string
 
         const jobPriceUSD = parseFloat(formData.get('jobPriceUSD') as string) || 0
-        const exchangeRate = parseFloat(formData.get('exchangeRate') as string) || 25300
+        const exchangeRate = parseFloat(formData.get('exchangeRate') as string) || 26300
         const wageVND = parseFloat(formData.get('value') as string) || 0
 
         // Server-side calculation to ensure data integrity

@@ -78,7 +78,7 @@ export async function updateTaskDetails(id: string, data: {
 
             const newJobPriceUSD = data.jobPriceUSD !== undefined ? data.jobPriceUSD : (currentTask.jobPriceUSD || 0)
             const newValue = data.value !== undefined ? data.value : (currentTask.value || 0) // This is Wage VND
-            const rate = currentTask.exchangeRate || 25300
+            const rate = currentTask.exchangeRate || 26300
 
             updateData.jobPriceUSD = newJobPriceUSD
             updateData.value = newValue

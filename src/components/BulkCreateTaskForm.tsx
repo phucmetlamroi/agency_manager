@@ -56,7 +56,7 @@ const SectionBlock = ({ icon: Icon, title, color = 'indigo', children }: any) =>
 export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { users: User[], onSuccess?: () => void, workspaceId: string }) {
 
     // ── State (logic unchanged) ───────────────────────────────
-    const [rate, setRate] = useState<number>(25300)
+    const [rate, setRate] = useState<number>(26300)
     const [usd, setUsd] = useState<number>(0)
     const [usdDisplay, setUsdDisplay] = useState<string>('')
     const [wage, setWage] = useState<number>(0)
@@ -81,9 +81,9 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
     useEffect(() => {
         async function fetchRate() {
             try {
-                const res = await fetch('https://open.er-api.com/v6/latest/USD')
+                const res = await fetch('/api/exchange-rate')
                 const data = await res.json()
-                if (data?.rates?.VND) setRate(data.rates.VND)
+                if (data?.rate) setRate(Math.round(data.rate))
             } catch (e) { console.error("Rate fetch failed") }
         }
         fetchRate()

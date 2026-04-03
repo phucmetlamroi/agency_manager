@@ -12,7 +12,7 @@ type User = {
 }
 
 import ClientSelector from '@/components/crm/ClientSelector'
-import PriceTemplateSelector from '@/components/PriceTemplateSelector'
+import PriceTemplateSelector, { useRadialTrigger, PriceTemplateSelectorHandle } from '@/components/PriceTemplateSelector'
 
 export default function CreateTaskForm({ users, workspaceId }: { users: User[], workspaceId: string }) {
     const [rate, setRate] = useState<number>(26300)
@@ -27,7 +27,8 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
 
     const [clientId, setClientId] = useState<number | null>(null)
     const notesViRef = useRef<HTMLTextAreaElement>(null)
-    const financeRef = useRef<HTMLDivElement>(null)
+    const selectorRef = useRef<PriceTemplateSelectorHandle>(null)
+    const { onContainerMouseDown } = useRadialTrigger(selectorRef)
 
     const handleTemplateSelect = (data: { usd: number | null; vnd: number | null }) => {
         if (data.usd != null) {
@@ -115,10 +116,10 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
                     style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }} />
             </div>
 
-            <div ref={financeRef} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative' }}>
+            <div onMouseDown={onContainerMouseDown} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '-0.5rem' }}>
                     <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>$ TÀI CHÍNH</span>
-                    <PriceTemplateSelector workspaceId={workspaceId} onSelect={handleTemplateSelect} financeRef={financeRef} />
+                    <PriceTemplateSelector workspaceId={workspaceId} onSelect={handleTemplateSelect} ref={selectorRef} />
                 </div>
                 <div>
                     <label style={{ fontSize: '0.8rem', color: '#888' }}>Tiền Job (USD)</label>

@@ -5,7 +5,7 @@ import { createBatchTasks } from '@/actions/bulk-task-actions'
 import ClientSelector from '@/components/crm/ClientSelector'
 import { toast } from 'sonner'
 import { Copy, Users, DollarSign, Link2, Rocket, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react'
-import PriceTemplateSelector from '@/components/PriceTemplateSelector'
+import PriceTemplateSelector, { useRadialTrigger, PriceTemplateSelectorHandle } from '@/components/PriceTemplateSelector'
 
 // ── Types ────────────────────────────────────────────────────
 type User = {
@@ -78,7 +78,8 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [profitShare, setProfitShare] = useState<number>(0)
     const [revenueVnd, setRevenueVnd] = useState<number>(0)
-    const financeRef = useRef<HTMLDivElement>(null)
+    const selectorRef = useRef<PriceTemplateSelectorHandle>(null)
+    const { onContainerMouseDown } = useRadialTrigger(selectorRef)
 
     const handleTemplateSelect = (data: { usd: number | null; vnd: number | null }) => {
         if (data.usd != null) {
@@ -186,8 +187,8 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
             </SectionBlock>
 
             {/* ── BLOCK 2: Finance ──────────────────────────── */}
-            <div ref={financeRef}>
-            <SectionBlock icon={DollarSign} title={<span className="flex items-center gap-2">{"T\u00e0i ch\u00ednh"} <PriceTemplateSelector workspaceId={workspaceId} onSelect={handleTemplateSelect} financeRef={financeRef} /></span>} color="emerald">
+            <div onMouseDown={onContainerMouseDown}>
+            <SectionBlock icon={DollarSign} title={<span className="flex items-center gap-2">{"T\u00e0i ch\u00ednh"} <PriceTemplateSelector workspaceId={workspaceId} onSelect={handleTemplateSelect} ref={selectorRef} /></span>} color="emerald">
                 <div className="grid grid-cols-2 gap-3">
                     <FormInput label="Giá Job (USD)" value={usdDisplay} onChange={handleUsdChange} placeholder="0" />
                     <FormInput label="Thù lao Editor (VND)" value={wageDisplay} onChange={handleWageChange} placeholder="0" />

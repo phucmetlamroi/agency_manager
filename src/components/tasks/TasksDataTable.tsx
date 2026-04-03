@@ -14,7 +14,6 @@ import {
     useReactTable,
 } from "@tanstack/react-table"
 import { SlidersHorizontal } from "lucide-react"
-import { useDraggable } from "@dnd-kit/core"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -33,37 +32,14 @@ import {
     TableRow,
 } from "@/components/ui/table"
 
-// Draggable Row: only provides drag handle, does NOT move the row itself
-// The DragOverlay in parent handles the visual feedback
-function DraggableTableRow({ id, children, isBeingDragged }: {
-    id: string,
-    children: React.ReactNode,
-    isBeingDragged: boolean,
-}) {
-    const { attributes, listeners, setNodeRef } = useDraggable({ id })
-
-    return (
-        <tr
-            ref={setNodeRef}
-            {...attributes}
-            {...listeners}
-            className={`
-                cursor-grab active:cursor-grabbing border-b transition-all duration-150
-                ${isBeingDragged ? 'opacity-30 bg-indigo-500/5' : 'hover:bg-white/[0.02]'}
-            `}
-        >
-            {children}
-        </tr>
-    )
-}
-
 interface TasksDataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
     rowSelection?: Record<string, boolean>
     setRowSelection?: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
     enableDrag?: boolean
-    draggedId?: string | null
+    onRowDragStart?: (e: React.DragEvent, taskId: string) => void
+    onRowDragEnd?: () => void
 }
 
 export function TasksDataTable<TData, TValue>({
@@ -72,13 +48,15 @@ export function TasksDataTable<TData, TValue>({
     rowSelection: externalRowSelection,
     setRowSelection: externalSetRowSelection,
     enableDrag = false,
-    draggedId = null,
+    onRowDragStart,
+    onRowDragEnd,
 }: TasksDataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
     const [internalRowSelection, setInternalRowSelection] = React.useState({})
     const [globalFilter, setGlobalFilter] = React.useState("")
+    const [draggingId, setDraggingId] = React.useState<string | null>(null)
 
     const rowSelection = externalRowSelection ?? internalRowSelection
     const setRowSelection = externalSetRowSelection ?? setInternalRowSelection
@@ -119,7 +97,7 @@ export function TasksDataTable<TData, TValue>({
         <div className="w-full">
             <div className="flex items-center py-4 gap-2">
                 <Input
-                    placeholder="T\u00ecm theo t\u00ean task, kh\u00e1ch h\u00e0ng..."
+                    placeholder="Search tasks, clients..."
                     value={globalFilter ?? ""}
                     onChange={(event) => setGlobalFilter(event.target.value)}
                     className="max-w-sm"
@@ -134,20 +112,16 @@ export function TasksDataTable<TData, TValue>({
                         {table
                             .getAllColumns()
                             .filter((column) => column.getCanHide())
-                            .map((column) => {
-                                return (
-                                    <DropdownMenuCheckboxItem
-                                        key={column.id}
-                                        className="capitalize"
-                                        checked={column.getIsVisible()}
-                                        onCheckedChange={(value) =>
-                                            column.toggleVisibility(!!value)
-                                        }
-                                    >
-                                        {column.id}
-                                    </DropdownMenuCheckboxItem>
-                                )
-                            })}
+                            .map((column) => (
+                                <DropdownMenuCheckboxItem
+                                    key={column.id}
+                                    className="capitalize"
+                                    checked={column.getIsVisible()}
+                                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                                >
+                                    {column.id}
+                                </DropdownMenuCheckboxItem>
+                            ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
@@ -156,60 +130,50 @@ export function TasksDataTable<TData, TValue>({
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
-                                {headerGroup.headers.map((header) => {
-                                    return (
-                                        <TableHead key={header.id}>
-                                            {header.isPlaceholder
-                                                ? null
-                                                : flexRender(
-                                                    header.column.columnDef.header,
-                                                    header.getContext()
-                                                )}
-                                        </TableHead>
-                                    )
-                                })}
+                                {headerGroup.headers.map((header) => (
+                                    <TableHead key={header.id}>
+                                        {header.isPlaceholder
+                                            ? null
+                                            : flexRender(header.column.columnDef.header, header.getContext())}
+                                    </TableHead>
+                                ))}
                             </TableRow>
                         ))}
                     </TableHeader>
                     <TableBody>
                         {table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => {
-                                const cells = row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(
-                                            cell.column.columnDef.cell,
-                                            cell.getContext()
-                                        )}
-                                    </TableCell>
-                                ))
-
-                                if (enableDrag) {
-                                    return (
-                                        <DraggableTableRow
-                                            key={row.id}
-                                            id={row.id}
-                                            isBeingDragged={draggedId === row.id}
-                                        >
-                                            {cells}
-                                        </DraggableTableRow>
-                                    )
-                                }
-
+                                const isDragging = draggingId === row.id
                                 return (
                                     <TableRow
                                         key={row.id}
                                         data-state={row.getIsSelected() && "selected"}
+                                        draggable={enableDrag}
+                                        onDragStart={(e) => {
+                                            if (!enableDrag) return
+                                            setDraggingId(row.id)
+                                            onRowDragStart?.(e, row.id)
+                                        }}
+                                        onDragEnd={() => {
+                                            setDraggingId(null)
+                                            onRowDragEnd?.()
+                                        }}
+                                        className={`
+                                            ${enableDrag ? 'cursor-grab active:cursor-grabbing' : ''}
+                                            ${isDragging ? 'opacity-30' : ''}
+                                        `}
                                     >
-                                        {cells}
+                                        {row.getVisibleCells().map((cell) => (
+                                            <TableCell key={cell.id}>
+                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                            </TableCell>
+                                        ))}
                                     </TableRow>
                                 )
                             })
                         ) : (
                             <TableRow>
-                                <TableCell
-                                    colSpan={columns.length}
-                                    className="h-24 text-center"
-                                >
+                                <TableCell colSpan={columns.length} className="h-24 text-center">
                                     No results.
                                 </TableCell>
                             </TableRow>
@@ -223,20 +187,10 @@ export function TasksDataTable<TData, TValue>({
                     {table.getFilteredRowModel().rows.length} row(s) selected.
                 </div>
                 <div className="space-x-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.previousPage()}
-                        disabled={!table.getCanPreviousPage()}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
                         Previous
                     </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.nextPage()}
-                        disabled={!table.getCanNextPage()}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
                         Next
                     </Button>
                 </div>

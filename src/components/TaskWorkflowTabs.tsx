@@ -27,7 +27,7 @@ interface TabConfig {
 const TAB_CONFIG: TabConfig[] = [
     {
         id: 'ASSIGNED',
-        label: '{"Nh\u1eadn Task"}',
+        label: 'Nhận Task',
         statusValues: ['Nh\u1eadn task', '\u0110\u00e3 nh\u1eadn task', '\u0110ang \u0111\u1ee3i giao', 'T\u1ea1m ng\u01b0ng'],
         targetStatus: 'Nh\u1eadn task',
         dotColor: 'bg-blue-500',
@@ -37,7 +37,7 @@ const TAB_CONFIG: TabConfig[] = [
     },
     {
         id: 'IN_PROGRESS',
-        label: '{"\u0110ang l\u00e0m"}',
+        label: 'Đang làm',
         statusValues: ['\u0110ang th\u1ef1c hi\u1ec7n'],
         targetStatus: '\u0110ang th\u1ef1c hi\u1ec7n',
         dotColor: 'bg-yellow-500',
@@ -47,7 +47,7 @@ const TAB_CONFIG: TabConfig[] = [
     },
     {
         id: 'REVISION',
-        label: '{"Revise / Review"}',
+        label: 'Revise / Review',
         statusValues: ['Revision', 'S\u1eeda frame', 'Review'],
         targetStatus: 'Revision',
         dotColor: 'bg-red-500',
@@ -57,7 +57,7 @@ const TAB_CONFIG: TabConfig[] = [
     },
     {
         id: 'COMPLETED',
-        label: '{"Ho\u00e0n t\u1ea5t"}',
+        label: 'Hoàn tất',
         statusValues: ['Ho\u00e0n t\u1ea5t'],
         targetStatus: 'Ho\u00e0n t\u1ea5t',
         dotColor: 'bg-emerald-500',
@@ -163,7 +163,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
         isAdmin ?? false,
         (task) => {
             if (!isAdmin && (task.status === 'Nh\u1eadn task' || task.status === '\u0110\u00e3 nh\u1eadn task')) {
-                toast.warning('{"Vui l\u00f2ng b\u1ea5m \\"B\u1eaft \u0111\u1ea7u\\" \u0111\u1ec3 m\u1edf kh\u00f3a task!"}')
+                toast.warning('Vui lòng bấm "Bắt đầu" để mở khóa task!')
                 return
             }
             setSelectedTask(task)
@@ -229,7 +229,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                 const res = await updateTaskStatus(actualIds[0], targetConfig.targetStatus, workspaceId)
                 if (res.error) toast.error(res.error)
                 else {
-                    toast.success(`{"Task \u2192 ${targetConfig.label}"}`)
+                    toast.success(`Task → ${targetConfig.label}`)
                     setRowSelection({})
                     router.refresh()
                 }
@@ -238,7 +238,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                 const res = await bulkUpdateStatus(actualIds, targetConfig.targetStatus, workspaceId)
                 if (res.error) toast.error(res.error)
                 else {
-                    toast.success(`{"${res.count} tasks \u2192 ${targetConfig.label}"}`)
+                    toast.success(`${res.count} tasks → ${targetConfig.label}`)
                     setRowSelection({})
                     router.refresh()
                 }
@@ -270,7 +270,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
             {/* ─── Drag Hint ──────────────────────── */}
             {isDragging && (
                 <div className="text-center text-xs text-zinc-400 animate-pulse py-1">
-                    {'{"\u2B06"} Drag to a tab above to change status'}
+                    {'⬆ Drag to a tab above to change status'}
                 </div>
             )}
 

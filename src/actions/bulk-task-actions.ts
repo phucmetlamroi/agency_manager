@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
-import { getSession } from '@/lib/auth'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 type BatchTaskInput = {
     titles: string[]
@@ -35,9 +35,9 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
         const deadlineDate = data.deadline ? parseVietnamDate(data.deadline) : null
 
         // Get current profile ID for isolation
-        const session = await getSession()
-        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
-        const currentProfileId = (session?.user as any)?.sessionProfileId
+        const { user } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        // Authorization checked above
+        const currentProfileId = (user as any)?.sessionProfileId
 
         // Use standard prisma instead of extension for this complex transaction
         await prisma.$transaction(async (tx) => {
@@ -88,8 +88,7 @@ export async function bulkDeleteTasks(taskIds: string[], workspaceId: string) {
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
-        const session = await getSession()
-        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         await prisma.task.deleteMany({
             where: {
@@ -111,8 +110,7 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
-        const session = await getSession()
-        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         // Filter out undefined/null values
         const updateData: any = {}
@@ -156,8 +154,7 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
-        const session = await getSession()
-        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         if (assigneeId && assigneeId.startsWith('agency:')) {
             return { error: 'Agency assignment is no longer supported.' }

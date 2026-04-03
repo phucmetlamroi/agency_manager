@@ -1,13 +1,14 @@
 'use server'
 
 import { getWorkspacePrisma } from "@/lib/prisma-workspace"
-import { getSession } from "@/lib/auth"
+import { verifyWorkspaceAccess } from "@/lib/security"
 import { revalidatePath } from 'next/cache'
 
 export async function getAnalyticsData(workspaceId: string) {
-    const session = await getSession()
-    if (!session || !session.user) return []
-    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
+    try {
+        const { user } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const currentProfileId = (user as any).sessionProfileId || undefined
+        const workspacePrisma = getWorkspacePrisma(workspaceId, currentProfileId)
 
     const completedTasksAggregate = await workspacePrisma.task.groupBy({
         by: ['assigneeId'],
@@ -87,12 +88,17 @@ export async function getAnalyticsData(workspaceId: string) {
     })
 
     return analyticsData
+    } catch(e) {
+        return []
+    }
 }
 
 export async function getUserErrorDetails(workspaceId: string, userId: string) {
-    const session = await getSession()
-    if (!session || !session.user) return []
-    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
+    try {
+        const { user, isGlobalAdmin } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        if (!isGlobalAdmin && user.id !== userId) return []
+        const currentProfileId = (user as any).sessionProfileId || undefined
+        const workspacePrisma = getWorkspacePrisma(workspaceId, currentProfileId)
 
     const dict = await (workspacePrisma as any).errorDictionary.findMany({
         where: { isActive: true }
@@ -130,12 +136,17 @@ export async function getUserErrorDetails(workspaceId: string, userId: string) {
         // Cuối cùng theo mã lỗi
         return a.code.localeCompare(b.code)
     })
+    } catch(e) {
+        return []
+    }
 }
 
 export async function getUserPerformanceScore(workspaceId: string, userId: string) {
-    const session = await getSession()
-    if (!session || !session.user) return null
-    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
+    try {
+        const { user, isGlobalAdmin } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        if (!isGlobalAdmin && user.id !== userId) return null
+        const currentProfileId = (user as any).sessionProfileId || undefined
+        const workspacePrisma = getWorkspacePrisma(workspaceId, currentProfileId)
 
     const taskCount = await workspacePrisma.task.count({
         where: {
@@ -175,12 +186,17 @@ export async function getUserPerformanceScore(workspaceId: string, userId: strin
         errorRate,
         rank
     }
+    } catch(e) {
+        return null
+    }
 }
 
 export async function getStaffErrorLogsDetail(workspaceId: string, userId: string) {
-    const session = await getSession()
-    if (!session || !session.user) return []
-    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
+    try {
+        const { user, isGlobalAdmin } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        if (!isGlobalAdmin && user.id !== userId) return []
+        const currentProfileId = (user as any).sessionProfileId || undefined
+        const workspacePrisma = getWorkspacePrisma(workspaceId, currentProfileId)
 
     const logs = await (workspacePrisma as any).errorLog.findMany({
         where: { userId },
@@ -230,18 +246,21 @@ export async function getStaffErrorLogsDetail(workspaceId: string, userId: strin
     }
 
     return Array.from(taskMap.values())
+    } catch(e) {
+        return []
+    }
 }
 
 export async function removeErrorLog(workspaceId: string, errorLogId: string) {
-    const session = await getSession()
-    // Chỉ Admin / Super Admin mới có quyền xóa lỗi
-    if (!session || !session.user || (session.user.role !== 'ADMIN' && session.user.role !== 'SUPER_ADMIN')) {
-        return { success: false, error: 'Unauthorized' }
-    }
-
-    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
-
     try {
+        const { user, workspaceRole, isGlobalAdmin } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        if (!isGlobalAdmin && workspaceRole !== 'ADMIN') {
+            return { success: false, error: 'Unauthorized' }
+        }
+
+        const currentProfileId = (user as any).sessionProfileId || undefined
+        const workspacePrisma = getWorkspacePrisma(workspaceId, currentProfileId)
+
         await (workspacePrisma as any).errorLog.delete({
             where: { id: errorLogId }
         })
@@ -251,6 +270,6 @@ export async function removeErrorLog(workspaceId: string, errorLogId: string) {
         return { success: true }
     } catch (e: any) {
         console.error('[Remove ErrorLog Error]', e)
-        return { success: false, error: 'Database error' }
+        return { success: false, error: e.message || 'Database error' }
     }
 }

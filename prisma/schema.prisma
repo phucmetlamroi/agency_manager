@@ -675,3 +675,15 @@ enum ScheduleExceptionType {
   BLOCK
   ADD
 }
+
+model PriceTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  priceUSD    Float?
+  wageVND     Float?
+  sortOrder   Int      @default(0)
+  workspaceId String
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId])
+}

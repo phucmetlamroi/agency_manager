@@ -46,9 +46,7 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
                 where: { month, year }
             },
             profileAccesses: true,
-            accessRequests: true,
-            // @ts-ignore
-            avatarUrl: true
+            accessRequests: true
         }
     })
 

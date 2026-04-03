@@ -2,7 +2,7 @@
 
 import { put } from '@vercel/blob'
 import { prisma } from '@/lib/db'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import sharp from 'sharp'
 
 export async function uploadPaymentQr(userId: string, formData: FormData) {
@@ -52,7 +52,7 @@ export async function uploadPaymentQr(userId: string, formData: FormData) {
             }
         })
 
-        revalidatePath('/dashboard/profile')
+        revalidatePath('/dashboard/profile', 'page')
         return { success: true, url: blob.url }
 
     } catch (error: any) {
@@ -100,7 +100,9 @@ export async function uploadAvatar(userId: string, formData: FormData) {
             }
         })
 
-        revalidatePath('/')
+        revalidateTag('leaderboard')
+        revalidatePath('/', 'layout')
+        
         return { success: true, url: blob.url }
 
     } catch (error: any) {

@@ -22,15 +22,15 @@ import { AssigneeCell } from "./cells/AssigneeCell"
 import { StatusCell } from "./cells/StatusCell"
 import { TitleCell } from "./cells/TitleCell"
 
-// Status dot colors
+// Status dot colors - using Unicode escapes to avoid encoding issues
 const STATUS_DOT: Record<string, string> = {
-    "Da nhan task": "bg-blue-500",
-    "Dang doi giao": "bg-purple-500",
-    "Dang thuc hien": "bg-yellow-500",
+    "\u0110\u00e3 nh\u1eadn task": "bg-blue-500",
+    "\u0110ang \u0111\u1ee3i giao": "bg-purple-500",
+    "\u0110ang th\u1ef1c hi\u1ec7n": "bg-yellow-500",
     "Revision": "bg-red-500",
-    "Hoan tat": "bg-emerald-500",
-    "Tam ngung": "bg-gray-500",
-    "Sua frame": "bg-pink-500",
+    "Ho\u00e0n t\u1ea5t": "bg-emerald-500",
+    "T\u1ea1m ng\u01b0ng": "bg-gray-500",
+    "S\u1eeda frame": "bg-pink-500",
     "Review": "bg-orange-500",
 }
 
@@ -57,7 +57,7 @@ export const getColumns = (
             ),
             cell: ({ row }) => (
                 <div className="flex items-center gap-1">
-                    {isAdmin && <GripVertical className="w-3 h-3 text-zinc-600 cursor-grab" />}
+                    {isAdmin && <GripVertical className="w-3 h-3 text-zinc-600" />}
                     <Checkbox
                         checked={row.getIsSelected()}
                         onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -83,7 +83,6 @@ export const getColumns = (
             },
             cell: ({ row }) => (
                 <div className="flex items-center gap-2">
-                    {/* Status dot */}
                     <div className={cn("w-2 h-2 rounded-full shrink-0", STATUS_DOT[row.original.status] || "bg-gray-500")} title={row.original.status} />
                     <TitleCell
                         task={row.original}
@@ -95,7 +94,7 @@ export const getColumns = (
         },
     ]
 
-    // Only show Status column for non-admin users (admin uses drag-and-drop)
+    // Only show Status column for non-admin users
     if (!isAdmin) {
         cols.push({
             accessorKey: "status",
@@ -126,7 +125,7 @@ export const getColumns = (
             cell: ({ row }) => {
                 const type = row.original.type
                 let variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info" = "outline"
-                
+
                 if (type === 'Short form') variant = "info"
                 else if (type === 'Long form') variant = "secondary"
                 else if (type === 'Trial') variant = "warning"
@@ -159,8 +158,9 @@ export const getColumns = (
                 const now = new Date()
                 const diffHours = (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60)
 
+                // Unicode escape for "Ho\u00e0n t\u1ea5t"
                 let colorClass = "text-muted-foreground"
-                if (row.original.status !== 'Hoan tat') {
+                if (row.original.status !== 'Ho\u00e0n t\u1ea5t') {
                     if (diffHours <= 0) colorClass = "text-red-500 font-bold animate-pulse"
                     else if (diffHours < 24) colorClass = "text-red-500 font-bold"
                     else if (diffHours < 48) colorClass = "text-amber-500 font-semibold"

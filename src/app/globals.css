@@ -238,6 +238,20 @@ h2.section-title {
   /* Estimate height to prevent scrollbar jumping */
 }
 
+/* === Radial Navigation Menu === */
+
+.radial-segment {
+  @apply bg-zinc-950/70 backdrop-blur-xl border border-white/10 rounded-full shadow-lg transition-colors duration-150;
+}
+
+.radial-segment-active {
+  @apply border-violet-500/40 bg-violet-950/50 shadow-violet-500/25;
+}
+
+.radial-center-glow {
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.25) 0%, transparent 70%);
+}
+
 /* === Portal Prose - Rich HTML notes rendering === */
 .prose-portal p {
   margin-bottom: 0.75rem;

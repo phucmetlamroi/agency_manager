@@ -3,6 +3,7 @@ import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'sonner';
 import { ConfirmProvider } from '@/components/ui/ConfirmModal';
+import { RadialNavProvider } from '@/components/radial-nav/RadialNavProvider';
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-heading",
@@ -44,8 +45,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${montserrat.variable} ${cormorant.variable} font-sans antialiased`} suppressHydrationWarning>
         <ConfirmProvider>
-          {children}
-          <Toaster position="top-center" theme="dark" richColors />
+          <RadialNavProvider>
+            {children}
+            <Toaster position="top-center" theme="dark" richColors />
+          </RadialNavProvider>
         </ConfirmProvider>
       </body>
     </html>

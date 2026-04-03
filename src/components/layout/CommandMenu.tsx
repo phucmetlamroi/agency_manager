@@ -72,7 +72,7 @@ export function CommandMenu() {
                     </CommandItem>
                     <CommandItem onSelect={() => runCommand(() => router.push('/admin/crm'))}>
                         <Smile className="mr-2 h-4 w-4" />
-                        <span>CRM & Clients</span>
+                        <span>Clients Manager</span>
                     </CommandItem>
                     <CommandItem onSelect={() => runCommand(() => router.push('/admin/payroll'))}>
                         <Wallet className="mr-2 h-4 w-4" />

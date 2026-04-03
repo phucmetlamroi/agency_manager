@@ -55,7 +55,7 @@ interface SidebarProps {
 const getNavItems = (workspaceId: string) => [
     { label: "Dashboard", href: `/${workspaceId}/admin`, icon: LayoutDashboard },
     { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo },
-    { label: "CRM & Clients", href: `/${workspaceId}/admin/crm`, icon: Smile },
+    { label: "Clients Manager", href: `/${workspaceId}/admin/crm`, icon: Smile },
     { label: "Schedule", href: `/${workspaceId}/admin/schedule`, icon: CalendarDays },
     { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet },
     { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2 },

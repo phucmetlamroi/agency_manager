@@ -56,16 +56,33 @@ export function useRadialGesture({
         [segmentCount]
     )
 
-    // Only allow gesture on genuinely empty background area.
+    // Only allow gesture on genuinely empty background area (The "Void").
     const isEmptySpace = useCallback((e: MouseEvent): boolean => {
         const target = e.target
         if (!(target instanceof Element)) return false
 
-        // Allow explicit triggers
+        // 1. Explicit triggers/ignores
         if (target.closest('[data-radial-trigger]')) return true
-        // Block explicit ignores
         if (target.closest('[data-radial-ignore]')) return false
 
+        // 2. Component Shells & Information Containers
+        // As confirmed by user, Sidebar, Cards, and Forms are "Information Areas".
+        const COMPONENT_SELECTOR = [
+            '.glass-panel',
+            '.card',
+            'aside',
+            'nav',
+            'form',
+            'header',
+            'footer',
+            '[role="dialog"]',
+            '[role="menu"]',
+            '[role="listbox"]'
+        ].join(', ')
+
+        if (target.closest(COMPONENT_SELECTOR)) return false
+
+        // 3. Interactive Element Registry
         const BLOCKING_SELECTOR = [
             'button',
             'a',
@@ -75,14 +92,10 @@ export function useRadialGesture({
             'label',
             'summary',
             'iframe',
-            'canvas',
-            'video',
-            'audio',
             'table',
             'th',
             'td',
             'tr',
-            'form',
             '[role]',
             '[contenteditable=""]',
             '[contenteditable="true"]',
@@ -100,43 +113,58 @@ export function useRadialGesture({
             '[onclick]',
         ].join(', ')
 
-        // 1. If any level in the hierarchy is interactive, block.
         if (target.closest(BLOCKING_SELECTOR)) return false
 
-        // 2. Check elements in the stack at the exact point
+        // 4. Trace the element stack at the click point
         const elementsAtPoint = document.elementsFromPoint(e.clientX, e.clientY)
         for (const el of elementsAtPoint) {
             if (!(el instanceof HTMLElement)) continue
             
-            // Skip core layout containers
+            // Layout markers: html/body are the base "Void"
             if (el.matches('html, body')) continue
             
-            // Block if we hit an interactive element in the stack
-            if (el.matches(BLOCKING_SELECTOR)) return false
+            // Block on any interactive or component level
+            if (el.matches(BLOCKING_SELECTOR) || el.matches(COMPONENT_SELECTOR)) return false
 
-            // Block on images and visual media
-            if (el.tagName === 'IMG' || el.tagName === 'SVG' || el.tagName === 'CANVAS') return false
+            // Block on information-rich tags
+            if (el.tagName === 'IMG' || el.tagName === 'SVG' || el.tagName === 'CANVAS' || el.tagName === 'H1' || el.tagName === 'H2' || el.tagName === 'H3') {
+                return false
+            }
 
             const style = window.getComputedStyle(el)
             
-            // Skip elements that are effectively invisible to mouse
+            // Skip transparent layout wrappers
             if (style.pointerEvents === 'none' || style.visibility === 'hidden' || style.display === 'none') {
                 continue
             }
 
-            // Block on objects with 'pointer' cursor (indicator of interactivity)
+            // High priority: if it looks like it does something, it's not a void.
             if (style.cursor === 'pointer') return false
 
-            // Block on elements containing direct text nodes (actual information)
+            // Visual Check: Cards vs Layout
+            // If it has background/border/shadow, check if it's a "Component" vs "Layout Wrapper"
+            const hasVisuals = 
+                (style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent') ||
+                (parseFloat(style.borderWidth) > 0 && style.borderColor !== 'transparent') ||
+                (style.boxShadow !== 'none')
+
+            if (hasVisuals) {
+                const rect = el.getBoundingClientRect()
+                const viewportArea = window.innerWidth * window.innerHeight
+                const elementArea = rect.width * rect.height
+                
+                // If the element covers more than 60% of the screen, it's likely a background Layout Wrapper
+                // Smaller than that with visuals = It's a "Component" (Information area)
+                if (elementArea < viewportArea * 0.6) {
+                    return false
+                }
+            }
+
+            // Block if it contains direct text nodes (Information)
             const hasTextContent = Array.from(el.childNodes).some(
                 node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim() !== ''
             )
             if (hasTextContent) return false
-            
-            // NOTE: We no longer block on background/border/shadow here. 
-            // Most modern layout containers (main, div wrappers) have backgrounds.
-            // By checking for text, interactive elements, and cursor pointers,
-            // we isolate "information" from "structural empty space".
         }
 
         return true

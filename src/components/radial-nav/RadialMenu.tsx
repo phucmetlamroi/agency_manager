@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, createElement } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Settings } from 'lucide-react'
@@ -112,8 +112,8 @@ function RadialSegmentItem({
     isHovered: boolean
     onClick: () => void
 }) {
-    const IconComponent = getIcon(segment.icon)
     const colors = segment.color ? (COLOR_MAP[segment.color] ?? FALLBACK_COLOR) : FALLBACK_COLOR
+    const isUnassigned = !segment.path
 
     return (
         <motion.div
@@ -142,48 +142,49 @@ function RadialSegmentItem({
             </AnimatePresence>
 
             <motion.button
-                onClick={onClick}
+                onClick={() => {
+                    if (!isUnassigned) onClick()
+                }}
                 animate={{
                     scale: isHovered ? 1.18 : 1,
                 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                 className={`
                     relative w-14 h-14 rounded-full flex flex-col items-center justify-center
-                    backdrop-blur-xl border shadow-lg cursor-pointer
+                    backdrop-blur-xl border shadow-lg
                     transition-colors duration-150
-                    ${isHovered
+                    ${isUnassigned
+                        ? 'bg-zinc-950/50 border-white/10 cursor-default'
+                        : isHovered
                         ? `${colors.bg} ${colors.border} ${colors.glow} shadow-lg`
-                        : 'bg-zinc-950/70 border-white/10 shadow-black/40'
+                        : 'bg-zinc-950/70 border-white/10 shadow-black/40 cursor-pointer'
                     }
                 `}
                 title={segment.label}
             >
-                <IconComponent
-                    className={`w-5 h-5 transition-colors duration-150 ${isHovered ? colors.text : 'text-zinc-400'}`}
-                />
+                {createElement(getIcon(segment.icon), {
+                    className: `w-5 h-5 transition-colors duration-150 ${
+                        isUnassigned ? 'text-zinc-600' : (isHovered ? colors.text : 'text-zinc-400')
+                    }`,
+                })}
             </motion.button>
 
-            {/* Label below */}
-            <AnimatePresence>
-                {isHovered && (
-                    <motion.div
-                        className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap"
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.12 }}
-                    >
-                        <span className={`
-                            text-xs font-semibold px-2 py-0.5 rounded-full
-                            bg-zinc-900/90 border border-white/10
-                            backdrop-blur-sm
-                            ${isHovered ? colors.text : 'text-zinc-400'}
-                        `}>
-                            {segment.label}
-                        </span>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <motion.div
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12 }}
+            >
+                <span className={`
+                    text-xs font-semibold px-2 py-0.5 rounded-full
+                    bg-zinc-900/90 border border-white/10
+                    backdrop-blur-sm
+                    ${isUnassigned ? 'text-zinc-500' : (isHovered ? colors.text : 'text-zinc-400')}
+                `}>
+                    {segment.label}
+                </span>
+            </motion.div>
         </motion.div>
     )
 }

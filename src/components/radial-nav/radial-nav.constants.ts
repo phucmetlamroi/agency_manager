@@ -12,19 +12,36 @@ import {
     Circle,
     TrendingUp,
     Zap,
+    AlertOctagon,
+    UserCircle,
+    ArrowRightLeft,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { RadialNavConfig, RadialSegment, RouteEntry } from './radial-nav.types'
 
-// ─────────────────────────────────────────────
-// Storage Key
-// ─────────────────────────────────────────────
+// Storage
 export const STORAGE_KEY = 'agency-manager:radial-nav-config'
 
-// ─────────────────────────────────────────────
-// Icon Map (string -> LucideIcon component)
-// Tree-shakeable: only imported icons are bundled
-// ─────────────────────────────────────────────
+// Slot defaults
+export const RADIAL_SLOT_COUNT = 6
+export const EMPTY_SEGMENT_LABEL = 'Trong'
+export const EMPTY_SEGMENT_PATH = ''
+
+export function createEmptySegment(index: number): RadialSegment {
+    return {
+        id: `seg-${index}`,
+        label: EMPTY_SEGMENT_LABEL,
+        path: EMPTY_SEGMENT_PATH,
+        icon: 'Circle',
+        color: 'zinc',
+    }
+}
+
+export function isEmptySegment(segment: RadialSegment): boolean {
+    return !segment.path
+}
+
+// Icon map
 export const ICON_MAP: Record<string, LucideIcon> = {
     LayoutDashboard,
     ListTodo,
@@ -38,6 +55,9 @@ export const ICON_MAP: Record<string, LucideIcon> = {
     User,
     TrendingUp,
     Zap,
+    AlertOctagon,
+    UserCircle,
+    ArrowRightLeft,
     Circle,
 }
 
@@ -45,43 +65,53 @@ export function getIcon(name: string): LucideIcon {
     return ICON_MAP[name] ?? Circle
 }
 
-// ─────────────────────────────────────────────
-// Route Registry — all navigable deep links
-// ─────────────────────────────────────────────
+// Route registry (role-aware)
 export const ROUTE_REGISTRY: RouteEntry[] = [
-    { path: '/[workspaceId]/admin',            label: 'Dashboard',    icon: 'LayoutDashboard', color: 'indigo'   },
-    { path: '/[workspaceId]/admin/queue',      label: 'Task Queue',   icon: 'ListTodo',        color: 'violet'   },
-    { path: '/[workspaceId]/admin/crm',        label: 'CRM',          icon: 'Smile',           color: 'cyan'     },
-    { path: '/[workspaceId]/admin/payroll',    label: 'Payroll',      icon: 'Wallet',          color: 'emerald'  },
-    { path: '/[workspaceId]/admin/finance',    label: 'Finance',      icon: 'CreditCard',      color: 'amber'    },
-    { path: '/[workspaceId]/admin/users',      label: 'Staff',        icon: 'Users',           color: 'blue'     },
-    { path: '/[workspaceId]/admin/schedule',   label: 'Schedule',     icon: 'CalendarDays',    color: 'pink'     },
-    { path: '/[workspaceId]/admin/analytics',  label: 'Analytics',    icon: 'BarChart3',       color: 'orange'   },
-    { path: '/[workspaceId]/admin/performance',label: 'Performance',  icon: 'TrendingUp',      color: 'rose'     },
-    { path: '/[workspaceId]/dashboard',        label: 'My Dashboard', icon: 'Home',            color: 'teal'     },
-    { path: '/profile',                        label: 'Profile',      icon: 'User',            color: 'zinc'     },
-    { path: '/workspace',                      label: 'Workspace',    icon: 'Zap',             color: 'purple'   },
+    // Admin scope
+    { path: '/[workspaceId]/admin',             label: 'Dashboard',      icon: 'LayoutDashboard', color: 'indigo',  allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/queue',       label: 'Task Queue',     icon: 'ListTodo',        color: 'violet',  allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/crm',         label: 'CRM',            icon: 'Smile',           color: 'cyan',    allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/payroll',     label: 'Payroll',        icon: 'Wallet',          color: 'emerald', allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/finance',     label: 'Finance',        icon: 'CreditCard',      color: 'amber',   allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/users',       label: 'Staff',          icon: 'Users',           color: 'blue',    allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/schedule',    label: 'Schedule',       icon: 'CalendarDays',    color: 'pink',    allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/analytics',   label: 'Analytics',      icon: 'BarChart3',       color: 'orange',  allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/performance', label: 'Performance',    icon: 'TrendingUp',      color: 'rose',    allowedRoles: ['ADMIN'] },
+
+    // User/member scope
+    { path: '/[workspaceId]/dashboard',            label: 'My Dashboard', icon: 'Home',         color: 'teal',    allowedRoles: ['ADMIN', 'USER'] },
+    { path: '/[workspaceId]/dashboard/schedule',   label: 'My Schedule',  icon: 'CalendarDays', color: 'pink',    allowedRoles: ['ADMIN', 'USER'] },
+    { path: '/[workspaceId]/dashboard/errors',     label: 'My Errors',    icon: 'AlertOctagon', color: 'rose',    allowedRoles: ['ADMIN', 'USER'] },
+    { path: '/[workspaceId]/dashboard/profile',    label: 'My Profile',   icon: 'UserCircle',   color: 'zinc',    allowedRoles: ['ADMIN', 'USER'] },
+    { path: '/profile',                            label: 'Switch Team',  icon: 'ArrowRightLeft',color: 'indigo', allowedRoles: ['ADMIN', 'USER'] },
+    { path: '/workspace',                          label: 'Workspace',    icon: 'Zap',          color: 'purple',  allowedRoles: ['ADMIN', 'USER'] },
 ]
 
-// ─────────────────────────────────────────────
-// Default Segments (8 segments on first load)
-// ─────────────────────────────────────────────
-export const DEFAULT_SEGMENTS: RadialSegment[] = ROUTE_REGISTRY.slice(0, 8).map((r, i) => ({
-    id: `seg-${i}`,
-    label: r.label,
-    path: r.path,
-    icon: r.icon,
-    color: r.color,
-}))
+export function isRouteAllowedForRole(route: RouteEntry, role: string | null | undefined): boolean {
+    if (!route.allowedRoles || route.allowedRoles.length === 0) return true
+    const normalizedRole = (role ?? '').toUpperCase()
+    return route.allowedRoles.includes(normalizedRole)
+}
+
+export function toSegmentFromRoute(route: RouteEntry, index: number, id?: string): RadialSegment {
+    return {
+        id: id ?? `seg-${index}`,
+        label: route.label,
+        path: route.path,
+        icon: route.icon,
+        color: route.color,
+    }
+}
+
+// Default config: 6 empty slots
+export const DEFAULT_SEGMENTS: RadialSegment[] = Array.from({ length: RADIAL_SLOT_COUNT }, (_, i) => createEmptySegment(i))
 
 export const DEFAULT_CONFIG: RadialNavConfig = {
     version: 1,
     segments: DEFAULT_SEGMENTS,
 }
 
-// ─────────────────────────────────────────────
-// Color accent map for segment glow
-// ─────────────────────────────────────────────
+// Color map
 export const COLOR_MAP: Record<string, { bg: string; border: string; glow: string; text: string }> = {
     indigo:  { bg: 'bg-indigo-950/60',  border: 'border-indigo-500/40',  glow: 'shadow-indigo-500/30',  text: 'text-indigo-300'  },
     violet:  { bg: 'bg-violet-950/60',  border: 'border-violet-500/40',  glow: 'shadow-violet-500/30',  text: 'text-violet-300'  },
@@ -99,11 +129,9 @@ export const COLOR_MAP: Record<string, { bg: string; border: string; glow: strin
 
 export const FALLBACK_COLOR = { bg: 'bg-zinc-950/60', border: 'border-white/10', glow: 'shadow-black/30', text: 'text-zinc-300' }
 
-// ─────────────────────────────────────────────
-// Radial Geometry
-// ─────────────────────────────────────────────
-export const RADIAL_RADIUS = 130       // px from origin to segment center
-export const DEAD_ZONE_RADIUS = 45     // px — no selection near center
-export const DRAG_THRESHOLD = 8        // px — min drag distance to open menu
-export const SEGMENT_MIN = 6
-export const SEGMENT_MAX = 10
+// Radial geometry
+export const RADIAL_RADIUS = 130
+export const DEAD_ZONE_RADIUS = 45
+export const DRAG_THRESHOLD = 8
+export const SEGMENT_MIN = RADIAL_SLOT_COUNT
+export const SEGMENT_MAX = RADIAL_SLOT_COUNT

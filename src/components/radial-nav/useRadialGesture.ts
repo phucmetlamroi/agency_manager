@@ -56,18 +56,76 @@ export function useRadialGesture({
         [segmentCount]
     )
 
-    // Check if the event target is "empty space" (not an interactive element)
-    const isEmptySpace = useCallback((target: EventTarget | null): boolean => {
+    // Only allow gesture on genuinely empty background area.
+    const isEmptySpace = useCallback((e: MouseEvent): boolean => {
+        const target = e.target
         if (!(target instanceof Element)) return false
-        const INTERACTIVE = ['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT', 'LABEL']
-        let el: Element | null = target
-        while (el) {
-            if (INTERACTIVE.includes(el.tagName)) return false
-            if (el.getAttribute('role') === 'button') return false
-            if (el.getAttribute('data-radial-ignore') !== null) return false
-            if (el.getAttribute('data-radial-trigger') !== null) return true // explicit allow
-            el = el.parentElement
+
+        if (target.closest('[data-radial-trigger]')) return true
+        if (target.closest('[data-radial-ignore]')) return false
+
+        const BLOCKING_SELECTOR = [
+            'button',
+            'a',
+            'input',
+            'textarea',
+            'select',
+            'label',
+            'summary',
+            'iframe',
+            'canvas',
+            'video',
+            'audio',
+            'table',
+            'th',
+            'td',
+            'tr',
+            'form',
+            '[role]',
+            '[contenteditable=""]',
+            '[contenteditable="true"]',
+            '[tabindex]:not([tabindex="-1"])',
+            '[draggable="true"]',
+            '[aria-haspopup]',
+            '[aria-controls]',
+            '[aria-expanded]',
+            '[data-state]',
+            '[data-slot]',
+            '[data-radix-popper-content-wrapper]',
+            '[data-radix-menu-content]',
+            '[data-radix-dialog-content]',
+            '[data-radix-select-content]',
+            '[onclick]',
+        ].join(', ')
+
+        if (target.closest(BLOCKING_SELECTOR)) return false
+
+        const elementsAtPoint = document.elementsFromPoint(e.clientX, e.clientY)
+        for (const el of elementsAtPoint) {
+            if (!(el instanceof HTMLElement)) continue
+            if (el.closest('[data-radial-trigger]')) return true
+            if (el.matches('html, body')) continue
+            if (el.matches(BLOCKING_SELECTOR)) return false
+
+            const style = window.getComputedStyle(el)
+            if (style.pointerEvents === 'none' || style.visibility === 'hidden' || style.display === 'none') {
+                continue
+            }
+
+            const hasBackground = style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent'
+            const hasBorder =
+                (parseFloat(style.borderTopWidth) > 0 ||
+                    parseFloat(style.borderRightWidth) > 0 ||
+                    parseFloat(style.borderBottomWidth) > 0 ||
+                    parseFloat(style.borderLeftWidth) > 0) &&
+                style.borderColor !== 'transparent'
+            const hasShadow = style.boxShadow !== 'none'
+
+            if (hasBackground || hasBorder || hasShadow) {
+                return false
+            }
         }
+
         return true
     }, [])
 
@@ -94,7 +152,7 @@ export function useRadialGesture({
             if (e.button !== 0) return
             if (!e.ctrlKey) return
             if (e.shiftKey) return
-            if (!isEmptySpace(e.target)) return
+            if (!isEmptySpace(e)) return
 
             gestureState.current = 'ARMED'
             origin.current = { x: e.clientX, y: e.clientY }

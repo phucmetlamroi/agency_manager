@@ -5,7 +5,7 @@
 export type RadialSegment = {
     id: string
     label: string
-    path: string         // e.g. "/[workspaceId]/admin/payroll"
+    path: string         // empty string means unassigned slot
     icon: string         // lucide icon name string
     color?: string       // optional accent override (e.g. "emerald", "indigo")
 }
@@ -34,4 +34,5 @@ export type RouteEntry = {
     label: string
     icon: string
     color?: string
+    allowedRoles?: string[]  // undefined => available to all roles
 }

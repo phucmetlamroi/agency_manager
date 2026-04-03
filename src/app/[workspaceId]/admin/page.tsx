@@ -5,7 +5,6 @@ import { redirect } from 'next/navigation'
 import TaskTable from '@/components/TaskTable'
 import CreateTaskForm from '@/components/CreateTaskForm'
 import { isMobileDevice } from '@/lib/device'
-import { checkOverdueTasks } from '@/actions/reputation-actions'
 
 import { getSession } from '@/lib/auth'
 import BottleneckAlert from '@/components/BottleneckAlert'
@@ -30,9 +29,6 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         where: { id: session.user.id },
         select: { username: true }
     })
-
-    // 1. Run Logic to Recall Overdue Tasks
-    await checkOverdueTasks(workspaceId)
 
     const tasks = await workspacePrisma.task.findMany({
         include: {

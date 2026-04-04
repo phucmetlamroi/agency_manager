@@ -14,9 +14,10 @@ export async function getTagsForUser(workspaceId: string) {
     if (!session) return { error: 'Unauthorized', tags: [] }
 
     const userId = session.user.id
+    const profileId = session.user.profileId
 
     const tags = await prisma.tagCategory.findMany({
-        where: { userId },
+        where: { userId, ...(profileId ? { profileId } : {}) },
         orderBy: { createdAt: 'asc' },
         select: { id: true, name: true, createdAt: true }
     })
@@ -115,6 +116,16 @@ export async function setTaskTags(taskId: string, tagCategoryIds: string[], work
     // Verify task exists
     const task = await workspacePrisma.task.findUnique({ where: { id: taskId } })
     if (!task) return { error: 'Task not found' }
+
+    // Validate that all tagCategoryIds belong to the current user
+    if (tagCategoryIds.length > 0) {
+        const ownedTags = await prisma.tagCategory.findMany({
+            where: { id: { in: tagCategoryIds }, userId: session.user.id }
+        })
+        if (ownedTags.length !== tagCategoryIds.length) {
+            return { error: 'Invalid tag IDs: some tags do not belong to you' }
+        }
+    }
 
     // Delete existing tags for this task
     await prisma.taskTag.deleteMany({ where: { taskId } })

@@ -89,9 +89,9 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
         toast.success('Tag đã được xóa')
     }
 
-    // Clamp position to viewport
-    const left = Math.min(position.x, window.innerWidth - 500)
-    const top = Math.min(position.y, window.innerHeight - 420)
+    // Clamp position to viewport (SSR-safe)
+    const left = typeof window !== 'undefined' ? Math.min(position.x, window.innerWidth - 500) : position.x
+    const top = typeof window !== 'undefined' ? Math.min(position.y, window.innerHeight - 420) : position.y
 
     return (
         <AnimatePresence>

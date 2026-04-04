@@ -37,6 +37,7 @@ export function DurationInput({ value, onChange, disabled = false }: DurationInp
 
     const handleConfirm = () => {
         if (parsed?.valid) {
+            onChange(rawInput)
             setIsEditing(false)
         }
     }

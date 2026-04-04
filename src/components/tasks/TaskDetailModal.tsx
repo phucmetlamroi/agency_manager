@@ -160,7 +160,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     // Uses capture phase to intercept before Radix Dialog can swallow events
     const tagZoneRef = useRef<HTMLDivElement | null>(null)
     useEffect(() => {
-        if (!isOpen || !isAdmin) return
+        if (!isOpen) return
 
         // Find the tag zone element after render
         const findTagZone = () => document.querySelector('[data-tag-zone="true"]') as HTMLDivElement | null
@@ -175,6 +175,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         }
 
         const isInsideTagZone = (target: HTMLElement) => {
+            if (tagZoneRef.current && tagZoneRef.current.contains(target)) return true
             return !!target.closest('[data-tag-zone="true"]')
         }
 
@@ -185,6 +186,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             if (isInteractiveTarget(target)) return
             e.preventDefault()
             e.stopPropagation()
+            e.stopImmediatePropagation()
             setTagLibraryPos({ x: e.clientX, y: e.clientY })
             setTagLibraryOpen(true)
         }
@@ -197,6 +199,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             if (isInteractiveTarget(target)) return
             e.preventDefault()
             e.stopPropagation()
+            e.stopImmediatePropagation()
             document.body.style.userSelect = 'none'
             ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
         }
@@ -227,7 +230,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         // Attach in CAPTURE phase so we fire before Radix Dialog
         document.addEventListener('contextmenu', handleContextMenu, true)
         document.addEventListener('mousedown', handleMouseDown, true)
-        document.addEventListener('mousemove', handleMouseMove)
+        document.addEventListener('mousemove', handleMouseMove, { passive: false })
         document.addEventListener('mouseup', handleMouseUp)
 
         return () => {
@@ -238,7 +241,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             document.removeEventListener('mouseup', handleMouseUp)
             document.body.style.userSelect = ''
         }
-    }, [isOpen, isAdmin])
+    }, [isOpen])
 
     if (!isOpen || !localTask) return null
 
@@ -489,8 +492,9 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                         Wraps sections 2-6 so empty space anywhere triggers gestures
                     ════════════════════════════════════════ */}
                     <div
+                        ref={tagZoneRef}
                         data-tag-zone="true"
-                        className="space-y-6"
+                        className="space-y-6 min-h-[50px] p-2 -m-2 rounded-3xl transition-colors hover:bg-white/[0.02]"
                     >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -849,11 +853,9 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                             <Tag className="w-3.5 h-3.5" strokeWidth={1.5} />
                             Tài nguyên & Ghi chú
-                            {isAdmin && (
-                                <span className="text-zinc-600 text-[9px] normal-case font-medium ml-1">
-                                    (Chuột phải = Tag Library · Ctrl+Kéo = Chọn Tag)
-                                </span>
-                            )}
+                            <span className="text-zinc-600 text-[9px] normal-case font-medium ml-1">
+                                (Chuột phải = Tag Library · Ctrl+Kéo = Chọn Tag)
+                            </span>
                         </label>
 
                         {/* Duration Input (admin edit mode) */}

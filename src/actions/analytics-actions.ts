@@ -187,7 +187,13 @@ export async function getUserPerformanceScore(workspaceId: string, userId: strin
         rank
     }
     } catch(e) {
-        return null
+        console.error('[getUserPerformanceScore Error]', e)
+        return {
+            taskCount: 0,
+            totalPenalty: 0,
+            errorRate: 0,
+            rank: 'N/A'
+        }
     }
 }
 
@@ -233,13 +239,13 @@ export async function getStaffErrorLogsDetail(workspaceId: string, userId: strin
         }
 
         const taskEntry = taskMap.get(log.taskId)
-        taskEntry.totalPenalty += log.calculatedScore
+        taskEntry.totalPenalty += Number(log.calculatedScore || 0)
         taskEntry.errors.push({
             id: log.id,
             errorCode: log.error.code,
             errorDescription: log.error.description,
-            frequency: log.frequency,
-            penalty: log.calculatedScore,
+            frequency: Number(log.frequency || 0),
+            penalty: Number(log.calculatedScore || 0),
             detectedBy: log.detectedBy?.nickname || log.detectedBy?.username || 'Hệ thống',
             createdAt: log.createdAt.toISOString()
         })

@@ -10,10 +10,6 @@ const bypassModels = [
     'Workspace',
     'WorkspaceMember',
     'BillingProfile',
-    'Payroll',
-    'PayrollLock',
-    'MonthlyBonus',
-    'PerformanceMetric',
     'ErrorDictionary'
 ]
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, RefreshCw, ShoppingBag, Sparkles, TrendingUp, Download } from 'lucide-react'
+import { X, RefreshCw, ShoppingBag, Sparkles, TrendingUp, Download, CheckCircle2 } from 'lucide-react'
 import {
     DndContext,
     DragOverlay,
@@ -21,77 +21,126 @@ import { toast } from 'sonner'
 
 const CLAIM_ZONE_ID = 'claim-drop-zone'
 
-// Smooth fade-out when dropped outside zone (ghost card fills the visual gap)
 const dropAnimation: DropAnimation = {
-    duration: 260,
+    duration: 220,
     easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
 }
 
-// ── Drop Zone — appears when dragging, fixed at bottom center ──
-function ClaimDropZone() {
+// ══════════════════════════════════════════════════════════════════
+// A. FULL-SCREEN DROP ZONE — entire viewport is the hitbox
+//    Appears OVER everything (z-9997) except DragOverlay (z-9999)
+//    Drop anywhere = claim task. Only Escape = cancel.
+// ══════════════════════════════════════════════════════════════════
+function FullScreenDropZone() {
     const { isOver, setNodeRef } = useDroppable({ id: CLAIM_ZONE_ID })
 
     return (
         <motion.div
             ref={setNodeRef}
-            initial={{ y: 96, opacity: 0, scale: 0.95 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 96, opacity: 0, scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-            className="fixed bottom-6 left-1/2 z-[9998]"
-            style={{ translateX: '-50%' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[9997]"
         >
+            {/* ── Tinted backdrop: dark → indigo when active ── */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="absolute inset-0 bg-gradient-to-b from-indigo-950/20 via-indigo-950/30 to-indigo-950/50"
+            />
+
+            {/* ── Pulsing edge glow (viewport border) ── */}
             <motion.div
                 animate={{
-                    borderColor: isOver ? 'rgba(99,102,241,0.9)' : 'rgba(99,102,241,0.3)',
-                    backgroundColor: isOver ? 'rgba(79,70,229,0.18)' : 'rgba(18,18,22,0.88)',
-                    boxShadow: isOver
-                        ? '0 0 0 1px rgba(99,102,241,0.5), 0 8px 48px rgba(99,102,241,0.3), 0 0 80px rgba(99,102,241,0.15)'
-                        : '0 0 0 1px rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.5)',
+                    boxShadow: [
+                        'inset 0 0 60px rgba(99,102,241,0.08), inset 0 0 120px rgba(99,102,241,0.04)',
+                        'inset 0 0 80px rgba(99,102,241,0.15), inset 0 0 160px rgba(99,102,241,0.08)',
+                        'inset 0 0 60px rgba(99,102,241,0.08), inset 0 0 120px rgba(99,102,241,0.04)',
+                    ],
                 }}
-                transition={{ duration: 0.18 }}
-                className="flex items-center gap-4 px-8 py-4 rounded-2xl border-2 border-dashed backdrop-blur-2xl min-w-[400px] cursor-copy"
-            >
-                {/* Animated icon */}
-                <motion.div
-                    animate={{
-                        y: isOver ? [0, -5, 0] : 0,
-                        scale: isOver ? [1, 1.15, 1] : 1,
-                        backgroundColor: isOver ? 'rgba(79,70,229,0.3)' : 'rgba(79,70,229,0.12)',
-                        borderColor: isOver ? 'rgba(99,102,241,0.6)' : 'rgba(99,102,241,0.25)',
-                    }}
-                    transition={{
-                        duration: 0.6,
-                        repeat: isOver ? Infinity : 0,
-                        ease: 'easeInOut',
-                    }}
-                    className="w-9 h-9 rounded-xl border flex items-center justify-center flex-shrink-0"
-                >
-                    <Download className="w-4 h-4 text-indigo-400" strokeWidth={2} />
-                </motion.div>
+                transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                className="absolute inset-0 pointer-events-none"
+            />
 
-                <div className="flex flex-col gap-0.5">
-                    <motion.p
-                        animate={{ color: isOver ? 'rgb(165,180,252)' : 'rgb(113,113,122)' }}
-                        transition={{ duration: 0.15 }}
-                        className="text-sm font-extrabold uppercase tracking-widest"
+            {/* ── Animated scan-line edges ── */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {/* Top edge */}
+                <motion.div
+                    animate={{ x: ['-100%', '100%'] }}
+                    transition={{ repeat: Infinity, duration: 3, ease: 'linear' }}
+                    className="absolute top-0 left-0 w-1/3 h-[2px] bg-gradient-to-r from-transparent via-indigo-400/60 to-transparent"
+                />
+                {/* Bottom edge */}
+                <motion.div
+                    animate={{ x: ['100%', '-100%'] }}
+                    transition={{ repeat: Infinity, duration: 3, ease: 'linear' }}
+                    className="absolute bottom-0 right-0 w-1/3 h-[2px] bg-gradient-to-r from-transparent via-indigo-400/60 to-transparent"
+                />
+                {/* Left edge */}
+                <motion.div
+                    animate={{ y: ['-100%', '100%'] }}
+                    transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}
+                    className="absolute top-0 left-0 w-[2px] h-1/3 bg-gradient-to-b from-transparent via-indigo-400/40 to-transparent"
+                />
+                {/* Right edge */}
+                <motion.div
+                    animate={{ y: ['100%', '-100%'] }}
+                    transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}
+                    className="absolute top-0 right-0 w-[2px] h-1/3 bg-gradient-to-b from-transparent via-indigo-400/40 to-transparent"
+                />
+            </div>
+
+            {/* ── C. Bottom indicator bar — glowing confirmation zone ── */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
+                <motion.div
+                    initial={{ y: 40, opacity: 0, scale: 0.9 }}
+                    animate={{ y: 0, opacity: 1, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 28, delay: 0.1 }}
+                >
+                    <motion.div
+                        animate={{
+                            boxShadow: [
+                                '0 0 24px rgba(99,102,241,0.2), 0 0 0 1px rgba(99,102,241,0.3)',
+                                '0 0 48px rgba(99,102,241,0.35), 0 0 0 1px rgba(99,102,241,0.5)',
+                                '0 0 24px rgba(99,102,241,0.2), 0 0 0 1px rgba(99,102,241,0.3)',
+                            ],
+                            borderColor: [
+                                'rgba(99,102,241,0.4)',
+                                'rgba(129,140,248,0.7)',
+                                'rgba(99,102,241,0.4)',
+                            ],
+                        }}
+                        transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+                        className="flex items-center gap-4 px-10 py-5 rounded-2xl bg-indigo-950/85 border-2 border-dashed backdrop-blur-2xl"
                     >
-                        Thả ra để nhận task
-                    </motion.p>
-                    <AnimatePresence>
-                        {isOver && (
-                            <motion.p
-                                initial={{ opacity: 0, y: -4, height: 0 }}
-                                animate={{ opacity: 1, y: 0, height: 'auto' }}
-                                exit={{ opacity: 0, y: -4, height: 0 }}
-                                className="text-[10px] text-indigo-400/75 font-semibold"
-                            >
-                                Nhả chuột để xác nhận nhận task
-                            </motion.p>
-                        )}
-                    </AnimatePresence>
-                </div>
-            </motion.div>
+                        <motion.div
+                            animate={{
+                                y: [0, -6, 0],
+                                scale: [1, 1.12, 1],
+                            }}
+                            transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+                            className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center"
+                        >
+                            <Download className="w-5 h-5 text-indigo-400" strokeWidth={2} />
+                        </motion.div>
+                        <div>
+                            <p className="text-base font-extrabold text-indigo-300 uppercase tracking-widest">
+                                Thả ra để nhận task
+                            </p>
+                            <p className="text-[11px] text-indigo-400/60 mt-0.5 font-medium">
+                                Nhả chuột ở bất kỳ đâu · Nhấn <kbd className="px-1.5 py-0.5 bg-indigo-500/15 rounded text-indigo-300/80 text-[10px] border border-indigo-500/20">Esc</kbd> để hủy
+                            </p>
+                        </div>
+                        <motion.div
+                            animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
+                            transition={{ repeat: Infinity, duration: 2 }}
+                        >
+                            <CheckCircle2 className="w-6 h-6 text-emerald-400/70" strokeWidth={1.5} />
+                        </motion.div>
+                    </motion.div>
+                </motion.div>
+            </div>
         </motion.div>
     )
 }
@@ -108,7 +157,6 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
     const [loading, setLoading] = useState(false)
     const [activeTask, setActiveTask] = useState<MarketTask | null>(null)
 
-    // ── dnd-kit: pointer sensor with 8px activation distance (avoids accidental drags on click) ──
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: { distance: 8 },
@@ -139,31 +187,41 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
         return () => clearInterval(interval)
     }, [isOpen, fetchTasks])
 
-    // Optimistic claim: remove from list immediately, rollback on error
+    // ══════════════════════════════════════════
+    // B. CLAIM FLOW (verified):
+    //    1. onDragEnd → get taskId from activeTask
+    //    2. userId extracted from session inside claimTask()
+    //    3. claimTask(taskId, workspaceId) → DB update
+    //    4. Success → toast + remove from list
+    //    5. Error → rollback + error toast
+    // ══════════════════════════════════════════
     const handleClaim = useCallback(async (taskId: string) => {
         const taskToRemove = tasks.find(t => t.id === taskId)
         const updatedTasks = tasks.filter(t => t.id !== taskId)
+
+        // Optimistic: remove immediately
         setTasks(updatedTasks)
 
         const res = await claimTask(taskId, workspaceId)
         if (res.error) {
+            // Rollback on failure
             if (taskToRemove) setTasks(prev => [...prev, taskToRemove])
             toast.error(res.error)
             return
         }
 
-        toast.success('Task đã được nhận!')
+        toast.success('Task đã được nhận thành công!')
         onTaskCountChange?.(updatedTasks.length)
         if (updatedTasks.length === 0) setTimeout(onClose, 500)
     }, [tasks, workspaceId, onClose, onTaskCountChange])
 
-    // ── Drag handlers ──
     const onDragStart = useCallback(({ active }: DragStartEvent) => {
         const task = tasks.find(t => t.id === active.id)
         if (task) setActiveTask(task)
     }, [tasks])
 
     const onDragEnd = useCallback(({ over }: DragEndEvent) => {
+        // Full-screen zone: any drop = claim (unless over is null, which shouldn't happen)
         if (over?.id === CLAIM_ZONE_ID && activeTask) {
             handleClaim(activeTask.id)
         }
@@ -211,7 +269,6 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                 backdrop-blur-2xl
                                 shadow-[0_0_0_1px_rgba(245,158,11,0.06),0_8px_40px_rgba(0,0,0,0.7),0_0_80px_rgba(245,158,11,0.08)]"
                         >
-                            {/* Top accent line */}
                             <div className="absolute top-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
 
                             {/* ── Header ── */}
@@ -249,7 +306,7 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                             <span className="mx-1.5">task khả dụng</span>
                                             <span className="text-zinc-600">·</span>
                                             <span className="text-zinc-600 ml-1.5 italic">
-                                                {activeTask ? '🎯 Kéo xuống vùng nhận task bên dưới' : 'Kéo thẻ xuống để nhận'}
+                                                {activeTask ? '🎯 Thả ở bất kỳ đâu để nhận task' : 'Kéo thẻ ra để nhận'}
                                             </span>
                                         </p>
                                     </div>
@@ -311,21 +368,23 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                 )}
                             </div>
 
-                            {/* Bottom accent */}
                             <div className="absolute bottom-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
                         </motion.div>
                     </div>
 
-                    {/* ── Drop zone (fixed bottom, appears on drag) ── */}
+                    {/* ══════════════════════════════════════════
+                        A. FULL-SCREEN DROP ZONE
+                        Covers entire viewport (z-9997)
+                        Above modal, below DragOverlay
+                        Drop ANYWHERE = claim task
+                    ══════════════════════════════════════════ */}
                     <AnimatePresence>
-                        {activeTask && <ClaimDropZone />}
+                        {activeTask && <FullScreenDropZone />}
                     </AnimatePresence>
 
-                    {/* ── DragOverlay: renders to document.body via Portal (bypasses all overflow) ── */}
+                    {/* ── DragOverlay: Portal → document.body (z-9999, above drop zone) ── */}
                     <DragOverlay dropAnimation={dropAnimation}>
-                        {activeTask ? (
-                            <MarketTaskCardOverlay task={activeTask} />
-                        ) : null}
+                        {activeTask ? <MarketTaskCardOverlay task={activeTask} /> : null}
                     </DragOverlay>
                 </DndContext>
             )}

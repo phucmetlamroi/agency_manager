@@ -479,7 +479,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                         data-tag-zone="true"
                         onContextMenu={onTagZoneContextMenu}
                         onMouseDown={onTagZoneMouseDown}
-                        className="space-y-6 min-h-[50px] p-4 -m-4 rounded-[32px] transition-colors hover:bg-white/[0.03] active:bg-white/[0.05]"
+                        className="relative z-10 space-y-6 min-h-[50px] p-4 -m-4 rounded-[32px] border border-transparent hover:border-indigo-500/20 group transition-all duration-300"
                     >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -834,7 +834,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                     {/* ════════════════════════════════════════
                         6. TÀI NGUYÊN & GHI CHÚ (Tags + Duration)
                     ════════════════════════════════════════ */}
-                    <div className="space-y-4 p-4 bg-zinc-900/30 rounded-2xl border border-white/5">
+                    <div className="space-y-4 p-4 bg-zinc-900/30 rounded-2xl border border-white/5 group-hover:bg-indigo-500/5 group-hover:border-indigo-500/20 transition-all duration-300">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                             <Tag className="w-3.5 h-3.5" strokeWidth={1.5} />
                             Tài nguyên & Ghi chú

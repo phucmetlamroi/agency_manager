@@ -47,7 +47,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             },
             client: {
                 include: { parent: true }
-            }
+            },
+            taskTags: { include: { tagCategory: { select: { id: true, name: true } } } }
         },
         orderBy: { createdAt: 'desc' }
     })

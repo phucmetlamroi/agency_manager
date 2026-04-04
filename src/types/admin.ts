@@ -33,6 +33,12 @@ export type TaskWithUser = { // Updated with Client Info
 
     profitVND?: number | null
 
+    // Marketplace & Tags
+    duration?: string | null
+    claimSource?: string | null
+    claimedAt?: Date | string | null
+    taskTags?: { tagCategory: { id: string; name: string } }[]
+
     // Concurrency Control
     version: number
 }

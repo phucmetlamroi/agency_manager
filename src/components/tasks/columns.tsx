@@ -5,7 +5,9 @@ import { TaskWithUser } from "@/types/admin"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { ArrowUpDown, MoreHorizontal, Pen, Trash2, GripVertical } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Pen, Trash2, GripVertical, Undo2 } from "lucide-react"
+import { returnTask } from "@/actions/claim-actions"
+import { toast } from "sonner"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -40,7 +42,8 @@ export const getColumns = (
     onTaskClick: (task: TaskWithUser) => void,
     workspaceId: string,
     onDelete?: (id: string) => void,
-    selectedIds: string[] = []
+    selectedIds: string[] = [],
+    currentUserId?: string
 ): ColumnDef<TaskWithUser>[] => {
     const cols: ColumnDef<TaskWithUser>[] = [
         {
@@ -81,16 +84,25 @@ export const getColumns = (
                     </Button>
                 )
             },
-            cell: ({ row }) => (
-                <div className="flex items-center gap-2">
-                    <div className={cn("w-2 h-2 rounded-full shrink-0", STATUS_DOT[row.original.status] || "bg-gray-500")} title={row.original.status} />
-                    <TitleCell
-                        task={row.original}
-                        isAdmin={isAdmin}
-                        onClick={() => onTaskClick(row.original)}
-                    />
-                </div>
-            )
+            cell: ({ row }) => {
+                const claimSource = (row.original as any).claimSource
+                const glowClass = claimSource === 'MARKET'
+                    ? 'shadow-[0_0_12px_rgba(245,158,11,0.2)] border-l-2 border-l-amber-500/40 pl-2'
+                    : claimSource === 'ADMIN' && row.original.assigneeId
+                        ? 'shadow-[0_0_12px_rgba(59,130,246,0.2)] border-l-2 border-l-blue-500/40 pl-2'
+                        : ''
+
+                return (
+                    <div className={cn("flex items-center gap-2 rounded-lg transition-all", glowClass)}>
+                        <div className={cn("w-2 h-2 rounded-full shrink-0", STATUS_DOT[row.original.status] || "bg-gray-500")} title={row.original.status} />
+                        <TitleCell
+                            task={row.original}
+                            isAdmin={isAdmin}
+                            onClick={() => onTaskClick(row.original)}
+                        />
+                    </div>
+                )
+            }
         },
     ]
 
@@ -214,6 +226,30 @@ export const getColumns = (
                             <DropdownMenuItem onClick={() => onTaskClick(task)}>
                                 <Pen className="mr-2 h-4 w-4" /> Edit Details
                             </DropdownMenuItem>
+                            {/* Hoàn task — only for MARKET-claimed tasks within 10 minutes */}
+                            {(() => {
+                                const cs = (task as any).claimSource
+                                const ca = (task as any).claimedAt
+                                const isOwner = currentUserId && task.assigneeId === currentUserId
+                                if (cs !== 'MARKET' || !ca || !isOwner) return null
+                                const minutesSince = (Date.now() - new Date(ca).getTime()) / (1000 * 60)
+                                if (minutesSince > 10) return null
+                                return (
+                                    <DropdownMenuItem
+                                        className="text-amber-500 focus:text-amber-500"
+                                        onClick={async () => {
+                                            const res = await returnTask(task.id, workspaceId)
+                                            if (res.error) toast.error(res.error)
+                                            else {
+                                                toast.success('Task đã được hoàn trả')
+                                                window.location.reload()
+                                            }
+                                        }}
+                                    >
+                                        <Undo2 className="mr-2 h-4 w-4" /> Hoàn task
+                                    </DropdownMenuItem>
+                                )
+                            })()}
                             {isAdmin && onDelete && (
                                 <DropdownMenuItem
                                     className="text-red-500 focus:text-red-500"

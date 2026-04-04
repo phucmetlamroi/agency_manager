@@ -14,9 +14,10 @@ interface DesktopTaskTableProps {
     isAdmin?: boolean
     users?: any[]
     workspaceId: string
+    currentUserId?: string
 }
 
-export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], workspaceId }: DesktopTaskTableProps) {
+export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], workspaceId, currentUserId }: DesktopTaskTableProps) {
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
     const [rowSelection, setRowSelection] = useState({})
     const { confirm } = useConfirm()
@@ -65,7 +66,8 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
         }, // onTaskClick
         workspaceId, // workspaceId
         handleDelete, // onDelete
-        selectedIds // selectedRowIds for Bulk Assign
+        selectedIds, // selectedRowIds for Bulk Assign
+        currentUserId // for "Hoàn task" button visibility
     )
 
     return (

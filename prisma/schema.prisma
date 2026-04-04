@@ -36,6 +36,7 @@ model Profile {
   profileAccesses     ProfileAccess[]
   accessRequests      ProfileAccessRequest[] @relation("TargetProfileRequests")
   billingProfiles     BillingProfile[]
+  tagCategories       TagCategory[]
 }
 
 model Workspace {
@@ -128,6 +129,7 @@ model User {
   accessRequests      ProfileAccessRequest[]
   approvedRequests    ProfileAccessRequest[] @relation("ApprovedBy")
   requestedRequests   ProfileAccessRequest[] @relation("RequestedBy")
+  tagCategories       TagCategory[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 }
@@ -232,6 +234,10 @@ model Task {
   workspace        Workspace?        @relation(fields: [workspaceId], references: [id])
   profileId        String?
   profile          Profile?          @relation(fields: [profileId], references: [id])
+  duration         String?
+  claimSource      ClaimSource       @default(ADMIN)
+  claimedAt        DateTime?
+  taskTags         TaskTag[]
   rating           Rating?
 
   @@index([workspaceId, status])
@@ -687,4 +693,42 @@ model PriceTemplate {
   createdAt   DateTime @default(now())
 
   @@index([workspaceId])
+}
+
+// ----------------------------------------------------------------------
+// Tag & Marketplace Models
+// ----------------------------------------------------------------------
+
+enum ClaimSource {
+  ADMIN
+  MARKET
+}
+
+model TagCategory {
+  id        String    @id @default(uuid())
+  name      String
+  profileId String
+  userId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskTags  TaskTag[]
+
+  @@index([profileId])
+  @@index([userId])
+}
+
+model TaskTag {
+  id            String      @id @default(uuid())
+  taskId        String
+  tagCategoryId String
+
+  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagCategory   TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, tagCategoryId])
+  @@index([taskId])
+  @@index([tagCategoryId])
 }

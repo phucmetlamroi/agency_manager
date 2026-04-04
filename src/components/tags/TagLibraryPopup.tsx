@@ -16,9 +16,9 @@ interface TagLibraryPopupProps {
     onTagsChanged?: (tags: TagItem[]) => void
 }
 
-const POPUP_WIDTH = 420
-const POPUP_HEIGHT_EST = 380
-const MARGIN = 12
+const POPUP_WIDTH = 460
+const POPUP_HEIGHT_EST = 400
+const MARGIN = 16
 
 export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTagsChanged }: TagLibraryPopupProps) {
     const [tags, setTags] = useState<TagItem[]>([])
@@ -104,7 +104,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
     }
 
     // ── Smart position clamping ──
-    const computePosition = useCallback(() => {
+    const getClampedPosition = useCallback(() => {
         if (typeof window === 'undefined') return { left: position.x, top: position.y }
 
         const vw = window.innerWidth
@@ -115,7 +115,10 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
 
         // If popup would overflow right edge → show to the LEFT of cursor
         if (left + POPUP_WIDTH + MARGIN > vw) {
-            left = Math.max(MARGIN, left - POPUP_WIDTH)
+            left = Math.max(MARGIN, left - POPUP_WIDTH - 8)
+        } else {
+            // Offset slightly to provide breathing room from cursor
+            left = left + 8
         }
 
         // If popup would overflow bottom edge → shift upward
@@ -123,125 +126,134 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
             top = Math.max(MARGIN, vh - POPUP_HEIGHT_EST - MARGIN)
         }
 
-        // Final safety clamp
+        // Final viewport safety clamp
         left = Math.max(MARGIN, Math.min(left, vw - POPUP_WIDTH - MARGIN))
         top = Math.max(MARGIN, Math.min(top, vh - POPUP_HEIGHT_EST - MARGIN))
 
         return { left, top }
     }, [position.x, position.y])
 
-    const { left, top } = computePosition()
+    const { left, top } = getClampedPosition()
 
     return (
         <AnimatePresence>
             {isOpen && (
                 <motion.div
                     ref={popupRef}
-                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                    initial={{ opacity: 0, scale: 0.95, y: -5 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    className="fixed z-[9999] bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden"
+                    exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                    transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                    className="fixed z-[9999] bg-zinc-950/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden"
                     style={{ left, top, width: POPUP_WIDTH }}
                 >
-                    {/* ── Header ── */}
-                    <div className="px-5 py-3.5 border-b border-white/5 flex items-center justify-between bg-zinc-900/30">
+                    {/* Header */}
+                    <div className="px-5 py-3.5 border-b border-white/5 flex items-center justify-between bg-zinc-900/40">
                         <div className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center">
-                                <Tag className="w-3 h-3 text-indigo-400" strokeWidth={2} />
+                                <Tag className="w-3.5 h-3.5 text-indigo-400" strokeWidth={2.5} />
                             </div>
                             <h3 className="text-sm font-bold text-white tracking-tight">Tag Library</h3>
-                            <span className="text-[10px] text-zinc-500 font-semibold ml-1">{tags.length}/15</span>
+                            <span className="text-[10px] text-zinc-500 font-bold bg-zinc-800/50 px-1.5 py-0.5 rounded ml-1">{tags.length}/15</span>
                         </div>
-                        <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors">
-                            <X className="w-4 h-4 text-zinc-500" />
+                        <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors group">
+                            <X className="w-4 h-4 text-zinc-500 group-hover:text-white" />
                         </button>
                     </div>
 
-                    {/* ── Two-column grid ── */}
-                    <div className="grid grid-cols-2 gap-4 p-5">
-                        {/* Left: Add new tag */}
-                        <div className="flex flex-col gap-3">
-                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                Thêm Tag Mới
-                            </label>
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                value={newTagName}
-                                onChange={(e) => setNewTagName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                                placeholder="Tên tag..."
-                                maxLength={30}
-                                className="px-3.5 py-2.5 text-sm bg-zinc-900/50 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                            />
+                    {/* Content Grid */}
+                    <div className="grid grid-cols-2 gap-5 p-5">
+                        {/* LEFT: Add Area */}
+                        <div className="space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.15em] px-1">
+                                    Thêm Tag Mới
+                                </label>
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={newTagName}
+                                    onChange={(e) => setNewTagName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                                    placeholder="Ví dụ: Urgent..."
+                                    maxLength={25}
+                                    className="w-full pl-3.5 pr-3.5 py-2.5 text-sm bg-zinc-900/80 border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                                />
+                            </div>
                             <button
                                 onClick={handleAdd}
                                 disabled={loading || !newTagName.trim()}
-                                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-indigo-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-br from-indigo-600 to-indigo-700 text-white text-xs font-bold rounded-xl hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all active:scale-95 disabled:opacity-30 disabled:grayscale"
                             >
-                                <Plus className="w-4 h-4" strokeWidth={2} />
-                                Thêm
+                                <Plus className="w-4 h-4" strokeWidth={3} />
+                                THÊM VÀO THƯ VIỆN
                             </button>
+                            
+                            <div className="p-3 bg-indigo-500/5 rounded-xl border border-indigo-500/10">
+                                <p className="text-[10px] text-indigo-300 leading-relaxed italic opacity-70">
+                                    💡 Các thẻ trong thư viện sẽ xuất hiện trong menu Radial để bạn đánh dấu nhanh.
+                                </p>
+                            </div>
                         </div>
 
-                        {/* Right: Existing tags */}
-                        <div className="flex flex-col gap-3">
-                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                Danh sách ({tags.length})
+                        {/* RIGHT: List Area */}
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.15em] px-1">
+                                Danh Sách ({tags.length})
                             </label>
-                            <div className="space-y-1.5 max-h-[260px] overflow-y-auto custom-scrollbar">
-                                {tags.length === 0 && (
-                                    <p className="text-xs text-zinc-600 italic py-4 text-center">Chưa có tag nào</p>
-                                )}
-                                <AnimatePresence>
-                                    {tags.map((tag) => (
-                                        <motion.div
-                                            key={tag.id}
-                                            layout
-                                            initial={{ opacity: 0, x: 10 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: -10 }}
-                                            className="group flex items-center justify-between p-2.5 bg-zinc-900/40 hover:bg-zinc-900/70 border border-white/5 rounded-lg transition-colors"
-                                        >
-                                            {editingId === tag.id ? (
-                                                <div className="flex items-center gap-1.5 flex-1">
-                                                    <input
-                                                        value={editingName}
-                                                        onChange={(e) => setEditingName(e.target.value)}
-                                                        onKeyDown={(e) => e.key === 'Enter' && handleUpdate(tag.id)}
-                                                        className="flex-1 px-2 py-1 text-xs bg-zinc-800 border border-white/10 rounded text-white outline-none"
-                                                        autoFocus
-                                                    />
-                                                    <button onClick={() => handleUpdate(tag.id)} className="p-1 hover:bg-zinc-700 rounded text-emerald-400">
-                                                        <Check className="w-3 h-3" />
-                                                    </button>
-                                                    <button onClick={() => setEditingId(null)} className="p-1 hover:bg-zinc-700 rounded text-zinc-500">
-                                                        <X className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <span className="text-sm text-zinc-200 font-medium truncate">{tag.name}</span>
-                                                    <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 transition-opacity flex-shrink-0">
-                                                        <button
-                                                            onClick={() => { setEditingId(tag.id); setEditingName(tag.name) }}
-                                                            className="p-1 hover:bg-zinc-700 rounded text-zinc-400 transition-colors"
-                                                        >
-                                                            <Pencil className="w-3 h-3" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(tag.id)}
-                                                            className="p-1 hover:bg-zinc-700 rounded text-red-400 transition-colors"
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
+                            <div className="space-y-1.5 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
+                                {tags.length === 0 ? (
+                                    <div className="h-32 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-xl bg-zinc-900/20">
+                                        <Tag className="w-6 h-6 text-zinc-800 mb-2" />
+                                        <p className="text-[11px] text-zinc-600 font-medium">Chưa có tag nào</p>
+                                    </div>
+                                ) : (
+                                    <AnimatePresence initial={false}>
+                                        {tags.map((tag) => (
+                                            <motion.div
+                                                key={tag.id}
+                                                layout
+                                                initial={{ opacity: 0, x: 10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: -10 }}
+                                                className="group flex items-center justify-between p-2.5 bg-zinc-900/40 hover:bg-zinc-900/80 border border-white/5 hover:border-white/10 rounded-xl transition-all"
+                                            >
+                                                {editingId === tag.id ? (
+                                                    <div className="flex items-center gap-1.5 flex-1 p-0.5">
+                                                        <input
+                                                            value={editingName}
+                                                            onChange={(e) => setEditingName(e.target.value)}
+                                                            onKeyDown={(e) => e.key === 'Enter' && handleUpdate(tag.id)}
+                                                            className="flex-1 px-2.5 py-1 text-xs bg-zinc-800 border border-indigo-500/30 rounded-lg text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                                            autoFocus
+                                                        />
+                                                        <button onClick={() => handleUpdate(tag.id)} className="p-1 px-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md text-emerald-400 transition-colors">
+                                                            <Check className="w-3 h-3" strokeWidth={3} />
                                                         </button>
                                                     </div>
-                                                </>
-                                            )}
-                                        </motion.div>
-                                    ))}
-                                </AnimatePresence>
+                                                ) : (
+                                                    <>
+                                                        <span className="text-[13px] text-zinc-300 font-semibold truncate pl-1">{tag.name}</span>
+                                                        <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-all">
+                                                            <button
+                                                                onClick={() => { setEditingId(tag.id); setEditingName(tag.name) }}
+                                                                className="p-1.5 hover:bg-zinc-700/50 rounded-lg text-zinc-500 hover:text-zinc-200 transition-colors"
+                                                            >
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(tag.id)}
+                                                                className="p-1.5 hover:bg-red-500/10 rounded-lg text-zinc-600 hover:text-red-400 transition-colors"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
+                                )}
                             </div>
                         </div>
                     </div>

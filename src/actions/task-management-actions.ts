@@ -113,7 +113,9 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
                 assigneeId: assignmentId,
                 assignedAgencyId: null,
                 status: 'Nh\u1eadn task',
-                isPenalized: false
+                isPenalized: false,
+                claimSource: 'ADMIN',
+                claimedAt: new Date()
             }
         }
 

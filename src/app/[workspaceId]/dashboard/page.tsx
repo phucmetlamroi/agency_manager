@@ -13,6 +13,7 @@ import {
     TrendingUp, TrendingDown, Minus, AlertTriangle, ShieldCheck,
     Clock, ListChecks, Flame, ArrowUp, ArrowDown, Zap
 } from 'lucide-react'
+import { MarketplaceProvider } from '@/components/marketplace/MarketplaceProvider'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,9 +48,19 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                     id: true, username: true, role: true, nickname: true,
                     monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } }
                 }
-            }
+            },
+            taskTags: { include: { tagCategory: { select: { id: true, name: true } } } }
         },
         orderBy: { createdAt: 'desc' }
+    })
+
+    // ── Marketplace task count ─────────────────────────────────
+    const marketplaceCount = await (workspacePrisma as any).task.count({
+        where: {
+            assigneeId: null,
+            isArchived: false,
+            status: '\u0110ang \u0111\u1ee3i giao'
+        }
     })
 
     // ── Salary Calculations (workspace scoped) ─────────────────
@@ -221,9 +232,14 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                     Danh sách Task của tôi
                 </h3>
                 <div className="rounded-2xl border border-white/8 bg-zinc-950/60 backdrop-blur-sm overflow-hidden shadow-lg">
-                    <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={false} isMobile={await isMobileDevice()} workspaceId={workspaceId} />
+                    <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={false} isMobile={await isMobileDevice()} workspaceId={workspaceId} currentUserId={userId} />
                 </div>
             </div>
+
+            {/* ═══════════════════════════════════════════════════
+                MARKETPLACE FAB
+            ═══════════════════════════════════════════════════ */}
+            <MarketplaceProvider workspaceId={workspaceId} initialTaskCount={marketplaceCount} />
         </div>
     )
 }

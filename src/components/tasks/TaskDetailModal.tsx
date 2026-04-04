@@ -14,9 +14,14 @@ import {
     Copy, ExternalLink, FolderOpen, Film, MonitorPlay, FolderInput,
     ChevronRight, ChevronDown, Clock, DollarSign, ClipboardList, 
     FileText, AlertTriangle, Pencil, CheckCircle, Target, BookOpen,
-    Link2, Layers
+    Link2, Layers, Tag
 } from "lucide-react"
 import ManagerReviewChecklist from "./ManagerReviewChecklist"
+import { TagLibraryPopup } from "@/components/tags/TagLibraryPopup"
+import { TagRadialMenu } from "@/components/tags/TagRadialMenu"
+import { TagPills } from "@/components/tags/TagPills"
+import { DurationInput } from "@/components/ui/DurationInput"
+import { getTagsForUser, setTaskTags, getTaskTags } from "@/actions/tag-actions"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
 
@@ -39,6 +44,14 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     const [enabledFields, setEnabledFields] = useState<Record<string, boolean>>({})
     const toggleField = (field: string) => setEnabledFields(prev => ({ ...prev, [field]: !prev[field] }))
     const [frameAccount, setFrameAccount] = useState({ account: '', password: '' })
+    // Tag & Duration state
+    const [tagLibraryOpen, setTagLibraryOpen] = useState(false)
+    const [tagLibraryPos, setTagLibraryPos] = useState({ x: 0, y: 0 })
+    const [radialMenuOpen, setRadialMenuOpen] = useState(false)
+    const [radialOrigin, setRadialOrigin] = useState({ x: 0, y: 0 })
+    const [allTags, setAllTags] = useState<{ id: string; name: string }[]>([])
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+    const [ctrlDragState, setCtrlDragState] = useState<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
     const [form, setForm] = useState({
         resources: '',
         linkRaw: '',
@@ -52,7 +65,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         value: 0,
         collectFilesLink: '',
         submissionFolder: '',
-        scriptLink: ''
+        scriptLink: '',
+        duration: ''
     })
 
     // Helper: Parse content for Tiptap (logic unchanged)
@@ -114,11 +128,26 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 value: task.value || 0,
                 collectFilesLink: task.collectFilesLink || '',
                 submissionFolder: submission,
-                scriptLink: scriptUrl
+                scriptLink: scriptUrl,
+                duration: task.duration || ''
             })
             setIsEditing(false)
+
+            // Load tags for this task
+            getTaskTags(task.id).then(res => {
+                if (res.tags) setSelectedTagIds(res.tags.map(t => t.id))
+            })
         }
     }, [task])
+
+    // Load all available tags when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            getTagsForUser(workspaceId).then(res => {
+                if (res.tags) setAllTags(res.tags)
+            })
+        }
+    }, [isOpen, workspaceId])
 
     useEffect(() => {
         if (isOpen) {
@@ -184,8 +213,14 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             deadline: form.deadline || undefined,
             jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
             value: isAdmin ? Number(form.value) : undefined,
-            collectFilesLink: form.collectFilesLink
+            collectFilesLink: form.collectFilesLink,
+            duration: isAdmin ? form.duration || undefined : undefined
         }, workspaceId)
+
+        // Save tags (admin only)
+        if (isAdmin && localTask) {
+            await setTaskTags(localTask.id, selectedTagIds, workspaceId)
+        }
 
         if (res?.success) {
             setLocalTask(prev => prev ? ({
@@ -704,6 +739,77 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             </div>
                         )}
                     </div>
+
+                    {/* ════════════════════════════════════════
+                        6. TÀI NGUYÊN & GHI CHÚ (Tags + Duration)
+                    ════════════════════════════════════════ */}
+                    <div
+                        className="space-y-4 p-4 bg-zinc-900/30 rounded-2xl border border-white/5"
+                        onContextMenu={(e) => {
+                            // Only trigger on empty space (not inputs/buttons)
+                            const target = e.target as HTMLElement
+                            if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
+                            if (!isAdmin) return
+                            e.preventDefault()
+                            setTagLibraryPos({ x: e.clientX, y: e.clientY })
+                            setTagLibraryOpen(true)
+                        }}
+                        onMouseDown={(e) => {
+                            // Ctrl + click to open radial menu
+                            if (!e.ctrlKey || e.button !== 0) return
+                            if (!isAdmin) return
+                            const target = e.target as HTMLElement
+                            if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
+                            e.preventDefault()
+                            setCtrlDragState({ active: true, startX: e.clientX, startY: e.clientY })
+                        }}
+                        onMouseMove={(e) => {
+                            if (!ctrlDragState.active) return
+                            const dx = e.clientX - ctrlDragState.startX
+                            const dy = e.clientY - ctrlDragState.startY
+                            if (Math.sqrt(dx * dx + dy * dy) > 20) {
+                                setRadialOrigin({ x: ctrlDragState.startX, y: ctrlDragState.startY })
+                                setRadialMenuOpen(true)
+                                setCtrlDragState({ active: false, startX: 0, startY: 0 })
+                            }
+                        }}
+                        onMouseUp={() => {
+                            setCtrlDragState({ active: false, startX: 0, startY: 0 })
+                        }}
+                    >
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                            <Tag className="w-3.5 h-3.5" strokeWidth={1.5} />
+                            Tài nguyên & Ghi chú
+                            {isAdmin && (
+                                <span className="text-zinc-600 text-[9px] normal-case font-medium ml-1">
+                                    (Chuột phải = Tag Library · Ctrl+Kéo = Chọn Tag)
+                                </span>
+                            )}
+                        </label>
+
+                        {/* Duration Input (admin edit mode) */}
+                        {(isAdmin || form.duration) && (
+                            <DurationInput
+                                value={form.duration || null}
+                                onChange={(val) => setForm({ ...form, duration: val })}
+                                disabled={!isAdmin || !isEditing}
+                            />
+                        )}
+
+                        {/* Tag Pills */}
+                        <TagPills
+                            tags={allTags.filter(t => selectedTagIds.includes(t.id))}
+                            onRemove={isAdmin && isEditing ? (tagId) => setSelectedTagIds(prev => prev.filter(id => id !== tagId)) : undefined}
+                            readonly={!isAdmin || !isEditing}
+                        />
+
+                        {/* Empty state hint */}
+                        {selectedTagIds.length === 0 && allTags.length === 0 && isAdmin && (
+                            <p className="text-xs text-zinc-600 italic text-center py-2">
+                                Chuột phải để tạo Tag mới
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 {/* ── SAVE FOOTER ───────────────────────────── */}
@@ -732,6 +838,31 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                     />
                 )}
             </DialogContent>
+
+            {/* ── TAG LIBRARY POPUP (Right-click) ──────────── */}
+            <TagLibraryPopup
+                isOpen={tagLibraryOpen}
+                onClose={() => setTagLibraryOpen(false)}
+                position={tagLibraryPos}
+                workspaceId={workspaceId}
+                onTagsChanged={(tags) => setAllTags(tags)}
+            />
+
+            {/* ── TAG RADIAL MENU (Ctrl+Drag) ─────────────── */}
+            <TagRadialMenu
+                isOpen={radialMenuOpen}
+                origin={radialOrigin}
+                tags={allTags}
+                selectedTagIds={selectedTagIds}
+                onToggle={(tagId) => {
+                    setSelectedTagIds(prev =>
+                        prev.includes(tagId)
+                            ? prev.filter(id => id !== tagId)
+                            : [...prev, tagId]
+                    )
+                }}
+                onClose={() => setRadialMenuOpen(false)}
+            />
         </Dialog>
     )
 }

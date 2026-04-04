@@ -18,6 +18,7 @@ export async function updateTaskDetails(id: string, data: {
     jobPriceUSD?: number
     value?: number
     collectFilesLink?: string
+    duration?: string
 }, workspaceId: string) {
     try {
         const session = await getSession()
@@ -47,6 +48,7 @@ export async function updateTaskDetails(id: string, data: {
             }
             if (data.notes !== undefined) updateData.notes_vi = data.notes
             if (data.notes_en !== undefined) updateData.notes_en = data.notes_en
+            if (data.duration !== undefined) updateData.duration = data.duration
         } else {
             // Non-admins are ONLY allowed to update their delivery/translation fields
             if (data.productLink !== undefined) updateData.productLink = data.productLink

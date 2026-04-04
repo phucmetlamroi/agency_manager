@@ -17,7 +17,8 @@
       "Bash(vercel build:*)",
       "Bash(vercel pull:*)",
       "Bash(pip install:*)",
-      "Bash(uv --version)"
+      "Bash(uv --version)",
+      "Bash(npx prisma:*)"
     ]
   }
 }

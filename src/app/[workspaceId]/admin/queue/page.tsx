@@ -25,7 +25,8 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                     monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } }
                 }
             },
-            client: { include: { parent: true } }
+            client: { include: { parent: true } },
+            taskTags: { include: { tagCategory: { select: { id: true, name: true } } } }
         },
         orderBy: { createdAt: 'desc' }
     })

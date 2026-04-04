@@ -28,7 +28,6 @@ export async function getMarketplaceTasks(workspaceId: string) {
         where: {
             assigneeId: null,
             isArchived: false,
-            status: '\u0110ang \u0111\u1ee3i giao' // "Đang đợi giao"
         },
         include: {
             client: {

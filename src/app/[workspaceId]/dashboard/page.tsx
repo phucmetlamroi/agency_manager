@@ -24,6 +24,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
     const workspacePrisma = getWorkspacePrisma(workspaceId)
     const userId = session.user.id
+    const userIsAdmin = session.user.role === 'ADMIN' || !!(session.user as any).isTreasurer
 
     // ── Data Fetching (workspace isolated) ──────────────────────
     const perfData = await getUserPerformanceScore(workspaceId, userId)
@@ -59,7 +60,6 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         where: {
             assigneeId: null,
             isArchived: false,
-            status: '\u0110ang \u0111\u1ee3i giao'
         }
     })
 
@@ -232,7 +232,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                     Danh sách Task của tôi
                 </h3>
                 <div className="rounded-2xl border border-white/8 bg-zinc-950/60 backdrop-blur-sm overflow-hidden shadow-lg">
-                    <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={false} isMobile={await isMobileDevice()} workspaceId={workspaceId} currentUserId={userId} />
+                    <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={userIsAdmin} isMobile={await isMobileDevice()} workspaceId={workspaceId} currentUserId={userId} />
                 </div>
             </div>
 

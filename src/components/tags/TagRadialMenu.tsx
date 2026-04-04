@@ -56,7 +56,7 @@ export function TagRadialMenu({ isOpen, origin, tags, selectedTagIds, onToggle, 
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.12 }}
-                        className="fixed inset-0 z-[300] bg-black/30 backdrop-blur-[2px]"
+                        className="fixed inset-0 z-[9998] bg-black/30 backdrop-blur-[2px]"
                         onClick={onClose}
                     />
 
@@ -65,7 +65,7 @@ export function TagRadialMenu({ isOpen, origin, tags, selectedTagIds, onToggle, 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed z-[301] pointer-events-none"
+                        className="fixed z-[9999] pointer-events-none"
                         style={{ left: origin.x, top: origin.y }}
                     >
                         {/* Center dot */}

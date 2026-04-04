@@ -102,7 +102,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-                    className="fixed z-[200] bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/60 w-[460px] overflow-hidden"
+                    className="fixed z-[9999] bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/60 w-[460px] overflow-hidden"
                     style={{ left, top }}
                 >
                     {/* Header */}

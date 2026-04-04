@@ -55,7 +55,13 @@ export async function loginAction(prevState: any, formData: FormData) {
         role = user.role
         console.log(`[Login] Success for: ${username}, role: ${role}`)
         // Login success
-        await login({ id: user.id, username: user.username, role: user.role, hasAcceptedTerms: user.hasAcceptedTerms })
+        await login({ 
+            id: user.id, 
+            username: user.username, 
+            role: user.role, 
+            profileId: user.profileId, // Include profileId
+            hasAcceptedTerms: user.hasAcceptedTerms 
+        })
         console.log(`[Login] Cookie set for: ${username}`)
 
     } catch (err) {

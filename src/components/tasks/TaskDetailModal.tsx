@@ -426,19 +426,9 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                     onClick={async () => {
                                         await handleSave();
                                         if (!isAdmin) {
-                                            const res = await updateTaskStatus(localTask.id, 'Revision', workspaceId, undefined, undefined, localTask.version)
-                                            if (res?.error) {
-                                                toast.error(res.error)
-                                            } else {
-                                                setLocalTask(prev => prev ? ({
-                                                    ...prev,
-                                                    status: 'Revision',
-                                                    deadline: null,
-                                                    version: typeof prev.version === 'number' ? prev.version + 1 : prev.version
-                                                }) : null)
-                                                setForm(prev => ({ ...prev, deadline: '' }))
-                                                toast.success('Đã nộp bài, task chuyển sang Revision và đã xóa deadline')
-                                            }
+                                            const res = await updateTaskStatus(localTask.id, 'Review', workspaceId, undefined, undefined, localTask.version)
+                                            if (res?.error) toast.error(res.error)
+                                            else toast.success('Đã nộp bài (Sent to Review)')
                                         }
                                         setIsEditingLink(false);
                                     }}

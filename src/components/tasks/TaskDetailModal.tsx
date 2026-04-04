@@ -156,12 +156,55 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         }
     }, [isOpen])
 
-    // ── Document-level mousemove/mouseup for Ctrl+drag radial menu ──
+    // ── Native DOM event listeners for tag zone gestures ──
+    // Uses capture phase to intercept before Radix Dialog can swallow events
+    const tagZoneRef = useRef<HTMLDivElement | null>(null)
     useEffect(() => {
-        const handleDocMouseMove = (e: MouseEvent) => {
+        if (!isOpen || !isAdmin) return
+
+        // Find the tag zone element after render
+        const findTagZone = () => document.querySelector('[data-tag-zone="true"]') as HTMLDivElement | null
+        // Small delay to ensure portal is mounted
+        const timer = setTimeout(() => { tagZoneRef.current = findTagZone() }, 50)
+
+        const isInteractiveTarget = (target: HTMLElement) => {
+            const tag = target.tagName
+            if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'TEXTAREA' || tag === 'A') return true
+            if (target.closest('.tiptap') || target.closest('[contenteditable]') || target.closest('a')) return true
+            return false
+        }
+
+        const isInsideTagZone = (target: HTMLElement) => {
+            return !!target.closest('[data-tag-zone="true"]')
+        }
+
+        // Right-click → Tag Library
+        const handleContextMenu = (e: MouseEvent) => {
+            const target = e.target as HTMLElement
+            if (!isInsideTagZone(target)) return
+            if (isInteractiveTarget(target)) return
+            e.preventDefault()
+            e.stopPropagation()
+            setTagLibraryPos({ x: e.clientX, y: e.clientY })
+            setTagLibraryOpen(true)
+        }
+
+        // Ctrl+mousedown → start drag tracking
+        const handleMouseDown = (e: MouseEvent) => {
+            if (!e.ctrlKey || e.button !== 0) return
+            const target = e.target as HTMLElement
+            if (!isInsideTagZone(target)) return
+            if (isInteractiveTarget(target)) return
+            e.preventDefault()
+            e.stopPropagation()
+            document.body.style.userSelect = 'none'
+            ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
+        }
+
+        // mousemove → detect drag distance → open radial menu
+        const handleMouseMove = (e: MouseEvent) => {
             const drag = ctrlDragRef.current
             if (!drag.active) return
-            // Prevent text selection while Ctrl+dragging
             e.preventDefault()
             const dx = e.clientX - drag.startX
             const dy = e.clientY - drag.startY
@@ -172,22 +215,30 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 document.body.style.userSelect = ''
             }
         }
-        const handleDocMouseUp = () => {
+
+        // mouseup → reset drag state
+        const handleMouseUp = () => {
             if (ctrlDragRef.current.active) {
                 document.body.style.userSelect = ''
             }
             ctrlDragRef.current = { active: false, startX: 0, startY: 0 }
         }
-        if (isOpen) {
-            document.addEventListener('mousemove', handleDocMouseMove)
-            document.addEventListener('mouseup', handleDocMouseUp)
-        }
+
+        // Attach in CAPTURE phase so we fire before Radix Dialog
+        document.addEventListener('contextmenu', handleContextMenu, true)
+        document.addEventListener('mousedown', handleMouseDown, true)
+        document.addEventListener('mousemove', handleMouseMove)
+        document.addEventListener('mouseup', handleMouseUp)
+
         return () => {
-            document.removeEventListener('mousemove', handleDocMouseMove)
-            document.removeEventListener('mouseup', handleDocMouseUp)
+            clearTimeout(timer)
+            document.removeEventListener('contextmenu', handleContextMenu, true)
+            document.removeEventListener('mousedown', handleMouseDown, true)
+            document.removeEventListener('mousemove', handleMouseMove)
+            document.removeEventListener('mouseup', handleMouseUp)
             document.body.style.userSelect = ''
         }
-    }, [isOpen])
+    }, [isOpen, isAdmin])
 
     if (!isOpen || !localTask) return null
 
@@ -438,25 +489,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                         Wraps sections 2-6 so empty space anywhere triggers gestures
                     ════════════════════════════════════════ */}
                     <div
-                        onContextMenu={(e) => {
-                            const target = e.target as HTMLElement
-                            if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
-                            if (target.closest('.tiptap') || target.closest('[contenteditable]')) return
-                            if (!isAdmin) return
-                            e.preventDefault()
-                            setTagLibraryPos({ x: e.clientX, y: e.clientY })
-                            setTagLibraryOpen(true)
-                        }}
-                        onMouseDown={(e) => {
-                            if (!e.ctrlKey || e.button !== 0) return
-                            if (!isAdmin) return
-                            const target = e.target as HTMLElement
-                            if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
-                            if (target.closest('.tiptap') || target.closest('[contenteditable]')) return
-                            e.preventDefault()
-                            document.body.style.userSelect = 'none'
-                            ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
-                        }}
+                        data-tag-zone="true"
                         className="space-y-6"
                     >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

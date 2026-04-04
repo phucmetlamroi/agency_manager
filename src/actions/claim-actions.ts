@@ -3,11 +3,24 @@
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { prisma } from '@/lib/db'
+
+// ─── Helper: Verify user belongs to workspace ─────────────────
+async function verifyWorkspaceMembership(userId: string, workspaceId: string) {
+    const member = await prisma.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId, workspaceId } }
+    })
+    return !!member
+}
 
 // ─── Get unassigned tasks for marketplace ─────────────────────
 export async function getMarketplaceTasks(workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized', tasks: [] }
+
+    if (!await verifyWorkspaceMembership(session.user.id, workspaceId)) {
+        return { error: 'Forbidden: Not a member of this workspace', tasks: [] }
+    }
 
     const workspacePrisma = getWorkspacePrisma(workspaceId)
 
@@ -57,6 +70,11 @@ export async function claimTask(taskId: string, workspaceId: string) {
     if (!session) return { error: 'Unauthorized' }
 
     const userId = session.user.id
+
+    if (!await verifyWorkspaceMembership(userId, workspaceId)) {
+        return { error: 'Forbidden: Not a member of this workspace' }
+    }
+
     const workspacePrisma = getWorkspacePrisma(workspaceId)
 
     // Use transaction with optimistic locking to prevent race conditions
@@ -115,6 +133,11 @@ export async function returnTask(taskId: string, workspaceId: string) {
     if (!session) return { error: 'Unauthorized' }
 
     const userId = session.user.id
+
+    if (!await verifyWorkspaceMembership(userId, workspaceId)) {
+        return { error: 'Forbidden: Not a member of this workspace' }
+    }
+
     const workspacePrisma = getWorkspacePrisma(workspaceId)
 
     const task = await workspacePrisma.task.findUnique({
@@ -140,8 +163,8 @@ export async function returnTask(taskId: string, workspaceId: string) {
             status: '\u0110ang \u0111\u1ee3i giao', // "Đang đợi giao"
             claimSource: 'ADMIN', // Reset to default
             claimedAt: null,
-            isPenalized: false,
-            deadline: null
+            isPenalized: false
+            // Note: deadline is preserved intentionally
         }
     })
 

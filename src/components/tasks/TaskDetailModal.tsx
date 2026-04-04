@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { updateTaskStatus } from "@/actions/task-actions"
@@ -51,7 +51,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     const [radialOrigin, setRadialOrigin] = useState({ x: 0, y: 0 })
     const [allTags, setAllTags] = useState<{ id: string; name: string }[]>([])
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
-    const [ctrlDragState, setCtrlDragState] = useState<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
+    const ctrlDragRef = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
     const [form, setForm] = useState({
         resources: '',
         linkRaw: '',
@@ -133,7 +133,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             })
             setIsEditing(false)
 
-            // Load tags for this task
+            // Reset and load tags for this task
+            setSelectedTagIds([])
             getTaskTags(task.id).then(res => {
                 if (res.tags) setSelectedTagIds(res.tags.map(t => t.id))
             })
@@ -152,6 +153,32 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     useEffect(() => {
         if (isOpen) {
             getFrameAccount().then(data => { setFrameAccount(data) })
+        }
+    }, [isOpen])
+
+    // ── Document-level mousemove/mouseup for Ctrl+drag radial menu ──
+    useEffect(() => {
+        const handleDocMouseMove = (e: MouseEvent) => {
+            const drag = ctrlDragRef.current
+            if (!drag.active) return
+            const dx = e.clientX - drag.startX
+            const dy = e.clientY - drag.startY
+            if (Math.sqrt(dx * dx + dy * dy) > 20) {
+                setRadialOrigin({ x: drag.startX, y: drag.startY })
+                setRadialMenuOpen(true)
+                ctrlDragRef.current = { active: false, startX: 0, startY: 0 }
+            }
+        }
+        const handleDocMouseUp = () => {
+            ctrlDragRef.current = { active: false, startX: 0, startY: 0 }
+        }
+        if (isOpen) {
+            document.addEventListener('mousemove', handleDocMouseMove)
+            document.addEventListener('mouseup', handleDocMouseUp)
+        }
+        return () => {
+            document.removeEventListener('mousemove', handleDocMouseMove)
+            document.removeEventListener('mouseup', handleDocMouseUp)
         }
     }, [isOpen])
 
@@ -755,26 +782,13 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             setTagLibraryOpen(true)
                         }}
                         onMouseDown={(e) => {
-                            // Ctrl + click to open radial menu
+                            // Ctrl + left-click to initiate radial menu drag
                             if (!e.ctrlKey || e.button !== 0) return
                             if (!isAdmin) return
                             const target = e.target as HTMLElement
                             if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
                             e.preventDefault()
-                            setCtrlDragState({ active: true, startX: e.clientX, startY: e.clientY })
-                        }}
-                        onMouseMove={(e) => {
-                            if (!ctrlDragState.active) return
-                            const dx = e.clientX - ctrlDragState.startX
-                            const dy = e.clientY - ctrlDragState.startY
-                            if (Math.sqrt(dx * dx + dy * dy) > 20) {
-                                setRadialOrigin({ x: ctrlDragState.startX, y: ctrlDragState.startY })
-                                setRadialMenuOpen(true)
-                                setCtrlDragState({ active: false, startX: 0, startY: 0 })
-                            }
-                        }}
-                        onMouseUp={() => {
-                            setCtrlDragState({ active: false, startX: 0, startY: 0 })
+                            ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
                         }}
                     >
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">

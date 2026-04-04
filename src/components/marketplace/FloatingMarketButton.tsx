@@ -13,7 +13,6 @@ export function FloatingMarketButton({ onClick, taskCount = 0 }: FloatingMarketB
     const [position, setPosition] = useState({ x: 0, y: 0 })
 
     useEffect(() => {
-        // Load saved position from localStorage
         const saved = localStorage.getItem('market-fab-pos')
         if (saved) {
             try {
@@ -34,29 +33,40 @@ export function FloatingMarketButton({ onClick, taskCount = 0 }: FloatingMarketB
             dragMomentum={false}
             dragElastic={0.15}
             onDragEnd={(_, info) => {
-                savePosition(info.point.x - window.innerWidth + 80, info.point.y - window.innerHeight + 80)
+                savePosition(position.x + info.offset.x, position.y + info.offset.y)
             }}
             whileHover={{
-                scale: 1.1,
-                boxShadow: '0 0 24px rgba(245, 158, 11, 0.45)',
+                scale: 1.08,
             }}
             whileTap={{ scale: 0.95 }}
             onClick={onClick}
             style={{ x: position.x, y: position.y }}
-            className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 border border-white/20 shadow-xl shadow-black/40 flex items-center justify-center cursor-grab active:cursor-grabbing z-40 select-none"
+            className="fixed bottom-6 right-6 w-[56px] h-[56px] rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-orange-600 border border-amber-400/30 flex items-center justify-center cursor-grab active:cursor-grabbing z-40 select-none
+                shadow-[0_4px_24px_rgba(245,158,11,0.35),0_0_0_1px_rgba(245,158,11,0.1)]
+                hover:shadow-[0_4px_32px_rgba(245,158,11,0.5),0_0_0_1px_rgba(245,158,11,0.2)]
+                transition-shadow duration-300"
             title="Phiên chợ Task"
         >
-            <Store className="w-6 h-6 text-white" strokeWidth={1.8} />
+            <Store className="w-[22px] h-[22px] text-white drop-shadow-sm" strokeWidth={1.8} />
 
             {/* Task count badge */}
             {taskCount > 0 && (
                 <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 2.5 }}
-                    className="absolute -top-1 -right-1 min-w-[20px] h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shadow-lg shadow-red-500/40"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center px-1.5 shadow-lg shadow-red-500/40 border-2 border-zinc-950"
                 >
                     {taskCount > 99 ? '99+' : taskCount}
                 </motion.div>
+            )}
+
+            {/* Pulse ring when tasks available */}
+            {taskCount > 0 && (
+                <motion.div
+                    animate={{ scale: [1, 1.6], opacity: [0.4, 0] }}
+                    transition={{ repeat: Infinity, duration: 2, ease: 'easeOut' }}
+                    className="absolute inset-0 rounded-2xl border-2 border-amber-400/50 pointer-events-none"
+                />
             )}
         </motion.button>
     )

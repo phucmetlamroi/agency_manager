@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Pencil, Trash2, X, Check, Tag } from 'lucide-react'
 import { createTag, updateTag, deleteTag, getTagsForUser } from '@/actions/tag-actions'
@@ -15,6 +15,10 @@ interface TagLibraryPopupProps {
     workspaceId: string
     onTagsChanged?: (tags: TagItem[]) => void
 }
+
+const POPUP_WIDTH = 420
+const POPUP_HEIGHT_EST = 380
+const MARGIN = 12
 
 export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTagsChanged }: TagLibraryPopupProps) {
     const [tags, setTags] = useState<TagItem[]>([])
@@ -42,6 +46,16 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
         }
         document.addEventListener('mousedown', handler)
         return () => document.removeEventListener('mousedown', handler)
+    }, [isOpen, onClose])
+
+    // Close on Escape
+    useEffect(() => {
+        if (!isOpen) return
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose()
+        }
+        document.addEventListener('keydown', handler)
+        return () => document.removeEventListener('keydown', handler)
     }, [isOpen, onClose])
 
     const loadTags = async () => {
@@ -89,36 +103,63 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
         toast.success('Tag đã được xóa')
     }
 
-    // Clamp position to viewport (SSR-safe)
-    const left = typeof window !== 'undefined' ? Math.min(position.x, window.innerWidth - 500) : position.x
-    const top = typeof window !== 'undefined' ? Math.min(position.y, window.innerHeight - 420) : position.y
+    // ── Smart position clamping ──
+    const computePosition = useCallback(() => {
+        if (typeof window === 'undefined') return { left: position.x, top: position.y }
+
+        const vw = window.innerWidth
+        const vh = window.innerHeight
+
+        let left = position.x
+        let top = position.y
+
+        // If popup would overflow right edge → show to the LEFT of cursor
+        if (left + POPUP_WIDTH + MARGIN > vw) {
+            left = Math.max(MARGIN, left - POPUP_WIDTH)
+        }
+
+        // If popup would overflow bottom edge → shift upward
+        if (top + POPUP_HEIGHT_EST + MARGIN > vh) {
+            top = Math.max(MARGIN, vh - POPUP_HEIGHT_EST - MARGIN)
+        }
+
+        // Final safety clamp
+        left = Math.max(MARGIN, Math.min(left, vw - POPUP_WIDTH - MARGIN))
+        top = Math.max(MARGIN, Math.min(top, vh - POPUP_HEIGHT_EST - MARGIN))
+
+        return { left, top }
+    }, [position.x, position.y])
+
+    const { left, top } = computePosition()
 
     return (
         <AnimatePresence>
             {isOpen && (
                 <motion.div
                     ref={popupRef}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-                    className="fixed z-[9999] bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/60 w-[460px] overflow-hidden"
-                    style={{ left, top }}
+                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    className="fixed z-[9999] bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden"
+                    style={{ left, top, width: POPUP_WIDTH }}
                 >
-                    {/* Header */}
-                    <div className="px-5 py-3.5 border-b border-white/5 flex items-center justify-between">
+                    {/* ── Header ── */}
+                    <div className="px-5 py-3.5 border-b border-white/5 flex items-center justify-between bg-zinc-900/30">
                         <div className="flex items-center gap-2">
-                            <Tag className="w-3.5 h-3.5 text-indigo-400" strokeWidth={2} />
+                            <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center">
+                                <Tag className="w-3 h-3 text-indigo-400" strokeWidth={2} />
+                            </div>
                             <h3 className="text-sm font-bold text-white tracking-tight">Tag Library</h3>
-                            <span className="text-[10px] text-zinc-500 font-semibold">{tags.length}/15</span>
+                            <span className="text-[10px] text-zinc-500 font-semibold ml-1">{tags.length}/15</span>
                         </div>
-                        <button onClick={onClose} className="p-1 hover:bg-zinc-800 rounded-lg transition-colors">
+                        <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors">
                             <X className="w-4 h-4 text-zinc-500" />
                         </button>
                     </div>
 
-                    {/* Two-column grid */}
-                    <div className="grid grid-cols-2 gap-5 p-5">
+                    {/* ── Two-column grid ── */}
+                    <div className="grid grid-cols-2 gap-4 p-5">
                         {/* Left: Add new tag */}
                         <div className="flex flex-col gap-3">
                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">

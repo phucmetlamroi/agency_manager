@@ -159,6 +159,19 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     // ── Native DOM event listeners for tag zone gestures ──
     // Uses capture phase to intercept before Radix Dialog can swallow events
     const tagZoneRef = useRef<HTMLDivElement | null>(null)
+
+    const isInteractiveTarget = (target: HTMLElement) => {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'TEXTAREA' || tag === 'A') return true
+        if (target.closest('.tiptap') || target.closest('[contenteditable]') || target.closest('a')) return true
+        return false
+    }
+
+    const isInsideTagZone = (target: HTMLElement) => {
+        if (tagZoneRef.current && (tagZoneRef.current === target || tagZoneRef.current.contains(target))) return true
+        return !!target.closest('[data-tag-zone="true"]')
+    }
+
     useEffect(() => {
         if (!isOpen) return
 
@@ -167,54 +180,17 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         // Small delay to ensure portal is mounted
         const timer = setTimeout(() => { tagZoneRef.current = findTagZone() }, 50)
 
-        const isInteractiveTarget = (target: HTMLElement) => {
-            const tag = target.tagName
-            if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'TEXTAREA' || tag === 'A') return true
-            if (target.closest('.tiptap') || target.closest('[contenteditable]') || target.closest('a')) return true
-            return false
-        }
-
-        const isInsideTagZone = (target: HTMLElement) => {
-            if (tagZoneRef.current && tagZoneRef.current.contains(target)) return true
-            return !!target.closest('[data-tag-zone="true"]')
-        }
-
-        // Right-click → Tag Library
-        const handleContextMenu = (e: MouseEvent) => {
-            const target = e.target as HTMLElement
-            if (!isInsideTagZone(target)) return
-            if (isInteractiveTarget(target)) return
-            e.preventDefault()
-            e.stopPropagation()
-            e.stopImmediatePropagation()
-            setTagLibraryPos({ x: e.clientX, y: e.clientY })
-            setTagLibraryOpen(true)
-        }
-
-        // Ctrl+mousedown → start drag tracking
-        const handleMouseDown = (e: MouseEvent) => {
-            if (!e.ctrlKey || e.button !== 0) return
-            const target = e.target as HTMLElement
-            if (!isInsideTagZone(target)) return
-            if (isInteractiveTarget(target)) return
-            e.preventDefault()
-            e.stopPropagation()
-            e.stopImmediatePropagation()
-            document.body.style.userSelect = 'none'
-            ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
-        }
-
         // mousemove → detect drag distance → open radial menu
         const handleMouseMove = (e: MouseEvent) => {
             const drag = ctrlDragRef.current
             if (!drag.active) return
-            e.preventDefault()
+            
             const dx = e.clientX - drag.startX
             const dy = e.clientY - drag.startY
-            if (Math.sqrt(dx * dx + dy * dy) > 20) {
+            if (Math.sqrt(dx * dx + dy * dy) > 15) {
                 setRadialOrigin({ x: drag.startX, y: drag.startY })
                 setRadialMenuOpen(true)
-                ctrlDragRef.current = { active: false, startX: 0, startY: 0 }
+                drag.active = false
                 document.body.style.userSelect = ''
             }
         }
@@ -224,24 +200,41 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             if (ctrlDragRef.current.active) {
                 document.body.style.userSelect = ''
             }
-            ctrlDragRef.current = { active: false, startX: 0, startY: 0 }
+            ctrlDragRef.current.active = false
         }
 
-        // Attach in CAPTURE phase so we fire before Radix Dialog
-        document.addEventListener('contextmenu', handleContextMenu, true)
-        document.addEventListener('mousedown', handleMouseDown, true)
         document.addEventListener('mousemove', handleMouseMove, { passive: false })
         document.addEventListener('mouseup', handleMouseUp)
 
         return () => {
             clearTimeout(timer)
-            document.removeEventListener('contextmenu', handleContextMenu, true)
-            document.removeEventListener('mousedown', handleMouseDown, true)
             document.removeEventListener('mousemove', handleMouseMove)
             document.removeEventListener('mouseup', handleMouseUp)
             document.body.style.userSelect = ''
         }
     }, [isOpen])
+
+    // Specific handlers for the Tag Zone container
+    const onTagZoneContextMenu = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement
+        if (isInteractiveTarget(target)) return
+        
+        e.preventDefault()
+        e.stopPropagation()
+        setTagLibraryPos({ x: e.clientX, y: e.clientY })
+        setTagLibraryOpen(true)
+    }
+
+    const onTagZoneMouseDown = (e: React.MouseEvent) => {
+        if (!e.ctrlKey || e.button !== 0) return
+        const target = e.target as HTMLElement
+        if (isInteractiveTarget(target)) return
+        
+        e.preventDefault()
+        e.stopPropagation()
+        document.body.style.userSelect = 'none'
+        ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
+    }
 
     if (!isOpen || !localTask) return null
 
@@ -494,7 +487,9 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                     <div
                         ref={tagZoneRef}
                         data-tag-zone="true"
-                        className="space-y-6 min-h-[50px] p-2 -m-2 rounded-3xl transition-colors hover:bg-white/[0.02]"
+                        onContextMenu={onTagZoneContextMenu}
+                        onMouseDown={onTagZoneMouseDown}
+                        className="space-y-6 min-h-[50px] p-4 -m-4 rounded-[32px] transition-colors hover:bg-white/[0.03] active:bg-white/[0.05]"
                     >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 

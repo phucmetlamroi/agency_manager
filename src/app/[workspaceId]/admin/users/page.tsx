@@ -17,11 +17,23 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
         select: { username: true }
     })
 
-    const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    const month = now.getMonth() + 1
-    const year = now.getFullYear()
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { name: true }
+    })
+
+    // Extract targeting month/year from workspace name (format: "04 / 2026")
+    let targetMonth = new Date().getMonth() + 1
+    let targetYear = new Date().getFullYear()
+    
+    const monthYearMatch = workspace?.name?.match(/(\d{1,2})\s*\/\s*(\d{4})/)
+    if (monthYearMatch) {
+        targetMonth = parseInt(monthYearMatch[1])
+        targetYear = parseInt(monthYearMatch[2])
+    }
+
+    const startOfMonth = new Date(targetYear, targetMonth - 1, 1)
+    const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59)
 
     const users = await prisma.user.findMany({
         where: {
@@ -34,16 +46,21 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
         orderBy: { username: 'asc' },
         include: {
             _count: { select: { tasks: true } },
-            // For Payroll
+            // For Payroll calculation, MUST filter by workspaceId
             tasks: {
                 where: {
+                    workspaceId,
                     status: 'Hoàn tất',
                     updatedAt: { gte: startOfMonth, lte: endOfMonth }
                 },
                 select: { wageVND: true, value: true, status: true }
             },
             payrolls: {
-                where: { month, year }
+                where: { 
+                    workspaceId,
+                    month: targetMonth, 
+                    year: targetYear 
+                }
             },
             profileAccesses: true,
             accessRequests: true

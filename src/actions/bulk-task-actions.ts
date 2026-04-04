@@ -19,6 +19,7 @@ type BatchTaskInput = {
     notes: string | null
     notes_en: string | null
     type: string
+    tagIds?: string[]
 }
 
 export async function createBatchTasks(data: BatchTaskInput, workspaceId: string) {
@@ -44,7 +45,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             for (const title of data.titles) {
                 if (!title.trim()) continue;
 
-                await tx.task.create({
+                const task = await tx.task.create({
                     data: {
                         title: title.trim(),
                         value: data.wageVND,
@@ -64,10 +65,20 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         exchangeRate: data.exchangeRate,
                         profitVND: profitVND,
                         clientId: data.clientId,
-                        workspaceId: workspaceId, // Manual injection
-                        profileId: currentProfileId // Manual isolation
+                        workspaceId: workspaceId,
+                        profileId: currentProfileId
                     }
                 })
+
+            // Create TaskTags if any
+            if (data.tagIds && data.tagIds.length > 0) {
+                await tx.taskTag.createMany({
+                    data: data.tagIds.map(tagId => ({
+                        taskId: task.id,
+                        tagCategoryId: tagId
+                    }))
+                })
+            }
             }
         })
 

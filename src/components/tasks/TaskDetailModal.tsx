@@ -52,6 +52,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     const [allTags, setAllTags] = useState<{ id: string; name: string }[]>([])
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
     const ctrlDragRef = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
+    const dragRafRef = useRef<number>(0)
     const [form, setForm] = useState({
         resources: '',
         linkRaw: '',
@@ -177,11 +178,10 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
         // Find the tag zone element after render (Radix Dialog creates a Portal)
         const findTagZone = () => document.querySelector('[data-tag-zone="true"]') as HTMLDivElement | null
-        // Small delay to ensure portal is mounted
         const timer = setTimeout(() => { tagZoneRef.current = findTagZone() }, 100)
 
         // ── contextmenu (right-click) → open Tag Library ──
-        // CAPTURE phase so we fire BEFORE Radix Dialog can swallow the event
+        // CAPTURE phase: fires BEFORE Radix Dialog can swallow the event
         const handleContextMenu = (e: MouseEvent) => {
             const target = e.target as HTMLElement
             if (!isInsideTagZone(target)) return
@@ -205,46 +205,59 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
             e.stopPropagation()
             e.stopImmediatePropagation()
             document.body.style.userSelect = 'none'
+            document.body.style.pointerEvents = 'none'  // Block hit-testing during drag
             ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
         }
 
-        // ── mousemove → detect drag distance → open radial menu ──
+        // ── mousemove → rAF-synced threshold check → open radial menu ──
+        // Threshold: 4px (squared=16, avoids sqrt). Synced to refresh rate via rAF.
         const handleMouseMove = (e: MouseEvent) => {
             const drag = ctrlDragRef.current
             if (!drag.active) return
 
-            const dx = e.clientX - drag.startX
-            const dy = e.clientY - drag.startY
-            if (Math.sqrt(dx * dx + dy * dy) > 15) {
-                setRadialOrigin({ x: drag.startX, y: drag.startY })
-                setRadialMenuOpen(true)
-                drag.active = false
-                document.body.style.userSelect = ''
-            }
+            const cx = e.clientX, cy = e.clientY
+            cancelAnimationFrame(dragRafRef.current)
+            dragRafRef.current = requestAnimationFrame(() => {
+                if (!drag.active) return
+                const dx = cx - drag.startX
+                const dy = cy - drag.startY
+                if (dx * dx + dy * dy > 16) {
+                    // Restore pointer-events BEFORE opening menu so petals are clickable
+                    document.body.style.pointerEvents = ''
+                    document.body.style.userSelect = ''
+                    setRadialOrigin({ x: drag.startX, y: drag.startY })
+                    setRadialMenuOpen(true)
+                    drag.active = false
+                }
+            })
         }
 
-        // ── mouseup → reset drag state ──
+        // ── mouseup → reset drag state + restore body styles ──
         const handleMouseUp = () => {
             if (ctrlDragRef.current.active) {
                 document.body.style.userSelect = ''
+                document.body.style.pointerEvents = ''
             }
             ctrlDragRef.current.active = false
         }
 
-        // Attach contextmenu + mousedown in CAPTURE phase (third arg = true)
-        // This fires before Radix Dialog's Portal event handlers
+        // Attach: contextmenu + mousedown in CAPTURE phase (third arg = true)
         document.addEventListener('contextmenu', handleContextMenu, true)
         document.addEventListener('mousedown', handleMouseDown, true)
-        document.addEventListener('mousemove', handleMouseMove)
-        document.addEventListener('mouseup', handleMouseUp)
+        // mousemove: passive=true (no preventDefault needed), rAF handles sync
+        document.addEventListener('mousemove', handleMouseMove, { passive: true } as EventListenerOptions)
+        // mouseup in CAPTURE phase: ensures pointer-events restore even if children stopPropagation
+        document.addEventListener('mouseup', handleMouseUp, true)
 
         return () => {
             clearTimeout(timer)
+            cancelAnimationFrame(dragRafRef.current)
             document.removeEventListener('contextmenu', handleContextMenu, true)
             document.removeEventListener('mousedown', handleMouseDown, true)
             document.removeEventListener('mousemove', handleMouseMove)
-            document.removeEventListener('mouseup', handleMouseUp)
+            document.removeEventListener('mouseup', handleMouseUp, true)
             document.body.style.userSelect = ''
+            document.body.style.pointerEvents = ''
         }
     }, [isOpen, isAdmin])
 

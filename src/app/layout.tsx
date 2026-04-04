@@ -46,6 +46,9 @@ export default function RootLayout({
       <body className={`${montserrat.variable} ${cormorant.variable} font-sans antialiased`} suppressHydrationWarning>
         <ConfirmProvider>
           <RadialNavProvider>
+            <div className="fixed top-0 left-0 right-0 h-4 bg-indigo-600 text-[10px] text-white flex items-center justify-center font-bold z-[10000] pointer-events-none uppercase tracking-[0.2em] opacity-80">
+                LATEST DEPLOY: {new Date().toLocaleTimeString()} (GESTURES ACTIVE)
+            </div>
             {children}
             <Toaster position="top-center" theme="dark" richColors />
           </RadialNavProvider>

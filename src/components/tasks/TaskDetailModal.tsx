@@ -416,7 +416,31 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                     {/* ════════════════════════════════════════
                         2. RESOURCES + REFERENCES
+                    ════════════════════════════════════════
+                        EVENT ZONE: Right-click = Tag Library, Ctrl+Drag = Radial Menu
+                        Wraps sections 2-6 so empty space anywhere triggers gestures
                     ════════════════════════════════════════ */}
+                    <div
+                        onContextMenu={(e) => {
+                            const target = e.target as HTMLElement
+                            if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
+                            if (target.closest('.tiptap') || target.closest('[contenteditable]')) return
+                            if (!isAdmin) return
+                            e.preventDefault()
+                            setTagLibraryPos({ x: e.clientX, y: e.clientY })
+                            setTagLibraryOpen(true)
+                        }}
+                        onMouseDown={(e) => {
+                            if (!e.ctrlKey || e.button !== 0) return
+                            if (!isAdmin) return
+                            const target = e.target as HTMLElement
+                            if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
+                            if (target.closest('.tiptap') || target.closest('[contenteditable]')) return
+                            e.preventDefault()
+                            ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
+                        }}
+                        className="space-y-6"
+                    >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                         {/* RESOURCES */}
@@ -770,27 +794,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                     {/* ════════════════════════════════════════
                         6. TÀI NGUYÊN & GHI CHÚ (Tags + Duration)
                     ════════════════════════════════════════ */}
-                    <div
-                        className="space-y-4 p-4 bg-zinc-900/30 rounded-2xl border border-white/5"
-                        onContextMenu={(e) => {
-                            // Only trigger on empty space (not inputs/buttons)
-                            const target = e.target as HTMLElement
-                            if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
-                            if (!isAdmin) return
-                            e.preventDefault()
-                            setTagLibraryPos({ x: e.clientX, y: e.clientY })
-                            setTagLibraryOpen(true)
-                        }}
-                        onMouseDown={(e) => {
-                            // Ctrl + left-click to initiate radial menu drag
-                            if (!e.ctrlKey || e.button !== 0) return
-                            if (!isAdmin) return
-                            const target = e.target as HTMLElement
-                            if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
-                            e.preventDefault()
-                            ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
-                        }}
-                    >
+                    <div className="space-y-4 p-4 bg-zinc-900/30 rounded-2xl border border-white/5">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                             <Tag className="w-3.5 h-3.5" strokeWidth={1.5} />
                             Tài nguyên & Ghi chú
@@ -824,6 +828,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             </p>
                         )}
                     </div>
+                    </div>{/* ← close event zone wrapper (sections 2-6) */}
                 </div>
 
                 {/* ── SAVE FOOTER ───────────────────────────── */}

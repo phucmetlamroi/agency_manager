@@ -6,11 +6,17 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { prisma } from '@/lib/db'
 
 // ─── Helper: Verify user belongs to workspace ─────────────────
-async function verifyWorkspaceMembership(userId: string, workspaceId: string) {
+async function verifyWorkspaceAccess(userId: string, workspaceId: string) {
+    // Check WorkspaceMember table first
     const member = await prisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId, workspaceId } }
     })
-    return !!member
+    if (member) return true
+
+    // Fallback: check if the user exists within this workspace scope
+    const workspacePrisma = getWorkspacePrisma(workspaceId)
+    const user = await workspacePrisma.user.findUnique({ where: { id: userId } })
+    return !!user
 }
 
 // ─── Get unassigned tasks for marketplace ─────────────────────
@@ -18,7 +24,7 @@ export async function getMarketplaceTasks(workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized', tasks: [] }
 
-    if (!await verifyWorkspaceMembership(session.user.id, workspaceId)) {
+    if (!await verifyWorkspaceAccess(session.user.id, workspaceId)) {
         return { error: 'Forbidden: Not a member of this workspace', tasks: [] }
     }
 
@@ -70,7 +76,7 @@ export async function claimTask(taskId: string, workspaceId: string) {
 
     const userId = session.user.id
 
-    if (!await verifyWorkspaceMembership(userId, workspaceId)) {
+    if (!await verifyWorkspaceAccess(userId, workspaceId)) {
         return { error: 'Forbidden: Not a member of this workspace' }
     }
 
@@ -133,7 +139,7 @@ export async function returnTask(taskId: string, workspaceId: string) {
 
     const userId = session.user.id
 
-    if (!await verifyWorkspaceMembership(userId, workspaceId)) {
+    if (!await verifyWorkspaceAccess(userId, workspaceId)) {
         return { error: 'Forbidden: Not a member of this workspace' }
     }
 

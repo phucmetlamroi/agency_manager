@@ -22,6 +22,10 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
         setLoading(true)
         const res = await getMarketplaceTasks(workspaceId)
         setLoading(false)
+        if (res.error) {
+            console.error('[Marketplace] Error:', res.error)
+            toast.error(res.error)
+        }
         if (res.tasks) {
             setTasks(res.tasks as MarketTask[])
             onTaskCountChange?.(res.tasks.length)

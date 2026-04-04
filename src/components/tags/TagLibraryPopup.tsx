@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Pencil, Trash2, X, Check, Tag } from 'lucide-react'
 import { createTag, updateTag, deleteTag, getTagsForUser } from '@/actions/tag-actions'
@@ -26,15 +27,21 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editingName, setEditingName] = useState('')
     const [loading, setLoading] = useState(false)
+    const [mounted, setMounted] = useState(false)
     const popupRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
+    // SSR safety: only render portal after mount
+    useEffect(() => { 
+        setMounted(true) 
+    }, [])
+
     useEffect(() => {
-        if (isOpen) {
-            loadTags()
-            setTimeout(() => inputRef.current?.focus(), 100)
-        }
-    }, [isOpen])
+        if (!isOpen) return
+        loadTags()
+        const timer = setTimeout(() => inputRef.current?.focus(), 100)
+        return () => clearTimeout(timer)
+    }, [isOpen, workspaceId])
 
     // Close on outside click
     useEffect(() => {
@@ -135,7 +142,9 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
 
     const { left, top } = getClampedPosition()
 
-    return (
+    if (!mounted) return null
+
+    const popupContent = (
         <AnimatePresence>
             {isOpen && (
                 <motion.div
@@ -261,4 +270,6 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
             )}
         </AnimatePresence>
     )
+
+    return createPortal(popupContent, document.body)
 }

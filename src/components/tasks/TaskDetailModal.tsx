@@ -844,7 +844,11 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                     {/* ════════════════════════════════════════
                         6. TÀI NGUYÊN & GHI CHÚ (Tags + Duration)
                     ════════════════════════════════════════ */}
-                    <div className="space-y-4 p-4 bg-zinc-900/30 rounded-2xl border border-white/5 group-hover:bg-indigo-500/5 group-hover:border-indigo-500/20 transition-all duration-300">
+                    <div 
+                        onContextMenu={onTagZoneContextMenu}
+                        onMouseDown={onTagZoneMouseDown}
+                        className="space-y-4 p-4 bg-zinc-900/30 rounded-2xl border border-white/5 hover:border-indigo-500/60 hover:bg-indigo-500/20 active:bg-indigo-500/30 transition-all duration-300 shadow-lg shadow-indigo-500/5"
+                    >
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                             <Tag className="w-3.5 h-3.5" strokeWidth={1.5} />
                             Tài nguyên & Ghi chú

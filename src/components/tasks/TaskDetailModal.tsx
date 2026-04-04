@@ -161,15 +161,21 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         const handleDocMouseMove = (e: MouseEvent) => {
             const drag = ctrlDragRef.current
             if (!drag.active) return
+            // Prevent text selection while Ctrl+dragging
+            e.preventDefault()
             const dx = e.clientX - drag.startX
             const dy = e.clientY - drag.startY
             if (Math.sqrt(dx * dx + dy * dy) > 20) {
                 setRadialOrigin({ x: drag.startX, y: drag.startY })
                 setRadialMenuOpen(true)
                 ctrlDragRef.current = { active: false, startX: 0, startY: 0 }
+                document.body.style.userSelect = ''
             }
         }
         const handleDocMouseUp = () => {
+            if (ctrlDragRef.current.active) {
+                document.body.style.userSelect = ''
+            }
             ctrlDragRef.current = { active: false, startX: 0, startY: 0 }
         }
         if (isOpen) {
@@ -179,6 +185,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         return () => {
             document.removeEventListener('mousemove', handleDocMouseMove)
             document.removeEventListener('mouseup', handleDocMouseUp)
+            document.body.style.userSelect = ''
         }
     }, [isOpen])
 
@@ -447,6 +454,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA') return
                             if (target.closest('.tiptap') || target.closest('[contenteditable]')) return
                             e.preventDefault()
+                            document.body.style.userSelect = 'none'
                             ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
                         }}
                         className="space-y-6"

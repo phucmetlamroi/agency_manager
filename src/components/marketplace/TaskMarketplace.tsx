@@ -41,14 +41,12 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
     }, [isOpen, fetchTasks])
 
     const handleClaim = async (taskId: string) => {
-        // Optimistic: remove from local state
         const taskToRemove = tasks.find(t => t.id === taskId)
         const updatedTasks = tasks.filter(t => t.id !== taskId)
         setTasks(updatedTasks)
 
         const res = await claimTask(taskId, workspaceId)
         if (res.error) {
-            // Restore on error
             if (taskToRemove) setTasks(prev => [...prev, taskToRemove])
             toast.error(res.error)
             return
@@ -57,7 +55,6 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
         toast.success('Task đã được nhận!')
         onTaskCountChange?.(updatedTasks.length)
 
-        // Close if no more tasks
         if (updatedTasks.length === 0) {
             setTimeout(onClose, 500)
         }
@@ -66,43 +63,39 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
     return (
         <AnimatePresence>
             {isOpen && (
-                <>
-                    {/* Backdrop with warm ambient glow */}
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    {/* ── Backdrop ── */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50"
+                        className="absolute inset-0"
                         onClick={onClose}
                     >
-                        {/* Multi-layer backdrop */}
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-                        {/* Ambient glow spots */}
                         <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-amber-500/8 rounded-full blur-[120px] pointer-events-none" />
                         <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-orange-500/6 rounded-full blur-[100px] pointer-events-none" />
                     </motion.div>
 
-                    {/* Marketplace panel */}
+                    {/* ── Marketplace panel (centered via flex) ── */}
                     <motion.div
-                        initial={{ scale: 0.92, opacity: 0, y: 30 }}
-                        animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ scale: 0.92, opacity: 0, y: 30 }}
+                        initial={{ scale: 0.92, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.92, opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 280, damping: 28 }}
                         onClick={(e) => e.stopPropagation()}
-                        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[62vw] max-w-[940px] max-h-[82vh] flex flex-col overflow-hidden z-[51]
+                        className="relative w-[62vw] max-w-[940px] max-h-[82vh] flex flex-col overflow-hidden z-[1]
                             rounded-[28px] border border-amber-500/15
                             bg-gradient-to-b from-zinc-900/98 via-zinc-950/98 to-zinc-950/98
                             backdrop-blur-2xl
                             shadow-[0_0_0_1px_rgba(245,158,11,0.06),0_8px_40px_rgba(0,0,0,0.7),0_0_80px_rgba(245,158,11,0.08)]"
                     >
-                        {/* ── Top accent line ── */}
+                        {/* Top accent line */}
                         <div className="absolute top-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
 
                         {/* ── Header ── */}
                         <div className="relative px-8 py-6 flex justify-between items-center flex-shrink-0">
-                            {/* Left: Brand */}
                             <div className="flex items-center gap-4">
-                                {/* Animated icon container */}
                                 <motion.div
                                     animate={{
                                         boxShadow: [
@@ -139,7 +132,6 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                 </div>
                             </div>
 
-                            {/* Right: Actions */}
                             <div className="flex items-center gap-1.5">
                                 <motion.button
                                     whileHover={{ rotate: 180, scale: 1.05 }}
@@ -162,7 +154,6 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                 </motion.button>
                             </div>
 
-                            {/* Header bottom border */}
                             <div className="absolute bottom-0 left-6 right-6 h-[1px] bg-gradient-to-r from-transparent via-white/8 to-transparent" />
                         </div>
 
@@ -198,10 +189,10 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                             )}
                         </div>
 
-                        {/* ── Bottom accent ── */}
+                        {/* Bottom accent */}
                         <div className="absolute bottom-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
                     </motion.div>
-                </>
+                </div>
             )}
         </AnimatePresence>
     )

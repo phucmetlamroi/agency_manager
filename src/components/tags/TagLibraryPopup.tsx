@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Pencil, Trash2, X, Check, Tag } from 'lucide-react'
 import { createTag, updateTag, deleteTag, getTagsForUser } from '@/actions/tag-actions'
@@ -26,15 +27,19 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editingName, setEditingName] = useState('')
     const [loading, setLoading] = useState(false)
+    const [mounted, setMounted] = useState(false)
     const popupRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
+    // SSR safety: only render portal after mount
+    useEffect(() => { setMounted(true) }, [])
+
     useEffect(() => {
-        if (isOpen) {
-            loadTags()
-            setTimeout(() => inputRef.current?.focus(), 100)
-        }
-    }, [isOpen])
+        if (!isOpen) return
+        loadTags()
+        const timer = setTimeout(() => inputRef.current?.focus(), 100)
+        return () => clearTimeout(timer)
+    }, [isOpen, workspaceId])
 
     // Close on outside click
     useEffect(() => {
@@ -77,7 +82,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
             setTags(updated)
             onTagsChanged?.(updated)
             setNewTagName('')
-            toast.success('Tag đã được tạo')
+            toast.success('Tag da duoc tao')
         }
     }
 
@@ -90,7 +95,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
             setTags(updated)
             onTagsChanged?.(updated)
             setEditingId(null)
-            toast.success('Tag đã được cập nhật')
+            toast.success('Tag da duoc cap nhat')
         }
     }
 
@@ -100,39 +105,39 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
         const updated = tags.filter(t => t.id !== tagId)
         setTags(updated)
         onTagsChanged?.(updated)
-        toast.success('Tag đã được xóa')
+        toast.success('Tag da duoc xoa')
     }
 
-    // ── Smart position clamping ──
-    const computePosition = useCallback(() => {
-        if (typeof window === 'undefined') return { left: position.x, top: position.y }
+    // ── Smart position: use right/bottom when overflowing ──
+    const computeStyle = useCallback((): React.CSSProperties => {
+        if (typeof window === 'undefined') return { left: position.x, top: position.y, width: POPUP_WIDTH }
 
         const vw = window.innerWidth
         const vh = window.innerHeight
 
-        let left = position.x
-        let top = position.y
+        const style: React.CSSProperties = { width: POPUP_WIDTH }
 
-        // If popup would overflow right edge → show to the LEFT of cursor
-        if (left + POPUP_WIDTH + MARGIN > vw) {
-            left = Math.max(MARGIN, left - POPUP_WIDTH)
+        // Horizontal: if popup overflows right edge → anchor from the right
+        if (position.x + POPUP_WIDTH + MARGIN > vw) {
+            style.right = Math.max(MARGIN, vw - position.x)
+        } else {
+            style.left = Math.max(MARGIN, position.x)
         }
 
-        // If popup would overflow bottom edge → shift upward
-        if (top + POPUP_HEIGHT_EST + MARGIN > vh) {
-            top = Math.max(MARGIN, vh - POPUP_HEIGHT_EST - MARGIN)
+        // Vertical: if popup overflows bottom edge → anchor from the bottom
+        if (position.y + POPUP_HEIGHT_EST + MARGIN > vh) {
+            style.bottom = Math.max(MARGIN, vh - position.y)
+        } else {
+            style.top = Math.max(MARGIN, position.y)
         }
 
-        // Final safety clamp
-        left = Math.max(MARGIN, Math.min(left, vw - POPUP_WIDTH - MARGIN))
-        top = Math.max(MARGIN, Math.min(top, vh - POPUP_HEIGHT_EST - MARGIN))
-
-        return { left, top }
+        return style
     }, [position.x, position.y])
 
-    const { left, top } = computePosition()
+    // Don't render on server or before mount
+    if (!mounted) return null
 
-    return (
+    const popupContent = (
         <AnimatePresence>
             {isOpen && (
                 <motion.div
@@ -141,8 +146,8 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -4 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    className="fixed z-[9999] bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden"
-                    style={{ left, top, width: POPUP_WIDTH }}
+                    className="fixed z-[9999] bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.05)] overflow-clip"
+                    style={computeStyle()}
                 >
                     {/* ── Header ── */}
                     <div className="px-5 py-3.5 border-b border-white/5 flex items-center justify-between bg-zinc-900/30">
@@ -163,7 +168,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                         {/* Left: Add new tag */}
                         <div className="flex flex-col gap-3">
                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                Thêm Tag Mới
+                                Them Tag Moi
                             </label>
                             <input
                                 ref={inputRef}
@@ -171,7 +176,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                                 value={newTagName}
                                 onChange={(e) => setNewTagName(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                                placeholder="Tên tag..."
+                                placeholder="Ten tag..."
                                 maxLength={30}
                                 className="px-3.5 py-2.5 text-sm bg-zinc-900/50 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                             />
@@ -181,18 +186,18 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                                 className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-indigo-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Plus className="w-4 h-4" strokeWidth={2} />
-                                Thêm
+                                Them
                             </button>
                         </div>
 
                         {/* Right: Existing tags */}
                         <div className="flex flex-col gap-3">
                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                Danh sách ({tags.length})
+                                Danh sach ({tags.length})
                             </label>
                             <div className="space-y-1.5 max-h-[260px] overflow-y-auto custom-scrollbar">
                                 {tags.length === 0 && (
-                                    <p className="text-xs text-zinc-600 italic py-4 text-center">Chưa có tag nào</p>
+                                    <p className="text-xs text-zinc-600 italic py-4 text-center">Chua co tag nao</p>
                                 )}
                                 <AnimatePresence>
                                     {tags.map((tag) => (
@@ -249,4 +254,8 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
             )}
         </AnimatePresence>
     )
+
+    // ── CRITICAL: Render via Portal into document.body ──
+    // This prevents the popup from affecting layout inside Radix Dialog Portal
+    return createPortal(popupContent, document.body)
 }

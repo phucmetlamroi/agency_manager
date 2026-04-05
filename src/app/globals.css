@@ -309,3 +309,135 @@ h2.section-title {
   margin-bottom: 0.5rem;
   margin-top: 1rem;
 }
+
+/* ═══════════════════════════════════════════════════════
+   Portal Status Badge — Holographic Signal Lamp Animations
+   Each status has a unique living micro-animation.
+   ═══════════════════════════════════════════════════════ */
+
+/* Pending: gentle opacity breathing */
+.portal-badge-breathe::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.07), transparent);
+  animation: _pbBreathe 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes _pbBreathe {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+/* In Progress: sweeping scan-line shimmer */
+.portal-badge-scan::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent 0%, rgba(167, 139, 250, 0.12) 50%, transparent 100%);
+  animation: _pbScan 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes _pbScan {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  30%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
+/* Action Required: urgent double-pulse glow */
+.portal-badge-urgency::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(251, 113, 133, 0.08);
+  animation: _pbUrgency 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes _pbUrgency {
+  0%, 100% { opacity: 0; }
+  15% { opacity: 1; }
+  30% { opacity: 0; }
+  45% { opacity: 0.8; }
+  60% { opacity: 0; }
+}
+
+/* Revising: icon rotation + shimmer */
+.portal-badge-icon-spin {
+  animation: _pbIconSpin 3s linear infinite;
+}
+
+@keyframes _pbIconSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+.portal-badge-spin-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(251, 146, 60, 0.07), transparent);
+  animation: _pbBreathe 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Completed: brief afterglow flash */
+.portal-badge-settle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(52, 211, 153, 0.1);
+  animation: _pbSettle 4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes _pbSettle {
+  0%   { opacity: 0; }
+  5%   { opacity: 1; }
+  15%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   5C: Portal Skeleton Loading Pulse
+   ═══════════════════════════════════════════════════════ */
+.portal-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  background-size: 200% 100%;
+  animation: _portalShimmer 1.5s ease-in-out infinite;
+  border-radius: 0.75rem;
+}
+
+@keyframes _portalShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   5D: Portal Empty States
+   ═══════════════════════════════════════════════════════ */
+.portal-empty-state {
+  @apply flex flex-col items-center justify-center text-center py-12;
+  @apply bg-zinc-950/40 backdrop-blur-xl border border-dashed border-white/[0.06] rounded-2xl;
+}
+
+.portal-empty-state svg {
+  @apply text-zinc-800 mb-3;
+}
+
+.portal-empty-state p {
+  @apply text-zinc-500 text-sm;
+}

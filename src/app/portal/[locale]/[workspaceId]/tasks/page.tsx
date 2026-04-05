@@ -4,6 +4,8 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import PortalDashboardBento from '@/components/portal/PortalDashboardBento';
 import TaskGroupAccordion from '@/components/portal/TaskGroupAccordion';
+import HeroDashboardCard from '@/components/portal/HeroDashboardCard';
+import PortalPageTransition from '@/components/portal/PortalPageTransition';
 
 export default async function PortalTasksPage({
     params
@@ -37,15 +39,18 @@ export default async function PortalTasksPage({
         : '--';
 
     return (
+        <PortalPageTransition>
         <div className="w-full max-w-6xl mx-auto p-4 sm:p-8">
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h1 className="text-3xl font-light tracking-tight bg-gradient-to-br from-amber-100 via-yellow-400 to-amber-600 bg-clip-text text-transparent drop-shadow-sm">
-                        {t('your_tasks')}
-                    </h1>
-                    <p className="text-sm text-zinc-500 mt-1">Command Center &middot; {total} active processes</p>
-
-                </div>
+            <div className="mb-8">
+                <HeroDashboardCard
+                    title={t('your_tasks')}
+                    total={total}
+                    completed={completed}
+                    inProgress={inProgress}
+                    actionRequired={actionRequired}
+                    dueSoon={dueSoon}
+                    nextDeadlineLabel={nextDeadlineLabel}
+                />
             </div>
 
             <div className="mb-10">
@@ -57,8 +62,7 @@ export default async function PortalTasksPage({
                 locale={locale}
                 workspaceId={workspaceId}
             />
-
-
         </div>
+        </PortalPageTransition>
     );
 }

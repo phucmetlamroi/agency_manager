@@ -74,7 +74,7 @@ export default function InvoiceDashboard({
             </div>
 
             {/* Center: Main content */}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0 min-h-0">
                 {/* 3A: Hero stat cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                     {stats.map((s, i) => {
@@ -128,8 +128,8 @@ export default function InvoiceDashboard({
                     </button>
                 </div>
 
-                {/* 3B: Invoice cards grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto pb-20 text-left custom-scrollbar">
+                {/* 3B: Invoice cards grid — flex-1 + min-h-0 constrains height for scroll */}
+                <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto pb-6 text-left custom-scrollbar content-start">
                     {filteredInvoices.length === 0 ? (
                         <div className="col-span-full py-20 text-center">
                             <Receipt size={32} className="mx-auto mb-3 text-zinc-800" />

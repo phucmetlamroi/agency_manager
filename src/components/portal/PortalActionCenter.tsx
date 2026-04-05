@@ -1,8 +1,10 @@
 'use client'
 
 import { useMemo } from 'react'
-import { AlertCircle, RotateCcw, Clock, Inbox } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { AlertCircle, Clock, Inbox, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
+import PortalStatusBadge from './PortalStatusBadge'
 
 type Task = {
     id: string
@@ -42,75 +44,83 @@ export default function PortalActionCenter({
 
     const visible = attentionTasks.slice(0, 3)
 
+    const stats = [
+        { label: 'Action', value: actionRequiredCount, color: 'text-rose-400', border: 'border-rose-500/15', bg: 'bg-rose-500/[0.06]' },
+        { label: 'Revisions', value: revisingCount, color: 'text-orange-400', border: 'border-orange-500/15', bg: 'bg-orange-500/[0.06]' },
+        { label: 'Due Soon', value: dueSoonCount, color: 'text-amber-400', border: 'border-amber-500/15', bg: 'bg-amber-500/[0.06]' },
+    ]
+
     return (
-        <div className="bg-zinc-950/60 backdrop-blur-2xl border border-yellow-500/20 shadow-2xl shadow-black/50 rounded-3xl p-6 h-full flex flex-col group hover:-translate-y-1 hover:shadow-yellow-500/10 hover:border-yellow-500/30 transition-all duration-300">
-            <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20">
-                    <Inbox size={18} className="text-yellow-500" />
+        <div className="relative bg-zinc-950/60 backdrop-blur-2xl border border-white/[0.06] shadow-xl shadow-black/40 rounded-3xl p-6 h-full flex flex-col overflow-hidden">
+            {/* Ambient glow */}
+            <div className="absolute -top-16 -left-16 w-40 h-40 bg-rose-500/[0.03] rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex items-center gap-3 mb-5 relative z-10">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500/15 to-orange-500/5 flex items-center justify-center border border-rose-500/20 shadow-lg shadow-rose-500/5">
+                    <Inbox size={18} className="text-rose-400" />
                 </div>
                 <div>
-                    <h2 className="text-white font-medium">Priority Inbox</h2>
+                    <h2 className="text-white font-semibold">Priority Inbox</h2>
                     <p className="text-zinc-500 text-xs">Items that need your attention</p>
                 </div>
+                {attentionTasks.length > 0 && (
+                    <span className="ml-auto text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                        {attentionTasks.length}
+                    </span>
+                )}
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mb-4">
-                <div className="rounded-2xl border border-yellow-500/10 bg-zinc-900/60 p-3">
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Action</p>
-                    <p className="text-lg font-light text-yellow-500">{actionRequiredCount}</p>
-                </div>
-                <div className="rounded-2xl border border-white/5 bg-zinc-900/60 p-3">
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Revisions</p>
-                    <p className="text-lg font-light text-amber-500">{revisingCount}</p>
-                </div>
-                <div className="rounded-2xl border border-white/5 bg-zinc-900/60 p-3">
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Due Soon</p>
-                    <p className="text-lg font-light text-zinc-300">{dueSoonCount}</p>
-                </div>
+            {/* Stat pills */}
+            <div className="grid grid-cols-3 gap-2 mb-4 relative z-10">
+                {stats.map(s => (
+                    <div key={s.label} className={`rounded-xl border ${s.border} ${s.bg} p-2.5 text-center`}>
+                        <p className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">{s.label}</p>
+                        <p className={`text-lg font-light ${s.color} mt-0.5`}>{s.value}</p>
+                    </div>
+                ))}
             </div>
 
-            <div className="flex-1 space-y-2">
-                {visible.length > 0 ? visible.map(task => (
-                    <Link
+            {/* Task cards */}
+            <div className="flex-1 space-y-2 relative z-10">
+                {visible.length > 0 ? visible.map((task, i) => (
+                    <motion.div
                         key={task.id}
-                        href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
-                        className="block w-full text-left bg-zinc-900/50 hover:bg-zinc-800/80 border border-white/5 p-4 rounded-2xl transition-colors group/row"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.06, duration: 0.2 }}
                     >
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="text-sm text-zinc-200 font-medium truncate group-hover/row:text-white">
+                        <Link
+                            href={`/portal/${locale}/${workspaceId}/tasks/${task.id}`}
+                            className="group/row flex items-center gap-3 bg-zinc-900/40 hover:bg-zinc-900/70 border border-white/[0.04] hover:border-white/[0.08] p-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20"
+                        >
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm text-zinc-200 font-medium truncate group-hover/row:text-white transition-colors">
                                     {task.title}
                                 </p>
-                                <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
-                                    {task.clientStatus === 'Action Required' ? (
-                                        <span className="inline-flex items-center gap-1 text-yellow-500">
-                                            <AlertCircle size={12} /> Action required
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1 text-amber-500">
-                                            <RotateCcw size={12} /> Revising
-                                        </span>
-                                    )}
+                                <div className="mt-1.5 flex items-center gap-2 text-[10px] text-zinc-500">
+                                    <PortalStatusBadge
+                                        status={task.clientStatus}
+                                        pulse={task.clientStatus === 'Action Required'}
+                                        size="compact"
+                                    />
                                     {task.deadline && (
                                         <span className="inline-flex items-center gap-1">
-                                            <Clock size={12} /> {new Date(task.deadline).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
+                                            <Clock size={10} /> {new Date(task.deadline).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
                                         </span>
                                     )}
                                 </div>
                             </div>
-                            <span className="text-[10px] uppercase tracking-widest text-yellow-600 group-hover/row:text-yellow-400 transition-colors">Open</span>
-                        </div>
-                    </Link>
+                            <ArrowUpRight size={14} className="text-zinc-600 group-hover/row:text-rose-400 transition-colors shrink-0" />
+                        </Link>
+                    </motion.div>
                 )) : (
-                    <div className="flex h-full items-center justify-center text-xs text-zinc-500 bg-zinc-900/30 border border-dashed border-white/5 rounded-2xl">
-                        All caught up. No urgent actions.
+                    <div className="flex h-full items-center justify-center text-xs text-zinc-500 bg-zinc-900/20 border border-dashed border-white/[0.04] rounded-xl py-8">
+                        <div className="text-center">
+                            <AlertCircle size={20} className="mx-auto mb-2 text-zinc-700" />
+                            All caught up. No urgent actions.
+                        </div>
                     </div>
                 )}
-            </div>
-            <div className="mt-4 text-right">
-                <a href="#all-tasks" className="text-[10px] uppercase tracking-widest text-zinc-500 hover:text-yellow-500 transition-colors">
-                    Open full task list
-                </a>
             </div>
         </div>
     )

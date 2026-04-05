@@ -25,46 +25,56 @@ export default async function WorkspaceLayout({
 
     return (
         <div className="flex h-screen w-full bg-zinc-950 text-slate-200 overflow-hidden font-sans antialiased flex-col md:flex-row" style={{ colorScheme: 'dark' }}>
-            {/* Desktop Sidebar (Hidden on mobile) */}
-            <aside className="hidden md:flex w-64 flex-shrink-0 border-r border-zinc-800 bg-zinc-950/50 backdrop-blur-xl flex-col justify-between">
-                <div className="p-6">
+            {/* Desktop Sidebar — Premium Glassmorphism */}
+            <aside className="hidden md:flex w-64 flex-shrink-0 border-r border-white/[0.06] bg-zinc-950/70 backdrop-blur-2xl flex-col justify-between relative overflow-hidden">
+                {/* Ambient glow */}
+                <div className="absolute -top-20 -left-20 w-48 h-48 bg-indigo-500/[0.04] rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-16 -right-16 w-40 h-40 bg-violet-500/[0.03] rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute top-0 right-0 bottom-0 w-px bg-gradient-to-b from-indigo-500/20 via-transparent to-violet-500/10 pointer-events-none" />
+
+                <div className="relative p-6 z-10">
                     {/* Logo */}
                     <div className="flex items-center gap-3 mb-10">
-                        <div className="w-8 h-8 rounded bg-gradient-to-tr from-indigo-500 to-purple-600 shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-[0_0_20px_rgba(99,102,241,0.35)] flex items-center justify-center border border-indigo-400/20">
+                            <span className="text-white font-bold text-sm tracking-tight">CP</span>
+                        </div>
                         <div>
-                            <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-md leading-tight">Client Portal</h1>
-                            <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">{workspaceId}</p>
+                            <h1 className="text-lg font-bold tracking-tight text-white leading-tight">Client Portal</h1>
+                            <p className="text-[9px] text-zinc-500 font-mono uppercase tracking-[0.2em] mt-0.5">{workspaceId}</p>
                         </div>
                     </div>
 
+                    {/* Section label */}
+                    <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] mb-3 px-3">Navigation</p>
+
                     {/* Navigation */}
                     <nav className="space-y-1">
-                        <SidebarLink locale={locale} workspaceId={workspaceId} href="/tasks" icon={<CheckSquare size={18} />} label={t('tasks')} />
-                        <SidebarLink locale={locale} workspaceId={workspaceId} href="/invoices" icon={<FileText size={18} />} label={t('invoices')} />
+                        <SidebarLink locale={locale} workspaceId={workspaceId} href="/tasks" icon={<CheckSquare size={17} />} label={t('tasks')} />
+                        <SidebarLink locale={locale} workspaceId={workspaceId} href="/invoices" icon={<FileText size={17} />} label={t('invoices')} />
 
-                        <div className="pt-4 mt-4 border-t border-zinc-800/60">
-                            <SidebarLink locale={locale} workspaceId={null as any} href="" icon={<LayoutGrid size={18} />} label={t('switch_workspace')} />
+                        <div className="pt-4 mt-4 border-t border-white/[0.04]">
+                            <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] mb-3 px-3">Workspace</p>
+                            <SidebarLink locale={locale} workspaceId={null as any} href="" icon={<LayoutGrid size={17} />} label={t('switch_workspace')} />
                         </div>
                     </nav>
                 </div>
 
-                {/* Bottom: Language + Logout */}
-                <div className="p-4 border-t border-zinc-800/60 space-y-2">
-                    {/* Language Switcher */}
+                {/* Bottom: Language + User card */}
+                <div className="relative z-10 p-4 border-t border-white/[0.04] space-y-2">
                     <LanguageSwitcher currentLocale={locale} />
 
-                    {/* Logout */}
+                    {/* User card + Logout */}
                     <form action={logoutAction}>
                         <button
                             type="submit"
-                            className="w-full flex items-center gap-3 hover:bg-zinc-900/50 px-3 py-2.5 rounded-lg cursor-pointer transition-colors group text-left"
+                            className="w-full flex items-center gap-3 bg-zinc-900/40 hover:bg-zinc-800/60 border border-white/[0.04] hover:border-white/[0.08] px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-200 group text-left"
                         >
-                            <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors shrink-0">
-                                <LogOut size={15} />
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-indigo-300 transition-colors shrink-0 border border-white/[0.06] shadow-sm">
+                                <LogOut size={14} />
                             </div>
                             <div className="min-w-0">
                                 <p className="text-sm font-medium text-zinc-300 group-hover:text-white truncate">{t('logout')}</p>
-                                <p className="text-xs text-zinc-600 truncate">{session.user.username}</p>
+                                <p className="text-[10px] text-zinc-600 truncate">{session.user.username}</p>
                             </div>
                         </button>
                     </form>
@@ -99,19 +109,19 @@ export default async function WorkspaceLayout({
                     {children}
                 </div>
 
-                {/* Simple Mobile Bottom Nav for Clients */}
-                <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-zinc-900/90 backdrop-blur-xl border-t border-zinc-800 flex items-center justify-around z-50 pb-[env(safe-area-inset-bottom)]">
-                    <Link href={`/portal/${locale}/${workspaceId}/tasks`} className="flex flex-col items-center gap-1 text-zinc-400 hover:text-white active:text-indigo-400 transition-colors">
-                        <CheckSquare size={20} />
-                        <span className="text-[10px] uppercase font-bold tracking-tighter">{t('tasks')}</span>
+                {/* Mobile Bottom Nav — Frosted Glass */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-zinc-950/80 backdrop-blur-2xl border-t border-white/[0.06] flex items-center justify-around z-50 pb-[env(safe-area-inset-bottom)]">
+                    <Link href={`/portal/${locale}/${workspaceId}/tasks`} className="flex flex-col items-center gap-1 text-zinc-500 hover:text-white active:text-indigo-400 transition-colors group">
+                        <CheckSquare size={19} className="group-hover:scale-110 transition-transform" />
+                        <span className="text-[9px] uppercase font-bold tracking-wider">{t('tasks')}</span>
                     </Link>
-                    <Link href={`/portal/${locale}/${workspaceId}/invoices`} className="flex flex-col items-center gap-1 text-zinc-400 hover:text-white active:text-indigo-400 transition-colors">
-                        <FileText size={20} />
-                        <span className="text-[10px] uppercase font-bold tracking-tighter">{t('invoices')}</span>
+                    <Link href={`/portal/${locale}/${workspaceId}/invoices`} className="flex flex-col items-center gap-1 text-zinc-500 hover:text-white active:text-indigo-400 transition-colors group">
+                        <FileText size={19} className="group-hover:scale-110 transition-transform" />
+                        <span className="text-[9px] uppercase font-bold tracking-wider">{t('invoices')}</span>
                     </Link>
-                    <Link href={`/portal/${locale}`} className="flex flex-col items-center gap-1 text-zinc-400 hover:text-white active:text-indigo-400 transition-colors">
-                        <LayoutGrid size={20} />
-                        <span className="text-[10px] uppercase font-bold tracking-tighter">WS</span>
+                    <Link href={`/portal/${locale}`} className="flex flex-col items-center gap-1 text-zinc-500 hover:text-white active:text-indigo-400 transition-colors group">
+                        <LayoutGrid size={19} className="group-hover:scale-110 transition-transform" />
+                        <span className="text-[9px] uppercase font-bold tracking-wider">WS</span>
                     </Link>
                 </div>
             </main>
@@ -124,10 +134,13 @@ function SidebarLink({ locale, workspaceId, href, icon, label }: { locale: strin
     return (
         <Link
             href={fullHref}
-            className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-400 rounded-lg hover:bg-zinc-800/50 hover:text-indigo-300 transition-all duration-300 hover:shadow-[inset_2px_0_0_rgba(99,102,241,1)]"
+            className="group/link flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-400 rounded-xl hover:bg-white/[0.04] hover:text-white transition-all duration-200 relative"
         >
-            {icon}
-            <span>{label}</span>
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-0 group-hover/link:h-5 bg-indigo-500 rounded-full transition-all duration-200 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+            <div className="w-8 h-8 rounded-lg bg-white/[0.03] group-hover/link:bg-indigo-500/10 border border-white/[0.04] group-hover/link:border-indigo-500/20 flex items-center justify-center transition-all duration-200 shrink-0">
+                {icon}
+            </div>
+            <span className="group-hover/link:translate-x-0.5 transition-transform duration-200">{label}</span>
         </Link>
     );
 }

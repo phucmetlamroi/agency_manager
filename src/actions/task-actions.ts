@@ -53,7 +53,7 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             return { error: 'Task has been updated by someone else. Please refresh.' } // UI should handle this
         }
 
-        // Logic: Clear deadline if 'Tạm ngưng'. Revision shouldn't clear deadline unless explicitly asked.
+        // Clear deadline when task is paused or moved to Revision.
         const restrictedStatuses = ['Tạm ngưng', 'Revision']
         // Existing Deadline clear logic
         const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}

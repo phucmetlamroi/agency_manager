@@ -4,8 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import { createBatchTasks } from '@/actions/bulk-task-actions'
 import ClientSelector from '@/components/crm/ClientSelector'
 import { toast } from 'sonner'
-import { Copy, Users, DollarSign, Link2, Rocket, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Copy, Users, DollarSign, Link2, Rocket, Info, TrendingUp, TrendingDown, Minus, Tag as TagIcon } from 'lucide-react'
 import PriceTemplateSelector, { useRadialTrigger, PriceTemplateSelectorHandle } from '@/components/PriceTemplateSelector'
+import { TagLibraryPopup } from "@/components/tags/TagLibraryPopup"
+import { TagRadialMenu } from "@/components/tags/TagRadialMenu"
+import { TagPills } from "@/components/tags/TagPills"
+import { getTagsForUser } from "@/actions/tag-actions"
+import { cn } from "@/lib/utils"
 
 // ── Types ────────────────────────────────────────────────────
 type User = {
@@ -78,8 +83,65 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [profitShare, setProfitShare] = useState<number>(0)
     const [revenueVnd, setRevenueVnd] = useState<number>(0)
-    const selectorRef = useRef<PriceTemplateSelectorHandle>(null)
-    const { onContainerMouseDown } = useRadialTrigger(selectorRef)
+
+    // ── Tag State & Gestures ──────────────────────────────────
+    const [tagLibraryOpen, setTagLibraryOpen] = useState(false)
+    const [tagLibraryPos, setTagLibraryPos] = useState({ x: 0, y: 0 })
+    const [radialMenuOpen, setRadialMenuOpen] = useState(false)
+    const [radialOrigin, setRadialOrigin] = useState({ x: 0, y: 0 })
+    const [allTags, setAllTags] = useState<{ id: string; name: string }[]>([])
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+    const ctrlDragRef = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
+
+    const isInteractiveTarget = (target: HTMLElement) => {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'TEXTAREA' || tag === 'A') return true
+        if (target.closest('.tiptap') || target.closest('[contenteditable]') || target.closest('a')) return true
+        return false
+    }
+
+    const onTagZoneContextMenu = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement
+        if (isInteractiveTarget(target)) return
+        e.preventDefault()
+        e.stopPropagation()
+        setTagLibraryPos({ x: e.clientX, y: e.clientY })
+        setTagLibraryOpen(true)
+    }
+
+    const onTagZoneMouseDown = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement
+        if (isInteractiveTarget(target)) return
+
+        if (e.ctrlKey && e.button === 0) {
+            e.preventDefault()
+            e.stopPropagation()
+            ctrlDragRef.current = { active: true, startX: e.clientX, startY: e.clientY }
+
+            const onMouseMove = (moveEvent: MouseEvent) => {
+                if (!ctrlDragRef.current.active) return
+                const dist = Math.sqrt(
+                    Math.pow(moveEvent.clientX - ctrlDragRef.current.startX, 2) +
+                    Math.pow(moveEvent.clientY - ctrlDragRef.current.startY, 2)
+                )
+                if (dist > 15) {
+                    setRadialOrigin({ x: ctrlDragRef.current.startX, y: ctrlDragRef.current.startY })
+                    setRadialMenuOpen(true)
+                    cleanup()
+                }
+            }
+
+            const onMouseUp = () => cleanup()
+            const cleanup = () => {
+                ctrlDragRef.current.active = false
+                window.removeEventListener('mousemove', onMouseMove)
+                window.removeEventListener('mouseup', onMouseUp)
+            }
+
+            window.addEventListener('mousemove', onMouseMove)
+            window.addEventListener('mouseup', onMouseUp)
+        }
+    }
 
     const handleTemplateSelect = (data: { usd: number | null; vnd: number | null }) => {
         if (data.usd != null) {
@@ -92,16 +154,24 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
         }
     }
 
+    const selectorRef = useRef<PriceTemplateSelectorHandle>(null)
+    const { onContainerMouseDown } = useRadialTrigger(selectorRef)
+
     useEffect(() => {
-        async function fetchRate() {
+        async function fetchInitialData() {
             try {
+                // Rate
                 const res = await fetch('/api/exchange-rate')
                 const data = await res.json()
                 if (data?.rate) setRate(Math.round(data.rate))
-            } catch (e) { console.error("Rate fetch failed") }
+
+                // Tags
+                const tagsRes = await getTagsForUser(workspaceId)
+                if (tagsRes.tags) setAllTags(tagsRes.tags)
+            } catch (e) { console.error("Initial fetch failed") }
         }
-        fetchRate()
-    }, [])
+        fetchInitialData()
+    }, [workspaceId])
 
     useEffect(() => {
         const lines = rawTitles.split('\n').map(l => l.trim()).filter(l => l.length > 0)
@@ -146,7 +216,8 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
             collectFilesLink: collectFilesLink || null,
             notes: notes || null,
             notes_en: notesEn || null,
-            type
+            type,
+            tagIds: selectedTagIds
         }, workspaceId)
 
         if (res.error) { toast.error(res.error) }
@@ -187,6 +258,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
             </SectionBlock>
 
             {/* ── BLOCK 2: Finance ──────────────────────────── */}
+            {/* ── BLOCK 2: Finance ──────────────────────────── */}
             <div onMouseDown={onContainerMouseDown}>
             <SectionBlock icon={DollarSign} title={<span className="flex items-center gap-2">{"T\u00e0i ch\u00ednh"} <PriceTemplateSelector workspaceId={workspaceId} onSelect={handleTemplateSelect} ref={selectorRef} /></span>} color="emerald">
                 <div className="grid grid-cols-2 gap-3">
@@ -215,7 +287,31 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
             </div>
 
             {/* ── BLOCK 3: Resources & Notes ────────────────── */}
-            <SectionBlock icon={Link2} title="Tài nguyên & Ghi chú" color="blue">
+            <div 
+                onContextMenu={onTagZoneContextMenu}
+                onMouseDown={onTagZoneMouseDown}
+                className={cn(
+                    "rounded-xl border p-4 transition-all duration-300",
+                    "bg-blue-500/5 border-blue-500/30",
+                    "hover:border-indigo-500/60 hover:bg-indigo-500/20 active:bg-indigo-500/30 shadow-lg shadow-indigo-500/5"
+                )}
+            >
+                <div className="flex items-center gap-2 mb-4">
+                    <Link2 className="w-4 h-4 text-blue-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-blue-400 flex items-center gap-2">
+                        {"T\u00e0i nguy\u00ean & Ghi ch\u00fa"}
+                        <span className="text-zinc-600 text-[9px] normal-case font-medium lowercase">
+                            (right-click = tags · ctrl+drag = radial)
+                        </span>
+                    </h4>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    {/* Tag Pills */}
+                    <TagPills 
+                        tags={allTags.filter(t => selectedTagIds.includes(t.id))}
+                        onRemove={(id) => setSelectedTagIds(prev => prev.filter(t => t !== id))}
+                    />
                 <div className="grid grid-cols-2 gap-3">
                     <FormInput label="Link Raw Footage" value={linkRaw} onChange={(e: any) => setLinkRaw(e.target.value)} placeholder="https://..." />
                     <FormInput label="Link B-Roll" value={linkBroll} onChange={(e: any) => setLinkBroll(e.target.value)} placeholder="https://..." />
@@ -244,7 +340,30 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                         className="w-full px-3 py-2.5 bg-zinc-900/60 border border-emerald-500/15 rounded-xl text-zinc-200 text-sm placeholder:text-zinc-700 focus:outline-none focus:border-emerald-500/40 transition-all duration-200 resize-none" />
                     <p className="text-[10px] text-zinc-700 mt-1 italic">ℹ️ Tự dán kết quả dịch vào đây để tối ưu chi phí.</p>
                 </div>
-            </SectionBlock>
+                </div>
+            </div>
+
+            {/* Tag Library Popup */}
+            <TagLibraryPopup
+                isOpen={tagLibraryOpen}
+                onClose={() => setTagLibraryOpen(false)}
+                position={tagLibraryPos}
+                workspaceId={workspaceId}
+                onTagsChanged={(tags) => setAllTags(tags)}
+            />
+
+            {/* Tag Radial Menu */}
+            <TagRadialMenu
+                isOpen={radialMenuOpen}
+                onClose={() => setRadialMenuOpen(false)}
+                origin={radialOrigin}
+                tags={allTags}
+                selectedTagIds={selectedTagIds}
+                onToggle={(id) => setSelectedTagIds(prev => 
+                    prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+                )}
+            />
+
 
             {/* ── BLOCK 4: Task List ────────────────────────── */}
             <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">

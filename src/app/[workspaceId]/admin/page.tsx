@@ -74,7 +74,6 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
 
     const completedTasks = tasks.filter((t: any) => t.status === SALARY_COMPLETED_STATUS)
-    const completedThisMonth = completedTasks.filter((t: any) => new Date(t.createdAt) >= startOfMonth)
     const completedLastMonth = completedTasks.filter((t: any) => {
         const d = new Date(t.createdAt)
         return d >= startOfLastMonth && d <= endOfLastMonth
@@ -115,7 +114,6 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     const revenueByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
     completedTasks.forEach((t: any) => {
-        // JS getDay: 0=Sun,1=Mon…6=Sat → remap so Mon=0
         const raw = new Date(t.updatedAt || t.createdAt).getDay()
         const mapped = (raw + 6) % 7
         revenueByDay[mapped] = (revenueByDay[mapped] || 0) + Number(t.value || 0)
@@ -124,7 +122,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
 
     // Revenue totals this/prev week
     const startOfWeek = new Date(now)
-    startOfWeek.setDate(now.getDate() - now.getDay() + 1) // Mon
+    startOfWeek.setDate(now.getDate() - now.getDay() + 1)
     startOfWeek.setHours(0, 0, 0, 0)
     const startOfPrevWeek = new Date(startOfWeek)
     startOfPrevWeek.setDate(startOfPrevWeek.getDate() - 7)

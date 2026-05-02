@@ -14,7 +14,16 @@ export async function getTagsForUser(workspaceId: string) {
     if (!session) return { error: 'Unauthorized', tags: [] }
 
     const userId = session.user.id
-    const profileId = session.user.profileId
+    let profileId = session.user.profileId
+
+    // If profileId is missing in session, try fetching it from the database
+    if (!profileId) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { profileId: true }
+        })
+        profileId = user?.profileId || null
+    }
 
     const tags = await prisma.tagCategory.findMany({
         where: { userId, ...(profileId ? { profileId } : {}) },
@@ -34,7 +43,17 @@ export async function createTag(name: string, workspaceId: string) {
     if (!isAdmin) return { error: 'Forbidden' }
 
     const userId = session.user.id
-    const profileId = session.user.profileId
+    let profileId = session.user.profileId
+
+    // If profileId is missing in session, try fetching it from the database
+    if (!profileId) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { profileId: true }
+        })
+        profileId = user?.profileId || null
+    }
+
     if (!profileId) return { error: 'No profile found' }
 
     const trimmed = name.trim()

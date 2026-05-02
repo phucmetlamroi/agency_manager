@@ -128,8 +128,8 @@ export default function InvoiceDashboard({
                     </button>
                 </div>
 
-                {/* 3B: Invoice cards grid — flex-1 + min-h-0 constrains height for scroll */}
-                <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto pb-6 text-left custom-scrollbar content-start">
+                {/* 3B: Invoice cards grid */}
+                <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto pb-6 content-start text-left custom-scrollbar">
                     {filteredInvoices.length === 0 ? (
                         <div className="col-span-full py-20 text-center">
                             <Receipt size={32} className="mx-auto mb-3 text-zinc-800" />

@@ -1,6 +1,5 @@
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import TaskTable from '@/components/TaskTable'
-import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { serializeDecimal } from '@/lib/serialization'
@@ -13,8 +12,6 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
 
     const profileId = (session.user as any).sessionProfileId
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
-
-    await checkOverdueTasks(workspaceId)
 
     // ── Data fetching (logic unchanged) ──────────────────────
     const tasks = await workspacePrisma.task.findMany({

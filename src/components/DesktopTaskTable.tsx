@@ -577,7 +577,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                             <button
                                                 onClick={async () => {
                                                     await handleSaveDetails(); // Saves everything, effectively saving the link
-                                                    if (!isAdmin) await handleStatusChange(selectedTask.id, 'Review'); // Only set Review if user submits
+                                                    if (!isAdmin) await handleStatusChange(selectedTask.id, 'Revision'); // User submit -> Revision + clear deadline
                                                     setIsEditingLink(false);
                                                 }}
                                                 className="px-3 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1 transition-colors"

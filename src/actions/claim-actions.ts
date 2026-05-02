@@ -19,13 +19,60 @@ async function verifyWorkspaceAccess(userId: string, workspaceId: string) {
     return !!user
 }
 
+// ─── Get marketplace open/close status ────────────────────────
+export async function getMarketplaceStatus(workspaceId: string) {
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { marketplaceOpen: true }
+    })
+    return workspace?.marketplaceOpen ?? true
+}
+
+// ─── Toggle marketplace open/close (Admin only) ──────────────
+export async function toggleMarketplace(workspaceId: string) {
+    const session = await getSession()
+    if (!session) return { error: 'Unauthorized' }
+
+    // Check admin role
+    const member = await prisma.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: session.user.id, workspaceId } },
+        select: { role: true }
+    })
+    if (!member || !['ADMIN', 'AGENCY_ADMIN'].includes(member.role)) {
+        return { error: 'Chỉ admin mới có quyền đóng/mở phiên chợ' }
+    }
+
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { marketplaceOpen: true }
+    })
+    if (!workspace) return { error: 'Workspace không tồn tại' }
+
+    const newStatus = !workspace.marketplaceOpen
+    await prisma.workspace.update({
+        where: { id: workspaceId },
+        data: { marketplaceOpen: newStatus }
+    })
+
+    revalidatePath(`/${workspaceId}/admin/queue`)
+    revalidatePath(`/${workspaceId}/dashboard`)
+
+    return { success: true, marketplaceOpen: newStatus }
+}
+
 // ─── Get unassigned tasks for marketplace ─────────────────────
 export async function getMarketplaceTasks(workspaceId: string) {
     const session = await getSession()
-    if (!session) return { error: 'Unauthorized', tasks: [] }
+    if (!session) return { error: 'Unauthorized', tasks: [], marketplaceOpen: true }
 
     if (!await verifyWorkspaceAccess(session.user.id, workspaceId)) {
-        return { error: 'Forbidden: Not a member of this workspace', tasks: [] }
+        return { error: 'Forbidden: Not a member of this workspace', tasks: [], marketplaceOpen: true }
+    }
+
+    // Check if marketplace is open
+    const isOpen = await getMarketplaceStatus(workspaceId)
+    if (!isOpen) {
+        return { tasks: [], marketplaceOpen: false }
     }
 
     const workspacePrisma = getWorkspacePrisma(workspaceId)
@@ -66,13 +113,17 @@ export async function getMarketplaceTasks(workspaceId: string) {
         createdAt: t.createdAt.toISOString()
     }))
 
-    return { tasks: serialized }
+    return { tasks: serialized, marketplaceOpen: true }
 }
 
 // ─── Claim a task from marketplace ────────────────────────────
 export async function claimTask(taskId: string, workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
+
+    // Block claims if marketplace is closed
+    const isOpen = await getMarketplaceStatus(workspaceId)
+    if (!isOpen) return { error: 'Phiên chợ hiện đang đóng. Vui lòng chờ admin mở.' }
 
     const userId = session.user.id
 

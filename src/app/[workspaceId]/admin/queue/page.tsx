@@ -1,9 +1,12 @@
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import TaskTable from '@/components/TaskTable'
+import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { serializeDecimal } from '@/lib/serialization'
 import { Package, Sparkles, Users, Clock } from 'lucide-react'
+import { MarketplaceToggle } from '@/components/marketplace/MarketplaceToggle'
+import { prisma } from '@/lib/db'
 
 export default async function TaskQueuePage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -12,6 +15,15 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
 
     const profileId = (session.user as any).sessionProfileId
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+
+    await checkOverdueTasks(workspaceId)
+
+    // ── Marketplace status ───────────────────────────────────
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { marketplaceOpen: true }
+    })
+    const marketplaceOpen = workspace?.marketplaceOpen ?? true
 
     // ── Data fetching (logic unchanged) ──────────────────────
     const tasks = await workspacePrisma.task.findMany({
@@ -57,15 +69,20 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                     </h1>
                     <p className="text-zinc-500 mt-1 text-sm">Danh sách các công việc chưa có người nhận. Vui lòng phân công cho nhân viên.</p>
                 </div>
-                <div className={`px-4 py-2 rounded-xl font-black text-sm flex items-center gap-2 ${
-                    count > 0
-                        ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shadow-md shadow-indigo-500/10'
-                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                }`}>
-                    <span className="text-lg">{count}</span>
-                    <span>Task</span>
+                <div className="flex items-center gap-3">
+                    <div className={`px-4 py-2 rounded-xl font-black text-sm flex items-center gap-2 ${
+                        count > 0
+                            ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shadow-md shadow-indigo-500/10'
+                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    }`}>
+                        <span className="text-lg">{count}</span>
+                        <span>Task</span>
+                    </div>
                 </div>
             </div>
+
+            {/* ── Marketplace Toggle ─────────────────────────── */}
+            <MarketplaceToggle workspaceId={workspaceId} initialOpen={marketplaceOpen} />
 
             {/* ── Main Card ───────────────────────────────── */}
             <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-zinc-950/60 backdrop-blur-md shadow-xl shadow-black/40">

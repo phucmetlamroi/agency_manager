@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, RefreshCw, ShoppingBag, Sparkles, TrendingUp, Download, CheckCircle2 } from 'lucide-react'
+import { X, RefreshCw, ShoppingBag, Sparkles, TrendingUp, Download, CheckCircle2, Lock, ShieldAlert } from 'lucide-react'
 import {
     DndContext,
     DragOverlay,
@@ -156,6 +156,7 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
     const [tasks, setTasks] = useState<MarketTask[]>([])
     const [loading, setLoading] = useState(false)
     const [activeTask, setActiveTask] = useState<MarketTask | null>(null)
+    const [marketplaceOpen, setMarketplaceOpen] = useState(true)
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -167,6 +168,16 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
         setLoading(true)
         const res = await getMarketplaceTasks(workspaceId)
         setLoading(false)
+
+        // Handle marketplace closed status
+        if (res.marketplaceOpen === false) {
+            setMarketplaceOpen(false)
+            setTasks([])
+            onTaskCountChange?.(0)
+            return
+        }
+        setMarketplaceOpen(true)
+
         if (res.error) {
             console.error('[Marketplace] Error:', res.error)
             toast.error(res.error)
@@ -216,9 +227,10 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
     }, [tasks, workspaceId, onClose, onTaskCountChange])
 
     const onDragStart = useCallback(({ active }: DragStartEvent) => {
+        if (!marketplaceOpen) return // Block drag when closed
         const task = tasks.find(t => t.id === active.id)
         if (task) setActiveTask(task)
-    }, [tasks])
+    }, [tasks, marketplaceOpen])
 
     const onDragEnd = useCallback(({ over }: DragEndEvent) => {
         // Full-screen zone: any drop = claim (unless over is null, which shouldn't happen)
@@ -290,7 +302,16 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                     <div>
                                         <div className="flex items-center gap-2.5">
                                             <h2 className="text-xl font-extrabold text-white tracking-tight">Phiên Chợ Task</h2>
-                                            {tasks.length > 0 && (
+                                            {!marketplaceOpen ? (
+                                                <motion.div
+                                                    initial={{ scale: 0 }}
+                                                    animate={{ scale: 1 }}
+                                                    className="flex items-center gap-1 px-2.5 py-1 bg-red-500/12 border border-red-500/25 rounded-full"
+                                                >
+                                                    <Lock className="w-3 h-3 text-red-400" strokeWidth={2} />
+                                                    <span className="text-[10px] font-black text-red-400 uppercase tracking-wider">Đã đóng</span>
+                                                </motion.div>
+                                            ) : tasks.length > 0 ? (
                                                 <motion.div
                                                     initial={{ scale: 0 }}
                                                     animate={{ scale: 1 }}
@@ -299,7 +320,7 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                                     <TrendingUp className="w-3 h-3 text-emerald-400" strokeWidth={2} />
                                                     <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">Live</span>
                                                 </motion.div>
-                                            )}
+                                            ) : null}
                                         </div>
                                         <p className="text-xs text-zinc-500 mt-0.5 font-medium">
                                             <span className="text-amber-400/80 font-bold">{tasks.length}</span>
@@ -339,7 +360,39 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
 
                             {/* ── Task Grid ── */}
                             <div className="flex-1 overflow-y-auto p-6 pt-4 custom-scrollbar">
-                                {tasks.length === 0 ? (
+                                {!marketplaceOpen ? (
+                                    /* ── Marketplace Closed State ── */
+                                    <div className="flex flex-col items-center justify-center py-24 text-center">
+                                        <motion.div
+                                            animate={{
+                                                boxShadow: [
+                                                    '0 0 30px rgba(239,68,68,0.1)',
+                                                    '0 0 50px rgba(239,68,68,0.2)',
+                                                    '0 0 30px rgba(239,68,68,0.1)',
+                                                ],
+                                            }}
+                                            transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+                                            className="w-24 h-24 rounded-3xl bg-gradient-to-br from-red-500/15 to-orange-500/5 border border-red-500/25 flex items-center justify-center mb-6"
+                                        >
+                                            <motion.div
+                                                animate={{ rotate: [0, -5, 5, 0] }}
+                                                transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+                                            >
+                                                <Lock className="w-10 h-10 text-red-400/80" strokeWidth={1.5} />
+                                            </motion.div>
+                                        </motion.div>
+                                        <h3 className="text-xl font-extrabold text-zinc-200 tracking-tight">
+                                            Phiên chợ hiện đang đóng
+                                        </h3>
+                                        <p className="text-sm text-zinc-500 mt-3 max-w-[320px] leading-relaxed">
+                                            Admin chưa mở phiên chợ. Vui lòng chờ admin mở nhé!
+                                        </p>
+                                        <div className="mt-6 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/8 border border-red-500/15">
+                                            <ShieldAlert className="w-4 h-4 text-red-400/70" strokeWidth={2} />
+                                            <span className="text-xs text-red-400/70 font-semibold">Không thể nhận task lúc này</span>
+                                        </div>
+                                    </div>
+                                ) : tasks.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-24 text-center">
                                         <motion.div
                                             animate={{ scale: [1, 1.08, 1], rotate: [0, 3, -3, 0] }}

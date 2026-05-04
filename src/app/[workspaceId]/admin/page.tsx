@@ -13,8 +13,8 @@ import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import Leaderboard from '@/components/dashboard/Leaderboard'
 import { AdminKPIWidgets } from '@/components/dashboard/AdminKPIWidgets'
 import { AdminRevenueChart } from '@/components/dashboard/AdminRevenueChart'
-import Link from 'next/link'
-import { CalendarDays, LayoutGrid, Search, Bell, ChevronDown } from 'lucide-react'
+import DashboardTopBar from '@/components/dashboard/DashboardTopBar'
+import DashboardActionWrapper from '@/components/dashboard/DashboardActionWrapper'
 
 export default async function AdminDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -62,10 +62,15 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         }
     })
 
-    // 4. Client count
+    // 4. Client count + client list for AddTaskModal
     const totalClientsTarget = await (workspacePrisma as any).client.count({ where: { parentId: null } })
     const activeClientIds = new Set(tasks.map((t: any) => t.clientId).filter(Boolean))
     const totalClients = activeClientIds.size
+
+    const allClients = await workspacePrisma.client.findMany({
+        select: { id: true, name: true, parentId: true, parent: { select: { name: true } } },
+        orderBy: { name: 'asc' },
+    })
 
     // ── KPI Calculations ──────────────────────────────────────────
     const now = new Date()
@@ -165,51 +170,20 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             />
 
             {/* ── Top Bar ─────────────────────────────────────── */}
-            <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 mb-0 sticky top-0 z-20 flex items-center px-7 h-[72px] border-b border-white/5 bg-[rgba(10,10,10,0.50)] backdrop-blur-[10px] gap-4 flex-shrink-0">
-                <div>
-                    <h1 className="text-[22px] font-extrabold text-zinc-100 tracking-[-0.02em]">
-                        Workspace Dashboard
-                    </h1>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                        Chào mừng trở lại, <strong className="text-zinc-400">{displayName}</strong>. Đây là tổng quan hôm nay.
-                    </p>
-                </div>
-                <div className="flex-1" />
-                {/* Search */}
-                <button className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/[0.08] text-zinc-400 flex items-center justify-center hover:bg-white/[0.06] transition-colors">
-                    <Search className="w-4 h-4" />
-                </button>
-                {/* Bell */}
-                <button className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/[0.08] text-zinc-400 flex items-center justify-center hover:bg-white/[0.06] transition-colors">
-                    <Bell className="w-4 h-4" />
-                </button>
-                {/* Profile pill */}
-                <div className="flex items-center gap-2 py-1.5 pl-1.5 pr-3 rounded-full bg-white/[0.04] border border-white/[0.08]">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-[10px]">
-                        {initials}
-                    </div>
-                    <span className="text-xs font-semibold text-zinc-300">{displayName}</span>
-                    <ChevronDown className="w-3 h-3 text-zinc-500" />
-                </div>
+            <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 mb-0 sticky top-0 z-20">
+                <DashboardTopBar
+                    displayName={displayName}
+                    initials={initials}
+                    workspaceId={workspaceId}
+                />
             </div>
 
-            {/* ── Action Bar ──────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                <button className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-transparent border border-white/[0.08] text-zinc-400 text-xs font-semibold cursor-default">
-                    <CalendarDays className="w-3.5 h-3.5" /> This month
-                </button>
-                <div className="flex items-center gap-2">
-                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-transparent border border-white/[0.08] text-zinc-400 text-xs font-semibold cursor-default">
-                        <LayoutGrid className="w-3.5 h-3.5" /> Manage widgets
-                    </button>
-                    <Link
-                        href={`/${workspaceId}/admin/queue`}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-indigo-600 border border-transparent text-white text-xs font-bold shadow-[0_8px_20px_rgba(79,70,229,0.35)] hover:bg-indigo-500 transition-colors"
-                    >
-                        + Add new task
-                    </Link>
-                </div>
-            </div>
+            {/* ── Action Bar + Add Task Modal ──────────────────── */}
+            <DashboardActionWrapper
+                workspaceId={workspaceId}
+                clients={allClients.map(c => ({ ...c, id: String(c.id), parentId: c.parentId ? String(c.parentId) : null }))}
+                users={users.map(u => ({ id: u.id, username: u.username, nickname: u.nickname }))}
+            />
 
             {/* ── KPI Widgets ──────────────────────────────────── */}
             <AdminKPIWidgets data={{

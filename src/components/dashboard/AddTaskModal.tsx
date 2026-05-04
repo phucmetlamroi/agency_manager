@@ -135,32 +135,56 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 /*  Step Indicator                                                     */
 /* ------------------------------------------------------------------ */
 
-function StepIndicator({ current, total }: { current: number; total: number }) {
+function StepIndicator({
+  current,
+  total,
+  onStepClick,
+}: {
+  current: number
+  total: number
+  onStepClick: (step: number) => void
+}) {
   return (
     <div className="flex items-center justify-center gap-0 py-4 px-6">
       {Array.from({ length: total }).map((_, i) => {
         const isActive = i === current
         const isCompleted = i < current
+        const stepLabel = STEPS[i]?.label ?? ""
 
         return (
           <div key={i} className="flex items-center">
-            {/* Circle */}
-            <div
-              className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all duration-200 ${
-                isActive
-                  ? "bg-white border-2 border-white text-zinc-900 shadow-[0_0_16px_rgba(255,255,255,0.25)]"
-                  : isCompleted
-                    ? "bg-indigo-500/25 border-2 border-indigo-500/50 text-indigo-300"
-                    : "bg-white/[0.06] border-2 border-white/[0.08] text-zinc-600"
-              }`}
-            >
-              {isCompleted ? <Check size={14} strokeWidth={3} /> : i + 1}
+            {/* Circle + Label */}
+            <div className="flex flex-col items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onStepClick(i)}
+                className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
+                  isActive
+                    ? "bg-[#F4F4F5] border-2 border-white text-[#18181B] shadow-[0_4px_20px_rgba(255,255,255,0.15)]"
+                    : isCompleted
+                      ? "bg-[rgba(99,102,241,0.25)] border-2 border-[rgba(99,102,241,0.50)] text-indigo-300 shadow-[0_4px_16px_rgba(99,102,241,0.20)]"
+                      : "bg-white/[0.06] border-2 border-white/[0.08] text-zinc-500"
+                }`}
+              >
+                {isCompleted ? <Check size={14} strokeWidth={3} className="text-indigo-300" /> : i + 1}
+              </button>
+              <span
+                className={`text-[11px] leading-none transition-colors duration-200 ${
+                  isActive
+                    ? "font-bold text-white"
+                    : isCompleted
+                      ? "font-medium text-indigo-300"
+                      : "font-medium text-zinc-600"
+                }`}
+              >
+                {stepLabel}
+              </span>
             </div>
 
             {/* Connector line */}
             {i < total - 1 && (
               <div
-                className={`w-8 h-[2px] transition-colors duration-200 ${
+                className={`flex-1 min-w-[20px] h-[2px] mx-1 transition-colors duration-200 ${
                   isCompleted ? "bg-indigo-500/40" : "bg-white/[0.06]"
                 }`}
               />
@@ -272,35 +296,36 @@ export default function AddTaskModal({
               </div>
             </div>
 
-            {/* Task Type */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">Task Type</label>
-              <div className="relative">
-                <select
-                  className={selectBase}
-                  value={form.taskType}
-                  onChange={(e) => set("taskType", e.target.value)}
-                >
-                  <option value="">Select type...</option>
-                  {TASK_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-                <SelectChevron />
+            {/* Task Type + Deadline — 2-column row */}
+            <div className="flex gap-3">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-xs text-zinc-500 font-medium pl-1">Task Type</label>
+                <div className="relative">
+                  <select
+                    className={selectBase}
+                    value={form.taskType}
+                    onChange={(e) => set("taskType", e.target.value)}
+                  >
+                    <option value="">Select type...</option>
+                    {TASK_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <SelectChevron />
+                </div>
               </div>
-            </div>
 
-            {/* Deadline */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">Deadline</label>
-              <input
-                type="date"
-                className={inputBase}
-                value={form.deadline}
-                onChange={(e) => set("deadline", e.target.value)}
-              />
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-xs text-zinc-500 font-medium pl-1">Deadline</label>
+                <input
+                  type="date"
+                  className={inputBase}
+                  value={form.deadline}
+                  onChange={(e) => set("deadline", e.target.value)}
+                />
+              </div>
             </div>
 
             {/* Assignee */}
@@ -312,7 +337,7 @@ export default function AddTaskModal({
                   value={form.assigneeId}
                   onChange={(e) => set("assigneeId", e.target.value)}
                 >
-                  <option value="">Select assignee...</option>
+                  <option value="">Leave Blank (Task Pool)</option>
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.nickname ?? u.username}
@@ -351,28 +376,29 @@ export default function AddTaskModal({
       case 2:
         return (
           <div className="flex flex-col gap-5">
-            {/* Job Price USD */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">Job Price (USD)</label>
-              <input
-                type="number"
-                className={inputBase}
-                placeholder="0.00"
-                value={form.jobPriceUSD}
-                onChange={(e) => set("jobPriceUSD", e.target.value)}
-              />
-            </div>
+            {/* Job Price + Editor Fee — 2-column row */}
+            <div className="flex gap-3">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-xs text-zinc-500 font-medium pl-1">Job Price (USD)</label>
+                <input
+                  type="number"
+                  className={inputBase}
+                  placeholder="0.00"
+                  value={form.jobPriceUSD}
+                  onChange={(e) => set("jobPriceUSD", e.target.value)}
+                />
+              </div>
 
-            {/* Editor Fee VND */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">Editor Fee (VND)</label>
-              <input
-                type="number"
-                className={inputBase}
-                placeholder="0"
-                value={form.editorFee}
-                onChange={(e) => set("editorFee", e.target.value)}
-              />
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-xs text-zinc-500 font-medium pl-1">Editor Fee (VND)</label>
+                <input
+                  type="number"
+                  className={inputBase}
+                  placeholder="0"
+                  value={form.editorFee}
+                  onChange={(e) => set("editorFee", e.target.value)}
+                />
+              </div>
             </div>
 
             {/* Revenue progress bar */}
@@ -387,13 +413,16 @@ export default function AddTaskModal({
                   {revenueVND.toLocaleString("vi-VN")} VND
                 </span>
               </div>
-              <div className="h-3 w-full rounded-full bg-white/[0.04] border border-white/[0.06] overflow-hidden">
+              <div className="relative h-[28px] w-full rounded-full bg-white/[0.04] border border-white/[0.06] overflow-hidden">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
                   initial={{ width: 0 }}
                   animate={{ width: `${revenuePercent}%` }}
                   transition={{ type: "spring", stiffness: 120, damping: 20 }}
                 />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-zinc-400">
+                  ${revenueVND.toLocaleString("vi-VN")} / ${form.jobPriceUSD ? (jobPriceNum * USD_TO_VND).toLocaleString("vi-VN") : "0"}
+                </span>
               </div>
               <p className="text-[11px] text-zinc-600 pl-1">
                 {revenuePercent.toFixed(0)}% margin &middot; Rate: 1 USD = {USD_TO_VND.toLocaleString()} VND
@@ -523,12 +552,12 @@ export default function AddTaskModal({
       </div>
       <h3 className="text-xl font-bold text-white">Task Added</h3>
       <p className="text-sm text-zinc-400 text-center max-w-[320px]">
-        Task mới đã được thêm vào hệ thống thành công. Bạn có thể đóng cửa sổ này.
+        Task đã được thêm thành công vào hàng đợi. Bạn có thể xem trong Task Queue.
       </p>
       <button
         type="button"
         onClick={handleDone}
-        className="mt-2 h-11 px-10 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold transition-colors"
+        className="mt-2 h-11 px-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors"
       >
         Done
       </button>
@@ -571,10 +600,9 @@ export default function AddTaskModal({
             {!submitted && (
               <div className="flex items-start justify-between px-6 pt-6 pb-2">
                 <div>
-                  <p className="text-[13px] text-indigo-400 font-semibold tracking-wide">
-                    Step {step + 1} of {STEPS.length}
-                  </p>
-                  <h2 className="text-lg font-bold text-white mt-0.5">{stepTitle}</h2>
+                  <h2 className="text-[16px] font-extrabold text-white">
+                    Step {step + 1}. {stepTitle}:
+                  </h2>
                   <p className="text-xs text-zinc-500 mt-0.5">{stepSubtitles[step]}</p>
                 </div>
                 <button
@@ -588,7 +616,7 @@ export default function AddTaskModal({
             )}
 
             {/* -------- Step Indicator -------- */}
-            {!submitted && <StepIndicator current={step} total={STEPS.length} />}
+            {!submitted && <StepIndicator current={step} total={STEPS.length} onStepClick={setStep} />}
 
             {/* -------- Content -------- */}
             <div className="flex-1 overflow-y-auto px-6 pb-2 custom-scrollbar">
@@ -613,18 +641,19 @@ export default function AddTaskModal({
             {/* -------- Footer -------- */}
             {!submitted && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06]">
-                {step > 0 ? (
-                  <button
-                    type="button"
-                    onClick={goBack}
-                    className="flex items-center gap-2 h-10 px-5 rounded-full bg-transparent border border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/[0.16] text-sm font-medium transition-colors"
-                  >
-                    <ArrowLeft size={15} />
-                    Back
-                  </button>
-                ) : (
-                  <div />
-                )}
+                <button
+                  type="button"
+                  onClick={goBack}
+                  disabled={step === 0}
+                  className={`flex items-center gap-2 h-10 px-5 rounded-full bg-transparent border text-sm font-medium transition-colors ${
+                    step === 0
+                      ? "border-white/[0.04] text-zinc-700 cursor-default"
+                      : "border-white/[0.10] text-zinc-400 hover:text-white hover:border-white/[0.16] cursor-pointer"
+                  }`}
+                >
+                  <ArrowLeft size={15} />
+                  Back
+                </button>
 
                 {step < STEPS.length - 1 ? (
                   <button
@@ -639,7 +668,7 @@ export default function AddTaskModal({
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="flex items-center gap-2 h-10 px-6 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-emerald-500/20"
+                    className="flex items-center gap-2 h-10 px-6 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-indigo-500/20"
                   >
                     <Check size={15} />
                     Add Task

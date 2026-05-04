@@ -28,7 +28,7 @@ export function AdminShell({ children, user, workspaceId }: AdminShellProps) {
             <main
                 className={cn(
                     "flex-1 overflow-x-hidden pt-16 md:pt-0 relative transition-all duration-300",
-                    collapsed ? "md:ml-[80px]" : "md:ml-[280px]"
+                    collapsed ? "md:ml-[72px]" : "md:ml-[240px]"
                 )}
             >
                     {/* Leaderboard will go here */}

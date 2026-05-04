@@ -67,7 +67,7 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
             transition={{ delay: 0.2 }}
             className={[
                 "relative overflow-hidden rounded-[20px]",
-                "bg-[rgba(24,24,27,0.60)] backdrop-blur-xl",
+                "bg-[rgba(24,24,27,0.60)] backdrop-blur-[12px]",
                 "border border-white/[0.06]",
                 "shadow-[0_24px_60px_rgba(0,0,0,0.45)]",
                 "p-5 flex flex-col gap-3",

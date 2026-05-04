@@ -71,7 +71,7 @@ function DonutChart({ pct }: { pct: number }) {
 
 const CARD = [
     "relative overflow-hidden rounded-[20px]",
-    "bg-[rgba(24,24,27,0.60)] backdrop-blur-xl",
+    "bg-[rgba(24,24,27,0.60)] backdrop-blur-[12px]",
     "border border-white/[0.06]",
     "shadow-[0_24px_60px_rgba(0,0,0,0.45)]",
     "p-5 flex flex-col gap-2.5 min-w-0",
@@ -114,7 +114,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-baseline gap-0.5">
-                        <span className="text-[32px] font-extrabold text-white tracking-tight leading-none">
+                        <span className="text-[32px] font-extrabold text-white tracking-[-0.02em] leading-none">
                             {fmt(data.grossRevenue)}
                         </span>
                         <span className="text-base text-zinc-500 font-medium">đ</span>
@@ -171,7 +171,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                 </div>
 
                 <div className="flex items-baseline gap-0.5">
-                    <span className="text-[32px] font-extrabold text-white tracking-tight leading-none">
+                    <span className="text-[32px] font-extrabold text-white tracking-[-0.02em] leading-none">
                         {data.totalTasks}
                     </span>
                 </div>
@@ -218,7 +218,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-baseline gap-0.5">
-                        <span className="text-[32px] font-extrabold text-white tracking-tight leading-none">
+                        <span className="text-[32px] font-extrabold text-white tracking-[-0.02em] leading-none">
                             {data.totalClients}
                         </span>
                         <span className="text-base text-zinc-500 font-medium">

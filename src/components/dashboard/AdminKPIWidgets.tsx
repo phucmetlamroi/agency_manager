@@ -2,7 +2,7 @@
 
 import { useId } from "react"
 import { motion } from "framer-motion"
-import { TrendingUp, TrendingDown } from "lucide-react"
+import { Check, ChevronDown } from "lucide-react"
 import { AreaChart, Area, ResponsiveContainer } from "recharts"
 
 interface KPIData {
@@ -18,167 +18,233 @@ interface KPIData {
     sparklineData: Array<{ v: number }>
 }
 
+/* ── Reusable sub-components ─────────────────────────────────── */
+
 function TrendBadge({ current, prev }: { current: number; prev: number }) {
     if (prev === 0) return null
     const pct = Math.round(((current - prev) / prev) * 100)
     const up = pct >= 0
     return (
-        <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full ${
-            up ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-        }`}>
-            {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {up ? "+" : ""}{pct}%
+        <span
+            className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                up
+                    ? "bg-emerald-500/[0.12] text-emerald-400"
+                    : "bg-red-500/[0.12] text-red-400"
+            }`}
+        >
+            {up ? "▲" : "▼"} {up ? "+" : ""}
+            {pct}%
         </span>
     )
 }
 
-const card = "relative overflow-hidden rounded-2xl border border-white/8 bg-zinc-950/60 backdrop-blur-md shadow-xl shadow-black/40 p-6 flex flex-col gap-3"
+function DonutChart({ pct }: { pct: number }) {
+    const r = 32
+    const stroke = 6
+    const circ = 2 * Math.PI * r
+    const offset = circ * (1 - pct / 100)
+    return (
+        <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle
+                cx="40" cy="40" r={r}
+                fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke}
+            />
+            <circle
+                cx="40" cy="40" r={r}
+                fill="none" stroke="#6366F1" strokeWidth={stroke}
+                strokeDasharray={circ} strokeDashoffset={offset}
+                strokeLinecap="round" transform="rotate(-90 40 40)"
+                style={{ transition: "stroke-dashoffset 0.6s ease" }}
+            />
+            <text
+                x="40" y="44" textAnchor="middle"
+                fill="#F4F4F5" fontSize="14" fontWeight="800"
+                fontFamily="system-ui, sans-serif"
+            >
+                {pct}%
+            </text>
+        </svg>
+    )
+}
+
+/* ── Card shell matching HustlyTasker glass style ────────────── */
+
+const CARD = [
+    "relative overflow-hidden rounded-[20px]",
+    "bg-[rgba(24,24,27,0.60)] backdrop-blur-xl",
+    "border border-white/[0.06]",
+    "shadow-[0_24px_60px_rgba(0,0,0,0.45)]",
+    "p-5 flex flex-col gap-2.5 min-w-0",
+].join(" ")
+
+/* ── Main export ─────────────────────────────────────────────── */
 
 export function AdminKPIWidgets({ data }: { data: KPIData }) {
     const uid = useId()
-    const gradId = `revGrad-${uid}`
+    const gradId = `sparkGrad-${uid}`
 
-    const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(Math.round(n))
-    const clientPct = data.totalClientsTarget > 0
-        ? Math.round((data.totalClients / data.totalClientsTarget) * 100)
-        : 0
+    const fmt = (n: number) =>
+        new Intl.NumberFormat("vi-VN").format(Math.round(n))
+
+    const clientPct =
+        data.totalClientsTarget > 0
+            ? Math.round((data.totalClients / data.totalClientsTarget) * 100)
+            : 0
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* ── Card 1: Gross Revenue ── */}
+            {/* ── Card 1 · Gross Revenue ─────────────────────── */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05 }}
-                className={card}
+                className={CARD}
             >
-                <div className="absolute -top-8 -right-8 w-32 h-32 bg-emerald-500/6 blur-2xl rounded-full pointer-events-none" />
-                <div className="flex items-start justify-between">
-                    <div>
-                        <p className="text-xs font-semibold text-zinc-400 mb-1">Gross Revenue</p>
-                        <p className="text-2xl font-black text-zinc-100">
+                {/* Ambient orb */}
+                <div className="absolute -top-10 -right-10 w-[140px] h-[140px] rounded-full bg-indigo-500 opacity-[0.12] blur-[50px] pointer-events-none" />
+
+                <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.08em]">
+                        Gross Revenue
+                    </span>
+                    <span className="text-[11px] text-zinc-500 flex items-center gap-1 cursor-default">
+                        VNĐ <ChevronDown className="w-3 h-3" />
+                    </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <div className="flex items-baseline gap-0.5">
+                        <span className="text-[32px] font-extrabold text-white tracking-tight leading-none">
                             {fmt(data.grossRevenue)}
-                            <span className="text-sm font-bold text-zinc-400 ml-1">đ</span>
-                        </p>
+                        </span>
+                        <span className="text-base text-zinc-500 font-medium">đ</span>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                        <span className="text-[11px] font-medium text-zinc-500 bg-zinc-800/60 px-2 py-0.5 rounded-md">VNĐ</span>
-                        <TrendBadge current={data.grossRevenue} prev={data.grossRevenuePrev} />
+                    <div className="flex-1" />
+                    {/* Sparkline */}
+                    <div className="h-9 w-full max-w-[180px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart
+                                data={data.sparklineData}
+                                margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+                            >
+                                <defs>
+                                    <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <Area
+                                    type="monotone" dataKey="v"
+                                    stroke="#10B981" strokeWidth={1.5}
+                                    fill={`url(#${gradId})`} dot={false}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* Sparkline */}
-                <div className="h-12 mt-1">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data.sparklineData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                            <defs>
-                                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <Area type="monotone" dataKey="v" stroke="#10B981" strokeWidth={1.5} fill={`url(#${gradId})`} dot={false} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
+                <TrendBadge current={data.grossRevenue} prev={data.grossRevenuePrev} />
 
-                <p className="text-[11px] text-zinc-500 leading-snug">
+                <span className="text-[11px] text-zinc-500 mt-auto leading-snug">
                     {data.grossRevenue > data.grossRevenuePrev
                         ? `+${fmt(data.grossRevenue - data.grossRevenuePrev)}đ so với tháng trước`
                         : "Chưa có dữ liệu tháng trước"}
-                </p>
+                </span>
             </motion.div>
 
-            {/* ── Card 2: Total Tasks ── */}
+            {/* ── Card 2 · Total Tasks ───────────────────────── */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className={card}
+                className={CARD}
             >
-                <div className="absolute -top-8 -right-8 w-32 h-32 bg-indigo-500/6 blur-2xl rounded-full pointer-events-none" />
-                <div className="flex items-start justify-between">
-                    <div>
-                        <p className="text-xs font-semibold text-zinc-400 mb-1">Total Tasks</p>
-                        <p className="text-4xl font-black text-zinc-100">{data.totalTasks}</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                        <span className="text-[11px] font-medium text-zinc-500 bg-zinc-800/60 px-2 py-0.5 rounded-md">Tất cả</span>
-                        <TrendBadge current={data.totalTasks} prev={data.totalTasksPrev} />
-                    </div>
+                <div className="absolute -top-10 -right-10 w-[140px] h-[140px] rounded-full bg-indigo-500 opacity-[0.12] blur-[50px] pointer-events-none" />
+
+                <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.08em]">
+                        Total Tasks
+                    </span>
+                    <span className="text-[11px] text-zinc-500 flex items-center gap-1 cursor-default">
+                        This week <ChevronDown className="w-3 h-3" />
+                    </span>
                 </div>
 
-                <div className="flex flex-col gap-1.5 mt-1">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-                        <span className="text-xs text-zinc-400">{data.tasksInProgress} task đang xử lý</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                        <span className="text-xs text-zinc-400">{data.tasksCompleted} task hoàn tất</span>
-                    </div>
+                <div className="flex items-baseline gap-0.5">
+                    <span className="text-[32px] font-extrabold text-white tracking-tight leading-none">
+                        {data.totalTasks}
+                    </span>
                 </div>
 
-                <p className="text-[11px] text-zinc-500 mt-auto leading-snug">
-                    {data.totalTasks} task đang chạy,{" "}
+                {/* Status pills */}
+                <div className="flex gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 flex-shrink-0" />
+                        {data.tasksInProgress} in progress
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 px-2.5 py-1 rounded-full bg-emerald-500/[0.08] border border-emerald-500/[0.15]">
+                        <Check className="w-3 h-3 flex-shrink-0" />
+                        {data.tasksCompleted} completed
+                    </span>
+                </div>
+
+                <TrendBadge current={data.totalTasks} prev={data.totalTasksPrev} />
+
+                <span className="text-[11px] text-zinc-500 mt-auto leading-snug">
+                    {data.totalTasks} task đang chạy.{" "}
                     {data.totalTasksPrev > 0
                         ? `${Math.round(((data.totalTasks - data.totalTasksPrev) / data.totalTasksPrev) * 100)}% so với tháng trước`
-                        : "chưa có dữ liệu tháng trước"}
-                </p>
+                        : "Chưa có dữ liệu tháng trước"}
+                </span>
             </motion.div>
 
-            {/* ── Card 3: Total Clients ── */}
+            {/* ── Card 3 · Total Clients ─────────────────────── */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 }}
-                className={card}
+                className={CARD}
             >
-                <div className="absolute -top-8 -right-8 w-32 h-32 bg-cyan-500/6 blur-2xl rounded-full pointer-events-none" />
-                <div className="flex items-start justify-between">
-                    <div>
-                        <p className="text-xs font-semibold text-zinc-400 mb-1">Total Clients</p>
-                        <p className="text-2xl font-black text-zinc-100">
+                <div className="absolute -top-10 -right-10 w-[140px] h-[140px] rounded-full bg-indigo-500 opacity-[0.12] blur-[50px] pointer-events-none" />
+
+                <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.08em]">
+                        Total Clients
+                    </span>
+                    <span className="text-[11px] text-zinc-500 flex items-center gap-1 cursor-default">
+                        This week <ChevronDown className="w-3 h-3" />
+                    </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <div className="flex items-baseline gap-0.5">
+                        <span className="text-[32px] font-extrabold text-white tracking-tight leading-none">
                             {data.totalClients}
-                            <span className="text-sm font-medium text-zinc-500">/{data.totalClientsTarget}</span>
-                        </p>
+                        </span>
+                        <span className="text-base text-zinc-500 font-medium">
+                            /{data.totalClientsTarget}
+                        </span>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                        <span className="text-[11px] font-medium text-zinc-500 bg-zinc-800/60 px-2 py-0.5 rounded-md">Tháng này</span>
-                        {data.clientsNew > 0 && (
-                            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
-                                <TrendingUp className="w-3 h-3" />
-                                +{Math.round((data.clientsNew / Math.max(data.totalClients - data.clientsNew, 1)) * 100)}%
-                            </span>
-                        )}
+                    <div className="ml-auto">
+                        <DonutChart pct={clientPct} />
                     </div>
                 </div>
 
-                {/* Donut-style progress ring */}
-                <div className="flex items-center gap-4">
-                    <div className="relative w-16 h-16 flex-shrink-0">
-                        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                            <circle cx="18" cy="18" r="14" fill="none" stroke="#27272a" strokeWidth="4" />
-                            <circle
-                                cx="18" cy="18" r="14"
-                                fill="none"
-                                stroke="#22D3EE"
-                                strokeWidth="4"
-                                strokeDasharray={`${clientPct * 0.88} 88`}
-                                strokeLinecap="round"
-                            />
-                        </svg>
-                        <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-zinc-200">{clientPct}%</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-500 leading-snug">
-                        Đạt {clientPct}% mục tiêu tháng này
-                        {data.clientsNew > 0 && (
-                            <span className="block text-emerald-400 font-semibold mt-0.5">
-                                +{data.clientsNew} client mới
-                            </span>
-                        )}
-                    </p>
-                </div>
+                {data.clientsNew > 0 && (
+                    <TrendBadge
+                        current={data.totalClients}
+                        prev={Math.max(data.totalClients - data.clientsNew, 1)}
+                    />
+                )}
+
+                <span className="text-[11px] text-zinc-500 mt-auto leading-snug">
+                    Đạt {clientPct}% mục tiêu tháng này
+                    {data.clientsNew > 0 && (
+                        <span className="text-emerald-400 font-semibold ml-1">
+                            +{data.clientsNew} client mới
+                        </span>
+                    )}
+                </span>
             </motion.div>
         </div>
     )

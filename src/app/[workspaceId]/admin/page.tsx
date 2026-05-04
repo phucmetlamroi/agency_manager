@@ -13,8 +13,8 @@ import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import Leaderboard from '@/components/dashboard/Leaderboard'
 import { AdminKPIWidgets } from '@/components/dashboard/AdminKPIWidgets'
 import { AdminRevenueChart } from '@/components/dashboard/AdminRevenueChart'
-import { WorkflowStepsBar } from '@/components/dashboard/WorkflowStepsBar'
 import Link from 'next/link'
+import { CalendarDays, LayoutGrid } from 'lucide-react'
 
 export default async function AdminDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -118,7 +118,14 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         const mapped = (raw + 6) % 7
         revenueByDay[mapped] = (revenueByDay[mapped] || 0) + Number(t.value || 0)
     })
-    const revenueChartData = DAYS.map((day, i) => ({ day, revenue: revenueByDay[i] || 0, tasks: 0 }))
+    // ── Task count by weekday (for dual-line chart) ────────────
+    const tasksByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
+    completedTasks.forEach((t: any) => {
+        const raw = new Date(t.updatedAt || t.createdAt).getDay()
+        const mapped = (raw + 6) % 7
+        tasksByDay[mapped] = (tasksByDay[mapped] || 0) + 1
+    })
+    const revenueChartData = DAYS.map((day, i) => ({ day, revenue: revenueByDay[i] || 0, tasks: tasksByDay[i] || 0 }))
 
     // Revenue totals this/prev week
     const startOfWeek = new Date(now)
@@ -137,40 +144,27 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         })
         .reduce((s: number, t: any) => s + Number(t.value || 0), 0)
 
-    // ── Workflow step counts ────────────────────────────────────
-    const workflowCounts = {
-        assignee: tasks.filter((t: any) => ['Nhận task', 'Đang đợi giao'].includes(t.status)).length,
-        progress: tasks.filter((t: any) => ['Đang thực hiện', 'Review'].includes(t.status)).length,
-        revise: tasks.filter((t: any) => ['Revision', 'Gửi lại'].includes(t.status)).length,
-        complete: tasksCompleted,
-    }
-
     const unassignedTasks = tasks.filter((t: any) => !t.assigneeId)
     const assignedTasks = tasks.filter((t: any) => t.assigneeId)
 
-    const displayName = currentUser?.nickname || currentUser?.username || 'Admin'
-
     return (
-        <div className="space-y-6">
+        <div className="flex flex-col gap-5">
             <AutoRefresh />
 
-            {/* ── Page Header ─────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-zinc-100 tracking-tight">
-                        Workspace Dashboard
-                    </h1>
-                    <p className="text-sm text-zinc-500 mt-1">
-                        Chào mừng trở lại, <span className="text-indigo-400 font-semibold">{displayName}</span>. Đây là tổng quan hôm nay.
-                    </p>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
+            {/* ── Action Bar ──────────────────────────────────── */}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                <button className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-transparent border border-white/[0.08] text-zinc-400 text-xs font-semibold cursor-default">
+                    <CalendarDays className="w-3.5 h-3.5" /> This month
+                </button>
+                <div className="flex items-center gap-2">
+                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-transparent border border-white/[0.08] text-zinc-400 text-xs font-semibold cursor-default">
+                        <LayoutGrid className="w-3.5 h-3.5" /> Manage widgets
+                    </button>
                     <Link
                         href={`/${workspaceId}/admin/queue`}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-all duration-200 shadow-lg shadow-indigo-900/40"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-indigo-600 border border-transparent text-white text-xs font-bold shadow-[0_8px_20px_rgba(79,70,229,0.35)] hover:bg-indigo-500 transition-colors"
                     >
-                        <span className="text-lg leading-none">+</span>
-                        Thêm Task mới
+                        + Add new task
                     </Link>
                 </div>
             </div>
@@ -189,18 +183,18 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 sparklineData,
             }} />
 
-            {/* ── Revenue Chart + Rankings (2-col) ─────────────── */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-                <div className="xl:col-span-7">
+            {/* ── Revenue Chart + Rankings (flex 1.5 : 1) ──────── */}
+            <div className="flex flex-col xl:flex-row gap-4">
+                <div className="xl:flex-[1.5] min-w-0">
                     <AdminRevenueChart
                         data={revenueChartData}
                         totalRevenue={weekRevenue}
                         prevRevenue={prevWeekRevenue}
                     />
                 </div>
-                <div className="xl:col-span-5 min-h-[340px]">
+                <div className="xl:flex-1 min-w-0 min-h-[340px]">
                     <Suspense fallback={
-                        <div className="h-full rounded-2xl bg-zinc-950/60 border border-white/5 animate-pulse flex items-center justify-center text-zinc-500 text-sm">
+                        <div className="h-full rounded-[20px] bg-[rgba(24,24,27,0.60)] border border-white/[0.06] animate-pulse flex items-center justify-center text-zinc-500 text-sm">
                             Đang tải Bảng Xếp Hạng...
                         </div>
                     }>
@@ -212,11 +206,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             {/* ── Bottleneck Alert ─────────────────────────────── */}
             <BottleneckAlert tasks={serializeDecimal(tasks) as any} />
 
-            {/* ── Workflow Steps Bar ───────────────────────────── */}
-            <WorkflowStepsBar counts={workflowCounts} />
-
             {/* ── Task Workflow Tabs ───────────────────────────── */}
-            <div className="rounded-2xl border border-white/8 bg-zinc-950/60 backdrop-blur-sm overflow-hidden shadow-lg">
+            <div className="rounded-[20px] border border-white/[0.06] bg-[rgba(24,24,27,0.60)] backdrop-blur-xl overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
                 <TaskWorkflowTabs
                     tasks={serializeDecimal(assignedTasks.concat(unassignedTasks)) as any}
                     users={users}

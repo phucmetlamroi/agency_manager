@@ -7,7 +7,7 @@ import { deleteTask } from '@/actions/task-management-actions'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Search, Filter, ChevronLeft, ChevronRight, MoreHorizontal, Pen, Trash2, GripVertical, Timer, Undo2 } from 'lucide-react'
+import { Search, Filter, ChevronLeft, ChevronRight, MoreHorizontal, Pen, Trash2, GripVertical, Timer, Undo2, CalendarDays, ChevronDown } from 'lucide-react'
 import { AssigneeCell } from './tasks/cells/AssigneeCell'
 import { StatusCell } from './tasks/cells/StatusCell'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
@@ -42,7 +42,7 @@ const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }>
 }
 const TYPE_DEFAULT = { bg: 'rgba(161,161,170,0.10)', color: '#A1A1AA', border: 'rgba(161,161,170,0.20)' }
 
-// ─── TAB CONFIG (HustlyTasker style) ────────────────────────
+// ─── TAB CONFIG (Neon Purple Dark) ─────────────────────────
 type TabId = 'all' | 'progress' | 'review' | 'done'
 
 interface TabConfig {
@@ -55,13 +55,31 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-    { id: 'all',      label: 'All Tasks',       statuses: null,                                              color: '#A5B4FC', targetStatus: null },
-    { id: 'progress', label: 'In Progress',     statuses: ['Đang thực hiện'],                                     color: '#EAB308', targetStatus: 'Đang thực hiện' },
-    { id: 'review',   label: 'Review / Revise',  statuses: ['Review', 'Revision', 'Sửa frame'],               color: '#F97316', targetStatus: 'Revision' },
-    { id: 'done',     label: 'Completed',        statuses: ['Hoàn tất'],                                   color: '#10B981', targetStatus: 'Hoàn tất' },
+    { id: 'all',      label: 'Assignee',        statuses: null,                                              color: '#8B5CF6', targetStatus: null },
+    { id: 'progress', label: 'Progress',        statuses: ['Đang thực hiện'],                                     color: '#EAB308', targetStatus: 'Đang thực hiện' },
+    { id: 'review',   label: 'Revise',           statuses: ['Review', 'Revision', 'Sửa frame'],               color: '#F97316', targetStatus: 'Revision' },
+    { id: 'done',     label: 'Complete',         statuses: ['Hoàn tất'],                                   color: '#10B981', targetStatus: 'Hoàn tất' },
 ]
 
 const PER_PAGE = 8
+
+// ─── NEON PURPLE PALETTE ────────────────────────────────────
+const NP = {
+    surface: '#0A0A0A',
+    surfaceAlt: '#0E0B14',
+    rowHover: '#211B31',
+    border: 'rgba(139,92,246,0.15)',
+    borderSubtle: 'rgba(139,92,246,0.10)',
+    borderCell: 'rgba(139,92,246,0.12)',
+    accent: '#8B5CF6',
+    accentGlow: 'rgba(139,92,246,0.35)',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#A1A1AA',
+    textMuted: '#71717A',
+    lilac: '#D8B4FE',
+    pageActive: 'rgba(139,92,246,0.20)',
+    pageActiveBorder: 'rgba(139,92,246,0.30)',
+}
 
 // ─── MAIN COMPONENT ─────────────────────────────────────────
 export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, workspaceId }: {
@@ -274,20 +292,20 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
     const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#71717A' }
     const getTypeInfo = (type: string) => TYPE_COLORS[type] || TYPE_DEFAULT
     const getTypeLabel = (type: string) => {
-        if (type === 'Short form') return 'SHORT'
-        if (type === 'Long form') return 'LONG'
-        if (type === 'Trial') return 'TRIAL'
-        return type || 'TASK'
+        if (type === 'Short form') return 'Short form'
+        if (type === 'Long form') return 'Long form'
+        if (type === 'Trial') return 'Trial'
+        return type || 'Task'
     }
 
     const getDeadlineColor = (deadline: Date | null, status: string) => {
-        if (!deadline) return '#3F3F46'
-        if (status === 'Hoàn tất') return '#A1A1AA'
+        if (!deadline) return NP.textMuted
+        if (status === 'Hoàn tất') return NP.textSecondary
         const diff = (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60)
         if (diff <= 0) return '#EF4444'
         if (diff < 24) return '#EF4444'
         if (diff < 48) return '#FBBF24'
-        return '#A1A1AA'
+        return NP.textSecondary
     }
 
     const formatDeadline = (deadline: Date | null) => {
@@ -302,9 +320,12 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
     }
 
     return (
-        <div className="flex flex-col" style={{ gap: 14, padding: '16px 18px' }}>
-            {/* ─── TABS ROW ──────────────────────────────── */}
-            <div className="flex flex-wrap" style={{ gap: 6 }}>
+        <div
+            className="flex flex-col"
+            style={{ gap: 16, padding: '20px 18px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+        >
+            {/* ─── STATUS TABS (PROGRESS BAR section) ─────── */}
+            <div className="flex flex-wrap items-center" style={{ gap: 10 }}>
                 {TABS.map(tab => {
                     const isActive = activeTab === tab.id
                     const isOver = dragOverTabId === tab.id
@@ -317,29 +338,35 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                             onDrop={(e) => handleTabDrop(e, tab.id)}
                             className="flex items-center transition-all duration-200"
                             style={{
-                                gap: 6,
-                                padding: '8px 14px',
-                                borderRadius: 999,
-                                background: isActive ? `${tab.color}18` : isOver ? `${tab.color}12` : 'transparent',
-                                border: isActive ? `1px solid ${tab.color}35` : '1px solid rgba(255,255,255,0.08)',
-                                color: isActive ? tab.color : '#71717A',
-                                fontSize: 12,
+                                gap: 8,
+                                padding: '10px 20px',
+                                borderRadius: 26,
+                                background: isActive ? NP.accent : NP.surface,
+                                border: `1px solid ${isActive ? NP.accent : NP.border}`,
+                                color: isActive ? '#FFFFFF' : NP.textSecondary,
+                                fontSize: 14,
                                 fontWeight: 600,
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
                                 cursor: 'pointer',
+                                boxShadow: isActive
+                                    ? `0px 3.5px 1.8px rgba(0,0,0,0.25), 0 0 20px ${NP.accentGlow}`
+                                    : '0px 3.5px 1.8px rgba(0,0,0,0.25)',
                                 transform: isOver ? 'scale(1.05)' : 'scale(1)',
                             }}
                         >
+                            {/* Colored dot indicator */}
                             <span style={{
-                                width: 5, height: 5, borderRadius: '50%',
-                                background: isActive ? tab.color : '#52525B',
+                                width: 16, height: 16, borderRadius: '50%',
+                                background: isActive ? '#FFFFFF' : tab.color,
                                 flexShrink: 0,
+                                opacity: isActive ? 1 : 0.7,
                             }} />
                             {tab.label}
                             <span style={{
-                                fontSize: 9, fontWeight: 800,
-                                padding: '1px 6px', borderRadius: 999,
-                                background: isActive ? `${tab.color}20` : 'rgba(255,255,255,0.04)',
-                                color: isActive ? tab.color : '#3F3F46',
+                                fontSize: 11, fontWeight: 700,
+                                padding: '2px 8px', borderRadius: 999,
+                                background: isActive ? 'rgba(255,255,255,0.20)' : 'rgba(139,92,246,0.08)',
+                                color: isActive ? '#FFFFFF' : NP.textMuted,
                             }}>
                                 {tabCounts[tab.id]}
                             </span>
@@ -350,7 +377,10 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
 
             {/* ─── Drag Hint ─────────────────────────────── */}
             {isDragging && (
-                <div className="text-center text-xs text-zinc-400 animate-pulse py-1">
+                <div
+                    className="text-center text-xs animate-pulse py-1"
+                    style={{ color: NP.accent, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
                     Drag to a tab above to change status
                 </div>
             )}
@@ -360,13 +390,13 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                 <div
                     className="flex items-center justify-between animate-in slide-in-from-top-2"
                     style={{
-                        background: 'rgba(24,24,27,0.90)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        padding: '8px 14px',
-                        borderRadius: 12,
+                        background: NP.surface,
+                        border: `1px solid ${NP.border}`,
+                        padding: '10px 16px',
+                        borderRadius: 26,
                     }}
                 >
-                    <span className="text-white font-bold text-xs">
+                    <span style={{ color: NP.textPrimary, fontWeight: 700, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                         {selectedIds.length} tasks selected {isAdmin ? '- drag to change status' : ''}
                     </span>
                     <div className="flex gap-2">
@@ -375,13 +405,14 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                 onClick={handleBulkDelete}
                                 className="transition-colors"
                                 style={{
-                                    padding: '4px 12px',
-                                    borderRadius: 8,
+                                    padding: '6px 14px',
+                                    borderRadius: 26,
                                     background: 'rgba(239,68,68,0.15)',
                                     border: '1px solid rgba(239,68,68,0.25)',
                                     color: '#FCA5A5',
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: 700,
+                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
                                     cursor: 'pointer',
                                 }}
                             >
@@ -392,67 +423,68 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                 </div>
             )}
 
-            {/* ─── SEARCH ROW ────────────────────────────── */}
-            <div className="flex items-center" style={{ gap: 8 }}>
+            {/* ─── SEARCH BAR ───────────────────────────── */}
+            <div className="flex items-center" style={{ gap: 10 }}>
                 <div
                     className="flex-1 flex items-center"
                     style={{
                         gap: 10,
-                        padding: '10px 14px',
-                        borderRadius: 12,
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.06)',
+                        padding: '12px 18px',
+                        borderRadius: 26,
+                        background: NP.surface,
+                        border: `1px solid ${NP.border}`,
                     }}
                 >
-                    <Search style={{ width: 14, height: 14, color: '#52525B', flexShrink: 0 }} />
+                    <Search style={{ width: 16, height: 16, color: NP.textSecondary, flexShrink: 0 }} />
                     <input
                         value={search}
                         onChange={e => { setSearch(e.target.value); setPage(1) }}
-                        placeholder="Search tasks, clients..."
+                        placeholder="Search tasks..."
                         className="flex-1"
                         style={{
                             background: 'transparent',
                             border: 'none',
                             outline: 'none',
-                            color: '#F4F4F5',
-                            fontSize: 12,
+                            color: NP.textPrimary,
+                            fontSize: 14,
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
                         }}
                     />
                 </div>
                 <button
                     className="flex items-center transition-colors"
                     style={{
-                        gap: 6,
-                        padding: '10px 14px',
-                        borderRadius: 999,
-                        background: 'rgba(99,102,241,0.12)',
-                        border: '1px solid rgba(99,102,241,0.25)',
-                        color: '#A5B4FC',
-                        fontSize: 11,
-                        fontWeight: 700,
+                        gap: 8,
+                        padding: '12px 20px',
+                        borderRadius: 26,
+                        background: NP.accent,
+                        border: 'none',
+                        color: '#FFFFFF',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                         cursor: 'pointer',
                     }}
                 >
-                    <Filter style={{ width: 13, height: 13 }} />
                     View
+                    <Filter style={{ width: 14, height: 14 }} />
                 </button>
             </div>
 
-            {/* ─── TABLE (Glass Card) ────────────────────── */}
+            {/* ─── TASK TABLE (Glass Card) ───────────────── */}
             <div style={{
-                borderRadius: 20,
-                background: '#18181B',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxShadow: '0 24px 60px rgba(0,0,0,0.30)',
+                borderRadius: 26,
+                background: NP.surface,
+                border: `1px solid ${NP.border}`,
                 overflow: 'hidden',
             }}>
                 {/* Column Headers */}
                 <div
                     className="items-center hidden md:grid"
                     style={{
-                        gridTemplateColumns: '32px 2.4fr 0.7fr 1fr 0.6fr 0.7fr 0.8fr 36px',
-                        padding: '10px 18px',
-                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        gridTemplateColumns: '32px 2.2fr 0.8fr 1fr 0.7fr 0.7fr 0.8fr 40px',
+                        padding: '14px 20px',
+                        borderBottom: `1px solid ${NP.borderSubtle}`,
                     }}
                 >
                     {/* Select all checkbox */}
@@ -461,29 +493,39 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                             type="checkbox"
                             checked={paged.length > 0 && selectedIds.length === paged.length}
                             onChange={toggleAll}
-                            className="w-3.5 h-3.5 rounded accent-indigo-500 cursor-pointer"
-                            style={{ accentColor: '#6366F1' }}
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: NP.accent }}
                         />
                     </div>
-                    {(['Task', 'Status', 'Assignee', 'Type', 'Deadline', 'Amount', ''] as const).map(h => (
+                    {(['Task Name', 'Status', 'Assignee', 'Type', 'Deadline', 'Amount', ''] as const).map(h => (
                         <span
                             key={h || 'actions'}
                             onClick={() => {
-                                if (h === 'Task') toggleSort('title')
+                                if (h === 'Task Name') toggleSort('title')
                                 else if (h === 'Deadline') toggleSort('deadline')
                                 else if (h === 'Amount') toggleSort('price')
                             }}
-                            className={h === 'Task' || h === 'Deadline' || h === 'Amount' ? 'cursor-pointer hover:text-zinc-400 transition-colors select-none' : ''}
+                            className={h === 'Task Name' || h === 'Deadline' || h === 'Amount' ? 'cursor-pointer select-none' : ''}
                             style={{
-                                fontSize: 10,
-                                fontWeight: 700,
-                                color: '#52525B',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.08em',
+                                fontSize: 16,
+                                fontWeight: 400,
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                color: NP.textSecondary,
+                                transition: 'color 0.15s',
+                            }}
+                            onMouseEnter={e => {
+                                if (h === 'Task Name' || h === 'Deadline' || h === 'Amount') {
+                                    e.currentTarget.style.color = NP.textPrimary
+                                }
+                            }}
+                            onMouseLeave={e => {
+                                if (h === 'Task Name' || h === 'Deadline' || h === 'Amount') {
+                                    e.currentTarget.style.color = NP.textSecondary
+                                }
                             }}
                         >
                             {h}
-                            {sortField === 'title' && h === 'Task' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            {sortField === 'title' && h === 'Task Name' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                             {sortField === 'deadline' && h === 'Deadline' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                             {sortField === 'price' && h === 'Amount' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                         </span>
@@ -492,12 +534,16 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
 
                 {/* Rows */}
                 {paged.length === 0 && (
-                    <div style={{ padding: '32px 18px', textAlign: 'center', color: '#3F3F46', fontSize: 12 }}>
+                    <div style={{
+                        padding: '40px 20px', textAlign: 'center',
+                        color: NP.textMuted, fontSize: 14,
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}>
                         Không có task nào.
                     </div>
                 )}
 
-                {paged.map(task => {
+                {paged.map((task, idx) => {
                     const s = getStatusInfo(task.status)
                     const tc = getTypeInfo(task.type)
                     const dlColor = getDeadlineColor(task.deadline, task.status)
@@ -507,6 +553,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                     const duration = (task as any).duration as string | null | undefined
                     const claimSource = (task as any).claimSource
                     const isOverdue = task.deadline && task.status !== 'Hoàn tất' && new Date(task.deadline).getTime() < Date.now()
+                    const isOddRow = idx % 2 === 1
 
                     return (
                         <div
@@ -517,76 +564,85 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                             className="relative transition-colors duration-150 group/row"
                             style={{
                                 display: 'grid',
-                                gridTemplateColumns: '32px 2.4fr 0.7fr 1fr 0.6fr 0.7fr 0.8fr 36px',
-                                padding: '11px 18px',
-                                borderBottom: '1px solid rgba(255,255,255,0.03)',
+                                gridTemplateColumns: '32px 2.2fr 0.8fr 1fr 0.7fr 0.7fr 0.8fr 40px',
+                                padding: '17.8px 20px',
+                                borderBottom: `1px solid ${NP.borderSubtle}`,
                                 alignItems: 'center',
                                 cursor: isAdmin ? 'grab' : 'default',
-                                background: isSelected ? 'rgba(99,102,241,0.06)' : undefined,
+                                background: isSelected
+                                    ? 'rgba(139,92,246,0.08)'
+                                    : isOddRow ? NP.surfaceAlt : NP.surface,
                             }}
                             onMouseEnter={e => {
-                                if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.02)'
+                                if (!isSelected) e.currentTarget.style.background = NP.rowHover
                             }}
                             onMouseLeave={e => {
-                                if (!isSelected) e.currentTarget.style.background = 'transparent'
+                                if (!isSelected) e.currentTarget.style.background = isOddRow ? NP.surfaceAlt : NP.surface
                             }}
                         >
-                            {/* Left accent line */}
-                            <div style={{
-                                position: 'absolute', left: 0, top: 4, bottom: 4,
-                                width: 3, borderRadius: 2,
-                                background: s.color, opacity: 0.5,
-                            }} />
-
                             {/* Checkbox + drag handle */}
                             <div className="flex items-center justify-center gap-0.5">
-                                {isAdmin && <GripVertical className="w-3 h-3 text-zinc-700 opacity-0 group-hover/row:opacity-100 transition-opacity" />}
+                                {isAdmin && <GripVertical className="w-3.5 h-3.5 opacity-0 group-hover/row:opacity-100 transition-opacity" style={{ color: NP.textMuted }} />}
                                 <input
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => toggleRow(task.id)}
-                                    className="w-3.5 h-3.5 rounded cursor-pointer"
-                                    style={{ accentColor: '#6366F1' }}
+                                    className="w-4 h-4 rounded cursor-pointer"
+                                    style={{ accentColor: NP.accent }}
                                 />
                             </div>
 
-                            {/* Task cell */}
+                            {/* Task Name cell — pill container */}
                             <div
                                 onClick={() => handleTaskClick(task)}
                                 className="cursor-pointer min-w-0"
-                                style={{ paddingLeft: 4 }}
                             >
-                                {clientLabel && (
-                                    <div style={{
-                                        fontSize: 9, fontWeight: 600,
-                                        color: '#3B82F6',
-                                        letterSpacing: '0.03em',
-                                        marginBottom: 1,
-                                        textTransform: 'uppercase',
-                                    }}>
-                                        {clientLabel}
+                                <div style={{
+                                    display: 'inline-flex',
+                                    flexDirection: 'column',
+                                    padding: '6px 12px',
+                                    borderRadius: 14,
+                                    border: `1px solid ${NP.borderCell}`,
+                                    maxWidth: '100%',
+                                }}>
+                                    <div
+                                        className="transition-colors duration-150"
+                                        style={{
+                                            fontSize: 14, fontWeight: 700,
+                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                            color: NP.textPrimary,
+                                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                        }}
+                                        onMouseEnter={e => (e.currentTarget.style.color = NP.lilac)}
+                                        onMouseLeave={e => (e.currentTarget.style.color = NP.textPrimary)}
+                                    >
+                                        {task.title}
                                     </div>
-                                )}
-                                <div
-                                    className="transition-colors duration-150"
-                                    style={{
-                                        fontSize: 12, fontWeight: 700,
-                                        color: '#F4F4F5',
-                                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                                    }}
-                                    onMouseEnter={e => (e.currentTarget.style.color = '#A5B4FC')}
-                                    onMouseLeave={e => (e.currentTarget.style.color = '#F4F4F5')}
-                                >
-                                    {task.title}
+                                    {clientLabel && (
+                                        <div style={{
+                                            fontSize: 12, fontWeight: 500,
+                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                            color: NP.textSecondary,
+                                            marginTop: 1,
+                                        }}>
+                                            {clientLabel}
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="flex items-center flex-wrap" style={{ gap: 4, marginTop: 3 }}>
+                                {/* Tags row below pill */}
+                                <div className="flex items-center flex-wrap" style={{ gap: 4, marginTop: 4, paddingLeft: 4 }}>
                                     {isOverdue && (
-                                        <span style={{ fontSize: 8, fontWeight: 700, color: '#EF4444' }}>OVERDUE</span>
+                                        <span style={{
+                                            fontSize: 9, fontWeight: 700,
+                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                            color: '#EF4444',
+                                        }}>OVERDUE</span>
                                     )}
                                     {claimSource === 'MARKET' && (
                                         <span style={{
-                                            fontSize: 8, fontWeight: 600,
-                                            padding: '1px 5px', borderRadius: 999,
+                                            fontSize: 9, fontWeight: 600,
+                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                            padding: '2px 6px', borderRadius: 999,
                                             background: 'rgba(245,158,11,0.08)', color: '#FBBF24',
                                         }}>
                                             MARKET
@@ -596,9 +652,10 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                         <span
                                             key={tt.tagCategory.id}
                                             style={{
-                                                fontSize: 8, fontWeight: 600,
-                                                padding: '1px 5px', borderRadius: 999,
-                                                background: 'rgba(99,102,241,0.08)', color: '#818CF8',
+                                                fontSize: 9, fontWeight: 600,
+                                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                                padding: '2px 6px', borderRadius: 999,
+                                                background: 'rgba(139,92,246,0.08)', color: '#A78BFA',
                                             }}
                                         >
                                             {tt.tagCategory.name}
@@ -608,11 +665,12 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                         const parsed = parseDuration(duration)
                                         return (
                                             <span className="inline-flex items-center" style={{
-                                                gap: 2, fontSize: 8, fontWeight: 600,
-                                                padding: '1px 5px', borderRadius: 999,
+                                                gap: 3, fontSize: 9, fontWeight: 600,
+                                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                                padding: '2px 6px', borderRadius: 999,
                                                 background: 'rgba(245,158,11,0.08)', color: '#FBBF24',
                                             }}>
-                                                <Timer style={{ width: 8, height: 8 }} />
+                                                <Timer style={{ width: 9, height: 9 }} />
                                                 {parsed.valid ? formatDuration(parsed.totalSeconds) : duration}
                                             </span>
                                         )
@@ -620,7 +678,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                 </div>
                             </div>
 
-                            {/* Status cell */}
+                            {/* Status cell — pill */}
                             <div>
                                 {isAdmin ? (
                                     <StatusCell task={task} isAdmin={true} workspaceId={workspaceId} />
@@ -628,79 +686,105 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                     <span
                                         className="inline-flex items-center whitespace-nowrap"
                                         style={{
-                                            gap: 3,
-                                            padding: '3px 8px', borderRadius: 999,
-                                            fontSize: 9, fontWeight: 700,
-                                            background: `${s.color}15`,
+                                            gap: 5,
+                                            padding: '6px 12px', borderRadius: 14,
+                                            fontSize: 12, fontWeight: 600,
+                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                            border: `1px solid ${NP.borderCell}`,
+                                            background: 'transparent',
                                             color: s.color,
-                                            border: `1px solid ${s.color}25`,
                                         }}
                                     >
                                         <span style={{
-                                            width: 4, height: 4, borderRadius: '50%',
+                                            width: 8, height: 8, borderRadius: '50%',
                                             background: s.color, flexShrink: 0,
                                         }} />
-                                        {s.label}
+                                        <ChevronDown style={{ width: 12, height: 12, color: NP.textMuted }} />
                                     </span>
                                 )}
                             </div>
 
-                            {/* Assignee cell */}
+                            {/* Assignee cell — pill */}
                             <div className="min-w-0">
-                                <AssigneeCell
-                                    task={task}
-                                    users={users}
-                                    isAdmin={isAdmin ?? false}
-                                    selectedIds={selectedIds}
-                                    workspaceId={workspaceId}
-                                />
+                                <div style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    padding: '4px 10px',
+                                    borderRadius: 14,
+                                    border: `1px solid ${NP.borderCell}`,
+                                }}>
+                                    <AssigneeCell
+                                        task={task}
+                                        users={users}
+                                        isAdmin={isAdmin ?? false}
+                                        selectedIds={selectedIds}
+                                        workspaceId={workspaceId}
+                                    />
+                                </div>
                             </div>
 
-                            {/* Type cell */}
+                            {/* Type cell — dropdown pill */}
                             <div>
                                 <span style={{
                                     display: 'inline-flex',
-                                    padding: '3px 8px', borderRadius: 999,
-                                    fontSize: 9, fontWeight: 700,
-                                    background: tc.bg, color: tc.color,
-                                    border: `1px solid ${tc.border}`,
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    padding: '6px 12px', borderRadius: 14,
+                                    fontSize: 12, fontWeight: 600,
+                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                    border: `1px solid ${NP.borderCell}`,
+                                    background: 'transparent',
+                                    color: tc.color,
                                 }}>
                                     {getTypeLabel(task.type)}
+                                    <ChevronDown style={{ width: 12, height: 12, color: NP.textMuted }} />
                                 </span>
                             </div>
 
-                            {/* Deadline cell */}
-                            <span style={{
-                                fontSize: 11,
-                                fontFamily: 'ui-monospace, monospace',
-                                color: dlColor,
-                                fontWeight: dlColor === '#EF4444' ? 700 : 400,
-                            }}>
-                                {formatDeadline(task.deadline)}
-                            </span>
+                            {/* Deadline cell — pill with calendar icon */}
+                            <div>
+                                <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    padding: '6px 12px', borderRadius: 14,
+                                    fontSize: 13,
+                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                    fontWeight: dlColor === '#EF4444' ? 700 : 500,
+                                    color: dlColor,
+                                    border: `1px solid ${NP.borderCell}`,
+                                    background: 'transparent',
+                                }}>
+                                    {formatDeadline(task.deadline)}
+                                    <CalendarDays style={{ width: 13, height: 13, color: NP.textMuted }} />
+                                </span>
+                            </div>
 
                             {/* Amount cell */}
                             <span style={{
-                                fontSize: 11, fontWeight: 700,
-                                color: '#34D399',
-                                fontFamily: 'ui-monospace, monospace',
+                                fontSize: 13, fontWeight: 700,
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                color: NP.lilac,
                             }}>
                                 {formatAmount(task)}
                             </span>
 
-                            {/* Actions cell */}
+                            {/* Actions cell — three-dot MoreHorizontal */}
                             <div>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <button
-                                            className="flex items-center justify-center transition-colors hover:text-zinc-300"
+                                            className="flex items-center justify-center transition-colors"
                                             style={{
-                                                width: 28, height: 28, borderRadius: 6,
+                                                width: 32, height: 32, borderRadius: 8,
                                                 background: 'transparent', border: 'none',
-                                                color: '#3F3F46', cursor: 'pointer',
+                                                color: NP.textMuted, cursor: 'pointer',
                                             }}
+                                            onMouseEnter={e => (e.currentTarget.style.color = NP.textSecondary)}
+                                            onMouseLeave={e => (e.currentTarget.style.color = NP.textMuted)}
                                         >
-                                            <MoreHorizontal style={{ width: 14, height: 14 }} />
+                                            <MoreHorizontal style={{ width: 16, height: 16 }} />
                                         </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
@@ -755,66 +839,75 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                 {/* ─── PAGINATION ─────────────────────────── */}
                 {filtered.length > PER_PAGE && (
                     <div
-                        className="flex items-center justify-center"
+                        className="flex items-center justify-between"
                         style={{
-                            gap: 4,
-                            padding: '12px 18px',
-                            borderTop: '1px solid rgba(255,255,255,0.05)',
+                            padding: '14px 20px',
+                            borderTop: `1px solid ${NP.borderSubtle}`,
                         }}
                     >
+                        {/* Back button */}
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
                             disabled={page === 1}
                             className="flex items-center transition-colors"
                             style={{
-                                gap: 3,
-                                padding: '6px 12px', borderRadius: 999,
+                                gap: 6,
+                                padding: '8px 16px', borderRadius: 26,
                                 background: 'transparent',
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                color: page === 1 ? '#3F3F46' : '#A1A1AA',
-                                fontSize: 11, fontWeight: 600,
+                                border: `1px solid ${NP.border}`,
+                                color: page === 1 ? NP.textMuted : NP.textSecondary,
+                                fontSize: 13, fontWeight: 600,
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
                                 cursor: page === 1 ? 'default' : 'pointer',
+                                opacity: page === 1 ? 0.5 : 1,
                             }}
                         >
-                            <ChevronLeft style={{ width: 12, height: 12 }} />
+                            <ChevronLeft style={{ width: 14, height: 14 }} />
                             Back
                         </button>
 
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-                            <button
-                                key={n}
-                                onClick={() => setPage(n)}
-                                className="flex items-center justify-center transition-colors"
-                                style={{
-                                    width: 30, height: 30, borderRadius: 8,
-                                    background: page === n ? 'rgba(99,102,241,0.20)' : 'transparent',
-                                    border: page === n ? '1px solid rgba(99,102,241,0.30)' : '1px solid transparent',
-                                    color: page === n ? '#A5B4FC' : '#52525B',
-                                    fontSize: 11,
-                                    fontWeight: page === n ? 800 : 500,
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                {n}
-                            </button>
-                        ))}
+                        {/* Page numbers */}
+                        <div className="flex items-center" style={{ gap: 4 }}>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                                <button
+                                    key={n}
+                                    onClick={() => setPage(n)}
+                                    className="flex items-center justify-center transition-colors"
+                                    style={{
+                                        width: 34, height: 34, borderRadius: '50%',
+                                        background: page === n ? NP.pageActive : 'transparent',
+                                        border: page === n ? `1px solid ${NP.pageActiveBorder}` : '1px solid transparent',
+                                        color: page === n ? NP.textPrimary : NP.textSecondary,
+                                        fontSize: 13,
+                                        fontWeight: page === n ? 700 : 500,
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    {n}
+                                </button>
+                            ))}
+                        </div>
 
+                        {/* Next button */}
                         <button
                             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages}
                             className="flex items-center transition-colors"
                             style={{
-                                gap: 3,
-                                padding: '6px 12px', borderRadius: 999,
+                                gap: 6,
+                                padding: '8px 16px', borderRadius: 26,
                                 background: 'transparent',
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                color: page === totalPages ? '#3F3F46' : '#A1A1AA',
-                                fontSize: 11, fontWeight: 600,
+                                border: `1px solid ${NP.border}`,
+                                color: page === totalPages ? NP.textMuted : NP.textPrimary,
+                                fontSize: 13, fontWeight: 600,
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
                                 cursor: page === totalPages ? 'default' : 'pointer',
+                                opacity: page === totalPages ? 0.5 : 1,
                             }}
                         >
                             Next
-                            <ChevronRight style={{ width: 12, height: 12 }} />
+                            <ChevronRight style={{ width: 14, height: 14 }} />
                         </button>
                     </div>
                 )}

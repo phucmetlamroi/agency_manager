@@ -57,46 +57,70 @@ export default function DashboardTopBar({
   }, [])
 
   return (
-    <div
-      className="flex h-[72px] items-center justify-between border-b border-white/[0.05] px-7 gap-4 flex-shrink-0"
-      style={{
-        background: "rgba(10,10,10,0.50)",
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
-      }}
-    >
-      {/* ---- Left: Title & greeting ---- */}
+    <div className="flex items-end justify-between gap-6 px-1 pb-2 pt-2">
+      {/* ---- Left: Heading & subtitle ---- */}
       <div className="min-w-0">
         <h1
-          className="text-zinc-100 font-extrabold leading-tight whitespace-nowrap overflow-hidden text-ellipsis"
-          style={{ fontSize: 22, letterSpacing: "-0.02em" }}
+          className="font-extrabold leading-tight tracking-tight text-white"
+          style={{
+            fontSize: 40,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            letterSpacing: "-0.02em",
+          }}
         >
-          Workspace Dashboard
+          {displayName}
         </h1>
-        <p className="text-xs text-zinc-500 mt-0.5">
-          Ch&agrave;o mừng trở lại, <strong className="text-zinc-400">{displayName}</strong>. Đ&acirc;y l&agrave; tổng quan h&ocirc;m nay.
+        <p
+          className="mt-1.5"
+          style={{
+            fontSize: 13,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            color: "#A1A1AA",
+          }}
+        >
+          Welcome back, <span className="text-zinc-300">{displayName}</span>.
+          Here&apos;s what&apos;s happening today.
         </p>
       </div>
-      <div className="flex-1" />
 
-      {/* ---- Right: Actions ---- */}
-      <div className="flex items-center gap-2">
+      {/* ---- Right: Actions row ---- */}
+      <div className="flex items-center gap-3 flex-shrink-0">
         {/* Search button */}
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.04] text-zinc-400 transition-all duration-200 hover:bg-white/[0.08] hover:text-zinc-200"
+          className="flex h-12 w-12 items-center justify-center rounded-full transition-colors duration-200"
+          style={{
+            border: "1px solid rgba(139,92,246,0.15)",
+            background: "transparent",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#211B31"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent"
+          }}
           aria-label="Search"
         >
-          <Search size={16} strokeWidth={2} />
+          <Search size={18} strokeWidth={2} style={{ color: "#A1A1AA" }} />
         </button>
 
         {/* Bell / notification button */}
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.04] text-zinc-400 transition-all duration-200 hover:bg-white/[0.08] hover:text-zinc-200"
+          className="flex h-12 w-12 items-center justify-center rounded-full transition-colors duration-200"
+          style={{
+            border: "1px solid rgba(139,92,246,0.15)",
+            background: "transparent",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#211B31"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent"
+          }}
           aria-label="Notifications"
         >
-          <Bell size={16} strokeWidth={2} />
+          <Bell size={18} strokeWidth={2} style={{ color: "#A1A1AA" }} />
         </button>
 
         {/* Profile pill + dropdown wrapper */}
@@ -105,38 +129,61 @@ export default function DashboardTopBar({
           <button
             type="button"
             onClick={() => setOpen((prev) => !prev)}
-            className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.04] py-1.5 pl-1.5 pr-3 transition-all duration-200 hover:bg-white/[0.08]"
+            className="flex items-center gap-2.5 py-1.5 pl-1.5 pr-3.5 transition-colors duration-200"
+            style={{
+              borderRadius: 26,
+              border: "1px solid rgba(139,92,246,0.15)",
+              background: "transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#211B31"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent"
+            }}
           >
             {/* Avatar circle */}
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-[11px] font-bold text-white">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white">
               {initials}
             </span>
 
-            <span className="text-sm font-medium text-zinc-200">
+            <span
+              className="text-sm font-semibold text-zinc-200"
+              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+            >
               {displayName}
             </span>
 
             <ChevronDown
               size={14}
-              className={`text-zinc-500 transition-transform duration-200 ${
-                open ? "rotate-180" : "rotate-0"
-              }`}
+              className={`transition-transform duration-200`}
+              style={{
+                color: "#A1A1AA",
+                transform: open ? "rotate(180deg)" : "rotate(0deg)",
+              }}
             />
           </button>
 
           {/* Dropdown */}
           {open && (
             <div
-              className="absolute right-0 top-full z-50 mt-2 w-[260px] rounded-2xl border border-white/[0.08] p-2"
+              className="absolute right-0 top-full z-50 mt-2 w-[260px] p-2"
               style={{
-                background: "rgba(24,24,27,0.95)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                boxShadow: "0 16px 48px rgba(0,0,0,0.50)",
+                borderRadius: 16,
+                border: "1px solid rgba(139,92,246,0.15)",
+                background: "#0A0A0A",
+                boxShadow:
+                  "0 16px 48px rgba(0,0,0,0.50), 0 0 40px rgba(139,92,246,0.06)",
               }}
             >
               {/* Section label */}
-              <p className="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+              <p
+                className="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest"
+                style={{
+                  color: "#71717A",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+              >
                 Profiles
               </p>
 
@@ -152,11 +199,24 @@ export default function DashboardTopBar({
                           setActiveProfile(idx)
                           setOpen(false)
                         }}
-                        className={`flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-all duration-200 ${
-                          isActive
-                            ? "bg-indigo-500/[0.12]"
-                            : "hover:bg-white/[0.04]"
-                        }`}
+                        className="flex w-full items-center gap-2.5 px-2 py-2 text-left transition-colors duration-200"
+                        style={{
+                          borderRadius: 12,
+                          background: isActive
+                            ? "rgba(139,92,246,0.12)"
+                            : "transparent",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background =
+                              "rgba(255,255,255,0.04)"
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = "transparent"
+                          }
+                        }}
                       >
                         {/* Mini avatar */}
                         <span
@@ -167,10 +227,18 @@ export default function DashboardTopBar({
 
                         {/* Name + desc */}
                         <div className="flex flex-col overflow-hidden">
-                          <span className="truncate text-sm font-medium text-zinc-100">
+                          <span
+                            className="truncate text-sm font-medium text-zinc-100"
+                            style={{
+                              fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            }}
+                          >
                             {profile.name}
                           </span>
-                          <span className="truncate text-[11px] text-zinc-500">
+                          <span
+                            className="truncate text-[11px]"
+                            style={{ color: "#71717A" }}
+                          >
                             {profile.desc}
                           </span>
                         </div>
@@ -179,7 +247,8 @@ export default function DashboardTopBar({
                         {isActive && (
                           <Check
                             size={14}
-                            className="ml-auto flex-shrink-0 text-indigo-400"
+                            className="ml-auto flex-shrink-0"
+                            style={{ color: "#8B5CF6" }}
                           />
                         )}
                       </button>
@@ -189,12 +258,28 @@ export default function DashboardTopBar({
               </ul>
 
               {/* Divider */}
-              <div className="my-1.5 border-t border-white/[0.06]" />
+              <div
+                className="my-1.5"
+                style={{ borderTop: "1px solid rgba(139,92,246,0.10)" }}
+              />
 
               {/* Create profile button */}
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-sm text-zinc-400 transition-all duration-200 hover:bg-white/[0.04] hover:text-zinc-200"
+                className="flex w-full items-center gap-2 px-2 py-2 text-sm transition-colors duration-200"
+                style={{
+                  borderRadius: 12,
+                  color: "#A1A1AA",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.04)"
+                  e.currentTarget.style.color = "#D4D4D8"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent"
+                  e.currentTarget.style.color = "#A1A1AA"
+                }}
               >
                 <Plus size={14} strokeWidth={2} />
                 Create Profile

@@ -1,62 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Base */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    /* ═══ Neon Purple Dark Theme ═══ */
 
-    /* Card */
-    --card: 240 10% 4.5%;
-    --card-foreground: 0 0% 98%;
+    /* Background: #050505 near-black */
+    --background: 0 0% 2%;
+    --foreground: 0 0% 100%;
+
+    /* Card/Surface: #0A0A0A or #121016 (dark with hint of purple) */
+    --card: 264 14% 8%;
+    --card-foreground: 0 0% 100%;
 
     /* Popover */
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 264 14% 8%;
+    --popover-foreground: 0 0% 100%;
 
-    /* Primary - Violet/Purple Liquid */
-    --primary: 263 94% 65%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary — Neon Purple #8B5CF6 */
+    --primary: 263 91% 66%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Teal/Cyan */
-    --secondary: 180 100% 40%;
-    --secondary-foreground: 210 40% 98%;
+    /* Secondary — Glow #A855F7 */
+    --secondary: 271 91% 65%;
+    --secondary-foreground: 0 0% 100%;
 
-    /* Muted */
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    /* Muted — Card hover #211B31 */
+    --muted: 258 29% 15%;
+    --muted-foreground: 240 5% 65%;
 
-    /* Accent */
-    --accent: 263 94% 65%;
-    /* Same as primary for now or lighter */
-    --accent-foreground: 210 40% 98%;
+    /* Accent — Primary Dark #4C1D95 */
+    --accent: 262 67% 35%;
+    --accent-foreground: 0 0% 100%;
 
     /* Destructive */
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
     /* Border/Input/Ring */
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 263 94% 65%;
+    --border: 258 20% 18%;
+    --input: 258 20% 18%;
+    --ring: 263 91% 66%;
 
     /* Radius */
     --radius: 0.75rem;
 
-    /* Charts (Tremor) */
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
+    /* Charts */
+    --chart-1: 263 91% 66%;
+    --chart-2: 271 91% 65%;
+    --chart-3: 262 67% 35%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* ═══ Neon Purple Design Tokens ═══ */
+    --neon-bg: #050505;
+    --neon-surface: #0A0A0A;
+    --neon-surface-alt: #121016;
+    --neon-hover: #211B31;
+    --neon-primary: #8B5CF6;
+    --neon-glow: #A855F7;
+    --neon-dark: #4C1D95;
+    --neon-text: #FFFFFF;
+    --neon-text-secondary: #A1A1AA;
+    --neon-text-accent: #D8B4FE;
+    --neon-border: rgba(139, 92, 246, 0.15);
+    --neon-border-subtle: rgba(255, 255, 255, 0.06);
   }
 
-  /* Liquid Glass Custom Utilities */
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    --background: 0 0% 2%;
+    --foreground: 0 0% 100%;
   }
 }
 
@@ -66,10 +82,9 @@
   }
 
   html {
-    @apply bg-[#111111];
-    /* Critical for iOS elastic scroll color */
+    @apply bg-[#050505];
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     -webkit-text-size-adjust: 100%;
-    /* Prevent font-scale on orientation change */
   }
 
   body {

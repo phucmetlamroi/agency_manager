@@ -837,6 +837,7 @@ model Message {
   deletedAt      DateTime?
   viewOnce       Boolean     @default(false)
   viewedBy       Json?       // { userId: ISOdate } map of who viewed
+  deletedForUsers Json?      // { userId: ISOdate } per-user "delete for me" hide
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 

@@ -113,6 +113,8 @@ export async function getConversations() {
             avatarUrl: conv.avatarUrl,
             taskId: conv.taskId,
             workspaceId: conv.workspaceId,
+            createdById: conv.createdById,
+            isCreator: conv.createdById === userId,
             updatedAt: conv.updatedAt.toISOString(),
             task: conv.task ? {
                 title: conv.task.title,
@@ -479,7 +481,13 @@ export async function getMessages(conversationId: string, cursor?: string, limit
         },
     })
 
-    const data = messages.map(m => {
+    // Filter out messages the current user has hidden via "delete for me"
+    const visible = messages.filter(m => {
+        const hidden = (m.deletedForUsers as Record<string, string> | null)?.[userId]
+        return !hidden
+    })
+
+    const data = visible.map(m => {
         const reactionMap = new Map<string, { count: number; userIds: string[] }>()
         m.reactions.forEach(r => {
             const existing = reactionMap.get(r.emoji)
@@ -889,4 +897,184 @@ export async function markViewOnceViewed(messageId: string) {
     })
 
     return { data: { id: message.id, conversationId: message.conversationId, alreadyViewed: false } }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3 Tier 1: Rename, Delete-for-all, Delete-for-me, Mute, Search
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MAX_GROUP_NAME_LEN = 60
+
+export async function renameConversation(conversationId: string, newName: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const trimmed = newName.trim()
+    if (!trimmed) return { error: 'Name cannot be empty' }
+    if (trimmed.length > MAX_GROUP_NAME_LEN) return { error: `Name too long (max ${MAX_GROUP_NAME_LEN} chars)` }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const conv = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { type: true, createdById: true, name: true },
+    })
+    if (!conv) return { error: 'Conversation not found' }
+    if (conv.type === 'TASK') return { error: 'Task conversations cannot be renamed' }
+    if (conv.type === 'GROUP' && conv.createdById !== userId) {
+        return { error: 'Only the group creator can rename the group' }
+    }
+
+    const actor = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { username: true, nickname: true },
+    })
+    const actorName = actor?.nickname || actor?.username || 'Someone'
+
+    await prisma.$transaction([
+        prisma.conversation.update({
+            where: { id: conversationId },
+            data: { name: trimmed, updatedAt: new Date() },
+        }),
+        ...(conv.type === 'GROUP' ? [
+            prisma.message.create({
+                data: {
+                    conversationId,
+                    senderId: userId,
+                    type: 'SYSTEM',
+                    content: `${actorName} renamed the group to "${trimmed}"`,
+                },
+            }),
+        ] : []),
+    ])
+
+    return { data: { ok: true, name: trimmed } }
+}
+
+export async function deleteGroupForAll(conversationId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const conv = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { type: true, createdById: true },
+    })
+    if (!conv) return { error: 'Conversation not found' }
+    if (conv.type !== 'GROUP') return { error: 'Only group conversations can be deleted for all' }
+    if (conv.createdById !== userId) {
+        return { error: 'Only the group creator can delete the group' }
+    }
+
+    // Collect participant IDs BEFORE delete (for client-side broadcast notification)
+    const participants = await prisma.conversationParticipant.findMany({
+        where: { conversationId },
+        select: { userId: true },
+    })
+    const participantIds = participants.map(p => p.userId)
+
+    // Cascade delete via Prisma (Message, ConversationParticipant, MessageReaction, MessageReadReceipt all cascade)
+    await prisma.conversation.delete({ where: { id: conversationId } })
+
+    return { data: { ok: true, participantIds } }
+}
+
+export async function deleteMessageForMe(messageId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { id: true, conversationId: true, deletedForUsers: true },
+    })
+    if (!message) return { error: 'Message not found' }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId: message.conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const existing = (message.deletedForUsers as Record<string, string> | null) || {}
+    if (existing[userId]) return { data: { ok: true, alreadyHidden: true } }
+    existing[userId] = new Date().toISOString()
+
+    await prisma.message.update({
+        where: { id: messageId },
+        data: { deletedForUsers: existing as any },
+    })
+
+    return { data: { ok: true } }
+}
+
+export async function setConversationMuted(conversationId: string, muted: boolean) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    await prisma.conversationParticipant.update({
+        where: { conversationId_userId: { conversationId, userId } },
+        data: { isMuted: muted },
+    })
+
+    return { data: { ok: true, muted } }
+}
+
+export async function searchMessages(conversationId: string, query: string, limit = 30) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const trimmed = query.trim()
+    if (trimmed.length < 2) return { error: 'Query too short (min 2 chars)' }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const messages = await prisma.message.findMany({
+        where: {
+            conversationId,
+            isDeleted: false,
+            type: 'TEXT',
+            content: { contains: trimmed, mode: 'insensitive' },
+        },
+        include: {
+            sender: {
+                select: { id: true, username: true, nickname: true, avatarUrl: true },
+            },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: Math.min(limit, 100),
+    })
+
+    // Filter out messages hidden via "delete for me"
+    const visible = messages.filter(m => {
+        const hidden = (m.deletedForUsers as Record<string, string> | null)?.[userId]
+        return !hidden
+    })
+
+    return {
+        data: visible.map(m => ({
+            id: m.id,
+            content: m.content,
+            createdAt: m.createdAt.toISOString(),
+            sender: {
+                id: m.sender.id,
+                username: m.sender.username,
+                nickname: m.sender.nickname,
+                avatarUrl: m.sender.avatarUrl,
+            },
+        })),
+    }
 }

@@ -102,6 +102,10 @@ export function useChatMessages(conversationId: string | null) {
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, ...updates } : m))
     }, [])
 
+    const removeMessage = useCallback((messageId: string) => {
+        setMessages(prev => prev.filter(m => m.id !== messageId))
+    }, [])
+
     const reset = useCallback(() => {
         setMessages([])
         setHasMore(true)
@@ -117,6 +121,7 @@ export function useChatMessages(conversationId: string | null) {
         addOptimisticMessage,
         addIncomingMessage,
         updateMessage,
+        removeMessage,
         reset,
     }
 }

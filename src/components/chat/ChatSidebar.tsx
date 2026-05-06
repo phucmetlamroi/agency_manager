@@ -1,11 +1,33 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Plus, MessageSquare, Users, UserPlus, Check, X, Trash2 } from 'lucide-react'
-import { getConversations, deleteConversation } from '@/actions/chat-actions'
+import { Search, Plus, MessageSquare, Users, UserPlus, Check, X, Trash2, Pencil, Bell, BellOff, ShieldAlert } from 'lucide-react'
+import {
+    getConversations,
+    deleteConversation,
+    deleteGroupForAll,
+    setConversationMuted,
+} from '@/actions/chat-actions'
 import { getContacts, getContactRequests, respondToContactRequest } from '@/actions/contact-actions'
 import { useChatContext } from './ChatProvider'
+import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
+import { RenameGroupDialog } from './RenameGroupDialog'
+import { supabase } from '@/lib/supabase'
+import { getConversationChannel, getUserNotificationChannel, CHAT_EVENTS } from '@/lib/chat-channels'
 import { toast } from 'sonner'
+
+// Fire-and-forget broadcast to a channel: subscribe → send → cleanup
+function fireBroadcast(channelName: string, event: string, payload: any) {
+    const ch = supabase.channel(channelName)
+    ch.subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+            ch.send({ type: 'broadcast', event, payload })
+                .finally(() => setTimeout(() => supabase.removeChannel(ch), 500))
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            supabase.removeChannel(ch)
+        }
+    })
+}
 
 type Tab = 'messages' | 'contacts' | 'requests'
 
@@ -15,6 +37,8 @@ interface ConversationItem {
     name: string | null
     avatarUrl: string | null
     taskId: string | null
+    createdById?: string
+    isCreator?: boolean
     task: { title: string; clientName: string | null; assigneeName: string | null } | null
     updatedAt: string
     participants: { userId: string; user: { id: string; username: string; nickname: string | null; avatarUrl: string | null } }[]
@@ -30,7 +54,7 @@ interface ChatSidebarProps {
 }
 
 export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: ChatSidebarProps) {
-    const { currentUserId, unreadCounts } = useChatContext()
+    const { currentUserId, unreadCounts, setConversationMutedLocal } = useChatContext()
     const [tab, setTab] = useState<Tab>('messages')
     const [search, setSearch] = useState('')
     const [conversations, setConversations] = useState<ConversationItem[]>([])
@@ -38,6 +62,7 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
     const [requests, setRequests] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [contextMenu, setContextMenu] = useState<{ convId: string; x: number; y: number } | null>(null)
+    const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null)
     const contextMenuRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -66,6 +91,71 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
         setContextMenu(null)
     }, [])
 
+    const handleDeleteGroupForAll = useCallback(async (convId: string) => {
+        if (!confirm('Permanently delete this group for ALL members? This cannot be undone.')) {
+            setContextMenu(null)
+            return
+        }
+        // Fetch participant IDs BEFORE delete (for broadcast targeting)
+        const conv = conversations.find(c => c.id === convId)
+        const participantIds = conv?.participants.map(p => p.userId) || []
+
+        // Broadcast on conversation channel BEFORE deleting (so members receive event)
+        fireBroadcast(getConversationChannel(convId), CHAT_EVENTS.CONVERSATION_DELETED, {
+            conversationId: convId,
+            byUserId: currentUserId,
+            hardDelete: true,
+        })
+
+        // Also notify each participant's user channel so their sidebars update
+        participantIds.forEach(uid => {
+            if (uid === currentUserId) return
+            fireBroadcast(getUserNotificationChannel(uid), CHAT_EVENTS.CONVERSATION_DELETED, {
+                conversationId: convId,
+                byUserId: currentUserId,
+                hardDelete: true,
+            })
+        })
+
+        const res = await deleteGroupForAll(convId)
+        if (res.error) {
+            toast.error(res.error)
+        } else {
+            setConversations(prev => prev.filter(c => c.id !== convId))
+            toast.success('Group deleted for everyone')
+        }
+        setContextMenu(null)
+    }, [conversations, currentUserId])
+
+    const handleToggleMute = useCallback(async (convId: string, currentMuted: boolean) => {
+        const next = !currentMuted
+        // Optimistic update
+        setConversations(prev => prev.map(c => c.id === convId ? { ...c, isMuted: next } : c))
+        setConversationMutedLocal(convId, next)
+        const res = await setConversationMuted(convId, next)
+        if (res.error) {
+            toast.error(res.error)
+            // Revert
+            setConversations(prev => prev.map(c => c.id === convId ? { ...c, isMuted: currentMuted } : c))
+            setConversationMutedLocal(convId, currentMuted)
+            return
+        }
+        toast.success(next ? 'Notifications muted' : 'Notifications unmuted')
+        setContextMenu(null)
+    }, [setConversationMutedLocal])
+
+    const handleOpenRename = useCallback((convId: string) => {
+        const conv = conversations.find(c => c.id === convId)
+        if (!conv) return
+        setRenameTarget({ id: conv.id, name: conv.name || '' })
+        setContextMenu(null)
+    }, [conversations])
+
+    const handleRenamed = useCallback((newName: string) => {
+        if (!renameTarget) return
+        setConversations(prev => prev.map(c => c.id === renameTarget.id ? { ...c, name: newName } : c))
+    }, [renameTarget])
+
     const loadConversations = useCallback(async () => {
         setLoading(true)
         const res = await getConversations()
@@ -92,6 +182,19 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
     useEffect(() => {
         loadConversations()
     }, [unreadCounts])
+
+    // Listen for hard-delete events on the user notification channel
+    const handleSidebarEvent = useCallback((event: string, payload: any) => {
+        if (event === CHAT_EVENTS.CONVERSATION_DELETED && payload.hardDelete) {
+            // Conversation was nuked by creator — remove from local list immediately
+            setConversations(prev => prev.filter(c => c.id !== payload.conversationId))
+        }
+        if (event === CHAT_EVENTS.CONVERSATION_UPDATED && payload.conversationId && payload.name) {
+            setConversations(prev => prev.map(c => c.id === payload.conversationId ? { ...c, name: payload.name } : c))
+        }
+    }, [])
+
+    useSupabaseChannel(getUserNotificationChannel(currentUserId), handleSidebarEvent)
 
     const getDisplayName = (conv: ConversationItem) => {
         if (conv.type === 'DIRECT') {
@@ -218,10 +321,11 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
 
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-center">
-                                    <span className={`text-[13px] overflow-hidden text-ellipsis whitespace-nowrap ${
+                                    <span className={`text-[13px] overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-1 ${
                                         unread ? 'font-bold text-white' : 'font-medium text-zinc-200'
                                     }`}>
                                         {name}
+                                        {conv.isMuted && <BellOff className="w-3 h-3 text-zinc-600 shrink-0" />}
                                     </span>
                                     {conv.lastMessage && (
                                         <span className="text-[10px] text-zinc-600 shrink-0 ml-2">
@@ -358,19 +462,70 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
             </div>
 
             {/* Context menu for conversation row */}
-            {contextMenu && (
-                <div
-                    ref={contextMenuRef}
-                    className="fixed z-[100] bg-zinc-900 border border-violet-500/20 rounded-lg shadow-2xl py-1 min-w-[180px]"
-                    style={{ left: Math.min(contextMenu.x, window.innerWidth - 200), top: Math.min(contextMenu.y, window.innerHeight - 80) }}
-                >
-                    <button
-                        onClick={() => handleDeleteChat(contextMenu.convId)}
-                        className="w-full px-3 py-2 text-[12px] text-red-400 hover:bg-red-500/10 cursor-pointer text-left flex items-center gap-2"
+            {contextMenu && (() => {
+                const conv = conversations.find(c => c.id === contextMenu.convId)
+                if (!conv) return null
+                const isGroup = conv.type === 'GROUP'
+                const isCreator = !!conv.isCreator
+                return (
+                    <div
+                        ref={contextMenuRef}
+                        className="fixed z-[100] bg-zinc-900 border border-violet-500/20 rounded-lg shadow-2xl py-1 min-w-[200px]"
+                        style={{ left: Math.min(contextMenu.x, window.innerWidth - 220), top: Math.min(contextMenu.y, window.innerHeight - 200) }}
                     >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete chat
-                    </button>
-                </div>
+                        {/* Mute / Unmute */}
+                        <button
+                            onClick={() => handleToggleMute(conv.id, conv.isMuted)}
+                            className="w-full px-3 py-2 text-[12px] text-zinc-300 hover:bg-white/5 cursor-pointer text-left flex items-center gap-2"
+                        >
+                            {conv.isMuted
+                                ? <><Bell className="w-3.5 h-3.5" /> Unmute notifications</>
+                                : <><BellOff className="w-3.5 h-3.5" /> Mute notifications</>}
+                        </button>
+
+                        {/* Rename — group creator only */}
+                        {isGroup && isCreator && (
+                            <button
+                                onClick={() => handleOpenRename(conv.id)}
+                                className="w-full px-3 py-2 text-[12px] text-zinc-300 hover:bg-white/5 cursor-pointer text-left flex items-center gap-2"
+                            >
+                                <Pencil className="w-3.5 h-3.5" /> Rename group
+                            </button>
+                        )}
+
+                        <div className="h-px bg-white/[0.06] my-0.5" />
+
+                        {/* Delete for me */}
+                        <button
+                            onClick={() => handleDeleteChat(conv.id)}
+                            className="w-full px-3 py-2 text-[12px] text-zinc-300 hover:bg-white/5 cursor-pointer text-left flex items-center gap-2"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            {isGroup && isCreator ? 'Leave & remove from my list' : 'Delete chat'}
+                        </button>
+
+                        {/* Delete group for everyone — creator only */}
+                        {isGroup && isCreator && (
+                            <button
+                                onClick={() => handleDeleteGroupForAll(conv.id)}
+                                className="w-full px-3 py-2 text-[12px] text-red-400 hover:bg-red-500/10 cursor-pointer text-left flex items-center gap-2"
+                            >
+                                <ShieldAlert className="w-3.5 h-3.5" /> Delete group for everyone
+                            </button>
+                        )}
+                    </div>
+                )
+            })()}
+
+            {/* Rename group dialog */}
+            {renameTarget && (
+                <RenameGroupDialog
+                    isOpen={!!renameTarget}
+                    onClose={() => setRenameTarget(null)}
+                    conversationId={renameTarget.id}
+                    currentName={renameTarget.name}
+                    onRenamed={handleRenamed}
+                />
             )}
         </div>
     )

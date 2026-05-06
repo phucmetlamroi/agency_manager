@@ -5,7 +5,8 @@ import { useChatMessages, type ChatMessage } from '@/hooks/useChatMessages'
 import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
 import { useChatContext } from './ChatProvider'
 import { getConversationChannel, getUserNotificationChannel, CHAT_EVENTS } from '@/lib/chat-channels'
-import { markAsRead, toggleReaction, getConversations } from '@/actions/chat-actions'
+import { supabase } from '@/lib/supabase'
+import { markAsRead, toggleReaction, getConversations, getMessages as fetchMessages } from '@/actions/chat-actions'
 import { uploadChatFile } from '@/actions/chat-upload-actions'
 import { MessageBubble } from './MessageBubble'
 import { ChatInput } from './ChatInput'
@@ -34,6 +35,7 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
     const lastTypingSentRef = useRef(0)
 
+    // ── Load messages on conversation change ──────────────────
     useEffect(() => {
         setActiveConversationId(conversationId)
         reset()
@@ -60,6 +62,49 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
 
         return () => setActiveConversationId(null)
     }, [conversationId])
+
+    // ── Polling fallback — fetch new messages every 4s ──────
+    const lastMessageTimestampRef = useRef<string | null>(null)
+    useEffect(() => {
+        // Track the latest message timestamp for comparison
+        if (messages.length > 0) {
+            lastMessageTimestampRef.current = messages[0].createdAt
+        }
+    }, [messages])
+
+    useEffect(() => {
+        if (!conversationId) return
+
+        const pollInterval = setInterval(async () => {
+            // Only poll when tab is visible
+            if (document.hidden) return
+            try {
+                const res = await fetchMessages(conversationId, undefined, 10)
+                if (res.data && res.data.length > 0) {
+                    // Add any messages we don't already have
+                    res.data.forEach((msg: any) => {
+                        addIncomingMessage(msg)
+                    })
+                }
+            } catch {
+                // Polling failed silently — will retry next interval
+            }
+        }, 4000)
+
+        return () => clearInterval(pollInterval)
+    }, [conversationId, addIncomingMessage])
+
+    // ── Refresh on tab visibility change ────────────────────
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (!document.hidden && conversationId) {
+                loadMessages(true)
+                markAsRead(conversationId)
+            }
+        }
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }, [conversationId, loadMessages])
 
     const handleChannelEvent = useCallback((event: string, payload: any) => {
         if (event === CHAT_EVENTS.NEW_MESSAGE && payload.senderId !== currentUserId) {
@@ -120,6 +165,7 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
 
         const result = await sendMessage(content, 'TEXT', replyToId)
         if (result) {
+            // Broadcast on the conversation channel (for users viewing this chat)
             broadcast(CHAT_EVENTS.NEW_MESSAGE, {
                 conversationId,
                 senderId: currentUserId,
@@ -127,13 +173,30 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                 message: result,
             })
 
-            const participants = await fetch(`/api/chat/participants?conversationId=${conversationId}`).then(r => r.json()).catch(() => ({ userIds: [] }))
-            ;(participants.userIds || []).forEach((uid: string) => {
-                if (uid !== currentUserId) {
-                    const userChannel = getUserNotificationChannel(uid)
-                    const ch = (window as any).__supabase_channels?.[userChannel]
-                }
-            })
+            // Notify other participants via their personal notification channels
+            try {
+                const participants = await fetch(`/api/chat/participants?conversationId=${conversationId}`).then(r => r.json()).catch(() => ({ userIds: [] }))
+                const senderName = result.sender.nickname || result.sender.username
+                ;(participants.userIds || []).forEach((uid: string) => {
+                    if (uid !== currentUserId) {
+                        const userChannel = supabase.channel(getUserNotificationChannel(uid))
+                        userChannel.send({
+                            type: 'broadcast',
+                            event: CHAT_EVENTS.NEW_MESSAGE,
+                            payload: {
+                                conversationId,
+                                senderId: currentUserId,
+                                senderName,
+                                message: result,
+                            },
+                        }).then(() => {
+                            supabase.removeChannel(userChannel)
+                        })
+                    }
+                })
+            } catch {
+                // Non-critical: notification failed, polling will catch up
+            }
         }
     }, [conversationId, currentUserId, replyTo, sendMessage, addOptimisticMessage, broadcast])
 

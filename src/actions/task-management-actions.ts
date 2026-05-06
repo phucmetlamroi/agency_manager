@@ -22,6 +22,7 @@ export async function deleteTask(id: string, workspaceId: string) {
         await workspacePrisma.task.delete({ where: { id } })
 
         revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/dashboard`)
         return { success: true }
     } catch (e: any) {
         return { error: e.message || 'Error deleting task' }
@@ -53,6 +54,7 @@ export async function updateTask(id: string, data: any, workspaceId: string) {
         await workspacePrisma.task.update({ where: { id }, data })
 
         revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/dashboard`)
         return { success: true }
     } catch (e: any) {
         return { error: 'Failed to update' }

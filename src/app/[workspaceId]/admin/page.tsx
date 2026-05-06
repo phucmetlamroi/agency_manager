@@ -159,24 +159,22 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         <div className="flex flex-col gap-5">
             <AutoRefresh />
 
-            {/* ── Ambient radial gradients (matches design body::before) ── */}
+            {/* ── Ambient neon glow (subtle purple radials) ── */}
             <div
                 className="fixed inset-0 pointer-events-none z-0"
                 style={{
                     background:
-                        'radial-gradient(900px 600px at 12% -10%, rgba(99,102,241,0.08), transparent 60%), ' +
-                        'radial-gradient(800px 600px at 100% 110%, rgba(168,85,247,0.08), transparent 60%)',
+                        'radial-gradient(800px 500px at 10% -8%, rgba(139,92,246,0.06), transparent 55%), ' +
+                        'radial-gradient(600px 400px at 95% 105%, rgba(168,85,247,0.04), transparent 50%)',
                 }}
             />
 
-            {/* ── Top Bar ─────────────────────────────────────── */}
-            <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 mb-0 sticky top-0 z-20">
-                <DashboardTopBar
-                    displayName={displayName}
-                    initials={initials}
-                    workspaceId={workspaceId}
-                />
-            </div>
+            {/* ── Top Bar (Welcome Section) ──────────────────── */}
+            <DashboardTopBar
+                displayName={displayName}
+                initials={initials}
+                workspaceId={workspaceId}
+            />
 
             {/* ── Action Bar + Add Task Modal ──────────────────── */}
             <DashboardActionWrapper
@@ -210,8 +208,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 </div>
                 <div className="xl:flex-1 min-w-0 min-h-[340px]">
                     <Suspense fallback={
-                        <div className="h-full rounded-[20px] bg-[rgba(24,24,27,0.60)] border border-white/[0.06] animate-pulse flex items-center justify-center text-zinc-500 text-sm">
-                            Đang tải Bảng Xếp Hạng...
+                        <div className="h-full rounded-[26px] bg-[#0A0A0A] border border-[rgba(139,92,246,0.15)] animate-pulse flex items-center justify-center text-[#A1A1AA] text-sm">
+                            Loading Rankings...
                         </div>
                     }>
                         <Leaderboard workspaceId={workspaceId} />
@@ -223,15 +221,13 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             <BottleneckAlert tasks={serializeDecimal(tasks) as any} />
 
             {/* ── Task Workflow Tabs ───────────────────────────── */}
-            <div className="rounded-[20px] border border-white/[0.06] bg-[rgba(24,24,27,0.60)] backdrop-blur-[12px] overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
-                <TaskWorkflowTabs
-                    tasks={serializeDecimal(assignedTasks.concat(unassignedTasks)) as any}
-                    users={users}
-                    isMobile={await isMobileDevice()}
-                    isAdmin={true}
-                    workspaceId={workspaceId}
-                />
-            </div>
+            <TaskWorkflowTabs
+                tasks={serializeDecimal(assignedTasks.concat(unassignedTasks)) as any}
+                users={users}
+                isMobile={await isMobileDevice()}
+                isAdmin={true}
+                workspaceId={workspaceId}
+            />
 
             {/* Safe spacer */}
             <div className="h-10" />

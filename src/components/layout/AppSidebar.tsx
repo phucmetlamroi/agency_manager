@@ -18,7 +18,10 @@ import {
     UserCircle,
     Activity,
     Menu,
-    CalendarDays
+    CalendarDays,
+    MessageSquare,
+    AlertOctagon,
+    ArrowRightLeft
 } from "lucide-react"
 
 import {
@@ -38,6 +41,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
+type ViewRole = 'ADMIN' | 'USER'
+
 interface SidebarProps {
     user: {
         username: string
@@ -47,18 +52,34 @@ interface SidebarProps {
     }
     workspaceId: string
     onCollapsedChange?: (collapsed: boolean) => void
+    /** Which role's navigation set to show. Defaults to 'ADMIN' for backward compatibility. */
+    viewRole?: ViewRole
 }
 
-const getNavItems = (workspaceId: string) => [
-    { label: "Dashboard", href: `/${workspaceId}/admin`, icon: LayoutDashboard },
-    { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo },
-    { label: "Clients Manager", href: `/${workspaceId}/admin/crm`, icon: Smile },
-    { label: "Schedule", href: `/${workspaceId}/admin/schedule`, icon: CalendarDays },
-    { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet },
-    { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2 },
-    { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users },
-    { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity },
-]
+interface NavItem {
+    label: string
+    href: string
+    icon: React.ComponentType<{ className?: string }>
+    roles: ViewRole[]
+    danger?: boolean
+}
+
+const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
+    const allItems: NavItem[] = [
+        { label: "Dashboard", href: viewRole === 'USER' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`, icon: LayoutDashboard, roles: ['ADMIN', 'USER'] },
+        { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN'] },
+        { label: "Clients Manager", href: `/${workspaceId}/admin/crm`, icon: Smile, roles: ['ADMIN'] },
+        { label: "Chat", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/chat` : `/${workspaceId}/admin/chat`, icon: MessageSquare, roles: ['ADMIN', 'USER'] },
+        { label: "Schedule", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
+        { label: "My Errors", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },
+        { label: "Profile", href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, roles: ['USER'] },
+        { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN'] },
+        { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN'] },
+        { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users, roles: ['ADMIN'] },
+        { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN'] },
+    ]
+    return allItems.filter(item => item.roles.includes(viewRole))
+}
 
 /* ── Neon Purple Dark palette constants ── */
 const SIDEBAR_BG = "#0A0A0A"
@@ -74,10 +95,13 @@ const LOGO_ICON_BG = "linear-gradient(135deg,#6366F1,#8B5CF6)"
 const LOGO_ICON_GLOW = "0 0 18px rgba(139,92,246,0.40)"
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
-export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProps) {
+export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'ADMIN' }: SidebarProps) {
     const pathname = usePathname()
     const [collapsed, setCollapsed] = React.useState(false)
     const [isMobile, setIsMobile] = React.useState(false)
+    const isAdminUser = user.role === 'ADMIN'
+    const otherViewRole: ViewRole = viewRole === 'ADMIN' ? 'USER' : 'ADMIN'
+    const switchRoleHref = viewRole === 'ADMIN' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`
 
     // Handle resize
     React.useEffect(() => {
@@ -101,8 +125,8 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
         return name.slice(0, 2).toUpperCase()
     }
 
-    // Filtered nav items based on role
-    const filteredNavItems = getNavItems(workspaceId).filter(item => {
+    // Filtered nav items based on view role + treasurer access
+    const filteredNavItems = getNavItems(workspaceId, viewRole).filter(item => {
         if (item.href.includes('/admin/finance')) return user.role === 'ADMIN' || user.isTreasurer
         if (item.href.includes('/admin/analytics')) return user.role === 'ADMIN'
         return true
@@ -176,7 +200,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                         Hustly<span style={{ color: "#8B5CF6" }}>Tasker</span>
                                     </span>
                                     <span className="text-[9px] uppercase font-mono tracking-[0.18em]" style={{ color: INACTIVE_TEXT }}>
-                                        Admin &middot; v2.4
+                                        {viewRole === 'ADMIN' ? 'Admin' : 'User'} &middot; v2.4
                                     </span>
                                 </div>
                             </div>
@@ -185,6 +209,9 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                             <nav className="flex-1 px-4 py-5 flex flex-col gap-[16px] overflow-auto">
                                 {filteredNavItems.map((item) => {
                                     const isActive = pathname === item.href
+                                    const activeBg = item.danger ? "#EF4444" : ACTIVE_BG
+                                    const activeGlow = item.danger ? "0 4px 20px rgba(239,68,68,0.35)" : ACTIVE_GLOW
+                                    const inactiveColor = item.danger ? "#F87171" : INACTIVE_TEXT
                                     return (
                                         <Link
                                             key={item.href}
@@ -196,9 +223,9 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                                 paddingRight: 16,
                                                 borderRadius: 26,
                                                 fontFamily: FONT,
-                                                background: isActive ? ACTIVE_BG : "transparent",
-                                                color: isActive ? "#FFFFFF" : INACTIVE_TEXT,
-                                                boxShadow: isActive ? ACTIVE_GLOW : "none",
+                                                background: isActive ? activeBg : "transparent",
+                                                color: isActive ? "#FFFFFF" : inactiveColor,
+                                                boxShadow: isActive ? activeGlow : "none",
                                             }}
                                         >
                                             <item.icon className="w-[20px] h-[20px] flex-shrink-0" />
@@ -206,6 +233,25 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                         </Link>
                                     )
                                 })}
+                                {isAdminUser && (
+                                    <Link
+                                        href={switchRoleHref}
+                                        className="flex items-center gap-3 text-[14px] font-semibold transition-all duration-200 mt-2"
+                                        style={{
+                                            height: 52,
+                                            paddingLeft: 16,
+                                            paddingRight: 16,
+                                            borderRadius: 26,
+                                            fontFamily: FONT,
+                                            background: "rgba(99,102,241,0.1)",
+                                            color: "#818CF8",
+                                            border: "1px solid rgba(99,102,241,0.2)",
+                                        }}
+                                    >
+                                        <ArrowRightLeft className="w-[20px] h-[20px] flex-shrink-0" />
+                                        <span className="flex-1">Switch to {otherViewRole === 'ADMIN' ? 'Admin' : 'User'} View</span>
+                                    </Link>
+                                )}
                             </nav>
 
                             {/* Sheet profile */}
@@ -272,7 +318,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                 Hustly<span style={{ color: "#8B5CF6" }}>Tasker</span>
                             </span>
                             <span className="text-[9px] uppercase font-mono tracking-[0.18em] whitespace-nowrap" style={{ color: INACTIVE_TEXT }}>
-                                Admin &middot; v2.4
+                                {viewRole === 'ADMIN' ? 'Admin' : 'User'} &middot; v2.4
                             </span>
                         </div>
                     )}
@@ -308,6 +354,11 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                 )}>
                     {filteredNavItems.map((item) => {
                         const isActive = pathname === item.href
+                        const dangerActiveBg = "#EF4444"
+                        const dangerGlow = "0 4px 20px rgba(239,68,68,0.35)"
+                        const activeBg = item.danger ? dangerActiveBg : ACTIVE_BG
+                        const activeGlow = item.danger ? dangerGlow : ACTIVE_GLOW
+                        const inactiveColor = item.danger ? "#F87171" : INACTIVE_TEXT
 
                         if (collapsed) {
                             return (
@@ -318,9 +369,9 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                             className="flex items-center justify-center w-[46px] h-[46px] mx-auto transition-all duration-200"
                                             style={{
                                                 borderRadius: 23,
-                                                background: isActive ? ACTIVE_BG : "transparent",
-                                                color: isActive ? "#FFFFFF" : INACTIVE_TEXT,
-                                                boxShadow: isActive ? ACTIVE_GLOW : "none",
+                                                background: isActive ? activeBg : "transparent",
+                                                color: isActive ? "#FFFFFF" : inactiveColor,
+                                                boxShadow: isActive ? activeGlow : "none",
                                             }}
                                             onMouseEnter={(e) => {
                                                 if (!isActive) {
@@ -331,7 +382,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                             onMouseLeave={(e) => {
                                                 if (!isActive) {
                                                     e.currentTarget.style.background = "transparent"
-                                                    e.currentTarget.style.color = INACTIVE_TEXT
+                                                    e.currentTarget.style.color = inactiveColor
                                                 }
                                             }}
                                         >
@@ -354,9 +405,9 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                     paddingRight: 16,
                                     borderRadius: 26,
                                     fontFamily: FONT,
-                                    background: isActive ? ACTIVE_BG : "transparent",
-                                    color: isActive ? "#FFFFFF" : INACTIVE_TEXT,
-                                    boxShadow: isActive ? ACTIVE_GLOW : "none",
+                                    background: isActive ? activeBg : "transparent",
+                                    color: isActive ? "#FFFFFF" : inactiveColor,
+                                    boxShadow: isActive ? activeGlow : "none",
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!isActive) {
@@ -367,7 +418,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                 onMouseLeave={(e) => {
                                     if (!isActive) {
                                         e.currentTarget.style.background = "transparent"
-                                        e.currentTarget.style.color = INACTIVE_TEXT
+                                        e.currentTarget.style.color = inactiveColor
                                     }
                                 }}
                             >
@@ -442,6 +493,12 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange }: SidebarProp
                                 <DropdownMenuItem onClick={() => window.location.href = `/${workspaceId}/admin/finance`}>
                                     <Wallet className="mr-2 h-4 w-4" />
                                     <span>Finance Portal</span>
+                                </DropdownMenuItem>
+                            )}
+                            {isAdminUser && (
+                                <DropdownMenuItem onClick={() => window.location.href = switchRoleHref}>
+                                    <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                    <span>Switch to {otherViewRole === 'ADMIN' ? 'Admin' : 'User'} View</span>
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator style={{ background: DIVIDER }} />

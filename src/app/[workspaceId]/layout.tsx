@@ -3,7 +3,8 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import PresenceTracker from '@/components/tracking/PresenceTracker'
 import ImpersonationBanner from '@/components/layout/ImpersonationBanner'
-import ToSRevisitButton from '@/components/ToSRevisitButton'
+import { ChatProvider } from '@/components/chat/ChatProvider'
+import { ChatFloatingPanel } from '@/components/chat/ChatFloatingPanel'
 
 export default async function WorkspaceLayout({
     children,
@@ -30,21 +31,20 @@ export default async function WorkspaceLayout({
     // We can inject the workspaceId context down if needed, 
     // but React Server Components inside will also get `params.workspaceId` from their own props.
     return (
-        <div className="workspace-container h-full w-full relative flex flex-col">
-            {session.user.isImpersonating && (
-                <ImpersonationBanner 
-                    username={session.user.nickname || session.user.username} 
-                    workspaceId={workspaceId} 
-                />
-            )}
-            <PresenceTracker currentUserId={session.user.id} />
-            <div className="flex-1 min-h-0 overflow-hidden relative">
-                {children}
+        <ChatProvider userId={session.user.id}>
+            <div className="workspace-container h-full w-full relative flex flex-col">
+                {session.user.isImpersonating && (
+                    <ImpersonationBanner
+                        username={session.user.nickname || session.user.username}
+                        workspaceId={workspaceId}
+                    />
+                )}
+                <PresenceTracker currentUserId={session.user.id} />
+                <div className="flex-1 min-h-0 overflow-hidden relative">
+                    {children}
+                </div>
+                <ChatFloatingPanel workspaceId={workspaceId} profileId={profileId} />
             </div>
-            <ToSRevisitButton 
-                role={session.user.role} 
-                hasAccepted={session.user.hasAcceptedTerms} 
-            />
-        </div>
+        </ChatProvider>
     )
 }

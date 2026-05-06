@@ -23,8 +23,6 @@ type UserAnalytics = {
   totalPenalty: number
   errorRate: number
   rank: string
-  hasAcceptedTerms: boolean
-  termsAcceptedAt: string | null
 }
 
 const columnHelper = createColumnHelper<UserAnalytics>()
@@ -77,44 +75,6 @@ const columns = [
       return (
         <div className="text-center">
            <Badge variant="outline" className={`${bg} font-bold px-3`}>{val}</Badge>
-        </div>
-      )
-    }
-  }),
-  columnHelper.accessor('hasAcceptedTerms', {
-    header: 'Thỏa thuận',
-    cell: info => {
-      const row = info.row.original;
-      const accepted = row.hasAcceptedTerms;
-      const date = row.termsAcceptedAt;
-
-      if (!accepted) {
-        return (
-          <div className="text-center flex flex-col items-center">
-            <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30 text-[10px]">Chưa ký</Badge>
-          </div>
-        )
-      }
-
-      // Format date in Vietnam Time (+7)
-      let dateString = 'Đã ký';
-      if (date) {
-        const d = new Date(date);
-        // Format: HH:mm DD/MM/YYYY
-        dateString = d.toLocaleString('vi-VN', {
-          timeZone: 'Asia/Ho_Chi_Minh',
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        });
-      }
-
-      return (
-        <div className="text-center flex flex-col items-center gap-1">
-          <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30 text-[10px]">Đã ký</Badge>
-          <span className="text-[9px] text-zinc-500 font-mono">{dateString}</span>
         </div>
       )
     }

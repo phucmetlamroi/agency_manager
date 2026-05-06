@@ -132,6 +132,15 @@ model User {
   requestedRequests   ProfileAccessRequest[] @relation("RequestedBy")
   tagCategories       TagCategory[]
 
+  // Chat relations
+  contactsSent         Contact[]                @relation("ContactRequester")
+  contactsReceived     Contact[]                @relation("ContactReceiver")
+  chatParticipations   ConversationParticipant[]
+  createdConversations Conversation[]           @relation("ConversationCreator")
+  messagesSent         Message[]                @relation("MessageSender")
+  messageReactions     MessageReaction[]
+  messageReadReceipts  MessageReadReceipt[]
+
   profile Profile? @relation(fields: [profileId], references: [id])
 }
 
@@ -240,6 +249,7 @@ model Task {
   claimedAt        DateTime?
   taskTags         TaskTag[]
   rating           Rating?
+  conversation     Conversation?
 
   @@index([workspaceId, status])
   @@index([workspaceId, isArchived])
@@ -732,4 +742,137 @@ model TaskTag {
   @@unique([taskId, tagCategoryId])
   @@index([taskId])
   @@index([tagCategoryId])
+}
+
+// ----------------------------------------------------------------------
+// Chat & Messaging Models
+// ----------------------------------------------------------------------
+
+enum ContactStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+  TASK
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+model Contact {
+  id          String        @id @default(uuid())
+  requesterId String
+  receiverId  String
+  status      ContactStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  requester User @relation("ContactRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiver  User @relation("ContactReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, receiverId])
+  @@index([receiverId, status])
+  @@index([requesterId, status])
+}
+
+model Conversation {
+  id          String           @id @default(uuid())
+  type        ConversationType
+  name        String?
+  avatarUrl   String?
+  taskId      String?          @unique
+  workspaceId String?
+  createdById String
+  deletedFor  Json?            // { userId: ISOdate } per-participant soft delete
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  task         Task?                      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy    User                       @relation("ConversationCreator", fields: [createdById], references: [id])
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([type, workspaceId])
+  @@index([taskId])
+}
+
+model ConversationParticipant {
+  id             String   @id @default(uuid())
+  conversationId String
+  userId         String
+  role           String   @default("MEMBER")
+  lastReadAt     DateTime @default(now())
+  joinedAt       DateTime @default(now())
+  isMuted        Boolean  @default(false)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId, lastReadAt])
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String?     @db.Text
+  type           MessageType @default(TEXT)
+  fileUrl        String?
+  fileName       String?
+  fileSize       Int?
+  replyToId      String?
+  isEdited       Boolean     @default(false)
+  isDeleted      Boolean     @default(false)
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  viewOnce       Boolean     @default(false)
+  viewedBy       Json?       // { userId: ISOdate } map of who viewed
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User              @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo      Message?          @relation("MessageReply", fields: [replyToId], references: [id])
+  replies      Message[]         @relation("MessageReply")
+  reactions    MessageReaction[]
+  readReceipts MessageReadReceipt[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+model MessageReadReceipt {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
 }

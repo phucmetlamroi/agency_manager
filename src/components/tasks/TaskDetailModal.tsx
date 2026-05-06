@@ -25,6 +25,7 @@ import { TagPills } from "@/components/tags/TagPills"
 import { DurationInput } from "@/components/ui/DurationInput"
 import { getTagsForUser, setTaskTags, getTaskTags } from "@/actions/tag-actions"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { TaskChatSection } from "@/components/chat/TaskChatSection"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
 
@@ -1192,6 +1193,21 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                         </span>
                                     )}
                                 </div>
+                            </AccordionSection>
+
+                            {/* ═══ SECTION 8: Task Discussion ═════════════ */}
+                            <AccordionSection
+                                id={8}
+                                icon={<MessageSquare className="w-[15px] h-[15px]" strokeWidth={1.5} />}
+                                iconColor="#8B5CF6"
+                                title="Discussion"
+                            >
+                                {localTask && (
+                                    <TaskChatSection
+                                        taskId={localTask.id}
+                                        workspaceId={workspaceId}
+                                    />
+                                )}
                             </AccordionSection>
 
                             </div>{/* close tag zone wrapper */}

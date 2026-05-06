@@ -38,10 +38,8 @@ export async function getAnalyticsData(workspaceId: string) {
     const users = await workspacePrisma.user.findMany({
         where: { id: { in: userIds } },
         select: { 
-            id: true, 
-            username: true,
-            hasAcceptedTerms: true,
-            termsAcceptedAt: true
+            id: true,
+            username: true
         }
     })
 
@@ -81,9 +79,7 @@ export async function getAnalyticsData(workspaceId: string) {
             completedTasks: taskCount,
             totalPenalty: totalPenalty,
             errorRate,
-            rank,
-            hasAcceptedTerms: u.hasAcceptedTerms,
-            termsAcceptedAt: u.termsAcceptedAt ? u.termsAcceptedAt.toISOString() : null
+            rank
         }
     })
 

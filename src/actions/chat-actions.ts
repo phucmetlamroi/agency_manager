@@ -1,0 +1,763 @@
+'use server'
+
+import { prisma } from '@/lib/db'
+import { getSession } from '@/lib/auth'
+import { revalidatePath } from 'next/cache'
+
+async function getAuthSession(): Promise<{ userId: string; profileId: string } | null> {
+    const session = await getSession()
+    if (!session?.user?.id) return null
+    const profileId = (session.user as any)?.sessionProfileId
+    if (!profileId) return null
+    return { userId: session.user.id, profileId }
+}
+
+async function getProfileWorkspaceIds(profileId: string): Promise<string[]> {
+    const workspaces = await prisma.workspace.findMany({
+        where: { profileId },
+        select: { id: true },
+    })
+    return workspaces.map(w => w.id)
+}
+
+async function verifyUsersInProfile(userIds: string[], profileId: string): Promise<boolean> {
+    const count = await prisma.user.count({
+        where: {
+            id: { in: userIds },
+            OR: [
+                { profileId },
+                { profileAccesses: { some: { profileId } } },
+            ],
+        },
+    })
+    return count === userIds.length
+}
+
+export async function getConversations() {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId, profileId } = auth
+
+    const workspaceIds = await getProfileWorkspaceIds(profileId)
+
+    const conversations = await prisma.conversation.findMany({
+        where: {
+            participants: { some: { userId } },
+            OR: [
+                { workspaceId: { in: workspaceIds } },
+                {
+                    type: 'DIRECT',
+                    workspaceId: null,
+                    participants: {
+                        every: {
+                            user: {
+                                OR: [
+                                    { profileId },
+                                    { profileAccesses: { some: { profileId } } },
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        },
+        include: {
+            participants: {
+                include: {
+                    user: {
+                        select: { id: true, username: true, nickname: true, avatarUrl: true },
+                    },
+                },
+            },
+            messages: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                include: {
+                    sender: {
+                        select: { id: true, username: true, nickname: true },
+                    },
+                },
+            },
+            task: {
+                select: {
+                    title: true,
+                    client: { select: { name: true } },
+                    assignee: { select: { nickname: true, username: true } },
+                },
+            },
+        },
+        orderBy: { updatedAt: 'desc' },
+    })
+
+    // Filter out conversations soft-deleted by current user (deletedFor JSON contains userId).
+    // Deletion is reset if a NEW message arrives after the deletion timestamp.
+    const visibleConversations = conversations.filter(conv => {
+        const deletedFor = (conv as any).deletedFor as Record<string, string> | null
+        const deletedAt = deletedFor?.[userId]
+        if (!deletedAt) return true
+        const lastMessage = conv.messages[0]
+        if (lastMessage && lastMessage.createdAt > new Date(deletedAt)) return true
+        return false
+    })
+
+    const withUnread = visibleConversations.map(conv => {
+        const myParticipation = conv.participants.find(p => p.userId === userId)
+        const lastReadAt = myParticipation?.lastReadAt || new Date(0)
+        const lastMessage = conv.messages[0] || null
+        const unreadCount = lastMessage && lastMessage.createdAt > lastReadAt && lastMessage.senderId !== userId ? 1 : 0
+
+        return {
+            id: conv.id,
+            type: conv.type,
+            name: conv.name,
+            avatarUrl: conv.avatarUrl,
+            taskId: conv.taskId,
+            workspaceId: conv.workspaceId,
+            updatedAt: conv.updatedAt.toISOString(),
+            task: conv.task ? {
+                title: conv.task.title,
+                clientName: conv.task.client?.name || null,
+                assigneeName: conv.task.assignee?.nickname || conv.task.assignee?.username || null,
+            } : null,
+            participants: conv.participants.map(p => ({
+                userId: p.userId,
+                role: p.role,
+                user: p.user,
+            })),
+            lastMessage: lastMessage ? {
+                id: lastMessage.id,
+                content: lastMessage.content,
+                type: lastMessage.type,
+                senderId: lastMessage.senderId,
+                senderName: lastMessage.sender.nickname || lastMessage.sender.username,
+                createdAt: lastMessage.createdAt.toISOString(),
+            } : null,
+            unreadCount,
+            isMuted: myParticipation?.isMuted || false,
+        }
+    })
+
+    return { data: withUnread }
+}
+
+export async function getOrCreateDirectConversation(otherUserId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId, profileId } = auth
+    if (userId === otherUserId) return { error: 'Cannot message yourself' }
+
+    const bothInProfile = await verifyUsersInProfile([userId, otherUserId], profileId)
+    if (!bothInProfile) return { error: 'User not in current team' }
+
+    const existing = await prisma.conversation.findFirst({
+        where: {
+            type: 'DIRECT',
+            AND: [
+                { participants: { some: { userId } } },
+                { participants: { some: { userId: otherUserId } } },
+            ],
+        },
+        select: { id: true },
+    })
+
+    if (existing) return { data: { conversationId: existing.id } }
+
+    const contact = await prisma.contact.findFirst({
+        where: {
+            OR: [
+                { requesterId: userId, receiverId: otherUserId },
+                { requesterId: otherUserId, receiverId: userId },
+            ],
+            status: 'ACCEPTED',
+        },
+    })
+
+    if (!contact) return { error: 'Must be contacts first' }
+
+    const conv = await prisma.conversation.create({
+        data: {
+            type: 'DIRECT',
+            createdById: userId,
+            participants: {
+                create: [
+                    { userId },
+                    { userId: otherUserId },
+                ],
+            },
+        },
+    })
+
+    return { data: { conversationId: conv.id } }
+}
+
+export async function getOrCreateTaskConversation(taskId: string, workspaceId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId, profileId } = auth
+
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    if (!workspace || workspace.profileId !== profileId) {
+        return { error: 'Workspace not accessible' }
+    }
+
+    const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: {
+            title: true,
+            assigneeId: true,
+            clientUserId: true,
+            workspaceId: true,
+            assignee: { select: { id: true, username: true, nickname: true } },
+            client: { select: { name: true } },
+            clientUser: { select: { id: true, username: true, nickname: true } },
+        },
+    })
+
+    if (!task || task.workspaceId !== workspaceId) {
+        return { error: 'Task not found in workspace' }
+    }
+
+    const taskTitle = task.title || 'Untitled Task'
+    const clientName = task.client?.name || null
+    const assigneeName = task.assignee?.nickname || task.assignee?.username || null
+    const convName = taskTitle
+
+    const existing = await prisma.conversation.findUnique({
+        where: { taskId },
+        select: { id: true, name: true },
+    })
+
+    if (existing) {
+        if (!existing.name && convName) {
+            await prisma.conversation.update({
+                where: { id: existing.id },
+                data: { name: convName },
+            })
+        }
+        return {
+            data: {
+                conversationId: existing.id,
+                conversationName: existing.name || convName,
+                taskTitle,
+                clientName,
+                assigneeName,
+            },
+        }
+    }
+
+    const participantIds = new Set<string>([userId])
+    if (task.assigneeId) participantIds.add(task.assigneeId)
+    if (task.clientUserId) participantIds.add(task.clientUserId)
+
+    const conv = await prisma.conversation.create({
+        data: {
+            type: 'TASK',
+            name: convName,
+            taskId,
+            workspaceId,
+            createdById: userId,
+            participants: {
+                create: Array.from(participantIds).map(uid => ({ userId: uid })),
+            },
+        },
+    })
+
+    return {
+        data: {
+            conversationId: conv.id,
+            conversationName: convName,
+            taskTitle,
+            clientName,
+            assigneeName,
+        },
+    }
+}
+
+export async function createGroupConversation(
+    name: string,
+    participantIds: string[],
+    workspaceId: string
+) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId, profileId } = auth
+
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    if (!workspace || workspace.profileId !== profileId) {
+        return { error: 'Workspace not accessible' }
+    }
+
+    const allIds = new Set([userId, ...participantIds])
+
+    const allInProfile = await verifyUsersInProfile(Array.from(allIds), profileId)
+    if (!allInProfile) {
+        return { error: 'Some participants are not in the current team' }
+    }
+
+    const conv = await prisma.conversation.create({
+        data: {
+            type: 'GROUP',
+            name,
+            workspaceId,
+            createdById: userId,
+            participants: {
+                create: Array.from(allIds).map(uid => ({
+                    userId: uid,
+                    role: uid === userId ? 'ADMIN' : 'MEMBER',
+                })),
+            },
+        },
+    })
+
+    return { data: { conversationId: conv.id } }
+}
+
+export async function getMessages(conversationId: string, cursor?: string, limit = 30) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const messages = await prisma.message.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        include: {
+            sender: {
+                select: { id: true, username: true, nickname: true, avatarUrl: true },
+            },
+            replyTo: {
+                select: {
+                    id: true,
+                    content: true,
+                    sender: { select: { username: true, nickname: true } },
+                },
+            },
+            reactions: {
+                select: { emoji: true, userId: true },
+            },
+        },
+    })
+
+    const data = messages.map(m => {
+        const reactionMap = new Map<string, { count: number; userIds: string[] }>()
+        m.reactions.forEach(r => {
+            const existing = reactionMap.get(r.emoji)
+            if (existing) {
+                existing.count++
+                existing.userIds.push(r.userId)
+            } else {
+                reactionMap.set(r.emoji, { count: 1, userIds: [r.userId] })
+            }
+        })
+
+        // View-once: if message has been viewed by current user (or anyone OTHER than sender),
+        // hide content/file from non-sender viewers.
+        const viewedBy = (m.viewOnce && m.viewedBy && typeof m.viewOnce === 'boolean') ? (m.viewedBy as Record<string, string> | null) : null
+        const isSender = m.senderId === userId
+        const viewedByMe = viewedBy && !!viewedBy[userId]
+        const expired = m.viewOnce && !isSender && viewedByMe
+        const content = expired ? null : m.content
+        const fileUrl = expired ? null : m.fileUrl
+
+        return {
+            id: m.id,
+            conversationId: m.conversationId,
+            senderId: m.senderId,
+            content,
+            type: m.type,
+            fileUrl,
+            fileName: m.fileName,
+            fileSize: m.fileSize,
+            replyToId: m.replyToId,
+            isEdited: m.isEdited,
+            isDeleted: m.isDeleted,
+            editedAt: m.editedAt ? m.editedAt.toISOString() : null,
+            deletedAt: m.deletedAt ? m.deletedAt.toISOString() : null,
+            viewOnce: m.viewOnce,
+            viewed: !!viewedByMe,
+            expired: !!expired,
+            createdAt: m.createdAt.toISOString(),
+            sender: m.sender,
+            replyTo: m.replyTo,
+            reactions: Array.from(reactionMap.entries()).map(([emoji, data]) => ({
+                emoji,
+                ...data,
+            })),
+        }
+    })
+
+    return { data }
+}
+
+export async function sendMessage(
+    conversationId: string,
+    content: string,
+    type: 'TEXT' | 'IMAGE' | 'FILE' = 'TEXT',
+    replyToId?: string,
+    fileUrl?: string,
+    fileName?: string,
+    fileSize?: number,
+    viewOnce: boolean = false
+) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const [message] = await prisma.$transaction([
+        prisma.message.create({
+            data: {
+                conversationId,
+                senderId: userId,
+                content,
+                type,
+                replyToId: replyToId || null,
+                fileUrl: fileUrl || null,
+                fileName: fileName || null,
+                fileSize: fileSize || null,
+                viewOnce: viewOnce && (type === 'IMAGE' || type === 'FILE'),
+            },
+            include: {
+                sender: {
+                    select: { id: true, username: true, nickname: true, avatarUrl: true },
+                },
+                replyTo: {
+                    select: {
+                        id: true,
+                        content: true,
+                        sender: { select: { username: true, nickname: true } },
+                    },
+                },
+            },
+        }),
+        prisma.conversation.update({
+            where: { id: conversationId },
+            data: { updatedAt: new Date() },
+        }),
+        prisma.conversationParticipant.update({
+            where: { conversationId_userId: { conversationId, userId } },
+            data: { lastReadAt: new Date() },
+        }),
+    ])
+
+    return {
+        data: {
+            id: message.id,
+            conversationId: message.conversationId,
+            senderId: message.senderId,
+            content: message.content,
+            type: message.type,
+            fileUrl: message.fileUrl,
+            fileName: message.fileName,
+            fileSize: message.fileSize,
+            replyToId: message.replyToId,
+            isEdited: false,
+            isDeleted: false,
+            editedAt: null,
+            deletedAt: null,
+            viewOnce: message.viewOnce,
+            viewed: false,
+            expired: false,
+            createdAt: message.createdAt.toISOString(),
+            sender: message.sender,
+            replyTo: message.replyTo,
+            reactions: [],
+        },
+    }
+}
+
+export async function markAsRead(conversationId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    await prisma.conversationParticipant.update({
+        where: { conversationId_userId: { conversationId, userId } },
+        data: { lastReadAt: new Date() },
+    })
+
+    return { success: true }
+}
+
+export async function getUnreadCounts() {
+    const auth = await getAuthSession()
+    if (!auth) return { data: {} }
+    const { userId, profileId } = auth
+
+    const workspaceIds = await getProfileWorkspaceIds(profileId)
+
+    const results: Array<{ conversationId: string; unread: bigint }> = await prisma.$queryRaw`
+        SELECT cp."conversationId", COUNT(m.id)::bigint as unread
+        FROM "ConversationParticipant" cp
+        JOIN "Conversation" c ON c.id = cp."conversationId"
+        JOIN "Message" m ON m."conversationId" = cp."conversationId"
+        WHERE cp."userId" = ${userId}
+          AND m."createdAt" > cp."lastReadAt"
+          AND m."senderId" != ${userId}
+          AND (
+            c."workspaceId" = ANY(${workspaceIds}::text[])
+            OR (c."type" = 'DIRECT' AND c."workspaceId" IS NULL)
+          )
+        GROUP BY cp."conversationId"
+    `
+
+    const counts: Record<string, number> = {}
+    let total = 0
+    for (const r of results) {
+        const n = Number(r.unread)
+        if (n > 0) {
+            counts[r.conversationId] = n
+            total += n
+        }
+    }
+
+    return { data: { counts, total } }
+}
+
+export async function toggleReaction(messageId: string, emoji: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { conversationId: true },
+    })
+    if (!message) return { error: 'Message not found' }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId: message.conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const existing = await prisma.messageReaction.findUnique({
+        where: { messageId_userId_emoji: { messageId, userId, emoji } },
+    })
+
+    if (existing) {
+        await prisma.messageReaction.delete({ where: { id: existing.id } })
+        return { data: { action: 'removed' } }
+    } else {
+        await prisma.messageReaction.create({
+            data: { messageId, userId, emoji },
+        })
+        return { data: { action: 'added' } }
+    }
+}
+
+export async function getTaskConversationStatus(taskIds: string[]) {
+    const auth = await getAuthSession()
+    if (!auth) return {}
+    const { profileId } = auth
+
+    if (taskIds.length === 0) return {}
+
+    const workspaceIds = await getProfileWorkspaceIds(profileId)
+
+    const conversations = await prisma.conversation.findMany({
+        where: {
+            taskId: { in: taskIds },
+            workspaceId: { in: workspaceIds },
+        },
+        select: { taskId: true, id: true },
+    })
+
+    const result: Record<string, { hasConversation: boolean; conversationId: string | null }> = {}
+    for (const tid of taskIds) {
+        const conv = conversations.find(c => c.taskId === tid)
+        result[tid] = conv
+            ? { hasConversation: true, conversationId: conv.id }
+            : { hasConversation: false, conversationId: null }
+    }
+    return result
+}
+
+export async function getTaskUnreadCounts(taskIds: string[]) {
+    const auth = await getAuthSession()
+    if (!auth) return {}
+    const { userId, profileId } = auth
+
+    if (taskIds.length === 0) return {}
+
+    const workspaceIds = await getProfileWorkspaceIds(profileId)
+
+    const results: Array<{ taskId: string; unread: bigint }> = await prisma.$queryRaw`
+        SELECT c."taskId", COUNT(m.id)::bigint as unread
+        FROM "Conversation" c
+        JOIN "ConversationParticipant" cp ON cp."conversationId" = c.id
+        JOIN "Message" m ON m."conversationId" = c.id
+        WHERE c."taskId" = ANY(${taskIds}::text[])
+          AND c."workspaceId" = ANY(${workspaceIds}::text[])
+          AND cp."userId" = ${userId}
+          AND m."createdAt" > cp."lastReadAt"
+          AND m."senderId" != ${userId}
+        GROUP BY c."taskId"
+    `
+
+    const counts: Record<string, number> = {}
+    for (const r of results) {
+        counts[r.taskId] = Number(r.unread)
+    }
+    return counts
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Messenger-grade actions: delete chat, recall message, edit message, view-once
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RECALL_WINDOW_MS = 10 * 60 * 1000  // 10 minutes
+const EDIT_WINDOW_MS = 15 * 60 * 1000    // 15 minutes
+
+export async function deleteConversation(conversationId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const conv = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { deletedFor: true },
+    })
+    const existing = (conv?.deletedFor as Record<string, string> | null) || {}
+    existing[userId] = new Date().toISOString()
+
+    await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { deletedFor: existing as any },
+    })
+
+    revalidatePath('/[workspaceId]/admin/chat', 'page')
+    revalidatePath('/[workspaceId]/dashboard/chat', 'page')
+    return { data: { ok: true } }
+}
+
+export async function recallMessage(messageId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { id: true, senderId: true, conversationId: true, createdAt: true, isDeleted: true },
+    })
+    if (!message) return { error: 'Message not found' }
+    if (message.senderId !== userId) return { error: 'Cannot recall others\' messages' }
+    if (message.isDeleted) return { error: 'Already deleted' }
+
+    const ageMs = Date.now() - message.createdAt.getTime()
+    if (ageMs > RECALL_WINDOW_MS) return { error: 'Recall window has expired (10 min)' }
+
+    const updated = await prisma.message.update({
+        where: { id: messageId },
+        data: {
+            isDeleted: true,
+            deletedAt: new Date(),
+            content: null,
+            fileUrl: null,
+            fileName: null,
+            fileSize: null,
+        },
+    })
+
+    return {
+        data: {
+            id: updated.id,
+            conversationId: updated.conversationId,
+            isDeleted: true,
+            deletedAt: updated.deletedAt?.toISOString(),
+        },
+    }
+}
+
+export async function editMessage(messageId: string, newContent: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const trimmed = newContent.trim()
+    if (!trimmed) return { error: 'Content cannot be empty' }
+    if (trimmed.length > 4000) return { error: 'Content too long' }
+
+    const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { id: true, senderId: true, conversationId: true, createdAt: true, isDeleted: true, type: true },
+    })
+    if (!message) return { error: 'Message not found' }
+    if (message.senderId !== userId) return { error: 'Cannot edit others\' messages' }
+    if (message.isDeleted) return { error: 'Cannot edit deleted message' }
+    if (message.type !== 'TEXT') return { error: 'Only text messages can be edited' }
+
+    const ageMs = Date.now() - message.createdAt.getTime()
+    if (ageMs > EDIT_WINDOW_MS) return { error: 'Edit window has expired (15 min)' }
+
+    const updated = await prisma.message.update({
+        where: { id: messageId },
+        data: {
+            content: trimmed,
+            isEdited: true,
+            editedAt: new Date(),
+        },
+    })
+
+    return {
+        data: {
+            id: updated.id,
+            conversationId: updated.conversationId,
+            content: updated.content,
+            isEdited: true,
+            editedAt: updated.editedAt?.toISOString(),
+        },
+    }
+}
+
+export async function markViewOnceViewed(messageId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { id: true, senderId: true, conversationId: true, viewOnce: true, viewedBy: true },
+    })
+    if (!message) return { error: 'Message not found' }
+    if (!message.viewOnce) return { error: 'Not a view-once message' }
+    if (message.senderId === userId) return { error: 'Sender does not need to view' }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId: message.conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const existing = (message.viewedBy as Record<string, string> | null) || {}
+    if (existing[userId]) {
+        return { data: { id: message.id, alreadyViewed: true } }
+    }
+    existing[userId] = new Date().toISOString()
+
+    await prisma.message.update({
+        where: { id: messageId },
+        data: { viewedBy: existing as any },
+    })
+
+    return { data: { id: message.id, conversationId: message.conversationId, alreadyViewed: false } }
+}

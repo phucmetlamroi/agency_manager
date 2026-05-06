@@ -36,41 +36,16 @@ export async function middleware(request: NextRequest) {
             if (!session?.user) throw new Error('Invalid session')
             
             const role = session.user.role;
-            const isToSPage = pathname.includes('/user-agreement');
 
-            // 1. HIGH PRIORITY EXEMPTION: User Agreement Page
-            // If they are on the ToS page, let them be there UNLESS they already accepted.
-            if (isToSPage) {
-                if (session.user.hasAcceptedTerms) {
-                    if (role === 'CLIENT') {
-                        return NextResponse.redirect(new URL('/portal/en', request.url));
-                    }
-                    // Staff/Admin: redirect away from ToS since already accepted
-                    return NextResponse.redirect(new URL('/login', request.url));
-                }
-                return NextResponse.next();
-            }
-
-            // 2. Auth Redirects for /login and /
+            // 1. Auth Redirects for /login and /
             if (pathname === '/login' || pathname === '/') {
                 if (role === 'CLIENT') {
                     return NextResponse.redirect(new URL('/portal/en', request.url));
                 }
-                // Staff/Admin: let them through to /login (which handles its own redirect)
-            }
-            
-            // 3. Mandatory ToS Check (Skip for Admins and Clients)
-            // If they haven't accepted, force them to the agreement page.
-            if (role !== 'ADMIN' && role !== 'CLIENT' && !session.user.hasAcceptedTerms) {
-                if (!pathname.startsWith('/api')) {
-                    return NextResponse.redirect(new URL('/user-agreement', request.url));
-                }
-                return NextResponse.next();
             }
 
-            // 4. Basic role isolation for CLIENT
+            // 2. Basic role isolation for CLIENT
             // Clients are ONLY allowed in /portal or /api.
-            // (Agreement page already handled by exemption above).
             if (role === 'CLIENT' && !pathname.startsWith('/portal') && !pathname.startsWith('/api')) {
                 return NextResponse.redirect(new URL('/portal/en', request.url));
             }

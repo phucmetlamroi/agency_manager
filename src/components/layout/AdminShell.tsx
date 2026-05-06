@@ -15,23 +15,23 @@ interface AdminShellProps {
         avatarUrl?: string
     }
     workspaceId: string
+    viewRole?: 'ADMIN' | 'USER'
 }
 
 
 
-export function AdminShell({ children, user, workspaceId }: AdminShellProps) {
+export function AdminShell({ children, user, workspaceId, viewRole = 'ADMIN' }: AdminShellProps) {
     const [collapsed, setCollapsed] = React.useState(false)
 
     return (
         <div className="flex min-h-dvh bg-background text-foreground">
-            <AppSidebar user={user} workspaceId={workspaceId} onCollapsedChange={setCollapsed} />
+            <AppSidebar user={user} workspaceId={workspaceId} onCollapsedChange={setCollapsed} viewRole={viewRole} />
             <main
                 className={cn(
                     "flex-1 overflow-x-hidden pt-16 md:pt-0 relative transition-all duration-300",
                     collapsed ? "md:ml-[72px]" : "md:ml-[261px]"
                 )}
             >
-                    {/* Leaderboard will go here */}
                 <div className="container mx-auto p-4 md:p-8 max-w-[2000px] animate-fade-in">
                     {children}
                     {/* Safe spacer for bottom content */}

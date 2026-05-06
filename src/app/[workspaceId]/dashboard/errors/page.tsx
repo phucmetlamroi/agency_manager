@@ -38,7 +38,7 @@ export default async function UserErrorsPage({ params }: { params: Promise<{ wor
 
             {/* ── Page Header ───────────────────────────── */}
             <div>
-                <h1 className="text-2xl font-heading font-bold flex items-center gap-3">
+                <h1 className="text-2xl font-bold flex items-center gap-3">
                     <AlertOctagon className="w-7 h-7 text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
                     <span className="bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
                         Hồ Sơ Vi Phạm Của Bạn

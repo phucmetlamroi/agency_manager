@@ -5,7 +5,6 @@ import { isMobileDevice } from '@/lib/device'
 import Leaderboard from '@/components/dashboard/Leaderboard'
 import { Suspense } from 'react'
 import { serializeDecimal } from '@/lib/serialization'
-import { UserRole } from '@prisma/client'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
 import { getUserPerformanceScore } from '@/actions/analytics-actions'
@@ -38,7 +37,8 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         }
     })
 
-    if ((userWithBonus?.role as UserRole) === UserRole.ADMIN) redirect(`/${workspaceId}/admin`)
+    // Note: ADMIN users can view the user dashboard via the "Switch to User View" button.
+    // No automatic redirect — they can switch back to admin view from the sidebar.
 
     const tasks = await (workspacePrisma as any).task.findMany({
         where: { assigneeId: userId },
@@ -227,7 +227,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                 TASK TABLE
             ═══════════════════════════════════════════════════ */}
             <div>
-                <h3 className="text-xl font-heading font-bold text-zinc-100 mb-4 flex items-center gap-2">
+                <h3 className="text-xl font-bold text-zinc-100 mb-4 flex items-center gap-2">
                     <ListChecks className="w-5 h-5 text-indigo-400" strokeWidth={1.5} />
                     Danh sách Task của tôi
                 </h3>

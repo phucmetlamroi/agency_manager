@@ -33,7 +33,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
                     <ShieldCheck className="w-3.5 h-3.5" />
                     Account Settings
                 </div>
-                <h1 className="text-3xl font-heading font-black text-white italic tracking-tighter">
+                <h1 className="text-3xl font-black text-white italic tracking-tighter">
                     THÔNG TIN CÁ NHÂN
                 </h1>
                 <p className="text-zinc-500 text-sm max-w-sm mx-auto font-medium">Quản lý hồ sơ, bảo mật và thông tin thanh toán của bạn.</p>

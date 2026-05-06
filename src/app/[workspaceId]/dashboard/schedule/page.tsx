@@ -80,7 +80,7 @@ export default async function UserSchedulePage({
       {/* ── Page Header ──────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-zinc-100 flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
             <CalendarDays className="w-6 h-6 text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
             Lịch làm việc của tôi
           </h1>

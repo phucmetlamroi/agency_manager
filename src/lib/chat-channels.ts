@@ -9,6 +9,11 @@ export const CHAT_EVENTS = {
     READ_RECEIPT: 'read_receipt',
     REACTION: 'reaction',
     CONVERSATION_UPDATED: 'conversation_updated',
+    // Tier 2
+    MESSAGE_PINNED: 'message_pinned',
+    MESSAGE_UNPINNED: 'message_unpinned',
+    MESSAGE_IMPORTANT_CHANGED: 'message_important_changed',
+    PRESENCE_CHANGED: 'presence_changed',
 } as const
 
 export function getConversationChannel(conversationId: string) {

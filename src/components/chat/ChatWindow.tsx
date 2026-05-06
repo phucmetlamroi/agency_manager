@@ -14,7 +14,9 @@ import { ChatInput } from './ChatInput'
 import { GroupMembersDialog } from './GroupMembersDialog'
 import { RenameGroupDialog } from './RenameGroupDialog'
 import { MessageSearchPanel } from './MessageSearchPanel'
-import { Loader2, ClipboardList, User, Briefcase, Users, Pencil, Bell, BellOff, Search } from 'lucide-react'
+import { PinnedMessagesPanel } from './PinnedMessagesPanel'
+import type { MentionableUser } from './MentionAutocomplete'
+import { Loader2, ClipboardList, User, Briefcase, Users, Pencil, Bell, BellOff, Search, Pin } from 'lucide-react'
 import { toast } from 'sonner'
 
 // ★ Fire-and-forget: properly subscribe → send → cleanup
@@ -55,6 +57,7 @@ interface ConversationMeta {
     clientName?: string | null
     assigneeName?: string | null
     participantNames?: string[]
+    participants?: MentionableUser[]
 }
 
 interface ChatWindowProps {
@@ -72,6 +75,7 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
     const [showGroupMembers, setShowGroupMembers] = useState(false)
     const [showRenameDialog, setShowRenameDialog] = useState(false)
     const [showSearchPanel, setShowSearchPanel] = useState(false)
+    const [showPinnedPanel, setShowPinnedPanel] = useState(false)
     const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -92,6 +96,12 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                     const otherNames = conv.participants
                         .filter((p: any) => p.userId !== currentUserId)
                         .map((p: any) => p.user.nickname || p.user.username)
+                    const allParticipants: MentionableUser[] = conv.participants.map((p: any) => ({
+                        id: p.user.id,
+                        username: p.user.username,
+                        nickname: p.user.nickname,
+                        avatarUrl: p.user.avatarUrl,
+                    }))
                     setMeta({
                         type: conv.type,
                         name: conv.name,
@@ -101,6 +111,7 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                         clientName: conv.task?.clientName,
                         assigneeName: conv.task?.assigneeName,
                         participantNames: otherNames,
+                        participants: allParticipants,
                     })
                     if (conv.name && conv.type === 'GROUP') setDisplayName(conv.name)
                 }
@@ -198,24 +209,34 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
             setActiveConversationId(null)
             setIsPanelOpen(false)
         }
+        if ((event === CHAT_EVENTS.MESSAGE_PINNED || event === CHAT_EVENTS.MESSAGE_UNPINNED) && payload.messageId) {
+            updateMessage(payload.messageId, { isPinned: event === CHAT_EVENTS.MESSAGE_PINNED })
+        }
+        if (event === CHAT_EVENTS.MESSAGE_IMPORTANT_CHANGED && payload.messageId) {
+            updateMessage(payload.messageId, { isImportant: !!payload.isImportant })
+        }
     }, [currentUserId, conversationId, addIncomingMessage, updateMessage, setActiveConversationId, setIsPanelOpen])
 
     const { broadcast } = useSupabaseChannel(getConversationChannel(conversationId), handleChannelEvent)
     const { broadcast: broadcastUser } = useSupabaseChannel(getUserNotificationChannel(currentUserId), () => {}, false)
 
-    const handleSend = useCallback(async (content: string, replyToId?: string) => {
+    const handleSend = useCallback(async (content: string, replyToId?: string, opts?: { mentions?: string[]; isImportant?: boolean; isAnnouncement?: boolean }) => {
+        const msgType: ChatMessage['type'] = opts?.isAnnouncement ? 'ANNOUNCEMENT' : 'TEXT'
         const optimistic: ChatMessage = {
             id: `temp-${Date.now()}`,
             conversationId,
             senderId: currentUserId,
             content,
-            type: 'TEXT',
+            type: msgType,
             fileUrl: null,
             fileName: null,
             fileSize: null,
             replyToId: replyToId || null,
             isEdited: false,
             isDeleted: false,
+            mentions: opts?.mentions || [],
+            isImportant: !!opts?.isImportant,
+            isPinned: false,
             createdAt: new Date().toISOString(),
             sender: { id: currentUserId, username: '', nickname: null, avatarUrl: null },
             replyTo: replyTo ? { id: replyTo.id, content: replyTo.content, sender: replyTo.sender } : null,
@@ -233,7 +254,7 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
         })
 
         // Server save runs after broadcast — receiver already has the message
-        const result = await sendMessage(content, 'TEXT', replyToId)
+        const result = await sendMessage(content, msgType, replyToId, undefined, undefined, undefined, false, opts?.mentions, opts?.isImportant)
         if (result) {
             // Replace sender's optimistic with confirmed
             addIncomingMessage(result)
@@ -295,6 +316,15 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
             broadcast(CHAT_EVENTS.VIEW_ONCE_VIEWED, {
                 messageId,
                 viewerId: currentUserId,
+            })
+        } else if (typeof updates.isPinned === 'boolean') {
+            broadcast(updates.isPinned ? CHAT_EVENTS.MESSAGE_PINNED : CHAT_EVENTS.MESSAGE_UNPINNED, {
+                messageId,
+            })
+        } else if (typeof updates.isImportant === 'boolean') {
+            broadcast(CHAT_EVENTS.MESSAGE_IMPORTANT_CHANGED, {
+                messageId,
+                isImportant: updates.isImportant,
             })
         }
     }, [broadcast, updateMessage, currentUserId])
@@ -420,6 +450,15 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                 </div>
                 {/* Header action buttons */}
                 <div className="flex items-center gap-1 shrink-0">
+                    {/* Pinned messages */}
+                    <button
+                        onClick={() => setShowPinnedPanel(p => !p)}
+                        className={`p-1.5 rounded-lg transition-colors cursor-pointer bg-transparent border-none ${showPinnedPanel ? 'bg-amber-500/15' : 'hover:bg-white/10'}`}
+                        title="Pinned messages"
+                    >
+                        <Pin className={`w-4 h-4 ${showPinnedPanel ? 'text-amber-400' : 'text-zinc-400'}`} />
+                    </button>
+
                     {/* Search messages */}
                     <button
                         onClick={() => setShowSearchPanel(p => !p)}
@@ -479,6 +518,8 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                         onReact={handleReact}
                         onMessageUpdated={handleMessageUpdated}
                         onMessageHidden={removeMessage}
+                        canPin={meta?.type === 'GROUP' ? !!meta?.isCreator : true}
+                        participants={meta?.participants || []}
                         currentUserId={currentUserId}
                     />
                 ))}
@@ -502,6 +543,8 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                 onFileUpload={handleFileUpload}
                 replyTo={replyTo}
                 onCancelReply={() => setReplyTo(null)}
+                participants={meta?.participants || []}
+                canSendAnnouncement={meta?.type === 'GROUP' && !!meta?.isCreator}
             />
 
             {/* Group members dialog */}
@@ -528,6 +571,22 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                 onResultClick={(messageId) => {
                     setShowSearchPanel(false)
                     setScrollToMessageId(messageId)
+                }}
+            />
+
+            {/* Pinned messages panel */}
+            <PinnedMessagesPanel
+                isOpen={showPinnedPanel}
+                onClose={() => setShowPinnedPanel(false)}
+                conversationId={conversationId}
+                canManage={meta?.type === 'GROUP' ? !!meta?.isCreator : true}
+                onPinClick={(messageId) => {
+                    setShowPinnedPanel(false)
+                    setScrollToMessageId(messageId)
+                }}
+                onUnpinned={(messageId) => {
+                    updateMessage(messageId, { isPinned: false })
+                    broadcast(CHAT_EVENTS.MESSAGE_UNPINNED, { messageId })
                 }}
             />
         </div>

@@ -1,17 +1,19 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Plus, MessageSquare, Users, UserPlus, Check, X, Trash2, Pencil, Bell, BellOff, ShieldAlert } from 'lucide-react'
+import { Search, Plus, MessageSquare, Users, UserPlus, Check, X, Trash2, Pencil, Bell, BellOff, ShieldAlert, MoreHorizontal, Ban } from 'lucide-react'
 import {
     getConversations,
     deleteConversation,
     deleteGroupForAll,
     setConversationMuted,
 } from '@/actions/chat-actions'
-import { getContacts, getContactRequests, respondToContactRequest } from '@/actions/contact-actions'
+import { getContacts, getContactRequests, respondToContactRequest, blockContact } from '@/actions/contact-actions'
+import { presenceColor, presenceSubtitle } from '@/lib/presence-format'
 import { useChatContext } from './ChatProvider'
 import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
 import { RenameGroupDialog } from './RenameGroupDialog'
+import { StatusSwitcher } from './StatusSwitcher'
 import { supabase } from '@/lib/supabase'
 import { getConversationChannel, getUserNotificationChannel, CHAT_EVENTS } from '@/lib/chat-channels'
 import { toast } from 'sonner'
@@ -62,8 +64,10 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
     const [requests, setRequests] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [contextMenu, setContextMenu] = useState<{ convId: string; x: number; y: number } | null>(null)
+    const [contactMenu, setContactMenu] = useState<{ contactId: string; targetUserId: string; targetName: string; x: number; y: number } | null>(null)
     const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null)
     const contextMenuRef = useRef<HTMLDivElement>(null)
+    const contactMenuRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         if (!contextMenu) return
@@ -75,6 +79,38 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
         document.addEventListener('mousedown', onClick)
         return () => document.removeEventListener('mousedown', onClick)
     }, [contextMenu])
+
+    useEffect(() => {
+        if (!contactMenu) return
+        const onClick = (e: MouseEvent) => {
+            if (contactMenuRef.current && !contactMenuRef.current.contains(e.target as Node)) {
+                setContactMenu(null)
+            }
+        }
+        document.addEventListener('mousedown', onClick)
+        return () => document.removeEventListener('mousedown', onClick)
+    }, [contactMenu])
+
+    const handleBlockContact = useCallback(async (targetUserId: string, targetName: string) => {
+        if (!confirm(`Block ${targetName}? They will no longer be able to message you, and existing chats will be hidden.`)) {
+            setContactMenu(null)
+            return
+        }
+        const res = await blockContact(targetUserId)
+        if (res.error) {
+            toast.error(res.error)
+        } else {
+            toast.success(`Blocked ${targetName}`)
+            // Remove from contacts list locally
+            setContacts(prev => prev.filter((c: any) => c.user.id !== targetUserId))
+            // Hide direct conversations with the blocked user from sidebar
+            setConversations(prev => prev.filter(c => {
+                if (c.type !== 'DIRECT') return true
+                return !c.participants.some(p => p.userId === targetUserId)
+            }))
+        }
+        setContactMenu(null)
+    }, [])
 
     const handleDeleteChat = useCallback(async (convId: string) => {
         if (!confirm('Delete this conversation? It will only disappear from your list — others will still see it.')) {
@@ -243,12 +279,15 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
             {/* Header */}
             <div className="flex items-center justify-between px-3.5 pt-3.5 pb-2.5">
                 <h2 className="text-base font-extrabold text-white m-0">Chat</h2>
-                <button
-                    onClick={onNewChat}
-                    className="w-[30px] h-[30px] rounded-lg border-none cursor-pointer bg-violet-500/15 flex items-center justify-center hover:bg-violet-500/25 transition-colors"
-                >
-                    <Plus className="w-4 h-4 text-violet-500" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                    <StatusSwitcher />
+                    <button
+                        onClick={onNewChat}
+                        className="w-[30px] h-[30px] rounded-lg border-none cursor-pointer bg-violet-500/15 flex items-center justify-center hover:bg-violet-500/25 transition-colors"
+                    >
+                        <Plus className="w-4 h-4 text-violet-500" />
+                    </button>
+                </div>
             </div>
 
             {/* Search */}
@@ -359,46 +398,57 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
                     )
                 })}
 
-                {tab === 'contacts' && contacts.map(c => (
-                    <div
-                        key={c.contactId}
-                        onClick={() => {
-                            const conv = conversations.find(cv =>
-                                cv.type === 'DIRECT' && cv.participants.some(p => p.userId === c.user.id)
-                            )
-                            if (conv) onSelectConversation(conv.id, c.user.nickname || c.user.username)
-                        }}
-                        className="flex items-center gap-2.5 py-2.5 px-3.5 cursor-pointer hover:bg-white/[0.03] transition-colors"
-                    >
-                        <div className="relative">
-                            {c.user.avatarUrl ? (
-                                <div
-                                    className="w-9 h-9 rounded-full bg-center bg-cover"
-                                    style={{ backgroundImage: `url(${c.user.avatarUrl})` }}
-                                />
-                            ) : (
-                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-bold text-white">
-                                    {(c.user.nickname || c.user.username).charAt(0).toUpperCase()}
+                {tab === 'contacts' && contacts.map(c => {
+                    const targetName = c.user.nickname || c.user.username
+                    return (
+                        <div
+                            key={c.contactId}
+                            className="group/contact flex items-center gap-2.5 py-2.5 px-3.5 cursor-pointer hover:bg-white/[0.03] transition-colors"
+                            onClick={() => {
+                                const conv = conversations.find(cv =>
+                                    cv.type === 'DIRECT' && cv.participants.some(p => p.userId === c.user.id)
+                                )
+                                if (conv) onSelectConversation(conv.id, targetName)
+                            }}
+                        >
+                            <div className="relative">
+                                {c.user.avatarUrl ? (
+                                    <div
+                                        className="w-9 h-9 rounded-full bg-center bg-cover"
+                                        style={{ backgroundImage: `url(${c.user.avatarUrl})` }}
+                                    />
+                                ) : (
+                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-bold text-white">
+                                        {targetName.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-zinc-950 ${presenceColor(c.user.presenceStatus)}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-[13px] font-medium text-zinc-200 truncate">{targetName}</div>
+                                <div className="text-[11px] text-zinc-600 truncate">
+                                    {presenceSubtitle(c.user.presenceStatus, c.user.lastSeen)}
                                 </div>
-                            )}
-                            <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-zinc-950 ${
-                                c.user.presenceStatus === 'ONLINE'
-                                    ? 'bg-emerald-500'
-                                    : c.user.presenceStatus === 'AWAY'
-                                        ? 'bg-yellow-500'
-                                        : 'bg-zinc-600'
-                            }`} />
-                        </div>
-                        <div>
-                            <div className="text-[13px] font-medium text-zinc-200">
-                                {c.user.nickname || c.user.username}
                             </div>
-                            <div className="text-[11px] text-zinc-600">
-                                {c.user.presenceStatus === 'ONLINE' ? 'Online' : c.user.presenceStatus === 'AWAY' ? 'Away' : 'Offline'}
-                            </div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setContactMenu({
+                                        contactId: c.contactId,
+                                        targetUserId: c.user.id,
+                                        targetName,
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                    })
+                                }}
+                                className="opacity-0 group-hover/contact:opacity-100 transition-opacity p-1 rounded-md hover:bg-white/10 cursor-pointer bg-transparent border-none shrink-0"
+                                title="More"
+                            >
+                                <MoreHorizontal className="w-3.5 h-3.5 text-zinc-400" />
+                            </button>
                         </div>
-                    </div>
-                ))}
+                    )
+                })}
 
                 {tab === 'requests' && requests.map(r => (
                     <div key={r.id} className="flex items-center gap-2.5 py-2.5 px-3.5">
@@ -526,6 +576,22 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
                     currentName={renameTarget.name}
                     onRenamed={handleRenamed}
                 />
+            )}
+
+            {/* Contact context menu */}
+            {contactMenu && (
+                <div
+                    ref={contactMenuRef}
+                    className="fixed z-[100] bg-zinc-900 border border-violet-500/20 rounded-lg shadow-2xl py-1 min-w-[180px]"
+                    style={{ left: Math.min(contactMenu.x, window.innerWidth - 200), top: Math.min(contactMenu.y, window.innerHeight - 100) }}
+                >
+                    <button
+                        onClick={() => handleBlockContact(contactMenu.targetUserId, contactMenu.targetName)}
+                        className="w-full px-3 py-2 text-[12px] text-red-400 hover:bg-red-500/10 cursor-pointer text-left flex items-center gap-2"
+                    >
+                        <Ban className="w-3.5 h-3.5" /> Block {contactMenu.targetName}
+                    </button>
+                </div>
             )}
         </div>
     )

@@ -12,9 +12,25 @@ import {
     Lock,
     Eye,
     EyeOff,
+    Forward,
+    Pin,
+    PinOff,
+    Star,
+    Megaphone,
+    CornerDownRight,
 } from 'lucide-react'
 import type { ChatMessage } from '@/hooks/useChatMessages'
-import { recallMessage, editMessage, markViewOnceViewed, deleteMessageForMe } from '@/actions/chat-actions'
+import {
+    recallMessage,
+    editMessage,
+    markViewOnceViewed,
+    deleteMessageForMe,
+    pinMessage,
+    unpinMessage,
+    setMessageImportant,
+} from '@/actions/chat-actions'
+import { splitMentions, type MentionableUser } from '@/lib/mentions'
+import { ForwardMessageDialog } from './ForwardMessageDialog'
 import { toast } from 'sonner'
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
@@ -28,10 +44,12 @@ interface MessageBubbleProps {
     onReact?: (messageId: string, emoji: string) => void
     onMessageUpdated?: (messageId: string, updates: Partial<ChatMessage>) => void
     onMessageHidden?: (messageId: string) => void
+    canPin?: boolean   // GROUP: only creator. DIRECT/TASK: any participant.
+    participants?: MentionableUser[]
     currentUserId: string
 }
 
-export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpdated, onMessageHidden, currentUserId }: MessageBubbleProps) {
+export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpdated, onMessageHidden, canPin = true, participants = [], currentUserId }: MessageBubbleProps) {
     const [showActions, setShowActions] = useState(false)
     const [showReactions, setShowReactions] = useState(false)
     const [showMenu, setShowMenu] = useState(false)
@@ -39,6 +57,7 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
     const [editValue, setEditValue] = useState(message.content || '')
     const [viewOnceModal, setViewOnceModal] = useState(false)
     const [viewOnceUrl, setViewOnceUrl] = useState<string | null>(null)
+    const [showForward, setShowForward] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
 
     // Close action menu on outside click
@@ -94,6 +113,33 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
         setShowMenu(false)
     }
 
+    const handlePin = async () => {
+        const res = message.isPinned ? await unpinMessage(message.id) : await pinMessage(message.id)
+        if (res.error) {
+            toast.error(res.error)
+            return
+        }
+        onMessageUpdated?.(message.id, { isPinned: !message.isPinned })
+        toast.success(message.isPinned ? 'Unpinned' : 'Pinned')
+        setShowMenu(false)
+    }
+
+    const handleToggleImportant = async () => {
+        const next = !message.isImportant
+        const res = await setMessageImportant(message.id, next)
+        if (res.error) {
+            toast.error(res.error)
+            return
+        }
+        onMessageUpdated?.(message.id, { isImportant: next })
+        setShowMenu(false)
+    }
+
+    const handleForward = () => {
+        setShowForward(true)
+        setShowMenu(false)
+    }
+
     const handleEditSubmit = async () => {
         const trimmed = editValue.trim()
         if (!trimmed || trimmed === message.content) {
@@ -146,6 +192,50 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
     const isViewOnce = !!message.viewOnce
     const isExpiredViewOnce = isViewOnce && message.expired
     const isViewOnceCard = isViewOnce && !isMine && !message.viewed && !message.expired
+    const isAnnouncement = message.type === 'ANNOUNCEMENT'
+    const isForwarded = !!message.forwardedFromMessageId
+    const isMentioningMe = (message.mentions || []).includes(currentUserId)
+
+    // Render TEXT content with mention pills
+    const renderContent = (content: string | null) => {
+        if (!content) return null
+        const segments = splitMentions(content, participants)
+        return segments.map((seg, i) => {
+            if (seg.type === 'text') return <span key={i}>{seg.value}</span>
+            const isMe = seg.userId === currentUserId
+            return (
+                <span
+                    key={i}
+                    className={`inline-flex items-center font-semibold rounded px-1 ${
+                        isMe
+                            ? 'bg-amber-500/25 text-amber-200'
+                            : 'bg-violet-500/20 text-violet-300'
+                    }`}
+                >
+                    @{seg.handle}
+                </span>
+            )
+        })
+    }
+
+    // Announcement renders as full-width banner instead of bubble
+    if (isAnnouncement && !editing) {
+        return (
+            <div data-message-id={message.id} className="my-2 mx-2 rounded-2xl">
+                <div className="rounded-2xl bg-gradient-to-br from-fuchsia-600/15 to-violet-600/15 border border-fuchsia-500/30 px-4 py-3 shadow-[0_0_24px_rgba(217,70,239,0.15)]">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <Megaphone className="w-3.5 h-3.5 text-fuchsia-300" />
+                        <span className="text-[10px] uppercase tracking-wide text-fuchsia-300 font-bold">Announcement</span>
+                        <span className="text-[10px] text-zinc-500">· {message.sender.nickname || message.sender.username}</span>
+                        <span className="text-[10px] text-zinc-600 ml-auto">{time}</span>
+                    </div>
+                    <p className="m-0 text-[14px] leading-relaxed text-zinc-100 break-words whitespace-pre-wrap">
+                        {renderContent(message.content)}
+                    </p>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <>
@@ -182,13 +272,38 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
                         </div>
                     )}
 
+                    {isForwarded && (
+                        <div className="flex items-center gap-1 text-[10px] text-zinc-500 italic px-1 mb-0.5">
+                            <CornerDownRight className="w-2.5 h-2.5" /> Forwarded
+                        </div>
+                    )}
+
                     <div className={`relative ${
                         message.type === 'IMAGE' && !isViewOnceCard && !isExpiredViewOnce ? 'p-1' : 'px-3.5 py-2'
                     } ${
-                        isMine
-                            ? 'rounded-2xl rounded-tr-sm bg-violet-500/15 border border-violet-500/20'
-                            : 'rounded-2xl rounded-tl-sm bg-white/[0.04] border border-white/[0.06]'
+                        message.isImportant
+                            ? isMine
+                                ? 'rounded-2xl rounded-tr-sm bg-amber-500/15 border border-amber-500/40 shadow-[0_0_16px_rgba(251,191,36,0.15)]'
+                                : 'rounded-2xl rounded-tl-sm bg-amber-500/10 border border-amber-500/30 shadow-[0_0_16px_rgba(251,191,36,0.1)]'
+                            : isMentioningMe
+                                ? isMine
+                                    ? 'rounded-2xl rounded-tr-sm bg-violet-500/25 border border-violet-500/40'
+                                    : 'rounded-2xl rounded-tl-sm bg-violet-500/[0.10] border border-violet-500/30'
+                                : isMine
+                                    ? 'rounded-2xl rounded-tr-sm bg-violet-500/15 border border-violet-500/20'
+                                    : 'rounded-2xl rounded-tl-sm bg-white/[0.04] border border-white/[0.06]'
                     }`}>
+                        {message.isImportant && (
+                            <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center shadow-[0_0_8px_rgba(251,191,36,0.5)]">
+                                <Star className="w-2.5 h-2.5 text-white fill-white" />
+                            </div>
+                        )}
+                        {message.isPinned && (
+                            <div className="absolute -top-2 left-2 px-1.5 h-4 rounded-full bg-amber-500/30 border border-amber-500/40 flex items-center gap-0.5">
+                                <Pin className="w-2 h-2 text-amber-300" />
+                                <span className="text-[8px] text-amber-300 font-bold">PINNED</span>
+                            </div>
+                        )}
                         {/* Edit mode (TEXT only) */}
                         {editing ? (
                             <div className="flex flex-col gap-2 min-w-[200px]">
@@ -271,7 +386,7 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
 
                                 {message.type === 'TEXT' && (
                                     <p className="m-0 text-[13px] leading-relaxed text-zinc-200 break-words whitespace-pre-wrap">
-                                        {message.content}
+                                        {renderContent(message.content)}
                                     </p>
                                 )}
 
@@ -306,11 +421,27 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
                                                     <Copy className="w-3 h-3" /> Copy text
                                                 </button>
                                             )}
+                                            <button onClick={handleForward} className="w-full px-3 py-1.5 text-[12px] text-zinc-300 hover:bg-white/5 cursor-pointer text-left flex items-center gap-2">
+                                                <Forward className="w-3 h-3" /> Forward
+                                            </button>
+                                            {canPin && !message.isDeleted && message.type !== 'SYSTEM' && (
+                                                <button onClick={handlePin} className="w-full px-3 py-1.5 text-[12px] text-zinc-300 hover:bg-white/5 cursor-pointer text-left flex items-center gap-2">
+                                                    {message.isPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+                                                    {message.isPinned ? 'Unpin' : 'Pin message'}
+                                                </button>
+                                            )}
+                                            {isMine && message.type === 'TEXT' && !message.isDeleted && (
+                                                <button onClick={handleToggleImportant} className="w-full px-3 py-1.5 text-[12px] text-zinc-300 hover:bg-white/5 cursor-pointer text-left flex items-center gap-2">
+                                                    <Star className={`w-3 h-3 ${message.isImportant ? 'text-amber-400 fill-amber-400' : ''}`} />
+                                                    {message.isImportant ? 'Unmark important' : 'Mark important'}
+                                                </button>
+                                            )}
                                             {canEdit && (
                                                 <button onClick={() => { setEditing(true); setShowMenu(false) }} className="w-full px-3 py-1.5 text-[12px] text-zinc-300 hover:bg-white/5 cursor-pointer text-left flex items-center gap-2">
                                                     <Pencil className="w-3 h-3" /> Edit
                                                 </button>
                                             )}
+                                            <div className="h-px bg-white/[0.06] my-0.5" />
                                             <button onClick={handleDeleteForMe} className="w-full px-3 py-1.5 text-[12px] text-zinc-300 hover:bg-white/5 cursor-pointer text-left flex items-center gap-2">
                                                 <EyeOff className="w-3 h-3" /> Delete for me
                                             </button>
@@ -364,6 +495,14 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
                     </span>
                 </div>
             </div>
+
+            {/* Forward dialog */}
+            <ForwardMessageDialog
+                isOpen={showForward}
+                onClose={() => setShowForward(false)}
+                messageId={message.id}
+                messagePreview={message.content || message.fileName || undefined}
+            />
 
             {/* View-once full-screen modal */}
             {viewOnceModal && viewOnceUrl && (

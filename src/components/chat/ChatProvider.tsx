@@ -105,9 +105,14 @@ export function ChatProvider({ userId, children }: { userId: string; children: R
         if (event === CHAT_EVENTS.NEW_MESSAGE && payload.senderId !== userId) {
             if (payload.conversationId !== activeConversationId) {
                 const isMuted = mutedConversationIdsRef.current.has(payload.conversationId)
-                if (!isMuted) {
+                // Mention OR important message overrides mute
+                const isMention = Array.isArray(payload.message?.mentions) && payload.message.mentions.includes(userId)
+                const isImportant = !!payload.message?.isImportant
+                const isAnnouncement = payload.message?.type === 'ANNOUNCEMENT'
+                if (!isMuted || isMention || isImportant || isAnnouncement) {
                     playNotificationSound()
-                    flashTabTitle(payload.senderName || 'Someone')
+                    const prefix = isMention ? '@you ' : isImportant ? '⭐ ' : isAnnouncement ? '📣 ' : ''
+                    flashTabTitle(`${prefix}${payload.senderName || 'Someone'}`)
                 }
                 setUnreadCounts(prev => ({
                     ...prev,

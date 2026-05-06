@@ -88,7 +88,7 @@ export async function trackEvent(payload: TrackingEventPayload) {
 /**
  * Pings the application with presence data (Heartbeat)
  */
-export async function pingHeartbeat(status: 'ONLINE' | 'AWAY' = 'ONLINE', currentUserId?: string) {
+export async function pingHeartbeat(status: 'ONLINE' | 'AWAY' | 'BUSY' | 'OFFLINE' = 'ONLINE', currentUserId?: string) {
     try {
         // Find the user context. If currentUserId is not provided, try to extract via headers or layout auth
         if (!currentUserId) return { success: false, reason: 'No User ID provided for heartbeat' }

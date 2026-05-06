@@ -197,10 +197,10 @@ export async function getContacts() {
         },
         include: {
             requester: {
-                select: { id: true, username: true, nickname: true, avatarUrl: true, presence: { select: { status: true } } },
+                select: { id: true, username: true, nickname: true, avatarUrl: true, presence: { select: { status: true, lastHeartbeat: true } } },
             },
             receiver: {
-                select: { id: true, username: true, nickname: true, avatarUrl: true, presence: { select: { status: true } } },
+                select: { id: true, username: true, nickname: true, avatarUrl: true, presence: { select: { status: true, lastHeartbeat: true } } },
             },
         },
     })
@@ -216,10 +216,60 @@ export async function getContacts() {
                     nickname: other.nickname,
                     avatarUrl: other.avatarUrl,
                     presenceStatus: other.presence?.status || 'OFFLINE',
+                    lastSeen: other.presence?.lastHeartbeat?.toISOString() || null,
                 },
             }
         }),
     }
+}
+
+export async function getBlockedContacts() {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const contacts = await prisma.contact.findMany({
+        where: {
+            status: 'BLOCKED',
+            requesterId: userId,
+        },
+        include: {
+            receiver: {
+                select: { id: true, username: true, nickname: true, avatarUrl: true },
+            },
+        },
+    })
+    return {
+        data: contacts.map(c => ({
+            contactId: c.id,
+            user: {
+                id: c.receiver.id,
+                username: c.receiver.username,
+                nickname: c.receiver.nickname,
+                avatarUrl: c.receiver.avatarUrl,
+            },
+        })),
+    }
+}
+
+export async function unblockContact(targetUserId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const contact = await prisma.contact.findFirst({
+        where: {
+            requesterId: userId,
+            receiverId: targetUserId,
+            status: 'BLOCKED',
+        },
+    })
+    if (!contact) return { error: 'Not blocked' }
+
+    // Delete the BLOCKED record. They can re-friend if they want.
+    await prisma.contact.delete({ where: { id: contact.id } })
+
+    return { data: { ok: true } }
 }
 
 export async function blockContact(targetUserId: string) {

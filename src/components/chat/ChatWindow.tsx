@@ -8,6 +8,7 @@ import { getConversationChannel, getUserNotificationChannel, CHAT_EVENTS } from 
 import { supabase } from '@/lib/supabase'
 import { markAsRead, toggleReaction, getConversations, getMessages as fetchMessages } from '@/actions/chat-actions'
 import { uploadChatFile } from '@/actions/chat-upload-actions'
+import { playNotificationSound } from '@/lib/notification-sound'
 import { MessageBubble } from './MessageBubble'
 import { ChatInput } from './ChatInput'
 import { Loader2, ClipboardList, User, Briefcase } from 'lucide-react'
@@ -139,6 +140,10 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
         if (event === CHAT_EVENTS.NEW_MESSAGE && payload.senderId !== currentUserId) {
             addIncomingMessage(payload.message)
             markAsRead(conversationId)
+            // Play sound when tab is not focused (user is away but in this conversation)
+            if (document.hidden) {
+                playNotificationSound()
+            }
         }
         if (event === CHAT_EVENTS.MESSAGE_EDITED && payload.messageId) {
             updateMessage(payload.messageId, {

@@ -126,43 +126,30 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
     const profileId = (session?.user as any)?.sessionProfileId
     const leaderboard = await getLeaderboardData(workspaceId, profileId)
 
-    const getRankColor = (rank: string) => {
-        if (rank === 'S') return 'from-yellow-400 to-purple-500 text-yellow-500 border-yellow-500/50 bg-yellow-500/10'
-        if (rank === 'A') return 'from-green-400 to-emerald-500 text-green-400 border-green-500/50 bg-green-500/10'
-        if (rank === 'B') return 'from-blue-400 to-cyan-500 text-blue-400 border-blue-500/50 bg-blue-500/10'
-        if (rank === 'C') return 'from-orange-400 to-amber-500 text-orange-400 border-orange-500/50 bg-orange-500/10'
-        if (rank === 'D') return 'from-red-500 to-rose-600 text-red-500 border-red-500/50 bg-red-500/10'
-        return 'text-zinc-500 border-zinc-700 bg-zinc-800'
-    }
-
     const top3 = leaderboard.slice(0, 3)
-    const rest = leaderboard.slice(3)
 
     // Podium order: 2nd (left), 1st (center), 3rd (right)
     const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean)
 
-    // Bar config per placement
-    const barConfig: Record<number, { height: string; bg: string; nameCls: string; ringCls: string; fallbackBg: string; label: string }> = {
+    // Bar config per placement — heights proportional like Figma
+    const barConfig: Record<number, { height: string; bg: string; ringCls: string; fallbackBg: string; label: string }> = {
         0: {
-            height: 'h-[96px]',
+            height: 'h-[100px]',
             bg: 'bg-[#4C1D95]',
-            nameCls: 'text-white',
             ringCls: 'ring-2 ring-[#8B5CF6]/50',
             fallbackBg: 'bg-gradient-to-br from-[#8B5CF6] to-[#4C1D95]',
             label: '2',
         },
         1: {
-            height: 'h-[108px]',
+            height: 'h-[120px]',
             bg: 'bg-[#8B5CF6]',
-            nameCls: 'text-[#D8B4FE]',
             ringCls: 'ring-2 ring-[#A855F7]',
             fallbackBg: 'bg-gradient-to-br from-[#A855F7] to-[#8B5CF6]',
             label: '1',
         },
         2: {
-            height: 'h-[79px]',
+            height: 'h-[80px]',
             bg: 'bg-[#211B31]',
-            nameCls: 'text-white',
             ringCls: 'ring-2 ring-[#4C1D95]/50',
             fallbackBg: 'bg-gradient-to-br from-[#8B5CF6] to-[#4C1D95]',
             label: '3',
@@ -174,11 +161,8 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
             className="relative overflow-hidden rounded-[26px] bg-[#0A0A0A] border border-[rgba(139,92,246,0.15)] shadow-2xl shadow-black/60 flex flex-col h-full"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
         >
-            {/* Subtle ambient glow */}
-            <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-64 h-64 bg-[#8B5CF6]/[0.06] blur-[80px] rounded-full pointer-events-none" />
-
             {/* ===== HEADER ===== */}
-            <div className="relative z-10 px-6 pt-6 pb-2 flex items-start justify-between">
+            <div className="relative z-10 px-5 pt-5 pb-2 flex items-start justify-between">
                 <div className="flex flex-col gap-0.5">
                     <h3 className="text-lg font-bold text-white leading-tight tracking-tight">
                         Rankings
@@ -187,105 +171,59 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {/* "This week" pill */}
                     <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-[rgba(139,92,246,0.15)] text-[11px] font-medium text-[#A1A1AA] select-none">
                         This week
                         <ChevronDown className="w-3 h-3 text-[#A1A1AA]/70" />
                     </span>
-                    {/* "Details" pill — refresh for admins, static for others */}
                     <RefreshLeaderboardButton isAdmin={session?.user?.role === 'ADMIN'} />
                 </div>
             </div>
 
-            {/* ===== BODY ===== */}
-            <div className="relative z-10 flex-1 flex flex-col px-6 pb-6">
+            {/* ===== BODY — only top 3 podium ===== */}
+            <div className="relative z-10 flex-1 flex flex-col justify-end px-5 pb-5">
                 {leaderboard.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-[#A1A1AA] py-10">
                         <Trophy className="w-10 h-10 text-[#4C1D95] mb-3" />
                         <p className="text-sm">Chưa có đủ dữ liệu xếp hạng.</p>
                     </div>
                 ) : (
-                    <>
-                        {/* ===== PODIUM ===== */}
-                        {podiumOrder.length > 0 && (
-                            <div className="flex items-end justify-center gap-3 pt-10 pb-2">
-                                {podiumOrder.map((person, idx) => {
-                                    if (!person) return null
-                                    const cfg = barConfig[idx]
-                                    return (
-                                        <div key={person.id} className="flex flex-col items-center flex-1 max-w-[120px]">
-                                            {/* Avatar */}
-                                            <div className="relative mb-2">
-                                                <Avatar className={`h-11 w-11 ${cfg.ringCls} border-2 border-[#0A0A0A]`}>
-                                                    <AvatarImage
-                                                        src={person.avatarUrl || `https://avatar.vercel.sh/${person.username}`}
-                                                        className="object-cover"
-                                                    />
-                                                    <AvatarFallback className={`${cfg.fallbackBg} text-white text-sm font-bold`}>
-                                                        {person.username[0]}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                            </div>
+                    <div className="flex items-end justify-center gap-4">
+                        {podiumOrder.map((person, idx) => {
+                            if (!person) return null
+                            const cfg = barConfig[idx]
+                            return (
+                                <div key={person.id} className="flex flex-col items-center flex-1">
+                                    {/* Avatar */}
+                                    <Avatar className={`h-11 w-11 ${cfg.ringCls} border-2 border-[#0A0A0A] mb-2`}>
+                                        <AvatarImage
+                                            src={person.avatarUrl || `https://avatar.vercel.sh/${person.username}`}
+                                            className="object-cover"
+                                        />
+                                        <AvatarFallback className={`${cfg.fallbackBg} text-white text-sm font-bold`}>
+                                            {person.username[0]}
+                                        </AvatarFallback>
+                                    </Avatar>
 
-                                            {/* Name */}
-                                            <span className={`text-[13px] font-semibold truncate w-full text-center mb-2 ${cfg.nameCls}`}>
-                                                {person.username}
-                                            </span>
+                                    {/* Name */}
+                                    <span className="text-[13px] font-semibold truncate w-full text-center mb-2 text-white">
+                                        {person.username}
+                                    </span>
 
-                                            {/* Bar pedestal */}
-                                            <div
-                                                className={`w-full ${cfg.height} ${cfg.bg} rounded-tl-[26px] rounded-tr-[26px] rounded-bl-[6px] rounded-br-[6px] relative flex items-center justify-center transition-all`}
-                                            >
-                                                {/* Placement number */}
-                                                <span className="text-white/80 text-2xl font-extrabold select-none">
-                                                    {cfg.label}
-                                                </span>
-                                                {/* Subtle inner glow for 1st */}
-                                                {idx === 1 && (
-                                                    <div className="absolute inset-0 rounded-tl-[26px] rounded-tr-[26px] rounded-bl-[6px] rounded-br-[6px] bg-gradient-to-t from-transparent to-white/[0.08] pointer-events-none" />
-                                                )}
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        )}
-
-                        {/* ===== REST LIST (4-10) — compact, subtle ===== */}
-                        {rest.length > 0 && (
-                            <div className="mt-4 space-y-1 overflow-y-auto max-h-[180px] pr-1">
-                                {rest.map((r, i) => (
+                                    {/* Bar pedestal */}
                                     <div
-                                        key={r.id}
-                                        className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.03] border border-[rgba(139,92,246,0.08)] hover:bg-white/[0.06] hover:border-[rgba(139,92,246,0.15)] transition-all duration-200 group"
+                                        className={`w-full ${cfg.height} ${cfg.bg} rounded-t-[20px] rounded-b-[6px] relative flex items-center justify-center`}
                                     >
-                                        <div className="flex items-center gap-2.5">
-                                            <span className="text-[#A1A1AA]/60 font-mono font-bold w-4 text-right text-xs">
-                                                {i + 4}
-                                            </span>
-                                            <Avatar className="h-7 w-7 ring-1 ring-[#4C1D95]/30 border border-[#0A0A0A]">
-                                                <AvatarImage
-                                                    src={r.avatarUrl || `https://avatar.vercel.sh/${r.username}`}
-                                                    className="object-cover"
-                                                />
-                                                <AvatarFallback className="bg-gradient-to-br from-[#8B5CF6] to-[#4C1D95] text-white text-[10px] font-bold">
-                                                    {r.username[0]}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <span className="text-xs font-medium text-[#A1A1AA] group-hover:text-white transition-colors truncate max-w-[100px]">
-                                                {r.username}
-                                            </span>
-                                        </div>
-                                        <span
-                                            className={`text-[10px] px-2 py-0.5 rounded-md font-bold font-mono border ${getRankColor(r.rank).split(' ').slice(2).join(' ')}`}
-                                        >
-                                            {r.rank}
+                                        <span className="text-white/80 text-2xl font-extrabold select-none">
+                                            {cfg.label}
                                         </span>
+                                        {idx === 1 && (
+                                            <div className="absolute inset-0 rounded-t-[20px] rounded-b-[6px] bg-gradient-to-t from-transparent to-white/[0.08] pointer-events-none" />
+                                        )}
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </>
+                                </div>
+                            )
+                        })}
+                    </div>
                 )}
             </div>
         </div>

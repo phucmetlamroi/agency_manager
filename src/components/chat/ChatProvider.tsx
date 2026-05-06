@@ -62,7 +62,7 @@ export function ChatProvider({ userId, children }: { userId: string; children: R
 
     useEffect(() => {
         refreshUnread()
-        const interval = setInterval(refreshUnread, 30000)
+        const interval = setInterval(refreshUnread, 10000)
         return () => clearInterval(interval)
     }, [refreshUnread])
 

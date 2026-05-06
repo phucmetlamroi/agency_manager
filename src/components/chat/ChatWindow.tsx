@@ -12,6 +12,35 @@ import { MessageBubble } from './MessageBubble'
 import { ChatInput } from './ChatInput'
 import { Loader2, ClipboardList, User, Briefcase } from 'lucide-react'
 
+// ★ Fire-and-forget: properly subscribe → send → cleanup
+// The old code created channels without subscribe() so send() silently failed.
+function notifyParticipantChannels(conversationId: string, senderId: string, message: any) {
+    fetch(`/api/chat/participants?conversationId=${conversationId}`)
+        .then(r => r.json())
+        .then(({ userIds }) => {
+            const senderName = message.sender?.nickname || message.sender?.username || ''
+            ;(userIds || []).forEach((uid: string) => {
+                if (uid === senderId) return
+                const channelName = getUserNotificationChannel(uid)
+                const ch = supabase.channel(channelName)
+                ch.subscribe((status: string) => {
+                    if (status === 'SUBSCRIBED') {
+                        ch.send({
+                            type: 'broadcast',
+                            event: CHAT_EVENTS.NEW_MESSAGE,
+                            payload: { conversationId, senderId, senderName, message },
+                        }).finally(() => {
+                            setTimeout(() => supabase.removeChannel(ch), 500)
+                        })
+                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                        supabase.removeChannel(ch)
+                    }
+                })
+            })
+        })
+        .catch(() => { /* Non-critical — polling catches up */ })
+}
+
 interface ConversationMeta {
     type: string
     taskTitle?: string
@@ -89,7 +118,7 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
             } catch {
                 // Polling failed silently — will retry next interval
             }
-        }, 4000)
+        }, 2000)
 
         return () => clearInterval(pollInterval)
     }, [conversationId, addIncomingMessage])
@@ -163,9 +192,22 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
         }
         addOptimisticMessage(optimistic)
 
+        // ★ KEY FIX: Broadcast optimistic message IMMEDIATELY — don't wait for server save.
+        // The receiver gets the message in <100ms instead of waiting 2-4s for DB round-trip.
+        broadcast(CHAT_EVENTS.NEW_MESSAGE, {
+            conversationId,
+            senderId: currentUserId,
+            senderName: '',
+            message: optimistic,
+        })
+
+        // Server save runs after broadcast — receiver already has the message
         const result = await sendMessage(content, 'TEXT', replyToId)
         if (result) {
-            // Broadcast on the conversation channel (for users viewing this chat)
+            // Replace sender's optimistic with confirmed
+            addIncomingMessage(result)
+
+            // Broadcast confirmed message → receiver deduplicates temp-* and gets real ID
             broadcast(CHAT_EVENTS.NEW_MESSAGE, {
                 conversationId,
                 senderId: currentUserId,
@@ -173,32 +215,10 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                 message: result,
             })
 
-            // Notify other participants via their personal notification channels
-            try {
-                const participants = await fetch(`/api/chat/participants?conversationId=${conversationId}`).then(r => r.json()).catch(() => ({ userIds: [] }))
-                const senderName = result.sender.nickname || result.sender.username
-                ;(participants.userIds || []).forEach((uid: string) => {
-                    if (uid !== currentUserId) {
-                        const userChannel = supabase.channel(getUserNotificationChannel(uid))
-                        userChannel.send({
-                            type: 'broadcast',
-                            event: CHAT_EVENTS.NEW_MESSAGE,
-                            payload: {
-                                conversationId,
-                                senderId: currentUserId,
-                                senderName,
-                                message: result,
-                            },
-                        }).then(() => {
-                            supabase.removeChannel(userChannel)
-                        })
-                    }
-                })
-            } catch {
-                // Non-critical: notification failed, polling will catch up
-            }
+            // ★ FIX: Notify other participants via personal channels (properly subscribe first)
+            void notifyParticipantChannels(conversationId, currentUserId, result)
         }
-    }, [conversationId, currentUserId, replyTo, sendMessage, addOptimisticMessage, broadcast])
+    }, [conversationId, currentUserId, replyTo, sendMessage, addOptimisticMessage, addIncomingMessage, broadcast])
 
     const handleFileUpload = useCallback(async (file: File, viewOnce = false) => {
         const formData = new FormData()

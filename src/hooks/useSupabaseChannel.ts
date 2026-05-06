@@ -20,7 +20,7 @@ export function useSupabaseChannel(
         setIsSubscribed(false)
 
         const channel = supabase.channel(channelName, {
-            config: { broadcast: { ack: true } },
+            config: { broadcast: { self: false } },
         })
 
         channel

@@ -15,6 +15,8 @@ interface DashboardActionWrapperProps {
     parent?: { name: string } | null
   }>
   users: Array<{ id: string; username: string; nickname?: string | null }>
+  workspaces: Array<{ id: string; name: string; description: string | null }>
+  userRole: string
   onTaskCreated?: () => void
 }
 
@@ -22,6 +24,8 @@ export default function DashboardActionWrapper({
   workspaceId,
   clients,
   users,
+  workspaces,
+  userRole,
 }: DashboardActionWrapperProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const router = useRouter()
@@ -86,6 +90,8 @@ export default function DashboardActionWrapper({
       <DashboardActionBar
         workspaceId={workspaceId}
         onAddTask={() => setModalOpen(true)}
+        workspaces={workspaces}
+        userRole={userRole}
       />
       <AddTaskModal
         open={modalOpen}

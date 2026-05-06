@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   X,
@@ -12,10 +12,8 @@ import {
   Banknote,
   Link as LinkIcon,
   CheckCircle,
-  KeyRound,
   FileText,
-  Eye,
-  EyeOff,
+  Search,
 } from "lucide-react"
 
 /* ------------------------------------------------------------------ */
@@ -66,7 +64,6 @@ const STEPS = [
   { label: "Video", icon: Video },
   { label: "Finance", icon: Banknote },
   { label: "Resources", icon: LinkIcon },
-  { label: "Frame", icon: KeyRound },
   { label: "Notes", icon: FileText },
   { label: "Review", icon: CheckCircle },
 ] as const
@@ -141,6 +138,164 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
       <span className="text-[13px] text-zinc-300 font-semibold capitalize max-w-[60%] text-right truncate">
         {value || "—"}
       </span>
+    </div>
+  )
+}
+
+function AutocompleteInput({
+  selectedId,
+  onSelect,
+  options,
+  placeholder,
+  emptyLabel,
+}: {
+  selectedId: string
+  onSelect: (id: string) => void
+  options: Array<{ id: string; label: string; parentLabel?: string }>
+  placeholder: string
+  emptyLabel?: string
+}) {
+  const [query, setQuery] = useState("")
+  const [isOpen, setIsOpen] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const selectedOption = options.find((o) => o.id === selectedId)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+        setIsSearching(false)
+        setQuery("")
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  useEffect(() => {
+    if (!selectedId) {
+      setQuery("")
+      setIsSearching(false)
+    }
+  }, [selectedId])
+
+  const filtered = query
+    ? options.filter((o) => {
+        const searchStr = o.parentLabel ? `${o.parentLabel} ${o.label}` : o.label
+        return searchStr.toLowerCase().includes(query.toLowerCase())
+      })
+    : options
+
+  const displayValue = isSearching
+    ? query
+    : selectedOption
+      ? selectedOption.parentLabel
+        ? `${selectedOption.parentLabel} / ${selectedOption.label}`
+        : selectedOption.label
+      : ""
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="relative">
+        <div className="pointer-events-none absolute left-[14px] top-1/2 -translate-y-1/2 text-[#71717A]">
+          <Search size={14} />
+        </div>
+        <input
+          ref={inputRef}
+          className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] pl-9 pr-9 text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+          placeholder={placeholder}
+          value={displayValue}
+          onChange={(e) => {
+            if (selectedId && !isSearching) {
+              onSelect("")
+            }
+            setQuery(e.target.value)
+            setIsSearching(true)
+            setIsOpen(true)
+          }}
+          onFocus={() => {
+            setIsOpen(true)
+            if (selectedId) {
+              setIsSearching(true)
+              setQuery("")
+            }
+          }}
+        />
+        {selectedId && !isSearching && (
+          <button
+            type="button"
+            onClick={() => {
+              onSelect("")
+              setIsSearching(true)
+              setQuery("")
+              inputRef.current?.focus()
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A1A1AA] hover:text-white transition-colors"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-full mt-1.5 left-0 w-full z-50 max-h-[200px] overflow-y-auto rounded-2xl border border-[rgba(139,92,246,0.15)] bg-[#0A0A0A] shadow-[0_16px_48px_rgba(0,0,0,0.5)] custom-scrollbar"
+          >
+            {emptyLabel && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect("")
+                  setIsOpen(false)
+                  setIsSearching(false)
+                  setQuery("")
+                }}
+                className="w-full text-left px-4 py-2.5 text-[13px] text-zinc-500 hover:bg-white/[0.06] transition-colors"
+              >
+                {emptyLabel}
+              </button>
+            )}
+            {filtered.length > 0 ? (
+              filtered.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(o.id)
+                    setIsOpen(false)
+                    setIsSearching(false)
+                    setQuery("")
+                  }}
+                  className={`w-full text-left px-4 py-2.5 text-[13px] transition-colors ${
+                    o.id === selectedId
+                      ? "bg-[#8B5CF6]/10 text-white"
+                      : "text-zinc-300 hover:bg-white/[0.06]"
+                  }`}
+                >
+                  {o.parentLabel ? (
+                    <>
+                      <span className="text-zinc-500">{o.parentLabel}</span>
+                      <span className="text-zinc-600 mx-1">/</span>
+                      <span>{o.label}</span>
+                    </>
+                  ) : (
+                    o.label
+                  )}
+                </button>
+              ))
+            ) : (
+              <div className="px-4 py-3 text-[13px] text-zinc-600">No results found</div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -224,7 +379,6 @@ export default function AddTaskModal({
   const [form, setForm] = useState<TaskFormData>({ ...INITIAL_FORM })
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -232,7 +386,6 @@ export default function AddTaskModal({
       setForm({ ...INITIAL_FORM })
       setSubmitted(false)
       setSubmitting(false)
-      setShowPassword(false)
     }
   }, [open])
 
@@ -259,10 +412,9 @@ export default function AddTaskModal({
   const stepTitle = STEPS[step]?.label ?? ""
   const stepSubtitles = [
     "Set the basic task details",
-    "Add video URLs for this task",
+    "Add video names for this task",
     "Define pricing and editor compensation",
     "Attach resource links for this task",
-    "Frame account credentials (optional)",
     "Manager instructions and client requests",
     "Review everything before submitting",
   ]
@@ -297,26 +449,26 @@ export default function AddTaskModal({
   const renderStep = () => {
     switch (step) {
       /* ============ STEP 1 : General Info ============ */
-      case 0:
+      case 0: {
+        const clientOptions = clients.map((c) => ({
+          id: c.id,
+          label: c.name,
+          parentLabel: c.parent?.name,
+        }))
+        const userOptions = users.map((u) => ({
+          id: u.id,
+          label: u.nickname ?? u.username,
+        }))
         return (
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs text-[#A1A1AA] font-medium pl-1">Client</label>
-              <div className="relative">
-                <select
-                  className={selectBase}
-                  value={form.clientId}
-                  onChange={(e) => set("clientId", e.target.value)}
-                >
-                  <option value="">Select client...</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.parent ? `${c.parent.name} / ${c.name}` : c.name}
-                    </option>
-                  ))}
-                </select>
-                <SelectChevron />
-              </div>
+              <AutocompleteInput
+                selectedId={form.clientId}
+                onSelect={(id) => set("clientId", id)}
+                options={clientOptions}
+                placeholder="Search client..."
+              />
             </div>
 
             <div className="flex gap-3">
@@ -352,37 +504,28 @@ export default function AddTaskModal({
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs text-[#A1A1AA] font-medium pl-1">Assignee</label>
-              <div className="relative">
-                <select
-                  className={selectBase}
-                  value={form.assigneeId}
-                  onChange={(e) => set("assigneeId", e.target.value)}
-                >
-                  <option value="">Leave Blank (Task Pool)</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nickname ?? u.username}
-                    </option>
-                  ))}
-                </select>
-                <SelectChevron />
-              </div>
+              <AutocompleteInput
+                selectedId={form.assigneeId}
+                onSelect={(id) => set("assigneeId", id)}
+                options={userOptions}
+                placeholder="Search assignee..."
+                emptyLabel="Leave Blank (Task Pool)"
+              />
             </div>
           </div>
         )
+      }
 
       /* ============ STEP 2 : Video ============ */
       case 1:
         return (
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-[#A1A1AA] font-medium pl-1">
-                Video List <span className="text-zinc-600">(one URL per line)</span>
-              </label>
+              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Video list</label>
               <textarea
                 className={textareaBase}
                 style={{ minHeight: 200 }}
-                placeholder={"https://youtube.com/watch?v=...\nhttps://youtube.com/watch?v=..."}
+                placeholder="Video name..."
                 value={form.videoList}
                 onChange={(e) => set("videoList", e.target.value)}
               />
@@ -483,60 +626,8 @@ export default function AddTaskModal({
           </div>
         )
 
-      /* ============ STEP 5 : Frame Account ============ */
+      /* ============ STEP 5 : Notes ============ */
       case 4:
-        return (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Frame Username</label>
-              <input
-                type="text"
-                className={inputBase}
-                placeholder="username..."
-                value={form.frameUsername}
-                onChange={(e) => set("frameUsername", e.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Frame Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  className={inputBase + " pr-12"}
-                  placeholder="password..."
-                  value={form.framePassword}
-                  onChange={(e) => set("framePassword", e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A1A1AA] hover:text-white transition-colors"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Frame Note</label>
-              <textarea
-                className={textareaBase}
-                style={{ minHeight: 100 }}
-                placeholder="Ghi chú về tài khoản frame..."
-                value={form.frameNote}
-                onChange={(e) => set("frameNote", e.target.value)}
-              />
-            </div>
-
-            <p className="text-[11px] text-zinc-600 pl-1">
-              Thông tin tài khoản frame dành cho editor. Bỏ trống nếu không cần.
-            </p>
-          </div>
-        )
-
-      /* ============ STEP 6 : Notes ============ */
-      case 5:
         return (
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">
@@ -563,8 +654,8 @@ export default function AddTaskModal({
           </div>
         )
 
-      /* ============ STEP 7 : Review ============ */
-      case 6:
+      /* ============ STEP 6 : Review ============ */
+      case 5:
         return (
           <div className="flex flex-col gap-2">
             <ReviewRow label="Client" value={clientName} />
@@ -590,8 +681,6 @@ export default function AddTaskModal({
             <ReviewRow label="Reference" value={form.references} />
             <ReviewRow label="Submit Folder" value={form.submitFolder} />
             <ReviewRow label="Script" value={form.script} />
-            {form.frameUsername && <ReviewRow label="Frame User" value={form.frameUsername} />}
-            {form.frameNote && <ReviewRow label="Frame Note" value={form.frameNote} />}
             <ReviewRow label="Manager Instruction" value={form.notesVi} />
             <ReviewRow label="Client Request" value={form.notesEn} />
           </div>

@@ -69,6 +69,17 @@ export async function renameWorkspaceAction(workspaceId: string, newName: string
     }
 }
 
+export async function getWorkspacesForProfile(profileId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) return []
+
+    return prisma.workspace.findMany({
+        where: { profileId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, name: true, description: true }
+    })
+}
+
 export async function deleteWorkspaceAction(workspaceId: string) {
     const session = await getSession()
     if (!session?.user?.id) {

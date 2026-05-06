@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from '@/lib/db'
-import { login, logout } from '@/lib/auth'
+import { login, logout, loginWithProfile } from '@/lib/auth'
 import { compare } from 'bcryptjs'
 import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
@@ -54,32 +54,62 @@ export async function loginAction(prevState: any, formData: FormData) {
 
         role = user.role
         console.log(`[Login] Success for: ${username}, role: ${role}`)
-        // Login success
-        await login({ 
-            id: user.id, 
-            username: user.username, 
-            role: user.role, 
-            profileId: user.profileId, // Include profileId
-            hasAcceptedTerms: user.hasAcceptedTerms 
+
+        // CLIENT role → portal flow (unchanged)
+        if (role === 'CLIENT') {
+            await login({
+                id: user.id, username: user.username, role: user.role,
+                profileId: user.profileId, hasAcceptedTerms: user.hasAcceptedTerms
+            })
+            const cookieStore = await cookies()
+            cookieStore.set('NEXT_LOCALE', 'en', { path: '/' })
+            redirect('/portal/en')
+        }
+
+        // Staff/Admin: auto-select profile + most recent workspace → dashboard
+        let defaultProfileId = user.profileId
+
+        if (!defaultProfileId) {
+            const crossAccess = await prisma.profileAccess.findFirst({
+                where: { userId: user.id },
+                select: { profileId: true }
+            })
+            defaultProfileId = crossAccess?.profileId ?? null
+        }
+
+        if (!defaultProfileId) {
+            await login({
+                id: user.id, username: user.username, role: user.role,
+                profileId: user.profileId, hasAcceptedTerms: user.hasAcceptedTerms
+            })
+            console.log(`[Login] No profile found for ${username}, fallback to /profile`)
+            redirect('/profile')
+        }
+
+        await loginWithProfile({
+            id: user.id, username: user.username, role: user.role,
+            profileId: user.profileId, hasAcceptedTerms: user.hasAcceptedTerms
+        }, defaultProfileId)
+        console.log(`[Login] Cookie set with profileId=${defaultProfileId} for: ${username}`)
+
+        const firstWs = await prisma.workspace.findFirst({
+            where: { profileId: defaultProfileId },
+            orderBy: { createdAt: 'desc' },
         })
-        console.log(`[Login] Cookie set for: ${username}`)
+
+        if (!firstWs) {
+            console.log(`[Login] No workspace for profile ${defaultProfileId}, fallback to /workspace`)
+            redirect('/workspace')
+        }
+
+        console.log(`[Login] Auto-redirect to workspace ${firstWs.id} for: ${username}`)
+        redirect(`/${firstWs.id}/admin`)
 
     } catch (err) {
         if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
         console.error('[Login] ERROR:', err)
         return { error: `Lỗi: ${err instanceof Error ? err.message : 'Unknown'}` }
     }
-
-    console.log(`[Login] Redirecting ${username} based on role: ${role}`)
-
-    if (role === 'CLIENT') {
-        const cookieStore = await cookies()
-        cookieStore.set('NEXT_LOCALE', 'en', { path: '/' })
-        redirect('/portal/en')
-    }
-
-    // Redirect staff/admins to the Workspace Portal
-    redirect('/workspace')
 }
 
 export async function logoutAction() {

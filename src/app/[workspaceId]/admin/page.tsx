@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { isMobileDevice } from '@/lib/device'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
+import { prisma } from '@/lib/db'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
 import { serializeDecimal } from '@/lib/serialization'
@@ -15,6 +16,7 @@ import { AdminKPIWidgets } from '@/components/dashboard/AdminKPIWidgets'
 import { AdminRevenueChart } from '@/components/dashboard/AdminRevenueChart'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar'
 import DashboardActionWrapper from '@/components/dashboard/DashboardActionWrapper'
+import { getAvailableProfiles } from '@/actions/profile-actions'
 
 export default async function AdminDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -152,6 +154,18 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     const unassignedTasks = tasks.filter((t: any) => !t.assigneeId)
     const assignedTasks = tasks.filter((t: any) => t.assigneeId)
 
+    // ── Profiles & Workspaces for TopBar/ActionBar pickers ──
+    const profiles = await getAvailableProfiles()
+    const serializedProfiles = (profiles as any[]).map((p: any) => ({
+        id: p.id, name: p.name, logoUrl: p.logoUrl || null
+    }))
+
+    const workspacesForProfile = await prisma.workspace.findMany({
+        where: { profileId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, name: true, description: true }
+    })
+
     const displayName = currentUser?.nickname || currentUser?.username || 'Admin'
     const initials = displayName.split(/\s+/).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || 'AD'
 
@@ -174,6 +188,9 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 displayName={displayName}
                 initials={initials}
                 workspaceId={workspaceId}
+                profiles={serializedProfiles}
+                currentProfileId={profileId}
+                userRole={session.user.role}
             />
 
             {/* ── Action Bar + Add Task Modal ──────────────────── */}
@@ -181,6 +198,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 workspaceId={workspaceId}
                 clients={allClients.map(c => ({ ...c, id: String(c.id), parentId: c.parentId ? String(c.parentId) : null }))}
                 users={users.map(u => ({ id: u.id, username: u.username, nickname: u.nickname }))}
+                workspaces={workspacesForProfile}
+                userRole={session.user.role}
             />
 
             {/* ── KPI Widgets ──────────────────────────────────── */}

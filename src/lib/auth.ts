@@ -15,6 +15,23 @@ export async function login(userData: any) {
     })
 }
 
+export async function loginWithProfile(userData: any, profileId: string) {
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const session = await encrypt({
+        user: { ...userData, sessionProfileId: profileId },
+        expires,
+    })
+
+    const cookieStore = await cookies()
+    cookieStore.set('session', session, {
+        expires,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+    })
+}
+
 export async function logout() {
     const cookieStore = await cookies()
     cookieStore.set('session', '', { expires: new Date(0) })

@@ -1,48 +1,43 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, Bell, ChevronDown, Check, Plus } from "lucide-react"
+import { Search, Bell, ChevronDown, Check, Plus, Loader2 } from "lucide-react"
 
-// ---------- Types ----------
+interface ProfileItem {
+  id: string
+  name: string
+  logoUrl: string | null
+}
+
 interface DashboardTopBarProps {
   displayName: string
   initials: string
   workspaceId: string
+  profiles: ProfileItem[]
+  currentProfileId: string
+  userRole: string
 }
 
-// ---------- Placeholder profile data ----------
-const PROFILES = [
-  {
-    initials: "F1",
-    name: "Folder 1",
-    desc: "Description 1",
-    gradient: "from-indigo-500 to-violet-500",
-  },
-  {
-    initials: "F2",
-    name: "Folder 2",
-    desc: "Description 2",
-    gradient: "from-emerald-500 to-cyan-500",
-  },
-  {
-    initials: "F3",
-    name: "Folder 3",
-    desc: "Description 3",
-    gradient: "from-amber-500 to-red-500",
-  },
+const GRADIENT_POOL = [
+  "from-[#8B5CF6] to-[#6366F1]",
+  "from-emerald-500 to-cyan-500",
+  "from-amber-500 to-red-500",
+  "from-pink-500 to-rose-500",
+  "from-sky-500 to-indigo-500",
 ]
 
-// ---------- Component ----------
 export default function DashboardTopBar({
   displayName,
   initials,
   workspaceId,
+  profiles,
+  currentProfileId,
+  userRole,
 }: DashboardTopBarProps) {
   const [open, setOpen] = useState(false)
-  const [activeProfile, setActiveProfile] = useState(0)
+  const [switching, setSwitching] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
@@ -55,6 +50,25 @@ export default function DashboardTopBar({
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  const handleProfileSwitch = async (newProfileId: string) => {
+    if (newProfileId === currentProfileId || switching) return
+    setSwitching(true)
+    try {
+      await fetch("/api/profile/select", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: newProfileId }),
+      })
+      const res = await fetch(`/api/workspace/first?profileId=${newProfileId}`)
+      const { workspaceId: newWsId } = await res.json()
+      window.location.href = newWsId ? `/${newWsId}/admin` : "/workspace"
+    } catch {
+      setSwitching(false)
+    }
+  }
+
+  const currentProfile = profiles.find((p) => p.id === currentProfileId)
 
   return (
     <div className="flex items-end justify-between gap-6 px-1 pb-2 pt-2">
@@ -125,15 +139,16 @@ export default function DashboardTopBar({
 
         {/* Profile pill + dropdown wrapper */}
         <div className="relative" ref={dropdownRef}>
-          {/* Profile pill trigger */}
           <button
             type="button"
             onClick={() => setOpen((prev) => !prev)}
+            disabled={switching}
             className="flex items-center gap-2.5 py-1.5 pl-1.5 pr-3.5 transition-colors duration-200"
             style={{
               borderRadius: 26,
               border: "1px solid rgba(139,92,246,0.15)",
               background: "transparent",
+              opacity: switching ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = "#211B31"
@@ -142,9 +157,12 @@ export default function DashboardTopBar({
               e.currentTarget.style.background = "transparent"
             }}
           >
-            {/* Avatar circle */}
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white">
-              {initials}
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#8B5CF6] to-[#6366F1] text-xs font-bold text-white">
+              {switching ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                initials
+              )}
             </span>
 
             <span
@@ -156,7 +174,7 @@ export default function DashboardTopBar({
 
             <ChevronDown
               size={14}
-              className={`transition-transform duration-200`}
+              className="transition-transform duration-200"
               style={{
                 color: "#A1A1AA",
                 transform: open ? "rotate(180deg)" : "rotate(0deg)",
@@ -165,9 +183,9 @@ export default function DashboardTopBar({
           </button>
 
           {/* Dropdown */}
-          {open && (
+          {open && !switching && (
             <div
-              className="absolute right-0 top-full z-50 mt-2 w-[260px] p-2"
+              className="absolute right-0 top-full z-50 mt-2 w-[280px] p-2"
               style={{
                 borderRadius: 16,
                 border: "1px solid rgba(139,92,246,0.15)",
@@ -176,7 +194,6 @@ export default function DashboardTopBar({
                   "0 16px 48px rgba(0,0,0,0.50), 0 0 40px rgba(139,92,246,0.06)",
               }}
             >
-              {/* Section label */}
               <p
                 className="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest"
                 style={{
@@ -187,18 +204,23 @@ export default function DashboardTopBar({
                 Profiles
               </p>
 
-              {/* Profile list */}
               <ul className="flex flex-col gap-0.5">
-                {PROFILES.map((profile, idx) => {
-                  const isActive = idx === activeProfile
+                {profiles.map((profile, idx) => {
+                  const isActive = profile.id === currentProfileId
+                  const gradient =
+                    GRADIENT_POOL[idx % GRADIENT_POOL.length]
+                  const profileInitials = profile.name
+                    .split(/\s+/)
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2)
+
                   return (
-                    <li key={idx}>
+                    <li key={profile.id}>
                       <button
                         type="button"
-                        onClick={() => {
-                          setActiveProfile(idx)
-                          setOpen(false)
-                        }}
+                        onClick={() => handleProfileSwitch(profile.id)}
                         className="flex w-full items-center gap-2.5 px-2 py-2 text-left transition-colors duration-200"
                         style={{
                           borderRadius: 12,
@@ -218,14 +240,20 @@ export default function DashboardTopBar({
                           }
                         }}
                       >
-                        {/* Mini avatar */}
                         <span
-                          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${profile.gradient} text-[11px] font-bold text-white`}
+                          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${gradient} text-[11px] font-bold text-white`}
                         >
-                          {profile.initials}
+                          {profile.logoUrl ? (
+                            <img
+                              src={profile.logoUrl}
+                              alt=""
+                              className="h-8 w-8 rounded-lg object-cover"
+                            />
+                          ) : (
+                            profileInitials
+                          )}
                         </span>
 
-                        {/* Name + desc */}
                         <div className="flex flex-col overflow-hidden">
                           <span
                             className="truncate text-sm font-medium text-zinc-100"
@@ -239,11 +267,10 @@ export default function DashboardTopBar({
                             className="truncate text-[11px]"
                             style={{ color: "#71717A" }}
                           >
-                            {profile.desc}
+                            {isActive ? "Active" : "Switch to this profile"}
                           </span>
                         </div>
 
-                        {/* Active check */}
                         {isActive && (
                           <Check
                             size={14}
@@ -257,33 +284,40 @@ export default function DashboardTopBar({
                 })}
               </ul>
 
-              {/* Divider */}
-              <div
-                className="my-1.5"
-                style={{ borderTop: "1px solid rgba(139,92,246,0.10)" }}
-              />
-
-              {/* Create profile button */}
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 px-2 py-2 text-sm transition-colors duration-200"
-                style={{
-                  borderRadius: 12,
-                  color: "#A1A1AA",
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.04)"
-                  e.currentTarget.style.color = "#D4D4D8"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent"
-                  e.currentTarget.style.color = "#A1A1AA"
-                }}
-              >
-                <Plus size={14} strokeWidth={2} />
-                Create Profile
-              </button>
+              {userRole === "ADMIN" && (
+                <>
+                  <div
+                    className="my-1.5"
+                    style={{
+                      borderTop: "1px solid rgba(139,92,246,0.10)",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.href = "/profile"
+                    }}
+                    className="flex w-full items-center gap-2 px-2 py-2 text-sm transition-colors duration-200"
+                    style={{
+                      borderRadius: 12,
+                      color: "#A1A1AA",
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background =
+                        "rgba(255,255,255,0.04)"
+                      e.currentTarget.style.color = "#D4D4D8"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent"
+                      e.currentTarget.style.color = "#A1A1AA"
+                    }}
+                  >
+                    <Plus size={14} strokeWidth={2} />
+                    Create Profile
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

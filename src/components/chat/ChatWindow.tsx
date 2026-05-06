@@ -11,7 +11,8 @@ import { uploadChatFile } from '@/actions/chat-upload-actions'
 import { playNotificationSound } from '@/lib/notification-sound'
 import { MessageBubble } from './MessageBubble'
 import { ChatInput } from './ChatInput'
-import { Loader2, ClipboardList, User, Briefcase } from 'lucide-react'
+import { GroupMembersDialog } from './GroupMembersDialog'
+import { Loader2, ClipboardList, User, Briefcase, Users } from 'lucide-react'
 
 // ★ Fire-and-forget: properly subscribe → send → cleanup
 // The old code created channels without subscribe() so send() silently failed.
@@ -61,6 +62,7 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
     const { messages, hasMore, isLoading, loadMessages, sendMessage, addIncomingMessage, addOptimisticMessage, updateMessage, reset } = useChatMessages(conversationId as string)
     const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
     const [typingUsers, setTypingUsers] = useState<string[]>([])
+    const [showGroupMembers, setShowGroupMembers] = useState(false)
     const scrollRef = useRef<HTMLDivElement>(null)
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
     const lastTypingSentRef = useRef(0)
@@ -333,6 +335,16 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                         </div>
                     )}
                 </div>
+                {/* Group members button — only for GROUP conversations */}
+                {meta?.type === 'GROUP' && (
+                    <button
+                        onClick={() => setShowGroupMembers(true)}
+                        className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent border-none"
+                        title="Group members"
+                    >
+                        <Users className="w-4.5 h-4.5 text-zinc-400" />
+                    </button>
+                )}
             </div>
 
             {/* Messages area */}
@@ -372,6 +384,13 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                 onFileUpload={handleFileUpload}
                 replyTo={replyTo}
                 onCancelReply={() => setReplyTo(null)}
+            />
+
+            {/* Group members dialog */}
+            <GroupMembersDialog
+                isOpen={showGroupMembers}
+                onClose={() => setShowGroupMembers(false)}
+                conversationId={conversationId}
             />
         </div>
     )

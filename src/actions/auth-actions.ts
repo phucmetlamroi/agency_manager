@@ -59,7 +59,7 @@ export async function loginAction(prevState: any, formData: FormData) {
         if (role === 'CLIENT') {
             await login({
                 id: user.id, username: user.username, role: user.role,
-                profileId: user.profileId, hasAcceptedTerms: user.hasAcceptedTerms
+                profileId: user.profileId
             })
             const cookieStore = await cookies()
             cookieStore.set('NEXT_LOCALE', 'en', { path: '/' })
@@ -80,7 +80,7 @@ export async function loginAction(prevState: any, formData: FormData) {
         if (!defaultProfileId) {
             await login({
                 id: user.id, username: user.username, role: user.role,
-                profileId: user.profileId, hasAcceptedTerms: user.hasAcceptedTerms
+                profileId: user.profileId
             })
             console.log(`[Login] No profile found for ${username}, fallback to /login`)
             redirect('/login')
@@ -88,7 +88,7 @@ export async function loginAction(prevState: any, formData: FormData) {
 
         await loginWithProfile({
             id: user.id, username: user.username, role: user.role,
-            profileId: user.profileId, hasAcceptedTerms: user.hasAcceptedTerms
+            profileId: user.profileId
         }, defaultProfileId)
         console.log(`[Login] Cookie set with profileId=${defaultProfileId} for: ${username}`)
 

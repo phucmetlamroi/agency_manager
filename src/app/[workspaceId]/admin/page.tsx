@@ -197,16 +197,16 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 sparklineData,
             }} />
 
-            {/* ── Revenue Chart + Rankings (flex 1.5 : 1) ──────── */}
+            {/* ── Revenue Chart + Rankings (flex 2 : 1) ──────── */}
             <div className="flex flex-col xl:flex-row gap-4">
-                <div className="xl:flex-[1.5] min-w-0">
+                <div className="xl:flex-[2] min-w-0">
                     <AdminRevenueChart
                         data={revenueChartData}
                         totalRevenue={weekRevenue}
                         prevRevenue={prevWeekRevenue}
                     />
                 </div>
-                <div className="xl:flex-1 min-w-0 min-h-[340px]">
+                <div className="xl:flex-1 min-w-0">
                     <Suspense fallback={
                         <div className="h-full rounded-[26px] bg-[#0A0A0A] border border-[rgba(139,92,246,0.15)] animate-pulse flex items-center justify-center text-[#A1A1AA] text-sm">
                             Loading Rankings...

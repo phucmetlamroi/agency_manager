@@ -43,6 +43,11 @@ export async function createTask(formData: FormData, workspaceId: string) {
         const notes_vi = formData.get('notes') as string
         const notes_en = formData.get('notes_en') as string
         const collectFilesLink = formData.get('collectFilesLink') as string
+        const submissionFolder = formData.get('submissionFolder') as string
+        const productLink = formData.get('productLink') as string
+        const frameUsername = formData.get('frameUsername') as string
+        const framePassword = formData.get('framePassword') as string
+        const frameNote = formData.get('frameNote') as string
 
         const jobPriceUSD = parseFloat(formData.get('jobPriceUSD') as string) || 0
         const exchangeRate = parseFloat(formData.get('exchangeRate') as string) || 26300
@@ -72,6 +77,11 @@ export async function createTask(formData: FormData, workspaceId: string) {
                 assigneeId: assigneeId || null,
                 fileLink: fileLink || null,
                 collectFilesLink: collectFilesLink || null,
+                submissionFolder: submissionFolder || null,
+                productLink: productLink || null,
+                frameUsername: frameUsername || null,
+                framePassword: framePassword || null,
+                frameNote: frameNote || null,
                 status: assigneeId ? 'Nh\u1eadn task' : '\u0110ang \u0111\u1ee3i giao',
 
                 // Financials

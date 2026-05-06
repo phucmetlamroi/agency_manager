@@ -12,6 +12,10 @@ import {
   Banknote,
   Link as LinkIcon,
   CheckCircle,
+  KeyRound,
+  FileText,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 
 /* ------------------------------------------------------------------ */
@@ -27,10 +31,14 @@ interface TaskFormData {
   jobPriceUSD: string
   editorFee: string
   rawFootage: string
+  collectFile: string
   bRoll: string
-  sampleProject: string
-  submissionFolder: string
   references: string
+  submitFolder: string
+  script: string
+  frameUsername: string
+  framePassword: string
+  frameNote: string
   notesVi: string
   notesEn: string
 }
@@ -46,7 +54,7 @@ interface AddTaskModalProps {
     parent?: { name: string } | null
   }>
   users: Array<{ id: string; username: string; nickname?: string | null }>
-  onSubmit?: (data: TaskFormData) => void
+  onSubmit?: (data: TaskFormData) => void | Promise<void>
 }
 
 /* ------------------------------------------------------------------ */
@@ -58,6 +66,8 @@ const STEPS = [
   { label: "Video", icon: Video },
   { label: "Finance", icon: Banknote },
   { label: "Resources", icon: LinkIcon },
+  { label: "Frame", icon: KeyRound },
+  { label: "Notes", icon: FileText },
   { label: "Review", icon: CheckCircle },
 ] as const
 
@@ -72,10 +82,14 @@ const INITIAL_FORM: TaskFormData = {
   jobPriceUSD: "",
   editorFee: "",
   rawFootage: "",
+  collectFile: "",
   bRoll: "",
-  sampleProject: "",
-  submissionFolder: "",
   references: "",
+  submitFolder: "",
+  script: "",
+  frameUsername: "",
+  framePassword: "",
+  frameNote: "",
   notesVi: "",
   notesEn: "",
 }
@@ -83,20 +97,20 @@ const INITIAL_FORM: TaskFormData = {
 const USD_TO_VND = 25_000
 
 /* ------------------------------------------------------------------ */
-/*  Shared input styles                                                */
+/*  Neon Purple input styles                                           */
 /* ------------------------------------------------------------------ */
 
 const inputBase =
-  "h-11 w-full rounded-full bg-white/[0.04] border border-white/[0.08] px-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-indigo-500/50 focus:bg-white/[0.06]"
+  "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
 
 const selectBase =
-  "h-11 w-full rounded-full bg-white/[0.04] border border-white/[0.08] px-[18px] pr-10 text-[13px] text-zinc-300 outline-none appearance-none cursor-pointer transition-colors focus:border-indigo-500/50 focus:bg-white/[0.06]"
+  "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] pr-10 text-[13px] text-zinc-300 outline-none appearance-none cursor-pointer transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
 
 const textareaBase =
-  "w-full rounded-2xl bg-white/[0.04] border border-white/[0.08] px-[18px] py-3 text-[13px] text-zinc-300 placeholder:text-zinc-600 leading-[1.6] outline-none resize-none transition-colors focus:border-indigo-500/50 focus:bg-white/[0.06]"
+  "w-full rounded-2xl bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] py-3 text-[13px] text-zinc-300 placeholder:text-zinc-600 leading-[1.6] outline-none resize-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
 
 const linkInputBase =
-  "h-11 w-full rounded-full bg-white/[0.04] border border-white/[0.08] pl-[38px] pr-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-indigo-500/50 focus:bg-white/[0.06]"
+  "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] pl-[38px] pr-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
 
 /* ------------------------------------------------------------------ */
 /*  Small sub-components                                               */
@@ -104,7 +118,7 @@ const linkInputBase =
 
 function SelectChevron() {
   return (
-    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500">
+    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#A1A1AA]">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
         <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -114,7 +128,7 @@ function SelectChevron() {
 
 function LinkFieldIcon() {
   return (
-    <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
+    <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A1A1AA]">
       <LinkIcon size={14} />
     </div>
   )
@@ -122,8 +136,8 @@ function LinkFieldIcon() {
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between p-[10px_14px] rounded-xl bg-white/[0.03] border border-white/[0.04]">
-      <span className="text-xs text-zinc-500 font-semibold">{label}</span>
+    <div className="flex items-center justify-between p-[10px_14px] rounded-xl bg-white/[0.03] border border-[rgba(139,92,246,0.08)]">
+      <span className="text-xs text-[#A1A1AA] font-semibold">{label}</span>
       <span className="text-[13px] text-zinc-300 font-semibold capitalize max-w-[60%] text-right truncate">
         {value || "—"}
       </span>
@@ -145,7 +159,7 @@ function StepIndicator({
   onStepClick: (step: number) => void
 }) {
   return (
-    <div className="flex items-center justify-center gap-0 py-4 px-6">
+    <div className="flex items-center justify-center gap-0 py-4 px-4">
       {Array.from({ length: total }).map((_, i) => {
         const isActive = i === current
         const isCompleted = i < current
@@ -153,27 +167,26 @@ function StepIndicator({
 
         return (
           <div key={i} className="flex items-center">
-            {/* Circle + Label */}
             <div className="flex flex-col items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => onStepClick(i)}
-                className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
+                className={`relative z-10 flex items-center justify-center w-9 h-9 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
                   isActive
-                    ? "bg-[#F4F4F5] border-2 border-white text-[#18181B] shadow-[0_4px_20px_rgba(255,255,255,0.15)]"
+                    ? "bg-[#8B5CF6] border-2 border-[#A855F7] text-white shadow-[0_4px_20px_rgba(139,92,246,0.35)]"
                     : isCompleted
-                      ? "bg-[rgba(99,102,241,0.25)] border-2 border-[rgba(99,102,241,0.50)] text-indigo-300 shadow-[0_4px_16px_rgba(99,102,241,0.20)]"
+                      ? "bg-[#8B5CF6]/25 border-2 border-[#8B5CF6]/50 text-[#D8B4FE] shadow-[0_4px_16px_rgba(139,92,246,0.15)]"
                       : "bg-white/[0.06] border-2 border-white/[0.08] text-zinc-500"
                 }`}
               >
-                {isCompleted ? <Check size={14} strokeWidth={3} className="text-indigo-300" /> : i + 1}
+                {isCompleted ? <Check size={13} strokeWidth={3} className="text-[#D8B4FE]" /> : i + 1}
               </button>
               <span
-                className={`text-[11px] leading-none transition-colors duration-200 ${
+                className={`text-[10px] leading-none transition-colors duration-200 ${
                   isActive
                     ? "font-bold text-white"
                     : isCompleted
-                      ? "font-medium text-indigo-300"
+                      ? "font-medium text-[#D8B4FE]"
                       : "font-medium text-zinc-600"
                 }`}
               >
@@ -181,11 +194,10 @@ function StepIndicator({
               </span>
             </div>
 
-            {/* Connector line */}
             {i < total - 1 && (
               <div
-                className={`flex-1 min-w-[20px] h-[2px] mx-1 transition-colors duration-200 ${
-                  isCompleted ? "bg-indigo-500/40" : "bg-white/[0.06]"
+                className={`flex-1 min-w-[12px] h-[2px] mx-0.5 transition-colors duration-200 ${
+                  isCompleted ? "bg-[#8B5CF6]/40" : "bg-white/[0.06]"
                 }`}
               />
             )}
@@ -211,13 +223,16 @@ export default function AddTaskModal({
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<TaskFormData>({ ...INITIAL_FORM })
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
-  // Reset state when modal opens
   useEffect(() => {
     if (open) {
       setStep(0)
       setForm({ ...INITIAL_FORM })
       setSubmitted(false)
+      setSubmitting(false)
+      setShowPassword(false)
     }
   }, [open])
 
@@ -246,7 +261,9 @@ export default function AddTaskModal({
     "Set the basic task details",
     "Add video URLs for this task",
     "Define pricing and editor compensation",
-    "Attach resource links and notes",
+    "Attach resource links for this task",
+    "Frame account credentials (optional)",
+    "Manager instructions and client requests",
     "Review everything before submitting",
   ]
 
@@ -259,9 +276,16 @@ export default function AddTaskModal({
     if (step > 0) setStep((s) => s - 1)
   }
 
-  const handleSubmit = () => {
-    onSubmit?.(form)
-    setSubmitted(true)
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    try {
+      await onSubmit?.(form)
+      setSubmitted(true)
+    } catch {
+      // Keep modal open on error
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleDone = () => {
@@ -276,9 +300,8 @@ export default function AddTaskModal({
       case 0:
         return (
           <div className="flex flex-col gap-4">
-            {/* Client */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">Client</label>
+              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Client</label>
               <div className="relative">
                 <select
                   className={selectBase}
@@ -296,10 +319,9 @@ export default function AddTaskModal({
               </div>
             </div>
 
-            {/* Task Type + Deadline — 2-column row */}
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
-                <label className="text-xs text-zinc-500 font-medium pl-1">Task Type</label>
+                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Task Type</label>
                 <div className="relative">
                   <select
                     className={selectBase}
@@ -318,7 +340,7 @@ export default function AddTaskModal({
               </div>
 
               <div className="flex-1 flex flex-col gap-1.5">
-                <label className="text-xs text-zinc-500 font-medium pl-1">Deadline</label>
+                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Deadline</label>
                 <input
                   type="date"
                   className={inputBase}
@@ -328,9 +350,8 @@ export default function AddTaskModal({
               </div>
             </div>
 
-            {/* Assignee */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">Assignee</label>
+              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Assignee</label>
               <div className="relative">
                 <select
                   className={selectBase}
@@ -355,7 +376,7 @@ export default function AddTaskModal({
         return (
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">
+              <label className="text-xs text-[#A1A1AA] font-medium pl-1">
                 Video List <span className="text-zinc-600">(one URL per line)</span>
               </label>
               <textarea
@@ -376,10 +397,9 @@ export default function AddTaskModal({
       case 2:
         return (
           <div className="flex flex-col gap-5">
-            {/* Job Price + Editor Fee — 2-column row */}
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1.5">
-                <label className="text-xs text-zinc-500 font-medium pl-1">Job Price (USD)</label>
+                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Job Price (USD)</label>
                 <input
                   type="number"
                   className={inputBase}
@@ -390,7 +410,7 @@ export default function AddTaskModal({
               </div>
 
               <div className="flex-1 flex flex-col gap-1.5">
-                <label className="text-xs text-zinc-500 font-medium pl-1">Editor Fee (VND)</label>
+                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Editor Fee (VND)</label>
                 <input
                   type="number"
                   className={inputBase}
@@ -401,10 +421,9 @@ export default function AddTaskModal({
               </div>
             </div>
 
-            {/* Revenue progress bar */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between px-1">
-                <span className="text-xs text-zinc-500 font-medium">Estimated Revenue</span>
+                <span className="text-xs text-[#A1A1AA] font-medium">Estimated Revenue</span>
                 <span
                   className={`text-[13px] font-bold ${
                     revenueVND >= 0 ? "text-emerald-400" : "text-red-400"
@@ -413,15 +432,15 @@ export default function AddTaskModal({
                   {revenueVND.toLocaleString("vi-VN")} VND
                 </span>
               </div>
-              <div className="relative h-[28px] w-full rounded-full bg-white/[0.04] border border-white/[0.06] overflow-hidden">
+              <div className="relative h-[28px] w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.08)] overflow-hidden">
                 <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
+                  className="h-full rounded-full bg-gradient-to-r from-[#8B5CF6] to-[#A855F7]"
                   initial={{ width: 0 }}
                   animate={{ width: `${revenuePercent}%` }}
                   transition={{ type: "spring", stiffness: 120, damping: 20 }}
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-zinc-400">
-                  ${revenueVND.toLocaleString("vi-VN")} / ${form.jobPriceUSD ? (jobPriceNum * USD_TO_VND).toLocaleString("vi-VN") : "0"}
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-[#A1A1AA]">
+                  {revenueVND.toLocaleString("vi-VN")} / {form.jobPriceUSD ? (jobPriceNum * USD_TO_VND).toLocaleString("vi-VN") : "0"}
                 </span>
               </div>
               <p className="text-[11px] text-zinc-600 pl-1">
@@ -431,22 +450,23 @@ export default function AddTaskModal({
           </div>
         )
 
-      /* ============ STEP 4 : Resources & Notes ============ */
+      /* ============ STEP 4 : Resources (6 link fields) ============ */
       case 3:
         return (
-          <div className="flex flex-col gap-5">
-            {/* 2x2 link grid */}
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
               {(
                 [
                   ["rawFootage", "Raw Footage"],
-                  ["bRoll", "B-Roll"],
-                  ["sampleProject", "Sample Project"],
-                  ["submissionFolder", "Submission Folder"],
+                  ["collectFile", "Collect File"],
+                  ["bRoll", "B-Rolls"],
+                  ["references", "Reference"],
+                  ["submitFolder", "Submit Folder"],
+                  ["script", "Script"],
                 ] as const
               ).map(([key, label]) => (
                 <div key={key} className="flex flex-col gap-1.5">
-                  <label className="text-xs text-zinc-500 font-medium pl-1">{label}</label>
+                  <label className="text-xs text-[#A1A1AA] font-medium pl-1">{label}</label>
                   <div className="relative">
                     <LinkFieldIcon />
                     <input
@@ -460,41 +480,82 @@ export default function AddTaskModal({
                 </div>
               ))}
             </div>
+          </div>
+        )
 
-            {/* References */}
+      /* ============ STEP 5 : Frame Account ============ */
+      case 4:
+        return (
+          <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">References</label>
+              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Frame Username</label>
+              <input
+                type="text"
+                className={inputBase}
+                placeholder="username..."
+                value={form.frameUsername}
+                onChange={(e) => set("frameUsername", e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Frame Password</label>
               <div className="relative">
-                <LinkFieldIcon />
                 <input
-                  type="url"
-                  className={linkInputBase}
-                  placeholder="https://..."
-                  value={form.references}
-                  onChange={(e) => set("references", e.target.value)}
+                  type={showPassword ? "text" : "password"}
+                  className={inputBase + " pr-12"}
+                  placeholder="password..."
+                  value={form.framePassword}
+                  onChange={(e) => set("framePassword", e.target.value)}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A1A1AA] hover:text-white transition-colors"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
-            {/* Vietnamese Notes */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">Notes (Vietnamese)</label>
+              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Frame Note</label>
               <textarea
                 className={textareaBase}
-                style={{ minHeight: 80 }}
-                placeholder="Ghi chú bằng tiếng Việt..."
+                style={{ minHeight: 100 }}
+                placeholder="Ghi chú về tài khoản frame..."
+                value={form.frameNote}
+                onChange={(e) => set("frameNote", e.target.value)}
+              />
+            </div>
+
+            <p className="text-[11px] text-zinc-600 pl-1">
+              Thông tin tài khoản frame dành cho editor. Bỏ trống nếu không cần.
+            </p>
+          </div>
+        )
+
+      /* ============ STEP 6 : Notes ============ */
+      case 5:
+        return (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Manager Instruction</label>
+              <textarea
+                className={textareaBase}
+                style={{ minHeight: 100 }}
+                placeholder="Hướng dẫn từ quản lý..."
                 value={form.notesVi}
                 onChange={(e) => set("notesVi", e.target.value)}
               />
             </div>
 
-            {/* English Notes */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-500 font-medium pl-1">Notes (English)</label>
+              <label className="text-xs text-[#A1A1AA] font-medium pl-1">Client Request</label>
               <textarea
                 className={textareaBase}
-                style={{ minHeight: 80 }}
-                placeholder="Notes in English..."
+                style={{ minHeight: 100 }}
+                placeholder="Yêu cầu từ khách hàng..."
                 value={form.notesEn}
                 onChange={(e) => set("notesEn", e.target.value)}
               />
@@ -502,8 +563,8 @@ export default function AddTaskModal({
           </div>
         )
 
-      /* ============ STEP 5 : Review ============ */
-      case 4:
+      /* ============ STEP 7 : Review ============ */
+      case 6:
         return (
           <div className="flex flex-col gap-2">
             <ReviewRow label="Client" value={clientName} />
@@ -524,12 +585,15 @@ export default function AddTaskModal({
               value={`${revenueVND.toLocaleString("vi-VN")} VND`}
             />
             <ReviewRow label="Raw Footage" value={form.rawFootage} />
-            <ReviewRow label="B-Roll" value={form.bRoll} />
-            <ReviewRow label="Sample Project" value={form.sampleProject} />
-            <ReviewRow label="Submission" value={form.submissionFolder} />
-            <ReviewRow label="References" value={form.references} />
-            <ReviewRow label="Notes (VI)" value={form.notesVi} />
-            <ReviewRow label="Notes (EN)" value={form.notesEn} />
+            <ReviewRow label="Collect File" value={form.collectFile} />
+            <ReviewRow label="B-Rolls" value={form.bRoll} />
+            <ReviewRow label="Reference" value={form.references} />
+            <ReviewRow label="Submit Folder" value={form.submitFolder} />
+            <ReviewRow label="Script" value={form.script} />
+            {form.frameUsername && <ReviewRow label="Frame User" value={form.frameUsername} />}
+            {form.frameNote && <ReviewRow label="Frame Note" value={form.frameNote} />}
+            <ReviewRow label="Manager Instruction" value={form.notesVi} />
+            <ReviewRow label="Client Request" value={form.notesEn} />
           </div>
         )
 
@@ -547,17 +611,17 @@ export default function AddTaskModal({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex items-center justify-center w-[72px] h-[72px] rounded-full bg-emerald-500/20 border border-emerald-500/30">
-        <Check size={36} className="text-emerald-400" strokeWidth={2.5} />
+      <div className="flex items-center justify-center w-[72px] h-[72px] rounded-full bg-[#8B5CF6]/20 border border-[#8B5CF6]/30">
+        <Check size={36} className="text-[#A855F7]" strokeWidth={2.5} />
       </div>
-      <h3 className="text-xl font-bold text-white">Task Added</h3>
-      <p className="text-sm text-zinc-400 text-center max-w-[320px]">
+      <h3 className="text-xl font-bold text-white">Successfully</h3>
+      <p className="text-sm text-[#A1A1AA] text-center max-w-[320px]">
         Task đã được thêm thành công vào hàng đợi. Bạn có thể xem trong Task Queue.
       </p>
       <button
         type="button"
         onClick={handleDone}
-        className="mt-2 h-11 px-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors"
+        className="mt-2 h-11 px-10 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
       >
         Done
       </button>
@@ -582,17 +646,17 @@ export default function AddTaskModal({
           }}
         >
           <motion.div
-            className="relative w-full max-w-[620px] max-h-[85vh] flex flex-col rounded-3xl border border-white/[0.08] shadow-[0_32px_80px_rgba(0,0,0,0.60)] overflow-hidden"
-            style={{ background: "rgba(24,24,27,0.92)", backdropFilter: "blur(24px)" }}
+            className="relative w-full max-w-[620px] max-h-[85vh] flex flex-col rounded-3xl border border-[rgba(139,92,246,0.15)] shadow-[0_32px_80px_rgba(0,0,0,0.60)] overflow-hidden"
+            style={{ background: "rgba(10,10,10,0.95)", backdropFilter: "blur(24px)" }}
             initial={{ opacity: 0, y: 32, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 260, damping: 28 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Ambient indigo orb */}
+            {/* Ambient purple orb */}
             <div
-              className="pointer-events-none absolute top-[-60px] right-[-60px] w-[180px] h-[180px] rounded-full bg-indigo-500 opacity-[0.08]"
+              className="pointer-events-none absolute top-[-60px] right-[-60px] w-[180px] h-[180px] rounded-full bg-[#8B5CF6] opacity-[0.08]"
               style={{ filter: "blur(60px)" }}
             />
 
@@ -603,12 +667,12 @@ export default function AddTaskModal({
                   <h2 className="text-[16px] font-extrabold text-white">
                     Step {step + 1}. {stepTitle}:
                   </h2>
-                  <p className="text-xs text-zinc-500 mt-0.5">{stepSubtitles[step]}</p>
+                  <p className="text-xs text-[#A1A1AA] mt-0.5">{stepSubtitles[step]}</p>
                 </div>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 hover:text-white transition-colors"
+                  className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[#A1A1AA] hover:text-white transition-colors"
                 >
                   <X size={16} />
                 </button>
@@ -640,7 +704,7 @@ export default function AddTaskModal({
 
             {/* -------- Footer -------- */}
             {!submitted && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06]">
+              <div className="flex items-center justify-between px-6 py-4 border-t border-[rgba(139,92,246,0.08)]">
                 <button
                   type="button"
                   onClick={goBack}
@@ -648,7 +712,7 @@ export default function AddTaskModal({
                   className={`flex items-center gap-2 h-10 px-5 rounded-full bg-transparent border text-sm font-medium transition-colors ${
                     step === 0
                       ? "border-white/[0.04] text-zinc-700 cursor-default"
-                      : "border-white/[0.10] text-zinc-400 hover:text-white hover:border-white/[0.16] cursor-pointer"
+                      : "border-[rgba(139,92,246,0.15)] text-[#A1A1AA] hover:text-white hover:border-[#8B5CF6]/40 cursor-pointer"
                   }`}
                 >
                   <ArrowLeft size={15} />
@@ -659,7 +723,7 @@ export default function AddTaskModal({
                   <button
                     type="button"
                     onClick={goNext}
-                    className="flex items-center gap-2 h-10 px-6 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-indigo-500/20"
+                    className="flex items-center gap-2 h-10 px-6 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
                   >
                     Next
                     <ArrowRight size={15} />
@@ -668,10 +732,11 @@ export default function AddTaskModal({
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="flex items-center gap-2 h-10 px-6 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-indigo-500/20"
+                    disabled={submitting}
+                    className="flex items-center gap-2 h-10 px-6 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Check size={15} />
-                    Add Task
+                    {submitting ? "Adding..." : "Add Task"}
                   </button>
                 )}
               </div>

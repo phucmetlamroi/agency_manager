@@ -146,9 +146,7 @@ export async function getOrCreateDirectConversation(otherUserId: string) {
     const { userId, profileId } = auth
     if (userId === otherUserId) return { error: 'Cannot message yourself' }
 
-    const bothInProfile = await verifyUsersInProfile([userId, otherUserId], profileId)
-    if (!bothInProfile) return { error: 'User not in current team' }
-
+    // Check existing conversation first
     const existing = await prisma.conversation.findFirst({
         where: {
             type: 'DIRECT',
@@ -162,6 +160,7 @@ export async function getOrCreateDirectConversation(otherUserId: string) {
 
     if (existing) return { data: { conversationId: existing.id } }
 
+    // Must be ACCEPTED contacts to create a DM — works across all profiles
     const contact = await prisma.contact.findFirst({
         where: {
             OR: [
@@ -174,6 +173,7 @@ export async function getOrCreateDirectConversation(otherUserId: string) {
 
     if (!contact) return { error: 'Must be contacts first' }
 
+    // Cross-profile DMs have no workspaceId — they're global conversations
     const conv = await prisma.conversation.create({
         data: {
             type: 'DIRECT',

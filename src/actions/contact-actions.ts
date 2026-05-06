@@ -19,21 +19,23 @@ export async function searchContacts(query: string, _profileId?: string) {
     const q = query.trim().toLowerCase()
     if (!q) return { data: [] }
 
+    // Determine if searching by email (contains @) or by name
+    const isEmailSearch = q.includes('@')
+
+    // Search ALL users in the system — no profile restriction.
+    // For name queries, search username/nickname/email.
+    // For email queries, prioritize exact/partial email match.
     const users = await prisma.user.findMany({
         where: {
             id: { not: userId },
-            role: { notIn: ['LOCKED'] },
-            OR: [
-                { profileId },
-                { profileAccesses: { some: { profileId } } },
-            ],
-            AND: {
-                OR: [
+            role: { notIn: ['LOCKED', 'CLIENT'] },
+            OR: isEmailSearch
+                ? [{ email: { contains: q, mode: 'insensitive' } }]
+                : [
                     { username: { contains: q, mode: 'insensitive' } },
                     { nickname: { contains: q, mode: 'insensitive' } },
                     { email: { contains: q, mode: 'insensitive' } },
                 ],
-            },
         },
         select: {
             id: true,
@@ -162,7 +164,10 @@ export async function getContactRequests() {
         where: { receiverId: userId, status: 'PENDING' },
         include: {
             requester: {
-                select: { id: true, username: true, nickname: true, avatarUrl: true, email: true },
+                select: {
+                    id: true, username: true, nickname: true, avatarUrl: true, email: true,
+                    profile: { select: { name: true } },
+                },
             },
         },
         orderBy: { createdAt: 'desc' },
@@ -171,7 +176,10 @@ export async function getContactRequests() {
     return {
         data: requests.map(r => ({
             id: r.id,
-            requester: r.requester,
+            requester: {
+                ...r.requester,
+                profileName: r.requester.profile?.name || null,
+            },
             createdAt: r.createdAt.toISOString(),
         })),
     }

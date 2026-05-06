@@ -309,10 +309,17 @@ export function ChatSidebar({ onSelectConversation, onNewChat, selectedId }: Cha
                             </div>
                         )}
                         <div className="flex-1 min-w-0">
-                            <div className="text-[13px] font-semibold text-zinc-200">
-                                {r.requester.nickname || r.requester.username}
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[13px] font-semibold text-zinc-200 truncate">
+                                    {r.requester.nickname || r.requester.username}
+                                </span>
+                                {(r.requester as any).profileName && (
+                                    <span className="shrink-0 text-[9px] text-amber-400 font-bold px-1.5 py-px rounded bg-amber-500/10 border border-amber-500/20">
+                                        {(r.requester as any).profileName}
+                                    </span>
+                                )}
                             </div>
-                            <div className="text-[11px] text-zinc-600">{r.requester.email}</div>
+                            <div className="text-[11px] text-zinc-600 truncate">{r.requester.email}</div>
                         </div>
                         <div className="flex gap-1">
                             <button

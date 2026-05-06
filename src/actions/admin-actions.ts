@@ -94,7 +94,8 @@ export async function createTask(formData: FormData, workspaceId: string) {
         })
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/admin/queue`)
-        revalidatePath(`/${workspaceId}/admin/crm`) // Revalidate CRM to show new tasks
+        revalidatePath(`/${workspaceId}/admin/crm`)
+        revalidatePath(`/${workspaceId}/dashboard`)
         return { success: true }
     } catch (e) {
         return { error: 'Error creating task' }

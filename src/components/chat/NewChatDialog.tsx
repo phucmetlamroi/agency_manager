@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { X, Search, UserPlus, Users, MessageSquare, Loader2 } from 'lucide-react'
+import { useState, useCallback, useRef } from 'react'
+import { X, Search, UserPlus, Users, MessageSquare, Loader2, Mail, Globe } from 'lucide-react'
 import { searchContacts, sendContactRequest } from '@/actions/contact-actions'
 import { getOrCreateDirectConversation, createGroupConversation } from '@/actions/chat-actions'
 import { useChatContext } from './ChatProvider'
@@ -23,14 +23,19 @@ export function NewChatDialog({ isOpen, onClose, onConversationCreated, workspac
     const [loading, setLoading] = useState(false)
     const [groupName, setGroupName] = useState('')
     const [groupMembers, setGroupMembers] = useState<{ id: string; name: string }[]>([])
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const handleSearch = useCallback(async (q: string) => {
         setQuery(q)
+        // Debounce search
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
         if (q.trim().length < 2) { setResults([]); return }
-        setLoading(true)
-        const res = await searchContacts(q, profileId)
-        if (res.data) setResults(res.data)
-        setLoading(false)
+        searchTimeoutRef.current = setTimeout(async () => {
+            setLoading(true)
+            const res = await searchContacts(q, profileId)
+            if (res.data) setResults(res.data)
+            setLoading(false)
+        }, 300)
     }, [profileId])
 
     const handleDMSelect = async (user: any) => {
@@ -134,15 +139,23 @@ export function NewChatDialog({ isOpen, onClose, onConversationCreated, workspac
                 )}
 
                 {/* Search */}
-                <div className="px-[18px] pb-2">
+                <div className="px-[18px] pb-2 space-y-1.5">
                     <div className="flex items-center gap-2 bg-zinc-950 rounded-xl px-2.5 border border-zinc-700/50 focus-within:border-violet-500/30 transition-colors">
-                        <Search className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                        {query.includes('@') ? (
+                            <Mail className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                        ) : (
+                            <Search className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                        )}
                         <input
                             value={query}
                             onChange={e => handleSearch(e.target.value)}
-                            placeholder="Search by name or email..."
+                            placeholder="Nhập tên hoặc email để tìm..."
                             className="flex-1 bg-transparent border-none outline-none text-zinc-200 text-[13px] py-2 font-[inherit] placeholder:text-zinc-600"
                         />
+                    </div>
+                    <div className="flex items-center gap-1.5 px-1">
+                        <Globe className="w-3 h-3 text-zinc-600" />
+                        <span className="text-[10px] text-zinc-600">Tìm bất kỳ người dùng nào trong hệ thống bằng email</span>
                     </div>
                 </div>
 
@@ -154,48 +167,64 @@ export function NewChatDialog({ isOpen, onClose, onConversationCreated, workspac
                         </div>
                     )}
 
+                    {results.length === 0 && !loading && query.trim().length >= 2 && (
+                        <div className="text-center py-8 px-4">
+                            <Mail className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+                            <p className="text-[13px] text-zinc-500 font-medium">Không tìm thấy người dùng</p>
+                            <p className="text-[11px] text-zinc-600 mt-1">
+                                {query.includes('@')
+                                    ? 'Email này chưa có trong hệ thống'
+                                    : 'Thử tìm bằng email chính xác'}
+                            </p>
+                        </div>
+                    )}
+
                     {results.map(user => {
                         const isGroupSelected = groupMembers.some(m => m.id === user.id)
                         return (
                             <div
                                 key={user.id}
                                 onClick={() => mode === 'dm' ? handleDMSelect(user) : toggleGroupMember(user)}
-                                className={`flex items-center gap-2.5 py-2 px-[18px] cursor-pointer transition-colors hover:bg-zinc-800/50 ${
+                                className={`flex items-center gap-2.5 py-2.5 px-[18px] cursor-pointer transition-colors hover:bg-zinc-800/50 ${
                                     isGroupSelected ? 'bg-violet-500/[0.08]' : ''
                                 }`}
                             >
                                 {user.avatarUrl ? (
                                     <div
-                                        className="w-[34px] h-[34px] rounded-full shrink-0 bg-center bg-cover"
+                                        className="w-[36px] h-[36px] rounded-full shrink-0 bg-center bg-cover"
                                         style={{ backgroundImage: `url(${user.avatarUrl})` }}
                                     />
                                 ) : (
-                                    <div className="w-[34px] h-[34px] rounded-full shrink-0 bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-[13px] font-bold text-white">
+                                    <div className="w-[36px] h-[36px] rounded-full shrink-0 bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-[13px] font-bold text-white">
                                         {(user.nickname || user.username).charAt(0).toUpperCase()}
                                     </div>
                                 )}
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-[13px] font-medium text-zinc-200">
-                                        {user.nickname || user.username}
-                                        {user.isSameProfile && (
-                                            <span className="text-[10px] text-violet-500 ml-1.5 font-semibold">SAME TEAM</span>
-                                        )}
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[13px] font-medium text-zinc-200 truncate">
+                                            {user.nickname || user.username}
+                                        </span>
+                                        {user.isSameProfile ? (
+                                            <span className="shrink-0 text-[9px] text-violet-400 font-bold px-1.5 py-px rounded bg-violet-500/10 border border-violet-500/20 uppercase">Team</span>
+                                        ) : user.profileName ? (
+                                            <span className="shrink-0 text-[9px] text-amber-400 font-bold px-1.5 py-px rounded bg-amber-500/10 border border-amber-500/20">{user.profileName}</span>
+                                        ) : null}
                                     </div>
-                                    <div className="text-[11px] text-zinc-600">{user.email || user.profileName}</div>
+                                    <div className="text-[11px] text-zinc-500 truncate">{user.email}</div>
                                 </div>
                                 {mode === 'dm' && (
-                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                                    <span className={`shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-lg ${
                                         user.contactStatus === 'ACCEPTED'
-                                            ? 'bg-emerald-500/15 text-emerald-500'
+                                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
                                             : user.contactStatus === 'PENDING'
-                                                ? 'bg-yellow-500/15 text-yellow-500'
-                                                : 'bg-violet-500/15 text-violet-500'
+                                                ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                                : 'bg-violet-500/15 text-violet-400 border border-violet-500/20'
                                     }`}>
-                                        {user.contactStatus === 'ACCEPTED' ? 'Message' : user.contactStatus === 'PENDING' ? 'Pending' : 'Add Friend'}
+                                        {user.contactStatus === 'ACCEPTED' ? 'Nhắn tin' : user.contactStatus === 'PENDING' ? (user.isRequester ? 'Đã gửi' : 'Chờ xác nhận') : 'Kết bạn'}
                                     </span>
                                 )}
                                 {mode === 'group' && isGroupSelected && (
-                                    <div className="w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center">
+                                    <div className="w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center shrink-0">
                                         <span className="text-white text-xs font-bold">&#10003;</span>
                                     </div>
                                 )}

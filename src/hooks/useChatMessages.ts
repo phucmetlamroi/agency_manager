@@ -86,8 +86,15 @@ export function useChatMessages(conversationId: string | null) {
 
     const addIncomingMessage = useCallback((message: ChatMessage) => {
         setMessages(prev => {
+            // Skip if this exact message ID already exists
             if (prev.some(m => m.id === message.id)) return prev
-            return [message, ...prev]
+            // Remove any matching optimistic temp messages (same sender + same content)
+            const filtered = prev.filter(m => {
+                if (!m.id.startsWith('temp-')) return true
+                if (m.senderId === message.senderId && m.content === message.content) return false
+                return true
+            })
+            return [message, ...filtered]
         })
     }, [])
 

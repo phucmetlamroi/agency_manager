@@ -10,7 +10,7 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
     if (!session) redirect('/login')
 
     const profileId = (session.user as any).sessionProfileId
-    if (!profileId) redirect('/profile')
+    if (!profileId) redirect('/login')
 
     const currentUser = await prisma.user.findUnique({
         where: { id: session.user.id },

@@ -91,7 +91,7 @@ export default function DesktopLayoutShell({
 
                     <div className="grid grid-cols-2 gap-2 mb-2">
                         <Link
-                            href="/profile"
+                            href={`/${workspaceId}/admin`}
                             className="col-span-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 text-sm font-bold transition-all duration-300"
                         >
                             <ArrowLeftRight className="w-4 h-4" /> Đổi Team / Workspace

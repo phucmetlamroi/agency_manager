@@ -25,6 +25,7 @@ type Task = {
     title: string
     status: string
     value?: number
+    jobPriceUSD?: number
 }
 
 type Client = {
@@ -64,7 +65,7 @@ function getAvatarGradient(id: number): string {
 
 /* ── Helper: compute revenue from tasks ── */
 function computeRevenue(tasks: Task[]): number {
-    return tasks.reduce((sum, t) => sum + (t.value || 0), 0)
+    return tasks.reduce((sum, t) => sum + (t.jobPriceUSD || 0), 0)
 }
 
 /* ── Helper: compute friction % (ratio of non-completed tasks) ── */

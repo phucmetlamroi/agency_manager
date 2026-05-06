@@ -20,7 +20,7 @@ export default async function WorkspaceLayout({
     // MANDATORY: Check if user has selected a profile session
     const profileId = (session.user as any).sessionProfileId
     if (!profileId) {
-        redirect('/profile')
+        redirect('/login')
     }
 
     const { workspaceId } = await params

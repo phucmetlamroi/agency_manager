@@ -24,7 +24,7 @@ export default async function UserSchedulePage({
   if ((user as any).role === 'CLIENT') redirect(`/${workspaceId}/dashboard`)
 
   const profileId = (user as any).sessionProfileId as string | undefined
-  if (!profileId) redirect('/profile')
+  if (!profileId) redirect('/login')
 
   // ── Date logic (unchanged) ────────────────────────────────
   const baseDate = query?.date ? new Date(query.date) : new Date()

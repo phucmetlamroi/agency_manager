@@ -6,7 +6,6 @@ import {
     CreditCard,
     Settings,
     Smile,
-    User,
     LayoutDashboard,
     ListTodo,
     Wallet,
@@ -81,11 +80,6 @@ export function CommandMenu() {
                 </CommandGroup>
                 <CommandSeparator />
                 <CommandGroup heading="Settings">
-                    <CommandItem onSelect={() => runCommand(() => router.push('/profile'))}>
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
-                        <CommandShortcut>⌘P</CommandShortcut>
-                    </CommandItem>
                     <CommandItem onSelect={() => runCommand(() => router.push('/settings'))}>
                         <Settings className="mr-2 h-4 w-4" />
                         <span>Settings</span>

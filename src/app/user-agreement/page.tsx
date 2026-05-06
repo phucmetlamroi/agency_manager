@@ -43,7 +43,7 @@ export default function UserAgreementPage() {
                     toast.success('Ký kết thỏa thuận thành công!')
                     // Wait a tiny bit so the toast is visible
                     setTimeout(() => {
-                        window.location.href = '/profile'
+                        window.location.href = '/login'
                     }, 500)
                 } else {
                     toast.error('Có lỗi xảy ra, vui lòng thử lại sau.')

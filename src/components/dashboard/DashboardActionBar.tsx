@@ -193,52 +193,6 @@ export default function DashboardActionBar({
                 )}
               </div>
 
-              {userRole === "ADMIN" && (
-                <div
-                  className="p-2"
-                  style={{
-                    borderTop: "1px solid rgba(139,92,246,0.10)",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpen(false)
-                      window.location.href = "/workspace"
-                    }}
-                    className="flex w-full items-center gap-2.5 px-2.5 py-2 transition-colors duration-200"
-                    style={{
-                      borderRadius: 12,
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(255,255,255,0.04)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent"
-                    }}
-                  >
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-lg"
-                      style={{
-                        border: "1px dashed rgba(139,92,246,0.25)",
-                      }}
-                    >
-                      <Plus
-                        className="h-4 w-4"
-                        style={{ color: "#71717A" }}
-                      />
-                    </div>
-                    <span
-                      className="text-[13px] font-semibold"
-                      style={{ color: "#A1A1AA" }}
-                    >
-                      Create Workspace
-                    </span>
-                  </button>
-                </div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>

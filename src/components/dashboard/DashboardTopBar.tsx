@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, Bell, ChevronDown, Check, Plus, Loader2 } from "lucide-react"
+import { Search, Bell, ChevronDown, Check, Loader2 } from "lucide-react"
 
 interface ProfileItem {
   id: string
@@ -62,7 +62,7 @@ export default function DashboardTopBar({
       })
       const res = await fetch(`/api/workspace/first?profileId=${newProfileId}`)
       const { workspaceId: newWsId } = await res.json()
-      window.location.href = newWsId ? `/${newWsId}/admin` : "/workspace"
+      window.location.href = newWsId ? `/${newWsId}/admin` : "/login"
     } catch {
       setSwitching(false)
     }
@@ -284,40 +284,6 @@ export default function DashboardTopBar({
                 })}
               </ul>
 
-              {userRole === "ADMIN" && (
-                <>
-                  <div
-                    className="my-1.5"
-                    style={{
-                      borderTop: "1px solid rgba(139,92,246,0.10)",
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.href = "/profile"
-                    }}
-                    className="flex w-full items-center gap-2 px-2 py-2 text-sm transition-colors duration-200"
-                    style={{
-                      borderRadius: 12,
-                      color: "#A1A1AA",
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(255,255,255,0.04)"
-                      e.currentTarget.style.color = "#D4D4D8"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent"
-                      e.currentTarget.style.color = "#A1A1AA"
-                    }}
-                  >
-                    <Plus size={14} strokeWidth={2} />
-                    Create Profile
-                  </button>
-                </>
-              )}
             </div>
           )}
         </div>

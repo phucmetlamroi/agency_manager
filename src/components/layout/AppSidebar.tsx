@@ -40,6 +40,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 
 type ViewRole = 'ADMIN' | 'USER'
 
@@ -163,12 +164,14 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                     </div>
                 </div>
 
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-100">
-                            <Menu className="h-6 w-6" />
-                        </Button>
-                    </SheetTrigger>
+                <div className="flex items-center gap-1">
+                    <NotificationBell />
+                    <Sheet>
+                        <SheetTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-100">
+                                <Menu className="h-6 w-6" />
+                            </Button>
+                        </SheetTrigger>
                     <SheetContent
                         side="left"
                         className="w-[280px] p-0 border-r"
@@ -275,7 +278,8 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                             </div>
                         </div>
                     </SheetContent>
-                </Sheet>
+                    </Sheet>
+                </div>
             </div>
         )
     }
@@ -313,7 +317,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                         <span className="text-white font-extrabold text-xl" style={{ fontFamily: FONT }}>H</span>
                     </div>
                     {!collapsed && (
-                        <div className="flex flex-col overflow-hidden">
+                        <div className="flex flex-col overflow-hidden flex-1">
                             <span className="font-extrabold text-[18px] text-white tracking-tight whitespace-nowrap" style={{ fontFamily: FONT, letterSpacing: "-0.02em" }}>
                                 Hustly<span style={{ color: "#8B5CF6" }}>Tasker</span>
                             </span>
@@ -322,6 +326,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                             </span>
                         </div>
                     )}
+                    {!collapsed && <NotificationBell />}
                 </div>
 
                 {/* ── Collapse toggle ── */}

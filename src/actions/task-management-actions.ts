@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth-guard'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { createNotificationInternal } from './notification-actions'
+import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
 // --- 1. DELETE TASK ---
 export async function deleteTask(id: string, workspaceId: string) {
@@ -122,6 +124,9 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
         }
 
         // C. EXECUTE DB UPDATE
+        // Capture old assigneeId BEFORE update for unassign notification
+        const oldAssigneeId = task.assigneeId
+
         const updatedTask = await workspacePrisma.task.update({
             where: { id: taskId },
             data: updateData,
@@ -137,6 +142,10 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
                 }
             }
         })
+
+        // D'. NOTIFICATION HOOKS — fire-and-forget
+        void notifyTaskAssignmentChange(updatedTask.id, updatedTask.title, user.id, oldAssigneeId, updateData.assigneeId)
+            .catch(() => {/* swallow */})
 
         // D. SIDE EFFECTS (Email)
         if (assignmentId && updatedTask.assignee) {
@@ -166,5 +175,84 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
     } catch (e: any) {
         console.error("Assign Task Error:", e)
         return { error: e.message || 'Failed to assign task' }
+    }
+}
+
+// Notify on task assignment changes
+async function notifyTaskAssignmentChange(
+    taskId: string,
+    taskTitle: string,
+    actorId: string,
+    oldAssigneeId: string | null,
+    newAssigneeId: string | null
+) {
+    if (oldAssigneeId === newAssigneeId) return
+
+    const actor = await prisma.user.findUnique({
+        where: { id: actorId },
+        select: { username: true, nickname: true, avatarUrl: true },
+    })
+    const actorName = actor?.nickname || actor?.username || 'Admin'
+
+    const safeTitle = taskTitle || 'Untitled task'
+
+    // Newly assigned user
+    if (newAssigneeId && newAssigneeId !== actorId) {
+        try {
+            const notif = await createNotificationInternal({
+                userId: newAssigneeId,
+                type: 'TASK_ASSIGNED',
+                title: 'New task assigned',
+                body: `${actorName} assigned you "${safeTitle}"`,
+                avatarUrl: actor?.avatarUrl,
+                taskId,
+                actorId,
+                metadata: { taskTitle: safeTitle },
+            })
+            void broadcastNotificationToUser(newAssigneeId, {
+                id: notif.id,
+                type: notif.type,
+                title: notif.title,
+                body: notif.body,
+                avatarUrl: notif.avatarUrl,
+                conversationId: notif.conversationId,
+                messageId: notif.messageId,
+                taskId: notif.taskId,
+                actorId: notif.actorId,
+                metadata: notif.metadata,
+                createdAt: notif.createdAt.toISOString(),
+                isRead: false,
+            })
+        } catch {/* swallow */}
+    }
+
+    // Previously-assigned user (notify of removal)
+    if (oldAssigneeId && oldAssigneeId !== actorId && oldAssigneeId !== newAssigneeId) {
+        try {
+            const notif = await createNotificationInternal({
+                userId: oldAssigneeId,
+                type: 'TASK_UNASSIGNED',
+                title: 'Task removed from you',
+                body: `${actorName} removed "${safeTitle}" from your queue`,
+                avatarUrl: actor?.avatarUrl,
+                taskId,
+                actorId,
+                metadata: { taskTitle: safeTitle },
+            })
+            void broadcastNotificationToUser(oldAssigneeId, {
+                id: notif.id,
+                type: notif.type,
+                title: notif.title,
+                body: notif.body,
+                avatarUrl: notif.avatarUrl,
+                conversationId: notif.conversationId,
+                messageId: notif.messageId,
+                taskId: notif.taskId,
+                actorId: notif.actorId,
+                metadata: notif.metadata,
+                createdAt: notif.createdAt.toISOString(),
+                isRead: false,
+            })
+        } catch {/* swallow */}
     }
 }

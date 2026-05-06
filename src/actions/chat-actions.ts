@@ -3,6 +3,8 @@
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { createNotificationInternal, createBulkNotificationsInternal } from './notification-actions'
+import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
 async function getAuthSession(): Promise<{ userId: string; profileId: string } | null> {
     const session = await getSession()
@@ -413,7 +415,56 @@ export async function addGroupMembers(conversationId: string, userIds: string[])
         data: { updatedAt: new Date() },
     })
 
+    // Notify newly added members
+    void notifyGroupMembersAdded(conversationId, userId, newIds).catch(() => {})
+
     return { data: { added: newIds.length } }
+}
+
+async function notifyGroupMembersAdded(conversationId: string, actorId: string, newUserIds: string[]) {
+    const conv = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { name: true, avatarUrl: true },
+    })
+    const actor = await prisma.user.findUnique({
+        where: { id: actorId },
+        select: { username: true, nickname: true, avatarUrl: true },
+    })
+    const actorName = actor?.nickname || actor?.username || 'Someone'
+    const groupName = conv?.name || 'a group'
+
+    for (const uid of newUserIds) {
+        try {
+            const notif = await createNotificationInternal({
+                userId: uid,
+                type: 'GROUP_MEMBER_ADDED',
+                title: 'You were added to a group',
+                body: `${actorName} added you to "${groupName}"`,
+                avatarUrl: conv?.avatarUrl || actor?.avatarUrl,
+                conversationId,
+                actorId,
+                metadata: { groupName },
+            })
+            void broadcastNotificationToUser(uid, serializeForBroadcast(notif))
+        } catch {/* per-recipient errors swallowed */}
+    }
+}
+
+function serializeForBroadcast(n: { id: string; type: string; title: string; body: string; avatarUrl: string | null; conversationId: string | null; messageId: string | null; taskId: string | null; actorId: string | null; metadata: any; createdAt: Date; isRead: boolean }) {
+    return {
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        body: n.body,
+        avatarUrl: n.avatarUrl,
+        conversationId: n.conversationId,
+        messageId: n.messageId,
+        taskId: n.taskId,
+        actorId: n.actorId,
+        metadata: n.metadata,
+        createdAt: n.createdAt.toISOString(),
+        isRead: n.isRead,
+    }
 }
 
 export async function removeGroupMember(conversationId: string, targetUserId: string) {
@@ -432,11 +483,18 @@ export async function removeGroupMember(conversationId: string, targetUserId: st
         return { error: 'Only the group creator can remove members' }
     }
 
+    // Capture remaining participants BEFORE delete (for "left" notification)
+    const remainingParticipants = await prisma.conversationParticipant.findMany({
+        where: { conversationId, userId: { not: targetUserId } },
+        select: { userId: true },
+    })
+
     await prisma.conversationParticipant.delete({
         where: { conversationId_userId: { conversationId, userId: targetUserId } },
     })
 
-    const action = targetUserId === userId ? 'left the group' : 'removed a member'
+    const isLeaving = targetUserId === userId
+    const action = isLeaving ? 'left the group' : 'removed a member'
     await prisma.message.create({
         data: {
             conversationId,
@@ -446,7 +504,68 @@ export async function removeGroupMember(conversationId: string, targetUserId: st
         },
     })
 
+    // Fire notifications
+    void notifyGroupMemberRemoved(conversationId, userId, targetUserId, isLeaving, remainingParticipants.map(p => p.userId)).catch(() => {})
+
     return { data: { ok: true } }
+}
+
+async function notifyGroupMemberRemoved(
+    conversationId: string,
+    actorId: string,
+    targetUserId: string,
+    isLeaving: boolean,
+    remainingUserIds: string[]
+) {
+    const conv = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { name: true, avatarUrl: true },
+    })
+    const actor = await prisma.user.findUnique({
+        where: { id: actorId },
+        select: { username: true, nickname: true, avatarUrl: true },
+    })
+    const target = await prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { username: true, nickname: true, avatarUrl: true },
+    })
+    const actorName = actor?.nickname || actor?.username || 'Someone'
+    const targetName = target?.nickname || target?.username || 'Someone'
+    const groupName = conv?.name || 'the group'
+
+    if (!isLeaving) {
+        // Notify the user who was removed (not themselves leaving)
+        try {
+            const notif = await createNotificationInternal({
+                userId: targetUserId,
+                type: 'GROUP_MEMBER_REMOVED',
+                title: 'You were removed from a group',
+                body: `${actorName} removed you from "${groupName}"`,
+                avatarUrl: conv?.avatarUrl || actor?.avatarUrl,
+                conversationId,
+                actorId,
+                metadata: { groupName },
+            })
+            void broadcastNotificationToUser(targetUserId, serializeForBroadcast(notif))
+        } catch {/* swallowed */}
+    } else {
+        // Someone left → notify remaining members
+        for (const uid of remainingUserIds) {
+            try {
+                const notif = await createNotificationInternal({
+                    userId: uid,
+                    type: 'GROUP_MEMBER_LEFT',
+                    title: 'A member left the group',
+                    body: `${targetName} left "${groupName}"`,
+                    avatarUrl: target?.avatarUrl,
+                    conversationId,
+                    actorId: targetUserId,
+                    metadata: { groupName, leaverName: targetName },
+                })
+                void broadcastNotificationToUser(uid, serializeForBroadcast(notif))
+            } catch {/* swallowed */}
+        }
+    }
 }
 
 export async function getMessages(conversationId: string, cursor?: string, limit = 30) {
@@ -613,6 +732,12 @@ export async function sendMessage(
         }),
     ])
 
+    // ── Fire notifications to all other participants ────────────────────────
+    // Persist a Notification record per recipient (respecting mute/mention rules).
+    // This is fire-and-forget: errors do not block message send.
+    void notifyMessageRecipients(message.id, message.conversationId, userId, message.content || '', message.sender, (message.mentions as string[] | null) || [], message.isImportant, message.type as any)
+        .catch(() => { /* logged elsewhere */ })
+
     return {
         data: {
             id: message.id,
@@ -641,6 +766,103 @@ export async function sendMessage(
             replyTo: message.replyTo,
             reactions: [],
         },
+    }
+}
+
+// Helper: fan out notifications for a new message.
+// - Fetches participants (excluding sender) and their mute state
+// - For each recipient: NEW_MESSAGE if not muted, MENTION if mentioned (bypass mute)
+// - Broadcasts NOTIFICATION_NEW so the recipient's client updates the bell instantly
+async function notifyMessageRecipients(
+    messageId: string,
+    conversationId: string,
+    senderId: string,
+    content: string,
+    sender: { id: string; username: string; nickname: string | null; avatarUrl: string | null },
+    mentions: string[],
+    isImportant: boolean,
+    msgType: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'ANNOUNCEMENT'
+) {
+    if (msgType === 'SYSTEM') return  // System messages never notify
+
+    const participants = await prisma.conversationParticipant.findMany({
+        where: {
+            conversationId,
+            userId: { not: senderId },
+        },
+        select: {
+            userId: true,
+            isMuted: true,
+            conversation: {
+                select: { type: true, name: true, task: { select: { title: true } } },
+            },
+        },
+    })
+
+    if (participants.length === 0) return
+
+    const senderName = sender.nickname || sender.username || 'Someone'
+    const conv = participants[0]?.conversation
+    const convLabel = conv?.type === 'TASK'
+        ? conv.task?.title || 'Task chat'
+        : conv?.type === 'GROUP'
+            ? conv.name || 'Group'
+            : senderName  // DIRECT — recipient sees sender as the "label"
+
+    const previewBody = msgType === 'IMAGE' ? '📷 Photo' : msgType === 'FILE' ? '📎 File' : msgType === 'ANNOUNCEMENT' ? `📣 ${content.slice(0, 100)}` : content.slice(0, 120)
+
+    const mentionSet = new Set(mentions || [])
+
+    // Process each recipient
+    for (const p of participants) {
+        const isMentioned = mentionSet.has(p.userId)
+        const isMuted = p.isMuted
+
+        // Skip if muted AND not mentioned AND not announcement AND not important
+        if (isMuted && !isMentioned && msgType !== 'ANNOUNCEMENT' && !isImportant) {
+            continue
+        }
+
+        const notifType: 'NEW_MESSAGE' | 'MENTION' = isMentioned ? 'MENTION' : 'NEW_MESSAGE'
+        const titlePrefix = isMentioned ? `@${senderName} mentioned you` : senderName
+        const title = conv?.type === 'GROUP' ? `${titlePrefix} · ${convLabel}` : titlePrefix
+
+        try {
+            const notif = await createNotificationInternal({
+                userId: p.userId,
+                type: notifType,
+                title,
+                body: previewBody,
+                avatarUrl: sender.avatarUrl,
+                conversationId,
+                messageId,
+                actorId: senderId,
+                metadata: {
+                    convType: conv?.type,
+                    convLabel,
+                    msgType,
+                    isImportant,
+                    isMention: isMentioned,
+                },
+            })
+            // Fire-and-forget broadcast (don't await individually — Promise.all could be added)
+            void broadcastNotificationToUser(p.userId, {
+                id: notif.id,
+                type: notif.type,
+                title: notif.title,
+                body: notif.body,
+                avatarUrl: notif.avatarUrl,
+                conversationId: notif.conversationId,
+                messageId: notif.messageId,
+                taskId: notif.taskId,
+                actorId: notif.actorId,
+                metadata: notif.metadata,
+                createdAt: notif.createdAt.toISOString(),
+                isRead: false,
+            })
+        } catch {
+            // Per-recipient failures shouldn't block siblings
+        }
     }
 }
 
@@ -1002,8 +1224,37 @@ export async function deleteGroupForAll(conversationId: string) {
     })
     const participantIds = participants.map(p => p.userId)
 
+    // Snapshot the conversation name for notification body before deletion
+    const convSnapshot = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { name: true, avatarUrl: true },
+    })
+    const actor = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { username: true, nickname: true, avatarUrl: true },
+    })
+    const groupName = convSnapshot?.name || 'a group'
+    const actorName = actor?.nickname || actor?.username || 'The creator'
+
     // Cascade delete via Prisma (Message, ConversationParticipant, MessageReaction, MessageReadReceipt all cascade)
     await prisma.conversation.delete({ where: { id: conversationId } })
+
+    // Notify other members that the group was deleted
+    const recipientIds = participantIds.filter(id => id !== userId)
+    for (const uid of recipientIds) {
+        try {
+            const notif = await createNotificationInternal({
+                userId: uid,
+                type: 'GROUP_DELETED',
+                title: 'A group was deleted',
+                body: `${actorName} deleted "${groupName}"`,
+                avatarUrl: convSnapshot?.avatarUrl || actor?.avatarUrl,
+                actorId: userId,
+                metadata: { groupName },
+            })
+            void broadcastNotificationToUser(uid, serializeForBroadcast(notif))
+        } catch {/* swallowed */}
+    }
 
     return { data: { ok: true, participantIds } }
 }

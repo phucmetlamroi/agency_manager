@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
 import { getUserNotificationChannel, CHAT_EVENTS } from '@/lib/chat-channels'
 import { playNotificationSound, flashTabTitle, initNotificationSound } from '@/lib/notification-sound'
-import { getUnreadCounts } from '@/actions/chat-actions'
+import { getUnreadCounts, getConversations } from '@/actions/chat-actions'
 import type { ChatMessage } from '@/hooks/useChatMessages'
 
 interface ChatContextValue {
@@ -22,6 +22,9 @@ interface ChatContextValue {
     pendingConversationId: string | null
     pendingConversationName: string | null
     clearPendingConversation: () => void
+    mutedConversationIds: Set<string>
+    setConversationMutedLocal: (conversationId: string, muted: boolean) => void
+    refreshMutedConversations: () => void
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null)
@@ -39,7 +42,10 @@ export function ChatProvider({ userId, children }: { userId: string; children: R
     const [isPanelOpen, setIsPanelOpen] = useState(false)
     const [pendingConversationId, setPendingConversationId] = useState<string | null>(null)
     const [pendingConversationName, setPendingConversationName] = useState<string | null>(null)
+    const [mutedConversationIds, setMutedConversationIds] = useState<Set<string>>(new Set())
+    const mutedConversationIdsRef = useRef<Set<string>>(new Set())
     const onIncomingRef = useRef<((msg: ChatMessage) => void) | null>(null)
+    mutedConversationIdsRef.current = mutedConversationIds
 
     const openConversation = useCallback((conversationId: string, name?: string) => {
         setPendingConversationId(conversationId)
@@ -60,6 +66,26 @@ export function ChatProvider({ userId, children }: { userId: string; children: R
         }
     }, [])
 
+    const refreshMutedConversations = useCallback(async () => {
+        const res = await getConversations()
+        if (res.data) {
+            const muted = new Set<string>()
+            res.data.forEach((c: any) => {
+                if (c.isMuted) muted.add(c.id)
+            })
+            setMutedConversationIds(muted)
+        }
+    }, [])
+
+    const setConversationMutedLocal = useCallback((conversationId: string, muted: boolean) => {
+        setMutedConversationIds(prev => {
+            const next = new Set(prev)
+            if (muted) next.add(conversationId)
+            else next.delete(conversationId)
+            return next
+        })
+    }, [])
+
     // Initialize audio unlock on first user interaction (fixes browser autoplay policy)
     useEffect(() => {
         initNotificationSound()
@@ -67,15 +93,22 @@ export function ChatProvider({ userId, children }: { userId: string; children: R
 
     useEffect(() => {
         refreshUnread()
-        const interval = setInterval(refreshUnread, 10000)
+        refreshMutedConversations()
+        const interval = setInterval(() => {
+            refreshUnread()
+            refreshMutedConversations()
+        }, 10000)
         return () => clearInterval(interval)
-    }, [refreshUnread])
+    }, [refreshUnread, refreshMutedConversations])
 
     const handleNotification = useCallback((event: string, payload: any) => {
         if (event === CHAT_EVENTS.NEW_MESSAGE && payload.senderId !== userId) {
             if (payload.conversationId !== activeConversationId) {
-                playNotificationSound()
-                flashTabTitle(payload.senderName || 'Someone')
+                const isMuted = mutedConversationIdsRef.current.has(payload.conversationId)
+                if (!isMuted) {
+                    playNotificationSound()
+                    flashTabTitle(payload.senderName || 'Someone')
+                }
                 setUnreadCounts(prev => ({
                     ...prev,
                     [payload.conversationId]: (prev[payload.conversationId] || 0) + 1,
@@ -87,7 +120,11 @@ export function ChatProvider({ userId, children }: { userId: string; children: R
                 onIncomingRef.current(payload.message)
             }
         }
-    }, [userId, activeConversationId])
+        if (event === CHAT_EVENTS.CONVERSATION_DELETED && payload.hardDelete) {
+            // Group nuked by creator — refresh local state
+            refreshMutedConversations()
+        }
+    }, [userId, activeConversationId, refreshMutedConversations])
 
     useSupabaseChannel(getUserNotificationChannel(userId), handleNotification, true)
 
@@ -112,6 +149,9 @@ export function ChatProvider({ userId, children }: { userId: string; children: R
                 pendingConversationId,
                 pendingConversationName,
                 clearPendingConversation,
+                mutedConversationIds,
+                setConversationMutedLocal,
+                refreshMutedConversations,
             }}
         >
             {children}

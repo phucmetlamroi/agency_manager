@@ -6,13 +6,16 @@ import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
 import { useChatContext } from './ChatProvider'
 import { getConversationChannel, getUserNotificationChannel, CHAT_EVENTS } from '@/lib/chat-channels'
 import { supabase } from '@/lib/supabase'
-import { markAsRead, toggleReaction, getConversations, getMessages as fetchMessages } from '@/actions/chat-actions'
+import { markAsRead, toggleReaction, getConversations, getMessages as fetchMessages, setConversationMuted } from '@/actions/chat-actions'
 import { uploadChatFile } from '@/actions/chat-upload-actions'
 import { playNotificationSound } from '@/lib/notification-sound'
 import { MessageBubble } from './MessageBubble'
 import { ChatInput } from './ChatInput'
 import { GroupMembersDialog } from './GroupMembersDialog'
-import { Loader2, ClipboardList, User, Briefcase, Users } from 'lucide-react'
+import { RenameGroupDialog } from './RenameGroupDialog'
+import { MessageSearchPanel } from './MessageSearchPanel'
+import { Loader2, ClipboardList, User, Briefcase, Users, Pencil, Bell, BellOff, Search } from 'lucide-react'
+import { toast } from 'sonner'
 
 // ★ Fire-and-forget: properly subscribe → send → cleanup
 // The old code created channels without subscribe() so send() silently failed.
@@ -45,6 +48,9 @@ function notifyParticipantChannels(conversationId: string, senderId: string, mes
 
 interface ConversationMeta {
     type: string
+    name?: string | null
+    isCreator?: boolean
+    isMuted?: boolean
     taskTitle?: string
     clientName?: string | null
     assigneeName?: string | null
@@ -57,18 +63,23 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ conversationId, conversationName }: ChatWindowProps) {
-    const { currentUserId, setActiveConversationId } = useChatContext()
+    const { currentUserId, setActiveConversationId, setConversationMutedLocal, setIsPanelOpen } = useChatContext()
     const [meta, setMeta] = useState<ConversationMeta | null>(null)
-    const { messages, hasMore, isLoading, loadMessages, sendMessage, addIncomingMessage, addOptimisticMessage, updateMessage, reset } = useChatMessages(conversationId as string)
+    const [displayName, setDisplayName] = useState(conversationName)
+    const { messages, hasMore, isLoading, loadMessages, sendMessage, addIncomingMessage, addOptimisticMessage, updateMessage, removeMessage, reset } = useChatMessages(conversationId as string)
     const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
     const [typingUsers, setTypingUsers] = useState<string[]>([])
     const [showGroupMembers, setShowGroupMembers] = useState(false)
+    const [showRenameDialog, setShowRenameDialog] = useState(false)
+    const [showSearchPanel, setShowSearchPanel] = useState(false)
+    const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
     const lastTypingSentRef = useRef(0)
 
     // ── Load messages on conversation change ──────────────────
     useEffect(() => {
+        setDisplayName(conversationName)
         setActiveConversationId(conversationId)
         reset()
         loadMessages(true)
@@ -83,11 +94,15 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                         .map((p: any) => p.user.nickname || p.user.username)
                     setMeta({
                         type: conv.type,
+                        name: conv.name,
+                        isCreator: conv.isCreator,
+                        isMuted: conv.isMuted,
                         taskTitle: conv.task?.title,
                         clientName: conv.task?.clientName,
                         assigneeName: conv.task?.assigneeName,
                         participantNames: otherNames,
                     })
+                    if (conv.name && conv.type === 'GROUP') setDisplayName(conv.name)
                 }
             }
         })
@@ -174,7 +189,16 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                 setTypingUsers(prev => prev.filter(n => n !== payload.userName))
             }, 3000)
         }
-    }, [currentUserId, conversationId, addIncomingMessage, updateMessage])
+        if (event === CHAT_EVENTS.CONVERSATION_UPDATED && payload.name) {
+            setDisplayName(payload.name)
+            setMeta(prev => prev ? { ...prev, name: payload.name } : prev)
+        }
+        if (event === CHAT_EVENTS.CONVERSATION_DELETED && payload.hardDelete) {
+            toast.error('This group was deleted by the creator')
+            setActiveConversationId(null)
+            setIsPanelOpen(false)
+        }
+    }, [currentUserId, conversationId, addIncomingMessage, updateMessage, setActiveConversationId, setIsPanelOpen])
 
     const { broadcast } = useSupabaseChannel(getConversationChannel(conversationId), handleChannelEvent)
     const { broadcast: broadcastUser } = useSupabaseChannel(getUserNotificationChannel(currentUserId), () => {}, false)
@@ -291,8 +315,64 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
         }
     }
 
+    const handleRenamed = useCallback((newName: string) => {
+        setDisplayName(newName)
+        setMeta(prev => prev ? { ...prev, name: newName } : prev)
+        broadcast(CHAT_EVENTS.CONVERSATION_UPDATED, { conversationId, name: newName })
+        // Also notify each participant's user channel so their sidebar updates
+        fetch(`/api/chat/participants?conversationId=${conversationId}`)
+            .then(r => r.json())
+            .then(({ userIds }) => {
+                ;(userIds || []).forEach((uid: string) => {
+                    if (uid === currentUserId) return
+                    const ch = supabase.channel(getUserNotificationChannel(uid))
+                    ch.subscribe((status: string) => {
+                        if (status === 'SUBSCRIBED') {
+                            ch.send({
+                                type: 'broadcast',
+                                event: CHAT_EVENTS.CONVERSATION_UPDATED,
+                                payload: { conversationId, name: newName },
+                            }).finally(() => setTimeout(() => supabase.removeChannel(ch), 500))
+                        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                            supabase.removeChannel(ch)
+                        }
+                    })
+                })
+            })
+            .catch(() => {})
+    }, [conversationId, currentUserId, broadcast])
+
+    const handleMuteToggle = useCallback(async () => {
+        const next = !meta?.isMuted
+        setMeta(prev => prev ? { ...prev, isMuted: next } : prev)
+        setConversationMutedLocal(conversationId, next)
+        const res = await setConversationMuted(conversationId, next)
+        if (res.error) {
+            toast.error(res.error)
+            // Revert
+            setMeta(prev => prev ? { ...prev, isMuted: !next } : prev)
+            setConversationMutedLocal(conversationId, !next)
+            return
+        }
+        toast.success(next ? 'Notifications muted' : 'Notifications unmuted')
+    }, [meta?.isMuted, conversationId, setConversationMutedLocal])
+
+    // Scroll to message when search result is clicked
+    useEffect(() => {
+        if (!scrollToMessageId) return
+        const el = document.querySelector<HTMLElement>(`[data-message-id="${scrollToMessageId}"]`)
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            el.classList.add('ring-2', 'ring-violet-500/60', 'transition-all')
+            setTimeout(() => {
+                el.classList.remove('ring-2', 'ring-violet-500/60')
+            }, 1500)
+        }
+        setScrollToMessageId(null)
+    }, [scrollToMessageId, messages])
+
     return (
-        <div className="flex flex-col h-full bg-zinc-950">
+        <div className="flex flex-col h-full bg-zinc-950 relative">
             {/* Header */}
             <div className="px-4 py-2.5 border-b border-white/[0.08] flex items-center gap-2.5 bg-zinc-950/90 backdrop-blur-xl">
                 {meta?.type === 'TASK' ? (
@@ -301,11 +381,14 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                     </div>
                 ) : (
                     <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-sm font-bold text-white bg-gradient-to-br from-indigo-500 to-violet-500">
-                        {conversationName.charAt(0).toUpperCase()}
+                        {displayName.charAt(0).toUpperCase()}
                     </div>
                 )}
                 <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-zinc-100 truncate">{conversationName}</div>
+                    <div className="text-sm font-bold text-zinc-100 truncate flex items-center gap-1.5">
+                        {displayName}
+                        {meta?.isMuted && <BellOff className="w-3 h-3 text-zinc-500 shrink-0" />}
+                    </div>
                     {meta?.type === 'TASK' && (meta.clientName || meta.assigneeName) ? (
                         <div className="flex items-center gap-2 mt-px">
                             {meta.clientName && (
@@ -335,16 +418,50 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                         </div>
                     )}
                 </div>
-                {/* Group members button — only for GROUP conversations */}
-                {meta?.type === 'GROUP' && (
+                {/* Header action buttons */}
+                <div className="flex items-center gap-1 shrink-0">
+                    {/* Search messages */}
                     <button
-                        onClick={() => setShowGroupMembers(true)}
-                        className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent border-none"
-                        title="Group members"
+                        onClick={() => setShowSearchPanel(p => !p)}
+                        className={`p-1.5 rounded-lg transition-colors cursor-pointer bg-transparent border-none ${showSearchPanel ? 'bg-violet-500/15' : 'hover:bg-white/10'}`}
+                        title="Search messages"
                     >
-                        <Users className="w-4.5 h-4.5 text-zinc-400" />
+                        <Search className={`w-4 h-4 ${showSearchPanel ? 'text-violet-400' : 'text-zinc-400'}`} />
                     </button>
-                )}
+
+                    {/* Mute toggle */}
+                    <button
+                        onClick={handleMuteToggle}
+                        className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent border-none"
+                        title={meta?.isMuted ? 'Unmute notifications' : 'Mute notifications'}
+                    >
+                        {meta?.isMuted
+                            ? <BellOff className="w-4 h-4 text-zinc-400" />
+                            : <Bell className="w-4 h-4 text-zinc-400" />}
+                    </button>
+
+                    {/* Rename — creator-only for groups */}
+                    {meta?.type === 'GROUP' && meta?.isCreator && (
+                        <button
+                            onClick={() => setShowRenameDialog(true)}
+                            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent border-none"
+                            title="Rename group"
+                        >
+                            <Pencil className="w-4 h-4 text-zinc-400" />
+                        </button>
+                    )}
+
+                    {/* Group members button — only for GROUP conversations */}
+                    {meta?.type === 'GROUP' && (
+                        <button
+                            onClick={() => setShowGroupMembers(true)}
+                            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent border-none"
+                            title="Group members"
+                        >
+                            <Users className="w-4 h-4 text-zinc-400" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Messages area */}
@@ -361,6 +478,7 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                         onReply={setReplyTo}
                         onReact={handleReact}
                         onMessageUpdated={handleMessageUpdated}
+                        onMessageHidden={removeMessage}
                         currentUserId={currentUserId}
                     />
                 ))}
@@ -391,6 +509,26 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
                 isOpen={showGroupMembers}
                 onClose={() => setShowGroupMembers(false)}
                 conversationId={conversationId}
+            />
+
+            {/* Rename group dialog */}
+            <RenameGroupDialog
+                isOpen={showRenameDialog}
+                onClose={() => setShowRenameDialog(false)}
+                conversationId={conversationId}
+                currentName={meta?.name || displayName}
+                onRenamed={handleRenamed}
+            />
+
+            {/* Message search panel */}
+            <MessageSearchPanel
+                isOpen={showSearchPanel}
+                onClose={() => setShowSearchPanel(false)}
+                conversationId={conversationId}
+                onResultClick={(messageId) => {
+                    setShowSearchPanel(false)
+                    setScrollToMessageId(messageId)
+                }}
             />
         </div>
     )

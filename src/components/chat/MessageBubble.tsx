@@ -11,9 +11,10 @@ import {
     Copy,
     Lock,
     Eye,
+    EyeOff,
 } from 'lucide-react'
 import type { ChatMessage } from '@/hooks/useChatMessages'
-import { recallMessage, editMessage, markViewOnceViewed } from '@/actions/chat-actions'
+import { recallMessage, editMessage, markViewOnceViewed, deleteMessageForMe } from '@/actions/chat-actions'
 import { toast } from 'sonner'
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
@@ -26,10 +27,11 @@ interface MessageBubbleProps {
     onReply?: (message: ChatMessage) => void
     onReact?: (messageId: string, emoji: string) => void
     onMessageUpdated?: (messageId: string, updates: Partial<ChatMessage>) => void
+    onMessageHidden?: (messageId: string) => void
     currentUserId: string
 }
 
-export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpdated, currentUserId }: MessageBubbleProps) {
+export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpdated, onMessageHidden, currentUserId }: MessageBubbleProps) {
     const [showActions, setShowActions] = useState(false)
     const [showReactions, setShowReactions] = useState(false)
     const [showMenu, setShowMenu] = useState(false)
@@ -53,7 +55,7 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
 
     if (message.isDeleted) {
         return (
-            <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1`}>
+            <div data-message-id={message.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 rounded-2xl`}>
                 <div className="px-3.5 py-2 rounded-2xl bg-white/[0.03] text-zinc-500 text-[13px] italic flex items-center gap-2">
                     <Trash2 className="w-3 h-3" />
                     {isMine ? 'You recalled this message' : 'This message was recalled'}
@@ -78,6 +80,17 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
             return
         }
         onMessageUpdated?.(message.id, { isDeleted: true, deletedAt: res.data?.deletedAt })
+        setShowMenu(false)
+    }
+
+    const handleDeleteForMe = async () => {
+        if (!confirm('Hide this message from your view? Other participants will still see it.')) return
+        const res = await deleteMessageForMe(message.id)
+        if (res.error) {
+            toast.error(res.error)
+            return
+        }
+        onMessageHidden?.(message.id)
         setShowMenu(false)
     }
 
@@ -137,7 +150,8 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
     return (
         <>
             <div
-                className={`flex gap-2 mb-2 group ${isMine ? 'flex-row-reverse' : ''}`}
+                data-message-id={message.id}
+                className={`flex gap-2 mb-2 group rounded-2xl ${isMine ? 'flex-row-reverse' : ''}`}
                 onMouseEnter={() => setShowActions(true)}
                 onMouseLeave={() => { setShowActions(false); setShowReactions(false) }}
             >
@@ -297,13 +311,13 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
                                                     <Pencil className="w-3 h-3" /> Edit
                                                 </button>
                                             )}
+                                            <button onClick={handleDeleteForMe} className="w-full px-3 py-1.5 text-[12px] text-zinc-300 hover:bg-white/5 cursor-pointer text-left flex items-center gap-2">
+                                                <EyeOff className="w-3 h-3" /> Delete for me
+                                            </button>
                                             {canRecall && (
                                                 <button onClick={handleRecall} className="w-full px-3 py-1.5 text-[12px] text-red-400 hover:bg-red-500/10 cursor-pointer text-left flex items-center gap-2">
                                                     <Trash2 className="w-3 h-3" /> Delete for everyone
                                                 </button>
-                                            )}
-                                            {!canRecall && !canEdit && message.type !== 'TEXT' && (
-                                                <div className="px-3 py-1.5 text-[11px] text-zinc-500 italic">No actions available</div>
                                             )}
                                         </div>
                                     )}

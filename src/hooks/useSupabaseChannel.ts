@@ -11,12 +11,15 @@ export function useSupabaseChannel(
 ) {
     const channelRef = useRef<RealtimeChannel | null>(null)
     const onEventRef = useRef(onEvent)
+    const isSubscribedRef = useRef(false)
     const [isSubscribed, setIsSubscribed] = useState(false)
+    const pendingBroadcasts = useRef<Array<{ event: string; payload: any }>>([])
     onEventRef.current = onEvent
 
     useEffect(() => {
         if (!enabled || !channelName) return
 
+        isSubscribedRef.current = false
         setIsSubscribed(false)
 
         const channel = supabase.channel(channelName, {
@@ -29,13 +32,17 @@ export function useSupabaseChannel(
             })
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
+                    isSubscribedRef.current = true
                     setIsSubscribed(true)
+                    // Flush any broadcasts that were queued while subscribing
+                    const pending = pendingBroadcasts.current.splice(0)
+                    pending.forEach(({ event, payload }) => {
+                        channel.send({ type: 'broadcast', event, payload }).catch(() => {})
+                    })
                 } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    isSubscribedRef.current = false
                     setIsSubscribed(false)
-                    // Retry subscription after a short delay
-                    setTimeout(() => {
-                        channel.subscribe()
-                    }, 2000)
+                    setTimeout(() => { channel.subscribe() }, 2000)
                 }
             })
 
@@ -44,21 +51,27 @@ export function useSupabaseChannel(
         return () => {
             supabase.removeChannel(channel)
             channelRef.current = null
+            isSubscribedRef.current = false
             setIsSubscribed(false)
+            pendingBroadcasts.current = []
         }
     }, [channelName, enabled])
 
     const broadcast = useCallback(
         async (event: string, payload: any) => {
-            if (!channelRef.current) return
+            const channel = channelRef.current
+            if (!channel) return
+
+            // If not subscribed yet, queue the broadcast for when subscription confirms
+            if (!isSubscribedRef.current) {
+                pendingBroadcasts.current.push({ event, payload })
+                return
+            }
+
             try {
-                await channelRef.current.send({
-                    type: 'broadcast',
-                    event,
-                    payload,
-                })
+                await channel.send({ type: 'broadcast', event, payload })
             } catch {
-                // Broadcast failed silently — polling will catch up
+                // Broadcast failed — polling will catch up
             }
         },
         []

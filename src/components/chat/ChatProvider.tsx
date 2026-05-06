@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
 import { getUserNotificationChannel, CHAT_EVENTS } from '@/lib/chat-channels'
-import { playNotificationSound, flashTabTitle } from '@/lib/notification-sound'
+import { playNotificationSound, flashTabTitle, initNotificationSound } from '@/lib/notification-sound'
 import { getUnreadCounts } from '@/actions/chat-actions'
 import type { ChatMessage } from '@/hooks/useChatMessages'
 
@@ -58,6 +58,11 @@ export function ChatProvider({ userId, children }: { userId: string; children: R
             setUnreadCounts(result.data.counts as Record<string, number>)
             setUnreadTotal(result.data.total as number)
         }
+    }, [])
+
+    // Initialize audio unlock on first user interaction (fixes browser autoplay policy)
+    useEffect(() => {
+        initNotificationSound()
     }, [])
 
     useEffect(() => {

@@ -318,6 +318,135 @@ export async function createGroupConversation(
     return { data: { conversationId: conv.id } }
 }
 
+export async function getGroupMembers(conversationId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const conv = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { type: true, createdById: true },
+    })
+    if (!conv || conv.type !== 'GROUP') return { error: 'Not a group conversation' }
+
+    const members = await prisma.conversationParticipant.findMany({
+        where: { conversationId },
+        include: {
+            user: {
+                select: { id: true, username: true, nickname: true, avatarUrl: true, email: true },
+            },
+        },
+    })
+
+    return {
+        data: {
+            members: members.map(m => ({
+                userId: m.userId,
+                role: m.role,
+                username: m.user.username,
+                nickname: m.user.nickname,
+                avatarUrl: m.user.avatarUrl,
+                email: m.user.email,
+            })),
+            isCreator: conv.createdById === userId,
+        },
+    }
+}
+
+export async function addGroupMembers(conversationId: string, userIds: string[]) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId, profileId } = auth
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const conv = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { type: true, workspaceId: true },
+    })
+    if (!conv || conv.type !== 'GROUP') return { error: 'Not a group conversation' }
+
+    // Check which users are already members
+    const existing = await prisma.conversationParticipant.findMany({
+        where: { conversationId, userId: { in: userIds } },
+        select: { userId: true },
+    })
+    const existingIds = new Set(existing.map(e => e.userId))
+    const newIds = userIds.filter(id => !existingIds.has(id))
+
+    if (newIds.length === 0) return { error: 'All users are already members' }
+
+    // Verify new users are in the same profile
+    const allInProfile = await verifyUsersInProfile(newIds, profileId)
+    if (!allInProfile) return { error: 'Some users are not in the current team' }
+
+    await prisma.conversationParticipant.createMany({
+        data: newIds.map(uid => ({
+            conversationId,
+            userId: uid,
+            role: 'MEMBER',
+        })),
+    })
+
+    // Add system message
+    await prisma.message.create({
+        data: {
+            conversationId,
+            senderId: userId,
+            type: 'SYSTEM',
+            content: `added ${newIds.length} member(s) to the group`,
+        },
+    })
+
+    await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+    })
+
+    return { data: { added: newIds.length } }
+}
+
+export async function removeGroupMember(conversationId: string, targetUserId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const conv = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { type: true, createdById: true },
+    })
+    if (!conv || conv.type !== 'GROUP') return { error: 'Not a group conversation' }
+
+    // Only group creator can remove members (or user can leave themselves)
+    if (targetUserId !== userId && conv.createdById !== userId) {
+        return { error: 'Only the group creator can remove members' }
+    }
+
+    await prisma.conversationParticipant.delete({
+        where: { conversationId_userId: { conversationId, userId: targetUserId } },
+    })
+
+    const action = targetUserId === userId ? 'left the group' : 'removed a member'
+    await prisma.message.create({
+        data: {
+            conversationId,
+            senderId: userId,
+            type: 'SYSTEM',
+            content: action,
+        },
+    })
+
+    return { data: { ok: true } }
+}
+
 export async function getMessages(conversationId: string, cursor?: string, limit = 30) {
     const auth = await getAuthSession()
     if (!auth) return { error: 'Unauthorized' }

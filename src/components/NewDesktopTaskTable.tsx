@@ -365,13 +365,22 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                     }}
                 >
                     <div className="flex items-center justify-center">
-                        <input
-                            type="checkbox"
-                            checked={paged.length > 0 && selectedIds.length === paged.length}
-                            onChange={toggleAll}
-                            className="w-3.5 h-3.5 rounded cursor-pointer"
-                            style={{ accentColor: '#6366F1' }}
-                        />
+                        <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={paged.length > 0 && selectedIds.length === paged.length}
+                            onClick={toggleAll}
+                            className="w-[18px] h-[18px] shrink-0 rounded-full border-2 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                            style={{
+                                borderColor: paged.length > 0 && selectedIds.length === paged.length ? '#8B5CF6' : '#52525B',
+                                background: paged.length > 0 && selectedIds.length === paged.length ? '#8B5CF6' : 'transparent',
+                                boxShadow: paged.length > 0 && selectedIds.length === paged.length ? '0 0 10px rgba(139,92,246,0.4)' : 'none',
+                            }}
+                        >
+                            {paged.length > 0 && selectedIds.length === paged.length && (
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                            )}
+                        </button>
                     </div>
                     {(['Task', 'Status', 'Assignee', 'Type', 'Deadline', 'Amount', ''] as const).map(h => (
                         <span
@@ -444,13 +453,22 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
 
                             {/* Checkbox */}
                             <div className="flex items-center justify-center">
-                                <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => toggleRow(task.id)}
-                                    className="w-3.5 h-3.5 rounded cursor-pointer"
-                                    style={{ accentColor: '#6366F1' }}
-                                />
+                                <button
+                                    type="button"
+                                    role="checkbox"
+                                    aria-checked={isSelected}
+                                    onClick={() => toggleRow(task.id)}
+                                    className="w-[18px] h-[18px] shrink-0 rounded-full border-2 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                                    style={{
+                                        borderColor: isSelected ? '#8B5CF6' : '#52525B',
+                                        background: isSelected ? '#8B5CF6' : 'transparent',
+                                        boxShadow: isSelected ? '0 0 10px rgba(139,92,246,0.4)' : 'none',
+                                    }}
+                                >
+                                    {isSelected && (
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                    )}
+                                </button>
                             </div>
 
                             {/* Task cell */}

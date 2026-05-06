@@ -262,15 +262,25 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
 
                 {isAdmin && tasks.length > 0 && (
                   <div className="flex items-center gap-2 px-2">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 rounded border-gray-700 bg-zinc-800"
-                      checked={selectedIds.length === tasks.length && tasks.length > 0}
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedIds(tasks.map(t => t.id))
-                        else setSelectedIds([])
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={selectedIds.length === tasks.length && tasks.length > 0}
+                      onClick={() => {
+                        if (selectedIds.length === tasks.length && tasks.length > 0) setSelectedIds([])
+                        else setSelectedIds(tasks.map(t => t.id))
                       }}
-                    />
+                      className="w-[18px] h-[18px] shrink-0 rounded-full border-2 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                      style={{
+                        borderColor: selectedIds.length === tasks.length && tasks.length > 0 ? '#8B5CF6' : '#52525B',
+                        background: selectedIds.length === tasks.length && tasks.length > 0 ? '#8B5CF6' : 'transparent',
+                        boxShadow: selectedIds.length === tasks.length && tasks.length > 0 ? '0 0 10px rgba(139,92,246,0.4)' : 'none',
+                      }}
+                    >
+                      {selectedIds.length === tasks.length && tasks.length > 0 && (
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      )}
+                    </button>
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Ch\u1ecdn t\u1ea5t c\u1ea3</span>
                   </div>
                 )}
@@ -288,15 +298,25 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                             {/* Checkbox for Admin */}
                             {isAdmin && (
                               <div className="absolute -left-3 top-1/2 -translate-y-1/2 z-10" onClick={(e) => e.stopPropagation()}>
-                                <input 
-                                  type="checkbox" 
-                                  className="w-5 h-5 rounded-md border-2 border-indigo-500/50 bg-zinc-900 checked:bg-indigo-500 cursor-pointer shadow-lg transition-all hover:scale-110"
-                                  checked={isSelected}
-                                  onChange={(e) => {
-                                    if (e.target.checked) setSelectedIds(prev => [...prev, task.id])
-                                    else setSelectedIds(prev => prev.filter(id => id !== task.id))
+                                <button
+                                  type="button"
+                                  role="checkbox"
+                                  aria-checked={isSelected}
+                                  onClick={() => {
+                                    if (isSelected) setSelectedIds(prev => prev.filter(id => id !== task.id))
+                                    else setSelectedIds(prev => [...prev, task.id])
                                   }}
-                                />
+                                  className="w-[20px] h-[20px] shrink-0 rounded-full border-2 transition-all duration-200 flex items-center justify-center cursor-pointer hover:scale-110"
+                                  style={{
+                                    borderColor: isSelected ? '#8B5CF6' : 'rgba(99,102,241,0.5)',
+                                    background: isSelected ? '#8B5CF6' : 'rgba(24,24,27,1)',
+                                    boxShadow: isSelected ? '0 0 12px rgba(139,92,246,0.5)' : '0 2px 8px rgba(0,0,0,0.3)',
+                                  }}
+                                >
+                                  {isSelected && (
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                  )}
+                                </button>
                               </div>
                             )}
 

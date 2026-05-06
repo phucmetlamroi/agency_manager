@@ -389,12 +389,22 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         if (!isBulkMode || !isEditing) return null
         return (
             <label className="inline-flex items-center gap-1.5 cursor-pointer ml-2">
-                <input
-                    type="checkbox"
-                    className="w-3.5 h-3.5 accent-amber-500"
-                    checked={!!enabledFields[field]}
-                    onChange={() => toggleField(field)}
-                />
+                <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={!!enabledFields[field]}
+                    onClick={() => toggleField(field)}
+                    className="w-[16px] h-[16px] shrink-0 rounded-full border-2 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                    style={{
+                        borderColor: enabledFields[field] ? '#F59E0B' : '#52525B',
+                        background: enabledFields[field] ? '#F59E0B' : 'transparent',
+                        boxShadow: enabledFields[field] ? '0 0 8px rgba(245,158,11,0.4)' : 'none',
+                    }}
+                >
+                    {enabledFields[field] && (
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    )}
+                </button>
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${enabledFields[field] ? 'text-amber-400' : 'text-zinc-600'}`}>
                     {enabledFields[field] ? 'GHI ĐÈ' : 'GIỮ'}
                 </span>

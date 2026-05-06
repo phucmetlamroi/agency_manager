@@ -478,6 +478,7 @@ export async function getMessages(conversationId: string, cursor?: string, limit
             reactions: {
                 select: { emoji: true, userId: true },
             },
+            pin: { select: { id: true } },
         },
     })
 
@@ -525,6 +526,11 @@ export async function getMessages(conversationId: string, cursor?: string, limit
             viewOnce: m.viewOnce,
             viewed: !!viewedByMe,
             expired: !!expired,
+            isImportant: !!m.isImportant,
+            mentions: (m.mentions as string[] | null) || [],
+            forwardedFromMessageId: m.forwardedFromMessageId,
+            forwardedFromConversationId: m.forwardedFromConversationId,
+            isPinned: !!m.pin,
             createdAt: m.createdAt.toISOString(),
             sender: m.sender,
             replyTo: m.replyTo,
@@ -541,12 +547,14 @@ export async function getMessages(conversationId: string, cursor?: string, limit
 export async function sendMessage(
     conversationId: string,
     content: string,
-    type: 'TEXT' | 'IMAGE' | 'FILE' = 'TEXT',
+    type: 'TEXT' | 'IMAGE' | 'FILE' | 'ANNOUNCEMENT' = 'TEXT',
     replyToId?: string,
     fileUrl?: string,
     fileName?: string,
     fileSize?: number,
-    viewOnce: boolean = false
+    viewOnce: boolean = false,
+    mentions?: string[],
+    isImportant: boolean = false
 ) {
     const auth = await getAuthSession()
     if (!auth) return { error: 'Unauthorized' }
@@ -556,6 +564,16 @@ export async function sendMessage(
         where: { conversationId_userId: { conversationId, userId } },
     })
     if (!participant) return { error: 'Not a participant' }
+
+    // ANNOUNCEMENT — only group creator can send
+    if (type === 'ANNOUNCEMENT') {
+        const conv = await prisma.conversation.findUnique({
+            where: { id: conversationId },
+            select: { type: true, createdById: true },
+        })
+        if (!conv || conv.type !== 'GROUP') return { error: 'Announcements only allowed in groups' }
+        if (conv.createdById !== userId) return { error: 'Only the group creator can send announcements' }
+    }
 
     const [message] = await prisma.$transaction([
         prisma.message.create({
@@ -569,6 +587,8 @@ export async function sendMessage(
                 fileName: fileName || null,
                 fileSize: fileSize || null,
                 viewOnce: viewOnce && (type === 'IMAGE' || type === 'FILE'),
+                mentions: mentions && mentions.length > 0 ? (mentions as any) : undefined,
+                isImportant: !!isImportant,
             },
             include: {
                 sender: {
@@ -611,6 +631,11 @@ export async function sendMessage(
             viewOnce: message.viewOnce,
             viewed: false,
             expired: false,
+            isImportant: message.isImportant,
+            mentions: (message.mentions as string[] | null) || [],
+            forwardedFromMessageId: message.forwardedFromMessageId,
+            forwardedFromConversationId: message.forwardedFromConversationId,
+            isPinned: false,
             createdAt: message.createdAt.toISOString(),
             sender: message.sender,
             replyTo: message.replyTo,
@@ -1077,4 +1102,285 @@ export async function searchMessages(conversationId: string, query: string, limi
             },
         })),
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3 Tier 2: Forward, Pin, Important, Announcement, Mentions, Presence
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MAX_PINS_PER_CONV = 50
+
+export async function forwardMessage(messageId: string, toConversationIds: string[]) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    if (!toConversationIds.length) return { error: 'No target conversations' }
+    if (toConversationIds.length > 20) return { error: 'Cannot forward to more than 20 conversations' }
+
+    const source = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: {
+            id: true, conversationId: true, content: true, type: true,
+            fileUrl: true, fileName: true, fileSize: true, isDeleted: true,
+            viewOnce: true, deletedForUsers: true,
+        },
+    })
+    if (!source) return { error: 'Message not found' }
+    if (source.isDeleted) return { error: 'Cannot forward a recalled message' }
+    if (source.viewOnce) return { error: 'Cannot forward view-once messages' }
+
+    // Verify caller can SEE the source message
+    const srcParticipant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId: source.conversationId, userId } },
+    })
+    if (!srcParticipant) return { error: 'Cannot forward — not a participant of source' }
+
+    // Check caller is a participant in all target conversations
+    const targets = await prisma.conversationParticipant.findMany({
+        where: {
+            conversationId: { in: toConversationIds },
+            userId,
+        },
+        select: { conversationId: true },
+    })
+    const targetIds = new Set(targets.map(t => t.conversationId))
+    if (targetIds.size !== toConversationIds.length) {
+        return { error: 'You are not a participant of all selected conversations' }
+    }
+
+    // Forward to each target — create new message with provenance
+    const forwarded = await prisma.$transaction(
+        toConversationIds.map(targetId =>
+            prisma.message.create({
+                data: {
+                    conversationId: targetId,
+                    senderId: userId,
+                    content: source.content,
+                    type: source.type === 'ANNOUNCEMENT' ? 'TEXT' : source.type,
+                    fileUrl: source.fileUrl,
+                    fileName: source.fileName,
+                    fileSize: source.fileSize,
+                    forwardedFromMessageId: source.id,
+                    forwardedFromConversationId: source.conversationId,
+                },
+            })
+        )
+    )
+
+    // Bump updatedAt on all targets
+    await prisma.conversation.updateMany({
+        where: { id: { in: toConversationIds } },
+        data: { updatedAt: new Date() },
+    })
+
+    return { data: { count: forwarded.length, messageIds: forwarded.map(f => f.id) } }
+}
+
+export async function pinMessage(messageId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { id: true, conversationId: true, isDeleted: true },
+    })
+    if (!message) return { error: 'Message not found' }
+    if (message.isDeleted) return { error: 'Cannot pin a deleted message' }
+
+    const conv = await prisma.conversation.findUnique({
+        where: { id: message.conversationId },
+        select: { type: true, createdById: true },
+    })
+    if (!conv) return { error: 'Conversation not found' }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId: message.conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    // GROUP: only creator can pin. DIRECT/TASK: any participant.
+    if (conv.type === 'GROUP' && conv.createdById !== userId) {
+        return { error: 'Only the group creator can pin messages' }
+    }
+
+    // Already pinned?
+    const existing = await prisma.messagePin.findUnique({ where: { messageId } })
+    if (existing) return { data: { ok: true, alreadyPinned: true } }
+
+    // Enforce limit
+    const count = await prisma.messagePin.count({ where: { conversationId: message.conversationId } })
+    if (count >= MAX_PINS_PER_CONV) return { error: `Pin limit reached (${MAX_PINS_PER_CONV})` }
+
+    await prisma.messagePin.create({
+        data: {
+            messageId,
+            conversationId: message.conversationId,
+            pinnedById: userId,
+        },
+    })
+
+    return { data: { ok: true, conversationId: message.conversationId } }
+}
+
+export async function unpinMessage(messageId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const pin = await prisma.messagePin.findUnique({
+        where: { messageId },
+        include: { conversation: { select: { type: true, createdById: true } } },
+    })
+    if (!pin) return { error: 'Not pinned' }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId: pin.conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    // GROUP: only creator OR the user who pinned can unpin. DIRECT/TASK: any participant.
+    if (pin.conversation.type === 'GROUP' && pin.conversation.createdById !== userId && pin.pinnedById !== userId) {
+        return { error: 'Only the group creator or the pinner can unpin' }
+    }
+
+    await prisma.messagePin.delete({ where: { messageId } })
+
+    return { data: { ok: true, conversationId: pin.conversationId } }
+}
+
+export async function getPinnedMessages(conversationId: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const participant = await prisma.conversationParticipant.findUnique({
+        where: { conversationId_userId: { conversationId, userId } },
+    })
+    if (!participant) return { error: 'Not a participant' }
+
+    const pins = await prisma.messagePin.findMany({
+        where: { conversationId },
+        orderBy: { pinnedAt: 'desc' },
+        include: {
+            message: {
+                include: {
+                    sender: { select: { id: true, username: true, nickname: true, avatarUrl: true } },
+                },
+            },
+            pinnedBy: { select: { username: true, nickname: true } },
+        },
+    })
+
+    // Filter out pins on hidden-for-me messages
+    const visible = pins.filter(p => {
+        const hidden = (p.message.deletedForUsers as Record<string, string> | null)?.[userId]
+        return !hidden && !p.message.isDeleted
+    })
+
+    return {
+        data: visible.map(p => ({
+            id: p.message.id,
+            content: p.message.content,
+            type: p.message.type,
+            fileUrl: p.message.fileUrl,
+            fileName: p.message.fileName,
+            fileSize: p.message.fileSize,
+            createdAt: p.message.createdAt.toISOString(),
+            pinnedAt: p.pinnedAt.toISOString(),
+            pinnedByName: p.pinnedBy.nickname || p.pinnedBy.username,
+            sender: {
+                id: p.message.sender.id,
+                username: p.message.sender.username,
+                nickname: p.message.sender.nickname,
+                avatarUrl: p.message.sender.avatarUrl,
+            },
+        })),
+    }
+}
+
+export async function setMessageImportant(messageId: string, important: boolean) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { id: true, senderId: true, conversationId: true, isDeleted: true },
+    })
+    if (!message) return { error: 'Message not found' }
+    if (message.senderId !== userId) return { error: 'Only the sender can mark as important' }
+    if (message.isDeleted) return { error: 'Cannot mark a deleted message' }
+
+    await prisma.message.update({
+        where: { id: messageId },
+        data: { isImportant: !!important },
+    })
+
+    return { data: { ok: true, conversationId: message.conversationId, isImportant: !!important } }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Presence
+// ─────────────────────────────────────────────────────────────────────────────
+
+const VALID_PRESENCE = new Set(['ONLINE', 'OFFLINE', 'AWAY', 'BUSY'])
+
+export async function setMyPresence(status: string) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const upper = (status || '').toUpperCase()
+    if (!VALID_PRESENCE.has(upper)) return { error: 'Invalid status' }
+
+    await prisma.userPresence.upsert({
+        where: { userId },
+        create: { userId, status: upper, lastHeartbeat: new Date() },
+        update: { status: upper, lastHeartbeat: new Date() },
+    })
+
+    return { data: { ok: true, status: upper } }
+}
+
+export async function getMyPresence() {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+    const { userId } = auth
+
+    const presence = await prisma.userPresence.findUnique({
+        where: { userId },
+        select: { status: true, lastHeartbeat: true },
+    })
+
+    return {
+        data: {
+            status: presence?.status || 'OFFLINE',
+            lastHeartbeat: presence?.lastHeartbeat?.toISOString() || null,
+        },
+    }
+}
+
+// Get presence + last seen for a list of users.
+export async function getUsersPresence(userIds: string[]) {
+    const auth = await getAuthSession()
+    if (!auth) return { error: 'Unauthorized' }
+
+    if (userIds.length === 0) return { data: {} }
+
+    const records = await prisma.userPresence.findMany({
+        where: { userId: { in: userIds } },
+        select: { userId: true, status: true, lastHeartbeat: true },
+    })
+
+    const result: Record<string, { status: string; lastSeen: string | null }> = {}
+    for (const id of userIds) {
+        const r = records.find(x => x.userId === id)
+        result[id] = {
+            status: r?.status || 'OFFLINE',
+            lastSeen: r?.lastHeartbeat?.toISOString() || null,
+        }
+    }
+    return { data: result }
 }

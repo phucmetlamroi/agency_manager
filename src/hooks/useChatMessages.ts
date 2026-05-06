@@ -8,7 +8,7 @@ export interface ChatMessage {
     conversationId: string
     senderId: string
     content: string | null
-    type: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM'
+    type: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'ANNOUNCEMENT'
     fileUrl: string | null
     fileName: string | null
     fileSize: number | null
@@ -20,6 +20,11 @@ export interface ChatMessage {
     viewOnce?: boolean
     viewed?: boolean
     expired?: boolean
+    isImportant?: boolean
+    mentions?: string[]
+    forwardedFromMessageId?: string | null
+    forwardedFromConversationId?: string | null
+    isPinned?: boolean
     createdAt: string
     sender: {
         id: string
@@ -67,16 +72,22 @@ export function useChatMessages(conversationId: string | null) {
 
     const sendMessage = useCallback(async (
         content: string,
-        type: 'TEXT' | 'IMAGE' | 'FILE' = 'TEXT',
+        type: 'TEXT' | 'IMAGE' | 'FILE' | 'ANNOUNCEMENT' = 'TEXT',
         replyToId?: string,
         fileUrl?: string,
         fileName?: string,
         fileSize?: number,
-        viewOnce?: boolean
+        viewOnce?: boolean,
+        mentions?: string[],
+        isImportant?: boolean
     ) => {
         if (!conversationId) return null
 
-        const result = await sendMessageAction(conversationId, content, type, replyToId, fileUrl, fileName, fileSize, viewOnce ?? false)
+        const result = await sendMessageAction(
+            conversationId, content, type, replyToId,
+            fileUrl, fileName, fileSize, viewOnce ?? false,
+            mentions, isImportant ?? false
+        )
         return result.data || null
     }, [conversationId])
 

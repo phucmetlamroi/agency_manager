@@ -1,36 +1,81 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { Send, Paperclip, X, SmilePlus, Eye } from 'lucide-react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { Send, Paperclip, X, SmilePlus, Eye, Megaphone, Star } from 'lucide-react'
 import type { ChatMessage } from '@/hooks/useChatMessages'
 import { ACCEPT_ATTRIBUTE, validateChatFile, MAX_BYTES } from '@/lib/chat-file-types'
+import { findActiveMention, resolveMentions } from '@/lib/mentions'
+import { MentionAutocomplete, type MentionableUser } from './MentionAutocomplete'
 import { toast } from 'sonner'
 
 const EMOJI_LIST = ['😀', '😂', '🥰', '😎', '🤔', '😢', '😡', '🤯', '🥳', '😴', '👍', '👎', '❤️', '🔥', '💯', '✅', '🎉', '⭐', '💪', '🙏']
 
 interface ChatInputProps {
-    onSend: (content: string, replyToId?: string) => void
+    onSend: (content: string, replyToId?: string, opts?: { mentions?: string[]; isImportant?: boolean; isAnnouncement?: boolean }) => void
     onFileUpload: (file: File, viewOnce?: boolean) => void
     replyTo: ChatMessage | null
     onCancelReply: () => void
     disabled?: boolean
+    participants?: MentionableUser[]
+    canSendAnnouncement?: boolean
 }
 
-export function ChatInput({ onSend, onFileUpload, replyTo, onCancelReply, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onFileUpload, replyTo, onCancelReply, disabled, participants = [], canSendAnnouncement = false }: ChatInputProps) {
     const [text, setText] = useState('')
     const [showEmoji, setShowEmoji] = useState(false)
     const [viewOnceMode, setViewOnceMode] = useState(false)
+    const [importantMode, setImportantMode] = useState(false)
+    const [announceMode, setAnnounceMode] = useState(false)
+    const [mentionQuery, setMentionQuery] = useState<{ token: string; start: number; end: number } | null>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileRef = useRef<HTMLInputElement>(null)
 
     const handleSend = useCallback(() => {
         const trimmed = text.trim()
         if (!trimmed || disabled) return
-        onSend(trimmed, replyTo?.id)
+        const mentions = resolveMentions(trimmed, participants)
+        onSend(trimmed, replyTo?.id, {
+            mentions: mentions.length > 0 ? mentions : undefined,
+            isImportant: importantMode,
+            isAnnouncement: announceMode,
+        })
         setText('')
+        setImportantMode(false)
+        setAnnounceMode(false)
+        setMentionQuery(null)
         onCancelReply()
         if (textareaRef.current) textareaRef.current.style.height = '38px'
-    }, [text, replyTo, onSend, onCancelReply, disabled])
+    }, [text, replyTo, onSend, onCancelReply, disabled, participants, importantMode, announceMode])
+
+    // Close announce mode if user loses creator privilege
+    useEffect(() => {
+        if (!canSendAnnouncement) setAnnounceMode(false)
+    }, [canSendAnnouncement])
+
+    const updateMentionQuery = (value: string, cursor: number) => {
+        const found = findActiveMention(value, cursor)
+        setMentionQuery(found)
+    }
+
+    const handlePickMention = (user: MentionableUser) => {
+        if (!mentionQuery) return
+        const handle = user.username  // Stable handle
+        const before = text.slice(0, mentionQuery.start)
+        const after = text.slice(mentionQuery.end)
+        const inserted = `@${handle} `
+        const next = before + inserted + after
+        setText(next)
+        setMentionQuery(null)
+        // Restore focus + cursor
+        requestAnimationFrame(() => {
+            const el = textareaRef.current
+            if (el) {
+                el.focus()
+                const newCursor = (before + inserted).length
+                el.setSelectionRange(newCursor, newCursor)
+            }
+        })
+    }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -44,6 +89,12 @@ export function ChatInput({ onSend, onFileUpload, replyTo, onCancelReply, disabl
         const el = e.target
         el.style.height = '38px'
         el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+        updateMentionQuery(e.target.value, el.selectionStart || 0)
+    }
+
+    const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+        const el = e.currentTarget
+        updateMentionQuery(el.value, el.selectionStart || 0)
     }
 
     const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,8 +147,34 @@ export function ChatInput({ onSend, onFileUpload, replyTo, onCancelReply, disabl
                 </div>
             )}
 
+            {/* Important banner */}
+            {importantMode && (
+                <div className="flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/15 border-b border-amber-500/20">
+                    <Star className="w-3 h-3 text-amber-300" />
+                    <div className="flex-1 text-[11px] text-amber-300 font-semibold">
+                        Important — message will be highlighted and notify even muted recipients
+                    </div>
+                    <button onClick={() => setImportantMode(false)} className="bg-transparent border-none cursor-pointer p-0.5">
+                        <X className="w-3.5 h-3.5 text-amber-300" />
+                    </button>
+                </div>
+            )}
+
+            {/* Announcement banner */}
+            {announceMode && (
+                <div className="flex items-center gap-2 px-3.5 py-1.5 bg-fuchsia-500/15 border-b border-fuchsia-500/20">
+                    <Megaphone className="w-3 h-3 text-fuchsia-300" />
+                    <div className="flex-1 text-[11px] text-fuchsia-300 font-semibold">
+                        Announcement mode — will display as a highlighted banner for all members
+                    </div>
+                    <button onClick={() => setAnnounceMode(false)} className="bg-transparent border-none cursor-pointer p-0.5">
+                        <X className="w-3.5 h-3.5 text-fuchsia-300" />
+                    </button>
+                </div>
+            )}
+
             {/* Input row */}
-            <div className="flex items-end gap-1.5 p-2.5 px-2.5">
+            <div className="flex items-end gap-1.5 p-2.5 px-2.5 relative">
                 {/* File attach */}
                 <button
                     onClick={() => fileRef.current?.click()}
@@ -118,6 +195,30 @@ export function ChatInput({ onSend, onFileUpload, replyTo, onCancelReply, disabl
                 >
                     <Eye className="w-4 h-4" />
                 </button>
+
+                {/* Important toggle */}
+                <button
+                    onClick={() => setImportantMode(v => !v)}
+                    className={`w-[34px] h-[34px] rounded-full border-none cursor-pointer flex items-center justify-center shrink-0 transition-colors ${
+                        importantMode ? 'bg-amber-500/30 text-amber-300' : 'bg-white/[0.06] text-zinc-400 hover:bg-white/10'
+                    }`}
+                    title="Mark as important — needs response"
+                >
+                    <Star className={`w-4 h-4 ${importantMode ? 'fill-amber-300' : ''}`} />
+                </button>
+
+                {/* Announcement toggle (creator-only) */}
+                {canSendAnnouncement && (
+                    <button
+                        onClick={() => setAnnounceMode(v => !v)}
+                        className={`w-[34px] h-[34px] rounded-full border-none cursor-pointer flex items-center justify-center shrink-0 transition-colors ${
+                            announceMode ? 'bg-fuchsia-500/30 text-fuchsia-300' : 'bg-white/[0.06] text-zinc-400 hover:bg-white/10'
+                        }`}
+                        title="Announcement (creator only)"
+                    >
+                        <Megaphone className="w-4 h-4" />
+                    </button>
+                )}
 
                 {/* Emoji picker */}
                 <div className="relative shrink-0">
@@ -151,11 +252,21 @@ export function ChatInput({ onSend, onFileUpload, replyTo, onCancelReply, disabl
                     value={text}
                     onChange={handleInput}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type a message..."
+                    onSelect={handleSelect}
+                    placeholder={announceMode ? "Write the announcement..." : "Type a message... use @ to mention"}
                     disabled={disabled}
                     rows={1}
                     className="flex-1 resize-none py-2 px-3.5 bg-white/5 border border-violet-500/15 rounded-[20px] text-zinc-200 text-[13px] leading-normal outline-none font-[inherit] placeholder:text-zinc-600"
                     style={{ height: 38, maxHeight: 120 }}
+                />
+
+                {/* Mention autocomplete */}
+                <MentionAutocomplete
+                    isOpen={!!mentionQuery && participants.length > 0}
+                    query={mentionQuery?.token || ''}
+                    candidates={participants}
+                    onPick={handlePickMention}
+                    onClose={() => setMentionQuery(null)}
                 />
 
                 {/* Send button */}

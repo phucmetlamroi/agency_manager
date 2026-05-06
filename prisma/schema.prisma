@@ -140,6 +140,7 @@ model User {
   messagesSent         Message[]                @relation("MessageSender")
   messageReactions     MessageReaction[]
   messageReadReceipts  MessageReadReceipt[]
+  pinnedMessages       MessagePin[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 }
@@ -766,6 +767,7 @@ enum MessageType {
   IMAGE
   FILE
   SYSTEM
+  ANNOUNCEMENT
 }
 
 model Contact {
@@ -800,6 +802,7 @@ model Conversation {
   createdBy    User                       @relation("ConversationCreator", fields: [createdById], references: [id])
   participants ConversationParticipant[]
   messages     Message[]
+  pins         MessagePin[]
 
   @@index([type, workspaceId])
   @@index([taskId])
@@ -838,6 +841,10 @@ model Message {
   viewOnce       Boolean     @default(false)
   viewedBy       Json?       // { userId: ISOdate } map of who viewed
   deletedForUsers Json?      // { userId: ISOdate } per-user "delete for me" hide
+  isImportant    Boolean     @default(false)  // sender flagged as needs response
+  mentions       Json?       // string[] of userIds mentioned via @
+  forwardedFromMessageId      String?
+  forwardedFromConversationId String?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -847,9 +854,24 @@ model Message {
   replies      Message[]         @relation("MessageReply")
   reactions    MessageReaction[]
   readReceipts MessageReadReceipt[]
+  pin          MessagePin?
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+model MessagePin {
+  id             String   @id @default(uuid())
+  messageId      String   @unique
+  conversationId String
+  pinnedById     String
+  pinnedAt       DateTime @default(now())
+
+  message      Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  pinnedBy     User         @relation(fields: [pinnedById], references: [id])
+
+  @@index([conversationId, pinnedAt])
 }
 
 model MessageReaction {

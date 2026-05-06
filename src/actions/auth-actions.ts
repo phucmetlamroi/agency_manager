@@ -82,8 +82,8 @@ export async function loginAction(prevState: any, formData: FormData) {
                 id: user.id, username: user.username, role: user.role,
                 profileId: user.profileId, hasAcceptedTerms: user.hasAcceptedTerms
             })
-            console.log(`[Login] No profile found for ${username}, fallback to /profile`)
-            redirect('/profile')
+            console.log(`[Login] No profile found for ${username}, fallback to /login`)
+            redirect('/login')
         }
 
         await loginWithProfile({
@@ -98,8 +98,8 @@ export async function loginAction(prevState: any, formData: FormData) {
         })
 
         if (!firstWs) {
-            console.log(`[Login] No workspace for profile ${defaultProfileId}, fallback to /workspace`)
-            redirect('/workspace')
+            console.log(`[Login] No workspace for profile ${defaultProfileId}, fallback to /login`)
+            redirect('/login')
         }
 
         console.log(`[Login] Auto-redirect to workspace ${firstWs.id} for: ${username}`)

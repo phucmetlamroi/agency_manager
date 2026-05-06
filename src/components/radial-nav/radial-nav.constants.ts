@@ -83,8 +83,6 @@ export const ROUTE_REGISTRY: RouteEntry[] = [
     { path: '/[workspaceId]/dashboard/schedule',   label: 'My Schedule',  icon: 'CalendarDays', color: 'pink',    allowedRoles: ['ADMIN', 'USER'] },
     { path: '/[workspaceId]/dashboard/errors',     label: 'My Errors',    icon: 'AlertOctagon', color: 'rose',    allowedRoles: ['ADMIN', 'USER'] },
     { path: '/[workspaceId]/dashboard/profile',    label: 'My Profile',   icon: 'UserCircle',   color: 'zinc',    allowedRoles: ['ADMIN', 'USER'] },
-    { path: '/profile',                            label: 'Switch Team',  icon: 'ArrowRightLeft',color: 'indigo', allowedRoles: ['ADMIN', 'USER'] },
-    { path: '/workspace',                          label: 'Workspace',    icon: 'Zap',          color: 'purple',  allowedRoles: ['ADMIN', 'USER'] },
 ]
 
 export function isRouteAllowedForRole(route: RouteEntry, role: string | null | undefined): boolean {

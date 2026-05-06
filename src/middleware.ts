@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
 
     // 2. Auth Guard ONLY
     if (!sessionCookie) {
-        const protectedPaths = ['/workspace', '/portal', '/admin', '/dashboard', '/profile']
+        const protectedPaths = ['/portal', '/admin', '/dashboard']
         if (protectedPaths.some(p => pathname.startsWith(p))) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
@@ -42,16 +42,21 @@ export async function middleware(request: NextRequest) {
             // If they are on the ToS page, let them be there UNLESS they already accepted.
             if (isToSPage) {
                 if (session.user.hasAcceptedTerms) {
-                    const target = role === 'CLIENT' ? '/portal/en' : '/profile';
-                    return NextResponse.redirect(new URL(target, request.url));
+                    if (role === 'CLIENT') {
+                        return NextResponse.redirect(new URL('/portal/en', request.url));
+                    }
+                    // Staff/Admin: redirect away from ToS since already accepted
+                    return NextResponse.redirect(new URL('/login', request.url));
                 }
                 return NextResponse.next();
             }
 
             // 2. Auth Redirects for /login and /
             if (pathname === '/login' || pathname === '/') {
-                const target = role === 'CLIENT' ? '/portal/en' : '/profile';
-                return NextResponse.redirect(new URL(target, request.url));
+                if (role === 'CLIENT') {
+                    return NextResponse.redirect(new URL('/portal/en', request.url));
+                }
+                // Staff/Admin: let them through to /login (which handles its own redirect)
             }
             
             // 3. Mandatory ToS Check (Skip for Admins and Clients)
@@ -72,11 +77,11 @@ export async function middleware(request: NextRequest) {
 
             // VERCEL FIX 4: CHECK EMBEDDED PROFILE ID
             // If they are trying to access a workspace or admin panel but haven't selected a profile
-            const requiresProfilePaths = ['/workspace', '/admin', '/dashboard'];
+            const requiresProfilePaths = ['/admin', '/dashboard'];
             if (requiresProfilePaths.some(p => pathname.startsWith(p))) {
                 if (!session.user.sessionProfileId) {
-                    console.log(`[Middleware] Missing sessionProfileId for path ${pathname}. Redirecting to /profile`);
-                    return NextResponse.redirect(new URL('/profile', request.url))
+                    console.log(`[Middleware] Missing sessionProfileId for path ${pathname}. Redirecting to /login`);
+                    return NextResponse.redirect(new URL('/login', request.url))
                 }
             }
         } catch (err) {

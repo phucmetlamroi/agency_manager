@@ -39,8 +39,8 @@ export default function UserTopNav({ workspaceId }: { workspaceId: string }) {
             {/* Separator */}
             <div className="w-px h-5 bg-white/10 mx-2" />
 
-            <Link 
-                href="/profile" 
+            <Link
+                href={`/${workspaceId}/admin`}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-all duration-200"
             >
                 <ArrowRightLeft className="w-4 h-4" />

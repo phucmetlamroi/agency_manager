@@ -25,7 +25,7 @@ export default async function AdminSchedulePage({
 
   // Get the current profile — crucial for data isolation
   const profileId = (user as any).sessionProfileId as string | undefined
-  if (!profileId) redirect('/profile')
+  if (!profileId) redirect('/login')
 
   const baseDate = query?.date ? new Date(query.date) : new Date()
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 })

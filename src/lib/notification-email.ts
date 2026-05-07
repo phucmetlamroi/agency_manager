@@ -461,15 +461,9 @@ export async function maybeSendNotificationEmail(
             return
         }
 
-        // 4. Online check (only for non-bypass-digest types — bypass-digest events
-        //    are urgent enough to email even when user is online)
-        if (!cfg.bypassDigest) {
-            const offline = await isUserOffline(notification.userId)
-            if (!offline) {
-                console.log(`${tag} SKIP: user is online, bypassDigest=${cfg.bypassDigest}`)
-                return
-            }
-        }
+        // 4. Online check — DISABLED per user request.
+        // All notifications must be emailed immediately regardless of online status.
+        // Previously: skipped email when user was online for non-bypass-digest types.
 
         // 5. Conversation mute
         if (notification.conversationId && !cfg.bypassMute) {

@@ -122,7 +122,8 @@ model User {
   monthlyRanks      MonthlyRank[]       @relation("UserMonthlyRanks")
   sessions          Session[]
   events            Event[]
-  presence          UserPresence?
+  presence                UserPresence?
+  notificationPreference  NotificationPreference?
   scheduleRules      ScheduleRule[]
   scheduleExceptions ScheduleException[]
   dailyAvailabilities DailyAvailability[]
@@ -814,6 +815,19 @@ model Notification {
   @@index([userId, isRead, createdAt])
   @@index([userId, type, createdAt])
   @@index([userId, conversationId, type, createdAt])
+}
+
+model NotificationPreference {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  emailEnabled    Boolean  @default(true)
+  emailDigestMode String   @default("REALTIME") // REALTIME | HOURLY | DAILY | OFF
+  quietHoursStart Int?     // 0-23 UTC hour, null = no quiet hours
+  quietHoursEnd   Int?     // 0-23 UTC hour
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Contact {

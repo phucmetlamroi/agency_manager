@@ -156,5 +156,135 @@ export const emailTemplates = {
             </div>
         `
         return wrapTemplate(content, `[Invoice] Đã tạo hóa đơn mới #${invoiceNumber}`)
-    }
+    },
+
+    // ─── Notification Email Templates ───────────────────────────────────────
+
+    // 6. Single realtime notification email (for REALTIME digest mode)
+    notificationRealtime: (
+        userName: string,
+        notification: {
+            type: string
+            title: string
+            body: string
+            conversationId: string | null
+            taskId: string | null
+        },
+        appUrl: string,
+    ) => {
+        const typeEmoji: Record<string, string> = {
+            NEW_MESSAGE: '💬',
+            MENTION: '📢',
+            GROUP_MEMBER_ADDED: '👥',
+            GROUP_MEMBER_REMOVED: '👤',
+            GROUP_MEMBER_LEFT: '🚪',
+            GROUP_DELETED: '🗑️',
+            TASK_DEADLINE_APPROACHING: '⏰',
+            TASK_OVERDUE: '🚨',
+        }
+        const emoji = typeEmoji[notification.type] || '🔔'
+
+        // Build CTA link
+        let ctaLink = `${appUrl}/dashboard`
+        let ctaLabel = 'MỞ AGENCYMANAGER'
+        if (notification.conversationId) {
+            ctaLink = `${appUrl}/dashboard` // chat opens via sidebar
+            ctaLabel = 'MỞ TIN NHẮN'
+        } else if (notification.taskId) {
+            ctaLink = `${appUrl}/dashboard`
+            ctaLabel = 'XEM TASK'
+        }
+
+        const content = `
+            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p>Bạn có một thông báo mới:</p>
+
+            <div class="card">
+                <p><strong>${emoji} ${notification.title}</strong></p>
+                <p style="color: #4b5563; margin-top: 8px;">${notification.body}</p>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="${ctaLink}" class="btn">${ctaLabel}</a>
+            </div>
+
+            <p style="font-size: 12px; color: #9ca3af; margin-top: 24px;">
+                Bạn nhận email này vì đã bật thông báo qua email.
+                Thay đổi tùy chọn trong Settings &gt; Notification Preferences.
+            </p>
+        `
+        return wrapTemplate(content, notification.title)
+    },
+
+    // 7. Digest email — batched notifications (for HOURLY / DAILY mode)
+    notificationDigest: (
+        userName: string,
+        notifications: Array<{
+            type: string
+            title: string
+            body: string
+            createdAt: string
+        }>,
+        appUrl: string,
+    ) => {
+        const typeEmoji: Record<string, string> = {
+            NEW_MESSAGE: '💬',
+            MENTION: '📢',
+            GROUP_MEMBER_ADDED: '👥',
+            GROUP_MEMBER_REMOVED: '👤',
+            GROUP_MEMBER_LEFT: '🚪',
+            GROUP_DELETED: '🗑️',
+            TASK_DEADLINE_APPROACHING: '⏰',
+            TASK_OVERDUE: '🚨',
+        }
+
+        const formatRelativeTime = (iso: string) => {
+            const diff = Date.now() - new Date(iso).getTime()
+            const min = Math.floor(diff / 60000)
+            if (min < 1) return 'vừa xong'
+            if (min < 60) return `${min} phút trước`
+            const hr = Math.floor(min / 60)
+            if (hr < 24) return `${hr} giờ trước`
+            const day = Math.floor(hr / 24)
+            return `${day} ngày trước`
+        }
+
+        const truncate = (text: string, maxLen = 80) =>
+            text.length > maxLen ? text.slice(0, maxLen) + '...' : text
+
+        const rows = notifications.map(n => {
+            const emoji = typeEmoji[n.type] || '🔔'
+            return `
+                <tr>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 14px; width: 30px; text-align: center;">${emoji}</td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb;">
+                        <div style="font-weight: 600; font-size: 13px; color: #111827;">${n.title}</div>
+                        <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${truncate(n.body)}</div>
+                    </td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; white-space: nowrap; text-align: right;">${formatRelativeTime(n.createdAt)}</td>
+                </tr>
+            `
+        }).join('')
+
+        const content = `
+            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p>Bạn có <strong>${notifications.length}</strong> thông báo mới:</p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+
+            <div style="text-align: center;">
+                <a href="${appUrl}/dashboard" class="btn">XEM TẤT CẢ THÔNG BÁO</a>
+            </div>
+
+            <p style="font-size: 12px; color: #9ca3af; margin-top: 24px;">
+                Bạn nhận email này vì đã bật thông báo tổng hợp.
+                Thay đổi tùy chọn trong Settings &gt; Notification Preferences.
+            </p>
+        `
+        return wrapTemplate(content, `[AgencyManager] Bạn có ${notifications.length} thông báo mới`)
+    },
 }

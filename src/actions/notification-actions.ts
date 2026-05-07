@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import type { NotificationType } from '@prisma/client'
 import type { CreateNotificationParams } from '@/types/notification'
+import { maybeSendNotificationEmail } from '@/lib/notification-email'
 
 async function getAuthUserId(): Promise<string | null> {
     const session = await getSession()
@@ -73,6 +74,17 @@ export async function createNotificationInternal(params: CreateNotificationParam
             metadata: (metadata as any) || undefined,
         },
     })
+
+    // Fire-and-forget email notification (only on fresh creation, not grouping-update)
+    const recipientUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+    })
+    void maybeSendNotificationEmail(
+        { ...created, metadata: (created.metadata as Record<string, any> | null) },
+        recipientUser?.email ?? null,
+    ).catch(() => {})
+
     return created
 }
 
@@ -218,4 +230,71 @@ export async function clearAllArchived() {
     })
 
     return { data: { count: res.count } }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification Preference CRUD
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getMyNotificationPreferences() {
+    const userId = await getAuthUserId()
+    if (!userId) return { error: 'Unauthorized' }
+
+    let pref = await prisma.notificationPreference.findUnique({ where: { userId } })
+    if (!pref) {
+        pref = await prisma.notificationPreference.create({
+            data: { userId }, // all defaults apply
+        })
+    }
+
+    return {
+        data: {
+            emailEnabled: pref.emailEnabled,
+            emailDigestMode: pref.emailDigestMode,
+            quietHoursStart: pref.quietHoursStart,
+            quietHoursEnd: pref.quietHoursEnd,
+        },
+    }
+}
+
+export async function updateMyNotificationPreferences(params: {
+    emailEnabled?: boolean
+    emailDigestMode?: string
+    quietHoursStart?: number | null
+    quietHoursEnd?: number | null
+}) {
+    const userId = await getAuthUserId()
+    if (!userId) return { error: 'Unauthorized' }
+
+    const validModes = ['REALTIME', 'HOURLY', 'DAILY', 'OFF']
+    if (params.emailDigestMode && !validModes.includes(params.emailDigestMode)) {
+        return { error: 'Invalid digest mode. Must be REALTIME, HOURLY, DAILY, or OFF' }
+    }
+
+    // Validate quiet hours range
+    if (params.quietHoursStart != null && (params.quietHoursStart < 0 || params.quietHoursStart > 23)) {
+        return { error: 'quietHoursStart must be 0-23' }
+    }
+    if (params.quietHoursEnd != null && (params.quietHoursEnd < 0 || params.quietHoursEnd > 23)) {
+        return { error: 'quietHoursEnd must be 0-23' }
+    }
+
+    await prisma.notificationPreference.upsert({
+        where: { userId },
+        create: {
+            userId,
+            emailEnabled: params.emailEnabled ?? true,
+            emailDigestMode: params.emailDigestMode ?? 'REALTIME',
+            quietHoursStart: params.quietHoursStart ?? null,
+            quietHoursEnd: params.quietHoursEnd ?? null,
+        },
+        update: {
+            ...(params.emailEnabled !== undefined && { emailEnabled: params.emailEnabled }),
+            ...(params.emailDigestMode !== undefined && { emailDigestMode: params.emailDigestMode }),
+            ...(params.quietHoursStart !== undefined && { quietHoursStart: params.quietHoursStart }),
+            ...(params.quietHoursEnd !== undefined && { quietHoursEnd: params.quietHoursEnd }),
+        },
+    })
+
+    return { data: { ok: true } }
 }

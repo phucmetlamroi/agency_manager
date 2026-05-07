@@ -421,9 +421,18 @@ export async function maybeSendNotificationEmail(
     notification: NotificationForEmail,
     recipientEmail: string | null,
 ): Promise<void> {
+    const tag = `[notification-email] [${notification.type}] [user:${notification.userId}]`
     try {
-        if (notification.emailSentAt) return
-        if (!recipientEmail) return
+        if (notification.emailSentAt) {
+            console.log(`${tag} SKIP: emailSentAt already set`)
+            return
+        }
+        if (!recipientEmail) {
+            console.log(`${tag} SKIP: no recipient email`)
+            return
+        }
+
+        console.log(`${tag} Processing email to ${recipientEmail}...`)
 
         const cfg = BYPASS_CONFIG[notification.type] || DEFAULT_BYPASS
 
@@ -434,31 +443,49 @@ export async function maybeSendNotificationEmail(
         const emailEnabled = pref?.emailEnabled ?? true
         const digestMode = pref?.emailDigestMode ?? 'REALTIME'
 
-        if (!emailEnabled || digestMode === 'OFF') return
+        if (!emailEnabled || digestMode === 'OFF') {
+            console.log(`${tag} SKIP: emailEnabled=${emailEnabled}, digestMode=${digestMode}`)
+            return
+        }
 
         // 2. Digest mode → defer to cron unless this event bypasses digest
-        if ((digestMode === 'HOURLY' || digestMode === 'DAILY') && !cfg.bypassDigest) return
+        if ((digestMode === 'HOURLY' || digestMode === 'DAILY') && !cfg.bypassDigest) {
+            console.log(`${tag} SKIP: digest mode ${digestMode}, bypassDigest=${cfg.bypassDigest}`)
+            return
+        }
 
         // 3. Quiet hours
         const inQuiet = isInQuietHours(pref?.quietHoursStart ?? null, pref?.quietHoursEnd ?? null)
-        if (inQuiet && !resolveBypass(cfg.bypassQuietHours, notification.metadata)) return
+        if (inQuiet && !resolveBypass(cfg.bypassQuietHours, notification.metadata)) {
+            console.log(`${tag} SKIP: quiet hours active, bypassQuietHours=${cfg.bypassQuietHours}`)
+            return
+        }
 
         // 4. Online check (only for non-bypass-digest types — bypass-digest events
         //    are urgent enough to email even when user is online)
         if (!cfg.bypassDigest) {
             const offline = await isUserOffline(notification.userId)
-            if (!offline) return
+            if (!offline) {
+                console.log(`${tag} SKIP: user is online, bypassDigest=${cfg.bypassDigest}`)
+                return
+            }
         }
 
         // 5. Conversation mute
         if (notification.conversationId && !cfg.bypassMute) {
             const muted = await isConversationMutedForUser(notification.userId, notification.conversationId)
-            if (muted) return
+            if (muted) {
+                console.log(`${tag} SKIP: conversation muted`)
+                return
+            }
         }
 
         // 6. Atomically claim
         const claimed = await claimForEmail(notification.id)
-        if (!claimed) return
+        if (!claimed) {
+            console.log(`${tag} SKIP: claim failed (already claimed)`)
+            return
+        }
 
         // 7. Resolve recipient + workspace
         const user = await prisma.user.findUnique({
@@ -467,6 +494,8 @@ export async function maybeSendNotificationEmail(
         })
         const recipientName = user?.nickname || user?.username || 'Bạn'
         const wsId = await resolveWorkspaceId(notification.userId, await workspaceIdForNotification(notification))
+
+        console.log(`${tag} Rendering template for ${recipientName}, workspace=${wsId}`)
 
         // 8. Render via registry
         const rendered = await buildTemplateParams({
@@ -478,18 +507,19 @@ export async function maybeSendNotificationEmail(
         })
 
         if (!rendered) {
-            // No template for this type — skip silently (still keep emailSentAt
-            // claim so we don't retry forever)
+            console.log(`${tag} SKIP: no template rendered for type ${notification.type}`)
             return
         }
 
+        console.log(`${tag} Sending email to ${recipientEmail}, subject="${rendered.subject}"`)
         await sendEmail({
             to: recipientEmail,
             subject: rendered.subject,
             html: rendered.html,
         })
+        console.log(`${tag} ✅ Email pipeline complete`)
     } catch (err) {
-        console.error('[notification-email] maybeSendNotificationEmail error:', err)
+        console.error(`${tag} ERROR:`, err)
     }
 }
 

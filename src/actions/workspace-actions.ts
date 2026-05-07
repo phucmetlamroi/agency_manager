@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { ensureNotLastOwner, LastOwnerProtectionError } from '@/lib/workspace-guards'
+import { audit } from '@/lib/audit-log'
 
 export async function createWorkspaceAction(formData: FormData) {
     const session = await getSession()
@@ -40,6 +41,15 @@ export async function createWorkspaceAction(formData: FormData) {
             })
         })
 
+        await audit({
+            workspaceId: newWorkspaceId,
+            actorUserId: session.user.id,
+            action: 'workspace.created',
+            targetType: 'Workspace',
+            targetId: newWorkspaceId,
+            after: { name, profileId: session.user.sessionProfileId },
+        })
+
         revalidatePath('/workspace')
         return { success: true, workspaceId: newWorkspaceId }
     } catch (e: any) {
@@ -56,12 +66,28 @@ export async function renameWorkspaceAction(workspaceId: string, newName: string
     try {
         // SECURITY: Verify caller is OWNER/ADMIN of THIS workspace.
         // Without this, any authenticated user could rename any workspace by ID.
-        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
+        const before = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { name: true },
+        })
 
         await prisma.workspace.update({
             where: { id: workspaceId },
             data: { name: newName }
         })
+
+        await audit({
+            workspaceId,
+            actorUserId: userId,
+            action: 'workspace.updated',
+            targetType: 'Workspace',
+            targetId: workspaceId,
+            before: { name: before?.name },
+            after: { name: newName },
+        })
+
         revalidatePath('/workspace')
         return { success: true }
     } catch (error: any) {
@@ -77,11 +103,30 @@ export async function getWorkspacesForProfile(profileId: string) {
     const session = await getSession()
     if (!session?.user?.id) return []
 
-    return prisma.workspace.findMany({
-        where: { profileId },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, name: true, description: true }
-    })
+    // Hide soft-deleted workspaces from the switcher.
+    // The `status` column may not exist pre-migration; in that case the where
+    // clause silently degrades (Postgres treats unknown column as error so
+    // we fall back to no filter via try/catch).
+    try {
+        return await prisma.workspace.findMany({
+            where: {
+                profileId,
+                status: 'ACTIVE',
+            } as any,
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, name: true, description: true }
+        })
+    } catch (err: any) {
+        if (err?.code === 'P2009' || /column.*does not exist/i.test(err?.message ?? '')) {
+            // Pre-migration fallback.
+            return prisma.workspace.findMany({
+                where: { profileId },
+                orderBy: { createdAt: 'desc' },
+                select: { id: true, name: true, description: true }
+            })
+        }
+        throw err
+    }
 }
 
 /**
@@ -142,6 +187,16 @@ export async function transferWorkspaceOwnership(workspaceId: string, newOwnerUs
             }),
         ])
 
+        await audit({
+            workspaceId,
+            actorUserId: callerId,
+            action: 'workspace.transferred_ownership',
+            targetType: 'Workspace',
+            targetId: workspaceId,
+            before: { ownerId: callerId },
+            after: { ownerId: newOwnerUserId },
+        })
+
         revalidatePath(`/${workspaceId}/admin/users`)
         revalidatePath('/workspace')
         return { success: true }
@@ -161,17 +216,48 @@ export async function deleteWorkspaceAction(workspaceId: string) {
     try {
         // SECURITY: Verify caller is at least ADMIN; then enforce OWNER for delete.
         // Global admins bypass membership check via verifyWorkspaceAccess.
-        const { workspaceRole, isGlobalAdmin } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { workspaceRole, isGlobalAdmin, userId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         if (!isGlobalAdmin && workspaceRole !== 'OWNER') {
             return { error: 'Bạn không có quyền xóa Workspace này. Chỉ chủ sở hữu mới có quyền xóa.' }
         }
 
-        // Soft-delete is implemented in Chapter 3 (sets status=SOFT_DELETED).
-        // For now keep hard delete to match existing behavior.
-        await prisma.workspace.delete({
-            where: { id: workspaceId }
-        })
+        // SOFT-DELETE: workspace becomes invisible to switcher; hard delete
+        // happens after `hardDeleteAfter` (30 days) via cron. OWNER can restore
+        // within that window.
+        // NOTE: requires schema migration 20260507000000_workspace_security_phase1
+        // to be applied. Until then, falls back to hard-delete.
+        const HARD_DELETE_GRACE_DAYS = 30
+        const hardDeleteAfter = new Date(Date.now() + HARD_DELETE_GRACE_DAYS * 24 * 3600 * 1000)
+
+        try {
+            await prisma.workspace.update({
+                where: { id: workspaceId },
+                data: {
+                    status: 'SOFT_DELETED',
+                    deletedAt: new Date(),
+                    hardDeleteAfter,
+                } as any, // cast: schema added these in migration; ts-types may lag locally
+            })
+
+            await audit({
+                workspaceId,
+                actorUserId: userId,
+                action: 'workspace.soft_deleted',
+                targetType: 'Workspace',
+                targetId: workspaceId,
+                after: { hardDeleteAfter: hardDeleteAfter.toISOString() },
+            })
+        } catch (softErr: any) {
+            // If migration not yet applied, the new columns won't exist.
+            // Fall back to hard delete (legacy behavior).
+            if (softErr?.code === 'P2009' || softErr?.code === 'P2025' || /column.*does not exist/i.test(softErr?.message ?? '')) {
+                console.warn('[deleteWorkspace] soft-delete columns missing — falling back to hard delete')
+                await prisma.workspace.delete({ where: { id: workspaceId } })
+            } else {
+                throw softErr
+            }
+        }
 
         revalidatePath('/workspace')
         return { success: true }
@@ -181,5 +267,45 @@ export async function deleteWorkspaceAction(workspaceId: string) {
             return { error: error.message }
         }
         return { error: 'Lỗi khi xóa Workspace' }
+    }
+}
+
+/**
+ * Restore a soft-deleted workspace within the 30-day grace window.
+ * Only available to global admins or original owners (verified via membership).
+ */
+export async function restoreWorkspaceAction(workspaceId: string) {
+    try {
+        const { workspaceRole, isGlobalAdmin, userId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
+        if (!isGlobalAdmin && workspaceRole !== 'OWNER') {
+            return { error: 'Chỉ OWNER mới có thể khôi phục Workspace.' }
+        }
+
+        await prisma.workspace.update({
+            where: { id: workspaceId },
+            data: {
+                status: 'ACTIVE',
+                deletedAt: null,
+                hardDeleteAfter: null,
+            } as any,
+        })
+
+        await audit({
+            workspaceId,
+            actorUserId: userId,
+            action: 'workspace.restored',
+            targetType: 'Workspace',
+            targetId: workspaceId,
+        })
+
+        revalidatePath('/workspace')
+        return { success: true }
+    } catch (error: any) {
+        console.error(error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
+        return { error: 'Lỗi khi khôi phục Workspace.' }
     }
 }

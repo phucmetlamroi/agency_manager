@@ -17,21 +17,21 @@ model Profile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users        User[]
-  workspaces   Workspace[]
-  tasks        Task[]
-  clients      Client[]
-  projects     Project[]
-  invoices     Invoice[]
-  payrolls     Payroll[]
-  bonuses      MonthlyBonus[]
-  payrollLocks PayrollLock[]
-  metrics      PerformanceMetric[]
-  agencies           Agency[]
-  errorLogs          ErrorLog[]
-  monthlyRanks       MonthlyRank[]
-  scheduleRules      ScheduleRule[]
-  scheduleExceptions ScheduleException[]
+  users               User[]
+  workspaces          Workspace[]
+  tasks               Task[]
+  clients             Client[]
+  projects            Project[]
+  invoices            Invoice[]
+  payrolls            Payroll[]
+  bonuses             MonthlyBonus[]
+  payrollLocks        PayrollLock[]
+  metrics             PerformanceMetric[]
+  agencies            Agency[]
+  errorLogs           ErrorLog[]
+  monthlyRanks        MonthlyRank[]
+  scheduleRules       ScheduleRule[]
+  scheduleExceptions  ScheduleException[]
   dailyAvailabilities DailyAvailability[]
   profileAccesses     ProfileAccess[]
   accessRequests      ProfileAccessRequest[] @relation("TargetProfileRequests")
@@ -48,27 +48,37 @@ model Workspace {
   updatedAt       DateTime @updatedAt
   profileId       String?
 
-  members            WorkspaceMember[]
-  tasks              Task[]
-  clients            Client[]
-  scheduleRules      ScheduleRule[]
-  scheduleExceptions ScheduleException[]
+  // Soft-delete (Phase 1 multi-workspace plan, Chapter 3)
+  // status defaults to ACTIVE; SOFT_DELETED workspaces hidden from switcher
+  // until hard-delete cron after `hardDeleteAfter`.
+  status          String    @default("ACTIVE") // see WorkspaceStatus enum: ACTIVE | SUSPENDED | SOFT_DELETED
+  deletedAt       DateTime?
+  hardDeleteAfter DateTime?
+
+  members             WorkspaceMember[]
+  tasks               Task[]
+  clients             Client[]
+  scheduleRules       ScheduleRule[]
+  scheduleExceptions  ScheduleException[]
   dailyAvailabilities DailyAvailability[]
-  projects     Project[]
-  invoices     Invoice[]
-  payrolls     Payroll[]
-  bonuses      MonthlyBonus[]
-  payrollLocks PayrollLock[]
-  metrics      PerformanceMetric[]
-  feedbacks    Feedback[]
-  errorLogs    ErrorLog[]
-  monthlyRanks MonthlyRank[]
-  ratings      Rating[]
-  sessions     Session[]
+  projects            Project[]
+  invoices            Invoice[]
+  payrolls            Payroll[]
+  bonuses             MonthlyBonus[]
+  payrollLocks        PayrollLock[]
+  metrics             PerformanceMetric[]
+  feedbacks           Feedback[]
+  errorLogs           ErrorLog[]
+  monthlyRanks        MonthlyRank[]
+  ratings             Rating[]
+  sessions            Session[]
+  auditLogs           AuditLog[]
+  tagCategories       TagCategory[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 
   @@index([name])
+  @@index([status, deletedAt])
 }
 
 model WorkspaceMember {
@@ -110,35 +120,36 @@ model User {
   metrics           PerformanceMetric[]
   tasks             Task[]              @relation("AssigneeTasks")
 
-  agency            Agency?             @relation("AgencyMembers", fields: [agencyId], references: [id])
-  workspaces        WorkspaceMember[]
-  clientTasks       Task[]              @relation("UserClientTasks")
-  clientProjects    Project[]           @relation("UserClientProjects")
-  clientInvoices    Invoice[]           @relation("UserClientInvoices")
-  clientRatings     Rating[]            @relation("ClientRatings")
-  staffRatings      Rating[]            @relation("StaffRatings")
-  errorLogs         ErrorLog[]          @relation("UserErrorLogs")
-  detectedErrors    ErrorLog[]          @relation("UserDetectedErrors")
-  monthlyRanks      MonthlyRank[]       @relation("UserMonthlyRanks")
-  sessions          Session[]
-  events            Event[]
-  presence                UserPresence?
-  notificationPreference  NotificationPreference?
-  scheduleRules      ScheduleRule[]
-  scheduleExceptions ScheduleException[]
-  dailyAvailabilities DailyAvailability[]
-  profileAccesses     ProfileAccess[]
-  accessRequests      ProfileAccessRequest[]
-  approvedRequests    ProfileAccessRequest[] @relation("ApprovedBy")
-  requestedRequests   ProfileAccessRequest[] @relation("RequestedBy")
-  tagCategories       TagCategory[]
+  agency                 Agency?                 @relation("AgencyMembers", fields: [agencyId], references: [id])
+  workspaces             WorkspaceMember[]
+  clientTasks            Task[]                  @relation("UserClientTasks")
+  clientProjects         Project[]               @relation("UserClientProjects")
+  clientInvoices         Invoice[]               @relation("UserClientInvoices")
+  clientRatings          Rating[]                @relation("ClientRatings")
+  staffRatings           Rating[]                @relation("StaffRatings")
+  errorLogs              ErrorLog[]              @relation("UserErrorLogs")
+  detectedErrors         ErrorLog[]              @relation("UserDetectedErrors")
+  monthlyRanks           MonthlyRank[]           @relation("UserMonthlyRanks")
+  sessions               Session[]
+  events                 Event[]
+  presence               UserPresence?
+  notificationPreference NotificationPreference?
+  scheduleRules          ScheduleRule[]
+  scheduleExceptions     ScheduleException[]
+  dailyAvailabilities    DailyAvailability[]
+  profileAccesses        ProfileAccess[]
+  accessRequests         ProfileAccessRequest[]
+  approvedRequests       ProfileAccessRequest[]  @relation("ApprovedBy")
+  requestedRequests      ProfileAccessRequest[]  @relation("RequestedBy")
+  tagCategories          TagCategory[]
+  auditLogsAsActor       AuditLog[]              @relation("AuditLogActor")
 
   // Chat relations
-  contactsSent         Contact[]                @relation("ContactRequester")
-  contactsReceived     Contact[]                @relation("ContactReceiver")
+  contactsSent         Contact[]                 @relation("ContactRequester")
+  contactsReceived     Contact[]                 @relation("ContactReceiver")
   chatParticipations   ConversationParticipant[]
-  createdConversations Conversation[]           @relation("ConversationCreator")
-  messagesSent         Message[]                @relation("MessageSender")
+  createdConversations Conversation[]            @relation("ConversationCreator")
+  messagesSent         Message[]                 @relation("MessageSender")
   messageReactions     MessageReaction[]
   messageReadReceipts  MessageReadReceipt[]
   pinnedMessages       MessagePin[]
@@ -153,8 +164,8 @@ model ProfileAccess {
   profileId String
   grantedAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@unique([userId, profileId])
 }
@@ -169,15 +180,13 @@ model ProfileAccessRequest {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  targetProfile   Profile  @relation("TargetProfileRequests", fields: [targetProfileId], references: [id], onDelete: Cascade)
-  requestedBy     User     @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
-  approvedBy      User?    @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetProfile Profile @relation("TargetProfileRequests", fields: [targetProfileId], references: [id], onDelete: Cascade)
+  requestedBy   User    @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  approvedBy    User?   @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@unique([userId, targetProfileId])
 }
-
-
 
 model Payroll {
   id          String    @id @default(uuid())
@@ -278,16 +287,16 @@ model MonthlyBonus {
 }
 
 model PayrollLock {
-  id          String    @id @default(uuid())
-  month       Int
-  year        Int
-  isLocked    Boolean   @default(false)
-  lockedAt    DateTime  @default(now())
-  lockedBy    String
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  profileId   String?
-  profile     Profile?  @relation(fields: [profileId], references: [id])
+  id           String        @id @default(uuid())
+  month        Int
+  year         Int
+  isLocked     Boolean       @default(false)
+  lockedAt     DateTime      @default(now())
+  lockedBy     String
+  workspaceId  String
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id])
+  profileId    String?
+  profile      Profile?      @relation(fields: [profileId], references: [id])
   monthlyRanks MonthlyRank[]
 
   @@unique([month, year, workspaceId], name: "month_year_workspaceId")
@@ -404,7 +413,6 @@ model BillingProfile {
   profile         Profile? @relation(fields: [profileId], references: [id])
 }
 
-
 model Invoice {
   id              String        @id @default(uuid())
   invoiceNumber   String        @unique
@@ -447,6 +455,30 @@ model InvoiceItem {
   task        Task?   @relation(fields: [taskId], references: [id])
 }
 
+/// Immutable, append-only audit trail for security-sensitive workspace events.
+/// IMPORTANT: code SHOULD only INSERT. Never expose update/delete via API.
+/// At the DB level we will REVOKE UPDATE/DELETE on this table from the app
+/// role in Phase 2 (see migration_audit_log_revoke.sql in deploy plan).
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  workspaceId String
+  actorUserId String?
+  action      String // e.g. 'workspace.created', 'member.role_changed', 'workspace.soft_deleted'
+  targetType  String // e.g. 'WorkspaceMember', 'Workspace', 'Task'
+  targetId    String?
+  beforeData  Json?
+  afterData   Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User?     @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([action])
+}
+
 enum FeedbackSource {
   INTERNAL
   CLIENT
@@ -480,10 +512,6 @@ enum InvoiceTaskStatus {
   UNBILLED
   INVOICED
 }
-
-
-
-
 
 model Rating {
   id                  String   @id @default(cuid())
@@ -581,18 +609,18 @@ model ErrorLog {
   userId          String
   errorId         String
   frequency       Int      @default(1) // Số lần vi phạm lỗi này trong 1 task
-  calculatedScore Int      // frequency * ErrorDictionary.penalty
-  detectedById    String   // Manager người bắt lỗi
+  calculatedScore Int // frequency * ErrorDictionary.penalty
+  detectedById    String // Manager người bắt lỗi
   createdAt       DateTime @default(now())
   workspaceId     String
 
-  task        Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user        User            @relation("UserErrorLogs", fields: [userId], references: [id], onDelete: Cascade)
-  error       ErrorDictionary @relation(fields: [errorId], references: [id])
-  detectedBy  User            @relation("UserDetectedErrors", fields: [detectedById], references: [id])
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  profile     Profile?        @relation(fields: [profileId], references: [id])
-  profileId   String?
+  task       Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User            @relation("UserErrorLogs", fields: [userId], references: [id], onDelete: Cascade)
+  error      ErrorDictionary @relation(fields: [errorId], references: [id])
+  detectedBy User            @relation("UserDetectedErrors", fields: [detectedById], references: [id])
+  workspace  Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  profile    Profile?        @relation(fields: [profileId], references: [id])
+  profileId  String?
 
   @@index([taskId])
   @@index([userId])
@@ -601,19 +629,19 @@ model ErrorLog {
 }
 
 model MonthlyRank {
-  id             String   @id @default(uuid())
-  userId         String
-  month          Int
-  year           Int
-  workspaceId    String
-  totalTasks     Int      @default(0)
-  totalPenalty   Int      @default(0)
-  errorRate      Float    @default(0)
-  rank           String   @default("UNRANKED") // S, A, B, C, D, UNRANKED
-  isLocked       Boolean  @default(false)
-  payrollLockId  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  userId        String
+  month         Int
+  year          Int
+  workspaceId   String
+  totalTasks    Int      @default(0)
+  totalPenalty  Int      @default(0)
+  errorRate     Float    @default(0)
+  rank          String   @default("UNRANKED") // S, A, B, C, D, UNRANKED
+  isLocked      Boolean  @default(false)
+  payrollLockId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   user        User         @relation("UserMonthlyRanks", fields: [userId], references: [id], onDelete: Cascade)
   workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -630,9 +658,9 @@ model ScheduleRule {
   userId      String
   workspaceId String
   profileId   String
-  dayOfWeek   Int      // 0=Sun, 1=Mon, ... 6=Sat
-  startTime   String   // HH:mm
-  endTime     String   // HH:mm
+  dayOfWeek   Int // 0=Sun, 1=Mon, ... 6=Sat
+  startTime   String // HH:mm
+  endTime     String // HH:mm
   timezone    String   @default("Asia/Ho_Chi_Minh")
   isActive    Boolean  @default(true)
   updatedById String?
@@ -654,9 +682,9 @@ model ScheduleException {
   userId      String
   workspaceId String
   profileId   String
-  date        DateTime              // Normalized to UTC midnight
-  startTime   String                // HH:mm
-  endTime     String                // HH:mm
+  date        DateTime // Normalized to UTC midnight
+  startTime   String // HH:mm
+  endTime     String // HH:mm
   type        ScheduleExceptionType
   reason      String?
   timezone    String                @default("Asia/Ho_Chi_Minh")
@@ -679,7 +707,7 @@ model DailyAvailability {
   workspaceId String
   profileId   String
   date        DateTime // Normalized to UTC midnight
-  schedule    Json     // Array of 24 strings
+  schedule    Json // Array of 24 strings
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -719,28 +747,34 @@ enum ClaimSource {
 }
 
 model TagCategory {
-  id        String    @id @default(uuid())
-  name      String
-  profileId String
-  userId    String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  profileId   String
+  userId      String
+  // workspaceId optional during transition. Backfill via SQL migration,
+  // then make required in a follow-up. Until then `getWorkspacePrisma`
+  // will treat null as "any workspace" and queries should filter explicitly.
+  workspaceId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile   Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   taskTags  TaskTag[]
 
   @@index([profileId])
   @@index([userId])
+  @@index([workspaceId])
 }
 
 model TaskTag {
-  id            String      @id @default(uuid())
+  id            String @id @default(uuid())
   taskId        String
   tagCategoryId String
 
-  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  tagCategory   TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagCategory TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, tagCategoryId])
   @@index([taskId])
@@ -790,25 +824,25 @@ enum NotificationType {
 }
 
 model Notification {
-  id              String           @id @default(uuid())
-  userId          String
-  type            NotificationType
-  title           String
-  body            String           @db.Text
-  avatarUrl       String?
-  isRead          Boolean          @default(false)
-  isArchived      Boolean          @default(false)
+  id             String           @id @default(uuid())
+  userId         String
+  type           NotificationType
+  title          String
+  body           String           @db.Text
+  avatarUrl      String?
+  isRead         Boolean          @default(false)
+  isArchived     Boolean          @default(false)
   // Source links (nullable, depends on type)
-  conversationId  String?
-  messageId       String?
-  taskId          String?
-  actorId         String?
+  conversationId String?
+  messageId      String?
+  taskId         String?
+  actorId        String?
   // Flexible metadata (group name, task title, oldStatus, newStatus, messageCount, ...)
-  metadata        Json?
+  metadata       Json?
   // Delivery tracking — kept for future Push/Email phases
-  pushSentAt      DateTime?
-  emailSentAt     DateTime?
-  createdAt       DateTime         @default(now())
+  pushSentAt     DateTime?
+  emailSentAt    DateTime?
+  createdAt      DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -822,8 +856,8 @@ model NotificationPreference {
   userId          String   @unique
   emailEnabled    Boolean  @default(true)
   emailDigestMode String   @default("REALTIME") // REALTIME | HOURLY | DAILY | OFF
-  quietHoursStart Int?     // 0-23 UTC hour, null = no quiet hours
-  quietHoursEnd   Int?     // 0-23 UTC hour
+  quietHoursStart Int? // 0-23 UTC hour, null = no quiet hours
+  quietHoursEnd   Int? // 0-23 UTC hour
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -854,12 +888,12 @@ model Conversation {
   taskId      String?          @unique
   workspaceId String?
   createdById String
-  deletedFor  Json?            // { userId: ISOdate } per-participant soft delete
+  deletedFor  Json? // { userId: ISOdate } per-participant soft delete
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  task         Task?                      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  createdBy    User                       @relation("ConversationCreator", fields: [createdById], references: [id])
+  task         Task?                     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy    User                      @relation("ConversationCreator", fields: [createdById], references: [id])
   participants ConversationParticipant[]
   messages     Message[]
   pins         MessagePin[]
@@ -885,33 +919,33 @@ model ConversationParticipant {
 }
 
 model Message {
-  id             String      @id @default(uuid())
-  conversationId String
-  senderId       String
-  content        String?     @db.Text
-  type           MessageType @default(TEXT)
-  fileUrl        String?
-  fileName       String?
-  fileSize       Int?
-  replyToId      String?
-  isEdited       Boolean     @default(false)
-  isDeleted      Boolean     @default(false)
-  editedAt       DateTime?
-  deletedAt      DateTime?
-  viewOnce       Boolean     @default(false)
-  viewedBy       Json?       // { userId: ISOdate } map of who viewed
-  deletedForUsers Json?      // { userId: ISOdate } per-user "delete for me" hide
-  isImportant    Boolean     @default(false)  // sender flagged as needs response
-  mentions       Json?       // string[] of userIds mentioned via @
+  id                          String      @id @default(uuid())
+  conversationId              String
+  senderId                    String
+  content                     String?     @db.Text
+  type                        MessageType @default(TEXT)
+  fileUrl                     String?
+  fileName                    String?
+  fileSize                    Int?
+  replyToId                   String?
+  isEdited                    Boolean     @default(false)
+  isDeleted                   Boolean     @default(false)
+  editedAt                    DateTime?
+  deletedAt                   DateTime?
+  viewOnce                    Boolean     @default(false)
+  viewedBy                    Json? // { userId: ISOdate } map of who viewed
+  deletedForUsers             Json? // { userId: ISOdate } per-user "delete for me" hide
+  isImportant                 Boolean     @default(false) // sender flagged as needs response
+  mentions                    Json? // string[] of userIds mentioned via @
   forwardedFromMessageId      String?
   forwardedFromConversationId String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt                   DateTime    @default(now())
+  updatedAt                   DateTime    @updatedAt
 
-  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User              @relation("MessageSender", fields: [senderId], references: [id])
-  replyTo      Message?          @relation("MessageReply", fields: [replyToId], references: [id])
-  replies      Message[]         @relation("MessageReply")
+  conversation Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                 @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo      Message?             @relation("MessageReply", fields: [replyToId], references: [id])
+  replies      Message[]            @relation("MessageReply")
   reactions    MessageReaction[]
   readReceipts MessageReadReceipt[]
   pin          MessagePin?

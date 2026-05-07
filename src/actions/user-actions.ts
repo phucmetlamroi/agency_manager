@@ -6,6 +6,7 @@ import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { audit } from '@/lib/audit-log'
 
 export async function changePassword(formData: FormData, workspaceId: string) {
     const session = await getSession()
@@ -38,10 +39,13 @@ export async function changePassword(formData: FormData, workspaceId: string) {
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
         // SECURITY: workspace-scoped admin check (was global ADMIN only).
-        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         // Super Admin Protection
-        const targetUser = await prisma.user.findUnique({ where: { id: userId } })
+        const targetUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { username: true, role: true },
+        })
         if (targetUser?.username === 'admin') {
             return { success: false, error: 'KHÔNG THỂ THAY ĐỔI QUYỀN CỦA SUPER ADMIN!' }
         }
@@ -50,6 +54,17 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
             where: { id: userId },
             data: { role: newRole as UserRole }
         })
+
+        await audit({
+            workspaceId,
+            actorUserId: actorId,
+            action: 'member.role_changed',
+            targetType: 'User',
+            targetId: userId,
+            before: { role: targetUser?.role },
+            after: { role: newRole },
+        })
+
         revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error: any) {
@@ -63,10 +78,13 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
 export async function deleteUser(userId: string, workspaceId: string) {
     try {
         // SECURITY: workspace-scoped admin check (was global ADMIN only).
-        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         // Super Admin Protection
-        const targetUser = await prisma.user.findUnique({ where: { id: userId } })
+        const targetUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { username: true, role: true },
+        })
         if (targetUser?.username === 'admin') {
             return { success: false, error: 'KHÔNG THỂ XÓA SUPER ADMIN!' }
         }
@@ -74,6 +92,16 @@ export async function deleteUser(userId: string, workspaceId: string) {
         await prisma.user.delete({
             where: { id: userId }
         })
+
+        await audit({
+            workspaceId,
+            actorUserId: actorId,
+            action: 'member.removed',
+            targetType: 'User',
+            targetId: userId,
+            before: { username: targetUser?.username, role: targetUser?.role },
+        })
+
         revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error: any) {

@@ -8,7 +8,7 @@ import { prisma } from '@/lib/db'
 
 const MAX_TAGS_PER_USER = 15
 
-// ─── Get all tags for a user (within a profile) ───────────────
+// ─── Get all tags for a user (within a workspace) ───────────────
 export async function getTagsForUser(workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized', tags: [] }
@@ -25,8 +25,18 @@ export async function getTagsForUser(workspaceId: string) {
         profileId = user?.profileId || null
     }
 
+    // SECURITY: scope tags to this workspace. Until backfill is complete,
+    // also include tags with workspaceId IS NULL (legacy rows) belonging to
+    // the user/profile so users don't lose their tags during the transition.
     const tags = await prisma.tagCategory.findMany({
-        where: { userId, ...(profileId ? { profileId } : {}) },
+        where: {
+            userId,
+            ...(profileId ? { profileId } : {}),
+            OR: [
+                { workspaceId },
+                { workspaceId: null }, // legacy pre-migration rows
+            ],
+        } as any,
         orderBy: { createdAt: 'asc' },
         select: { id: true, name: true, createdAt: true }
     })
@@ -72,8 +82,11 @@ export async function createTag(name: string, workspaceId: string) {
     })
     if (existing) return { error: 'Tag đã tồn tại' }
 
+    // NEW: scope newly-created tags to the active workspace.
+    // The schema column is nullable for backwards-compat; once backfill is
+    // complete and we make it NOT NULL, this stays valid.
     const tag = await prisma.tagCategory.create({
-        data: { name: trimmed, profileId, userId },
+        data: { name: trimmed, profileId, userId, workspaceId } as any,
         select: { id: true, name: true, createdAt: true }
     })
 

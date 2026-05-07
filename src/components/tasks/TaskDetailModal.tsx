@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { updateTaskStatus } from "@/actions/task-actions"
@@ -51,6 +51,143 @@ const TASK_STATUSES = [
 
 function getStatusObj(status: string) {
     return TASK_STATUSES.find(s => s.id === status) || { id: status, label: status, color: "#71717A" }
+}
+
+// ── Helper: format link (pure function, extracted to module scope) ──
+function formatLink(link: string | null) {
+    if (!link) return '#'
+    if (link.startsWith('http')) return link
+    return `https://${link}`
+}
+
+// ── Bulk Toggle (extracted outside component to prevent focus loss on re-render) ──
+function BulkToggle({ field, label, isBulkMode, isEditing, enabled, onToggle }: {
+    field: string
+    label: string
+    isBulkMode: boolean
+    isEditing: boolean
+    enabled: boolean
+    onToggle: () => void
+}) {
+    if (!isBulkMode || !isEditing) return null
+    return (
+        <label className="inline-flex items-center gap-1.5 cursor-pointer ml-2">
+            <button
+                type="button"
+                role="checkbox"
+                aria-checked={!!enabled}
+                onClick={onToggle}
+                className="w-[16px] h-[16px] shrink-0 rounded-full border-2 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                style={{
+                    borderColor: enabled ? '#F59E0B' : '#52525B',
+                    background: enabled ? '#F59E0B' : 'transparent',
+                    boxShadow: enabled ? '0 0 8px rgba(245,158,11,0.4)' : 'none',
+                }}
+            >
+                {enabled && (
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                )}
+            </button>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${enabled ? 'text-amber-400' : 'text-zinc-600'}`}>
+                {enabled ? 'GHI ĐÈ' : 'GIỮ'}
+            </span>
+        </label>
+    )
+}
+
+// ── Accordion Section (extracted outside component to prevent focus loss on re-render) ──
+function AccordionSection({
+    icon, iconColor, title, rightSlot, children, isOpen, onToggle
+}: {
+    icon: React.ReactNode
+    iconColor: string
+    title: string
+    rightSlot?: React.ReactNode
+    children: React.ReactNode
+    isOpen: boolean
+    onToggle: () => void
+}) {
+    return (
+        <div
+            style={{
+                borderRadius: 16,
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.05)',
+                overflow: 'hidden',
+            }}
+        >
+            <div
+                onClick={onToggle}
+                className="flex items-center justify-between cursor-pointer select-none transition-colors hover:bg-white/[0.02]"
+                style={{
+                    padding: '12px 16px',
+                    borderBottom: isOpen ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                }}
+            >
+                <div className="flex items-center gap-2">
+                    <span style={{ color: iconColor }} className="flex-shrink-0">
+                        {icon}
+                    </span>
+                    <span className="text-xs font-bold text-zinc-100">{title}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    {rightSlot}
+                    {isOpen
+                        ? <ChevronUp className="w-3.5 h-3.5 text-zinc-600" strokeWidth={1.5} />
+                        : <ChevronDown className="w-3.5 h-3.5 text-zinc-600" strokeWidth={1.5} />
+                    }
+                </div>
+            </div>
+            <AnimatePresence initial={false}>
+                {isOpen && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        className="overflow-hidden"
+                    >
+                        <div className="flex flex-col gap-3" style={{ padding: '14px 16px' }}>
+                            {children}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    )
+}
+
+// ── Link button (extracted outside component to prevent focus loss on re-render) ──
+function LinkButton({ href, label, icon, accent }: { href: string | null; label: string; icon: React.ReactNode; accent?: string }) {
+    return (
+        <a
+            href={href ? formatLink(href) : '#'}
+            target="_blank"
+            rel="noopener"
+            className={cn(
+                "flex items-center gap-2 rounded-[10px] text-xs font-semibold transition-all",
+                href
+                    ? "text-indigo-300 hover:bg-white/[0.04]"
+                    : "text-zinc-700 pointer-events-none"
+            )}
+            style={{
+                padding: '10px 14px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                textDecoration: 'none',
+            }}
+        >
+            <span className="flex-shrink-0" style={{ color: accent }}>
+                {icon}
+            </span>
+            <span className="flex-1">{label}</span>
+            {href ? (
+                <ExternalLink className="w-3 h-3 text-zinc-600" strokeWidth={1.5} />
+            ) : (
+                <span className="text-[10px] text-zinc-700">Chua co</span>
+            )}
+        </a>
+    )
 }
 
 interface TaskDetailModalProps {
@@ -377,142 +514,13 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
         }
     }
 
-    const formatLink = (link: string | null) => {
-        if (!link) return '#'
-        if (link.startsWith('http')) return link
-        return `https://${link}`
-    }
-
     const isBulkMode = bulkSelectedIds.length > 1 && localTask && bulkSelectedIds.includes(localTask.id)
-
-    // ── Bulk Toggle ─────────────────────────────
-    const BulkToggle = ({ field, label }: { field: string; label: string }) => {
-        if (!isBulkMode || !isEditing) return null
-        return (
-            <label className="inline-flex items-center gap-1.5 cursor-pointer ml-2">
-                <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={!!enabledFields[field]}
-                    onClick={() => toggleField(field)}
-                    className="w-[16px] h-[16px] shrink-0 rounded-full border-2 transition-all duration-200 flex items-center justify-center cursor-pointer"
-                    style={{
-                        borderColor: enabledFields[field] ? '#F59E0B' : '#52525B',
-                        background: enabledFields[field] ? '#F59E0B' : 'transparent',
-                        boxShadow: enabledFields[field] ? '0 0 8px rgba(245,158,11,0.4)' : 'none',
-                    }}
-                >
-                    {enabledFields[field] && (
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                    )}
-                </button>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${enabledFields[field] ? 'text-amber-400' : 'text-zinc-600'}`}>
-                    {enabledFields[field] ? 'GHI ĐÈ' : 'GIỮ'}
-                </span>
-            </label>
-        )
-    }
 
     // ── Deadline status ───────────────────────────────────────
     const isOverdue = form.deadline && new Date() > new Date(form.deadline) && localTask?.status !== 'Hoàn tất'
 
     // ── Status object for ambient coloring ────────────────────
     const statusObj = getStatusObj(localTask.status)
-
-    // ── Accordion Section wrapper ─────────────────────────────
-    const AccordionSection = ({
-        id, icon, iconColor, title, rightSlot, children
-    }: {
-        id: number
-        icon: React.ReactNode
-        iconColor: string
-        title: string
-        rightSlot?: React.ReactNode
-        children: React.ReactNode
-    }) => {
-        const isOpen = !!openSections[id]
-        return (
-            <div
-                style={{
-                    borderRadius: 16,
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.05)',
-                    overflow: 'hidden',
-                }}
-            >
-                {/* Section header */}
-                <div
-                    onClick={() => toggleSection(id)}
-                    className="flex items-center justify-between cursor-pointer select-none transition-colors hover:bg-white/[0.02]"
-                    style={{
-                        padding: '12px 16px',
-                        borderBottom: isOpen ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                    }}
-                >
-                    <div className="flex items-center gap-2">
-                        <span style={{ color: iconColor }} className="flex-shrink-0">
-                            {icon}
-                        </span>
-                        <span className="text-xs font-bold text-zinc-100">{title}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        {rightSlot}
-                        {isOpen
-                            ? <ChevronUp className="w-3.5 h-3.5 text-zinc-600" strokeWidth={1.5} />
-                            : <ChevronDown className="w-3.5 h-3.5 text-zinc-600" strokeWidth={1.5} />
-                        }
-                    </div>
-                </div>
-                {/* Section body */}
-                <AnimatePresence initial={false}>
-                    {isOpen && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                            className="overflow-hidden"
-                        >
-                            <div className="flex flex-col gap-3" style={{ padding: '14px 16px' }}>
-                                {children}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-        )
-    }
-
-    // ── Link button (view mode) ───────────────────────────────
-    const LinkButton = ({ href, label, icon, accent }: { href: string | null; label: string; icon: React.ReactNode; accent?: string }) => (
-        <a
-            href={href ? formatLink(href) : '#'}
-            target="_blank"
-            rel="noopener"
-            className={cn(
-                "flex items-center gap-2 rounded-[10px] text-xs font-semibold transition-all",
-                href
-                    ? "text-indigo-300 hover:bg-white/[0.04]"
-                    : "text-zinc-700 pointer-events-none"
-            )}
-            style={{
-                padding: '10px 14px',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                textDecoration: 'none',
-            }}
-        >
-            <span className="flex-shrink-0" style={{ color: accent }}>
-                {icon}
-            </span>
-            <span className="flex-1">{label}</span>
-            {href ? (
-                <ExternalLink className="w-3 h-3 text-zinc-600" strokeWidth={1.5} />
-            ) : (
-                <span className="text-[10px] text-zinc-700">Chua co</span>
-            )}
-        </a>
-    )
 
     // ── Input style helper ────────────────────────────────────
     const inputCls = "w-full h-10 rounded-[10px] bg-white/[0.04] border border-white/[0.08] px-3.5 text-zinc-300 text-xs outline-none focus:border-indigo-500/50 transition-all placeholder:text-zinc-600"
@@ -704,7 +712,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                             {/* ═══ SECTION 1: Thanh Pham (Delivery) ═══════ */}
                             <AccordionSection
-                                id={1}
+                                isOpen={!!openSections[1]}
+                                onToggle={() => toggleSection(1)}
                                 icon={<PackageCheck className="w-[15px] h-[15px]" strokeWidth={1.5} />}
                                 iconColor="#10B981"
                                 title="Thanh Pham (Delivery)"
@@ -768,17 +777,18 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                 ) : (
                                     <div className="text-xs text-zinc-700 italic">Chua co link thanh pham.</div>
                                 )}
-                                <BulkToggle field="productLink" label="Product Link" />
+                                <BulkToggle field="productLink" label="Product Link" isBulkMode={!!isBulkMode} isEditing={isEditing} enabled={!!enabledFields['productLink']} onToggle={() => toggleField('productLink')} />
                             </AccordionSection>
 
                             {/* ═══ SECTION 2: Resources ═══════════════════ */}
                             <AccordionSection
-                                id={2}
+                                isOpen={!!openSections[2]}
+                                onToggle={() => toggleSection(2)}
                                 icon={<FolderOpen className="w-[15px] h-[15px]" strokeWidth={1.5} />}
                                 iconColor="#6366F1"
                                 title="Resources"
                             >
-                                <BulkToggle field="resources" label="Resources" />
+                                <BulkToggle field="resources" label="Resources" isBulkMode={!!isBulkMode} isEditing={isEditing} enabled={!!enabledFields['resources']} onToggle={() => toggleField('resources')} />
                                 {isEditing && isAdmin ? (
                                     <div className={cn("flex flex-col gap-2", isBulkMode && !enabledFields['resources'] ? 'opacity-40 pointer-events-none' : '')}>
                                         {/* RAW */}
@@ -918,12 +928,13 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                             {/* ═══ SECTION 3: References ══════════════════ */}
                             <AccordionSection
-                                id={3}
+                                isOpen={!!openSections[3]}
+                                onToggle={() => toggleSection(3)}
                                 icon={<Bookmark className="w-[15px] h-[15px]" strokeWidth={1.5} />}
                                 iconColor="#06B6D4"
                                 title="References"
                             >
-                                <BulkToggle field="references" label="References" />
+                                <BulkToggle field="references" label="References" isBulkMode={!!isBulkMode} isEditing={isEditing} enabled={!!enabledFields['references']} onToggle={() => toggleField('references')} />
                                 {isEditing && isAdmin ? (
                                     <div className={cn("flex flex-col gap-2", isBulkMode && !enabledFields['references'] ? 'opacity-40 pointer-events-none' : '')}>
                                         <div>
@@ -964,7 +975,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                             {/* ═══ SECTION 4: Deadline & Finance ══════════ */}
                             <AccordionSection
-                                id={4}
+                                isOpen={!!openSections[4]}
+                                onToggle={() => toggleSection(4)}
                                 icon={<CalendarClock className="w-[15px] h-[15px]" strokeWidth={1.5} />}
                                 iconColor="#F59E0B"
                                 title="Deadline & Finance"
@@ -977,7 +989,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                             Deadline
                                             {isOverdue && <span className="ml-1 text-red-400 animate-pulse">— QUA HAN</span>}
                                         </span>
-                                        <BulkToggle field="deadline" label="Deadline" />
+                                        <BulkToggle field="deadline" label="Deadline" isBulkMode={!!isBulkMode} isEditing={isEditing} enabled={!!enabledFields['deadline']} onToggle={() => toggleField('deadline')} />
                                         {isEditing && isAdmin ? (
                                             <input
                                                 type="datetime-local"
@@ -1058,7 +1070,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                             {/* ═══ SECTION 5: Ghi chu (Tieng Viet) ════════ */}
                             <AccordionSection
-                                id={5}
+                                isOpen={!!openSections[5]}
+                                onToggle={() => toggleSection(5)}
                                 icon={<MessageSquare className="w-[15px] h-[15px]" strokeWidth={1.5} />}
                                 iconColor="#A855F7"
                                 title="Ghi chu (Tieng Viet)"
@@ -1085,7 +1098,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                     ) : undefined
                                 }
                             >
-                                <BulkToggle field="notes" label="Notes VI" />
+                                <BulkToggle field="notes" label="Notes VI" isBulkMode={!!isBulkMode} isEditing={isEditing} enabled={!!enabledFields['notes']} onToggle={() => toggleField('notes')} />
                                 {isEditing && isAdmin ? (
                                     <div className="h-[250px] border border-white/[0.08] rounded-2xl overflow-hidden shadow-inner">
                                         <TiptapEditor
@@ -1103,12 +1116,13 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                             {/* ═══ SECTION 6: Notes (English) ═════════════ */}
                             <AccordionSection
-                                id={6}
+                                isOpen={!!openSections[6]}
+                                onToggle={() => toggleSection(6)}
                                 icon={<Languages className="w-[15px] h-[15px]" strokeWidth={1.5} />}
                                 iconColor="#6366F1"
                                 title="Notes (English)"
                             >
-                                <BulkToggle field="notes_en" label="Notes EN" />
+                                <BulkToggle field="notes_en" label="Notes EN" isBulkMode={!!isBulkMode} isEditing={isEditing} enabled={!!enabledFields['notes_en']} onToggle={() => toggleField('notes_en')} />
                                 {isEditing ? (
                                     <div className="h-[250px] border border-indigo-500/15 rounded-2xl overflow-hidden shadow-inner" style={{ background: 'rgba(99,102,241,0.03)' }}>
                                         <TiptapEditor
@@ -1135,7 +1149,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                             {/* ═══ SECTION 7: Tags & Duration ═════════════ */}
                             <AccordionSection
-                                id={7}
+                                isOpen={!!openSections[7]}
+                                onToggle={() => toggleSection(7)}
                                 icon={<Tag className="w-[15px] h-[15px]" strokeWidth={1.5} />}
                                 iconColor="#F59E0B"
                                 title="Tags & Duration"
@@ -1197,7 +1212,8 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
 
                             {/* ═══ SECTION 8: Task Discussion ═════════════ */}
                             <AccordionSection
-                                id={8}
+                                isOpen={!!openSections[8]}
+                                onToggle={() => toggleSection(8)}
                                 icon={<MessageSquare className="w-[15px] h-[15px]" strokeWidth={1.5} />}
                                 iconColor="#8B5CF6"
                                 title="Discussion"

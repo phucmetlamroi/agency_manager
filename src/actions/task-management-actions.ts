@@ -143,33 +143,13 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
             }
         })
 
-        // D'. NOTIFICATION HOOKS — fire-and-forget
+        // D. NOTIFICATION HOOKS — fire-and-forget
+        // Email is handled by the notification system (Phase N-6 templates + bypass matrix).
+        // Previously a direct sendEmail call lived here too, causing DUPLICATE emails.
+        // The notification system respects user prefs (mute/digest/quiet hours) while
+        // TASK_ASSIGNED bypasses mute + digest, ensuring delivery.
         void notifyTaskAssignmentChange(updatedTask.id, updatedTask.title, user.id, oldAssigneeId, updateData.assigneeId)
-            .catch(() => {/* swallow */})
-
-        // D. SIDE EFFECTS (Email — direct operational email to assignee)
-        if (assignmentId && updatedTask.assignee) {
-            if (updatedTask.assignee.email) {
-                console.log(`[assignTask] Sending direct email to ${updatedTask.assignee.email} for task "${updatedTask.title}"`)
-                const { sendEmail } = await import('@/lib/email')
-                const { emailTemplates } = await import('@/lib/email-templates')
-
-                sendEmail({
-                    to: updatedTask.assignee.email,
-                    subject: `[New Task] ${updatedTask.title}`,
-                    html: emailTemplates.taskAssigned(
-                        updatedTask.assignee.username || 'User',
-                        updatedTask.title,
-                        updatedTask.deadline,
-                        updatedTask.id
-                    )
-                }).catch(err => console.error("[assignTask] Email send failed:", err))
-            } else {
-                console.log(`[assignTask] No email on assignee record — skipping direct email for "${updatedTask.title}"`)
-            }
-        } else {
-            console.log(`[assignTask] No assignee found on updatedTask — skipping direct email`)
-        }
+            .catch((err) => console.error('[assignTask] notifyTaskAssignmentChange error:', err))
 
         // E. REVALIDATE
         const paths = [`/${workspaceId}/admin`, `/${workspaceId}/dashboard`, `/${workspaceId}/admin/queue`]

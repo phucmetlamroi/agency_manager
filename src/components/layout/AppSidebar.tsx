@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import {
     LayoutDashboard,
     Users,
+    UsersRound,
     Building2,
     Wallet,
     ListTodo,
@@ -21,7 +22,8 @@ import {
     CalendarDays,
     MessageSquare,
     AlertOctagon,
-    ArrowRightLeft
+    ArrowRightLeft,
+    Settings
 } from "lucide-react"
 
 import {
@@ -78,7 +80,9 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
         { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN'] },
         { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN'] },
         { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users, roles: ['ADMIN'] },
+        { label: "Members", href: `/${workspaceId}/admin/members`, icon: UsersRound, roles: ['ADMIN'] },
         { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN'] },
+        { label: "Settings", href: `/${workspaceId}/admin/settings`, icon: Settings, roles: ['ADMIN'] },
     ]
     return allItems.filter(item => item.roles.includes(viewRole))
 }

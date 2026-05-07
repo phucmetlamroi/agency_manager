@@ -56,6 +56,7 @@ model Workspace {
   hardDeleteAfter DateTime?
 
   members             WorkspaceMember[]
+  invitations         WorkspaceInvitation[]
   tasks               Task[]
   clients             Client[]
   scheduleRules       ScheduleRule[]
@@ -143,6 +144,8 @@ model User {
   requestedRequests      ProfileAccessRequest[]  @relation("RequestedBy")
   tagCategories          TagCategory[]
   auditLogsAsActor       AuditLog[]              @relation("AuditLogActor")
+  workspaceInvitesReceived WorkspaceInvitation[] @relation("WorkspaceInvitedUser")
+  workspaceInvitesSent     WorkspaceInvitation[] @relation("WorkspaceInviter")
 
   // Chat relations
   contactsSent         Contact[]                 @relation("ContactRequester")
@@ -453,6 +456,35 @@ model InvoiceItem {
   amount      Decimal @default(0)
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   task        Task?   @relation(fields: [taskId], references: [id])
+}
+
+/// Workspace invitation — allows OWNER/ADMIN to invite users to a workspace.
+/// Supports both in-profile direct adds and cross-profile invitations with
+/// accept/decline flow. Token field enables future email-based invite links.
+model WorkspaceInvitation {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  invitedUserId String?  // Target user ID (set for in-app invites)
+  invitedEmail  String?  // Email for future email-based invites
+  role          String   @default("MEMBER") // WorkspaceRole to assign on accept
+  token         String   @unique @default(uuid()) // For email/link-based invites
+  status        String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED | REVOKED
+  invitedById   String   // Who sent the invite
+  message       String?  // Optional personal message from inviter
+  expiresAt     DateTime // When the invitation expires
+  respondedAt   DateTime? // When the invitee accepted/declined
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedUser User?     @relation("WorkspaceInvitedUser", fields: [invitedUserId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation("WorkspaceInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, invitedUserId, status]) // Prevent duplicate pending invites
+  @@index([invitedUserId, status])
+  @@index([workspaceId, status])
+  @@index([token])
+  @@index([expiresAt])
 }
 
 /// Immutable, append-only audit trail for security-sensitive workspace events.

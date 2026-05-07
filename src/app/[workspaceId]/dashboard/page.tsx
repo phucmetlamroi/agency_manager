@@ -13,6 +13,7 @@ import {
     Clock, ListChecks, Flame, ArrowUp, ArrowDown, Zap
 } from 'lucide-react'
 import { MarketplaceProvider } from '@/components/marketplace/MarketplaceProvider'
+import PendingInvitationsBanner from '@/components/workspace/PendingInvitationsBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,6 +102,9 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
     return (
         <div className="max-w-5xl mx-auto space-y-8">
+
+            {/* Pending Workspace Invitations Banner */}
+            <PendingInvitationsBanner />
 
             {/* ══════════════════════════════════════════════════
                 BENTO BOX GRID

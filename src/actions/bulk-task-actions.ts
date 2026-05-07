@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { createNotificationInternal } from './notification-actions'
+import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
 type BatchTaskInput = {
     titles: string[]
@@ -48,6 +50,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
         const currentProfileId = (user as any)?.sessionProfileId
 
         // Use standard prisma instead of extension for this complex transaction
+        const createdTasks: { id: string; title: string }[] = []
         await prisma.$transaction(async (tx) => {
             for (const title of data.titles) {
                 if (!title.trim()) continue;
@@ -84,6 +87,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         frameNote: data.frameNote || null,
                     }
                 })
+                createdTasks.push({ id: task.id, title: task.title })
 
             // Create TaskTags if any
             if (data.tagIds && data.tagIds.length > 0) {
@@ -96,6 +100,49 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             }
             }
         })
+
+        // Notify assignee for each created task (fire-and-forget, after transaction committed)
+        if (data.assigneeId && createdTasks.length > 0) {
+            const actorId = (user as any).id as string
+            const actor = await prisma.user.findUnique({
+                where: { id: actorId },
+                select: { username: true, nickname: true, avatarUrl: true },
+            }).catch(() => null)
+            const actorName = actor?.nickname || actor?.username || 'Admin'
+
+            void (async () => {
+                for (const t of createdTasks) {
+                    try {
+                        const notif = await createNotificationInternal({
+                            userId: data.assigneeId!,
+                            type: 'TASK_ASSIGNED',
+                            title: 'New task assigned',
+                            body: `${actorName} assigned you "${t.title}"`,
+                            avatarUrl: actor?.avatarUrl,
+                            taskId: t.id,
+                            actorId,
+                            metadata: { taskTitle: t.title },
+                        })
+                        void broadcastNotificationToUser(data.assigneeId!, {
+                            id: notif.id,
+                            type: notif.type,
+                            title: notif.title,
+                            body: notif.body,
+                            avatarUrl: notif.avatarUrl,
+                            conversationId: notif.conversationId,
+                            messageId: notif.messageId,
+                            taskId: notif.taskId,
+                            actorId: notif.actorId,
+                            metadata: notif.metadata,
+                            createdAt: notif.createdAt.toISOString(),
+                            isRead: false,
+                        })
+                    } catch (err) {
+                        console.error(`[createBatchTasks] notification error for task ${t.id}:`, err)
+                    }
+                }
+            })()
+        }
 
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/admin/queue`)
@@ -211,7 +258,12 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
             updateData.status = '\u0110ang \u0111\u1ee3i giao'
         }
 
-        // Execute Update
+        // Execute Update — capture old assignees for unassign notifications
+        const tasksWithOldAssignees = await prisma.task.findMany({
+            where: { id: { in: taskIds }, workspaceId },
+            select: { id: true, title: true, assigneeId: true },
+        })
+
         await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
                 await tx.task.update({
@@ -223,6 +275,51 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
                 })
             }
         })
+
+        // Notify assignees (fire-and-forget, after transaction committed)
+        if (cleanAssigneeId) {
+            const { user: actorUser } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+            const actorId = (actorUser as any).id as string
+            const actor = await prisma.user.findUnique({
+                where: { id: actorId },
+                select: { username: true, nickname: true, avatarUrl: true },
+            }).catch(() => null)
+            const actorName = actor?.nickname || actor?.username || 'Admin'
+
+            void (async () => {
+                for (const t of tasksWithOldAssignees) {
+                    if (t.assigneeId === cleanAssigneeId) continue // already assigned to same user
+                    try {
+                        const notif = await createNotificationInternal({
+                            userId: cleanAssigneeId,
+                            type: 'TASK_ASSIGNED',
+                            title: 'New task assigned',
+                            body: `${actorName} assigned you "${t.title}"`,
+                            avatarUrl: actor?.avatarUrl,
+                            taskId: t.id,
+                            actorId,
+                            metadata: { taskTitle: t.title },
+                        })
+                        void broadcastNotificationToUser(cleanAssigneeId, {
+                            id: notif.id,
+                            type: notif.type,
+                            title: notif.title,
+                            body: notif.body,
+                            avatarUrl: notif.avatarUrl,
+                            conversationId: notif.conversationId,
+                            messageId: notif.messageId,
+                            taskId: notif.taskId,
+                            actorId: notif.actorId,
+                            metadata: notif.metadata,
+                            createdAt: notif.createdAt.toISOString(),
+                            isRead: false,
+                        })
+                    } catch (err) {
+                        console.error(`[bulkAssignTasks] notification error for task ${t.id}:`, err)
+                    }
+                }
+            })()
+        }
 
         revalidatePath(`/${workspaceId}/admin/queue`)
         revalidatePath(`/${workspaceId}/dashboard`)

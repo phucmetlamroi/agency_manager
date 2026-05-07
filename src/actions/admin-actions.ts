@@ -6,6 +6,8 @@ import { UserRole } from '@prisma/client'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getSession } from '@/lib/auth'
+import { createNotificationInternal } from './notification-actions'
+import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
@@ -64,7 +66,7 @@ export async function createTask(formData: FormData, workspaceId: string) {
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
-        await workspacePrisma.task.create({
+        const task = await workspacePrisma.task.create({
             data: {
                 title,
                 value,
@@ -92,6 +94,48 @@ export async function createTask(formData: FormData, workspaceId: string) {
                 clientId
             }
         })
+
+        // Notify assignee via email + in-app notification
+        if (assigneeId && session?.user?.id) {
+            const actorId = session.user.id
+            const actor = await prisma.user.findUnique({
+                where: { id: actorId },
+                select: { username: true, nickname: true, avatarUrl: true },
+            }).catch(() => null)
+            const actorName = actor?.nickname || actor?.username || 'Admin'
+
+            void (async () => {
+                try {
+                    const notif = await createNotificationInternal({
+                        userId: assigneeId,
+                        type: 'TASK_ASSIGNED',
+                        title: 'New task assigned',
+                        body: `${actorName} assigned you "${title}"`,
+                        avatarUrl: actor?.avatarUrl,
+                        taskId: task.id,
+                        actorId,
+                        metadata: { taskTitle: title },
+                    })
+                    void broadcastNotificationToUser(assigneeId, {
+                        id: notif.id,
+                        type: notif.type,
+                        title: notif.title,
+                        body: notif.body,
+                        avatarUrl: notif.avatarUrl,
+                        conversationId: notif.conversationId,
+                        messageId: notif.messageId,
+                        taskId: notif.taskId,
+                        actorId: notif.actorId,
+                        metadata: notif.metadata,
+                        createdAt: notif.createdAt.toISOString(),
+                        isRead: false,
+                    })
+                } catch (err) {
+                    console.error('[createTask] notification error:', err)
+                }
+            })()
+        }
+
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/admin/queue`)
         revalidatePath(`/${workspaceId}/admin/crm`)

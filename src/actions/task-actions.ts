@@ -166,7 +166,7 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
                             } else {
                                 // Normal Start (Notify Admin Fixed Email)
                                 // FALLBACK: If env is missing, use hardcoded email to ensure delivery for testing
-                                const adminEmail = process.env.SENDGRID_FROM_EMAIL || 'mullerjohannes762@gmail.com'
+                                const adminEmail = process.env.ADMIN_EMAIL || process.env.RESEND_FROM_EMAIL || 'mullerjohannes762@gmail.com'
 
                                 console.log(`[Email Debug] START TASK DETECTED. Target Admin: ${adminEmail}`)
 

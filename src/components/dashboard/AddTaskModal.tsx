@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
 import {
   X,
   ArrowLeft,
@@ -433,8 +434,8 @@ export default function AddTaskModal({
     try {
       await onSubmit?.(form)
       setSubmitted(true)
-    } catch {
-      // Keep modal open on error
+    } catch (err: any) {
+      toast.error(err?.message || 'Lỗi khi tạo task. Vui lòng thử lại.')
     } finally {
       setSubmitting(false)
     }

@@ -209,8 +209,10 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 </div>
                             </div>
 
-                            {/* Profile & Workspace Switcher */}
-                            <ProfileWorkspaceSwitcher workspaceId={workspaceId} viewRole={viewRole} />
+                            {/* Profile & Workspace Switcher (user view only — admin has its own picker) */}
+                            {viewRole === 'USER' && (
+                                <ProfileWorkspaceSwitcher workspaceId={workspaceId} viewRole={viewRole} />
+                            )}
 
                             {/* Sheet nav */}
                             <nav className="flex-1 px-4 py-5 flex flex-col gap-[16px] overflow-auto">
@@ -356,9 +358,13 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                     {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
                 </Button>
 
-                {/* ── Profile & Workspace Switcher ── */}
-                <ProfileWorkspaceSwitcher workspaceId={workspaceId} collapsed={collapsed} viewRole={viewRole} />
-                <div style={{ borderBottom: `1px solid ${DIVIDER}` }} />
+                {/* ── Profile & Workspace Switcher (user view only — admin has its own picker) ── */}
+                {viewRole === 'USER' && (
+                    <>
+                        <ProfileWorkspaceSwitcher workspaceId={workspaceId} collapsed={collapsed} viewRole={viewRole} />
+                        <div style={{ borderBottom: `1px solid ${DIVIDER}` }} />
+                    </>
+                )}
 
                 {/* ── Navigation ── */}
                 <nav className={cn(

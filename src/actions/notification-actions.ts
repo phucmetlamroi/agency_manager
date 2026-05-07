@@ -80,10 +80,13 @@ export async function createNotificationInternal(params: CreateNotificationParam
         where: { id: userId },
         select: { email: true },
     })
+    console.log(`[createNotificationInternal] type=${type}, userId=${userId}, recipientEmail=${recipientUser?.email ?? 'NULL'}`)
     void maybeSendNotificationEmail(
         { ...created, metadata: (created.metadata as Record<string, any> | null) },
         recipientUser?.email ?? null,
-    ).catch(() => {})
+    ).catch((err) => {
+        console.error(`[createNotificationInternal] maybeSendNotificationEmail failed for ${type}:`, err)
+    })
 
     return created
 }

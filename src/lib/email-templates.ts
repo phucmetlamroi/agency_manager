@@ -4,38 +4,41 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)
 }
 
-// Base Template Wrapper for consistent styling
-const wrapTemplate = (content: string, title: string) => `
-<!DOCTYPE html>
-<html>
+// Base Template Wrapper — HustlyTasker branded shell (operational/admin emails)
+// User-facing notifications use src/lib/notification-emails/ instead.
+const wrapTemplate = (content: string, title: string) => `<!DOCTYPE html>
+<html lang="vi">
 <head>
-    <style>
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .header { background: linear-gradient(135deg, #6d28d9, #7c3aed); padding: 20px; text-align: center; color: white; }
-        .header h1 { margin: 0; font-size: 24px; font-weight: bold; }
-        .body { padding: 30px; }
-        .footer { background: #f9fafb; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; }
-        .btn { display: inline-block; padding: 12px 24px; background-color: #6d28d9; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px; }
-        .highlight { font-weight: bold; color: #6d28d9; }
-        .card { background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #6d28d9; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>HustlyTasker</title>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>${title}</h1>
-        </div>
-        <div class="body">
-            ${content}
-        </div>
-        <div class="footer">
-            © ${new Date().getFullYear()} AgencyManager System. All rights reserved.
-        </div>
-    </div>
+<body style="margin:0;padding:0;background:#F4F4F4;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.6;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F4F4F4;padding:24px 12px;">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+<tr><td style="background:linear-gradient(135deg,#6D28D9,#7C3AED);padding:24px 32px;">
+<div style="display:inline-block;background:rgba(255,255,255,0.18);border-radius:10px;padding:8px 14px;">
+<span style="font-size:18px;font-weight:800;letter-spacing:-0.02em;color:#ffffff;">⚡ HustlyTasker</span>
+</div>
+<h1 style="margin:14px 0 0 0;font-size:20px;font-weight:700;color:#ffffff;line-height:1.4;">${title}</h1>
+</td></tr>
+<tr><td style="padding:32px 32px 28px 32px;">${content}</td></tr>
+<tr><td style="padding:0 32px 28px 32px;">
+<div style="border-top:1px solid #e5e7eb;padding-top:16px;font-size:11px;color:#9ca3af;text-align:center;">
+© ${new Date().getFullYear()} HustlyTasker. All rights reserved.
+</div>
+</td></tr>
+</table>
+</td></tr>
+</table>
+<style>
+.btn{display:inline-block;padding:12px 24px;background:#7C3AED;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:700;font-size:14px;border:2px solid #7C3AED;}
+.highlight{font-weight:700;color:#7C3AED;}
+.card{background:#fafafa;padding:16px 18px;border-radius:8px;margin:14px 0;border-left:4px solid #7C3AED;}
+</style>
 </body>
-</html>
-`
+</html>`
 
 export const emailTemplates = {
     // 1. Task Assigned (To User)

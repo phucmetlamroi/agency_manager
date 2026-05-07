@@ -6,7 +6,8 @@ import { prisma } from '@/lib/db'
 import ProfileForm from '@/components/ProfileForm'
 import PaymentQrUpload from '@/components/profile/PaymentQrUpload'
 import AvatarUpload from '@/components/profile/AvatarUpload'
-import { UserCircle, CreditCard, ShieldCheck } from 'lucide-react'
+import NotificationSettings from '@/components/profile/NotificationSettings'
+import { UserCircle, CreditCard, ShieldCheck, Bell } from 'lucide-react'
 
 export default async function ProfilePage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -54,6 +55,15 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
                     <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Hồ sơ & Bảo mật</h2>
                 </div>
                 <ProfileForm user={user} />
+            </div>
+
+            {/* ── Notification Settings ──────────────────── */}
+            <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1">
+                    <Bell className="w-5 h-5 text-violet-400" />
+                    <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Thong bao Email</h2>
+                </div>
+                <NotificationSettings />
             </div>
 
             {/* ── Payment / QR Info ─────────────────────── */}

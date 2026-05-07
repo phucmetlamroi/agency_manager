@@ -147,9 +147,10 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
         void notifyTaskAssignmentChange(updatedTask.id, updatedTask.title, user.id, oldAssigneeId, updateData.assigneeId)
             .catch(() => {/* swallow */})
 
-        // D. SIDE EFFECTS (Email)
+        // D. SIDE EFFECTS (Email — direct operational email to assignee)
         if (assignmentId && updatedTask.assignee) {
             if (updatedTask.assignee.email) {
+                console.log(`[assignTask] Sending direct email to ${updatedTask.assignee.email} for task "${updatedTask.title}"`)
                 const { sendEmail } = await import('@/lib/email')
                 const { emailTemplates } = await import('@/lib/email-templates')
 
@@ -162,8 +163,12 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
                         updatedTask.deadline,
                         updatedTask.id
                     )
-                }).catch(err => console.error("[Email Error] Background send failed:", err));
+                }).catch(err => console.error("[assignTask] Email send failed:", err))
+            } else {
+                console.log(`[assignTask] No email on assignee record — skipping direct email for "${updatedTask.title}"`)
             }
+        } else {
+            console.log(`[assignTask] No assignee found on updatedTask — skipping direct email`)
         }
 
         // E. REVALIDATE

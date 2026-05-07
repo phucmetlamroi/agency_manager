@@ -10,7 +10,13 @@ export function parseVietnamDate(dateStr: string): Date {
         return new Date(dateStr)
     }
 
-    // Append Vietnam Offset (+07:00)
+    // Handle date-only format "YYYY-MM-DD" (from type="date" inputs)
+    // vs datetime format "YYYY-MM-DDTHH:mm" (from type="datetime-local")
+    if (!dateStr.includes('T')) {
+        return new Date(`${dateStr}T00:00:00+07:00`)
+    }
+
+    // Append seconds and Vietnam Offset (+07:00)
     // We assume the input from the UI is intended to be Vietnam Time
     return new Date(`${dateStr}:00+07:00`)
 }

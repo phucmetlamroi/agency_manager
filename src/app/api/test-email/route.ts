@@ -9,17 +9,18 @@ import { NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email'
 
 export async function GET(request: Request) {
+    const url = new URL(request.url)
     const secret = process.env.CRON_SECRET
-    const headerKey =
+    const key =
         request.headers.get('x-cron-secret') ||
         request.headers.get('authorization')?.replace('Bearer ', '') ||
+        url.searchParams.get('secret') ||
         null
 
-    if (!secret || headerKey !== secret) {
+    if (!secret || key !== secret) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const url = new URL(request.url)
     const to = url.searchParams.get('to')
 
     // Diagnostic info

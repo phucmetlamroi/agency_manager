@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 export async function changePassword(formData: FormData, workspaceId: string) {
     const session = await getSession()
@@ -36,10 +37,9 @@ export async function changePassword(formData: FormData, workspaceId: string) {
 
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
-        const session = await getSession()
-        if (session?.user?.role !== 'ADMIN') {
-            return { success: false, error: 'Unauthorized' }
-        }
+        // SECURITY: workspace-scoped admin check (was global ADMIN only).
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
         // Super Admin Protection
         const targetUser = await prisma.user.findUnique({ where: { id: userId } })
         if (targetUser?.username === 'admin') {
@@ -52,17 +52,19 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
         })
         revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { success: false, error: error.message }
+        }
         return { success: false, error: 'Failed to update role' }
     }
 }
 
 export async function deleteUser(userId: string, workspaceId: string) {
     try {
-        const session = await getSession()
-        if (session?.user?.role !== 'ADMIN') {
-            return { success: false, error: 'Unauthorized' }
-        }
+        // SECURITY: workspace-scoped admin check (was global ADMIN only).
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
         // Super Admin Protection
         const targetUser = await prisma.user.findUnique({ where: { id: userId } })
         if (targetUser?.username === 'admin') {
@@ -74,18 +76,21 @@ export async function deleteUser(userId: string, workspaceId: string) {
         })
         revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
-    } catch (error) {
+    } catch (error: any) {
         console.error(error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { success: false, error: error.message }
+        }
         return { success: false, error: 'Failed to delete user' }
     }
 }
 
 export async function adminResetPassword(userId: string, newPassword: string, workspaceId: string) {
     try {
+        // SECURITY: workspace-scoped admin check (was global ADMIN only).
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const currentUser = await prisma.user.findUnique({ where: { id: session?.user?.id } })
-
-        if (currentUser?.role !== 'ADMIN') return { success: false, error: 'Unauthorized' }
 
         // Super Admin Protection
         const targetUser = await prisma.user.findUnique({ where: { id: userId } })
@@ -107,7 +112,10 @@ export async function adminResetPassword(userId: string, newPassword: string, wo
         })
         revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { success: false, error: error.message }
+        }
         return { success: false, error: 'Failed' }
     }
 }

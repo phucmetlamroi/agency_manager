@@ -75,7 +75,7 @@ model WorkspaceMember {
   id          String   @id @default(uuid())
   userId      String
   workspaceId String
-  role        String   @default("MEMBER") // "OWNER", "ADMIN", "MEMBER", "GUEST"
+  role        String   @default("MEMBER") // see WorkspaceRole enum — kept as String until migration applied
   joinedAt    DateTime @default(now())
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)

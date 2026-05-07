@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth-guard'
 import { sendEmail } from '@/lib/email'
 import { emailTemplates } from '@/lib/email-templates'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 // Helper to safely convert Decimal/Number/String to Number
 const toSafeNumber = (val: any) => {
@@ -23,6 +24,11 @@ export async function getBillingProfiles(workspaceId?: string) {
     try {
         let profileId: string | null = null;
         if (workspaceId) {
+            // SECURITY: Verify caller is a member of the workspace before reading
+            // its associated profile's billing data. Otherwise any user could
+            // dump billing data of any workspace by passing its ID.
+            await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+
             const ws = await prisma.workspace.findUnique({
                 where: { id: workspaceId },
                 select: { profileId: true }
@@ -40,8 +46,11 @@ export async function getBillingProfiles(workspaceId?: string) {
             updatedAt: p.updatedAt.toISOString()
         }))
         return { success: true, data: safeProfiles }
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching billing profiles:', error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
         return { error: 'Failed to fetch billing profiles' }
     }
 }
@@ -60,8 +69,13 @@ export async function createBillingProfile(data: {
 }) {
 
     try {
-        const user = await getCurrentUser()
-        if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
+        // SECURITY: if workspaceId provided, require workspace ADMIN; else require global ADMIN.
+        if (data.workspaceId) {
+            await verifyWorkspaceAccess(data.workspaceId, 'ADMIN')
+        } else {
+            const user = await getCurrentUser()
+            if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
+        }
 
         let profileId: string | null = null;
         if (data.workspaceId) {
@@ -98,7 +112,10 @@ export async function createBillingProfile(data: {
 
         revalidatePath('/admin/finance')
         return { success: true, data: profile }
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
         return { error: 'Failed to create billing profile' }
     }
 }

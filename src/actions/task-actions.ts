@@ -7,6 +7,8 @@ import { validateTransition, TaskState } from '@/lib/fsm-config'
 
 import { getCurrentUser } from '@/lib/auth-guard'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { createNotificationInternal } from './notification-actions'
+import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
 export async function updateTaskStatus(id: string, newStatus: string, workspaceId: string, newNotes?: string, feedbackData?: { type: FeedbackSource, content: string }, currentVersion?: number) {
     try {
@@ -259,6 +261,16 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         }
 
         // -----------------------
+        // NOTIFICATION FAN-OUT (in-app)
+        // Notify the assignee (if not the actor) that their task changed status.
+        void notifyTaskStatusChanged(
+            updatedTaskResult.id,
+            updatedTaskResult.title,
+            user.id,
+            updatedTaskResult.assigneeId,
+            task.status,
+            newStatus,
+        ).catch(() => {/* swallow */})
 
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/dashboard`)
@@ -269,4 +281,49 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         console.error('Update Task Status Error:', e)
         return { error: e.message || 'Failed' }
     }
+}
+
+async function notifyTaskStatusChanged(
+    taskId: string,
+    taskTitle: string,
+    actorId: string,
+    assigneeId: string | null,
+    oldStatus: string,
+    newStatus: string,
+) {
+    if (!assigneeId || assigneeId === actorId) return  // No notification when self-update
+
+    const actor = await prisma.user.findUnique({
+        where: { id: actorId },
+        select: { username: true, nickname: true, avatarUrl: true },
+    })
+    const actorName = actor?.nickname || actor?.username || 'Admin'
+    const safeTitle = taskTitle || 'Untitled task'
+
+    try {
+        const notif = await createNotificationInternal({
+            userId: assigneeId,
+            type: 'TASK_STATUS_CHANGED',
+            title: 'Task status changed',
+            body: `"${safeTitle}" moved from "${oldStatus}" to "${newStatus}" by ${actorName}`,
+            avatarUrl: actor?.avatarUrl,
+            taskId,
+            actorId,
+            metadata: { taskTitle: safeTitle, oldStatus, newStatus, actorName },
+        })
+        void broadcastNotificationToUser(assigneeId, {
+            id: notif.id,
+            type: notif.type,
+            title: notif.title,
+            body: notif.body,
+            avatarUrl: notif.avatarUrl,
+            conversationId: notif.conversationId,
+            messageId: notif.messageId,
+            taskId: notif.taskId,
+            actorId: notif.actorId,
+            metadata: notif.metadata,
+            createdAt: notif.createdAt.toISOString(),
+            isRead: false,
+        })
+    } catch {/* swallow */}
 }

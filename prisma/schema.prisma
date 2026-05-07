@@ -122,7 +122,8 @@ model User {
   monthlyRanks      MonthlyRank[]       @relation("UserMonthlyRanks")
   sessions          Session[]
   events            Event[]
-  presence          UserPresence?
+  presence                UserPresence?
+  notificationPreference  NotificationPreference?
   scheduleRules      ScheduleRule[]
   scheduleExceptions ScheduleException[]
   dailyAvailabilities DailyAvailability[]
@@ -141,6 +142,7 @@ model User {
   messageReactions     MessageReaction[]
   messageReadReceipts  MessageReadReceipt[]
   pinnedMessages       MessagePin[]
+  notifications        Notification[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 }
@@ -768,6 +770,64 @@ enum MessageType {
   FILE
   SYSTEM
   ANNOUNCEMENT
+}
+
+enum NotificationType {
+  // Chat
+  NEW_MESSAGE
+  MENTION
+  GROUP_MEMBER_ADDED
+  GROUP_MEMBER_REMOVED
+  GROUP_MEMBER_LEFT
+  GROUP_DELETED
+  // Task
+  TASK_ASSIGNED
+  TASK_UNASSIGNED
+  TASK_STATUS_CHANGED
+  TASK_DEADLINE_APPROACHING
+  TASK_OVERDUE
+  TASK_COMMENT
+}
+
+model Notification {
+  id              String           @id @default(uuid())
+  userId          String
+  type            NotificationType
+  title           String
+  body            String           @db.Text
+  avatarUrl       String?
+  isRead          Boolean          @default(false)
+  isArchived      Boolean          @default(false)
+  // Source links (nullable, depends on type)
+  conversationId  String?
+  messageId       String?
+  taskId          String?
+  actorId         String?
+  // Flexible metadata (group name, task title, oldStatus, newStatus, messageCount, ...)
+  metadata        Json?
+  // Delivery tracking — kept for future Push/Email phases
+  pushSentAt      DateTime?
+  emailSentAt     DateTime?
+  createdAt       DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, type, createdAt])
+  @@index([userId, conversationId, type, createdAt])
+}
+
+model NotificationPreference {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  emailEnabled    Boolean  @default(true)
+  emailDigestMode String   @default("REALTIME") // REALTIME | HOURLY | DAILY | OFF
+  quietHoursStart Int?     // 0-23 UTC hour, null = no quiet hours
+  quietHoursEnd   Int?     // 0-23 UTC hour
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Contact {

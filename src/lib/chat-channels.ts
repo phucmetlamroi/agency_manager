@@ -14,6 +14,9 @@ export const CHAT_EVENTS = {
     MESSAGE_UNPINNED: 'message_unpinned',
     MESSAGE_IMPORTANT_CHANGED: 'message_important_changed',
     PRESENCE_CHANGED: 'presence_changed',
+    // Notification system
+    NOTIFICATION_NEW: 'notification_new',
+    NOTIFICATION_READ: 'notification_read',
 } as const
 
 export function getConversationChannel(conversationId: string) {

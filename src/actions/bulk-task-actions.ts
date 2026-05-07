@@ -20,6 +20,13 @@ type BatchTaskInput = {
     notes_en: string | null
     type: string
     tagIds?: string[]
+    // Additional fields from AddTaskModal
+    fileLink?: string | null
+    submissionFolder?: string | null
+    productLink?: string | null
+    frameUsername?: string | null
+    framePassword?: string | null
+    frameNote?: string | null
 }
 
 export async function createBatchTasks(data: BatchTaskInput, workspaceId: string) {
@@ -66,7 +73,15 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         profitVND: profitVND,
                         clientId: data.clientId,
                         workspaceId: workspaceId,
-                        profileId: currentProfileId
+                        profileId: currentProfileId,
+
+                        // Additional fields
+                        fileLink: data.fileLink || null,
+                        submissionFolder: data.submissionFolder || null,
+                        productLink: data.productLink || null,
+                        frameUsername: data.frameUsername || null,
+                        framePassword: data.framePassword || null,
+                        frameNote: data.frameNote || null,
                     }
                 })
 

@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
+import { ProfileWorkspaceSwitcher } from "./ProfileWorkspaceSwitcher"
 
 type ViewRole = 'ADMIN' | 'USER'
 
@@ -208,6 +209,9 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 </div>
                             </div>
 
+                            {/* Profile & Workspace Switcher */}
+                            <ProfileWorkspaceSwitcher workspaceId={workspaceId} viewRole={viewRole} />
+
                             {/* Sheet nav */}
                             <nav className="flex-1 px-4 py-5 flex flex-col gap-[16px] overflow-auto">
                                 {filteredNavItems.map((item) => {
@@ -351,6 +355,10 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                 >
                     {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
                 </Button>
+
+                {/* ── Profile & Workspace Switcher ── */}
+                <ProfileWorkspaceSwitcher workspaceId={workspaceId} collapsed={collapsed} viewRole={viewRole} />
+                <div style={{ borderBottom: `1px solid ${DIVIDER}` }} />
 
                 {/* ── Navigation ── */}
                 <nav className={cn(

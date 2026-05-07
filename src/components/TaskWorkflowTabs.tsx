@@ -58,7 +58,7 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-    { id: 'all',      label: 'Assignee',        statuses: ['Nhận task', 'Đã nhận task'],                                   color: '#8B5CF6', targetStatus: null },
+    { id: 'all',      label: 'Assignee',        statuses: ['Nhận task', 'Đã nhận task', 'Đang đợi giao', 'Tạm ngưng'],  color: '#8B5CF6', targetStatus: null },
     { id: 'progress', label: 'Progress',        statuses: ['Đang thực hiện'],                                     color: '#EAB308', targetStatus: 'Đang thực hiện' },
     { id: 'review',   label: 'Revise',           statuses: ['Review', 'Revision', 'Sửa frame', 'Gửi lại'],    color: '#F97316', targetStatus: 'Revision' },
     { id: 'done',     label: 'Complete',         statuses: ['Hoàn tất'],                                   color: '#10B981', targetStatus: 'Hoàn tất' },

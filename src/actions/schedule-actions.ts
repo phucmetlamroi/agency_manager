@@ -4,14 +4,27 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { revalidatePath } from 'next/cache'
 import { ScheduleExceptionType } from '@prisma/client'
 import { getCurrentUser } from '@/lib/auth-guard'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 /**
  * Validates that the current user has permission to modify the target user's schedule.
  */
-async function validateAccess(targetUserId: string, targetProfileId: string | undefined) {
+async function validateAccess(workspaceId: string, targetUserId: string, targetProfileId: string | undefined) {
   const user = await getCurrentUser()
-  if (user.role === 'ADMIN') return user
-  
+
+  // Workspace membership is REQUIRED — even for self-schedule edits.
+  // This prevents ex-members from modifying their own schedule data after removal.
+  try {
+    const { isGlobalAdmin, workspaceRole } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    // Workspace ADMIN/OWNER can modify any member's schedule
+    if (isGlobalAdmin || workspaceRole === 'ADMIN' || workspaceRole === 'OWNER') return user
+  } catch (e: any) {
+    // SECURITY: If the user is not a member at all, block access completely.
+    if (e?.message?.startsWith('SECURITY_VIOLATION')) throw e
+    throw e
+  }
+
+  // MEMBER role confirmed — can only modify own schedule
   if (user.id !== targetUserId || user.profileId !== targetProfileId) {
     throw new Error('Bạn không có quyền thay đổi lịch của người khác hoặc profile khác.')
   }
@@ -32,9 +45,9 @@ export async function upsertScheduleRule(
   updaterId?: string
 ) {
   if (!profileId) throw new Error("profileId is required")
-  await validateAccess(userId, profileId)
+  await validateAccess(workspaceId, userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
-  
+
   // Find existing rule
   const existing = await prisma.scheduleRule.findFirst({
     where: { userId, dayOfWeek }
@@ -85,7 +98,7 @@ export async function deleteScheduleRule(
   const prisma = getWorkspacePrisma(workspaceId, profileId)
   const existing = await prisma.scheduleRule.findUnique({ where: { id: ruleId } })
   if (existing) {
-    await validateAccess(existing.userId, profileId)
+    await validateAccess(workspaceId, existing.userId, profileId)
     await prisma.scheduleRule.delete({
       where: { id: ruleId }
     })
@@ -111,7 +124,7 @@ export async function createScheduleException(
   creatorId?: string
 ) {
   if (!profileId) throw new Error("profileId is required")
-  await validateAccess(userId, profileId)
+  await validateAccess(workspaceId, userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
 
   // Parse "YYYY-MM-DD" directly as UTC midnight → no timezone drift
@@ -152,7 +165,7 @@ export async function createBatchScheduleExceptions(
 ) {
   if (!entries.length) return { count: 0 }
   if (!profileId) throw new Error("profileId is required")
-  await validateAccess(userId, profileId)
+  await validateAccess(workspaceId, userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
   
   const created = await prisma.$transaction(
@@ -189,7 +202,7 @@ export async function deleteScheduleException(
   const prisma = getWorkspacePrisma(workspaceId, profileId)
   const existing = await prisma.scheduleException.findUnique({ where: { id: exceptionId } })
   if (existing) {
-    await validateAccess(existing.userId, profileId)
+    await validateAccess(workspaceId, existing.userId, profileId)
     await prisma.scheduleException.delete({
       where: { id: exceptionId }
     })
@@ -258,7 +271,7 @@ export async function deleteScheduleExceptionsByIds(
     take: 1
   })
   if (samples.length) {
-    await validateAccess(samples[0].userId, profileId)
+    await validateAccess(workspaceId, samples[0].userId, profileId)
   }
 
   const result = await prisma.scheduleException.deleteMany({
@@ -281,8 +294,8 @@ export async function deleteScheduleExceptionsForDay(
   dateStr: string
 ) {
   if (!profileId) throw new Error("profileId is required")
-  await validateAccess(userId, profileId)
-  
+  await validateAccess(workspaceId, userId, profileId)
+
   const prisma = getWorkspacePrisma(workspaceId, profileId)
   const date = new Date(dateStr + 'T00:00:00.000Z')
   const result = await prisma.scheduleException.deleteMany({

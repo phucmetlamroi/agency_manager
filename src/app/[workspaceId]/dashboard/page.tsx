@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { MarketplaceProvider } from '@/components/marketplace/MarketplaceProvider'
 import PendingInvitationsBanner from '@/components/workspace/PendingInvitationsBanner'
+import { prisma } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,18 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
     const workspacePrisma = getWorkspacePrisma(workspaceId)
     const userId = session.user.id
-    const userIsAdmin = session.user.role === 'ADMIN' || !!(session.user as any).isTreasurer
+
+    // Workspace-scoped admin check: use workspace membership role, not global User.role.
+    // Global admins and treasurers retain admin access across all workspaces.
+    const isGlobalAdmin = session.user.role === 'ADMIN' || !!(session.user as any).isTreasurer
+    let userIsAdmin = isGlobalAdmin
+    if (!isGlobalAdmin) {
+        const membership = await prisma.workspaceMember.findUnique({
+            where: { userId_workspaceId: { userId, workspaceId } },
+            select: { role: true },
+        })
+        userIsAdmin = membership?.role === 'OWNER' || membership?.role === 'ADMIN'
+    }
 
     // ── Data Fetching (workspace isolated) ──────────────────────
     const perfData = await getUserPerformanceScore(workspaceId, userId)

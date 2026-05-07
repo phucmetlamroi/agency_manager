@@ -58,6 +58,8 @@ interface SidebarProps {
     onCollapsedChange?: (collapsed: boolean) => void
     /** Which role's navigation set to show. Defaults to 'ADMIN' for backward compatibility. */
     viewRole?: ViewRole
+    /** Workspace-scoped role (OWNER/ADMIN/MEMBER/GUEST). Used for nav filtering instead of global role. */
+    workspaceRole?: string
 }
 
 interface NavItem {
@@ -101,11 +103,14 @@ const LOGO_ICON_BG = "linear-gradient(135deg,#6366F1,#8B5CF6)"
 const LOGO_ICON_GLOW = "0 0 18px rgba(139,92,246,0.40)"
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
-export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'ADMIN' }: SidebarProps) {
+export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'ADMIN', workspaceRole }: SidebarProps) {
     const pathname = usePathname()
     const [collapsed, setCollapsed] = React.useState(false)
     const [isMobile, setIsMobile] = React.useState(false)
-    const isAdminUser = user.role === 'ADMIN'
+    // Use workspace role for permission checks, falling back to global role for backwards compat
+    const isAdminUser = workspaceRole
+        ? (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN' || user.role === 'ADMIN')
+        : user.role === 'ADMIN'
     const otherViewRole: ViewRole = viewRole === 'ADMIN' ? 'USER' : 'ADMIN'
     const switchRoleHref = viewRole === 'ADMIN' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`
 
@@ -131,10 +136,10 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
         return name.slice(0, 2).toUpperCase()
     }
 
-    // Filtered nav items based on view role + treasurer access
+    // Filtered nav items based on view role + workspace-scoped permissions
     const filteredNavItems = getNavItems(workspaceId, viewRole).filter(item => {
-        if (item.href.includes('/admin/finance')) return user.role === 'ADMIN' || user.isTreasurer
-        if (item.href.includes('/admin/analytics')) return user.role === 'ADMIN'
+        if (item.href.includes('/admin/finance')) return isAdminUser || user.isTreasurer
+        if (item.href.includes('/admin/analytics')) return isAdminUser
         return true
     })
 

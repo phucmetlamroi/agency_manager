@@ -90,7 +90,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
 
     const handleUpdate = async (tagId: string) => {
         if (!editingName.trim()) return
-        const res = await updateTag(tagId, editingName.trim())
+        const res = await updateTag(tagId, editingName.trim(), workspaceId)
         if (res.error) { toast.error(res.error); return }
         if (res.tag) {
             const updated = tags.map(t => t.id === tagId ? { ...t, name: res.tag!.name } : t)
@@ -102,7 +102,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
     }
 
     const handleDelete = async (tagId: string) => {
-        const res = await deleteTag(tagId)
+        const res = await deleteTag(tagId, workspaceId)
         if (res.error) { toast.error(res.error); return }
         const updated = tags.filter(t => t.id !== tagId)
         setTags(updated)

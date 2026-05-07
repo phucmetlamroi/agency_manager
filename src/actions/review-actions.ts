@@ -2,36 +2,39 @@
 
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getSession } from '@/lib/auth'
+import { verifyWorkspaceAccess } from '@/lib/security'
 import { revalidatePath } from 'next/cache'
 
 // Fetch the error dictionary for the UI
 export async function getErrorDictionary(workspaceId: string) {
     const session = await getSession()
     if (!session || !session.user) return []
-    
+
     const prisma = getWorkspacePrisma(workspaceId)
-    return await prisma.errorDictionary.findMany({ 
-        where: { isActive: true }, 
-        orderBy: { penalty: 'desc' } 
+    return await prisma.errorDictionary.findMany({
+        where: { isActive: true },
+        orderBy: { penalty: 'desc' }
     })
 }
 
 // Transaction: Mark Task Revision + Insert Error Logs
 export async function submitManagerReview(taskId: string, workspaceId: string, errors: { errorId: string, count: number }[], notes?: string) {
-    const session = await getSession()
-    if (!session || !session.user || (session.user.role !== 'ADMIN' && session.user.role !== 'SUPER_ADMIN')) {
-        return { success: false, error: 'Unauthorized' }
+    let access: Awaited<ReturnType<typeof verifyWorkspaceAccess>>
+    try {
+        access = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    } catch {
+        return { success: false, error: 'Unauthorized: insufficient workspace permissions' }
     }
 
     const prisma = getWorkspacePrisma(workspaceId)
-    
+
     try {
         const task = await prisma.task.findUnique({ where: { id: taskId } })
         if (!task || !task.assigneeId) {
             return { success: false, error: 'Task not found or has no assignee' }
         }
 
-        const profileId = session.user.sessionProfileId || null
+        const profileId = access.user.sessionProfileId || null
 
         const dict = await prisma.errorDictionary.findMany()
 
@@ -39,7 +42,7 @@ export async function submitManagerReview(taskId: string, workspaceId: string, e
             // 1. Change task state to Revision
             await tx.task.update({
                 where: { id: taskId },
-                data: { 
+                data: {
                     status: 'Revision',
                     notes_vi: notes ? `${task.notes_vi || ''}\n\n[MANAGER FEEDBACK]: ${notes}` : task.notes_vi
                 }
@@ -54,7 +57,7 @@ export async function submitManagerReview(taskId: string, workspaceId: string, e
                     errorId: err.errorId,
                     frequency: err.count,
                     calculatedScore: err.count * penalty,
-                    detectedById: session.user.id,
+                    detectedById: access.userId,
                     workspaceId: workspaceId,
                     profileId: profileId
                 }

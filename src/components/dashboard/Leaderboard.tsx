@@ -122,9 +122,21 @@ export const getLeaderboardData = unstable_cache(
 
 export default async function Leaderboard({ workspaceId }: { workspaceId: string }) {
     const { getSession } = await import("@/lib/auth")
+    const { prisma } = await import("@/lib/db")
     const session = await getSession()
     const profileId = (session?.user as any)?.sessionProfileId
     const leaderboard = await getLeaderboardData(workspaceId, profileId)
+
+    // Workspace-scoped admin check for refresh button visibility
+    const isGlobalAdmin = session?.user?.role === 'ADMIN'
+    let isWorkspaceAdmin = isGlobalAdmin
+    if (!isGlobalAdmin && session?.user?.id) {
+        const membership = await prisma.workspaceMember.findUnique({
+            where: { userId_workspaceId: { userId: session.user.id, workspaceId } },
+            select: { role: true },
+        })
+        isWorkspaceAdmin = membership?.role === 'OWNER' || membership?.role === 'ADMIN'
+    }
 
     const top3 = leaderboard.slice(0, 3)
 
@@ -175,7 +187,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                         This week
                         <ChevronDown className="w-3 h-3 text-[#A1A1AA]/70" />
                     </span>
-                    <RefreshLeaderboardButton isAdmin={session?.user?.role === 'ADMIN'} />
+                    <RefreshLeaderboardButton isAdmin={isWorkspaceAdmin} />
                 </div>
             </div>
 

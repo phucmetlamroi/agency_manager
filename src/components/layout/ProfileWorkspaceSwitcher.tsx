@@ -9,8 +9,11 @@ import {
     Users,
     Briefcase,
     Layers,
+    Plus,
 } from "lucide-react"
+import CreateWorkspaceModal from "@/components/workspace/CreateWorkspaceModal"
 import { getMyProfilesAndWorkspaces } from "@/actions/profile-actions"
+import { getWorkspacesForProfile } from "@/actions/workspace-actions"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -51,6 +54,7 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
     const pathname = usePathname()
     const [open, setOpen] = useState(false)
     const [switching, setSwitching] = useState(false)
+    const [showCreateModal, setShowCreateModal] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
 
     const [profiles, setProfiles] = useState<ProfileItem[]>([])
@@ -96,10 +100,23 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
                 toast.error(data.error || "Khong the chuyen profile")
                 return
             }
-            // After profile switch, reload to pick up new session + navigate to first workspace
-            toast.success(`Da chuyen sang ${profiles.find(p => p.id === profileId)?.name || 'profile moi'}`)
+            toast.success(`Đã chuyển sang ${profiles.find(p => p.id === profileId)?.name || 'profile mới'}`)
             setOpen(false)
-            // Full reload needed because session cookie changed
+
+            // After profile switch, navigate to the first workspace of the new profile.
+            // The cookie is already updated by the API response, so server actions
+            // will use the new session.
+            try {
+                const newWorkspaces = await getWorkspacesForProfile(profileId)
+                const firstWs = newWorkspaces?.[0]
+                if (firstWs) {
+                    const basePath = viewRole === "ADMIN" ? "admin" : "dashboard"
+                    window.location.href = `/${firstWs.id}/${basePath}`
+                    return
+                }
+            } catch { /* fallback below */ }
+
+            // Fallback: reload current page (will redirect if workspace doesn't belong to profile)
             window.location.href = viewRole === "ADMIN" ? `/${workspaceId}/admin` : `/${workspaceId}/dashboard`
         } catch {
             toast.error("Loi khi chuyen profile")
@@ -119,41 +136,50 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
         router.push(`/${newWsId}/${basePath}`)
     }
 
+    const handleOpenCreateModal = () => {
+        setOpen(false)
+        setShowCreateModal(true)
+    }
+
     // Don't render if no data yet
     if (profiles.length === 0 && workspaces.length === 0) return null
 
     // ── Collapsed mode: icon only ──
     if (collapsed) {
         return (
-            <div ref={dropdownRef} className="relative flex justify-center px-3 py-2">
-                <button
-                    onClick={() => setOpen(!open)}
-                    className="w-[46px] h-[46px] rounded-full flex items-center justify-center transition-colors cursor-pointer"
-                    style={{
-                        background: open ? ACTIVE_BG : "transparent",
-                        border: `1px solid ${open ? ACCENT : "transparent"}`,
-                    }}
-                    onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = HOVER_BG }}
-                    onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "transparent" }}
-                >
-                    <Layers size={18} style={{ color: ACCENT }} />
-                </button>
+            <>
+                <div ref={dropdownRef} className="relative flex justify-center px-3 py-2">
+                    <button
+                        onClick={() => setOpen(!open)}
+                        className="w-[46px] h-[46px] rounded-full flex items-center justify-center transition-colors cursor-pointer"
+                        style={{
+                            background: open ? ACTIVE_BG : "transparent",
+                            border: `1px solid ${open ? ACCENT : "transparent"}`,
+                        }}
+                        onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = HOVER_BG }}
+                        onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "transparent" }}
+                    >
+                        <Layers size={18} style={{ color: ACCENT }} />
+                    </button>
 
-                <AnimatePresence>
-                    {open && (
-                        <SwitcherDropdown
-                            profiles={profiles}
-                            workspaces={workspaces}
-                            currentProfileId={currentProfileId}
-                            workspaceId={workspaceId}
-                            switching={switching}
-                            onProfileSwitch={handleProfileSwitch}
-                            onWorkspaceSwitch={handleWorkspaceSwitch}
-                            align="right"
-                        />
-                    )}
-                </AnimatePresence>
-            </div>
+                    <AnimatePresence>
+                        {open && (
+                            <SwitcherDropdown
+                                profiles={profiles}
+                                workspaces={workspaces}
+                                currentProfileId={currentProfileId}
+                                workspaceId={workspaceId}
+                                switching={switching}
+                                onProfileSwitch={handleProfileSwitch}
+                                onWorkspaceSwitch={handleWorkspaceSwitch}
+                                onCreateWorkspace={handleOpenCreateModal}
+                                align="right"
+                            />
+                        )}
+                    </AnimatePresence>
+                </div>
+                <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+            </>
         )
     }
 
@@ -217,10 +243,12 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
                         switching={switching}
                         onProfileSwitch={handleProfileSwitch}
                         onWorkspaceSwitch={handleWorkspaceSwitch}
+                        onCreateWorkspace={handleOpenCreateModal}
                         align="left"
                     />
                 )}
             </AnimatePresence>
+            <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
         </div>
     )
 }
@@ -237,6 +265,7 @@ function SwitcherDropdown({
     switching,
     onProfileSwitch,
     onWorkspaceSwitch,
+    onCreateWorkspace,
     align,
 }: {
     profiles: ProfileItem[]
@@ -246,6 +275,7 @@ function SwitcherDropdown({
     switching: boolean
     onProfileSwitch: (id: string) => void
     onWorkspaceSwitch: (id: string) => void
+    onCreateWorkspace: () => void
     align: "left" | "right"
 }) {
     return (
@@ -377,6 +407,29 @@ function SwitcherDropdown({
                     })}
                 </div>
             )}
+
+            {/* ── Create Workspace ── */}
+            <div style={{ borderTop: `1px solid ${DIVIDER}` }} />
+            <div className="p-2">
+                <button
+                    type="button"
+                    onClick={onCreateWorkspace}
+                    className="flex w-full items-center gap-3 px-2.5 py-2.5 transition-colors duration-150 cursor-pointer"
+                    style={{ borderRadius: 12 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)" }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
+                >
+                    <div
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                        style={{ background: "rgba(139,92,246,0.10)", border: `1px dashed rgba(139,92,246,0.3)` }}
+                    >
+                        <Plus className="h-3.5 w-3.5" style={{ color: ACCENT }} />
+                    </div>
+                    <span className="text-[13px] font-semibold" style={{ color: MUTED_LIGHT }}>
+                        Tạo Workspace mới
+                    </span>
+                </button>
+            </div>
 
             {/* ── Empty state ── */}
             {profiles.length <= 1 && workspaces.length === 0 && (

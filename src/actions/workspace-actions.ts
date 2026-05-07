@@ -9,8 +9,15 @@ import { audit } from '@/lib/audit-log'
 
 export async function createWorkspaceAction(formData: FormData) {
     const session = await getSession()
-    if (!session?.user?.id || session.user.role !== 'ADMIN') {
-        return { error: 'Chỉ Admin mới có quyền tạo Workspace mới.' }
+    if (!session?.user?.id) {
+        return { error: 'Bạn cần đăng nhập để tạo Workspace.' }
+    }
+
+    // Self-service: any authenticated user with a valid profile can create a workspace.
+    // The creator automatically becomes OWNER.
+    const profileId = session.user.sessionProfileId
+    if (!profileId) {
+        return { error: 'Không tìm thấy Profile. Vui lòng đăng nhập lại.' }
     }
 
     const name = formData.get('name') as string
@@ -19,15 +26,29 @@ export async function createWorkspaceAction(formData: FormData) {
     if (!name || name.trim().length === 0) {
         return { error: 'Tên Workspace không được để trống' }
     }
+    if (name.trim().length > 50) {
+        return { error: 'Tên Workspace không được quá 50 ký tự' }
+    }
+    if (description && description.trim().length > 200) {
+        return { error: 'Mô tả không được quá 200 ký tự' }
+    }
+
+    // Rate limit: max 10 workspaces owned per user to prevent abuse.
+    const ownedCount = await prisma.workspaceMember.count({
+        where: { userId: session.user.id, role: 'OWNER' },
+    })
+    if (ownedCount >= 10) {
+        return { error: 'Bạn đã đạt giới hạn 10 Workspace. Hãy xóa workspace cũ trước khi tạo mới.' }
+    }
 
     try {
         let newWorkspaceId = ''
         await prisma.$transaction(async (tx) => {
             const workspace = await tx.workspace.create({
                 data: {
-                    name,
-                    description: description || null,
-                    profileId: session.user.sessionProfileId
+                    name: name.trim(),
+                    description: description?.trim() || null,
+                    profileId,
                 }
             })
             newWorkspaceId = workspace.id
@@ -47,7 +68,7 @@ export async function createWorkspaceAction(formData: FormData) {
             action: 'workspace.created',
             targetType: 'Workspace',
             targetId: newWorkspaceId,
-            after: { name, profileId: session.user.sessionProfileId },
+            after: { name: name.trim(), profileId },
         })
 
         revalidatePath('/workspace')

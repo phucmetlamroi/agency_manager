@@ -10,12 +10,15 @@ export default function MobileLayoutShell({
     children,
     user,
     handleLogout,
-    workspaceId
+    workspaceId,
+    workspaceRole,
 }: {
     children: React.ReactNode,
     user: any,
     workspaceId: string,
     handleLogout: () => void
+    /** Workspace-scoped role for nav filtering */
+    workspaceRole?: string
 }) {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
@@ -58,7 +61,7 @@ export default function MobileLayoutShell({
             </main>
 
             {/* BOTTOM NAV */}
-            <BottomNav role={user.role} workspaceId={workspaceId} />
+            <BottomNav role={workspaceRole && (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN') ? 'ADMIN' : user.role} workspaceId={workspaceId} />
 
             {/* USER DRAWER */}
             {isDrawerOpen && (

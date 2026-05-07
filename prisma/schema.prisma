@@ -783,16 +783,13 @@ model TagCategory {
   name        String
   profileId   String
   userId      String
-  // workspaceId optional during transition. Backfill via SQL migration,
-  // then make required in a follow-up. Until then `getWorkspacePrisma`
-  // will treat null as "any workspace" and queries should filter explicitly.
-  workspaceId String?
+  workspaceId String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   profile   Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   taskTags  TaskTag[]
 
   @@index([profileId])

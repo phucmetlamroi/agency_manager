@@ -26,46 +26,41 @@ export async function GET(request: Request) {
         const now = new Date()
         const results: string[] = []
 
-        // ── 1. TASK_DEADLINE_APPROACHING — tasks with deadline in next 24h ──
-        const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-        const approachingTasks = await prisma.task.findMany({
+        // ── 1a. TASK_DEADLINE_APPROACHING — 1h tier (urgent) ──
+        const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
+        const urgentTasks = await prisma.task.findMany({
             where: {
-                deadline: { gte: now, lte: twentyFourHoursFromNow },
+                deadline: { gte: now, lte: oneHourFromNow },
                 status: { notIn: ['Hoàn tất', 'Đã hủy', 'Quá hạn'] },
                 assigneeId: { not: null },
             },
             include: {
-                assignee: {
-                    select: { id: true, username: true, nickname: true },
-                },
+                assignee: { select: { id: true, username: true, nickname: true } },
             },
         })
 
-        for (const task of approachingTasks) {
+        for (const task of urgentTasks) {
             if (!task.assignee) continue
-
-            // Dedup: skip if we already created this notification for this task
+            // Dedup per (taskId, tier)
             const existing = await prisma.notification.findFirst({
                 where: {
                     userId: task.assignee.id,
                     taskId: task.id,
                     type: 'TASK_DEADLINE_APPROACHING',
+                    metadata: { path: ['tier'], equals: '1h' } as any,
                 },
             })
             if (existing) continue
 
-            const deadlineStr = task.deadline
-                ? new Date(task.deadline).toLocaleString('vi-VN')
-                : ''
+            const deadlineStr = task.deadline ? new Date(task.deadline).toLocaleString('vi-VN') : ''
             const notif = await createNotificationInternal({
                 userId: task.assignee.id,
                 type: 'TASK_DEADLINE_APPROACHING',
-                title: `Sắp đến hạn: ${task.title}`,
-                body: `Task "${task.title}" sẽ đến hạn lúc ${deadlineStr}. Hãy hoàn thành sớm!`,
+                title: `⚠️ Còn 1 giờ: ${task.title}`,
+                body: `Task "${task.title}" sẽ hết hạn lúc ${deadlineStr}. KHẨN — hãy hoàn thành ngay!`,
                 taskId: task.id,
-                metadata: { taskTitle: task.title, deadline: task.deadline?.toISOString() },
+                metadata: { taskTitle: task.title, deadline: task.deadline?.toISOString(), tier: '1h' },
             })
-            // Broadcast for in-app bell
             void broadcastNotificationToUser(task.assignee.id, {
                 id: notif.id,
                 type: notif.type,
@@ -80,7 +75,61 @@ export async function GET(request: Request) {
                 metadata: notif.metadata as Record<string, any> | null,
                 createdAt: notif.createdAt.toISOString(),
             })
-            results.push(`Deadline approaching: [${task.title}] → ${task.assignee.username}`)
+            results.push(`Deadline 1h URGENT: [${task.title}] → ${task.assignee.username}`)
+        }
+
+        // ── 1b. TASK_DEADLINE_APPROACHING — 24h tier ──
+        const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+        const approachingTasks = await prisma.task.findMany({
+            where: {
+                // Skip the 0-1h window — it's already handled by the urgent pass above
+                deadline: { gt: oneHourFromNow, lte: twentyFourHoursFromNow },
+                status: { notIn: ['Hoàn tất', 'Đã hủy', 'Quá hạn'] },
+                assigneeId: { not: null },
+            },
+            include: {
+                assignee: { select: { id: true, username: true, nickname: true } },
+            },
+        })
+
+        for (const task of approachingTasks) {
+            if (!task.assignee) continue
+
+            // Dedup per (taskId, tier)
+            const existing = await prisma.notification.findFirst({
+                where: {
+                    userId: task.assignee.id,
+                    taskId: task.id,
+                    type: 'TASK_DEADLINE_APPROACHING',
+                    metadata: { path: ['tier'], equals: '24h' } as any,
+                },
+            })
+            if (existing) continue
+
+            const deadlineStr = task.deadline ? new Date(task.deadline).toLocaleString('vi-VN') : ''
+            const notif = await createNotificationInternal({
+                userId: task.assignee.id,
+                type: 'TASK_DEADLINE_APPROACHING',
+                title: `Sắp đến hạn: ${task.title}`,
+                body: `Task "${task.title}" sẽ đến hạn lúc ${deadlineStr}. Hãy hoàn thành sớm!`,
+                taskId: task.id,
+                metadata: { taskTitle: task.title, deadline: task.deadline?.toISOString(), tier: '24h' },
+            })
+            void broadcastNotificationToUser(task.assignee.id, {
+                id: notif.id,
+                type: notif.type,
+                title: notif.title,
+                body: notif.body,
+                avatarUrl: null,
+                isRead: false,
+                conversationId: null,
+                messageId: null,
+                taskId: task.id,
+                actorId: null,
+                metadata: notif.metadata as Record<string, any> | null,
+                createdAt: notif.createdAt.toISOString(),
+            })
+            results.push(`Deadline 24h: [${task.title}] → ${task.assignee.username}`)
         }
 
         // ── 2. TASK_OVERDUE — mark overdue + send notification ──

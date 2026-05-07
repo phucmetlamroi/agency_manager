@@ -106,6 +106,41 @@ export async function getAvailableProfiles() {
     return []
 }
 
+/**
+ * Returns the user's accessible profiles AND workspaces for the current profile.
+ * Used by the sidebar ProfileWorkspaceSwitcher component.
+ */
+export async function getMyProfilesAndWorkspaces() {
+    const session = await getSession()
+    if (!session?.user) return { profiles: [], workspaces: [], currentProfileId: null }
+
+    const currentProfileId: string | null = (session.user as any).sessionProfileId || null
+
+    // Fetch accessible profiles
+    const profiles = await getAvailableProfiles()
+
+    // Fetch workspaces for the current profile
+    let workspaces: { id: string; name: string; description: string | null }[] = []
+    if (currentProfileId) {
+        workspaces = await prisma.workspace.findMany({
+            where: { profileId: currentProfileId },
+            select: { id: true, name: true, description: true },
+            orderBy: { createdAt: 'asc' }
+        })
+    }
+
+    return {
+        profiles: profiles.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            userCount: p._count?.users ?? 0,
+            workspaceCount: p._count?.workspaces ?? 0,
+        })),
+        workspaces,
+        currentProfileId,
+    }
+}
+
 export async function updateProfile(userId: string, data: {
     nickname?: string
     phoneNumber?: string

@@ -7,6 +7,32 @@ import { revalidatePath } from 'next/cache'
 import { SALARY_COMPLETED_STATUS, SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
 import { verifyWorkspaceAccess } from '@/lib/security'
 
+/**
+ * Extract payroll cycle (month/year) từ workspace.name format "MM / YYYY".
+ * Vd: "04 / 2026" → { month: 4, year: 2026 }
+ *
+ * Trước đây code hardcode `month=0, year=0` cho mọi workspace → KHÔNG truy vết
+ * được lương theo tháng (year-end report sai, audit khó). Pattern này thống nhất
+ * với cách `src/app/[workspaceId]/admin/users/page.tsx` đã extract.
+ *
+ * Fallback: nếu workspace.name không có format tháng/năm → dùng current date.
+ */
+function extractPayrollCycle(workspaceName: string | null | undefined): { month: number; year: number } {
+    if (workspaceName) {
+        const match = workspaceName.match(/(\d{1,2})\s*\/\s*(\d{4})/)
+        if (match) {
+            const month = parseInt(match[1], 10)
+            const year = parseInt(match[2], 10)
+            if (month >= 1 && month <= 12 && year >= 2020 && year <= 2099) {
+                return { month, year }
+            }
+        }
+    }
+    // Fallback: workspace name không có format MM/YYYY → dùng tháng/năm hiện tại
+    const now = new Date()
+    return { month: now.getMonth() + 1, year: now.getFullYear() }
+}
+
 const toSafeNumber = (value: unknown): number => {
     if (value == null) return 0
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0
@@ -31,17 +57,20 @@ const toSafeNumber = (value: unknown): number => {
 }
 
 export async function getPayrollLockStatus(workspaceId: string) {
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1
-    const currentYear = now.getFullYear()
-
     try {
         const workspacePrisma = getWorkspacePrisma(workspaceId)
+        // Lấy workspace name → extract month/year thực
+        const workspace = await workspacePrisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { name: true }
+        })
+        const { month, year } = extractPayrollCycle(workspace?.name)
+
         const lock = await workspacePrisma.payrollLock.findUnique({
             where: {
                 month_year_workspaceId: {
-                    month: 0,
-                    year: 0,
+                    month,
+                    year,
                     workspaceId
                 }
             } as any
@@ -60,12 +89,12 @@ export async function revertMonthlyBonus(workspaceId: string) {
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const workspace = await workspacePrisma.workspace.findUnique({
             where: { id: workspaceId },
-            select: { id: true, profileId: true }
+            select: { id: true, profileId: true, name: true }
         })
         if (!workspace) return { success: false, error: 'Workspace not found.' }
 
-        const currentMonth = 0
-        const currentYear = 0
+        // Extract month/year từ workspace name (vd "04 / 2026") thay vì hardcode 0
+        const { month: currentMonth, year: currentYear } = extractPayrollCycle(workspace.name)
 
         await workspacePrisma.monthlyBonus.deleteMany({
             where: { workspaceId, month: currentMonth, year: currentYear }
@@ -76,6 +105,21 @@ export async function revertMonthlyBonus(workspaceId: string) {
         await workspacePrisma.payrollLock.deleteMany({
             where: { workspaceId, month: currentMonth, year: currentYear }
         })
+
+        // Audit log: revert bonus là action quan trọng cần trace
+        try {
+            await prisma.auditLog.create({
+                data: {
+                    workspaceId,
+                    actorUserId: (await getSession())?.user?.id ?? null,
+                    action: 'payroll.bonus_reverted',
+                    targetType: 'PayrollLock',
+                    targetId: `${currentMonth}-${currentYear}`,
+                    beforeData: { month: currentMonth, year: currentYear, isLocked: true },
+                    afterData: { unlocked: true },
+                }
+            })
+        } catch { /* non-blocking */ }
 
         revalidatePath(`/${workspaceId}/admin/payroll`)
         return { success: true, message: 'Da hoan tac va mo khoa ky luong.' }
@@ -104,14 +148,16 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         stage = 'workspace-find'
         const workspace = await workspacePrisma.workspace.findUnique({
             where: { id: workspaceId },
-            select: { id: true, profileId: true }
+            select: { id: true, profileId: true, name: true }
         })
         if (!workspace) return { success: false, error: 'Workspace not found.' }
 
-        // We no longer use currentMonth/Year for filtering tasks.
-        // Everything inside this workspace is considered one cycle.
-        const currentMonth = 0 
-        const currentYear = 0
+        // Tasks vẫn được aggregate theo workspaceId (1 workspace = 1 cycle).
+        // NHƯNG payrollLock + bonus + monthlyRank records phải lưu month/year THỰC
+        // (extracted từ workspace.name format "MM / YYYY") để truy vết được trong
+        // year-end report, audit, và phân tích history. Hardcode month=0/year=0
+        // trước đây gây mất dữ liệu cycle — tất cả workspace đều ghi cùng key (0,0,wsId).
+        const { month: currentMonth, year: currentYear } = extractPayrollCycle(workspace.name)
 
         stage = 'lock-check'
         const existingLock = await workspacePrisma.payrollLock.findUnique({

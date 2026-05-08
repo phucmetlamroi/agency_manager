@@ -294,6 +294,41 @@ export async function deleteWorkspaceAction(workspaceId: string) {
             // Fall back to hard delete (legacy behavior).
             if (softErr?.code === 'P2009' || softErr?.code === 'P2025' || /column.*does not exist/i.test(softErr?.message ?? '')) {
                 console.warn('[deleteWorkspace] soft-delete columns missing — falling back to hard delete')
+
+                // Audit fix #4.2: Log workspace info BEFORE hard-delete (workspace
+                // sẽ bị xóa khỏi DB → audit row vẫn giữ vì workspaceId column
+                // KHÔNG cascade khi target row delete; tham chiếu chỉ là string).
+                // Capture workspace name + member count để forensics nếu cần.
+                let workspaceMeta: any = null
+                try {
+                    const ws = await prisma.workspace.findUnique({
+                        where: { id: workspaceId },
+                        select: {
+                            name: true,
+                            description: true,
+                            createdAt: true,
+                            _count: { select: { members: true, tasks: true } },
+                        },
+                    })
+                    workspaceMeta = ws
+                } catch { /* best-effort */ }
+
+                await audit({
+                    workspaceId: 'SYSTEM', // workspace sắp delete → dùng SYSTEM marker
+                    actorUserId: userId,
+                    action: 'workspace.hard_deleted',
+                    targetType: 'Workspace',
+                    targetId: workspaceId,
+                    before: {
+                        name: workspaceMeta?.name ?? 'unknown',
+                        description: workspaceMeta?.description ?? null,
+                        createdAt: workspaceMeta?.createdAt?.toISOString() ?? null,
+                        memberCount: workspaceMeta?._count?.members ?? null,
+                        taskCount: workspaceMeta?._count?.tasks ?? null,
+                        reason: 'soft-delete-fallback (migration not applied)',
+                    },
+                })
+
                 await prisma.workspace.delete({ where: { id: workspaceId } })
             } else {
                 throw softErr

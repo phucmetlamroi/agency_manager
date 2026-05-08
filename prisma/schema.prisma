@@ -143,6 +143,12 @@ model User {
   // Default true = backward compat. User có thể tắt trong Settings để chống
   // "spam invite từ unknown organizations" (audit finding #2.8).
   allowExternalInvites       Boolean   @default(true)
+  // Audit fix #3.6: Link CLIENT-role user → Client record (portal access).
+  // Trước đây client-portal-actions.ts match bằng `client.name === user.username`
+  // → collision-prone. Giờ dùng FK explicit. Optional (Int?) cho user không phải CLIENT.
+  clientId                   Int?
+  client                     Client?   @relation("ClientPortalUser", fields: [clientId], references: [id], onDelete: SetNull)
+
   ownedAgency       Agency[]            @relation("AgencyOwner")
   bonuses           MonthlyBonus[]
   payrolls          Payroll[]
@@ -364,6 +370,10 @@ model Client {
   workspace      Workspace? @relation(fields: [workspaceId], references: [id])
   profileId      String?
   profile        Profile?   @relation(fields: [profileId], references: [id])
+  // Audit fix #3.6: Reverse relation cho User.clientId
+  // Một Client record có thể có 0..N portal users (vd 1 client = nhiều người
+  // truy cập portal cùng).
+  portalUsers    User[]     @relation("ClientPortalUser")
 }
 
 model Project {

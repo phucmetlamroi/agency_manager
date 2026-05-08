@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Montserrat } from "next/font/google";
+import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'sonner';
 import { ConfirmProvider } from '@/components/ui/ConfirmModal';
@@ -11,10 +11,13 @@ const cormorant = Cormorant_Garamond({
   weight: ["300", "400", "500", "600", "700"],
 });
 
-const montserrat = Montserrat({
+// [Mobile font unification] Plus Jakarta Sans làm system-wide sans font
+// để khớp với AppSidebar (desktop chrome) — trước đây dùng Montserrat → không
+// nhất quán giữa sidebar (Plus Jakarta) và body (Montserrat).
+const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -42,8 +45,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${montserrat.variable} ${cormorant.variable} font-sans antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${plusJakarta.variable} ${cormorant.variable}`} suppressHydrationWarning>
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <ConfirmProvider>
           <RadialNavProvider>
             {children}

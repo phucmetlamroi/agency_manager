@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+/* [Mobile font unification] Plus Jakarta Sans giờ load qua next/font/google
+ * trong app/layout.tsx — không cần @import từ Google Fonts CDN nữa.
+ */
 
 @tailwind base;
 @tailwind components;
@@ -83,7 +85,8 @@
 
   html {
     @apply bg-[#050505];
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    /* font-sans (var --font-sans = Plus Jakarta Sans, loaded từ next/font/google in app/layout.tsx) */
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
     -webkit-text-size-adjust: 100%;
   }
 

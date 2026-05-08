@@ -39,7 +39,8 @@ interface Props {
 }
 
 /* ── Palette (matches AppSidebar) ── */
-const FONT = "'Plus Jakarta Sans', sans-serif"
+// [Mobile font unification] inherit system sans (Plus Jakarta Sans via next/font)
+const FONT = "var(--font-sans), 'Plus Jakarta Sans', sans-serif"
 const DIVIDER = "rgba(255,255,255,0.06)"
 const BORDER = "rgba(139,92,246,0.15)"
 const DROPDOWN_BG = "#0A0A0A"

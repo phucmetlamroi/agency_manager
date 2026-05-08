@@ -7,6 +7,7 @@ import { ensureNotLastOwner, LastOwnerProtectionError } from '@/lib/workspace-gu
 import { isWorkspaceRole, hasAtLeastRole, type WorkspaceRole } from '@/lib/workspace-roles'
 import { audit } from '@/lib/audit-log'
 import { requireFeature, SubscriptionLimitError } from '@/lib/subscription'
+import { checkInviteRate } from '@/lib/rate-limit-upstash'
 
 const INVITATION_EXPIRY_DAYS = 14
 
@@ -151,6 +152,15 @@ export async function inviteToWorkspace(
 
     if (targetUser.id === inviterId) {
         return { error: 'Bạn không thể tự mời chính mình.' }
+    }
+
+    // Audit fix #2.7: Rate-limit invitation per (workspace, target user) — 5/24h.
+    // Trước đây admin có thể spam mời cùng user → invitee inbox flooded.
+    const rateLimit = await checkInviteRate(workspaceId, targetUser.id)
+    if (!rateLimit.success) {
+        return {
+            error: `Đã đạt giới hạn 5 lời mời / ngày cho user này. Vui lòng thử lại sau ${rateLimit.retryAfter ?? 86400} giây.`,
+        }
     }
 
     // Check if already a member

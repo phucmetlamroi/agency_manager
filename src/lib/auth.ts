@@ -76,11 +76,18 @@ export async function createImpersonationSession(originalUser: any, targetUser: 
 
     // Keep the original admin session safe
     const originalSessionStr = await encrypt({ user: originalUser, expires })
-    
-    // Create new fake session
-    const impersonatedSessionStr = await encrypt({ 
-        user: { ...targetUser, isImpersonating: true, originalAdminId: originalUser.id }, 
-        expires 
+
+    // Create impersonated session với expiresAt claim → UI banner countdown
+    // (audit finding #2.5: Impersonation TTL không enforce force-logout, không có
+    // cảnh báo countdown). Claim này dùng để UI banner hiển thị thời gian còn lại.
+    const impersonatedSessionStr = await encrypt({
+        user: {
+            ...targetUser,
+            isImpersonating: true,
+            originalAdminId: originalUser.id,
+            impersonationExpiresAt: expires.toISOString(),
+        },
+        expires
     })
 
     const cookieStore = await cookies()

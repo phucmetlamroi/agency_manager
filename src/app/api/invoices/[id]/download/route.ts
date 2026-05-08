@@ -45,6 +45,15 @@ export async function GET(
 
         if (!invoice) return new NextResponse('Invoice not found', { status: 404 })
 
+        // 3. DEFENSE-IN-DEPTH: explicit workspace scope check.
+        // getWorkspacePrisma đã auto-inject workspaceId filter, nhưng nếu middleware
+        // có bug → bypass. Check thêm tại đây để bullet-proof anti-IDOR.
+        // Audit finding #6 (HIGH): Invoice download cross-workspace risk.
+        if ((invoice as any).workspaceId && (invoice as any).workspaceId !== workspaceId) {
+            console.error(`[IDOR] User ${user.id} attempted download invoice ${id} from workspace ${(invoice as any).workspaceId} via param ${workspaceId}`)
+            return new NextResponse('Forbidden: Invoice does not belong to this workspace', { status: 403 })
+        }
+
         const profile = invoice.billingSnapshot as any
 
         // 3. Construct PDF Payload

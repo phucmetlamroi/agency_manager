@@ -1,5 +1,5 @@
 import { logout } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
@@ -7,6 +7,8 @@ import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
 import { isMobileDevice } from '@/lib/device'
+
+const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // User Layout — uses the unified AppSidebar with viewRole='USER'
 // Mirrors AdminLayout structure for visual & UX parity.
@@ -19,6 +21,12 @@ export default async function UserLayout({
     params: Promise<{ workspaceId: string }>
 }) {
     const { workspaceId } = await params
+
+    // Reject non-UUID workspaceIds (e.g. /icon.png/dashboard từ PWA scan)
+    if (!WORKSPACE_ID_PATTERN.test(workspaceId)) {
+        notFound()
+    }
+
     const { status, session, dbUser } = await verifyActiveSession()
 
     if (status === 'unauthorized') {

@@ -97,5 +97,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+    // Exclude static assets từ middleware để Next dynamic route /[workspaceId]
+    // không match nhầm các asset như /icon.png, /manifest.json (file không tồn tại
+    // trong public sẽ rơi vào dynamic route → redirect chain bug).
+    matcher: [
+        '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|.*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|css|js|map|woff|woff2|ttf|otf)).*)',
+    ],
 }

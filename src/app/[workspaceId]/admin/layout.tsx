@@ -1,6 +1,6 @@
 import { logout } from '@/lib/auth'
 // Removed duplicate globals.css import
-import { redirect } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
@@ -8,6 +8,8 @@ import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
 import { isMobileDevice } from '@/lib/device'
+
+const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export default async function AdminLayout({
     children,
@@ -17,6 +19,12 @@ export default async function AdminLayout({
     params: Promise<{ workspaceId: string }>
 }) {
     const { workspaceId } = await params
+
+    // Reject non-UUID workspaceIds (e.g. /icon.png/admin từ PWA scan)
+    if (!WORKSPACE_ID_PATTERN.test(workspaceId)) {
+        notFound()
+    }
+
     const { status, session, dbUser, isAdmin } = await verifyActiveSession()
 
     if (status === 'unauthorized') {

@@ -30,10 +30,10 @@ export async function verifyWorkspaceAccess(
 
     const userId = session.user.id
 
-    // REAL-TIME DB CHECK: Fetch genuine role, bypassing stateless JWT
+    // REAL-TIME DB CHECK: Fetch genuine role + profileId, bypassing stateless JWT
     const dbUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true, isTreasurer: true, avatarUrl: true }
+        select: { role: true, isTreasurer: true, avatarUrl: true, profileId: true }
     })
 
     if (!dbUser || dbUser.role === 'LOCKED') {
@@ -45,10 +45,12 @@ export async function verifyWorkspaceAccess(
     // Global ADMINs (hoặc Treasurer) có quyền ghi/đọc tất cả.
     const isGlobalAdmin = globalRole === UserRole.ADMIN || dbUser.isTreasurer
 
-    // Nếu không phải Global Admin, BẮT BUỘC phải check trong bảng WorkspaceMember
+    // Nếu không phải Global Admin, check theo Profile-level membership pattern
+    // (giống Slack/Notion: workspace = "folder" trong Profile, member tính theo Profile).
     let workspaceRole: WorkspaceRole = 'MEMBER'
 
     if (!isGlobalAdmin) {
+        // PRIORITY 1: Explicit WorkspaceMember row (OWNER/ADMIN/specific role)
         const membership = await prisma.workspaceMember.findUnique({
             where: {
                 userId_workspaceId: {
@@ -58,17 +60,35 @@ export async function verifyWorkspaceAccess(
             }
         })
 
-        if (!membership) {
-            console.error(`[SECURITY] User ${userId} attempted to access unauthorized workspace ${workspaceId}`)
-            throw new Error('SECURITY_VIOLATION: Bạn không có quyền truy cập vào Workspace này (IDOR Blocked).')
-        }
+        if (membership) {
+            if (!isWorkspaceRole(membership.role)) {
+                console.error(`[SECURITY] Workspace ${workspaceId} member ${userId} has invalid role: ${membership.role}`)
+                throw new Error('SECURITY_VIOLATION: Vai trò không hợp lệ trong Workspace này.')
+            }
+            workspaceRole = membership.role
+        } else {
+            // PRIORITY 2: Profile-level fallback — user thuộc cùng Profile với Workspace
+            // → tự động grant role MEMBER. Pattern này cho phép "join Profile = auto-access
+            // tất cả Workspace trong Profile" (giống Google Drive folder hierarchy).
+            const workspace = await prisma.workspace.findUnique({
+                where: { id: workspaceId },
+                select: { profileId: true }
+            })
 
-        // Membership.role is `String` in DB; coerce to WorkspaceRole or throw.
-        if (!isWorkspaceRole(membership.role)) {
-            console.error(`[SECURITY] Workspace ${workspaceId} member ${userId} has invalid role: ${membership.role}`)
-            throw new Error('SECURITY_VIOLATION: Vai trò không hợp lệ trong Workspace này.')
+            const sameProfile = !!(
+                workspace?.profileId
+                && dbUser.profileId
+                && workspace.profileId === dbUser.profileId
+            )
+
+            if (!sameProfile) {
+                console.error(`[SECURITY] User ${userId} (profile=${dbUser.profileId}) attempted to access workspace ${workspaceId} (profile=${workspace?.profileId})`)
+                throw new Error('SECURITY_VIOLATION: Bạn không có quyền truy cập vào Workspace này (IDOR Blocked).')
+            }
+
+            // Profile member → default role MEMBER (không phải OWNER/ADMIN)
+            workspaceRole = 'MEMBER'
         }
-        workspaceRole = membership.role
 
         if (!hasAtLeastRole(workspaceRole, requiredRole)) {
             console.error(`[SECURITY] User ${userId} role=${workspaceRole} required=${requiredRole} on workspace ${workspaceId}`)

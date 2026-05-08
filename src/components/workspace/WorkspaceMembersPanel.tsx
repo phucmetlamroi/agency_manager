@@ -24,10 +24,13 @@ type MemberItem = {
     userId: string
     role: string
     joinedAt: string
+    /** 'workspace' = explicit WorkspaceMember row | 'profile' = Profile-level auto-access */
+    source?: 'workspace' | 'profile'
     user: {
         id: string
         username: string
         nickname: string | null
+        displayName?: string | null
         email: string | null
         avatarUrl: string | null
         role: string // global role
@@ -223,11 +226,19 @@ export default function WorkspaceMembersPanel({
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-sm font-semibold text-zinc-100 truncate">
-                                            {member.user.nickname || member.user.username}
+                                            {member.user.displayName || member.user.nickname || member.user.username}
                                         </span>
                                         {isSelf && (
                                             <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">
                                                 Bạn
+                                            </span>
+                                        )}
+                                        {member.source === 'profile' && (
+                                            <span
+                                                className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded"
+                                                title="Tự động truy cập từ Profile membership"
+                                            >
+                                                Profile
                                             </span>
                                         )}
                                     </div>
@@ -243,8 +254,11 @@ export default function WorkspaceMembersPanel({
                                     {badge.label}
                                 </div>
 
-                                {/* Actions */}
-                                {canManage && !isSelf && (
+                                {/* Actions — chỉ cho explicit WorkspaceMember (source='workspace').
+                                     Profile members (source='profile') quản lý ở Profile level.
+                                     Để promote Profile member thành OWNER/ADMIN → admin click "Mời thành viên"
+                                     và chọn user đó với role tương ứng → tạo WorkspaceMember row explicit. */}
+                                {canManage && !isSelf && member.source !== 'profile' && (
                                     <div className="relative shrink-0">
                                         <button
                                             onClick={() => setExpandedMemberId(isExpanded ? null : member.user.id)}

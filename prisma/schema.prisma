@@ -17,11 +17,7 @@ model Profile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Auth Phase 1: SaaS leasing hooks (Profile.subscriptionTier gates features)
-  // Values: FREE | TRIAL | STARTER | PRO | ENTERPRISE (String to match other status fields)
-  subscriptionTier String    @default("FREE")
-  trialStartedAt   DateTime?
-  trialEndsAt      DateTime?
+  // [Sprint B] Trial/subscription columns dropped — tất cả profile đều free + full features.
 
   users               User[]
   workspaces          Workspace[]
@@ -74,7 +70,7 @@ model Workspace {
   bonuses             MonthlyBonus[]
   payrollLocks        PayrollLock[]
   metrics             PerformanceMetric[]
-  feedbacks           Feedback[]
+  // [Sprint A removed] feedbacks relation — Feedback model deleted
   errorLogs           ErrorLog[]
   monthlyRanks        MonthlyRank[]
   ratings             Rating[]
@@ -289,7 +285,7 @@ model Task {
   invoiceId        String?
   invoiceStatus    InvoiceTaskStatus @default(UNBILLED)
   isArchived       Boolean           @default(false)
-  feedbacks        Feedback[]
+  // [Sprint A removed] feedbacks relation — Feedback model deleted
   errorLogs        ErrorLog[]
   invoiceItems     InvoiceItem[]
   assignedAgency   Agency?           @relation(fields: [assignedAgencyId], references: [id])
@@ -382,7 +378,7 @@ model Project {
   code         String?
   clientId     Int
   createdAt    DateTime   @default(now())
-  feedbacks    Feedback[]
+  // [Sprint A removed] feedbacks relation — Feedback model deleted
   client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tasks        Task[]
   workspaceId  String?
@@ -393,21 +389,9 @@ model Project {
   profile      Profile?   @relation(fields: [profileId], references: [id])
 }
 
-model Feedback {
-  id          Int            @id @default(autoincrement())
-  content     String
-  projectId   Int?
-  severity    Int            @default(1)
-  createdAt   DateTime       @default(now())
-  taskId      String?
-  workspaceId String?
-  type        FeedbackSource @default(CLIENT)
-  project     Project?       @relation(fields: [projectId], references: [id])
-  task        Task?          @relation(fields: [taskId], references: [id])
-  workspace   Workspace?     @relation(fields: [workspaceId], references: [id])
-
-  @@index([workspaceId])
-}
+// [Sprint A removed] model Feedback — bảng đánh giá Client/Internal đã bỏ
+// hoàn toàn (ManagerReviewChecklist + review-actions.ts cũng deleted).
+// `prisma db push --accept-data-loss` sẽ DROP table này.
 
 model PerformanceMetric {
   id                    String    @id @default(uuid())
@@ -566,10 +550,7 @@ model AuditLog {
   @@index([action])
 }
 
-enum FeedbackSource {
-  INTERNAL
-  CLIENT
-}
+// [Sprint A removed] enum FeedbackSource — Feedback model deleted
 
 enum ClientTier {
   DIAMOND

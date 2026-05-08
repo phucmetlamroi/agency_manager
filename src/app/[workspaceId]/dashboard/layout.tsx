@@ -6,7 +6,6 @@ import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
-import TrialStatusBanner from '@/components/layout/TrialStatusBanner'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
 
 // User Layout — uses the unified AppSidebar with viewRole='USER'
@@ -40,16 +39,7 @@ export default async function UserLayout({
     })
     const workspaceRole = membership?.role ?? undefined
 
-    // Fetch profile subscription state for TrialStatusBanner
-    const workspaceProfile = await prisma.workspace.findUnique({
-        where: { id: workspaceId },
-        select: {
-            profile: {
-                select: { subscriptionTier: true, trialStartedAt: true, trialEndsAt: true },
-            },
-        },
-    })
-    const profileSubscription = workspaceProfile?.profile ?? null
+    // [Sprint B] Trial banner removed.
 
     const headersList = await headers()
     const deviceType = headersList.get('x-device-type') || 'desktop'
@@ -100,7 +90,6 @@ export default async function UserLayout({
                     workspaceId={workspaceId}
                 />
             )}
-            <TrialStatusBanner profile={profileSubscription} />
             {children}
         </AdminShell>
     )

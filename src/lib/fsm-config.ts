@@ -7,12 +7,13 @@ export enum TaskState {
     PENDING = '\u0110ang \u0111\u1ee3i giao',      // Initial State (Global Pool)
     ASSIGNED = 'Nh\u1eadn task',          // User assigned but not started
     IN_PROGRESS = '\u0110ang th\u1ef1c hi\u1ec7n', // User working (Timer Running)
-    REVIEW = 'Review',              // Submitted, Waiting for Admin/Client
-    REVISION = 'Revision',          // Feedback received, User needs to fix
+    // [Sprint A removed] REVIEW state \u2014 submit gi\u1edd \u0111i th\u1eb3ng REVISION
+    REVISION = 'Revision',          // User n\u1ed9p link \u2192 admin s\u1ebd check & approve
     FIXING_FRAME = 'S\u1eeda frame',     // Specific active state for fixing frames
     PAUSED = 'T\u1ea1m ng\u01b0ng',           // Explicitly paused
     COMPLETED = 'Ho\u00e0n t\u1ea5t',         // Final State
-    CANCELLED = '\u0110\u00e3 h\u1ee7y'            // Dead State
+    CANCELLED = '\u0110\u00e3 h\u1ee7y',           // Dead State
+    OVERDUE = 'Qu\u00e1 h\u1ea1n'             // Auto-set b\u1edfi cron khi deadline qua
 }
 
 export type TaskEvent =
@@ -49,29 +50,32 @@ export const TRANSITIONS: Record<TaskEvent, TransitionRule> = {
         requiredRole: ['USER', 'ADMIN']
     },
     submit: {
-        from: [TaskState.IN_PROGRESS, TaskState.FIXING_FRAME, TaskState.REVISION],
-        to: TaskState.REVIEW,
+        // [Sprint A] User submit → đi thẳng REVISION (deadline cleared).
+        // Trước đây: → REVIEW (deadline còn) → admin xác nhận → REVISION.
+        // Bug cũ: admin quên xác nhận → user bị flag Quá hạn oan.
+        from: [TaskState.IN_PROGRESS, TaskState.FIXING_FRAME],
+        to: TaskState.REVISION,
         requiredRole: ['USER', 'ADMIN']
     },
     reject: {
-        from: [TaskState.REVIEW, TaskState.COMPLETED], // Allow reopen if needed
+        from: [TaskState.COMPLETED], // Reopen completed task → REVISION
         to: TaskState.REVISION,
         requiredRole: ['ADMIN']
     },
     request_fix: {
-        from: [TaskState.REVIEW, TaskState.IN_PROGRESS],
+        from: [TaskState.IN_PROGRESS, TaskState.REVISION],
         to: TaskState.FIXING_FRAME,
         requiredRole: ['ADMIN']
     },
     resume_fix: {
-        from: [TaskState.REVISION, TaskState.FIXING_FRAME], // Already fixing
-        to: TaskState.FIXING_FRAME, // Or IN_PROGRESS? Let's map to FIXING logic
+        from: [TaskState.REVISION, TaskState.FIXING_FRAME],
+        to: TaskState.FIXING_FRAME,
         requiredRole: ['USER']
     },
     finish: {
-        from: [TaskState.REVIEW, TaskState.IN_PROGRESS, TaskState.FIXING_FRAME, TaskState.REVISION], // Allow Revision -> Done
+        from: [TaskState.IN_PROGRESS, TaskState.FIXING_FRAME, TaskState.REVISION],
         to: TaskState.COMPLETED,
-        requiredRole: ['ADMIN', 'SYSTEM'] // System auto-finish if configured? Usually Admin.
+        requiredRole: ['ADMIN', 'SYSTEM']
     },
     pause: {
         from: [TaskState.IN_PROGRESS, TaskState.FIXING_FRAME, TaskState.ASSIGNED],
@@ -84,13 +88,13 @@ export const TRANSITIONS: Record<TaskEvent, TransitionRule> = {
         requiredRole: ['ADMIN', 'USER']
     },
     unassign: {
-        from: [TaskState.ASSIGNED, TaskState.IN_PROGRESS, TaskState.PAUSED, TaskState.REVIEW, TaskState.REVISION],
+        from: [TaskState.ASSIGNED, TaskState.IN_PROGRESS, TaskState.PAUSED, TaskState.REVISION],
         to: TaskState.PENDING,
         requiredRole: ['ADMIN', 'SYSTEM']
     },
     penalize: {
-        from: [TaskState.ASSIGNED, TaskState.IN_PROGRESS, TaskState.REVIEW, TaskState.REVISION], // Any active state
-        to: TaskState.PENDING, // Returns to pool
+        from: [TaskState.ASSIGNED, TaskState.IN_PROGRESS, TaskState.REVISION],
+        to: TaskState.PENDING,
         requiredRole: ['SYSTEM']
     },
     // ALLOW ADMIN/USER FLEXIBILITY

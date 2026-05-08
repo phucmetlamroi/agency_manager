@@ -27,26 +27,26 @@ export type TaskStatus =
     | 'Đang đợi giao'
     | 'Nhận task'
     | 'Đang thực hiện'
-    | 'Review'
     | 'Revision'
     | 'Gửi lại'
     | 'Hoàn tất'
     | 'Tạm ngưng'
+    | 'Quá hạn'
     | 'Hủy'
 
 /**
  * Valid transitions cho USER (assignee) role.
- * Map: status hiện tại → list các status được phép chuyển đến.
+ * [Sprint A] Bỏ 'Review' state — submit đi thẳng Revision.
  */
 const USER_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
     'Đang đợi giao': ['Nhận task'],                     // user claim task
     'Nhận task': ['Đang thực hiện', 'Đang đợi giao'],   // user start hoặc trả task (within 10 min via returnTask)
-    'Đang thực hiện': ['Review', 'Tạm ngưng'],          // user submit hoặc pause
-    'Review': [],                                        // chỉ admin được approve/reject
+    'Đang thực hiện': ['Revision', 'Tạm ngưng'],        // user submit (→ Revision) hoặc pause
     'Revision': ['Gửi lại'],                            // user fix → resubmit
     'Gửi lại': [],                                       // chỉ admin được approve
     'Hoàn tất': [],                                      // TERMINAL cho user
     'Tạm ngưng': ['Đang thực hiện'],                    // user resume
+    'Quá hạn': [],                                       // TERMINAL — admin cần extend deadline để unlock
     'Hủy': [],                                           // TERMINAL
 }
 
@@ -56,12 +56,12 @@ const USER_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
 const ADMIN_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
     'Đang đợi giao': ['Nhận task', 'Hủy'],
     'Nhận task': ['Đang thực hiện', 'Đang đợi giao', 'Hủy'],
-    'Đang thực hiện': ['Review', 'Tạm ngưng', 'Hủy', 'Hoàn tất'],
-    'Review': ['Revision', 'Hoàn tất', 'Hủy'],          // admin approve hoặc gửi sửa
-    'Revision': ['Gửi lại', 'Hủy'],
+    'Đang thực hiện': ['Revision', 'Tạm ngưng', 'Hủy', 'Hoàn tất'],
+    'Revision': ['Gửi lại', 'Hoàn tất', 'Đang thực hiện', 'Hủy'],
     'Gửi lại': ['Hoàn tất', 'Revision', 'Hủy'],
     'Hoàn tất': ['Đang thực hiện', 'Hủy'],              // admin có quyền unlock (audit log!)
     'Tạm ngưng': ['Đang thực hiện', 'Đang đợi giao', 'Hủy'],
+    'Quá hạn': ['Đang thực hiện', 'Hoàn tất', 'Hủy'],   // admin extend deadline → resume
     'Hủy': ['Đang đợi giao'],                            // admin re-open hủy task
 }
 

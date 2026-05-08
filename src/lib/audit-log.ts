@@ -58,7 +58,6 @@ export type AuditAction =
     | 'data.export'
     | 'data.import'
     | 'permission.checked_denied'
-    | 'subscription.trial_expired'
 
 /**
  * `workspaceId` value semantics (audit fix #2.9):
@@ -66,7 +65,7 @@ export type AuditAction =
  * - `null`: TRƯỚC ĐÂY dùng cho auth events (login, signup, ...). Vẫn support
  *   để backward compat, nhưng KHUYẾN NGHỊ dùng 'SYSTEM' marker explicit.
  * - `'SYSTEM'`: system-initiated event không thuộc workspace nào (cron jobs,
- *   trial expiration, hard-delete, ...). Dùng marker này để filter-able trong
+ *   hard-delete, ...). Dùng marker này để filter-able trong
  *   audit log viewer (`WHERE workspaceId = 'SYSTEM'` thay vì `IS NULL`).
  */
 export interface AuditOpts {

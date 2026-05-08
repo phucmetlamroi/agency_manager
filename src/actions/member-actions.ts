@@ -6,7 +6,6 @@ import { verifyWorkspaceAccess } from '@/lib/security'
 import { ensureNotLastOwner, LastOwnerProtectionError } from '@/lib/workspace-guards'
 import { isWorkspaceRole, hasAtLeastRole, type WorkspaceRole } from '@/lib/workspace-roles'
 import { audit } from '@/lib/audit-log'
-import { requireFeature, SubscriptionLimitError } from '@/lib/subscription'
 import { checkInviteRate } from '@/lib/rate-limit-upstash'
 
 const INVITATION_EXPIRY_DAYS = 14
@@ -179,21 +178,7 @@ export async function inviteToWorkspace(
 ) {
     const { userId: inviterId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
-    // Subscription gate: trial expired → block invite (read-only mode)
-    try {
-        const workspace = await prisma.workspace.findUnique({
-            where: { id: workspaceId },
-            select: { profile: { select: { subscriptionTier: true, trialStartedAt: true, trialEndsAt: true } } },
-        })
-        if (workspace?.profile) {
-            requireFeature(workspace.profile, 'team_invite')
-        }
-    } catch (e) {
-        if (e instanceof SubscriptionLimitError) {
-            return { error: e.message }
-        }
-        throw e
-    }
+    // [Sprint B] Subscription gating removed — tất cả admin có quyền mời member.
 
     // Validate role — can't invite as OWNER directly
     if (role === 'OWNER') {

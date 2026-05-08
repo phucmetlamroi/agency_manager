@@ -31,16 +31,17 @@ export async function getMarketplaceStatus(workspaceId: string) {
 
 // ─── Toggle marketplace open/close (Admin only) ──────────────
 export async function toggleMarketplace(workspaceId: string) {
-    const session = await getSession()
-    if (!session) return { error: 'Unauthorized' }
-
-    // Check admin role
-    const member = await prisma.workspaceMember.findUnique({
-        where: { userId_workspaceId: { userId: session.user.id, workspaceId } },
-        select: { role: true }
-    })
-    if (!member || !['ADMIN', 'AGENCY_ADMIN'].includes(member.role)) {
-        return { error: 'Chỉ admin mới có quyền đóng/mở phiên chợ' }
+    // [Sprint C] Use verifyWorkspaceAccess để chấp nhận: global ADMIN, profile
+    // admin (auto-MEMBER + globalAdmin escalation), workspace ADMIN/OWNER.
+    // Trước đây hardcode `WorkspaceMember.role IN ['ADMIN','AGENCY_ADMIN']`
+    // → profile admin không có WorkspaceMember explicit row sẽ bị block.
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    } catch (e: any) {
+        if (e?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: 'Chỉ admin mới có quyền đóng/mở phiên chợ' }
+        }
+        throw e
     }
 
     const workspace = await prisma.workspace.findUnique({

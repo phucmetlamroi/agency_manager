@@ -18,7 +18,6 @@ import {
     Link2, Layers, Tag, X, PackageCheck, Bookmark, CalendarClock,
     MessageSquare, Languages, Timer, ChevronRight, MonitorPlay
 } from "lucide-react"
-import ManagerReviewChecklist from "./ManagerReviewChecklist"
 import { TagLibraryPopup } from "@/components/tags/TagLibraryPopup"
 import { TagRadialMenu } from "@/components/tags/TagRadialMenu"
 import { TagPills } from "@/components/tags/TagPills"
@@ -29,7 +28,7 @@ import { TaskChatSection } from "@/components/chat/TaskChatSection"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
 
-// ── Status map matching HustlyTasker spec ────────────────────
+// ── Status map (Sprint A simplified — bỏ 'Review') ──────────
 const TASK_STATUSES = [
     { id: "waiting", label: "Đang đợi giao", color: "#A855F7" },
     { id: "Đang đợi giao", label: "Đang đợi giao", color: "#A855F7" },
@@ -37,8 +36,6 @@ const TASK_STATUSES = [
     { id: "Nhận task", label: "Nhận task", color: "#3B82F6" },
     { id: "in_progress", label: "Đang thực hiện", color: "#EAB308" },
     { id: "Đang thực hiện", label: "Đang thực hiện", color: "#EAB308" },
-    { id: "review", label: "Review", color: "#F97316" },
-    { id: "Review", label: "Review", color: "#F97316" },
     { id: "revision", label: "Revision", color: "#EF4444" },
     { id: "Revision", label: "Revision", color: "#EF4444" },
     { id: "fix_frame", label: "Sửa frame", color: "#EC4899" },
@@ -47,6 +44,8 @@ const TASK_STATUSES = [
     { id: "Tạm ngưng", label: "Tạm ngưng", color: "#71717A" },
     { id: "completed", label: "Hoàn tất", color: "#10B981" },
     { id: "Hoàn tất", label: "Hoàn tất", color: "#10B981" },
+    { id: "overdue", label: "Quá hạn", color: "#DC2626" },
+    { id: "Quá hạn", label: "Quá hạn", color: "#DC2626" },
 ] as const
 
 function getStatusObj(status: string) {
@@ -204,7 +203,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
     const [isEditingLink, setIsEditingLink] = useState(false)
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
     const [isFrameExpanded, setIsFrameExpanded] = useState(false)
-    const [showChecklist, setShowChecklist] = useState(false)
+    // [Sprint A] Removed `showChecklist` state — ManagerReviewChecklist deleted.
     // Accordion state: track which sections are open (null = section 1 open by default)
     const [openSections, setOpenSections] = useState<Record<number, boolean>>({ 1: true })
     // Bulk Mode: which fields are enabled for overwrite
@@ -736,9 +735,14 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                                 onClick={async () => {
                                                     await handleSave();
                                                     if (!isAdmin) {
-                                                        const res = await updateTaskStatus(localTask.id, 'Review', workspaceId, undefined, undefined, localTask.version)
+                                                        // Sprint A: User nộp link → status='Revision' (deadline auto cleared).
+                                                        // Trước đây qua trung gian 'Review' rồi admin xác nhận → Revision.
+                                                        // Lý do bỏ: admin quên xác nhận → user bị flag Quá hạn oan vì
+                                                        // status=Review vẫn còn deadline.
+                                                        // Giờ submit → Revision ngay → deadline cleared → cron không flag oan.
+                                                        const res = await updateTaskStatus(localTask.id, 'Revision', workspaceId, undefined, undefined, localTask.version)
                                                         if (res?.error) toast.error(res.error)
-                                                        else toast.success('Da nop bai (Sent to Review)')
+                                                        else toast.success('Đã nộp bài (chuyển sang Revision)')
                                                     }
                                                     setIsEditingLink(false);
                                                 }}
@@ -874,17 +878,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                                                 Frame.io
                                                 {isFrameExpanded ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
                                             </button>
-                                            {isAdmin && (
-                                                <button
-                                                    onClick={() => setShowChecklist(true)}
-                                                    className="px-2.5 flex items-center gap-1 text-red-400 text-[10px] font-bold cursor-pointer transition-colors hover:bg-red-500/10 whitespace-nowrap"
-                                                    style={{ background: 'rgba(239,68,68,0.06)', borderLeft: '1px solid rgba(255,255,255,0.06)' }}
-                                                    title="Manager Review Checklist"
-                                                >
-                                                    <ClipboardList className="w-3 h-3" strokeWidth={1.5} />
-                                                    Checklist
-                                                </button>
-                                            )}
+                                            {/* [Sprint A removed] Manager Review Checklist button — bảng đánh giá Client/Internal đã bỏ. */}
                                         </div>
                                     </div>
                                 )}
@@ -1253,19 +1247,7 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                             </div>
                         )}
 
-                        {/* ── CHECKLIST OVERLAY ──────────────────────── */}
-                        {showChecklist && (
-                            <ManagerReviewChecklist
-                                taskId={localTask.id}
-                                workspaceId={workspaceId}
-                                onClose={() => setShowChecklist(false)}
-                                onSuccess={() => {
-                                    setShowChecklist(false);
-                                    onClose();
-                                    window.location.reload();
-                                }}
-                            />
-                        )}
+                        {/* [Sprint A removed] CHECKLIST OVERLAY — ManagerReviewChecklist deleted */}
                     </motion.div>
                 </DialogPrimitive.Content>
             </DialogPrimitive.Portal>

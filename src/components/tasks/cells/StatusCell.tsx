@@ -28,7 +28,7 @@ const statusColors: Record<string, string> = {
     "Nhận task": "bg-blue-500/10 text-blue-500 border-blue-500/20",
     "Đang đợi giao": "bg-purple-500/10 text-purple-500 border-purple-500/20",
     "Đang thực hiện": "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-    "Review": "bg-orange-500/10 text-orange-500 border-orange-500/20",
+    // [Sprint A] 'Review' status đã bỏ — submit giờ đi thẳng Revision
     "Revision": "bg-red-500/10 text-red-500 border-red-500/20",
     "Gửi lại": "bg-orange-500/10 text-orange-500 border-orange-500/20",
     "Hoàn tất": "bg-green-500/10 text-green-500 border-green-500/20",
@@ -126,7 +126,8 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Review", "Revision", "Gửi lại", "Sửa frame", "Tạm ngừng", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
+                        {/* [Sprint A] 'Review' đã bỏ — submit → Revision */}
+                        {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Revision", "Gửi lại", "Sửa frame", "Tạm ngừng", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                         ))}
                     </SelectContent>

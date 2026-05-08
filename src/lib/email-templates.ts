@@ -84,21 +84,9 @@ export const emailTemplates = {
         return wrapTemplate(content, `[STARTED] ${userName} đã bắt đầu task: ${taskTitle}`)
     },
 
-    // 2. Task Submitted / Reviewing (To User & Admin) - NEW
-    taskSubmitted: (userName: string, taskTitle: string) => {
-        const content = `
-            <p>Hệ thống xác nhận bạn đã nộp bài cho task <span class="highlight">${taskTitle}</span>.</p>
-            
-            <div class="card" style="border-left-color: #3b82f6; background-color: #eff6ff;">
-                <p><strong>Trạng thái hiện tại:</strong> Đang chờ duyệt (Under Review)</p>
-            </div>
+    // [Sprint A removed] taskSubmitted (sent khi → 'Review') — status Review đã bỏ.
 
-            <p>Vui lòng chờ Admin kiểm tra và phản hồi (Feedback) trong thời gian sớm nhất. Bạn có thể nghỉ ngơi hoặc chuyển sang làm task khác trong lúc chờ đợi.</p>
-        `
-        return wrapTemplate(content, `[Submission] Task "${taskTitle}" đang chờ Admin phản hồi`)
-    },
-
-    // 3. Admin Feedback (To User)
+    // Admin Feedback (To User)
     taskFeedback: (userName: string, taskTitle: string, feedback: string) => {
         const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`
         const content = `

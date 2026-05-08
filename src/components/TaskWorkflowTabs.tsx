@@ -30,7 +30,7 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     'Đã nhận task':   { label: 'Đã nhận task',   color: '#3B82F6' },
     'Đang đợi giao':   { label: 'Đang đợi giao',   color: '#A855F7' },
     'Đang thực hiện':  { label: 'Đang thực hiện',  color: '#EAB308' },
-    'Review':              { label: 'Review',              color: '#F97316' },
+    // [Sprint A removed] 'Review' status — submit giờ đi thẳng Revision
     'Revision':            { label: 'Revision',            color: '#EF4444' },
     'Sửa frame':       { label: 'Sửa frame',       color: '#EC4899' },
     'Gửi lại':       { label: 'Gửi lại',       color: '#F97316' },
@@ -64,7 +64,7 @@ interface TabConfig {
 const TABS: TabConfig[] = [
     { id: 'all',      label: 'Assignee',        statuses: ['Nhận task', 'Đã nhận task', 'Tạm ngưng'],                    color: '#8B5CF6', targetStatus: null },
     { id: 'progress', label: 'Progress',        statuses: ['Đang thực hiện'],                                     color: '#EAB308', targetStatus: 'Đang thực hiện' },
-    { id: 'review',   label: 'Revise',           statuses: ['Review', 'Revision', 'Sửa frame', 'Gửi lại'],    color: '#F97316', targetStatus: 'Revision' },
+    { id: 'review',   label: 'Revise',           statuses: ['Revision', 'Sửa frame', 'Gửi lại'],              color: '#F97316', targetStatus: 'Revision' },
     // Tab "Quá hạn" mới: task bị cron tự động set status='Quá hạn' khi deadline
     // qua. Trước đây không có tab này → task overdue bị "thất lạc" khỏi UI.
     { id: 'overdue',  label: 'Quá hạn',         statuses: ['Quá hạn'],                                            color: '#DC2626', targetStatus: 'Quá hạn' },

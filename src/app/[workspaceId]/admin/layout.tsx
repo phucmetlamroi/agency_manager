@@ -7,6 +7,7 @@ import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import { prisma } from '@/lib/db'
+import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 
 export default async function AdminLayout({
     children,
@@ -61,9 +62,16 @@ export default async function AdminLayout({
         )
     }
 
+    // Auth Phase 3: hiển thị EmailMigrationModal nếu user cũ chưa hoàn tất migration
+    const needsEmailMigration = dbUser.hasCompletedEmailMigration === false
+    const displayName = dbUser.displayName ?? user.username
+
     return (
         <AdminShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
+            {needsEmailMigration && (
+                <EmailMigrationModal displayName={displayName} />
+            )}
             {children}
         </AdminShell>
     )

@@ -12,10 +12,29 @@ import { checkInviteRate } from '@/lib/rate-limit-upstash'
 const INVITATION_EXPIRY_DAYS = 14
 
 // ─── Get workspace members with roles ────────────────────────────
+/**
+ * List members visible trong workspace.
+ *
+ * Architecture: Profile-level membership (giống Slack/Notion):
+ * - Tất cả users thuộc Profile của Workspace = members (auto, role MEMBER)
+ * - WorkspaceMember row chỉ OVERRIDE role cho cases đặc biệt (OWNER/ADMIN/GUEST)
+ *
+ * Trả về:
+ * - `members`: union của (a) WorkspaceMember explicit + (b) Profile users
+ * - Field `source`: 'workspace' (explicit row) | 'profile' (auto from profileId match)
+ * - Email masked cho non-ADMIN callers (audit fix #3.2)
+ */
 export async function getWorkspaceMembers(workspaceId: string) {
     const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
 
-    const members = await prisma.workspaceMember.findMany({
+    // Get workspace + profileId
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+
+    // PRIORITY 1: Explicit WorkspaceMember rows (with custom role)
+    const workspaceMembers = await prisma.workspaceMember.findMany({
         where: { workspaceId },
         include: {
             user: {
@@ -23,41 +42,75 @@ export async function getWorkspaceMembers(workspaceId: string) {
                     id: true,
                     username: true,
                     nickname: true,
+                    displayName: true,
                     email: true,
                     avatarUrl: true,
-                    role: true, // global role
+                    role: true,
                 }
             }
         },
-        orderBy: [
-            // OWNERs first, then ADMINs, then MEMBERs, then GUESTs
-            { joinedAt: 'asc' }
-        ]
+        orderBy: { joinedAt: 'asc' },
     })
+
+    const explicitUserIds = new Set(workspaceMembers.map(m => m.userId))
+
+    // PRIORITY 2: Profile users không có WorkspaceMember row
+    let profileMembers: any[] = []
+    if (workspace?.profileId) {
+        const profileUsers = await prisma.user.findMany({
+            where: {
+                profileId: workspace.profileId,
+                id: { notIn: Array.from(explicitUserIds) },
+                role: { not: 'LOCKED' },  // Skip deactivated users
+            },
+            select: {
+                id: true,
+                username: true,
+                nickname: true,
+                displayName: true,
+                email: true,
+                avatarUrl: true,
+                role: true,
+                createdAt: true,
+            },
+        })
+
+        profileMembers = profileUsers.map(u => ({
+            id: `profile-${u.id}`,  // synthetic id (no WorkspaceMember row)
+            userId: u.id,
+            workspaceId,
+            role: 'MEMBER',  // default role for Profile-level access
+            joinedAt: u.createdAt,
+            user: u,
+            source: 'profile' as const,
+        }))
+    }
+
+    // Combine + tag source
+    const allMembers = [
+        ...workspaceMembers.map(m => ({ ...m, source: 'workspace' as const })),
+        ...profileMembers,
+    ]
 
     // Sort by role weight (OWNER > ADMIN > MEMBER > GUEST)
     const ROLE_ORDER: Record<string, number> = { OWNER: 4, ADMIN: 3, MEMBER: 2, GUEST: 1 }
-    members.sort((a, b) => (ROLE_ORDER[b.role] ?? 0) - (ROLE_ORDER[a.role] ?? 0))
+    allMembers.sort((a, b) => (ROLE_ORDER[b.role] ?? 0) - (ROLE_ORDER[a.role] ?? 0))
 
     // Audit fix #3.2: Mask email khi caller không phải ADMIN+
-    // Privacy: MEMBER role không cần biết email của thành viên khác →
-    // chỉ thấy username/nickname/avatar. Tránh email enumeration + business
-    // intelligence leak (vd competitor lấy email list).
     const isAdminOrAbove =
         access.isGlobalAdmin
         || access.workspaceRole === 'OWNER'
         || access.workspaceRole === 'ADMIN'
 
     if (!isAdminOrAbove) {
-        for (const m of members) {
+        for (const m of allMembers) {
             if (m.user && m.user.id !== access.userId) {
-                // Chỉ giữ email của chính mình; mask của người khác
                 m.user.email = null
             }
         }
     }
 
-    return { members }
+    return { members: allMembers }
 }
 
 // ─── Get pending invitations for a workspace ─────────────────────

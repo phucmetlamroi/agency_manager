@@ -1,14 +1,13 @@
 import { logout } from '@/lib/auth'
-import Link from 'next/link'
 // Removed duplicate globals.css import
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
+import { isMobileDevice } from '@/lib/device'
 
 export default async function AdminLayout({
     children,
@@ -43,9 +42,8 @@ export default async function AdminLayout({
 
     const user = { username: dbUser.username, role: dbUser.role, isTreasurer: dbUser.isTreasurer, id: dbUser.id, avatarUrl: (dbUser as any).avatarUrl }
 
-    const headersList = await headers()
-    const deviceType = headersList.get('x-device-type') || 'desktop'
-    const isMobile = deviceType === 'mobile'
+    // Mobile detection via user-agent + cookie override (xem src/lib/device.ts).
+    const isMobile = await isMobileDevice()
 
     const handleLogout = async () => {
         'use server'

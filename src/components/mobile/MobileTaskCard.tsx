@@ -1,14 +1,25 @@
 'use client'
 
 import { TaskWithUser } from '@/types/admin'
+
+// Status colors aligned với design-system (UI/UX standards):
+// - emerald (#10b981) cho success/Hoàn tất
+// - indigo (#6366f1) cho pending/Đang đợi giao
+// - amber (#fbbf24) cho in-progress
+// - red (#ef4444) cho Revision/Quá hạn
+// - rose (#f43f5e) cho Đã hủy (terminal negative)
+// - sky/violet/pink cho các revise sub-states
 const statusColors: Record<string, string> = {
-    "Nhận task": "#60a5fa",
-    "Đang đợi giao": "#a855f7",
-    "Đang thực hiện": "#fbbf24",
-    "Revision": "#ef4444",
-    "Hoàn tất": "#10b981",
-    "Tạm ngưng": "#9ca3af",
-    "Sửa frame": "#f472b6",
+    'Đang đợi giao': '#a855f7',
+    'Nhận task': '#60a5fa',
+    'Đang thực hiện': '#fbbf24',
+    'Revision': '#ef4444',
+    'Sửa frame': '#f472b6',
+    'Gửi lại': '#38bdf8',
+    'Tạm ngưng': '#9ca3af',
+    'Quá hạn': '#dc2626',
+    'Hoàn tất': '#10b981',
+    'Đã hủy': '#71717a',
 }
 
 export default function MobileTaskCard({ task, onAction, isAdmin }: {
@@ -44,7 +55,7 @@ export default function MobileTaskCard({ task, onAction, isAdmin }: {
                 </div>
 
                 {task.deadline && (
-                    <div className={new Date() > new Date(task.deadline) && task.status !== 'Hoàn tất' ? 'text-red-400 font-bold text-xs' : 'text-xs'}>
+                    <div className={new Date() > new Date(task.deadline) && !['Hoàn tất', 'Đã hủy', 'Quá hạn', 'Tạm ngưng'].includes(task.status) ? 'text-red-400 font-bold text-xs' : 'text-xs'}>
                         {new Date(task.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </div>
                 )}

@@ -90,6 +90,10 @@ export async function verifyWorkspaceAccess(
 /**
  * Kiểm tra Session chống lưu Cookie cũ chưa hết hạn (Session Fixation Block).
  * Hàm này dùng để đảm bảo mỗi khi gọi data, user chưa bị Locked bởi Admin.
+ *
+ * Auth Phase 1: Cũng kiểm tra `sessionVersion` — nếu JWT có version cũ hơn DB
+ * (do user reset password / "logout tất cả thiết bị") → reject session.
+ * Đây là defense-in-depth chống CVE-2025-29927 (middleware bypass).
  */
 export async function verifyActiveSession() {
     const session = await getSession()
@@ -100,10 +104,36 @@ export async function verifyActiveSession() {
     // Hit DB để check role hiện hành, đề phòng bị Ban hôm qua nhưng Cookie vẫn còn sống 7 ngày.
     const dbUser = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { role: true, id: true, isTreasurer: true, username: true, avatarUrl: true }
+        select: {
+            role: true,
+            id: true,
+            isTreasurer: true,
+            username: true,
+            avatarUrl: true,
+            // Auth Phase 1 fields
+            sessionVersion: true,
+            emailVerified: true,
+            hasCompletedEmailMigration: true,
+            displayName: true,
+            email: true,
+        }
     })
 
     if (!dbUser || dbUser.role === 'LOCKED') {
+        return { status: 'locked', session: null, dbUser: null, isAdmin: false }
+    }
+
+    // Defense-in-depth: nếu JWT có sessionVersion thấp hơn DB → JWT cũ → reject.
+    // Trường hợp: user reset password hoặc "logout tất cả thiết bị" → bump dbUser.sessionVersion.
+    // JWT cũ có version cũ → mọi request từ JWT đó bị reject ngay tại DAL.
+    //
+    // MEDIUM #9 fix: coerce null/undefined sessionVersion sang 0 — legacy users
+    // không có DB sessionVersion vẫn enforce check. Schema default là 0 nên
+    // legacy users sau migration đã có sessionVersion=0; defensive coercion ở đây
+    // để chắc chắn.
+    const tokenVersion = (session.user as any).sessionVersion ?? 0
+    const dbVersion = dbUser.sessionVersion ?? 0
+    if (tokenVersion < dbVersion) {
         return { status: 'locked', session: null, dbUser: null, isAdmin: false }
     }
 

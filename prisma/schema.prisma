@@ -17,6 +17,12 @@ model Profile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Auth Phase 1: SaaS leasing hooks (Profile.subscriptionTier gates features)
+  // Values: FREE | TRIAL | STARTER | PRO | ENTERPRISE (String to match other status fields)
+  subscriptionTier String    @default("FREE")
+  trialStartedAt   DateTime?
+  trialEndsAt      DateTime?
+
   users               User[]
   workspaces          Workspace[]
   tasks               Task[]
@@ -115,6 +121,24 @@ model User {
   agencyId          String?
   profileId         String?
   role              UserRole            @default(USER)
+
+  // ─── Auth Phase 1: signup / login email-only / forgot password ───
+  // Display name (giữ Unicode tiếng Việt có dấu — KHÔNG sanitize)
+  displayName                String?
+  // Email verification flow
+  emailVerified              Boolean   @default(false)
+  emailVerifiedAt            DateTime?
+  // Migration tracking cho user cũ (nhóm A/B/C trong backfill script)
+  hasCompletedEmailMigration Boolean   @default(false)
+  // Account lockout (5 fail / 15 phút)
+  failedLoginAttempts        Int       @default(0)
+  lockedUntil                DateTime?
+  // Audit timestamps
+  lastPasswordChangedAt      DateTime?
+  lastLoginAt                DateTime?
+  lastLoginIp                String?
+  // Bump để invalidate tất cả JWT cũ (CVE-2025-29927 defense + reset password)
+  sessionVersion             Int       @default(0)
   ownedAgency       Agency[]            @relation("AgencyOwner")
   bonuses           MonthlyBonus[]
   payrolls          Payroll[]
@@ -144,8 +168,14 @@ model User {
   requestedRequests      ProfileAccessRequest[]  @relation("RequestedBy")
   tagCategories          TagCategory[]
   auditLogsAsActor       AuditLog[]              @relation("AuditLogActor")
+  auditLogsAsTarget      AuditLog[]              @relation("AuditLogUser")
   workspaceInvitesReceived WorkspaceInvitation[] @relation("WorkspaceInvitedUser")
   workspaceInvitesSent     WorkspaceInvitation[] @relation("WorkspaceInviter")
+
+  // Auth Phase 1 relations
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetOTPs       PasswordResetOTP[]
+  loginAttempts           LoginAttempt[]
 
   // Chat relations
   contactsSent         Contact[]                 @relation("ContactRequester")
@@ -159,6 +189,10 @@ model User {
   notifications        Notification[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
+
+  // Auth Phase 1 indexes
+  @@index([email])
+  @@index([lockedUntil])
 }
 
 model ProfileAccess {
@@ -493,10 +527,15 @@ model WorkspaceInvitation {
 /// role in Phase 2 (see migration_audit_log_revoke.sql in deploy plan).
 model AuditLog {
   id          BigInt   @id @default(autoincrement())
-  workspaceId String
+  // Auth Phase 1: workspaceId nullable để hỗ trợ auth events (SIGNUP, LOGIN_FAILED, ...)
+  // không thuộc workspace nào. Workspace events giữ nguyên required workspaceId.
+  workspaceId String?
   actorUserId String?
-  action      String // e.g. 'workspace.created', 'member.role_changed', 'workspace.soft_deleted'
-  targetType  String // e.g. 'WorkspaceMember', 'Workspace', 'Task'
+  // userId = target user (cho auth events: SIGNUP, PASSWORD_RESET_REQUESTED, EMAIL_VERIFIED).
+  // Khác với actorUserId (người thực hiện action). Auth events thường userId = actorUserId.
+  userId      String?
+  action      String // e.g. 'workspace.created', 'auth.signup', 'auth.login_failed', 'auth.password_reset_requested'
+  targetType  String // e.g. 'WorkspaceMember', 'Workspace', 'Task', 'User'
   targetId    String?
   beforeData  Json?
   afterData   Json?
@@ -504,10 +543,12 @@ model AuditLog {
   userAgent   String?
   createdAt   DateTime @default(now())
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  actor     User?     @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User?      @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  user      User?      @relation("AuditLogUser", fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, createdAt])
+  @@index([userId, createdAt])
   @@index([action])
 }
 
@@ -1021,4 +1062,76 @@ model MessageReadReceipt {
 
   @@unique([messageId, userId])
   @@index([messageId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  Auth Phase 1: signup / login email-only / forgot password / migration
+// ─────────────────────────────────────────────────────────────────────
+
+/// Token gửi qua email để xác thực địa chỉ email (signup/migration) HOẶC password reset.
+/// Lưu HASH (SHA-256) của raw token; raw token chỉ xuất hiện trong link email/response.
+///
+/// Security note: `purpose` field BẮT BUỘC để tránh logic confusion —
+/// query email-verification flow KHÔNG được vô tình match password reset token và ngược lại.
+/// Mọi query MUST filter theo `purpose`.
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // SHA-256 hex của raw token
+  // Values: "EMAIL_VERIFICATION" | "PASSWORD_RESET" | "EMAIL_MIGRATION"
+  purpose   String    @default("EMAIL_VERIFICATION")
+  email     String    // Email liên quan (có thể khác User.email khi đổi)
+  expiresAt DateTime  // = createdAt + 24h (verification) hoặc 5 phút (password reset)
+  usedAt    DateTime? // null nếu chưa verify
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+/// OTP 6 chữ số cho luồng quên mật khẩu / xác thực email migration.
+/// Lưu HASH (SHA-256) của OTP plaintext; KHÔNG bao giờ lưu plaintext.
+///
+/// Security note: `purpose` field BẮT BUỘC để tránh token confusion —
+/// password reset OTP KHÔNG được vô tình match email migration query và ngược lại.
+model PasswordResetOTP {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpHash       String    // SHA-256 hex của 6-digit OTP
+  // Values: "PASSWORD_RESET" | "EMAIL_MIGRATION"
+  purpose       String    @default("PASSWORD_RESET")
+  email         String    // Snapshot email tại thời điểm tạo (chống email-change attack)
+  expiresAt     DateTime  // = createdAt + 10 phút
+  attemptCount  Int       @default(0) // Tăng mỗi lần verify sai; >= 5 → invalidate
+  consumedAt    DateTime? // Đặt khi user nhập đúng OTP và bắt đầu reset password
+  invalidatedAt DateTime? // Đặt khi vượt quá 5 lần thử / superseded
+  ipAddress     String?
+  createdAt     DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+/// Lịch sử các lần thử đăng nhập (success/fail) — phục vụ:
+///   - Account lockout (đếm 5 fail trong 15 phút sliding window)
+///   - Security audit ("ai đã login từ IP nào?")
+///   - Anti-fraud (Phase 5+ correlate với device fingerprint)
+model LoginAttempt {
+  id         String    @id @default(uuid())
+  userId     String?   // null nếu user_not_found (chống enumeration: vẫn log)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  emailTried String    // Lowercase. Có thể là email hoặc username (transition mode).
+  success    Boolean
+  failReason String?   // 'invalid_password' | 'user_not_found' | 'account_locked' | 'email_not_verified' | 'rate_limited'
+  ipAddress  String
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+
+  @@index([emailTried, createdAt])
+  @@index([ipAddress, createdAt])
+  @@index([userId, createdAt])
 }

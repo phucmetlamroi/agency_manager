@@ -82,7 +82,7 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
         { label: "Profile", href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, roles: ['USER'] },
         { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN'] },
         { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN'] },
-        { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users, roles: ['ADMIN'] },
+        { label: "Hiệu suất", href: `/${workspaceId}/admin/users`, icon: Users, roles: ['ADMIN'] },
         { label: "Members", href: `/${workspaceId}/admin/members`, icon: UsersRound, roles: ['ADMIN'] },
         { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN'] },
         { label: "Audit Log", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText, roles: ['ADMIN'] },

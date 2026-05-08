@@ -91,13 +91,41 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ wor
 
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-            <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>Staff Management</h2>
-            <UserPageTabs 
-                users={serializeDecimal(users)} 
-                currentUser={currentUser} 
-                profiles={profiles} 
+            <h2 className="title-gradient" style={{ marginBottom: '0.5rem' }}>Hiệu suất & Bảng lương</h2>
+            <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+                Xem performance, payroll, monthly rank của staff trong workspace.
+            </p>
+
+            {/* Banner: redirect user management → /admin/members */}
+            <div style={{
+                background: 'rgba(99, 102, 241, 0.08)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                fontSize: '0.875rem',
+                color: '#c7d2fe'
+            }}>
+                <span style={{ fontSize: '1.25rem' }}>👥</span>
+                <span style={{ flex: 1 }}>
+                    Để <strong>mời / xóa / phân quyền</strong> thành viên workspace, vui lòng dùng trang{' '}
+                    <a href={`/${workspaceId}/admin/members`} style={{
+                        color: '#a78bfa', textDecoration: 'underline', fontWeight: 600
+                    }}>
+                        Members →
+                    </a>
+                </span>
+            </div>
+
+            <UserPageTabs
+                users={serializeDecimal(users)}
+                currentUser={currentUser}
+                profiles={profiles}
                 incomingRequests={incomingRequests}
-                workspaceId={workspaceId} 
+                workspaceId={workspaceId}
             />
         </div>
     )

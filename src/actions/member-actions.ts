@@ -143,7 +143,7 @@ export async function inviteToWorkspace(
                 { email: { equals: trimmedUsername, mode: 'insensitive' } },
             ]
         },
-        select: { id: true, username: true, nickname: true, role: true }
+        select: { id: true, username: true, nickname: true, role: true, profileId: true, allowExternalInvites: true }
     })
 
     if (!targetUser) {
@@ -152,6 +152,21 @@ export async function inviteToWorkspace(
 
     if (targetUser.id === inviterId) {
         return { error: 'Bạn không thể tự mời chính mình.' }
+    }
+
+    // Audit fix #2.8: Cross-profile invite consent
+    // Nếu target user đã tắt allowExternalInvites và user thuộc Profile khác →
+    // không cho mời. User được quyền refuse "spam invite" từ unknown organizations.
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    if (workspace?.profileId && targetUser.profileId && workspace.profileId !== targetUser.profileId) {
+        if (targetUser.allowExternalInvites === false) {
+            return {
+                error: `User ${targetUser.username} đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.`,
+            }
+        }
     }
 
     // Audit fix #2.7: Rate-limit invitation per (workspace, target user) — 5/24h.

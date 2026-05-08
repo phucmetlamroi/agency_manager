@@ -60,8 +60,17 @@ export type AuditAction =
     | 'permission.checked_denied'
     | 'subscription.trial_expired'
 
+/**
+ * `workspaceId` value semantics (audit fix #2.9):
+ * - Real workspace UUID: workspace-scoped event (vd 'workspace.updated')
+ * - `null`: TRƯỚC ĐÂY dùng cho auth events (login, signup, ...). Vẫn support
+ *   để backward compat, nhưng KHUYẾN NGHỊ dùng 'SYSTEM' marker explicit.
+ * - `'SYSTEM'`: system-initiated event không thuộc workspace nào (cron jobs,
+ *   trial expiration, hard-delete, ...). Dùng marker này để filter-able trong
+ *   audit log viewer (`WHERE workspaceId = 'SYSTEM'` thay vì `IS NULL`).
+ */
 export interface AuditOpts {
-    workspaceId: string
+    workspaceId: string | null
     actorUserId: string | null
     action: AuditAction
     targetType: string

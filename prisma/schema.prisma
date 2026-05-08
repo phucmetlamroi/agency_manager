@@ -139,6 +139,10 @@ model User {
   lastLoginIp                String?
   // Bump để invalidate tất cả JWT cũ (CVE-2025-29927 defense + reset password)
   sessionVersion             Int       @default(0)
+  // Privacy: cho phép user thuộc Profile khác mời vào workspace của họ không?
+  // Default true = backward compat. User có thể tắt trong Settings để chống
+  // "spam invite từ unknown organizations" (audit finding #2.8).
+  allowExternalInvites       Boolean   @default(true)
   ownedAgency       Agency[]            @relation("AgencyOwner")
   bonuses           MonthlyBonus[]
   payrolls          Payroll[]

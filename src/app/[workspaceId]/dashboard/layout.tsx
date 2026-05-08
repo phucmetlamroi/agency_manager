@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
+import MobileLayoutShell from '@/components/layout/MobileLayoutShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
@@ -69,7 +70,6 @@ export default async function UserLayout({
     }
 
     if (isMobile) {
-        const { default: MobileLayoutShell } = await import('@/components/layout/MobileLayoutShell')
         return (
             <MobileLayoutShell user={user} workspaceId={workspaceId} handleLogout={handleLogout} workspaceRole={workspaceRole}>
                 <RoleWatcher currentRole={dbUserRole} isTreasurer={dbUser.isTreasurer ?? false} />

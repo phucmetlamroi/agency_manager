@@ -52,7 +52,7 @@ export function RenameGroupDialog({ isOpen, onClose, conversationId, currentName
             className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm"
             onClick={e => { if (e.target === e.currentTarget) onClose() }}
         >
-            <div className="w-[400px] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-white/[0.08] shadow-[0_24px_60px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div className="w-[calc(100vw-1rem)] sm:w-[400px] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-white/[0.08] shadow-[0_24px_60px_rgba(0,0,0,0.5)] overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-violet-500/10">
                     <div className="flex items-center gap-2">

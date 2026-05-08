@@ -87,7 +87,7 @@ export function NotificationPanel({ isOpen, onClose, onUnreadCountChange, incomi
         }
         setItems(prev => prev.map(n => ({ ...n, isRead: true })))
         onUnreadCountChange(0)
-        toast.success(`Marked ${res.data?.count || 0} as read`)
+        toast.success(`Đã đánh dấu đọc ${res.data?.count || 0} thông báo`)
     }
 
     const visible = tab === 'unread' ? items.filter(n => !n.isRead) : items
@@ -95,17 +95,19 @@ export function NotificationPanel({ isOpen, onClose, onUnreadCountChange, incomi
     if (!isOpen) return null
 
     return (
-        <div className="absolute right-0 top-full mt-2 w-[380px] max-h-[600px] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-violet-500/20 shadow-[0_24px_60px_rgba(0,0,0,0.5)] z-50 flex flex-col overflow-hidden">
+        // Mobile: full-width fixed bottom-anchored panel (offset from header).
+        // Desktop (sm+): floating 380px panel anchored to bell button.
+        <div className="fixed inset-x-2 top-[calc(56px+env(safe-area-inset-top))] sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] max-h-[calc(100dvh-80px)] sm:max-h-[600px] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-violet-500/20 shadow-[0_24px_60px_rgba(0,0,0,0.5)] z-50 flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-violet-500/10">
-                <h3 className="text-[14px] font-bold text-white m-0">Notifications</h3>
+                <h3 className="text-[14px] font-bold text-white m-0">Thông báo</h3>
                 <div className="flex items-center gap-1">
                     <button
                         onClick={handleMarkAllRead}
                         className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-white/10 cursor-pointer bg-transparent border-none text-[11px] text-zinc-400"
-                        title="Mark all as read"
+                        title="Đánh dấu tất cả đã đọc"
                     >
-                        <CheckCheck className="w-3 h-3" /> All read
+                        <CheckCheck className="w-3 h-3" /> Đã đọc hết
                     </button>
                     <button onClick={onClose} className="p-1 rounded-md hover:bg-white/10 cursor-pointer bg-transparent border-none">
                         <X className="w-3.5 h-3.5 text-zinc-500" />
@@ -116,8 +118,8 @@ export function NotificationPanel({ isOpen, onClose, onUnreadCountChange, incomi
             {/* Tabs */}
             <div className="flex gap-0.5 px-2 py-1.5 border-b border-white/[0.05]">
                 {([
-                    { id: 'all' as Tab, label: 'All' },
-                    { id: 'unread' as Tab, label: 'Unread' },
+                    { id: 'all' as Tab, label: 'Tất cả' },
+                    { id: 'unread' as Tab, label: 'Chưa đọc' },
                 ] as const).map(t => (
                     <button
                         key={t.id}
@@ -142,7 +144,7 @@ export function NotificationPanel({ isOpen, onClose, onUnreadCountChange, incomi
                 )}
 
                 {!loading && visible.length === 0 && (
-                    <EmptyNotification message={tab === 'unread' ? 'No unread notifications' : 'No notifications yet'} />
+                    <EmptyNotification message={tab === 'unread' ? 'Không có thông báo chưa đọc' : 'Chưa có thông báo nào'} />
                 )}
 
                 {visible.map(n => (
@@ -161,7 +163,7 @@ export function NotificationPanel({ isOpen, onClose, onUnreadCountChange, incomi
                         disabled={loading}
                         className="w-full py-2 text-[11px] text-violet-400 cursor-pointer bg-transparent border-none border-t border-white/[0.03] hover:bg-violet-500/[0.05] disabled:opacity-50"
                     >
-                        {loading ? 'Loading...' : 'Load more'}
+                        {loading ? 'Đang tải...' : 'Xem thêm'}
                     </button>
                 )}
             </div>

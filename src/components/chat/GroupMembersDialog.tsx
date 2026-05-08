@@ -116,7 +116,7 @@ export function GroupMembersDialog({ isOpen, onClose, conversationId }: GroupMem
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
             onClick={e => { if (e.target === e.currentTarget) onClose() }}
         >
-            <div className="w-[400px] max-h-[70vh] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-white/[0.08] shadow-[0_24px_60px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden">
+            <div className="w-[calc(100vw-1rem)] sm:w-[400px] max-h-[80dvh] sm:max-h-[70vh] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-white/[0.08] shadow-[0_24px_60px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-violet-500/10">
                     <h3 className="text-[15px] font-bold text-white m-0">

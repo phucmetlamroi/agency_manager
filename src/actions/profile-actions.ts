@@ -169,6 +169,58 @@ export async function updateProfile(userId: string, data: {
     }
 }
 
+/**
+ * Create a brand-new Profile for the current user.
+ *
+ * Use case: any authenticated user can create a Profile (Team) for themselves.
+ * They become the OWNER (via ProfileAccess) — first member with elevated privileges.
+ *
+ * Differs from admin-profile-actions.ts createProfile which requires super-admin.
+ *
+ * Rate limit: max 5 profiles created per user (prevent abuse).
+ */
+export async function createProfileForUser(name: string) {
+    const session = await getSession()
+    if (!session?.user?.id) {
+        return { error: 'Bạn cần đăng nhập' }
+    }
+
+    const trimmed = name?.trim()
+    if (!trimmed) return { error: 'Tên profile không được để trống' }
+    if (trimmed.length > 50) return { error: 'Tên profile không được quá 50 ký tự' }
+    if (trimmed.length < 2) return { error: 'Tên profile phải có ít nhất 2 ký tự' }
+
+    // Rate limit — max 5 profiles per user
+    const ownedAccessCount = await prisma.profileAccess.count({
+        where: { userId: session.user.id },
+    })
+    const ownedDirectCount = await prisma.profile.count({
+        where: { users: { some: { id: session.user.id } } },
+    })
+    if (ownedAccessCount + ownedDirectCount >= 5) {
+        return { error: 'Đã đạt giới hạn 5 profile/user. Hãy xoá profile cũ trước.' }
+    }
+
+    try {
+        const newProfile = await prisma.$transaction(async (tx) => {
+            const profile = await tx.profile.create({
+                data: { name: trimmed },
+            })
+            // Grant access — user can switch to this profile
+            await tx.profileAccess.create({
+                data: { userId: session.user.id, profileId: profile.id },
+            })
+            return profile
+        })
+
+        revalidatePath('/', 'layout')
+        return { success: true, profile: { id: newProfile.id, name: newProfile.name } }
+    } catch (e: any) {
+        console.error('createProfileForUser error:', e)
+        return { error: 'Không thể tạo profile. Vui lòng thử lại.' }
+    }
+}
+
 export async function changePassword(userId: string, currentPass: string, newPass: string, workspaceId: string) {
     try {
         const user = await prisma.user.findUnique({

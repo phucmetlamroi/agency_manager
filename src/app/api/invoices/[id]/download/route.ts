@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateInvoicePDF, InvoiceData } from '@/lib/invoice-generator'
 import { getCurrentUser } from '@/lib/auth-guard'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 export async function GET(
     req: NextRequest,
@@ -10,13 +11,25 @@ export async function GET(
     try {
         const { id } = await params
         const workspaceId = req.nextUrl.searchParams.get('workspaceId')
-        
+
         if (!workspaceId) return new NextResponse('Workspace ID required', { status: 400 })
 
         // 1. Auth Check
         const user = await getCurrentUser()
         if (!user || (user.role !== 'ADMIN' && !user.isTreasurer)) {
             return new NextResponse('Unauthorized', { status: 401 })
+        }
+
+        // 2. SECURITY: Verify caller belongs to this workspace.
+        // Without this, any global ADMIN could download invoices from ANY workspace,
+        // and the workspaceId param was previously trusted blindly.
+        try {
+            await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        } catch (e: any) {
+            if (e?.message?.startsWith('SECURITY_VIOLATION')) {
+                return new NextResponse(e.message, { status: 403 })
+            }
+            throw e
         }
 
         const workspacePrisma = getWorkspacePrisma(workspaceId)

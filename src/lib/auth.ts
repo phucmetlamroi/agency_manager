@@ -1,9 +1,21 @@
 import { cookies } from 'next/headers'
 import { encrypt, decrypt } from './jwt'
 
-export async function login(userData: any) {
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    const session = await encrypt({ user: userData, expires })
+const DEFAULT_SESSION_DAYS = 7
+const REMEMBER_ME_DAYS = 30
+
+/**
+ * Tạo session cookie cơ bản. KHÔNG embed profileId — dùng cho user mới signup
+ * chưa active workspace, hoặc CLIENT role.
+ *
+ * @param userData User payload bao gồm sessionVersion, restricted, requiresEmailMigration claims.
+ * @param opts.rememberMe Nếu true → cookie TTL 30d thay vì 7d.
+ */
+export async function login(userData: any, opts?: { rememberMe?: boolean }) {
+    const days = opts?.rememberMe ? REMEMBER_ME_DAYS : DEFAULT_SESSION_DAYS
+    const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+    const ttl = `${days} days`
+    const session = await encrypt({ user: userData, expires }, ttl)
 
     const cookieStore = await cookies()
     cookieStore.set('session', session, {
@@ -15,12 +27,14 @@ export async function login(userData: any) {
     })
 }
 
-export async function loginWithProfile(userData: any, profileId: string) {
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+export async function loginWithProfile(userData: any, profileId: string, opts?: { rememberMe?: boolean }) {
+    const days = opts?.rememberMe ? REMEMBER_ME_DAYS : DEFAULT_SESSION_DAYS
+    const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+    const ttl = `${days} days`
     const session = await encrypt({
         user: { ...userData, sessionProfileId: profileId },
         expires,
-    })
+    }, ttl)
 
     const cookieStore = await cookies()
     cookieStore.set('session', session, {
@@ -37,6 +51,15 @@ export async function logout() {
     cookieStore.set('session', '', { expires: new Date(0) })
 }
 
+/**
+ * Trả về JWT payload đã decrypt (KHÔNG check sessionVersion ở đây — giữ async-cheap
+ * cho middleware Edge runtime). Defense-in-depth check sessionVersion thực hiện ở:
+ *   - `verifyActiveSession()` trong src/lib/security.ts (đối với protected pages)
+ *   - DAL trong từng Server Action quan trọng
+ *
+ * Đây là pattern khuyến nghị bởi spec §12 (CVE-2025-29927 mitigation):
+ * không trust JWT đơn lẻ; luôn cross-check với DB ở DAL.
+ */
 export async function getSession() {
     const cookieStore = await cookies()
     const session = cookieStore.get('session')?.value

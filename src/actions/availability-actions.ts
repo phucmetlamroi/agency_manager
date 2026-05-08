@@ -5,6 +5,7 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getCurrentUser } from '@/lib/auth-guard'
 import { getVietnamCurrentHour, getVietnamDateKey, getVietnamDayStart, getVietnamWeekKeys } from '@/lib/date-utils'
 import { revalidatePath } from 'next/cache'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 const VALID_STATUSES = new Set(['EMPTY', 'FREE', 'BUSY', 'TENTATIVE'])
 const DEFAULT_SCHEDULE = Array.from({ length: 24 }, () => 'EMPTY')
@@ -159,8 +160,8 @@ export async function saveMyAvailability(dateKey: string, schedule: string[], wo
 
 export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: string) {
     try {
-        const user = await getCurrentUser()
-        if (user.role !== 'ADMIN') return { error: 'Unauthorized' }
+        // SECURITY: workspace-scoped admin check (was global ADMIN only).
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
 
         const date = getVietnamDayStart(dateKey)
@@ -212,8 +213,8 @@ export async function getAdminAvailabilityMatrix(dateKey: string, workspaceId: s
 
 export async function getAdminAvailabilityWeek(dateKey: string, workspaceId: string) {
     try {
-        const user = await getCurrentUser()
-        if (user.role !== 'ADMIN') return { error: 'Unauthorized' }
+        // SECURITY: workspace-scoped admin check (was global ADMIN only).
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         if (!isValidDateKey(dateKey)) return { error: 'Invalid date' }
 
         const weekKeys = getVietnamWeekKeys(dateKey)

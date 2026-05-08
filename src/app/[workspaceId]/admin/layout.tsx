@@ -6,6 +6,8 @@ import { headers } from 'next/headers'
 import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
+import { prisma } from '@/lib/db'
+import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 
 export default async function AdminLayout({
     children,
@@ -22,12 +24,19 @@ export default async function AdminLayout({
     }
 
     if (status === 'locked' || !dbUser) {
-        // Trực tiếp clear cookie và đuổi ra ngoài login 
         redirect('/api/auth/logout')
     }
 
-    // Robust Authorization: Ensure user is strictly an ADMIN
-    if (!isAdmin) {
+    // Workspace-scoped authorization: allow access if user is
+    // (a) global ADMIN/treasurer, OR (b) OWNER/ADMIN of this workspace.
+    const membership = await prisma.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
+        select: { role: true },
+    })
+    const workspaceRole = membership?.role ?? null
+    const canAccessAdmin = isAdmin || workspaceRole === 'OWNER' || workspaceRole === 'ADMIN'
+
+    if (!canAccessAdmin) {
         redirect(`/${workspaceId}/dashboard`)
     }
 
@@ -46,16 +55,23 @@ export default async function AdminLayout({
     if (isMobile) {
         const { default: MobileLayoutShell } = await import('@/components/layout/MobileLayoutShell')
         return (
-            <MobileLayoutShell user={user} workspaceId={workspaceId} handleLogout={handleLogout}>
+            <MobileLayoutShell user={user} workspaceId={workspaceId} handleLogout={handleLogout} workspaceRole={workspaceRole ?? undefined}>
                 <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
                 {children}
             </MobileLayoutShell>
         )
     }
 
+    // Auth Phase 3: hiển thị EmailMigrationModal nếu user cũ chưa hoàn tất migration
+    const needsEmailMigration = dbUser.hasCompletedEmailMigration === false
+    const displayName = dbUser.displayName ?? user.username
+
     return (
-        <AdminShell user={user} workspaceId={workspaceId}>
+        <AdminShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
+            {needsEmailMigration && (
+                <EmailMigrationModal displayName={displayName} />
+            )}
             {children}
         </AdminShell>
     )

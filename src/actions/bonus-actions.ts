@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { SALARY_COMPLETED_STATUS, SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 const toSafeNumber = (value: unknown): number => {
     if (value == null) return 0
@@ -53,8 +54,8 @@ export async function getPayrollLockStatus(workspaceId: string) {
 
 export async function revertMonthlyBonus(workspaceId: string) {
     try {
-        const session = await getSession()
-        if (!session) return { success: false, error: 'Unauthorized' }
+        // SECURITY: workspace-scoped admin check (was global ADMIN/Treasurer only).
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const workspace = await workspacePrisma.workspace.findUnique({
@@ -62,15 +63,6 @@ export async function revertMonthlyBonus(workspaceId: string) {
             select: { id: true, profileId: true }
         })
         if (!workspace) return { success: false, error: 'Workspace not found.' }
-
-        const currentUser = await workspacePrisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { id: true, role: true, isTreasurer: true }
-        })
-
-        if (currentUser?.role !== 'ADMIN' && !currentUser?.isTreasurer) {
-            return { success: false, error: 'Permission denied.' }
-        }
 
         const currentMonth = 0
         const currentYear = 0
@@ -103,9 +95,9 @@ export async function revertMonthlyBonus(workspaceId: string) {
 export async function calculateMonthlyBonus(workspaceId: string) {
     let stage = 'init'
     try {
-        stage = 'session'
-        const session = await getSession()
-        if (!session) return { success: false, error: 'Unauthorized' }
+        stage = 'permission-check'
+        // SECURITY: workspace-scoped admin check (was global ADMIN/Treasurer only).
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         stage = 'prisma-workspace'
         const workspacePrisma = getWorkspacePrisma(workspaceId)
@@ -115,15 +107,6 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             select: { id: true, profileId: true }
         })
         if (!workspace) return { success: false, error: 'Workspace not found.' }
-
-        stage = 'permission-find-user'
-        const currentUser = await workspacePrisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { id: true, role: true, isTreasurer: true }
-        })
-        if (currentUser?.role !== 'ADMIN' && !currentUser?.isTreasurer) {
-            return { success: false, error: 'Permission denied.' }
-        }
 
         // We no longer use currentMonth/Year for filtering tasks.
         // Everything inside this workspace is considered one cycle.

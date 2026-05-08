@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import ExcelJS from 'exceljs'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth-guard'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -96,7 +97,14 @@ export async function GET(req: NextRequest) {
             return new NextResponse('Unauthorized', { status: 401 })
         }
 
-        if (user.role !== 'ADMIN') {
+        // SECURITY: workspace-scoped admin check (was global ADMIN only).
+        // Without this, any global ADMIN could export tasks of ANY workspace.
+        try {
+            await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        } catch (e: any) {
+            if (e?.message?.startsWith('SECURITY_VIOLATION')) {
+                return new NextResponse(e.message, { status: 403 })
+            }
             return new NextResponse('Forbidden: Admin only', { status: 403 })
         }
 

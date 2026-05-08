@@ -17,21 +17,27 @@ model Profile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users        User[]
-  workspaces   Workspace[]
-  tasks        Task[]
-  clients      Client[]
-  projects     Project[]
-  invoices     Invoice[]
-  payrolls     Payroll[]
-  bonuses      MonthlyBonus[]
-  payrollLocks PayrollLock[]
-  metrics      PerformanceMetric[]
-  agencies           Agency[]
-  errorLogs          ErrorLog[]
-  monthlyRanks       MonthlyRank[]
-  scheduleRules      ScheduleRule[]
-  scheduleExceptions ScheduleException[]
+  // Auth Phase 1: SaaS leasing hooks (Profile.subscriptionTier gates features)
+  // Values: FREE | TRIAL | STARTER | PRO | ENTERPRISE (String to match other status fields)
+  subscriptionTier String    @default("FREE")
+  trialStartedAt   DateTime?
+  trialEndsAt      DateTime?
+
+  users               User[]
+  workspaces          Workspace[]
+  tasks               Task[]
+  clients             Client[]
+  projects            Project[]
+  invoices            Invoice[]
+  payrolls            Payroll[]
+  bonuses             MonthlyBonus[]
+  payrollLocks        PayrollLock[]
+  metrics             PerformanceMetric[]
+  agencies            Agency[]
+  errorLogs           ErrorLog[]
+  monthlyRanks        MonthlyRank[]
+  scheduleRules       ScheduleRule[]
+  scheduleExceptions  ScheduleException[]
   dailyAvailabilities DailyAvailability[]
   profileAccesses     ProfileAccess[]
   accessRequests      ProfileAccessRequest[] @relation("TargetProfileRequests")
@@ -48,34 +54,45 @@ model Workspace {
   updatedAt       DateTime @updatedAt
   profileId       String?
 
-  members            WorkspaceMember[]
-  tasks              Task[]
-  clients            Client[]
-  scheduleRules      ScheduleRule[]
-  scheduleExceptions ScheduleException[]
+  // Soft-delete (Phase 1 multi-workspace plan, Chapter 3)
+  // status defaults to ACTIVE; SOFT_DELETED workspaces hidden from switcher
+  // until hard-delete cron after `hardDeleteAfter`.
+  status          String    @default("ACTIVE") // see WorkspaceStatus enum: ACTIVE | SUSPENDED | SOFT_DELETED
+  deletedAt       DateTime?
+  hardDeleteAfter DateTime?
+
+  members             WorkspaceMember[]
+  invitations         WorkspaceInvitation[]
+  tasks               Task[]
+  clients             Client[]
+  scheduleRules       ScheduleRule[]
+  scheduleExceptions  ScheduleException[]
   dailyAvailabilities DailyAvailability[]
-  projects     Project[]
-  invoices     Invoice[]
-  payrolls     Payroll[]
-  bonuses      MonthlyBonus[]
-  payrollLocks PayrollLock[]
-  metrics      PerformanceMetric[]
-  feedbacks    Feedback[]
-  errorLogs    ErrorLog[]
-  monthlyRanks MonthlyRank[]
-  ratings      Rating[]
-  sessions     Session[]
+  projects            Project[]
+  invoices            Invoice[]
+  payrolls            Payroll[]
+  bonuses             MonthlyBonus[]
+  payrollLocks        PayrollLock[]
+  metrics             PerformanceMetric[]
+  feedbacks           Feedback[]
+  errorLogs           ErrorLog[]
+  monthlyRanks        MonthlyRank[]
+  ratings             Rating[]
+  sessions            Session[]
+  auditLogs           AuditLog[]
+  tagCategories       TagCategory[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 
   @@index([name])
+  @@index([status, deletedAt])
 }
 
 model WorkspaceMember {
   id          String   @id @default(uuid())
   userId      String
   workspaceId String
-  role        String   @default("MEMBER") // "OWNER", "ADMIN", "MEMBER", "GUEST"
+  role        String   @default("MEMBER") // see WorkspaceRole enum — kept as String until migration applied
   joinedAt    DateTime @default(now())
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -104,47 +121,78 @@ model User {
   agencyId          String?
   profileId         String?
   role              UserRole            @default(USER)
+
+  // ─── Auth Phase 1: signup / login email-only / forgot password ───
+  // Display name (giữ Unicode tiếng Việt có dấu — KHÔNG sanitize)
+  displayName                String?
+  // Email verification flow
+  emailVerified              Boolean   @default(false)
+  emailVerifiedAt            DateTime?
+  // Migration tracking cho user cũ (nhóm A/B/C trong backfill script)
+  hasCompletedEmailMigration Boolean   @default(false)
+  // Account lockout (5 fail / 15 phút)
+  failedLoginAttempts        Int       @default(0)
+  lockedUntil                DateTime?
+  // Audit timestamps
+  lastPasswordChangedAt      DateTime?
+  lastLoginAt                DateTime?
+  lastLoginIp                String?
+  // Bump để invalidate tất cả JWT cũ (CVE-2025-29927 defense + reset password)
+  sessionVersion             Int       @default(0)
   ownedAgency       Agency[]            @relation("AgencyOwner")
   bonuses           MonthlyBonus[]
   payrolls          Payroll[]
   metrics           PerformanceMetric[]
   tasks             Task[]              @relation("AssigneeTasks")
 
-  agency            Agency?             @relation("AgencyMembers", fields: [agencyId], references: [id])
-  workspaces        WorkspaceMember[]
-  clientTasks       Task[]              @relation("UserClientTasks")
-  clientProjects    Project[]           @relation("UserClientProjects")
-  clientInvoices    Invoice[]           @relation("UserClientInvoices")
-  clientRatings     Rating[]            @relation("ClientRatings")
-  staffRatings      Rating[]            @relation("StaffRatings")
-  errorLogs         ErrorLog[]          @relation("UserErrorLogs")
-  detectedErrors    ErrorLog[]          @relation("UserDetectedErrors")
-  monthlyRanks      MonthlyRank[]       @relation("UserMonthlyRanks")
-  sessions          Session[]
-  events            Event[]
-  presence                UserPresence?
-  notificationPreference  NotificationPreference?
-  scheduleRules      ScheduleRule[]
-  scheduleExceptions ScheduleException[]
-  dailyAvailabilities DailyAvailability[]
-  profileAccesses     ProfileAccess[]
-  accessRequests      ProfileAccessRequest[]
-  approvedRequests    ProfileAccessRequest[] @relation("ApprovedBy")
-  requestedRequests   ProfileAccessRequest[] @relation("RequestedBy")
-  tagCategories       TagCategory[]
+  agency                 Agency?                 @relation("AgencyMembers", fields: [agencyId], references: [id])
+  workspaces             WorkspaceMember[]
+  clientTasks            Task[]                  @relation("UserClientTasks")
+  clientProjects         Project[]               @relation("UserClientProjects")
+  clientInvoices         Invoice[]               @relation("UserClientInvoices")
+  clientRatings          Rating[]                @relation("ClientRatings")
+  staffRatings           Rating[]                @relation("StaffRatings")
+  errorLogs              ErrorLog[]              @relation("UserErrorLogs")
+  detectedErrors         ErrorLog[]              @relation("UserDetectedErrors")
+  monthlyRanks           MonthlyRank[]           @relation("UserMonthlyRanks")
+  sessions               Session[]
+  events                 Event[]
+  presence               UserPresence?
+  notificationPreference NotificationPreference?
+  scheduleRules          ScheduleRule[]
+  scheduleExceptions     ScheduleException[]
+  dailyAvailabilities    DailyAvailability[]
+  profileAccesses        ProfileAccess[]
+  accessRequests         ProfileAccessRequest[]
+  approvedRequests       ProfileAccessRequest[]  @relation("ApprovedBy")
+  requestedRequests      ProfileAccessRequest[]  @relation("RequestedBy")
+  tagCategories          TagCategory[]
+  auditLogsAsActor       AuditLog[]              @relation("AuditLogActor")
+  auditLogsAsTarget      AuditLog[]              @relation("AuditLogUser")
+  workspaceInvitesReceived WorkspaceInvitation[] @relation("WorkspaceInvitedUser")
+  workspaceInvitesSent     WorkspaceInvitation[] @relation("WorkspaceInviter")
+
+  // Auth Phase 1 relations
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetOTPs       PasswordResetOTP[]
+  loginAttempts           LoginAttempt[]
 
   // Chat relations
-  contactsSent         Contact[]                @relation("ContactRequester")
-  contactsReceived     Contact[]                @relation("ContactReceiver")
+  contactsSent         Contact[]                 @relation("ContactRequester")
+  contactsReceived     Contact[]                 @relation("ContactReceiver")
   chatParticipations   ConversationParticipant[]
-  createdConversations Conversation[]           @relation("ConversationCreator")
-  messagesSent         Message[]                @relation("MessageSender")
+  createdConversations Conversation[]            @relation("ConversationCreator")
+  messagesSent         Message[]                 @relation("MessageSender")
   messageReactions     MessageReaction[]
   messageReadReceipts  MessageReadReceipt[]
   pinnedMessages       MessagePin[]
   notifications        Notification[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
+
+  // Auth Phase 1 indexes
+  @@index([email])
+  @@index([lockedUntil])
 }
 
 model ProfileAccess {
@@ -153,8 +201,8 @@ model ProfileAccess {
   profileId String
   grantedAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@unique([userId, profileId])
 }
@@ -169,15 +217,13 @@ model ProfileAccessRequest {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  targetProfile   Profile  @relation("TargetProfileRequests", fields: [targetProfileId], references: [id], onDelete: Cascade)
-  requestedBy     User     @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
-  approvedBy      User?    @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetProfile Profile @relation("TargetProfileRequests", fields: [targetProfileId], references: [id], onDelete: Cascade)
+  requestedBy   User    @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  approvedBy    User?   @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@unique([userId, targetProfileId])
 }
-
-
 
 model Payroll {
   id          String    @id @default(uuid())
@@ -278,16 +324,16 @@ model MonthlyBonus {
 }
 
 model PayrollLock {
-  id          String    @id @default(uuid())
-  month       Int
-  year        Int
-  isLocked    Boolean   @default(false)
-  lockedAt    DateTime  @default(now())
-  lockedBy    String
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  profileId   String?
-  profile     Profile?  @relation(fields: [profileId], references: [id])
+  id           String        @id @default(uuid())
+  month        Int
+  year         Int
+  isLocked     Boolean       @default(false)
+  lockedAt     DateTime      @default(now())
+  lockedBy     String
+  workspaceId  String
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id])
+  profileId    String?
+  profile      Profile?      @relation(fields: [profileId], references: [id])
   monthlyRanks MonthlyRank[]
 
   @@unique([month, year, workspaceId], name: "month_year_workspaceId")
@@ -404,7 +450,6 @@ model BillingProfile {
   profile         Profile? @relation(fields: [profileId], references: [id])
 }
 
-
 model Invoice {
   id              String        @id @default(uuid())
   invoiceNumber   String        @unique
@@ -447,6 +492,66 @@ model InvoiceItem {
   task        Task?   @relation(fields: [taskId], references: [id])
 }
 
+/// Workspace invitation — allows OWNER/ADMIN to invite users to a workspace.
+/// Supports both in-profile direct adds and cross-profile invitations with
+/// accept/decline flow. Token field enables future email-based invite links.
+model WorkspaceInvitation {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  invitedUserId String?  // Target user ID (set for in-app invites)
+  invitedEmail  String?  // Email for future email-based invites
+  role          String   @default("MEMBER") // WorkspaceRole to assign on accept
+  token         String   @unique @default(uuid()) // For email/link-based invites
+  status        String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED | REVOKED
+  invitedById   String   // Who sent the invite
+  message       String?  // Optional personal message from inviter
+  expiresAt     DateTime // When the invitation expires
+  respondedAt   DateTime? // When the invitee accepted/declined
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedUser User?     @relation("WorkspaceInvitedUser", fields: [invitedUserId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation("WorkspaceInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, invitedUserId, status]) // Prevent duplicate pending invites
+  @@index([invitedUserId, status])
+  @@index([workspaceId, status])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+/// Immutable, append-only audit trail for security-sensitive workspace events.
+/// IMPORTANT: code SHOULD only INSERT. Never expose update/delete via API.
+/// At the DB level we will REVOKE UPDATE/DELETE on this table from the app
+/// role in Phase 2 (see migration_audit_log_revoke.sql in deploy plan).
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  // Auth Phase 1: workspaceId nullable để hỗ trợ auth events (SIGNUP, LOGIN_FAILED, ...)
+  // không thuộc workspace nào. Workspace events giữ nguyên required workspaceId.
+  workspaceId String?
+  actorUserId String?
+  // userId = target user (cho auth events: SIGNUP, PASSWORD_RESET_REQUESTED, EMAIL_VERIFIED).
+  // Khác với actorUserId (người thực hiện action). Auth events thường userId = actorUserId.
+  userId      String?
+  action      String // e.g. 'workspace.created', 'auth.signup', 'auth.login_failed', 'auth.password_reset_requested'
+  targetType  String // e.g. 'WorkspaceMember', 'Workspace', 'Task', 'User'
+  targetId    String?
+  beforeData  Json?
+  afterData   Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User?      @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  user      User?      @relation("AuditLogUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action])
+}
+
 enum FeedbackSource {
   INTERNAL
   CLIENT
@@ -480,10 +585,6 @@ enum InvoiceTaskStatus {
   UNBILLED
   INVOICED
 }
-
-
-
-
 
 model Rating {
   id                  String   @id @default(cuid())
@@ -581,18 +682,18 @@ model ErrorLog {
   userId          String
   errorId         String
   frequency       Int      @default(1) // Số lần vi phạm lỗi này trong 1 task
-  calculatedScore Int      // frequency * ErrorDictionary.penalty
-  detectedById    String   // Manager người bắt lỗi
+  calculatedScore Int // frequency * ErrorDictionary.penalty
+  detectedById    String // Manager người bắt lỗi
   createdAt       DateTime @default(now())
   workspaceId     String
 
-  task        Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user        User            @relation("UserErrorLogs", fields: [userId], references: [id], onDelete: Cascade)
-  error       ErrorDictionary @relation(fields: [errorId], references: [id])
-  detectedBy  User            @relation("UserDetectedErrors", fields: [detectedById], references: [id])
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  profile     Profile?        @relation(fields: [profileId], references: [id])
-  profileId   String?
+  task       Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User            @relation("UserErrorLogs", fields: [userId], references: [id], onDelete: Cascade)
+  error      ErrorDictionary @relation(fields: [errorId], references: [id])
+  detectedBy User            @relation("UserDetectedErrors", fields: [detectedById], references: [id])
+  workspace  Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  profile    Profile?        @relation(fields: [profileId], references: [id])
+  profileId  String?
 
   @@index([taskId])
   @@index([userId])
@@ -601,19 +702,19 @@ model ErrorLog {
 }
 
 model MonthlyRank {
-  id             String   @id @default(uuid())
-  userId         String
-  month          Int
-  year           Int
-  workspaceId    String
-  totalTasks     Int      @default(0)
-  totalPenalty   Int      @default(0)
-  errorRate      Float    @default(0)
-  rank           String   @default("UNRANKED") // S, A, B, C, D, UNRANKED
-  isLocked       Boolean  @default(false)
-  payrollLockId  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  userId        String
+  month         Int
+  year          Int
+  workspaceId   String
+  totalTasks    Int      @default(0)
+  totalPenalty  Int      @default(0)
+  errorRate     Float    @default(0)
+  rank          String   @default("UNRANKED") // S, A, B, C, D, UNRANKED
+  isLocked      Boolean  @default(false)
+  payrollLockId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   user        User         @relation("UserMonthlyRanks", fields: [userId], references: [id], onDelete: Cascade)
   workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -630,9 +731,9 @@ model ScheduleRule {
   userId      String
   workspaceId String
   profileId   String
-  dayOfWeek   Int      // 0=Sun, 1=Mon, ... 6=Sat
-  startTime   String   // HH:mm
-  endTime     String   // HH:mm
+  dayOfWeek   Int // 0=Sun, 1=Mon, ... 6=Sat
+  startTime   String // HH:mm
+  endTime     String // HH:mm
   timezone    String   @default("Asia/Ho_Chi_Minh")
   isActive    Boolean  @default(true)
   updatedById String?
@@ -654,9 +755,9 @@ model ScheduleException {
   userId      String
   workspaceId String
   profileId   String
-  date        DateTime              // Normalized to UTC midnight
-  startTime   String                // HH:mm
-  endTime     String                // HH:mm
+  date        DateTime // Normalized to UTC midnight
+  startTime   String // HH:mm
+  endTime     String // HH:mm
   type        ScheduleExceptionType
   reason      String?
   timezone    String                @default("Asia/Ho_Chi_Minh")
@@ -679,7 +780,7 @@ model DailyAvailability {
   workspaceId String
   profileId   String
   date        DateTime // Normalized to UTC midnight
-  schedule    Json     // Array of 24 strings
+  schedule    Json // Array of 24 strings
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -719,28 +820,31 @@ enum ClaimSource {
 }
 
 model TagCategory {
-  id        String    @id @default(uuid())
-  name      String
-  profileId String
-  userId    String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  profileId   String
+  userId      String
+  workspaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile   Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   taskTags  TaskTag[]
 
   @@index([profileId])
   @@index([userId])
+  @@index([workspaceId])
 }
 
 model TaskTag {
-  id            String      @id @default(uuid())
+  id            String @id @default(uuid())
   taskId        String
   tagCategoryId String
 
-  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  tagCategory   TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagCategory TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, tagCategoryId])
   @@index([taskId])
@@ -790,25 +894,25 @@ enum NotificationType {
 }
 
 model Notification {
-  id              String           @id @default(uuid())
-  userId          String
-  type            NotificationType
-  title           String
-  body            String           @db.Text
-  avatarUrl       String?
-  isRead          Boolean          @default(false)
-  isArchived      Boolean          @default(false)
+  id             String           @id @default(uuid())
+  userId         String
+  type           NotificationType
+  title          String
+  body           String           @db.Text
+  avatarUrl      String?
+  isRead         Boolean          @default(false)
+  isArchived     Boolean          @default(false)
   // Source links (nullable, depends on type)
-  conversationId  String?
-  messageId       String?
-  taskId          String?
-  actorId         String?
+  conversationId String?
+  messageId      String?
+  taskId         String?
+  actorId        String?
   // Flexible metadata (group name, task title, oldStatus, newStatus, messageCount, ...)
-  metadata        Json?
+  metadata       Json?
   // Delivery tracking — kept for future Push/Email phases
-  pushSentAt      DateTime?
-  emailSentAt     DateTime?
-  createdAt       DateTime         @default(now())
+  pushSentAt     DateTime?
+  emailSentAt    DateTime?
+  createdAt      DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -822,8 +926,8 @@ model NotificationPreference {
   userId          String   @unique
   emailEnabled    Boolean  @default(true)
   emailDigestMode String   @default("REALTIME") // REALTIME | HOURLY | DAILY | OFF
-  quietHoursStart Int?     // 0-23 UTC hour, null = no quiet hours
-  quietHoursEnd   Int?     // 0-23 UTC hour
+  quietHoursStart Int? // 0-23 UTC hour, null = no quiet hours
+  quietHoursEnd   Int? // 0-23 UTC hour
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -854,12 +958,12 @@ model Conversation {
   taskId      String?          @unique
   workspaceId String?
   createdById String
-  deletedFor  Json?            // { userId: ISOdate } per-participant soft delete
+  deletedFor  Json? // { userId: ISOdate } per-participant soft delete
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  task         Task?                      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  createdBy    User                       @relation("ConversationCreator", fields: [createdById], references: [id])
+  task         Task?                     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy    User                      @relation("ConversationCreator", fields: [createdById], references: [id])
   participants ConversationParticipant[]
   messages     Message[]
   pins         MessagePin[]
@@ -885,33 +989,33 @@ model ConversationParticipant {
 }
 
 model Message {
-  id             String      @id @default(uuid())
-  conversationId String
-  senderId       String
-  content        String?     @db.Text
-  type           MessageType @default(TEXT)
-  fileUrl        String?
-  fileName       String?
-  fileSize       Int?
-  replyToId      String?
-  isEdited       Boolean     @default(false)
-  isDeleted      Boolean     @default(false)
-  editedAt       DateTime?
-  deletedAt      DateTime?
-  viewOnce       Boolean     @default(false)
-  viewedBy       Json?       // { userId: ISOdate } map of who viewed
-  deletedForUsers Json?      // { userId: ISOdate } per-user "delete for me" hide
-  isImportant    Boolean     @default(false)  // sender flagged as needs response
-  mentions       Json?       // string[] of userIds mentioned via @
+  id                          String      @id @default(uuid())
+  conversationId              String
+  senderId                    String
+  content                     String?     @db.Text
+  type                        MessageType @default(TEXT)
+  fileUrl                     String?
+  fileName                    String?
+  fileSize                    Int?
+  replyToId                   String?
+  isEdited                    Boolean     @default(false)
+  isDeleted                   Boolean     @default(false)
+  editedAt                    DateTime?
+  deletedAt                   DateTime?
+  viewOnce                    Boolean     @default(false)
+  viewedBy                    Json? // { userId: ISOdate } map of who viewed
+  deletedForUsers             Json? // { userId: ISOdate } per-user "delete for me" hide
+  isImportant                 Boolean     @default(false) // sender flagged as needs response
+  mentions                    Json? // string[] of userIds mentioned via @
   forwardedFromMessageId      String?
   forwardedFromConversationId String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt                   DateTime    @default(now())
+  updatedAt                   DateTime    @updatedAt
 
-  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User              @relation("MessageSender", fields: [senderId], references: [id])
-  replyTo      Message?          @relation("MessageReply", fields: [replyToId], references: [id])
-  replies      Message[]         @relation("MessageReply")
+  conversation Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                 @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo      Message?             @relation("MessageReply", fields: [replyToId], references: [id])
+  replies      Message[]            @relation("MessageReply")
   reactions    MessageReaction[]
   readReceipts MessageReadReceipt[]
   pin          MessagePin?
@@ -958,4 +1062,76 @@ model MessageReadReceipt {
 
   @@unique([messageId, userId])
   @@index([messageId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  Auth Phase 1: signup / login email-only / forgot password / migration
+// ─────────────────────────────────────────────────────────────────────
+
+/// Token gửi qua email để xác thực địa chỉ email (signup/migration) HOẶC password reset.
+/// Lưu HASH (SHA-256) của raw token; raw token chỉ xuất hiện trong link email/response.
+///
+/// Security note: `purpose` field BẮT BUỘC để tránh logic confusion —
+/// query email-verification flow KHÔNG được vô tình match password reset token và ngược lại.
+/// Mọi query MUST filter theo `purpose`.
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // SHA-256 hex của raw token
+  // Values: "EMAIL_VERIFICATION" | "PASSWORD_RESET" | "EMAIL_MIGRATION"
+  purpose   String    @default("EMAIL_VERIFICATION")
+  email     String    // Email liên quan (có thể khác User.email khi đổi)
+  expiresAt DateTime  // = createdAt + 24h (verification) hoặc 5 phút (password reset)
+  usedAt    DateTime? // null nếu chưa verify
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+/// OTP 6 chữ số cho luồng quên mật khẩu / xác thực email migration.
+/// Lưu HASH (SHA-256) của OTP plaintext; KHÔNG bao giờ lưu plaintext.
+///
+/// Security note: `purpose` field BẮT BUỘC để tránh token confusion —
+/// password reset OTP KHÔNG được vô tình match email migration query và ngược lại.
+model PasswordResetOTP {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpHash       String    // SHA-256 hex của 6-digit OTP
+  // Values: "PASSWORD_RESET" | "EMAIL_MIGRATION"
+  purpose       String    @default("PASSWORD_RESET")
+  email         String    // Snapshot email tại thời điểm tạo (chống email-change attack)
+  expiresAt     DateTime  // = createdAt + 10 phút
+  attemptCount  Int       @default(0) // Tăng mỗi lần verify sai; >= 5 → invalidate
+  consumedAt    DateTime? // Đặt khi user nhập đúng OTP và bắt đầu reset password
+  invalidatedAt DateTime? // Đặt khi vượt quá 5 lần thử / superseded
+  ipAddress     String?
+  createdAt     DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+/// Lịch sử các lần thử đăng nhập (success/fail) — phục vụ:
+///   - Account lockout (đếm 5 fail trong 15 phút sliding window)
+///   - Security audit ("ai đã login từ IP nào?")
+///   - Anti-fraud (Phase 5+ correlate với device fingerprint)
+model LoginAttempt {
+  id         String    @id @default(uuid())
+  userId     String?   // null nếu user_not_found (chống enumeration: vẫn log)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  emailTried String    // Lowercase. Có thể là email hoặc username (transition mode).
+  success    Boolean
+  failReason String?   // 'invalid_password' | 'user_not_found' | 'account_locked' | 'email_not_verified' | 'rate_limited'
+  ipAddress  String
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+
+  @@index([emailTried, createdAt])
+  @@index([ipAddress, createdAt])
+  @@index([userId, createdAt])
 }

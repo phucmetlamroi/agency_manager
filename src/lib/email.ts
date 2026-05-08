@@ -3,7 +3,7 @@ import { Resend } from 'resend'
 
 // Initialize with API Key (from env)
 const API_KEY = process.env.RESEND_API_KEY
-const FROM_EMAIL_RAW = process.env.RESEND_FROM_EMAIL || 'notification@agencymanager.com'
+const FROM_EMAIL_RAW = process.env.RESEND_FROM_EMAIL || 'notification@hustlytasker.xyz'
 const SENDER_NAME = process.env.EMAIL_SENDER_NAME || 'HustlyTasker'
 const FROM_EMAIL = `${SENDER_NAME} <${FROM_EMAIL_RAW}>`
 

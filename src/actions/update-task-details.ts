@@ -1,10 +1,8 @@
 'use server'
 
-import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
-import { getSession } from '@/lib/auth'
-import { UserRole } from '@prisma/client'
+import { verifyWorkspaceAccess } from '@/lib/security'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
 export async function updateTaskDetails(id: string, data: {
@@ -21,9 +19,13 @@ export async function updateTaskDetails(id: string, data: {
     duration?: string
 }, workspaceId: string) {
     try {
-        const session = await getSession()
-        if (!session) return { error: 'Unauthorized' }
-        const isAdmin = session.user.role === UserRole.ADMIN || session.user.isTreasurer
+        let isAdmin = false
+        try {
+            const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+            isAdmin = access.isGlobalAdmin || access.workspaceRole === 'ADMIN' || access.workspaceRole === 'OWNER'
+        } catch {
+            return { error: 'Unauthorized: no workspace access' }
+        }
         const workspacePrisma = getWorkspacePrisma(workspaceId)
 
         // Fetch current task first to compare notes and check financial locks

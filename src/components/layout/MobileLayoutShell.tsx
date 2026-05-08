@@ -4,18 +4,21 @@ import React, { useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, UserCircle, ArrowLeftRight, Bell, Settings, LogOut, Monitor, X } from 'lucide-react'
+import { AlertTriangle, UserCircle, ArrowLeftRight, Bell, Settings, LogOut, Monitor, X, ScrollText, UsersRound } from 'lucide-react'
 
 export default function MobileLayoutShell({
     children,
     user,
     handleLogout,
-    workspaceId
+    workspaceId,
+    workspaceRole,
 }: {
     children: React.ReactNode,
     user: any,
     workspaceId: string,
     handleLogout: () => void
+    /** Workspace-scoped role for nav filtering */
+    workspaceRole?: string
 }) {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
@@ -58,7 +61,7 @@ export default function MobileLayoutShell({
             </main>
 
             {/* BOTTOM NAV */}
-            <BottomNav role={user.role} workspaceId={workspaceId} />
+            <BottomNav role={workspaceRole && (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN') ? 'ADMIN' : user.role} workspaceId={workspaceId} />
 
             {/* USER DRAWER */}
             {isDrawerOpen && (
@@ -103,11 +106,22 @@ export default function MobileLayoutShell({
                             <Link href={`/${workspaceId}/admin`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all duration-300 flex items-center gap-3 border border-indigo-500/20">
                                 <ArrowLeftRight className="w-4 h-4" /> Đổi Team / Workspace
                             </Link>
+                            {/* Admin-only links */}
+                            {workspaceRole && (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN') && (
+                                <>
+                                    <Link href={`/${workspaceId}/admin/members`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
+                                        <UsersRound className="w-4 h-4" /> Quản lý thành viên
+                                    </Link>
+                                    <Link href={`/${workspaceId}/admin/audit-log`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
+                                        <ScrollText className="w-4 h-4" /> Nhật ký hoạt động
+                                    </Link>
+                                    <Link href={`/${workspaceId}/admin/settings`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
+                                        <Settings className="w-4 h-4" /> Workspace Settings
+                                    </Link>
+                                </>
+                            )}
                             <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-400 border border-white/5 cursor-pointer">
                                 <Bell className="w-4 h-4" /> Notifications
-                            </button>
-                            <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-400 border border-white/5 cursor-pointer">
-                                <Settings className="w-4 h-4" /> Settings
                             </button>
                         </div>
 

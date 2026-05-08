@@ -8,11 +8,13 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getSession } from '@/lib/auth'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
-        const session = await getSession()
-        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
+        // SECURITY: Verify caller is ADMIN of THIS workspace (not just global ADMIN).
+        // Previously: any global ADMIN could change any user's role across all workspaces.
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.user.update({
@@ -22,7 +24,10 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
         revalidatePath(`/${workspaceId}/admin/users`)
         revalidatePath(`/${workspaceId}/admin`)
         return { success: true }
-    } catch (e) {
+    } catch (e: any) {
+        if (e?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: e.message }
+        }
         return { error: 'Failed to update role' }
     }
 }
@@ -61,8 +66,9 @@ export async function createTask(formData: FormData, workspaceId: string) {
 
         const clientId = formData.get('clientId') ? parseInt(formData.get('clientId') as string) : null
 
-        const session = await getSession()
-        if (session?.user?.role !== 'ADMIN') return { error: 'Unauthorized' }
+        // SECURITY: Verify caller is ADMIN of THIS workspace (workspace-scoped check).
+        // Replaces previous global `session.user.role === 'ADMIN'` check that ignored workspace boundary.
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
@@ -141,7 +147,10 @@ export async function createTask(formData: FormData, workspaceId: string) {
         revalidatePath(`/${workspaceId}/admin/crm`)
         revalidatePath(`/${workspaceId}/dashboard`)
         return { success: true }
-    } catch (e) {
+    } catch (e: any) {
+        if (e?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: e.message }
+        }
         return { error: 'Error creating task' }
     }
 }

@@ -26,9 +26,7 @@ export default async function WorkspaceLayout({
 
     const { workspaceId } = await params
 
-    const isSystemAdmin = session.user.role === 'ADMIN'
-
-    // We can inject the workspaceId context down if needed, 
+    // We can inject the workspaceId context down if needed,
     // but React Server Components inside will also get `params.workspaceId` from their own props.
     return (
         <ChatProvider userId={session.user.id}>

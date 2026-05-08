@@ -16,16 +16,18 @@ interface AdminShellProps {
     }
     workspaceId: string
     viewRole?: 'ADMIN' | 'USER'
+    /** Workspace-scoped role for nav filtering */
+    workspaceRole?: string
 }
 
 
 
-export function AdminShell({ children, user, workspaceId, viewRole = 'ADMIN' }: AdminShellProps) {
+export function AdminShell({ children, user, workspaceId, viewRole = 'ADMIN', workspaceRole }: AdminShellProps) {
     const [collapsed, setCollapsed] = React.useState(false)
 
     return (
         <div className="flex min-h-dvh bg-background text-foreground">
-            <AppSidebar user={user} workspaceId={workspaceId} onCollapsedChange={setCollapsed} viewRole={viewRole} />
+            <AppSidebar user={user} workspaceId={workspaceId} onCollapsedChange={setCollapsed} viewRole={viewRole} workspaceRole={workspaceRole} />
             <main
                 className={cn(
                     "flex-1 overflow-x-hidden pt-16 md:pt-0 relative transition-all duration-300",

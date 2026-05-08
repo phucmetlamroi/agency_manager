@@ -2,19 +2,24 @@
 
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
-import { UserRole } from '@prisma/client'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { prisma } from '@/lib/db'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 const MAX_TAGS_PER_USER = 15
 
-// ─── Get all tags for a user (within a profile) ───────────────
+// ─── Get all tags for a user (within a workspace) ───────────────
 export async function getTagsForUser(workspaceId: string) {
-    const session = await getSession()
-    if (!session) return { error: 'Unauthorized', tags: [] }
+    // SECURITY: verify caller is at least a MEMBER of this workspace.
+    let access
+    try {
+        access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    } catch {
+        return { error: 'Unauthorized', tags: [] }
+    }
 
-    const userId = session.user.id
-    let profileId = session.user.profileId
+    const userId = access.userId
+    let profileId = access.user.profileId
 
     // If profileId is missing in session, try fetching it from the database
     if (!profileId) {
@@ -26,7 +31,11 @@ export async function getTagsForUser(workspaceId: string) {
     }
 
     const tags = await prisma.tagCategory.findMany({
-        where: { userId, ...(profileId ? { profileId } : {}) },
+        where: {
+            userId,
+            ...(profileId ? { profileId } : {}),
+            workspaceId,
+        },
         orderBy: { createdAt: 'asc' },
         select: { id: true, name: true, createdAt: true }
     })
@@ -36,14 +45,15 @@ export async function getTagsForUser(workspaceId: string) {
 
 // ─── Create a new tag ─────────────────────────────────────────
 export async function createTag(name: string, workspaceId: string) {
-    const session = await getSession()
-    if (!session) return { error: 'Unauthorized' }
+    let access
+    try {
+        access = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    } catch {
+        return { error: 'Forbidden: insufficient workspace permissions' }
+    }
 
-    const isAdmin = session.user.role === UserRole.ADMIN || session.user.isTreasurer
-    if (!isAdmin) return { error: 'Forbidden' }
-
-    const userId = session.user.id
-    let profileId = session.user.profileId
+    const userId = access.userId
+    let profileId = access.user.profileId
 
     // If profileId is missing in session, try fetching it from the database
     if (!profileId) {
@@ -73,7 +83,7 @@ export async function createTag(name: string, workspaceId: string) {
     if (existing) return { error: 'Tag đã tồn tại' }
 
     const tag = await prisma.tagCategory.create({
-        data: { name: trimmed, profileId, userId },
+        data: { name: trimmed, profileId, userId, workspaceId },
         select: { id: true, name: true, createdAt: true }
     })
 
@@ -81,19 +91,21 @@ export async function createTag(name: string, workspaceId: string) {
 }
 
 // ─── Update tag name ──────────────────────────────────────────
-export async function updateTag(tagId: string, name: string) {
-    const session = await getSession()
-    if (!session) return { error: 'Unauthorized' }
-
-    const isAdmin = session.user.role === UserRole.ADMIN || session.user.isTreasurer
-    if (!isAdmin) return { error: 'Forbidden' }
+export async function updateTag(tagId: string, name: string, workspaceId: string) {
+    let access
+    try {
+        access = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    } catch {
+        return { error: 'Forbidden: insufficient workspace permissions' }
+    }
 
     const trimmed = name.trim()
     if (!trimmed) return { error: 'Tag name cannot be empty' }
 
     const tag = await prisma.tagCategory.findUnique({ where: { id: tagId } })
     if (!tag) return { error: 'Tag not found' }
-    if (tag.userId !== session.user.id) return { error: 'Forbidden' }
+    // Defense-in-depth: ensure the caller owns this tag
+    if (tag.userId !== access.userId) return { error: 'Forbidden' }
 
     const updated = await prisma.tagCategory.update({
         where: { id: tagId },
@@ -105,16 +117,18 @@ export async function updateTag(tagId: string, name: string) {
 }
 
 // ─── Delete tag ───────────────────────────────────────────────
-export async function deleteTag(tagId: string) {
-    const session = await getSession()
-    if (!session) return { error: 'Unauthorized' }
-
-    const isAdmin = session.user.role === UserRole.ADMIN || session.user.isTreasurer
-    if (!isAdmin) return { error: 'Forbidden' }
+export async function deleteTag(tagId: string, workspaceId: string) {
+    let access
+    try {
+        access = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    } catch {
+        return { error: 'Forbidden: insufficient workspace permissions' }
+    }
 
     const tag = await prisma.tagCategory.findUnique({ where: { id: tagId } })
     if (!tag) return { error: 'Tag not found' }
-    if (tag.userId !== session.user.id) return { error: 'Forbidden' }
+    // Defense-in-depth: ensure the caller owns this tag
+    if (tag.userId !== access.userId) return { error: 'Forbidden' }
 
     // Delete all associated TaskTags first (cascade should handle, but explicit)
     await prisma.tagCategory.delete({ where: { id: tagId } })
@@ -124,11 +138,12 @@ export async function deleteTag(tagId: string) {
 
 // ─── Set tags on a task ───────────────────────────────────────
 export async function setTaskTags(taskId: string, tagCategoryIds: string[], workspaceId: string) {
-    const session = await getSession()
-    if (!session) return { error: 'Unauthorized' }
-
-    const isAdmin = session.user.role === UserRole.ADMIN || session.user.isTreasurer
-    if (!isAdmin) return { error: 'Forbidden' }
+    let access
+    try {
+        access = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    } catch {
+        return { error: 'Forbidden: insufficient workspace permissions' }
+    }
 
     const workspacePrisma = getWorkspacePrisma(workspaceId)
 
@@ -139,7 +154,7 @@ export async function setTaskTags(taskId: string, tagCategoryIds: string[], work
     // Validate that all tagCategoryIds belong to the current user
     if (tagCategoryIds.length > 0) {
         const ownedTags = await prisma.tagCategory.findMany({
-            where: { id: { in: tagCategoryIds }, userId: session.user.id }
+            where: { id: { in: tagCategoryIds }, userId: access.userId }
         })
         if (ownedTags.length !== tagCategoryIds.length) {
             return { error: 'Invalid tag IDs: some tags do not belong to you' }

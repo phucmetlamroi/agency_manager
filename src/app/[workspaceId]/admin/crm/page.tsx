@@ -24,7 +24,7 @@ export default async function CRMDashboard({ params }: { params: Promise<{ works
                         <Building2 className="w-5 h-5 text-indigo-300" />
                     </div>
                     <div>
-                        <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight leading-tight m-0 font-heading">
+                        <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight leading-tight m-0">
                             Quản lý Khách hàng
                         </h1>
                         <p className="text-xs text-zinc-500 mt-1 m-0">

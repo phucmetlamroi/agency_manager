@@ -33,7 +33,7 @@ export default function MobileLayoutShell({
                     <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-xs shadow-md shadow-indigo-500/30">
                         A
                     </div>
-                    <h1 className="font-heading font-bold text-lg leading-none text-zinc-100">
+                    <h1 className="font-extrabold text-lg leading-none text-zinc-100 tracking-tight">
                         Agency<span className="text-indigo-400">Manager</span>
                     </h1>
                 </div>

@@ -20,8 +20,10 @@ const config: Config = {
         },
         extend: {
             fontFamily: {
+                // Single-font system: cả body và heading đều dùng Plus Jakarta Sans.
+                // Heading phân biệt bằng weight (font-bold/extrabold/black) thay vì family.
                 sans: ['var(--font-sans)', 'sans-serif'],
-                heading: ['var(--font-heading)', 'serif'],
+                heading: ['var(--font-sans)', 'sans-serif'],
             },
             colors: {
                 border: "hsl(var(--border))",

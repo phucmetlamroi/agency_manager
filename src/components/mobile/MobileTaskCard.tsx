@@ -120,7 +120,7 @@ export default function MobileTaskCard({
                                 </span>
                             )}
                         </div>
-                        <h3 className="text-white font-bold text-base leading-tight line-clamp-2 font-heading">
+                        <h3 className="text-white font-extrabold text-base leading-tight line-clamp-2 tracking-tight">
                             {task.title}
                         </h3>
                     </div>

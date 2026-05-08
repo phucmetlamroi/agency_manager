@@ -23,7 +23,7 @@ export default function DesktopLayoutShell({
             {/* DESKTOP SIDEBAR */}
             <aside className="w-64 border-r border-white/10 p-6 flex-col hidden md:flex sticky top-0 h-screen bg-zinc-950/50 backdrop-blur-xl">
                 <div className="mb-8">
-                    <h1 className="text-2xl font-heading font-bold bg-gradient-to-r from-emerald-400 to-indigo-500 bg-clip-text text-transparent drop-shadow-sm">
+                    <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 to-indigo-500 bg-clip-text text-transparent drop-shadow-sm">
                         TOP 1
                     </h1>
                 </div>

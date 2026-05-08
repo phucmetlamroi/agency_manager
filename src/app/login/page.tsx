@@ -26,7 +26,7 @@ export default function LoginPage() {
                     <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/30">
                         <span className="text-white font-black text-2xl">H</span>
                     </div>
-                    <h1 className="text-3xl font-bold text-white font-heading">Đăng nhập</h1>
+                    <h1 className="text-3xl font-extrabold text-white tracking-tight">Đăng nhập</h1>
                     <p className="text-zinc-400 text-sm mt-1">Hustly<span className="text-violet-400 font-semibold">Tasker</span></p>
                 </div>
 

@@ -115,7 +115,7 @@ export default async function AdminSchedulePage({
   return (
     <div className="flex-1 space-y-4 p-3 pt-4 sm:p-6">
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold tracking-tight font-heading">Lịch điều phối nhân sự</h2>
+        <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">Lịch điều phối nhân sự</h2>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Xem lịch làm việc của từng nhân sự trong team — chỉ xem, không can thiệp
         </p>

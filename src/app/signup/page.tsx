@@ -120,7 +120,7 @@ export default function SignupPage() {
                         <ArrowLeft className="w-4 h-4" />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold text-zinc-100 font-heading">Tạo tài khoản</h1>
+                        <h1 className="text-2xl font-extrabold text-zinc-100 tracking-tight">Tạo tài khoản</h1>
                         <p className="text-xs text-zinc-500">Hustly<span className="text-violet-400 font-semibold">Tasker</span> · Miễn phí, đầy đủ tính năng</p>
                     </div>
                 </div>

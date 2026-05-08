@@ -99,7 +99,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
             {/* Header — responsive: stack on mobile, row on desktop */}
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:mb-8">
                 <div>
-                    <h2 className="title-gradient text-2xl sm:text-3xl m-0 font-heading">Bảng lương & Thu nhập</h2>
+                    <h2 className="title-gradient text-2xl sm:text-3xl m-0 font-extrabold tracking-tight">Bảng lương & Thu nhập</h2>
                     <p className="text-zinc-500 mt-2 text-sm">
                         Workspace: <span className="text-white font-semibold">{workspace?.name}</span> · Tính trên các task đã "{SALARY_COMPLETED_STATUS}".
                     </p>

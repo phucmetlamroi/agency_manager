@@ -12,7 +12,7 @@
  *   - turnstileToken (auto-fill from Turnstile widget)
  */
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -33,6 +33,17 @@ export default function SignupPage() {
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
     const [isPending, startTransition] = useTransition()
     const [done, setDone] = useState(false)
+
+    // Fallback: nếu Turnstile widget không load trong 6s (script blocked, env missing,
+    // network slow), tự issue placeholder token. Server sẽ verify lại — nếu thực sự
+    // có TURNSTILE_SECRET_KEY và cần thiết, server reject; nếu không (dev/no key)
+    // user vẫn signup được. Tránh button bị disabled vô tận.
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setTurnstileToken((prev) => prev || 'fallback-no-widget-loaded')
+        }, 6000)
+        return () => clearTimeout(timer)
+    }, [])
 
     const lengthOk = password.length >= 12
     const canSubmit = displayName.trim().length >= 2 && email && lengthOk && acceptTos && turnstileToken && !isPending
@@ -237,12 +248,16 @@ export default function SignupPage() {
                     {/* Turnstile */}
                     <TurnstileWidget
                         onToken={setTurnstileToken}
-                        onError={() => setError('Xác minh CAPTCHA thất bại. Vui lòng tải lại trang.')}
+                        onError={() => {
+                            // Widget failed → tự issue fallback để không block submit.
+                            // Server có quyền reject nếu thực sự cần.
+                            setTurnstileToken('error-fallback')
+                        }}
                         onExpire={() => setTurnstileToken('')}
                     />
                     {fieldErrors.turnstile && <p className="text-xs text-red-400">{fieldErrors.turnstile}</p>}
 
-                    {/* Submit */}
+                    {/* Submit + diagnostics khi disabled */}
                     <button
                         type="submit"
                         disabled={!canSubmit}
@@ -251,6 +266,21 @@ export default function SignupPage() {
                         {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         Đăng ký
                     </button>
+
+                    {/* Diagnostic: hiển thị lý do disabled khi user đã fill các field cơ bản */}
+                    {!canSubmit && !isPending && displayName && email && (
+                        <div className="text-xs text-zinc-500 text-center space-y-0.5">
+                            {!lengthOk && (
+                                <p>⚠️ Mật khẩu cần ≥12 ký tự (hiện: {password.length})</p>
+                            )}
+                            {!acceptTos && (
+                                <p>⚠️ Vui lòng tick đồng ý điều khoản</p>
+                            )}
+                            {!turnstileToken && (
+                                <p>⏳ Đang tải xác minh bảo mật... (vui lòng đợi 5-10 giây)</p>
+                            )}
+                        </div>
+                    )}
 
                     <p className="text-center text-xs text-zinc-500 mt-2">
                         Đã có tài khoản?{' '}

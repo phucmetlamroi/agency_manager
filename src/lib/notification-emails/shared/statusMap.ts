@@ -17,7 +17,7 @@ const STATUS_MAP: Record<string, StatusInfo> = {
     'Đang thực hiện':  { icon: '🟡', label: 'Đang làm',    color: '#d97706', bg: '#fef3c7' },
     'Dang thuc hien':  { icon: '🟡', label: 'Đang làm',    color: '#d97706', bg: '#fef3c7' },
     'IN_PROGRESS':     { icon: '🟡', label: 'Đang làm',    color: '#d97706', bg: '#fef3c7' },
-    'Review':          { icon: '🔵', label: 'Đang review', color: '#2563eb', bg: '#dbeafe' },
+    // [Sprint A removed] 'Review' status — submit giờ đi thẳng Revision
     'Đã nộp':          { icon: '🔵', label: 'Đang review', color: '#2563eb', bg: '#dbeafe' },
     'Hoàn tất':        { icon: '🟢', label: 'Hoàn thành',  color: '#059669', bg: '#d1fae5' },
     'Hoan tat':        { icon: '🟢', label: 'Hoàn thành',  color: '#059669', bg: '#d1fae5' },

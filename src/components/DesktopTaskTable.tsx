@@ -10,7 +10,7 @@ import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
 import DeleteTaskButton from './DeleteTaskButton'
-import ManagerReviewChecklist from './tasks/ManagerReviewChecklist'
+// [Sprint A removed] ManagerReviewChecklist import — bảng đánh giá đã bỏ.
 
 import { TaskWithUser } from '@/types/admin'
 import { useConfirm } from '@/components/ui/ConfirmModal'
@@ -66,17 +66,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
     const [isUpdating, setIsUpdating] = useState(false)
 
 
-    // Feedback Modal State
-    const [feedbackModal, setFeedbackModal] = useState<{ isOpen: boolean, taskId: string | null }>({ isOpen: false, taskId: null })
-    const [feedbackForm, setFeedbackForm] = useState<{ type: 'INTERNAL' | 'CLIENT', content: string }>({ type: 'INTERNAL', content: '' })
-
-    const handleFeedbackSubmit = async () => {
-        if (!feedbackModal.taskId) return
-
-        await handleStatusChange(feedbackModal.taskId, 'Revision', undefined, feedbackForm)
-        setFeedbackModal({ isOpen: false, taskId: null })
-        setFeedbackForm({ type: 'INTERNAL', content: '' })
-    }
+    // [Sprint A removed] Feedback Modal State — bảng đánh giá Client/Internal đã bỏ.
 
     const openTask = (task: TaskWithUser) => {
         setSelectedTask(task)
@@ -245,7 +235,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                 >
 
                                     <option value="">-- Ch\u1ecdn tr\u1ea1ng th\u00e1i --</option>
-                                    {['Nh\u1eadn task', '\u0110ang th\u1ef1c hi\u1ec7n', 'Review', 'Ho\u00e0n t\u1ea5t', 'T\u1ea1m ng\u01b0ng', 'S\u1eeda frame'].map(opt => (
+                                    {['Nh\u1eadn task', '\u0110ang th\u1ef1c hi\u1ec7n', 'Revision', 'Ho\u00e0n t\u1ea5t', 'T\u1ea1m ng\u01b0ng', 'S\u1eeda frame', 'Qu\u00e1 h\u1ea1n'].map(opt => (
                                         <option key={opt} value={opt}>{opt}</option>
                                     ))}
                                 </select>
@@ -435,7 +425,8 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                                 <span className="animate-pulse">\u25cf</span> Working...
                                             </span>
                                         )}
-                                        {(task.status === 'T\u1ea1m ng\u01b0ng' || task.status === 'S\u1eeda frame' || task.status === '\u0110ang \u0111\u1ee3i giao' || task.status === 'Revision' || task.status === 'Review') && (
+                                        {/* [Sprint A] 'Review' \u0111\u00e3 b\u1ecf \u2014 submit gi\u1edd \u0111i th\u1eb3ng Revision */}
+                                        {(task.status === 'T\u1ea1m ng\u01b0ng' || task.status === 'S\u1eeda frame' || task.status === '\u0110ang \u0111\u1ee3i giao' || task.status === 'Revision' || task.status === 'Qu\u00e1 h\u1ea1n') && (
                                             <span className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 text-xs italic border border-gray-700">
                                                 \u23f3 Waiting...
                                             </span>
@@ -453,12 +444,9 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                         <select
                                             value={task.status}
                                             onChange={(e) => {
-                                                const val = e.target.value
-                                                if (val === 'Revision') {
-                                                    setFeedbackModal({ isOpen: true, taskId: task.id })
-                                                    return
-                                                }
-                                                handleStatusChange(task.id, val)
+                                                // [Sprint A] Trước đây 'Revision' mở Feedback modal
+                                                // (ManagerReviewChecklist). Bỏ rồi → đổi status trực tiếp.
+                                                handleStatusChange(task.id, e.target.value)
                                             }}
                                             className="appearance-none text-center font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer"
                                             style={{
@@ -837,18 +825,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
             )
             }
 
-            {/* FEEDBACK MODAL (MANAGER CHECKLIST) */}
-            {feedbackModal.isOpen && feedbackModal.taskId && (
-                <ManagerReviewChecklist
-                    taskId={feedbackModal.taskId}
-                    workspaceId={workspaceId}
-                    onClose={() => setFeedbackModal({ isOpen: false, taskId: null })}
-                    onSuccess={() => {
-                        setFeedbackModal({ isOpen: false, taskId: null })
-                        handleStatusChange(feedbackModal.taskId!, 'Revision')
-                    }}
-                />
-            )}
+            {/* [Sprint A removed] FEEDBACK MODAL (MANAGER CHECKLIST) */}
         </>
     )
 }

@@ -2,7 +2,6 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { FeedbackSource } from '@prisma/client'
 import { validateTransition, TaskState } from '@/lib/fsm-config'
 
 import { getCurrentUser } from '@/lib/auth-guard'
@@ -10,7 +9,10 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
-export async function updateTaskStatus(id: string, newStatus: string, workspaceId: string, newNotes?: string, feedbackData?: { type: FeedbackSource, content: string }, currentVersion?: number) {
+// Note (Sprint A simplification): bỏ parameter `feedbackData` (Feedback model
+// đã DROP). Backward-compat: caller cũ (nếu còn) vẫn gọi được, parameter
+// silently ignored. Sẽ remove hoàn toàn ở major version sau.
+export async function updateTaskStatus(id: string, newStatus: string, workspaceId: string, newNotes?: string, _legacyFeedbackData?: unknown, currentVersion?: number) {
     try {
         // --- LAYER 1 & 2: AUTH & CONTEXT ---
         const user = await getCurrentUser()
@@ -55,9 +57,13 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             return { error: 'Task has been updated by someone else. Please refresh.' } // UI should handle this
         }
 
-        // Clear deadline when task is paused or moved to Revision.
+        // Sprint A simplification: SUBMIT flow giờ là Đang thực hiện → Revision
+        // (không còn intermediate Review). Khi user nộp → status=Revision +
+        // deadline=null (cleared) → cron check-deadline KHÔNG flag Quá hạn oan.
+        //
+        // 'Tạm ngưng': pause task, deadline cũng cleared.
+        // Khi cần resume / extend → admin manually set deadline mới.
         const restrictedStatuses = ['Tạm ngưng', 'Revision']
-        // Existing Deadline clear logic
         const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}
 
         // --- SMART STOPWATCH LOGIC ---
@@ -66,24 +72,13 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
 
 
         // --- TRANSACTION BLOCK ---
-        // Ensure Atomicity: Feedback + Task Status must succeed or fail together.
+        // Sprint A simplification: Feedback model đã DROP (không còn
+        // ManagerReviewChecklist + bảng đánh giá Client/Internal).
         const transactionResult = await workspacePrisma.$transaction(async (tx) => {
-            // 1. Create Feedback (if applicable)
-            if (newStatus === 'Revision' && feedbackData) {
-                await tx.feedback.create({
-                    data: {
-                        content: feedbackData.content,
-                        type: feedbackData.type,
-                        taskId: id,
-                        ...(task.projectId ? { projectId: task.projectId } : {})
-                    }
-                })
-            }
+            // [REMOVED] Logic: Reward if Completed Early/On-Time (Reputation)
+            // [REMOVED] Feedback creation (model dropped)
 
-            // 2. [REMOVED] Logic: Reward if Completed Early/On-Time (Reputation)
-
-
-            // 3. Update Task Status
+            // Update Task Status
             const updateData = {
                 status: newStatus,
                 ...(newNotes ? { notes_vi: newNotes } : {}),
@@ -192,29 +187,8 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
                             }
                         }
 
-                        // TRIGGER 2: Submission / Review (To User & Admin)
-                        if (newStatus === 'Review') {
-                            if (updatedTaskResult.assignee?.email) {
-                                console.log(`[Email Debug] Triggering SUBMISSION email to ${updatedTaskResult.assignee.email}`)
-                                await sendEmail({
-                                    to: updatedTaskResult.assignee.email,
-                                    subject: `[Submission] Task "${updatedTaskResult.title}" đang chờ Admin phản hồi`,
-                                    html: emailTemplates.taskSubmitted(
-                                        updatedTaskResult.assignee.username || 'User',
-                                        updatedTaskResult.title
-                                    )
-                                })
-                            }
-
-                            // Also notify Admins
-                            const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } })
-                            for (const admin of admins) {
-                                if (admin.email) {
-                                    // Optional: Separate Admin Notification Template
-                                    // For now we just assume Admin checks dashboard, but good to have.
-                                }
-                            }
-                        }
+                        // [REMOVED Sprint A] TRIGGER 2 'Review' email — status Review đã bỏ
+                        // User submit giờ đi thẳng Revision (không qua Review intermediate).
 
                         // TRIGGER 3: Feedback / Revision (To User)
                         if (newStatus === 'Revision') {

@@ -90,26 +90,11 @@ export async function createProject(data: { name: string, clientId: number, code
     }
 }
 
-// --- FEEDBACK ACTIONS ---
-
-export async function createFeedback(data: { projectId: number, content: string, type: 'CLIENT' | 'INTERNAL', severity: number }, workspaceId: string) {
-    try {
-        const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
-        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
-        await workspacePrisma.feedback.create({
-            data: {
-                projectId: data.projectId,
-                content: data.content,
-                type: data.type,
-                severity: data.severity
-            }
-        })
-        revalidatePath(`/${workspaceId}/admin/crm`)
-        return { success: true }
-    } catch (error) {
-        return { success: false, error: 'Failed to create feedback' }
-    }
+// [Sprint A removed] FEEDBACK ACTIONS — Feedback model + ManagerReviewChecklist
+// đã bỏ. Caller cũ (UI) đã được cleanup. Giữ stub để tránh runtime crash nếu
+// còn caller chưa biết.
+export async function createFeedback(_data: any, _workspaceId: string) {
+    return { success: false, error: 'Feature removed: feedback system was simplified out of the workflow.' }
 }
 
 // --- DELETE ACTION ---

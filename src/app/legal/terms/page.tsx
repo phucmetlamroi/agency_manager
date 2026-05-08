@@ -49,16 +49,12 @@ export default function TermsPage() {
                         </section>
 
                         <section>
-                            <h2 className="text-xl font-bold text-zinc-100 mb-3">3. Gói dùng thử (Trial)</h2>
+                            <h2 className="text-xl font-bold text-zinc-100 mb-3">3. Quyền sử dụng Dịch vụ</h2>
                             <p>
-                                Tài khoản mới được dùng thử miễn phí <strong className="text-violet-400">14 ngày</strong>{' '}
-                                với đầy đủ tính năng. Sau khi hết hạn:
+                                Tất cả tài khoản hiện được sử dụng <strong className="text-violet-400">miễn phí</strong>{' '}
+                                với đầy đủ tính năng. Chúng tôi có thể giới thiệu các gói dịch vụ trả phí hoặc thay đổi
+                                phạm vi tính năng miễn phí trong tương lai và sẽ thông báo trước cho người dùng.
                             </p>
-                            <ul className="list-disc list-inside space-y-1 mt-2 ml-2">
-                                <li>Tài khoản chuyển sang gói FREE với truy cập giới hạn</li>
-                                <li>Toàn bộ dữ liệu được giữ nguyên</li>
-                                <li>Bạn có thể nâng cấp lên gói trả phí bất cứ lúc nào</li>
-                            </ul>
                         </section>
 
                         <section>
@@ -69,7 +65,7 @@ export default function TermsPage() {
                                 <li>Cố gắng phá hoại, hack, hoặc làm gián đoạn hệ thống</li>
                                 <li>Sao chép, bán lại hoặc tái phân phối Dịch vụ</li>
                                 <li>Tải lên nội dung vi phạm bản quyền hoặc gây hại</li>
-                                <li>Tạo nhiều tài khoản để lạm dụng gói trial</li>
+                                <li>Tạo nhiều tài khoản để lạm dụng Dịch vụ</li>
                             </ul>
                         </section>
 

@@ -58,8 +58,8 @@ export async function calculatePerformance(month: number, year: number, workspac
                             gte: startDate,
                             lte: endDate
                         }
-                    },
-                    include: { feedbacks: true }
+                    }
+                    // [Sprint A] include feedbacks REMOVED — Feedback model dropped
                 }
             }
         })
@@ -70,8 +70,11 @@ export async function calculatePerformance(month: number, year: number, workspac
             let totalRevenue = 0
             let totalTasks = user.tasks.length
             let onTimeCount = 0
-            let internalRevisions = 0
-            let clientRevisions = 0
+            // [Sprint A] internalRevisions/clientRevisions = 0 — Feedback dropped.
+            // Performance metrics giờ chỉ tính revenue + on-time. Có thể sau
+            // này thêm metric khác (vd # task quá hạn) thay thế.
+            const internalRevisions = 0
+            const clientRevisions = 0
 
             for (const task of user.tasks) {
                 // Revenue
@@ -83,17 +86,6 @@ export async function calculatePerformance(month: number, year: number, workspac
                 } else {
                     onTimeCount++ // No deadline = On Time
                 }
-
-                // Feedbacks
-                const taskInternalFbs = await workspacePrisma.feedback.count({
-                    where: { taskId: task.id, type: 'INTERNAL' }
-                })
-                const taskClientFbs = await workspacePrisma.feedback.count({
-                    where: { taskId: task.id, type: 'CLIENT' }
-                })
-
-                internalRevisions += taskInternalFbs
-                clientRevisions += taskClientFbs
             }
 
             const onTimeRate = totalTasks > 0 ? (onTimeCount / totalTasks) * 100 : 100

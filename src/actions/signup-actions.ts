@@ -13,7 +13,7 @@
  *   7. Hash password (bcrypt cost 12)
  *   8. Transaction:
  *      - Skip nếu email đã tồn tại (silent return success — anti-enumeration)
- *      - Tạo Profile mới (subscriptionTier=TRIAL, trialEndsAt=now+14d)
+ *      - Tạo Profile mới (free + full features — Sprint B bỏ trial/subscription)
  *      - Tạo User (role=USER, emailVerified=false, hasCompletedEmailMigration=true)
  *      - Tạo Workspace mặc định "{displayName}'s Workspace", User → OWNER
  *      - Tạo EmailVerificationToken (purpose=EMAIL_VERIFICATION, TTL 24h)
@@ -38,7 +38,6 @@ import { buildVerifyEmailEmail } from '@/lib/notification-emails/templates/auth/
 
 const SIGNUP_BCRYPT_COST = 12  // Higher cost for new signups (NIST 2025-aligned)
 const VERIFY_TOKEN_TTL_HOURS = 24
-const TRIAL_DAYS = 14
 const MAX_DISPLAY_NAME = 60
 const MIN_DISPLAY_NAME = 2
 
@@ -209,13 +208,10 @@ export async function signupAction(input: SignupInput): Promise<SignupResponse> 
     let rawToken: string
     try {
         const result = await prisma.$transaction(async (tx) => {
-            // Tạo Profile mới với TRIAL subscription
+            // [Sprint B] Tạo Profile mới — free + full features (bỏ trial/subscription)
             const profile = await tx.profile.create({
                 data: {
                     name: `${displayName}'s Profile`,
-                    subscriptionTier: 'TRIAL',
-                    trialStartedAt: new Date(),
-                    trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
                 },
                 select: { id: true },
             })

@@ -25,7 +25,8 @@ export default function MobileTaskView({ tasks, isAdmin, users, workspaceId }: {
         let res = tasks
         if (activeTab === 'ASSIGNED') res = tasks.filter(t => t.status === 'Nh\u1eadn task')
         if (activeTab === 'DOING') res = tasks.filter(t => t.status === '\u0110ang th\u1ef1c hi\u1ec7n')
-        if (activeTab === 'review') res = tasks.filter(t => t.status === 'Review' || t.status === 'Revision' || t.status === 'S\u1eeda frame')
+        // [Sprint A] 'Review' status \u0111\u00e3 b\u1ecf \u2014 ch\u1ec9 c\u00f2n Revision/S\u1eeda frame/G\u1eedi l\u1ea1i
+        if (activeTab === 'review') res = tasks.filter(t => t.status === 'Revision' || t.status === 'S\u1eeda frame' || t.status === 'G\u1eedi l\u1ea1i')
         // ALL matches everything
         setFilteredTasks(res)
     }, [tasks, activeTab])

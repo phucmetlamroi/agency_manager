@@ -31,10 +31,13 @@ const STATUS_DOT: Record<string, string> = {
     "\u0110ang \u0111\u1ee3i giao": "bg-purple-500",
     "\u0110ang th\u1ef1c hi\u1ec7n": "bg-yellow-500",
     "Revision": "bg-red-500",
+    "G\u1eedi l\u1ea1i": "bg-orange-500",
     "Ho\u00e0n t\u1ea5t": "bg-emerald-500",
     "T\u1ea1m ng\u01b0ng": "bg-gray-500",
     "S\u1eeda frame": "bg-pink-500",
-    "Review": "bg-orange-500",
+    "Qu\u00e1 h\u1ea1n": "bg-red-600",
+    "\u0110\u00e3 h\u1ee7y": "bg-zinc-500",
+    // [Sprint A] 'Review' status \u0111\u00e3 b\u1ecf \u2014 submit \u0111i th\u1eb3ng Revision
 }
 
 export const getColumns = (

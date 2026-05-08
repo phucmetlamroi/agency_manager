@@ -29,11 +29,15 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     'Đã nhận task':   { label: 'Đã nhận task',   color: '#3B82F6' },
     'Đang đợi giao':   { label: 'Đang đợi giao',   color: '#A855F7' },
     'Đang thực hiện':  { label: 'Đang thực hiện',  color: '#EAB308' },
-    'Review':              { label: 'Review',              color: '#F97316' },
+    // [Sprint A removed] 'Review' status — submit giờ đi thẳng Revision
     'Revision':            { label: 'Revision',            color: '#EF4444' },
     'Sửa frame':       { label: 'Sửa frame',       color: '#EC4899' },
+    'Gửi lại':       { label: 'Gửi lại',       color: '#F97316' },
     'Tạm ngưng':    { label: 'Tạm ngưng',    color: '#71717A' },
     'Hoàn tất':     { label: 'Hoàn tất',     color: '#10B981' },
+    // Cron auto-set khi deadline qua → cần dedicated tab cho admin theo dõi
+    'Quá hạn':      { label: 'Quá hạn',      color: '#DC2626' },
+    'Đã hủy':       { label: 'Đã hủy',       color: '#52525B' },
 }
 
 const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }> = {
@@ -44,7 +48,7 @@ const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }>
 const TYPE_DEFAULT = { bg: 'rgba(161,161,170,0.10)', color: '#A1A1AA', border: 'rgba(161,161,170,0.20)' }
 
 // ─── TAB CONFIG ─────────────────────────────────────────────
-type TabId = 'all' | 'progress' | 'review' | 'done'
+type TabId = 'all' | 'progress' | 'review' | 'overdue' | 'done'
 
 interface TabConfig {
     id: TabId
@@ -56,7 +60,10 @@ interface TabConfig {
 const TABS: TabConfig[] = [
     { id: 'all',      label: 'All Tasks',       statuses: null,                                              color: '#A5B4FC' },
     { id: 'progress', label: 'In Progress',     statuses: ['Đang thực hiện'],                                     color: '#EAB308' },
-    { id: 'review',   label: 'Review / Revise',  statuses: ['Review', 'Revision', 'Sửa frame'],               color: '#F97316' },
+    { id: 'review',   label: 'Revise',           statuses: ['Revision', 'Sửa frame', 'Gửi lại'],              color: '#F97316' },
+    // Tab "Quá hạn" mới: task bị cron auto-set status='Quá hạn' khi deadline qua.
+    // Trước đây không có tab dedicated → admin khó phát hiện task overdue assignee.
+    { id: 'overdue',  label: 'Quá hạn',         statuses: ['Quá hạn'],                                            color: '#DC2626' },
     { id: 'done',     label: 'Completed',        statuses: ['Hoàn tất'],                                   color: '#10B981' },
 ]
 

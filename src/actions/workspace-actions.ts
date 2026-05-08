@@ -312,6 +312,55 @@ export async function deleteWorkspaceAction(workspaceId: string) {
 }
 
 /**
+ * List soft-deleted workspaces mà current user là OWNER (để hiển thị trang Trash).
+ * Audit fix #3.1: User cần thấy workspaces đã xóa mềm để restore trước khi
+ * cron hard-delete (sau 30 ngày).
+ */
+export async function getMyTrashedWorkspaces() {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Unauthorized', workspaces: [] }
+
+    const userId = session.user.id
+
+    // Get OWNER memberships (chỉ OWNER được restore)
+    const memberships = await prisma.workspaceMember.findMany({
+        where: { userId, role: 'OWNER' },
+        select: { workspaceId: true },
+    })
+    const workspaceIds = memberships.map(m => m.workspaceId)
+
+    if (workspaceIds.length === 0) return { workspaces: [] }
+
+    const workspaces = await prisma.workspace.findMany({
+        where: {
+            id: { in: workspaceIds },
+            status: 'SOFT_DELETED',
+        } as any,
+        select: {
+            id: true,
+            name: true,
+            description: true,
+            deletedAt: true,
+            hardDeleteAfter: true,
+        } as any,
+        orderBy: { deletedAt: 'desc' } as any,
+    })
+
+    return {
+        workspaces: workspaces.map((w: any) => ({
+            id: w.id,
+            name: w.name,
+            description: w.description,
+            deletedAt: w.deletedAt?.toISOString() ?? null,
+            hardDeleteAfter: w.hardDeleteAfter?.toISOString() ?? null,
+            daysUntilHardDelete: w.hardDeleteAfter
+                ? Math.max(0, Math.ceil((w.hardDeleteAfter.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+                : 0,
+        })),
+    }
+}
+
+/**
  * Restore a soft-deleted workspace within the 30-day grace window.
  * Only available to global admins or original owners (verified via membership).
  */

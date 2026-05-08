@@ -81,7 +81,14 @@
       "Bash(python -c ' *)",
       "mcp__Claude_in_Chrome__navigate",
       "Bash(python -m http.server 8888)",
-      "Bash(start python *)"
+      "Bash(start python *)",
+      "Bash(npm uninstall *)",
+      "Bash(node test-email.mjs)",
+      "mcp__plugin_everything-claude-code_github__create_pull_request",
+      "mcp__8749a364-b042-4508-a736-082308b6c603__get_runtime_logs",
+      "Bash(find src/app -path \"*/admin*\" -name \"page.*\")",
+      "Bash(dir /s /b src\\\\app\\\\*admin*\\\\page.*)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Dareu\\\\.gemini\\\\antigravity\\\\playground\\\\blazing-station\\\\.claude\\\\worktrees\\\\cranky-austin\\\\src\\\\app\\\\[workspaceId]\\\\admin\\\\audit-log\")"
     ]
   }
 }

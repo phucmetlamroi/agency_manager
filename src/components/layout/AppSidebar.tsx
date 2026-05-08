@@ -23,7 +23,8 @@ import {
     MessageSquare,
     AlertOctagon,
     ArrowRightLeft,
-    Settings
+    Settings,
+    ScrollText
 } from "lucide-react"
 
 import {
@@ -84,6 +85,7 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
         { label: "Staff", href: `/${workspaceId}/admin/users`, icon: Users, roles: ['ADMIN'] },
         { label: "Members", href: `/${workspaceId}/admin/members`, icon: UsersRound, roles: ['ADMIN'] },
         { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN'] },
+        { label: "Audit Log", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText, roles: ['ADMIN'] },
         { label: "Settings", href: `/${workspaceId}/admin/settings`, icon: Settings, roles: ['ADMIN'] },
     ]
     return allItems.filter(item => item.roles.includes(viewRole))

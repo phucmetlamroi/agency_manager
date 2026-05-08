@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     // Diagnostic info
     const diag = {
         RESEND_API_KEY: process.env.RESEND_API_KEY ? `set (${process.env.RESEND_API_KEY.slice(0, 6)}...)` : 'NOT SET',
-        RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL || 'NOT SET (fallback: notification@agencymanager.com)',
+        RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL || 'NOT SET (fallback: notification@hustlytasker.xyz)',
         EMAIL_SENDER_NAME: process.env.EMAIL_SENDER_NAME || 'NOT SET (fallback: HustlyTasker)',
         JWT_SECRET: process.env.JWT_SECRET ? 'set' : 'NOT SET',
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'NOT SET',

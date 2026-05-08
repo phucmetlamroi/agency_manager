@@ -25,13 +25,18 @@ import {
 import { Label } from "@/components/ui/label"
 
 const statusColors: Record<string, string> = {
-    "Nh\u1eadn task": "bg-blue-500/10 text-blue-500 border-blue-500/20",
-    "\u0110ang \u0111\u1ee3i giao": "bg-purple-500/10 text-purple-500 border-purple-500/20",
-    "\u0110ang th\u1ef1c hi\u1ec7n": "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+    "Nhận task": "bg-blue-500/10 text-blue-500 border-blue-500/20",
+    "Đang đợi giao": "bg-purple-500/10 text-purple-500 border-purple-500/20",
+    "Đang thực hiện": "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+    "Review": "bg-orange-500/10 text-orange-500 border-orange-500/20",
     "Revision": "bg-red-500/10 text-red-500 border-red-500/20",
-    "Ho\u00e0n táº¥t": "bg-green-500/10 text-green-500 border-green-500/20",
-    "T\u1ea1m ng\u01b0ng": "bg-gray-500/10 text-gray-500 border-gray-500/20",
-    "S\u1eeda frame": "bg-pink-500/10 text-pink-500 border-pink-500/20",
+    "Gửi lại": "bg-orange-500/10 text-orange-500 border-orange-500/20",
+    "Hoàn tất": "bg-green-500/10 text-green-500 border-green-500/20",
+    "Tạm ngưng": "bg-gray-500/10 text-gray-500 border-gray-500/20",
+    "Sửa frame": "bg-pink-500/10 text-pink-500 border-pink-500/20",
+    // Bug fix: status="Quá hạn" set by cron when deadline passes — needed for visibility.
+    "Quá hạn": "bg-red-600/15 text-red-600 border-red-600/30 font-bold",
+    "Đã hủy": "bg-zinc-500/10 text-zinc-500 border-zinc-500/20",
 }
 
 interface StatusCellProps {
@@ -83,20 +88,20 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
 
     // USER VIEW
     if (!isAdmin) {
-        if (task.status === 'Nh\u1eadn task') {
+        if (task.status === 'Nhận task') {
             return (
                 <Button
                     size="sm"
                     className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold h-8 px-4 shadow-lg shadow-yellow-500/20 ring-1 ring-yellow-400/50 transition-all hover:scale-105"
-                    onClick={() => handleStatusChange('\u0110ang th\u1ef1c hi\u1ec7n')}
+                    onClick={() => handleStatusChange('Đang thực hiện')}
                 >
-                    {"\u25b6 B\u1eaft \u0111\u1ea7u"}
+                    {"▶ Bắt đầu"}
                 </Button>
             )
         }
-        if (task.status === '\u0110ang th\u1ef1c hi\u1ec7n') {
+        if (task.status === 'Đang thực hiện') {
             return (
-                <Badge variant="outline" className={`${statusColors['\u0110ang th\u1ef1c hi\u1ec7n']} gap-2`}>
+                <Badge variant="outline" className={`${statusColors['Đang thực hiện']} gap-2`}>
                     <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
@@ -121,7 +126,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        {["\u0110ang \u0111\u1ee3i giao", "Nh\u1eadn task", "\u0110ang th\u1ef1c hi\u1ec7n", "Revision", "S\u1eeda frame", "T\u1ea1m ng\u1eebng", "Ho\u00e0n táº¥t"].map(opt => (
+                        {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Review", "Revision", "Gửi lại", "Sửa frame", "Tạm ngừng", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                         ))}
                     </SelectContent>
@@ -134,7 +139,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                         variant="ghost"
                         className="h-8 w-8 text-green-500 hover:text-green-600 hover:bg-green-50"
                         title="Mark as Feedbacked (Resume)"
-                        onClick={() => handleStatusChange('\u0110ang th\u1ef1c hi\u1ec7n')}
+                        onClick={() => handleStatusChange('Đang thực hiện')}
                     >
                         ✔
                     </Button>
@@ -144,9 +149,9 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
             <Dialog open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className="text-red-500">{"Ph\u00e2n lo\u1ea1i Revision"}</DialogTitle>
+                        <DialogTitle className="text-red-500">{"Phân loại Revision"}</DialogTitle>
                         <DialogDescription>
-                            {"Vui l\u00f2ng ch\u1ecdn ngu\u1ed3n y\u00eau c\u1ea7u s\u1eeda \u0111\u1ed5i \u0111\u1ec3 t\u00ednh \u0111i\u1ec3m KPI."}
+                            {"Vui lòng chọn nguồn yêu cầu sửa đổi để tính điểm KPI."}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -176,11 +181,11 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Ghi ch\u00fa (Optional)</Label>
+                            <Label>Ghi chú (Optional)</Label>
                             <textarea
                                 value={feedback.content}
                                 onChange={(e) => setFeedback({ ...feedback, content: e.target.value })}
-                                placeholder="Chi ti\u1ebft l\u1ed7i..."
+                                placeholder="Chi tiết lỗi..."
                                 className="w-full p-2 border rounded-md text-sm min-h-[80px]"
                             />
                         </div>

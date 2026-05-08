@@ -20,21 +20,56 @@ async function getClientSession() {
 
 /**
  * Finds all client records associated with the user and their subsidiaries.
+ *
+ * Audit fix #3.6: Trước đây weak match `client.name === user.username` →
+ * collision-prone (vd 7 user "Jacob" map với 7 client "Jacob" cùng tên).
+ *
+ * Sau:
+ * 1. PRIORITY 1: User.clientId FK (explicit link, set bởi admin/backfill)
+ *    → safe, không collision
+ * 2. PRIORITY 2 (fallback legacy): name match — chỉ dùng khi FK chưa set.
+ *    Log warning để observability biết user nào còn dùng fallback.
+ *
+ * Sau khi backfill xong toàn bộ user → có thể remove fallback.
  */
 async function getRelatedClientIds(clientUserId: string) {
     const user = await globalPrisma.user.findUnique({ where: { id: clientUserId } })
     if (!user) return []
 
-    const rootClients = await globalPrisma.client.findMany({
-        where: {
-            OR: [
-                { name: user.username },
-                { name: user.nickname || '' }
-            ]
-        }
-    })
+    let rootIds: number[] = []
 
-    const rootIds = rootClients.map(c => c.id)
+    // PRIORITY 1: FK explicit link (post-audit fix #3.6)
+    const userClientId = (user as any).clientId as number | null | undefined
+    if (userClientId) {
+        const fkClient = await globalPrisma.client.findUnique({
+            where: { id: userClientId },
+            select: { id: true },
+        })
+        if (fkClient) {
+            rootIds = [fkClient.id]
+        }
+    }
+
+    // PRIORITY 2 (fallback): name matching — legacy users chưa backfill xong
+    if (rootIds.length === 0) {
+        console.warn(
+            `[client-portal] User ${user.username} (id=${user.id}) chưa có clientId FK. ` +
+            `Falling back to name matching — nguy cơ collision. ` +
+            `Admin nên SET "clientId" cho user này.`
+        )
+        const username: string = user.username ?? ''
+        const nickname: string = user.nickname ?? ''
+        const rootClients = await globalPrisma.client.findMany({
+            where: {
+                OR: [
+                    { name: username },
+                    { name: nickname }
+                ]
+            }
+        })
+        rootIds = rootClients.map(c => c.id)
+    }
+
     const allIds = new Set(rootIds)
 
     if (rootIds.length > 0) {

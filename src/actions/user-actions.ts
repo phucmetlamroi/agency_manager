@@ -96,14 +96,26 @@ export async function deleteUser(userId: string, workspaceId: string) {
  */
 export async function deactivateUser(userId: string, workspaceId: string) {
     try {
-        const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { username: true, role: true, sessionVersion: true, displayName: true },
+            select: { username: true, role: true, sessionVersion: true, displayName: true, profileId: true },
         })
         if (!targetUser) {
             return { success: false, error: 'User không tồn tại.' }
+        }
+
+        // Audit fix #2.6: profile scoping check
+        // Trước: workspace ADMIN có thể deactivate user thuộc profile khác (cross-tenant)
+        // Sau: target user phải cùng profile với caller (hoặc caller là global ADMIN)
+        const callerProfileId = (session?.user as any)?.sessionProfileId
+        const callerIsGlobalAdmin = (session?.user as any)?.role === 'ADMIN'
+        if (!callerIsGlobalAdmin && targetUser.profileId && targetUser.profileId !== callerProfileId) {
+            return {
+                success: false,
+                error: 'Bạn không thể deactivate user thuộc Profile khác.',
+            }
         }
 
         // Super Admin Protection

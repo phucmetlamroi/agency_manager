@@ -7,12 +7,13 @@ import { ensureNotLastOwner, LastOwnerProtectionError } from '@/lib/workspace-gu
 import { isWorkspaceRole, hasAtLeastRole, type WorkspaceRole } from '@/lib/workspace-roles'
 import { audit } from '@/lib/audit-log'
 import { requireFeature, SubscriptionLimitError } from '@/lib/subscription'
+import { checkInviteRate } from '@/lib/rate-limit-upstash'
 
 const INVITATION_EXPIRY_DAYS = 14
 
 // ─── Get workspace members with roles ────────────────────────────
 export async function getWorkspaceMembers(workspaceId: string) {
-    await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
 
     const members = await prisma.workspaceMember.findMany({
         where: { workspaceId },
@@ -37,6 +38,24 @@ export async function getWorkspaceMembers(workspaceId: string) {
     // Sort by role weight (OWNER > ADMIN > MEMBER > GUEST)
     const ROLE_ORDER: Record<string, number> = { OWNER: 4, ADMIN: 3, MEMBER: 2, GUEST: 1 }
     members.sort((a, b) => (ROLE_ORDER[b.role] ?? 0) - (ROLE_ORDER[a.role] ?? 0))
+
+    // Audit fix #3.2: Mask email khi caller không phải ADMIN+
+    // Privacy: MEMBER role không cần biết email của thành viên khác →
+    // chỉ thấy username/nickname/avatar. Tránh email enumeration + business
+    // intelligence leak (vd competitor lấy email list).
+    const isAdminOrAbove =
+        access.isGlobalAdmin
+        || access.workspaceRole === 'OWNER'
+        || access.workspaceRole === 'ADMIN'
+
+    if (!isAdminOrAbove) {
+        for (const m of members) {
+            if (m.user && m.user.id !== access.userId) {
+                // Chỉ giữ email của chính mình; mask của người khác
+                m.user.email = null
+            }
+        }
+    }
 
     return { members }
 }
@@ -142,7 +161,7 @@ export async function inviteToWorkspace(
                 { email: { equals: trimmedUsername, mode: 'insensitive' } },
             ]
         },
-        select: { id: true, username: true, nickname: true, role: true }
+        select: { id: true, username: true, nickname: true, role: true, profileId: true, allowExternalInvites: true }
     })
 
     if (!targetUser) {
@@ -151,6 +170,30 @@ export async function inviteToWorkspace(
 
     if (targetUser.id === inviterId) {
         return { error: 'Bạn không thể tự mời chính mình.' }
+    }
+
+    // Audit fix #2.8: Cross-profile invite consent
+    // Nếu target user đã tắt allowExternalInvites và user thuộc Profile khác →
+    // không cho mời. User được quyền refuse "spam invite" từ unknown organizations.
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    if (workspace?.profileId && targetUser.profileId && workspace.profileId !== targetUser.profileId) {
+        if (targetUser.allowExternalInvites === false) {
+            return {
+                error: `User ${targetUser.username} đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.`,
+            }
+        }
+    }
+
+    // Audit fix #2.7: Rate-limit invitation per (workspace, target user) — 5/24h.
+    // Trước đây admin có thể spam mời cùng user → invitee inbox flooded.
+    const rateLimit = await checkInviteRate(workspaceId, targetUser.id)
+    if (!rateLimit.success) {
+        return {
+            error: `Đã đạt giới hạn 5 lời mời / ngày cho user này. Vui lòng thử lại sau ${rateLimit.retryAfter ?? 86400} giây.`,
+        }
     }
 
     // Check if already a member

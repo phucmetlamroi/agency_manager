@@ -4,16 +4,17 @@ import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { prisma } from '@/lib/db'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
-// ─── Helper: Verify user belongs to workspace ─────────────────
-async function verifyWorkspaceAccess(userId: string, workspaceId: string) {
-    // Check WorkspaceMember table first
+// ─── Helper: Quick boolean membership check (legacy shim) ─────
+// Renamed from `verifyWorkspaceAccess` (which shadowed the global security
+// helper). Internal callers vẫn dùng để check nhanh; SECURITY-critical paths
+// (claim, etc.) phải dùng `verifyWorkspaceAccess` global thay vì hàm này.
+async function isWorkspaceMemberOrInScope(userId: string, workspaceId: string): Promise<boolean> {
     const member = await prisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId, workspaceId } }
     })
     if (member) return true
-
-    // Fallback: check if the user exists within this workspace scope
     const workspacePrisma = getWorkspacePrisma(workspaceId)
     const user = await workspacePrisma.user.findUnique({ where: { id: userId } })
     return !!user
@@ -65,7 +66,7 @@ export async function getMarketplaceTasks(workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized', tasks: [], marketplaceOpen: true }
 
-    if (!await verifyWorkspaceAccess(session.user.id, workspaceId)) {
+    if (!await isWorkspaceMemberOrInScope(session.user.id, workspaceId)) {
         return { error: 'Forbidden: Not a member of this workspace', tasks: [], marketplaceOpen: true }
     }
 
@@ -125,10 +126,19 @@ export async function claimTask(taskId: string, workspaceId: string) {
     const isOpen = await getMarketplaceStatus(workspaceId)
     if (!isOpen) return { error: 'Phiên chợ hiện đang đóng. Vui lòng chờ admin mở.' }
 
-    const userId = session.user.id
-
-    if (!await verifyWorkspaceAccess(userId, workspaceId)) {
-        return { error: 'Forbidden: Not a member of this workspace' }
+    // SECURITY FIX: trước đây gọi `verifyWorkspaceAccess(userId, workspaceId)` —
+    // sai args (signature là (workspaceId, requiredRole)). Code path này thực tế
+    // không pass do throw error → bug từ lâu nhưng không user nào claim được.
+    // Fix: gọi đúng + extract userId từ kết quả.
+    let userId: string
+    try {
+        const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        userId = access.userId
+    } catch (e: any) {
+        if (e?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: 'Bạn không phải member của workspace này.' }
+        }
+        throw e
     }
 
     const workspacePrisma = getWorkspacePrisma(workspaceId)
@@ -190,7 +200,7 @@ export async function returnTask(taskId: string, workspaceId: string) {
 
     const userId = session.user.id
 
-    if (!await verifyWorkspaceAccess(userId, workspaceId)) {
+    if (!await isWorkspaceMemberOrInScope(userId, workspaceId)) {
         return { error: 'Forbidden: Not a member of this workspace' }
     }
 

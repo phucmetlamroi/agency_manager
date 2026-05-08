@@ -9,6 +9,7 @@ import { AdminShell } from '@/components/layout/AdminShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import TrialStatusBanner from '@/components/layout/TrialStatusBanner'
+import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
 
 export default async function AdminLayout({
     children,
@@ -78,11 +79,22 @@ export default async function AdminLayout({
     })
     const profileSubscription = workspaceProfile?.profile ?? null
 
+    // Impersonation banner: audit fix #2.5
+    const isImpersonating = (session.user as any).isImpersonating === true
+    const impersonationExpiresAt = (session.user as any).impersonationExpiresAt as string | undefined
+
     return (
         <AdminShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />
+            )}
+            {isImpersonating && impersonationExpiresAt && (
+                <ImpersonationBannerWrapper
+                    impersonatedUsername={displayName}
+                    expiresAtIso={impersonationExpiresAt}
+                    workspaceId={workspaceId}
+                />
             )}
             <TrialStatusBanner profile={profileSubscription} />
             {children}

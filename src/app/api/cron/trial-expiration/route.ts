@@ -118,11 +118,14 @@ export async function GET(request: Request) {
                 })
                 expirationsProcessed++
 
-                // Audit log
+                // Audit log với SYSTEM marker (audit fix #2.9)
+                // Trước: workspaceId=null → khó filter trong audit log viewer
+                // Sau: workspaceId='SYSTEM' → có thể query WHERE workspaceId='SYSTEM'
+                // để xem tất cả system-initiated events.
                 try {
                     await prisma.auditLog.create({
                         data: {
-                            workspaceId: null,
+                            workspaceId: 'SYSTEM',
                             actorUserId: null, // system
                             action: 'subscription.trial_expired',
                             targetType: 'Profile',

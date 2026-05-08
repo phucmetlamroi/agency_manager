@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { createNotificationInternal, createBulkNotificationsInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
+import { checkChatMessageRate } from '@/lib/rate-limit-upstash'
 
 async function getAuthSession(): Promise<{ userId: string; profileId: string } | null> {
     const session = await getSession()
@@ -683,6 +684,15 @@ export async function sendMessage(
         where: { conversationId_userId: { conversationId, userId } },
     })
     if (!participant) return { error: 'Not a participant' }
+
+    // Audit fix #3.3: Rate-limit chat messages — 30 msg/min/user/conversation.
+    // Chống spam DoS storage + email notification flood.
+    const rl = await checkChatMessageRate(userId, conversationId)
+    if (!rl.success) {
+        return {
+            error: `Bạn đang gửi tin nhắn quá nhanh. Vui lòng đợi ${rl.retryAfter ?? 60} giây.`,
+        }
+    }
 
     // ANNOUNCEMENT — only group creator can send
     if (type === 'ANNOUNCEMENT') {

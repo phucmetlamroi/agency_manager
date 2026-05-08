@@ -131,8 +131,20 @@ export async function verifyActiveSession() {
     // không có DB sessionVersion vẫn enforce check. Schema default là 0 nên
     // legacy users sau migration đã có sessionVersion=0; defensive coercion ở đây
     // để chắc chắn.
-    const tokenVersion = (session.user as any).sessionVersion ?? 0
-    const dbVersion = dbUser.sessionVersion ?? 0
+    //
+    // Audit fix #4.1: Log warning nếu detect null sessionVersion ở JWT —
+    // báo hiệu legacy session từ trước Auth Phase 1, hoặc bug somewhere không
+    // set claim này. Log để observability biết khi nào safe để remove fallback.
+    const rawTokenVersion = (session.user as any).sessionVersion
+    const rawDbVersion = dbUser.sessionVersion
+    if (rawTokenVersion == null) {
+        console.warn(`[security] Legacy session detected: user ${dbUser.id} (${dbUser.username}) has JWT without sessionVersion. Force re-login recommended.`)
+    }
+    if (rawDbVersion == null) {
+        console.warn(`[security] DB sessionVersion is null for user ${dbUser.id} — should be 0 by default. Check migration.`)
+    }
+    const tokenVersion = rawTokenVersion ?? 0
+    const dbVersion = rawDbVersion ?? 0
     if (tokenVersion < dbVersion) {
         return { status: 'locked', session: null, dbUser: null, isAdmin: false }
     }

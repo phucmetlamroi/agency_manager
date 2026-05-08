@@ -5,16 +5,42 @@ import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { getSession } from '@/lib/auth'
+import { validateEmailForSignup } from '@/lib/email-validator'
 
+/**
+ * Admin tạo user invite-only (legacy flow song song với public signup).
+ *
+ * Audit fix #3.7: Trước đây không có email field → user cũ Việt Nam username
+ * không có email migrate. Giờ thêm OPTIONAL email field với validation.
+ */
 export async function createUser(formData: FormData, workspaceId: string) {
     const session = await getSession()
     if (!session?.user) return { error: 'Unauthorized' }
-    const username = formData.get('username') as string
+
+    const username = (formData.get('username') as string || '').trim()
     const password = formData.get('password') as string
+    const email = (formData.get('email') as string || '').trim().toLowerCase()
+    const displayName = (formData.get('displayName') as string || '').trim() || null
     const role = (formData.get('role') as string || 'USER') as UserRole
     let incomingProfileId = formData.get('profileId') as string || null
 
     if (!username || !password) return { error: 'Missing fields' }
+
+    // Audit fix #3.7: validate email nếu có (optional field)
+    if (email) {
+        const v = validateEmailForSignup(email)
+        if (!v.valid) {
+            return { error: v.message ?? 'Email không hợp lệ.' }
+        }
+        // Check email không trùng
+        const existing = await prisma.user.findFirst({
+            where: { email },
+            select: { id: true },
+        })
+        if (existing) {
+            return { error: `Email "${email}" đã được sử dụng.` }
+        }
+    }
 
     try {
         // Find the creator to determine their rights
@@ -40,13 +66,20 @@ export async function createUser(formData: FormData, workspaceId: string) {
                 username,
                 password: hashedPassword,
                 role,
-                profileId: assignedProfileId
+                profileId: assignedProfileId,
+                // Audit fix #3.7: store email + displayName nếu admin cung cấp
+                ...(email ? { email, hasCompletedEmailMigration: true } : {}),
+                displayName: displayName ?? username,
             }
         })
         revalidatePath(`/${workspaceId}/admin/users`)
-        revalidatePath(`/${workspaceId}/admin`) // Update Dashboard dropdown
+        revalidatePath(`/${workspaceId}/admin`)
         return { success: true }
-    } catch (e) {
+    } catch (e: any) {
+        // P2002 = unique constraint violation (username trùng)
+        if (e?.code === 'P2002') {
+            return { error: 'Username đã tồn tại.' }
+        }
         return { error: 'Error creating user' }
     }
 }

@@ -45,8 +45,13 @@ export async function upsertScheduleRule(
   updaterId?: string
 ) {
   if (!profileId) throw new Error("profileId is required")
-  await validateAccess(workspaceId, userId, profileId)
+  const caller = await validateAccess(workspaceId, userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
+
+  // Audit fix #3.5: updaterId required cho audit trail.
+  // Trước: optional → silent self-modify không ghi ai sửa.
+  // Sau: fallback to caller.id nếu không pass.
+  const effectiveUpdaterId = updaterId ?? caller.id
 
   // Find existing rule
   const existing = await prisma.scheduleRule.findFirst({
@@ -60,7 +65,7 @@ export async function upsertScheduleRule(
         startTime,
         endTime,
         timezone,
-        updatedById: updaterId,
+        updatedById: effectiveUpdaterId,
         version: { increment: 1 }
       }
     })
@@ -75,7 +80,7 @@ export async function upsertScheduleRule(
         startTime,
         endTime,
         timezone,
-        updatedById: updaterId,
+        updatedById: effectiveUpdaterId,
         workspaceId,
         profileId
       }

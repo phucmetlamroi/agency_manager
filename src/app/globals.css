@@ -162,7 +162,7 @@
 @media (max-width: 768px) {
 
   button,
-  input,
+  input:not([type="checkbox"]):not([type="radio"]),
   select,
   textarea,
   [role="button"] {
@@ -171,6 +171,12 @@
     min-width: 44px;
     touch-action: manipulation;
     /* Disable double-tap zoom */
+  }
+
+  /* Checkbox/radio: native 16x16 ổn cho mobile, không cần fat-finger expand */
+  input[type="checkbox"],
+  input[type="radio"] {
+    touch-action: manipulation;
   }
 
   /* Exception for small icon buttons inside dense UIs - use pseudo-element expansion instead */

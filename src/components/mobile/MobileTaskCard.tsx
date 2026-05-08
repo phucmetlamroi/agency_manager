@@ -70,10 +70,10 @@ export default function MobileTaskCard({
     )
 
     const PRIMARY_LABEL: Record<string, string> = {
-        'Đang thực hiện': 'Bắt đầu',
-        'Revision': 'Nộp bài',
-        'Gửi lại': 'Gửi lại',
-        'Hoàn tất': 'Hoàn tất',
+        'Đang thực hiện': 'Start',
+        'Revision': 'Submit',
+        'Gửi lại': 'Resubmit',
+        'Hoàn tất': 'Complete',
     }
 
     const handleCardClick = () => onAction(task)
@@ -132,7 +132,7 @@ export default function MobileTaskCard({
                                 <button
                                     onClick={(e) => e.stopPropagation()}
                                     className="flex-shrink-0 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors"
-                                    aria-label="Thao tác nhanh"
+                                    aria-label="Quick actions"
                                 >
                                     <MoreVertical className="w-4 h-4" />
                                 </button>
@@ -154,7 +154,7 @@ export default function MobileTaskCard({
                                                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors text-left"
                                             >
                                                 <Icon className="w-4 h-4 text-zinc-400" />
-                                                <span>Chuyển sang "{nextStatus}"</span>
+                                                <span>Change to "{nextStatus}"</span>
                                             </button>
                                         )
                                     })}

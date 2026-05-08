@@ -18,12 +18,14 @@ import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
 
 type TabKey = 'DOING' | 'ASSIGNED' | 'REVISE' | 'OVERDUE' | 'ALL'
 
+// Tab labels match desktop NewDesktopTaskTable (English labels, Vietnamese
+// status badge values bên trong card). Đồng nhất với PC.
 const TAB_LABELS: Record<TabKey, string> = {
-    DOING: 'Đang làm',
-    ASSIGNED: 'Nhận task',
-    REVISE: 'Cần sửa',
-    OVERDUE: 'Quá hạn',
-    ALL: 'Tất cả',
+    DOING: 'Doing',
+    ASSIGNED: 'Assignee',
+    REVISE: 'Revise',
+    OVERDUE: 'Overdue',
+    ALL: 'All',
 }
 
 const TAB_ORDER: TabKey[] = ['DOING', 'ASSIGNED', 'REVISE', 'OVERDUE', 'ALL']
@@ -44,28 +46,28 @@ function buildSwipeActions(
     let right: SwipeAction | undefined
     if (valid.includes('Đang thực hiện') && task.status === 'Nhận task') {
         right = {
-            label: 'Bắt đầu',
+            label: 'Start',
             icon: Play,
             color: 'bg-indigo-600 text-white',
             onAction: () => onChange('Đang thực hiện'),
         }
     } else if (valid.includes('Revision') && task.status === 'Đang thực hiện') {
         right = {
-            label: 'Nộp bài',
+            label: 'Submit',
             icon: Send,
             color: 'bg-amber-600 text-white',
             onAction: () => onChange('Revision'),
         }
     } else if (valid.includes('Gửi lại') && task.status === 'Revision') {
         right = {
-            label: 'Gửi lại',
+            label: 'Resubmit',
             icon: Send,
             color: 'bg-indigo-600 text-white',
             onAction: () => onChange('Gửi lại'),
         }
     } else if (valid.includes('Hoàn tất') && isAdmin) {
         right = {
-            label: 'Hoàn tất',
+            label: 'Complete',
             icon: CheckCircle2,
             color: 'bg-emerald-600 text-white',
             onAction: () => onChange('Hoàn tất'),
@@ -75,14 +77,14 @@ function buildSwipeActions(
     let left: SwipeAction | undefined
     if (valid.includes('Tạm ngưng')) {
         left = {
-            label: 'Tạm ngưng',
+            label: 'Pause',
             icon: Pause,
             color: 'bg-zinc-700 text-zinc-100',
             onAction: () => onChange('Tạm ngưng'),
         }
     } else if (valid.includes('Đang đợi giao')) {
         left = {
-            label: 'Trả lại',
+            label: 'Return',
             icon: Pause,
             color: 'bg-zinc-700 text-zinc-100',
             onAction: () => onChange('Đang đợi giao'),
@@ -136,7 +138,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
 
     const handleTaskClick = (task: TaskWithUser) => {
         if (!isAdmin && task.status === 'Nhận task') {
-            toast.warning('🔒 Vui lòng bấm "Bắt đầu" để mở khoá task!')
+            toast.warning('🔒 Tap "Start" to unlock this task first.')
             return
         }
         setSelectedTask(task)
@@ -154,7 +156,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
             toast.error((res as any).error)
             return false
         }
-        toast.success(`Đã chuyển sang "${status}"`)
+        toast.success(`Status changed to "${status}"`)
         // Refresh server data
         startTransition(() => router.refresh())
         return true
@@ -176,15 +178,15 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
     const handleDelete = async () => {
         if (!selectedTask) return
         if (await confirm({
-            title: 'Xoá task?',
-            message: 'Bạn có chắc muốn xoá task này? Hành động không thể hoàn tác.',
+            title: 'Delete Task',
+            message: 'Are you sure you want to delete this task? This cannot be undone.',
             type: 'danger',
-            confirmText: 'Xoá',
-            cancelText: 'Huỷ'
+            confirmText: 'Delete',
+            cancelText: 'Cancel'
         })) {
             await deleteTask(selectedTask.id, workspaceId)
             setIsDrawerOpen(false)
-            toast.success('Đã xoá task')
+            toast.success('Task deleted')
             startTransition(() => router.refresh())
         }
     }
@@ -274,9 +276,9 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
                                 <Inbox className="w-7 h-7 text-zinc-500" />
                             </div>
                             <div>
-                                <p className="text-zinc-300 font-semibold">Không có task</p>
+                                <p className="text-zinc-300 font-semibold">No tasks</p>
                                 <p className="text-zinc-500 text-sm mt-1">
-                                    Không có task trong "{TAB_LABELS[activeTab]}".
+                                    No tasks in "{TAB_LABELS[activeTab]}".
                                 </p>
                             </div>
                         </motion.div>

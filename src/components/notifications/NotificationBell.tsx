@@ -66,7 +66,7 @@ export function NotificationBell({ className = '' }: Props) {
             <button
                 onClick={() => setOpen(o => !o)}
                 className="relative p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent border-none"
-                title="Thông báo"
+                title="Notifications"
             >
                 <Bell className={`w-[18px] h-[18px] ${unreadCount > 0 ? 'text-violet-400' : 'text-zinc-400'}`} />
                 {unreadCount > 0 && (

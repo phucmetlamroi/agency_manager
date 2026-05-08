@@ -32,22 +32,22 @@ interface TaskDrawerProps {
 
 /**
  * Map giữa next-status (FSM) và button presentation.
- * Order: ưu tiên action thường gặp nhất trước.
+ * Labels English để khớp PC desktop pattern (DB status values vẫn Vietnamese).
  */
 const STATUS_BUTTON_CONFIG: Record<string, {
     label: string
     icon: React.ComponentType<{ className?: string }>
     variant: 'primary' | 'success' | 'warning' | 'neutral' | 'danger'
 }> = {
-    'Đang thực hiện': { label: 'Bắt đầu / Tiếp tục', icon: Play, variant: 'primary' },
-    'Revision': { label: 'Nộp bài (chuyển Revision)', icon: Send, variant: 'warning' },
-    'Gửi lại': { label: 'Gửi lại sau khi sửa', icon: Send, variant: 'primary' },
-    'Hoàn tất': { label: 'Hoàn tất', icon: CheckCircle2, variant: 'success' },
-    'Tạm ngưng': { label: 'Tạm ngưng', icon: Pause, variant: 'neutral' },
-    'Đang đợi giao': { label: 'Trả lại task', icon: AlertTriangle, variant: 'neutral' },
-    'Nhận task': { label: 'Nhận task', icon: Play, variant: 'primary' },
-    'Sửa frame': { label: 'Sửa frame', icon: AlertTriangle, variant: 'warning' },
-    'Hủy': { label: 'Huỷ task', icon: Trash2, variant: 'danger' },
+    'Đang thực hiện': { label: 'Start / Resume', icon: Play, variant: 'primary' },
+    'Revision': { label: 'Submit (→ Revision)', icon: Send, variant: 'warning' },
+    'Gửi lại': { label: 'Resubmit', icon: Send, variant: 'primary' },
+    'Hoàn tất': { label: 'Complete', icon: CheckCircle2, variant: 'success' },
+    'Tạm ngưng': { label: 'Pause', icon: Pause, variant: 'neutral' },
+    'Đang đợi giao': { label: 'Return to queue', icon: AlertTriangle, variant: 'neutral' },
+    'Nhận task': { label: 'Claim', icon: Play, variant: 'primary' },
+    'Sửa frame': { label: 'Fix frame', icon: AlertTriangle, variant: 'warning' },
+    'Hủy': { label: 'Cancel task', icon: Trash2, variant: 'danger' },
 }
 
 const VARIANT_STYLES: Record<string, string> = {
@@ -94,7 +94,7 @@ export function TaskDrawer({
             if ((res as any)?.error) {
                 toast.error((res as any).error)
             } else {
-                toast.success('Đã giao task thành công')
+                toast.success('Task assigned')
                 setShowAssignPicker(false)
                 onOpenChange(false)
                 router.refresh()
@@ -126,7 +126,7 @@ export function TaskDrawer({
                                     <Badge className="bg-blue-500/10 text-blue-300 border-blue-500/20">{clientLabel}</Badge>
                                 )}
                                 {isOverdue && (
-                                    <Badge className="bg-red-500/15 text-red-400 border-red-500/30">Quá hạn</Badge>
+                                    <Badge className="bg-red-500/15 text-red-400 border-red-500/30">Overdue</Badge>
                                 )}
                             </div>
 
@@ -138,12 +138,12 @@ export function TaskDrawer({
                                     <div className="bg-zinc-900/60 p-3 rounded-xl border border-white/8">
                                         <div className="flex items-center gap-2 text-zinc-400 mb-1">
                                             <Calendar className="w-4 h-4" />
-                                            <span className="text-xs uppercase tracking-wide">Hạn nộp</span>
+                                            <span className="text-xs uppercase tracking-wide">Deadline</span>
                                         </div>
                                         <p className="font-mono text-sm text-zinc-100">
                                             {task.deadline
                                                 ? `${new Date(task.deadline).toLocaleDateString('vi-VN')} ${new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
-                                                : 'Chưa đặt deadline'}
+                                                : 'No deadline set'}
                                         </p>
                                     </div>
                                 </div>
@@ -151,16 +151,16 @@ export function TaskDrawer({
                                 {/* Assignee */}
                                 <div className="bg-zinc-900/40 p-4 rounded-xl border border-white/8">
                                     <h4 className="text-sm font-medium text-zinc-400 mb-3 flex items-center gap-2">
-                                        <User className="w-4 h-4" /> Người thực hiện
+                                        <User className="w-4 h-4" /> Assignee
                                     </h4>
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold border border-indigo-500/30">
                                             {task.assignee?.username?.[0]?.toUpperCase() || '?'}
                                         </div>
                                         <div>
-                                            <p className="text-white font-medium">{task.assignee?.username || 'Chưa giao'}</p>
+                                            <p className="text-white font-medium">{task.assignee?.username || 'Unassigned'}</p>
                                             <p className="text-xs text-zinc-500">
-                                                {task.assignee ? 'Thành viên' : 'Bấm "Trả lại" để đẩy về marketplace'}
+                                                {task.assignee ? 'Staff member' : 'Tap "Return" to push back to marketplace'}
                                             </p>
                                         </div>
                                     </div>
@@ -168,14 +168,14 @@ export function TaskDrawer({
 
                                 {/* Instructions */}
                                 <div>
-                                    <h4 className="text-sm font-medium text-zinc-400 mb-2">Hướng dẫn</h4>
+                                    <h4 className="text-sm font-medium text-zinc-400 mb-2">Instructions</h4>
                                     <div
                                         className="text-sm text-zinc-200 leading-relaxed bg-zinc-900/60 p-4 rounded-xl border border-white/8 prose prose-invert prose-sm max-w-none break-words"
                                         dangerouslySetInnerHTML={{
                                             __html: ensureExternalLinks(DOMPurify.sanitize(
                                                 isAdmin
-                                                    ? (task.notes_vi || 'Chưa có hướng dẫn cụ thể.')
-                                                    : (task.notes_en || task.notes_vi || 'Chưa có hướng dẫn cụ thể.')
+                                                    ? (task.notes_vi || 'No specific instructions.')
+                                                    : (task.notes_en || task.notes_vi || 'No specific instructions.')
                                             ))
                                         }}
                                     />
@@ -190,14 +190,14 @@ export function TaskDrawer({
                                         className="flex items-center justify-center gap-2 w-full p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors"
                                     >
                                         <LinkIcon className="w-4 h-4" />
-                                        Mở link sản phẩm
+                                        Open product link
                                     </a>
                                 )}
 
                                 {/* References */}
                                 {task.references && (
                                     <div>
-                                        <h4 className="text-sm font-medium text-zinc-400 mb-2">Tham chiếu</h4>
+                                        <h4 className="text-sm font-medium text-zinc-400 mb-2">References</h4>
                                         <div className="text-sm text-zinc-300 bg-zinc-900/60 p-3 rounded-xl border border-white/8 break-all">
                                             {task.references}
                                         </div>
@@ -215,13 +215,13 @@ export function TaskDrawer({
                                 <div className="bg-zinc-900/80 border border-white/10 rounded-xl p-2 max-h-60 overflow-y-auto">
                                     <div className="flex items-center justify-between px-2 pb-2">
                                         <span className="text-xs font-bold uppercase tracking-wide text-zinc-400 flex items-center gap-1.5">
-                                            <Users className="w-3.5 h-3.5" /> Chọn người nhận
+                                            <Users className="w-3.5 h-3.5" /> Assign to
                                         </span>
                                         <button
                                             onClick={() => setShowAssignPicker(false)}
                                             className="text-xs text-zinc-500 hover:text-zinc-300"
                                         >
-                                            Đóng
+                                            Close
                                         </button>
                                     </div>
                                     <div className="space-y-1">
@@ -251,7 +251,7 @@ export function TaskDrawer({
                                     className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                 >
                                     <UserPlus className="w-4 h-4" />
-                                    Giao task cho thành viên
+                                    Assign to member
                                 </button>
                             )}
 
@@ -287,7 +287,7 @@ export function TaskDrawer({
                                         onClick={() => onOpenChange(false)}
                                         className="w-full"
                                     >
-                                        Đóng
+                                        Close
                                     </Button>
                                     {isAdmin && onDelete && (
                                         <Button
@@ -295,7 +295,7 @@ export function TaskDrawer({
                                             variant="outline"
                                             className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
                                         >
-                                            <Trash2 className="w-4 h-4 mr-1" /> Xoá
+                                            <Trash2 className="w-4 h-4 mr-1" /> Delete
                                         </Button>
                                     )}
                                 </div>

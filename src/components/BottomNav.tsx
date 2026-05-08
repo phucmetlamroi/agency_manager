@@ -36,7 +36,7 @@ export default function BottomNav({ role, workspaceId }: { role: string, workspa
         },
         {
             href: role === 'ADMIN' ? `/${workspaceId}/admin/schedule` : `/${workspaceId}/dashboard/schedule`,
-            label: 'Lịch',
+            label: 'Schedule',
             icon: CalendarDays,
             show: true,
         },

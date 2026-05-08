@@ -44,7 +44,7 @@ export default function MobileLayoutShell({
                     <button
                         onClick={() => setIsDrawerOpen(true)}
                         className="relative cursor-pointer group"
-                        aria-label="Mở menu cá nhân"
+                        aria-label="Open user menu"
                     >
                         <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/10 group-hover:ring-indigo-500/50 transition-all duration-300 shadow-md shadow-indigo-500/20 bg-zinc-900">
                             {user.avatarUrl ? (
@@ -105,25 +105,25 @@ export default function MobileLayoutShell({
                         <div className="flex-1 flex flex-col gap-2">
                             {/* Menu Items */}
                             <Link href={`/${workspaceId}/dashboard/errors`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold transition-all duration-300 flex items-center gap-3 border border-red-500/20">
-                                <AlertTriangle className="w-4 h-4" /> Hồ sơ vi phạm
+                                <AlertTriangle className="w-4 h-4" /> My Errors
                             </Link>
                             <Link href={`/${workspaceId}/dashboard/profile`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
                                 <UserCircle className="w-4 h-4" /> Profile
                             </Link>
                             <Link href={`/api/profile/select`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all duration-300 flex items-center gap-3 border border-indigo-500/20">
-                                <ArrowLeftRight className="w-4 h-4" /> Đổi Team / Workspace
+                                <ArrowLeftRight className="w-4 h-4" /> Switch Team / Workspace
                             </Link>
                             {/* Admin-only links */}
                             {workspaceRole && (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN') && (
                                 <>
                                     <Link href={`/${workspaceId}/admin/members`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
-                                        <UsersRound className="w-4 h-4" /> Quản lý thành viên
+                                        <UsersRound className="w-4 h-4" /> Members
                                     </Link>
                                     <Link href={`/${workspaceId}/admin/audit-log`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
-                                        <ScrollText className="w-4 h-4" /> Nhật ký hoạt động
+                                        <ScrollText className="w-4 h-4" /> Audit Log
                                     </Link>
                                     <Link href={`/${workspaceId}/admin/settings`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
-                                        <Settings className="w-4 h-4" /> Workspace Settings
+                                        <Settings className="w-4 h-4" /> Settings
                                     </Link>
                                 </>
                             )}

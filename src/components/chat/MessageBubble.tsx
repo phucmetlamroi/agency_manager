@@ -319,8 +319,8 @@ export function MessageBubble({ message, isMine, onReply, onReact, onMessageUpda
                                     }}
                                 />
                                 <div className="flex gap-2 justify-end">
-                                    <button onClick={() => { setEditing(false); setEditValue(message.content || '') }} className="text-[11px] text-zinc-400 px-2 py-1 rounded hover:bg-white/5">Huỷ</button>
-                                    <button onClick={handleEditSubmit} className="text-[11px] text-white bg-violet-500 px-3 py-1 rounded hover:bg-violet-600">Lưu</button>
+                                    <button onClick={() => { setEditing(false); setEditValue(message.content || '') }} className="text-[11px] text-zinc-400 px-2 py-1 rounded hover:bg-white/5">Cancel</button>
+                                    <button onClick={handleEditSubmit} className="text-[11px] text-white bg-violet-500 px-3 py-1 rounded hover:bg-violet-600">Save</button>
                                 </div>
                             </div>
                         ) : isExpiredViewOnce ? (

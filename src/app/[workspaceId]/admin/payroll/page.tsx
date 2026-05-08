@@ -95,59 +95,51 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
         : `/api/exports/monthly-tasks-xlsx?workspaceId=${workspaceId}`
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="max-w-[1200px] mx-auto">
+            {/* Header — responsive: stack on mobile, row on desktop */}
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:mb-8">
                 <div>
-                    <h2 className="title-gradient" style={{ fontSize: '2rem', margin: 0 }}>Bang Luong va Thu Nhap</h2>
-                    <p style={{ color: '#888', marginTop: '0.5rem' }}>
-                        Workspace: <span style={{ color: '#fff' }}>{workspace?.name}</span> - Tinh tren cac task da "{SALARY_COMPLETED_STATUS}".
+                    <h2 className="title-gradient text-2xl sm:text-3xl m-0 font-extrabold tracking-tight">Bảng lương & Thu nhập</h2>
+                    <p className="text-zinc-500 mt-2 text-sm">
+                        Workspace: <span className="text-white font-semibold">{workspace?.name}</span> · Tính trên các task đã "{SALARY_COMPLETED_STATUS}".
                     </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div className="flex flex-wrap items-center gap-2">
                     {canExportMonthlyXlsx && (
                         <a
                             href={exportUrl}
-                            style={{
-                                background: '#0f172a',
-                                border: '1px solid #334155',
-                                color: '#e2e8f0',
-                                padding: '0.55rem 1rem',
-                                borderRadius: '12px',
-                                fontSize: '0.9rem',
-                                fontWeight: 700,
-                                textDecoration: 'none'
-                            }}
+                            className="inline-flex items-center px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-sm font-bold no-underline hover:bg-slate-800 transition-colors"
                         >
-                            Export XLSX (Deadline Month)
+                            Export XLSX
                         </a>
                     )}
-                    <div style={{ background: '#333', padding: '0.5rem 1rem', borderRadius: '12px', color: '#ccc', fontSize: '0.9rem' }}>
-                        Workspace Mode: Isolated
+                    <div className="px-3 py-2 rounded-xl bg-zinc-800 text-zinc-400 text-xs font-medium">
+                        Workspace · Isolated
                     </div>
                 </div>
             </div>
 
             {canCalculateBonus && (
-                <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <div className="mb-6 flex justify-start sm:justify-end">
                     <BonusCalculator workspaceId={workspaceId} />
                 </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="flex flex-col gap-6 sm:gap-8">
                 {serializedUsers.map((user: any) => (
                     <PayrollCard
                         key={user.id}
                         user={user}
-                        currentMonth={0} // Irrelevant in workspace mode
+                        currentMonth={0}
                         currentYear={0}
                         workspaceId={workspaceId}
                     />
                 ))}
 
                 {serializedUsers.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
-                        Khong co du lieu luong trong thang nay.
+                    <div className="text-center py-12 text-zinc-500">
+                        Không có dữ liệu lương trong tháng này.
                     </div>
                 )}
             </div>

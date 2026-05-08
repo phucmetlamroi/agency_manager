@@ -15,104 +15,42 @@ export default async function CRMDashboard({ params }: { params: Promise<{ works
     const clientCount = typedClients.length
 
     return (
-        <div style={{ padding: '24px 28px' }}>
+        <div className="px-3 py-4 sm:px-7 sm:py-6">
             {/* ── Page Header ── */}
-            <header
-                style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: 28,
-                }}
-            >
+            <header className="flex flex-col gap-3 mb-5 sm:flex-row sm:items-start sm:justify-between sm:mb-7">
                 {/* Left side */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                    <div
-                        style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 12,
-                            background: 'rgba(99,102,241,0.15)',
-                            border: '1px solid rgba(99,102,241,0.25)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                        }}
-                    >
-                        <Building2 style={{ width: 20, height: 20, color: '#a5b4fc' }} />
+                <div className="flex items-start gap-3 sm:gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-5 h-5 text-indigo-300" />
                     </div>
                     <div>
-                        <h1
-                            style={{
-                                fontSize: 20,
-                                fontWeight: 800,
-                                color: '#ffffff',
-                                letterSpacing: '-0.025em',
-                                lineHeight: 1.2,
-                                margin: 0,
-                            }}
-                        >
+                        <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight leading-tight m-0">
                             Quản lý Khách hàng
                         </h1>
-                        <p
-                            style={{
-                                fontSize: 12,
-                                color: '#71717a',
-                                marginTop: 4,
-                                margin: 0,
-                                marginBlockStart: 4,
-                            }}
-                        >
+                        <p className="text-xs text-zinc-500 mt-1 m-0">
                             Hệ thống quản lý Đối tác, Brand con và Chỉ số Hiệu suất.
                         </p>
                     </div>
                 </div>
 
                 {/* Right side - Count badge */}
-                <div
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '6px 14px',
-                        borderRadius: 9999,
-                        background: 'rgba(99,102,241,0.12)',
-                        border: '1px solid rgba(99,102,241,0.25)',
-                    }}
-                >
-                    <span style={{ fontSize: 18, fontWeight: 700, color: '#a5b4fc' }}>
+                <div className="self-start sm:self-auto inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/12 border border-indigo-500/25">
+                    <span className="text-lg font-bold text-indigo-300">
                         {clientCount}
                     </span>
-                    <span style={{ fontSize: 11, color: '#6366f1', fontWeight: 500 }}>
+                    <span className="text-[11px] text-indigo-500 font-medium">
                         Clients
                     </span>
                 </div>
             </header>
 
             {/* ── Table Card ── */}
-            <div
-                style={{
-                    borderRadius: 20,
-                    background: '#18181B',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    boxShadow: '0 24px 60px rgba(0,0,0,0.30)',
-                    overflow: 'hidden',
-                }}
-            >
+            <div className="rounded-2xl bg-zinc-900 border border-white/8 shadow-xl shadow-black/30 overflow-hidden">
                 {/* Card header */}
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '16px 20px',
-                        borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    }}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Users style={{ width: 15, height: 15, color: '#a1a1aa' }} />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#ffffff' }}>
+                <div className="flex items-center justify-between gap-2 px-4 py-3 sm:px-5 sm:py-4 border-b border-white/5">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Users className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+                        <span className="text-xs sm:text-sm font-bold text-white truncate">
                             Danh sách Khách hàng
                         </span>
                     </div>

@@ -7,6 +7,7 @@ import { serializeDecimal } from '@/lib/serialization'
 import { Inbox, Sparkles, UserPlus, ListChecks, X, Filter, Clock } from 'lucide-react'
 import { MarketplaceToggle } from '@/components/marketplace/MarketplaceToggle'
 import { prisma } from '@/lib/db'
+import { isMobileDevice } from '@/lib/device'
 
 export default async function TaskQueuePage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -248,7 +249,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                 {/* Card Body */}
                 <div className="p-5">
                     {count > 0 ? (
-                        <TaskTable tasks={serializeDecimal(unassignedTasks) as any} isAdmin={true} users={users} workspaceId={workspaceId} />
+                        <TaskTable tasks={serializeDecimal(unassignedTasks) as any} isAdmin={true} users={users} workspaceId={workspaceId} isMobile={await isMobileDevice()} />
                     ) : (
                         /* ── Animated Empty State ─────────────── */
                         <div className="flex flex-col items-center justify-center py-20 gap-6">

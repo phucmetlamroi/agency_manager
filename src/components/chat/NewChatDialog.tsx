@@ -81,7 +81,7 @@ export function NewChatDialog({ isOpen, onClose, onConversationCreated, workspac
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
             onClick={e => { if (e.target === e.currentTarget) onClose() }}
         >
-            <div className="w-[420px] max-h-[80vh] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-white/[0.08] shadow-[0_24px_60px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden">
+            <div className="w-[calc(100vw-1rem)] sm:w-[420px] max-h-[85dvh] sm:max-h-[80vh] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-white/[0.08] shadow-[0_24px_60px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between px-[18px] py-4 border-b border-violet-500/10">
                     <h3 className="m-0 text-[15px] font-bold text-white">New Chat</h3>

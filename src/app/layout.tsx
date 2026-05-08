@@ -1,20 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Montserrat } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'sonner';
 import { ConfirmProvider } from '@/components/ui/ConfirmModal';
 import { RadialNavProvider } from '@/components/radial-nav/RadialNavProvider';
 
-const cormorant = Cormorant_Garamond({
-  variable: "--font-heading",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-});
-
-const montserrat = Montserrat({
+// [Single-font system] Plus Jakarta Sans làm font duy nhất cho toàn app —
+// body, heading, label, button. Heading dùng weight nặng hơn (700-800) để
+// tạo visual hierarchy thay vì đổi family (tránh font lệch tông gây xấu).
+// Variable --font-sans + --font-heading đều trỏ đến cùng family qua className.
+const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -42,8 +40,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${montserrat.variable} ${cormorant.variable} font-sans antialiased`} suppressHydrationWarning>
+    <html lang="en" className={plusJakarta.variable} suppressHydrationWarning>
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <ConfirmProvider>
           <RadialNavProvider>
             {children}

@@ -103,7 +103,9 @@ const DIVIDER = "rgba(255,255,255,0.06)"
 const AVATAR_GRADIENT = "linear-gradient(135deg,#A855F7,#6366F1)"
 const LOGO_ICON_BG = "linear-gradient(135deg,#6366F1,#8B5CF6)"
 const LOGO_ICON_GLOW = "0 0 18px rgba(139,92,246,0.40)"
-const FONT = "'Plus Jakarta Sans', sans-serif"
+// [Mobile font unification] Inherit system sans (--font-sans = Plus Jakarta Sans)
+// thay vì hardcode → khi đổi font system sau này tự sync, mobile + desktop nhất quán.
+const FONT = "var(--font-sans), 'Plus Jakarta Sans', sans-serif"
 
 export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'ADMIN', workspaceRole }: SidebarProps) {
     const pathname = usePathname()

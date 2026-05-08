@@ -26,14 +26,14 @@ export default function ForgotPasswordPage() {
     const [isPending, startTransition] = useTransition()
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4" style={{
+        <div className="min-h-dvh flex items-center justify-center px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" style={{
             background: 'radial-gradient(circle at top right, #2d1b5e, #000)'
         }}>
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className="w-full max-w-md p-8 backdrop-blur-2xl bg-white/[0.04] border border-white/10 rounded-2xl shadow-2xl"
+                className="w-full max-w-md p-6 sm:p-8 backdrop-blur-xl bg-zinc-950/60 border border-white/10 rounded-3xl shadow-2xl shadow-black/60"
             >
                 <div className="flex items-center gap-3 mb-6">
                     <Link
@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
                     >
                         <ArrowLeft className="w-4 h-4" />
                     </Link>
-                    <h1 className="text-xl font-bold text-zinc-100">Quên mật khẩu</h1>
+                    <h1 className="text-xl font-extrabold text-zinc-100 tracking-tight">Quên mật khẩu</h1>
                 </div>
 
                 {/* Step indicator */}
@@ -243,10 +243,12 @@ function StepEmail({ email, setEmail, isPending, onSubmit }: {
                     <input
                         type="email"
                         autoComplete="email"
+                        inputMode="email"
+                        autoCapitalize="none"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-lg text-zinc-100 outline-none transition-all"
+                        className="w-full h-12 pl-10 pr-4 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-xl text-zinc-100 outline-none transition-all"
                         placeholder="ban@congty.vn"
                     />
                 </div>
@@ -255,7 +257,7 @@ function StepEmail({ email, setEmail, isPending, onSubmit }: {
             <button
                 type="submit"
                 disabled={isPending || !email}
-                className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-xl shadow-lg shadow-violet-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
             >
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Gửi mã OTP
@@ -353,7 +355,7 @@ function StepOtp({ email, isPending, onVerify, onResend, onBack }: {
                 type="button"
                 onClick={() => onVerify(digits.join(''))}
                 disabled={!otpComplete || isPending}
-                className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-xl shadow-lg shadow-violet-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
             >
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
                 Xác minh mã
@@ -417,7 +419,7 @@ function StepPassword({ isPending, onSubmit }: {
                         required
                         value={pwd1}
                         onChange={(e) => setPwd1(e.target.value)}
-                        className="w-full pl-10 pr-12 py-3 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-lg text-zinc-100 outline-none transition-all"
+                        className="w-full h-12 pl-10 pr-12 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-xl text-zinc-100 outline-none transition-all"
                     />
                     <button
                         type="button"
@@ -442,7 +444,7 @@ function StepPassword({ isPending, onSubmit }: {
                         required
                         value={pwd2}
                         onChange={(e) => setPwd2(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-lg text-zinc-100 outline-none transition-all"
+                        className="w-full h-12 pl-10 pr-4 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-xl text-zinc-100 outline-none transition-all"
                     />
                 </div>
                 {pwd2 && (
@@ -455,7 +457,7 @@ function StepPassword({ isPending, onSubmit }: {
             <button
                 type="submit"
                 disabled={!canSubmit || isPending}
-                className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-xl shadow-lg shadow-violet-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
             >
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Cập nhật mật khẩu

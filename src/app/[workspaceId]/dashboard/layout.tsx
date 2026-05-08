@@ -1,12 +1,12 @@
 import { logout } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
+import { isMobileDevice } from '@/lib/device'
 
 // User Layout — uses the unified AppSidebar with viewRole='USER'
 // Mirrors AdminLayout structure for visual & UX parity.
@@ -41,9 +41,10 @@ export default async function UserLayout({
 
     // [Sprint B] Trial banner removed.
 
-    const headersList = await headers()
-    const deviceType = headersList.get('x-device-type') || 'desktop'
-    const isMobile = deviceType === 'mobile'
+    // Mobile detection: dùng helper isMobileDevice() (user-agent + cookie 'view-mode' override).
+    // Trước đây dùng header 'x-device-type' nhưng middleware không bao giờ set →
+    // mobile users luôn nhận desktop AdminShell thay vì MobileLayoutShell.
+    const isMobile = await isMobileDevice()
 
     const handleLogout = async () => {
         'use server'

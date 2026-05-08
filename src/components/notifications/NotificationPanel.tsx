@@ -95,7 +95,9 @@ export function NotificationPanel({ isOpen, onClose, onUnreadCountChange, incomi
     if (!isOpen) return null
 
     return (
-        <div className="absolute right-0 top-full mt-2 w-[380px] max-h-[600px] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-violet-500/20 shadow-[0_24px_60px_rgba(0,0,0,0.5)] z-50 flex flex-col overflow-hidden">
+        // Mobile: full-width fixed bottom-anchored panel (offset from header).
+        // Desktop (sm+): floating 380px panel anchored to bell button.
+        <div className="fixed inset-x-2 top-[calc(56px+env(safe-area-inset-top))] sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] max-h-[calc(100dvh-80px)] sm:max-h-[600px] bg-zinc-900/95 backdrop-blur-2xl rounded-2xl border border-violet-500/20 shadow-[0_24px_60px_rgba(0,0,0,0.5)] z-50 flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-violet-500/10">
                 <h3 className="text-[14px] font-bold text-white m-0">Notifications</h3>

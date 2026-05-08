@@ -51,7 +51,7 @@ export function ChatFloatingPanel({ workspaceId, profileId }: ChatFloatingPanelP
     return (
         <>
             <div
-                className={`fixed bottom-6 right-6 w-[400px] max-h-[calc(100vh-48px)] bg-zinc-950/95 backdrop-blur-xl border border-violet-500/20 shadow-[0_24px_60px_rgba(0,0,0,0.6),0_0_0_1px_rgba(139,92,246,0.08)] z-[91] flex flex-col overflow-hidden transition-[height,border-radius] duration-200 ease-out ${minimized ? 'h-12 rounded-[14px]' : 'h-[600px] rounded-2xl'}`}
+                className={`fixed inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[400px] max-h-[calc(100dvh-48px)] bg-zinc-950/95 backdrop-blur-xl border border-violet-500/20 shadow-[0_24px_60px_rgba(0,0,0,0.6),0_0_0_1px_rgba(139,92,246,0.08)] z-[91] flex flex-col overflow-hidden transition-[height,border-radius] duration-200 ease-out ${minimized ? 'h-12 rounded-[14px]' : 'h-[min(600px,calc(100dvh-32px))] rounded-2xl'}`}
             >
                 <div
                     className={`flex items-center justify-between px-3.5 h-12 shrink-0 bg-violet-500/[0.06] cursor-pointer ${minimized ? '' : 'border-b border-violet-500/10'}`}

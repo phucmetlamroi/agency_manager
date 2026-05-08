@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { ensureNotLastOwner, LastOwnerProtectionError } from '@/lib/workspace-guards'
 import { audit } from '@/lib/audit-log'
+import { requireFeature, SubscriptionLimitError } from '@/lib/subscription'
 
 export async function createWorkspaceAction(formData: FormData) {
     const session = await getSession()
@@ -39,6 +40,25 @@ export async function createWorkspaceAction(formData: FormData) {
     })
     if (ownedCount >= 10) {
         return { error: 'Bạn đã đạt giới hạn 10 Workspace. Hãy xóa workspace cũ trước khi tạo mới.' }
+    }
+
+    // Subscription gate: trial expired hoặc FREE tier không tạo workspace mới được.
+    // Workspace đầu tiên đã được tạo lúc signup → user phải upgrade để tạo thêm.
+    if (ownedCount >= 1) {
+        const profile = await prisma.profile.findUnique({
+            where: { id: profileId },
+            select: { subscriptionTier: true, trialStartedAt: true, trialEndsAt: true },
+        })
+        if (profile) {
+            try {
+                requireFeature(profile, 'workspace_create')
+            } catch (e) {
+                if (e instanceof SubscriptionLimitError) {
+                    return { error: e.message }
+                }
+                throw e
+            }
+        }
     }
 
     try {

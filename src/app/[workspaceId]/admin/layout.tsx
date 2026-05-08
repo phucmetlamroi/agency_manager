@@ -8,6 +8,7 @@ import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
+import TrialStatusBanner from '@/components/layout/TrialStatusBanner'
 
 export default async function AdminLayout({
     children,
@@ -66,12 +67,24 @@ export default async function AdminLayout({
     const needsEmailMigration = dbUser.hasCompletedEmailMigration === false
     const displayName = dbUser.displayName ?? user.username
 
+    // Fetch profile subscription state for TrialStatusBanner
+    const workspaceProfile = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: {
+            profile: {
+                select: { subscriptionTier: true, trialStartedAt: true, trialEndsAt: true },
+            },
+        },
+    })
+    const profileSubscription = workspaceProfile?.profile ?? null
+
     return (
         <AdminShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />
             )}
+            <TrialStatusBanner profile={profileSubscription} />
             {children}
         </AdminShell>
     )

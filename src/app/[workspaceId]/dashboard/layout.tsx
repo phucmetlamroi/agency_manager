@@ -6,6 +6,7 @@ import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
+import TrialStatusBanner from '@/components/layout/TrialStatusBanner'
 
 // User Layout — uses the unified AppSidebar with viewRole='USER'
 // Mirrors AdminLayout structure for visual & UX parity.
@@ -37,6 +38,17 @@ export default async function UserLayout({
         select: { role: true },
     })
     const workspaceRole = membership?.role ?? undefined
+
+    // Fetch profile subscription state for TrialStatusBanner
+    const workspaceProfile = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: {
+            profile: {
+                select: { subscriptionTier: true, trialStartedAt: true, trialEndsAt: true },
+            },
+        },
+    })
+    const profileSubscription = workspaceProfile?.profile ?? null
 
     const headersList = await headers()
     const deviceType = headersList.get('x-device-type') || 'desktop'
@@ -76,6 +88,7 @@ export default async function UserLayout({
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />
             )}
+            <TrialStatusBanner profile={profileSubscription} />
             {children}
         </AdminShell>
     )

@@ -9,6 +9,7 @@ import { getSession } from '@/lib/auth'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { requireFeature, SubscriptionLimitError } from '@/lib/subscription'
 
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
@@ -34,6 +35,28 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
 
 export async function createTask(formData: FormData, workspaceId: string) {
     try {
+        // Subscription gate: trial expired → block create task (read-only mode).
+        // Verify caller has workspace ADMIN access to fetch profile, then check tier.
+        try {
+            const access = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+            const profileId = (access.session?.user as any)?.sessionProfileId
+            if (profileId) {
+                const profile = await prisma.profile.findUnique({
+                    where: { id: profileId },
+                    select: { subscriptionTier: true, trialStartedAt: true, trialEndsAt: true },
+                })
+                if (profile) {
+                    requireFeature(profile, 'unlimited_tasks')
+                }
+            }
+        } catch (e) {
+            if (e instanceof SubscriptionLimitError) {
+                return { error: e.message }
+            }
+            // SECURITY_VIOLATION sẽ throw vẫn để outer catch handle
+            throw e
+        }
+
         const title = formData.get('title') as string
         const value = parseFloat(formData.get('value') as string) || 0
 

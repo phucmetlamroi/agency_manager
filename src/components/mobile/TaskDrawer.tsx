@@ -1,17 +1,21 @@
 "use client"
 
+import { useState } from "react"
 import { Drawer } from "vaul"
 import { TaskWithUser } from "@/types/admin"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import {
-    Calendar, Link as LinkIcon, User, Play, Pause, Send, CheckCircle2, AlertTriangle, Trash2,
+    Calendar, Link as LinkIcon, User, Play, Pause, Send, CheckCircle2, AlertTriangle, Trash2, UserPlus, Users,
 } from "lucide-react"
 import DOMPurify from "isomorphic-dompurify"
 import { ensureExternalLinks } from "@/lib/utils"
 import { formatClientHierarchy } from "@/lib/client-hierarchy"
 import { getValidNextStatuses, type ActorRole } from "@/lib/task-state-machine"
+import { assignTask } from "@/actions/task-management-actions"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface TaskDrawerProps {
     open: boolean
@@ -19,6 +23,8 @@ interface TaskDrawerProps {
     task: TaskWithUser | null
     isAdmin?: boolean
     workspaceId?: string
+    /** Available users for "Assign to" picker (admin queue use case). */
+    users?: { id: string; username: string; nickname?: string | null }[]
     onStatusChange?: (status: string) => void
     onDelete?: () => void
     onClose?: () => void
@@ -57,9 +63,15 @@ export function TaskDrawer({
     onOpenChange,
     task,
     isAdmin,
+    workspaceId,
+    users,
     onStatusChange,
     onDelete,
 }: TaskDrawerProps) {
+    const router = useRouter()
+    const [showAssignPicker, setShowAssignPicker] = useState(false)
+    const [isAssigning, setIsAssigning] = useState(false)
+
     if (!task) return null
     const clientLabel = formatClientHierarchy(task.client)
 
@@ -70,6 +82,27 @@ export function TaskDrawer({
     const isOverdue = task.deadline
         && new Date() > new Date(task.deadline)
         && !['Hoàn tất', 'Đã hủy', 'Quá hạn', 'Tạm ngưng'].includes(task.status)
+
+    // Admin can assign if task is unassigned & we have users list & workspaceId
+    const canAssign = isAdmin && !task.assigneeId && !!users?.length && !!workspaceId
+
+    const handleAssign = async (userId: string) => {
+        if (!workspaceId) return
+        setIsAssigning(true)
+        try {
+            const res = await assignTask(task.id, userId, workspaceId)
+            if ((res as any)?.error) {
+                toast.error((res as any).error)
+            } else {
+                toast.success('Đã giao task thành công')
+                setShowAssignPicker(false)
+                onOpenChange(false)
+                router.refresh()
+            }
+        } finally {
+            setIsAssigning(false)
+        }
+    }
 
     return (
         <Drawer.Root open={open} onOpenChange={onOpenChange}>
@@ -177,8 +210,53 @@ export function TaskDrawer({
                     {/* Fixed Footer Actions - iOS Safe Area aware */}
                     <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-zinc-950 border-t border-white/8 mt-auto">
                         <div className="max-w-md mx-auto space-y-2">
+                            {/* Assign picker (admin queue mode) */}
+                            {canAssign && showAssignPicker && (
+                                <div className="bg-zinc-900/80 border border-white/10 rounded-xl p-2 max-h-60 overflow-y-auto">
+                                    <div className="flex items-center justify-between px-2 pb-2">
+                                        <span className="text-xs font-bold uppercase tracking-wide text-zinc-400 flex items-center gap-1.5">
+                                            <Users className="w-3.5 h-3.5" /> Chọn người nhận
+                                        </span>
+                                        <button
+                                            onClick={() => setShowAssignPicker(false)}
+                                            className="text-xs text-zinc-500 hover:text-zinc-300"
+                                        >
+                                            Đóng
+                                        </button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {users!.map((u) => (
+                                            <button
+                                                key={u.id}
+                                                disabled={isAssigning}
+                                                onClick={() => handleAssign(u.id)}
+                                                className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 active:bg-white/10 transition-colors text-left disabled:opacity-50"
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 text-xs font-bold">
+                                                    {(u.nickname || u.username)[0]?.toUpperCase()}
+                                                </div>
+                                                <span className="text-sm text-zinc-100">
+                                                    {u.nickname || u.username}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Assign trigger button (admin + unassigned) */}
+                            {canAssign && !showAssignPicker && (
+                                <button
+                                    onClick={() => setShowAssignPicker(true)}
+                                    className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    <UserPlus className="w-4 h-4" />
+                                    Giao task cho thành viên
+                                </button>
+                            )}
+
                             {/* Status transition buttons (FSM-driven) */}
-                            {validNextStatuses.length > 0 && (
+                            {validNextStatuses.length > 0 && !showAssignPicker && (
                                 <div className="grid grid-cols-1 gap-2">
                                     {validNextStatuses.map(nextStatus => {
                                         const config = STATUS_BUTTON_CONFIG[nextStatus] ?? {
@@ -202,24 +280,26 @@ export function TaskDrawer({
                             )}
 
                             {/* Admin-only delete + close */}
-                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => onOpenChange(false)}
-                                    className="w-full"
-                                >
-                                    Đóng
-                                </Button>
-                                {isAdmin && onDelete && (
+                            {!showAssignPicker && (
+                                <div className="grid grid-cols-2 gap-2 pt-1">
                                     <Button
-                                        onClick={onDelete}
                                         variant="outline"
-                                        className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
+                                        onClick={() => onOpenChange(false)}
+                                        className="w-full"
                                     >
-                                        <Trash2 className="w-4 h-4 mr-1" /> Xoá
+                                        Đóng
                                     </Button>
-                                )}
-                            </div>
+                                    {isAdmin && onDelete && (
+                                        <Button
+                                            onClick={onDelete}
+                                            variant="outline"
+                                            className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-1" /> Xoá
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </Drawer.Content>

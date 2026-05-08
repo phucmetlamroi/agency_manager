@@ -3,8 +3,8 @@
 import React, { useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { AlertTriangle, UserCircle, ArrowLeftRight, Bell, Settings, LogOut, Monitor, X, ScrollText, UsersRound } from 'lucide-react'
+import { AlertTriangle, UserCircle, ArrowLeftRight, Settings, LogOut, Monitor, X, ScrollText, UsersRound } from 'lucide-react'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 
 export default function MobileLayoutShell({
     children,
@@ -38,20 +38,27 @@ export default function MobileLayoutShell({
                     </h1>
                 </div>
 
-                {/* Avatar Trigger */}
-                <button onClick={() => setIsDrawerOpen(true)} className="relative cursor-pointer group">
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/10 group-hover:ring-indigo-500/50 transition-all duration-300 shadow-md shadow-indigo-500/20 bg-zinc-900">
-                        {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-xs text-white">
-                                {user.username?.[0]?.toUpperCase()}
-                            </div>
-                        )}
-                    </div>
-                    {/* Online Status Dot */}
-                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-zinc-950 shadow-sm shadow-emerald-500/50"></div>
-                </button>
+                {/* Right cluster: NotificationBell + Avatar */}
+                <div className="flex items-center gap-2">
+                    <NotificationBell />
+                    <button
+                        onClick={() => setIsDrawerOpen(true)}
+                        className="relative cursor-pointer group"
+                        aria-label="Mở menu cá nhân"
+                    >
+                        <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/10 group-hover:ring-indigo-500/50 transition-all duration-300 shadow-md shadow-indigo-500/20 bg-zinc-900">
+                            {user.avatarUrl ? (
+                                <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-xs text-white">
+                                    {user.username?.[0]?.toUpperCase()}
+                                </div>
+                            )}
+                        </div>
+                        {/* Online Status Dot */}
+                        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-zinc-950 shadow-sm shadow-emerald-500/50"></div>
+                    </button>
+                </div>
             </header>
 
             {/* MAIN CONTENT */}
@@ -103,7 +110,7 @@ export default function MobileLayoutShell({
                             <Link href={`/${workspaceId}/dashboard/profile`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
                                 <UserCircle className="w-4 h-4" /> Profile
                             </Link>
-                            <Link href={`/${workspaceId}/admin`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all duration-300 flex items-center gap-3 border border-indigo-500/20">
+                            <Link href={`/api/profile/select`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all duration-300 flex items-center gap-3 border border-indigo-500/20">
                                 <ArrowLeftRight className="w-4 h-4" /> Đổi Team / Workspace
                             </Link>
                             {/* Admin-only links */}
@@ -120,9 +127,6 @@ export default function MobileLayoutShell({
                                     </Link>
                                 </>
                             )}
-                            <button className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-400 border border-white/5 cursor-pointer">
-                                <Bell className="w-4 h-4" /> Notifications
-                            </button>
                         </div>
 
                         <button

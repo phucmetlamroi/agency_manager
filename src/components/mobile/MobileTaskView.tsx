@@ -92,10 +92,10 @@ function buildSwipeActions(
     return { right, left }
 }
 
-export default function MobileTaskView({ tasks, isAdmin, workspaceId }: {
+export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
     tasks: TaskWithUser[]
     isAdmin: boolean
-    users?: any[]
+    users?: { id: string; username: string; nickname?: string | null }[]
     workspaceId: string
 }) {
     const router = useRouter()
@@ -290,6 +290,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId }: {
                 task={selectedTask}
                 isAdmin={isAdmin}
                 workspaceId={workspaceId}
+                users={users}
                 onStatusChange={handleStatusChangeFromDrawer}
                 onDelete={handleDelete}
             />

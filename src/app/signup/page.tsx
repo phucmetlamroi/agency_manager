@@ -78,13 +78,13 @@ export default function SignupPage() {
 
     if (done) {
         return (
-            <div className="min-h-screen flex items-center justify-center px-4" style={{
+            <div className="min-h-dvh flex items-center justify-center px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" style={{
                 background: 'radial-gradient(circle at top right, #2d1b5e, #000)'
             }}>
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="w-full max-w-md p-8 backdrop-blur-2xl bg-white/[0.04] border border-white/10 rounded-2xl shadow-2xl text-center"
+                    className="w-full max-w-md p-6 sm:p-8 backdrop-blur-xl bg-zinc-950/60 border border-white/10 rounded-3xl shadow-2xl shadow-black/60 text-center"
                 >
                     <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
                     <h1 className="text-2xl font-bold text-zinc-100 mb-2">Kiểm tra email!</h1>
@@ -103,14 +103,14 @@ export default function SignupPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 py-8" style={{
+        <div className="min-h-dvh flex items-center justify-center px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" style={{
             background: 'radial-gradient(circle at top right, #2d1b5e, #000)'
         }}>
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className="w-full max-w-md p-8 backdrop-blur-2xl bg-white/[0.04] border border-white/10 rounded-2xl shadow-2xl"
+                className="w-full max-w-md p-6 sm:p-8 backdrop-blur-xl bg-zinc-950/60 border border-white/10 rounded-3xl shadow-2xl shadow-black/60"
             >
                 <div className="flex items-center gap-3 mb-6">
                     <Link
@@ -120,8 +120,8 @@ export default function SignupPage() {
                         <ArrowLeft className="w-4 h-4" />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold text-zinc-100">Tạo tài khoản</h1>
-                        <p className="text-xs text-zinc-500">HustlyTasker · Dùng thử miễn phí 14 ngày</p>
+                        <h1 className="text-2xl font-bold text-zinc-100 font-heading">Tạo tài khoản</h1>
+                        <p className="text-xs text-zinc-500">Hustly<span className="text-violet-400 font-semibold">Tasker</span> · Miễn phí, đầy đủ tính năng</p>
                     </div>
                 </div>
 
@@ -153,7 +153,7 @@ export default function SignupPage() {
                                 value={displayName}
                                 onChange={(e) => setDisplayName(e.target.value)}
                                 placeholder="Nguyễn Văn An"
-                                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-lg text-zinc-100 outline-none transition-all"
+                                className="w-full h-12 pl-10 pr-4 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-xl text-zinc-100 outline-none transition-all"
                             />
                         </div>
                         {fieldErrors.displayName && <p className="text-xs text-red-400 mt-1">{fieldErrors.displayName}</p>}
@@ -167,11 +167,13 @@ export default function SignupPage() {
                             <input
                                 type="email"
                                 autoComplete="email"
+                                inputMode="email"
+                                autoCapitalize="none"
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="ban@congty.vn"
-                                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-lg text-zinc-100 outline-none transition-all"
+                                className="w-full h-12 pl-10 pr-4 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-xl text-zinc-100 outline-none transition-all"
                             />
                         </div>
                         {fieldErrors.email && <p className="text-xs text-red-400 mt-1">{fieldErrors.email}</p>}
@@ -190,7 +192,7 @@ export default function SignupPage() {
                                 maxLength={128}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full pl-10 pr-14 py-3 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-lg text-zinc-100 outline-none transition-all"
+                                className="w-full h-12 pl-10 pr-14 bg-white/5 border border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 rounded-xl text-zinc-100 outline-none transition-all"
                             />
                             <button
                                 type="button"
@@ -261,7 +263,7 @@ export default function SignupPage() {
                     <button
                         type="submit"
                         disabled={!canSubmit}
-                        className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                        className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-xl shadow-lg shadow-violet-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                     >
                         {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         Đăng ký

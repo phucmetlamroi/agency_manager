@@ -43,7 +43,12 @@ interface Props {
     onToken: (token: string) => void
     onError?: () => void
     onExpire?: () => void
-    /** "managed" (default) hiển thị widget, "invisible" chạy ngầm (cần size="invisible") */
+    /**
+     * 'always' = widget luôn hiện (user click "I'm not a robot"). KHUYẾN NGHỊ.
+     * 'execute' = widget ẩn, validate khi gọi turnstile.execute() programmatically.
+     * 'interaction-only' = ẩn cho user "trusted", chỉ hiện khi suspicious.
+     *   ⚠️ KHÔNG dùng cho signup vì có thể không tự issue token.
+     */
     appearance?: 'always' | 'execute' | 'interaction-only'
     theme?: 'light' | 'dark' | 'auto'
     /** Force re-render khi key đổi — dùng để reset widget sau form submit */
@@ -54,7 +59,11 @@ export default function TurnstileWidget({
     onToken,
     onError,
     onExpire,
-    appearance = 'interaction-only',
+    appearance = 'always',  // Đổi từ 'interaction-only' → 'always' để đảm bảo
+                            // widget LUÔN render và issue token. Bug trước:
+                            // 'interaction-only' không tự cấp token nếu không
+                            // detect "suspicious behavior" → button submit bị
+                            // disabled forever vì turnstileToken=''.
     theme = 'dark',
     resetKey = 0,
 }: Props) {
@@ -64,12 +73,18 @@ export default function TurnstileWidget({
     const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
     useEffect(() => {
-        // Skip if no site key (dev fallback) — auto-call onToken with placeholder
+        // No site key → bypass with placeholder token. Production server với
+        // TURNSTILE_SECRET_KEY set sẽ reject token này nên vẫn an toàn.
+        // Lý do bypass: nếu site key thiếu hoặc widget script bị block,
+        // form không bị disabled vô tận — user vẫn submit được, server
+        // có quyền reject.
         if (!siteKey) {
             if (process.env.NODE_ENV !== 'production') {
                 console.warn('[Turnstile] NEXT_PUBLIC_TURNSTILE_SITE_KEY not set — bypassing in dev.')
-                onToken('dev-bypass-token')
+            } else {
+                console.warn('[Turnstile] Site key missing in production — server-side check will reject.')
             }
+            onToken('no-turnstile-configured')
             return
         }
 

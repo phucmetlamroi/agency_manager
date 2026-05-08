@@ -1,48 +1,63 @@
 'use client'
 
-import { deleteUser } from '@/actions/user-actions'
+import { deactivateUser } from '@/actions/user-actions'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
+import { UserX } from 'lucide-react'
 
+/**
+ * @deprecated DeleteUserButton — đã đổi behavior từ HARD DELETE → DEACTIVATE.
+ * - HARD DELETE vi phạm PDPL Việt Nam (Luật 91/2025/QH15)
+ * - Cascade xóa tasks/comments/lịch sử nghiệp vụ
+ *
+ * Behavior mới:
+ * - Set role=LOCKED → user không thể đăng nhập
+ * - Bump sessionVersion → invalidate JWT đang active
+ * - Audit log đầy đủ
+ * - Data nguyên vẹn → có thể reactivate sau
+ *
+ * Component giữ tên cũ để không break call sites; sẽ rename ở Sprint 4.
+ */
 export default function DeleteUserButton({ userId, workspaceId }: { userId: string, workspaceId: string }) {
     const { confirm } = useConfirm()
-    const [isDeleting, setIsDeleting] = useState(false)
-    const router = useRouter()
+    const [isDeactivating, setIsDeactivating] = useState(false)
 
-    const handleDelete = async () => {
+    const handleDeactivate = async () => {
         if (!(await confirm({
-            title: 'Xóa User?',
-            message: 'CHÚ Ý: Xóa user sẽ khiến họ mất quyền truy cập NGAY LẬP TỨC. Bạn có chắc không?',
+            title: 'Deactivate User?',
+            message: 'User sẽ bị KHÓA — không thể đăng nhập, mọi session đang active sẽ bị logout.\n\nLƯU Ý: Data của user (tasks, comments, lịch sử) ĐƯỢC GIỮ NGUYÊN. Bạn có thể reactivate sau.\n\nĐể chỉ remove user khỏi workspace này (không khóa account), dùng trang Members.',
             type: 'danger',
-            confirmText: 'Xóa ngay',
+            confirmText: 'Deactivate',
             cancelText: 'Hủy'
         }))) return
 
-        setIsDeleting(true)
+        setIsDeactivating(true)
         try {
-            await deleteUser(userId, workspaceId)
-            toast.success('Đã xóa user thành công')
-        } catch (error) {
-            toast.error('Lỗi khi xóa user')
+            const result = await deactivateUser(userId, workspaceId)
+            if (result.success) {
+                toast.success(result.message ?? 'Đã deactivate user.')
+            } else {
+                toast.error(result.error ?? 'Lỗi khi deactivate user.')
+            }
+        } catch {
+            toast.error('Lỗi khi deactivate user.')
         } finally {
-            setIsDeleting(false)
+            setIsDeactivating(false)
         }
     }
 
     return (
         <button
-            onClick={handleDelete}
-            disabled={isDeleting}
+            onClick={handleDeactivate}
+            disabled={isDeactivating}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all disabled:opacity-50"
-            title="Xóa User"
+            title="Deactivate User (khóa account, giữ data)"
         >
-            {isDeleting ? (
+            {isDeactivating ? (
                 <div className="w-3.5 h-3.5 border-2 border-red-500/40 border-t-red-500 rounded-full animate-spin" />
             ) : (
-                <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+                <UserX className="w-4 h-4" strokeWidth={1.5} />
             )}
         </button>
     )

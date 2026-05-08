@@ -43,14 +43,22 @@ export type AuditAction =
     | 'member.role_changed'
     | 'member.suspended'
     | 'member.reactivated'
+    | 'user.deactivated'
+    | 'user.reactivated'
     | 'auth.login'
     | 'auth.logout'
     | 'auth.failed_attempt'
     | 'auth.impersonation_started'
     | 'auth.impersonation_ended'
+    | 'auth.admin_force_reset_triggered'
+    | 'payroll.bonus_calculated'
+    | 'payroll.bonus_reverted'
+    | 'payroll.locked'
+    | 'payroll.unlocked'
     | 'data.export'
     | 'data.import'
     | 'permission.checked_denied'
+    | 'subscription.trial_expired'
 
 export interface AuditOpts {
     workspaceId: string

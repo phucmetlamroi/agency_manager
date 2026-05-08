@@ -13,7 +13,7 @@ const INVITATION_EXPIRY_DAYS = 14
 
 // ─── Get workspace members with roles ────────────────────────────
 export async function getWorkspaceMembers(workspaceId: string) {
-    await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
 
     const members = await prisma.workspaceMember.findMany({
         where: { workspaceId },
@@ -38,6 +38,24 @@ export async function getWorkspaceMembers(workspaceId: string) {
     // Sort by role weight (OWNER > ADMIN > MEMBER > GUEST)
     const ROLE_ORDER: Record<string, number> = { OWNER: 4, ADMIN: 3, MEMBER: 2, GUEST: 1 }
     members.sort((a, b) => (ROLE_ORDER[b.role] ?? 0) - (ROLE_ORDER[a.role] ?? 0))
+
+    // Audit fix #3.2: Mask email khi caller không phải ADMIN+
+    // Privacy: MEMBER role không cần biết email của thành viên khác →
+    // chỉ thấy username/nickname/avatar. Tránh email enumeration + business
+    // intelligence leak (vd competitor lấy email list).
+    const isAdminOrAbove =
+        access.isGlobalAdmin
+        || access.workspaceRole === 'OWNER'
+        || access.workspaceRole === 'ADMIN'
+
+    if (!isAdminOrAbove) {
+        for (const m of members) {
+            if (m.user && m.user.id !== access.userId) {
+                // Chỉ giữ email của chính mình; mask của người khác
+                m.user.email = null
+            }
+        }
+    }
 
     return { members }
 }

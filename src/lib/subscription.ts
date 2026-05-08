@@ -1,18 +1,29 @@
 /**
- * Auth Phase 4 — SaaS subscription gating helpers.
+ * SaaS Subscription Gating — enforce tier-based feature access.
  *
  * Profile.subscriptionTier values: FREE | TRIAL | STARTER | PRO | ENTERPRISE
  *
- * - FREE:       Legacy users — không bị giới hạn (grandfathered).
- * - TRIAL:      User mới signup — 14 ngày dùng full features. Sau hết hạn → FREE.
- * - STARTER:    Tier paid cơ bản (Phase 5+).
- * - PRO:        Tier paid cao hơn (Phase 5+).
- * - ENTERPRISE: Custom contracts (Phase 5+).
+ * Tier semantics:
+ * - FREE:       Legacy users (grandfathered) hoặc trial expired
+ *               → READ-ONLY mode (xem được data, KHÔNG create/modify mới)
+ * - TRIAL:      User mới signup — 14 ngày full features
+ * - STARTER:    Paid tier cơ bản (Phase 5+ billing)
+ * - PRO:        Paid tier cao (Phase 5+)
+ * - ENTERPRISE: Custom contracts (Phase 5+)
  *
- * Phase 4 chỉ cần:
- *   - isTrialActive / isTrialExpired
- *   - canUseFeature() stub — tất cả features hiện đều available cho mọi tier
- *     (gating thật sẽ enable khi billing live ở Phase 5).
+ * Audit finding #6 (CRITICAL fix): Trial expired không block data access.
+ * Trước: cron set tier=FREE nhưng `canUseFeature()` chỉ check explicitly
+ * EXPIRED state (không có) → user vẫn create task/invite/edit thoải mái.
+ *
+ * Sau: tier=FREE → block các action "WRITE/MUTATE" (createTask, inviteMember,
+ * createWorkspace, ...). User vẫn xem được data, nhưng phải upgrade để tiếp tục.
+ *
+ * Server actions quan trọng MUST gate qua `requireFeature(profile, key)`:
+ *   - createTask, updateTask
+ *   - inviteMember, removeMember
+ *   - createWorkspace
+ *   - export PDF/Excel
+ *   - audit log view (admin)
  */
 
 export type SubscriptionTier = 'FREE' | 'TRIAL' | 'STARTER' | 'PRO' | 'ENTERPRISE'
@@ -36,7 +47,27 @@ export function isTrialExpired(profile: ProfileSubscriptionState): boolean {
 }
 
 /**
- * Số ngày còn lại của trial (làm tròn xuống). Trả 0 nếu hết hạn / không phải trial.
+ * Profile có quyền MUTATE (create/edit/delete) data không?
+ *
+ * - FREE: read-only (post-trial). Block writes.
+ * - TRIAL active: full access.
+ * - TRIAL expired: read-only (cron chưa chạy yet, vẫn block).
+ * - STARTER/PRO/ENTERPRISE: full access.
+ */
+export function canMutate(profile: ProfileSubscriptionState): boolean {
+    const tier = profile.subscriptionTier
+    if (tier === 'STARTER' || tier === 'PRO' || tier === 'ENTERPRISE') {
+        return true
+    }
+    if (tier === 'TRIAL') {
+        return isTrialActive(profile)
+    }
+    // FREE = read-only mode
+    return false
+}
+
+/**
+ * Số ngày còn lại của trial (làm tròn xuống). 0 nếu hết hạn / không phải trial.
  */
 export function trialDaysRemaining(profile: ProfileSubscriptionState): number {
     if (!isTrialActive(profile) || !profile.trialEndsAt) return 0
@@ -44,30 +75,106 @@ export function trialDaysRemaining(profile: ProfileSubscriptionState): number {
     return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)))
 }
 
-/**
- * Feature flag check. Phase 4: tất cả features đều available cho mọi tier.
- * Phase 5+: gate theo `featureKey` based trên tier.
- *
- * @example canUseFeature(profile, 'unlimited_tasks') → true (Phase 4)
- */
 export type FeatureKey =
-    | 'unlimited_tasks'
-    | 'export_pdf'
-    | 'team_invite'
-    | 'audit_log_view'
-    | 'analytics_advanced'
-    | 'custom_branding'
+    | 'unlimited_tasks'      // tạo task không giới hạn
+    | 'export_pdf'           // export invoice/payroll PDF
+    | 'export_excel'         // export Excel
+    | 'team_invite'          // mời thành viên
+    | 'audit_log_view'       // xem audit log
+    | 'analytics_advanced'   // analytics dashboard
+    | 'custom_branding'      // custom logo/banner
+    | 'workspace_create'     // tạo workspace mới (sau workspace đầu tiên)
+
+/**
+ * Tier requirements per feature.
+ * - 'mutate' = bất kỳ tier nào cho phép MUTATE (TRIAL active hoặc paid)
+ * - 'paid' = chỉ STARTER/PRO/ENTERPRISE
+ * - 'pro' = chỉ PRO/ENTERPRISE
+ * - 'enterprise' = chỉ ENTERPRISE
+ * - 'free' = ai cũng dùng được (read-only OK)
+ */
+const FEATURE_REQUIREMENTS: Record<FeatureKey, 'free' | 'mutate' | 'paid' | 'pro' | 'enterprise'> = {
+    unlimited_tasks: 'mutate',
+    export_pdf: 'mutate',
+    export_excel: 'mutate',
+    team_invite: 'mutate',
+    audit_log_view: 'free',          // ADMIN xem audit log → cần quyền nghiệp vụ, không gate theo tier
+    analytics_advanced: 'paid',      // Advanced analytics chỉ paid tier
+    custom_branding: 'pro',
+    workspace_create: 'mutate',
+}
 
 export function canUseFeature(
     profile: ProfileSubscriptionState,
-    _featureKey: FeatureKey
+    featureKey: FeatureKey,
 ): boolean {
-    // Phase 4: trial expired → block premium features (Phase 5 sẽ enable)
-    // Hiện tại chỉ block khi explicitly EXPIRED tier (chưa có); FREE legacy = full.
-    if (profile.subscriptionTier === 'TRIAL' && isTrialExpired(profile)) {
-        // Trial đã hết hạn nhưng cron chưa chạy yet → block
-        return false
+    const requirement = FEATURE_REQUIREMENTS[featureKey]
+    const tier = profile.subscriptionTier
+
+    switch (requirement) {
+        case 'free':
+            return true
+        case 'mutate':
+            return canMutate(profile)
+        case 'paid':
+            return tier === 'STARTER' || tier === 'PRO' || tier === 'ENTERPRISE'
+        case 'pro':
+            return tier === 'PRO' || tier === 'ENTERPRISE'
+        case 'enterprise':
+            return tier === 'ENTERPRISE'
     }
-    // Tất cả case khác: available
-    return true
+}
+
+/**
+ * Throw lỗi rõ ràng nếu feature không available.
+ * Dùng trong server actions để gate access.
+ *
+ * @example
+ *   await requireFeature(profile, 'team_invite')
+ *   // → throw 'SUBSCRIPTION_LIMIT' nếu trial hết hạn
+ */
+export class SubscriptionLimitError extends Error {
+    code = 'SUBSCRIPTION_LIMIT' as const
+    featureKey: FeatureKey
+
+    constructor(featureKey: FeatureKey, message?: string) {
+        super(message ?? `Tính năng "${featureKey}" yêu cầu nâng cấp gói.`)
+        this.name = 'SubscriptionLimitError'
+        this.featureKey = featureKey
+    }
+}
+
+export function requireFeature(
+    profile: ProfileSubscriptionState,
+    featureKey: FeatureKey,
+): void {
+    if (!canUseFeature(profile, featureKey)) {
+        if (isTrialExpired(profile)) {
+            throw new SubscriptionLimitError(
+                featureKey,
+                `Trial đã hết hạn. Vui lòng nâng cấp tại /upgrade để tiếp tục sử dụng "${featureKey}".`,
+            )
+        }
+        throw new SubscriptionLimitError(featureKey)
+    }
+}
+
+/**
+ * Helper async — fetch profile từ DB rồi check.
+ * Dùng khi caller chỉ có workspaceId, chưa có profile object.
+ */
+export async function requireFeatureForWorkspace(
+    prismaClient: { profile: { findFirst: (args: any) => Promise<any> } },
+    workspaceId: string,
+    featureKey: FeatureKey,
+): Promise<void> {
+    const profile = await prismaClient.profile.findFirst({
+        where: { workspaces: { some: { id: workspaceId } } },
+        select: { subscriptionTier: true, trialStartedAt: true, trialEndsAt: true },
+    })
+    if (!profile) {
+        // Không tìm thấy profile = không trong SaaS plan → coi như FREE (block mutate)
+        throw new SubscriptionLimitError(featureKey, 'Workspace không thuộc Profile nào.')
+    }
+    requireFeature(profile, featureKey)
 }

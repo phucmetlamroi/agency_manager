@@ -323,20 +323,21 @@ export async function inviteToWorkspace(
         return { error: `${targetUser.nickname || targetUser.username} đã là thành viên của workspace này.` }
     }
 
-    // Check for existing pending invitation
+    // [Re-invite policy] Cho phép invite NHIỀU LẦN kể cả khi đã có lời mời
+    // PENDING — refresh expiresAt + re-fire notification để invitee thấy lại
+    // trên bell + nhận email mới. Schema có unique (workspaceId, invitedUserId,
+    // status) nên dùng update thay vì create duplicate.
+    // Rate limit `checkInviteRate` ở trên (5/24h) vẫn chống spam.
+    let existingInvite: { id: string } | null = null
     try {
-        const existingInvite = await prisma.workspaceInvitation.findFirst({
+        existingInvite = await prisma.workspaceInvitation.findFirst({
             where: {
                 workspaceId,
                 invitedUserId: targetUser.id,
                 status: 'PENDING',
-                expiresAt: { gt: new Date() },
-            }
+            },
+            select: { id: true },
         })
-
-        if (existingInvite) {
-            return { error: `${targetUser.nickname || targetUser.username} đã có lời mời đang chờ.` }
-        }
     } catch (err: any) {
         // Table might not exist yet — continue to create
         if (err?.code !== 'P2021') throw err
@@ -389,20 +390,40 @@ export async function inviteToWorkspace(
         return { success: true, directAdd: true, username: targetUser.nickname || targetUser.username }
     }
 
-    // Cross-profile: create invitation
+    // Cross-profile: create OR refresh invitation
     try {
         const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 3600 * 1000)
 
-        const invitation = await prisma.workspaceInvitation.create({
-            data: {
-                workspaceId,
-                invitedUserId: targetUser.id,
-                role,
-                invitedById: inviterId,
-                message: message?.trim() || null,
-                expiresAt,
-            }
-        })
+        let invitation: { id: string }
+        let isReinvite = false
+
+        if (existingInvite) {
+            // Re-invite: refresh expiresAt + update role/message + re-fire notification
+            invitation = await prisma.workspaceInvitation.update({
+                where: { id: existingInvite.id },
+                data: {
+                    role,
+                    invitedById: inviterId,
+                    message: message?.trim() || null,
+                    expiresAt,
+                    // Giữ status='PENDING' (đã PENDING từ trước)
+                },
+                select: { id: true },
+            })
+            isReinvite = true
+        } else {
+            invitation = await prisma.workspaceInvitation.create({
+                data: {
+                    workspaceId,
+                    invitedUserId: targetUser.id,
+                    role,
+                    invitedById: inviterId,
+                    message: message?.trim() || null,
+                    expiresAt,
+                },
+                select: { id: true },
+            })
+        }
 
         await audit({
             workspaceId,
@@ -410,10 +431,12 @@ export async function inviteToWorkspace(
             action: 'member.invited',
             targetType: 'WorkspaceInvitation',
             targetId: invitation.id,
-            after: { targetUsername: targetUser.username, role },
+            after: { targetUsername: targetUser.username, role, reinvite: isReinvite },
         })
 
-        // Notify invitee + send email (best-effort, don't block on failure)
+        // Notify invitee + send email (best-effort). Re-invite cũng fire để
+        // invitee nhận notification mới (đặc biệt cần cho legacy invitations
+        // đã tạo trước feature notification).
         await notifyInvitee({
             invitationId: invitation.id,
             inviteeUserId: targetUser.id,
@@ -423,7 +446,12 @@ export async function inviteToWorkspace(
         }).catch((err) => console.warn('[inviteToWorkspace] notify failed:', err))
 
         revalidatePath(`/${workspaceId}/admin/members`)
-        return { success: true, directAdd: false, username: targetUser.nickname || targetUser.username }
+        return {
+            success: true,
+            directAdd: false,
+            reinvite: isReinvite,
+            username: targetUser.nickname || targetUser.username,
+        }
     } catch (err: any) {
         if (err?.code === 'P2021') {
             // Fallback: if invitation table doesn't exist, add directly

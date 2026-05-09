@@ -697,20 +697,20 @@ export function TaskDetailModal({
                             {/* TAB MAIN */}
                             {activeTab === 'main' && (
                                 <div className="grid grid-cols-2 gap-4">
-                                    {/* DELIVERY card */}
+                                    {/* DELIVERY card — editable by BOTH admin and user (assignee submits delivery link here) */}
                                     <Card
                                         title="Delivery"
                                         className="min-h-[220px]"
                                         rightSlot={
-                                            isAdmin && !editingDelivery ? (
+                                            !editingDelivery ? (
                                                 <EditButton onClick={enterEditDelivery} />
-                                            ) : editingDelivery ? (
+                                            ) : (
                                                 <ConfirmCancelGroup
                                                     onConfirm={handleSaveDelivery}
                                                     onCancel={() => setEditingDelivery(false)}
                                                     saving={savingCard}
                                                 />
-                                            ) : null
+                                            )
                                         }
                                     >
                                         {editingDelivery ? (
@@ -737,7 +737,7 @@ export function TaskDetailModal({
                                                     {form.productLink}
                                                 </p>
                                             )
-                                        ) : isAdmin ? (
+                                        ) : (
                                             <button
                                                 type="button"
                                                 onClick={enterEditDelivery}
@@ -745,8 +745,6 @@ export function TaskDetailModal({
                                             >
                                                 <Plus size={12} /> Add delivery link
                                             </button>
-                                        ) : (
-                                            <p className="text-[13px] text-zinc-600">Final products are pending.</p>
                                         )}
                                     </Card>
 

@@ -8,6 +8,24 @@ import { Dialog } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
 import DOMPurify from 'isomorphic-dompurify'
 import { cn } from "@/lib/utils"
+
+// ── DOMPurify global hook: force every anchor in sanitized HTML to open in
+// a new tab. Runs once at module load (DOMPurify is a singleton, so this
+// applies to ALL .sanitize() calls in this module + downstream consumers).
+// Guard with a global flag so HMR / multiple imports don't stack hooks.
+declare global {
+    // eslint-disable-next-line no-var
+    var __taskDetailDompurifyLinkHookRegistered: boolean | undefined
+}
+if (typeof window !== 'undefined' && !globalThis.__taskDetailDompurifyLinkHookRegistered) {
+    DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+        if (node.tagName === 'A') {
+            node.setAttribute('target', '_blank')
+            node.setAttribute('rel', 'noopener noreferrer')
+        }
+    })
+    globalThis.__taskDetailDompurifyLinkHookRegistered = true
+}
 import { motion } from "framer-motion"
 import {
     X, Pencil, LayoutGrid, FolderOpen, StickyNote, ExternalLink, Check, Plus,
@@ -679,20 +697,20 @@ export function TaskDetailModal({
                             {/* TAB MAIN */}
                             {activeTab === 'main' && (
                                 <div className="grid grid-cols-2 gap-4">
-                                    {/* DELIVERY card */}
+                                    {/* DELIVERY card — editable by BOTH admin and user (assignee submits delivery link here) */}
                                     <Card
                                         title="Delivery"
                                         className="min-h-[220px]"
                                         rightSlot={
-                                            isAdmin && !editingDelivery ? (
+                                            !editingDelivery ? (
                                                 <EditButton onClick={enterEditDelivery} />
-                                            ) : editingDelivery ? (
+                                            ) : (
                                                 <ConfirmCancelGroup
                                                     onConfirm={handleSaveDelivery}
                                                     onCancel={() => setEditingDelivery(false)}
                                                     saving={savingCard}
                                                 />
-                                            ) : null
+                                            )
                                         }
                                     >
                                         {editingDelivery ? (
@@ -719,7 +737,7 @@ export function TaskDetailModal({
                                                     {form.productLink}
                                                 </p>
                                             )
-                                        ) : isAdmin ? (
+                                        ) : (
                                             <button
                                                 type="button"
                                                 onClick={enterEditDelivery}
@@ -727,8 +745,6 @@ export function TaskDetailModal({
                                             >
                                                 <Plus size={12} /> Add delivery link
                                             </button>
-                                        ) : (
-                                            <p className="text-[13px] text-zinc-600">Final products are pending.</p>
                                         )}
                                     </Card>
 

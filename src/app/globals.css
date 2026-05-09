@@ -335,6 +335,61 @@ h2.section-title {
 }
 
 /* ═══════════════════════════════════════════════════════
+   TipTap editor — force readable dark-theme colors
+   (overrides prose defaults so user input stays bright)
+   ═══════════════════════════════════════════════════════ */
+.tiptap-editor,
+.tiptap-editor p,
+.tiptap-editor li,
+.tiptap-editor ul,
+.tiptap-editor ol {
+  color: #e4e4e7 !important;
+}
+.tiptap-editor h1,
+.tiptap-editor h2,
+.tiptap-editor h3,
+.tiptap-editor h4,
+.tiptap-editor strong {
+  color: #fafafa !important;
+}
+.tiptap-editor em {
+  color: #d4d4d8 !important;
+}
+.tiptap-editor a {
+  color: #a78bfa !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tiptap-editor a:hover {
+  color: #c4b5fd !important;
+}
+.tiptap-editor blockquote {
+  color: #a1a1aa !important;
+  border-left-color: rgba(139, 92, 246, 0.4) !important;
+}
+.tiptap-editor code {
+  background: rgba(139, 92, 246, 0.10) !important;
+  color: #f4f4f5 !important;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.tiptap-editor ul[data-type="taskList"] li {
+  list-style: none;
+}
+.tiptap-editor ul[data-type="taskList"] li > label {
+  display: inline-flex;
+  margin-right: 0.5rem;
+}
+/* Empty editor placeholder */
+.tiptap-editor p.is-editor-empty:first-child::before {
+  content: 'Type your note here…';
+  color: #71717a;
+  pointer-events: none;
+  height: 0;
+  float: left;
+}
+
+/* ═══════════════════════════════════════════════════════
    Portal Status Badge — Holographic Signal Lamp Animations
    Each status has a unique living micro-animation.
    ═══════════════════════════════════════════════════════ */

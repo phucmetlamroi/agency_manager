@@ -10,7 +10,7 @@ import DOMPurify from 'isomorphic-dompurify'
 import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
 import {
-    X, Pencil, LayoutGrid, FolderOpen, StickyNote, ExternalLink,
+    X, Pencil, LayoutGrid, FolderOpen, StickyNote, ExternalLink, Check, Plus,
 } from "lucide-react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 
@@ -73,17 +73,19 @@ function formatLink(link: string | null) {
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
-/*  Sub-components                                                         */
+/*  Card wrapper                                                           */
 /* ────────────────────────────────────────────────────────────────────── */
 
 function Card({
     title,
     children,
     className = '',
+    rightSlot,
 }: {
     title?: string
     children: React.ReactNode
     className?: string
+    rightSlot?: React.ReactNode
 }) {
     return (
         <div
@@ -92,15 +94,24 @@ function Card({
                 className,
             )}
         >
-            {title && (
-                <h4 className="text-[12px] font-bold uppercase tracking-wide text-zinc-400 mb-3">
-                    {title}
-                </h4>
+            {(title || rightSlot) && (
+                <div className="flex items-center justify-between mb-3">
+                    {title && (
+                        <h4 className="text-[12px] font-bold uppercase tracking-wide text-zinc-400">
+                            {title}
+                        </h4>
+                    )}
+                    {rightSlot}
+                </div>
             )}
             {children}
         </div>
     )
 }
+
+/* ────────────────────────────────────────────────────────────────────── */
+/*  Pills                                                                  */
+/* ────────────────────────────────────────────────────────────────────── */
 
 function StatusPill({ status }: { status: string }) {
     const s = getStatusInfo(status)
@@ -127,7 +138,10 @@ function TypePill({ type }: { type: string }) {
     )
 }
 
-/** Tab navigation pill (3 tabs) */
+/* ────────────────────────────────────────────────────────────────────── */
+/*  Tab navigation                                                         */
+/* ────────────────────────────────────────────────────────────────────── */
+
 function TabNav({
     activeTab,
     onChange,
@@ -167,52 +181,179 @@ function TabNav({
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
-/*  Field row (for resources/references read mode)                         */
+/*  LinkRow — per-field inline edit + named hyperlink display              */
 /* ────────────────────────────────────────────────────────────────────── */
 
-function ResourceRow({
+function LinkRow({
     label,
     value,
-    isEditing,
-    onChange,
-    placeholder,
+    canEdit,
+    onSave,
 }: {
     label: string
     value: string
-    isEditing: boolean
-    onChange: (v: string) => void
-    placeholder?: string
+    canEdit: boolean
+    onSave: (newValue: string) => Promise<void>
 }) {
+    const [isEditing, setIsEditing] = useState(false)
+    const [draft, setDraft] = useState(value)
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        setDraft(value)
+    }, [value])
+
+    const startEdit = () => {
+        setDraft(value)
+        setIsEditing(true)
+    }
+    const cancelEdit = () => {
+        setDraft(value)
+        setIsEditing(false)
+    }
+    const handleConfirm = async () => {
+        if (saving) return
+        if (draft.trim() === value.trim()) {
+            setIsEditing(false)
+            return
+        }
+        setSaving(true)
+        try {
+            await onSave(draft.trim())
+            setIsEditing(false)
+        } finally {
+            setSaving(false)
+        }
+    }
+
     if (isEditing) {
         return (
-            <div className="flex flex-col gap-1.5">
-                <span className="text-[12px] font-medium text-zinc-400">{label}</span>
+            <div className="flex items-center gap-2 py-2 border-b border-white/5 last:border-0">
+                <span className="text-[12px] font-medium text-zinc-300 flex-shrink-0 w-[120px]">
+                    {label}
+                </span>
                 <input
                     type="url"
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder ?? `Paste ${label.toLowerCase()} link`}
-                    className="h-9 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-3.5 text-[12px] text-zinc-300 placeholder:text-zinc-600 outline-none focus:border-violet-500/50"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleConfirm()
+                        if (e.key === 'Escape') cancelEdit()
+                    }}
+                    autoFocus
+                    placeholder="Paste link…"
+                    className="flex-1 h-8 rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[12px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-violet-500"
                 />
+                <button
+                    type="button"
+                    onClick={handleConfirm}
+                    disabled={saving}
+                    title="Confirm"
+                    className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
+                >
+                    <Check size={13} strokeWidth={3} />
+                </button>
+                <button
+                    type="button"
+                    onClick={cancelEdit}
+                    disabled={saving}
+                    title="Cancel"
+                    className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 disabled:opacity-50 transition-colors"
+                >
+                    <X size={13} />
+                </button>
             </div>
         )
     }
+
     return (
-        <div className="flex items-center justify-between gap-3 py-2 border-b border-white/5 last:border-0">
+        <div className="flex items-center justify-between gap-3 py-2 border-b border-white/5 last:border-0 group">
             <span className="text-[12px] font-medium text-zinc-300 flex-shrink-0">{label}</span>
-            {value?.trim() ? (
-                <a
-                    href={formatLink(value)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 max-w-[60%] text-[12px] text-violet-400 hover:text-violet-300 truncate"
-                >
-                    <span className="truncate">{value}</span>
-                    <ExternalLink size={11} className="flex-shrink-0" />
-                </a>
-            ) : (
-                <span className="text-[12px] text-zinc-600">None</span>
-            )}
+            <div className="flex items-center gap-2 min-w-0">
+                {value?.trim() ? (
+                    <a
+                        href={formatLink(value)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[12px] text-violet-400 hover:text-violet-300 truncate max-w-[180px]"
+                        title={value}
+                    >
+                        <span className="truncate">View {label}</span>
+                        <ExternalLink size={11} className="flex-shrink-0" />
+                    </a>
+                ) : canEdit ? (
+                    <button
+                        type="button"
+                        onClick={startEdit}
+                        className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-violet-300 transition-colors"
+                    >
+                        <Plus size={11} />
+                        Add link
+                    </button>
+                ) : (
+                    <span className="text-[12px] text-zinc-600">None</span>
+                )}
+                {canEdit && value?.trim() && (
+                    <button
+                        type="button"
+                        onClick={startEdit}
+                        title="Edit"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/[0.06]"
+                    >
+                        <Pencil size={11} className="text-zinc-500" />
+                    </button>
+                )}
+            </div>
+        </div>
+    )
+}
+
+/* ────────────────────────────────────────────────────────────────────── */
+/*  EditableCard — wraps a card with inline edit toggle (Delivery/Deadline/Finance) */
+/* ────────────────────────────────────────────────────────────────────── */
+
+function EditButton({ onClick, title }: { onClick: () => void; title?: string }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={title ?? "Edit"}
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/[0.06] transition-colors"
+        >
+            <Pencil size={12} className="text-zinc-500 hover:text-violet-300" />
+        </button>
+    )
+}
+
+function ConfirmCancelGroup({
+    onConfirm,
+    onCancel,
+    saving,
+}: {
+    onConfirm: () => void
+    onCancel: () => void
+    saving: boolean
+}) {
+    return (
+        <div className="flex items-center gap-1.5">
+            <button
+                type="button"
+                onClick={onConfirm}
+                disabled={saving}
+                title="Confirm"
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
+            >
+                <Check size={13} strokeWidth={3} />
+            </button>
+            <button
+                type="button"
+                onClick={onCancel}
+                disabled={saving}
+                title="Cancel"
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 disabled:opacity-50 transition-colors"
+            >
+                <X size={13} />
+            </button>
         </div>
     )
 }
@@ -238,25 +379,33 @@ export function TaskDetailModal({
     workspaceId,
 }: TaskDetailModalProps) {
     const [activeTab, setActiveTab] = useState<'main' | 'assets' | 'notes'>('main')
-    const [isEditing, setIsEditing] = useState(false)
-    const [saving, setSaving] = useState(false)
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
 
-    // Flat form state — same shape as before for backward-compat with action signature
+    // Per-card edit states (only one open at a time, but state per card)
+    const [editingDelivery, setEditingDelivery] = useState(false)
+    const [editingDeadline, setEditingDeadline] = useState(false)
+    const [editingFinance, setEditingFinance] = useState(false)
+    const [editingNotes, setEditingNotes] = useState(false)
+    const [savingCard, setSavingCard] = useState(false)
+
+    // Drafts for cards in edit mode
+    const [draftDelivery, setDraftDelivery] = useState('')
+    const [draftDeadline, setDraftDeadline] = useState('')
+    const [draftFinance, setDraftFinance] = useState({ jobPriceUSD: 0, value: 0 })
+    const [draftNotes, setDraftNotes] = useState('')
+
+    // Live form (keeps current values for display + base for save merging)
     const [form, setForm] = useState({
         productLink: '',
         deadline: '',
         jobPriceUSD: 0,
         value: 0,
-        // Resources tab fields (parsed from `resources` packed string)
         linkRaw: '',
         linkBroll: '',
         submissionFolder: '',
-        // References tab fields (parsed from `references` packed string)
         references: '',
         scriptLink: '',
         collectFilesLink: '',
-        // Notes tab — single TipTap rich text (notes_vi field, notes_en deprecated)
         notes: '',
     })
 
@@ -265,7 +414,6 @@ export function TaskDetailModal({
         if (!task) return
         setLocalTask(task)
 
-        // Parse packed resources string ("RAW:...|BROLL:...|SUBMISSION:...")
         const resString = task.resources || task.fileLink || ''
         let raw = ''
         let broll = ''
@@ -282,7 +430,6 @@ export function TaskDetailModal({
             raw = resString
         }
 
-        // Parse packed references string ("REF:...|SCRIPT:...")
         let refUrl = task.references || ''
         let scriptUrl = ''
         if (refUrl.startsWith('REF:')) {
@@ -314,88 +461,146 @@ export function TaskDetailModal({
             collectFilesLink: task.collectFilesLink || '',
             notes: parseContent(task.notes_vi),
         })
-        setIsEditing(false)
         setActiveTab('main')
+        setEditingDelivery(false)
+        setEditingDeadline(false)
+        setEditingFinance(false)
+        setEditingNotes(false)
     }, [task])
 
     if (!isOpen || !localTask) return null
 
-    const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
-        setForm((prev) => ({ ...prev, [key]: value }))
+    /* ── Generic per-field save ── */
+    const saveSingle = async (
+        patch: Parameters<typeof updateTaskDetails>[1],
+        successMsg = 'Updated',
+    ) => {
+        const res = await updateTaskDetails(localTask.id, patch, workspaceId)
+        if (res?.success) {
+            toast.success(successMsg)
+            return true
+        }
+        toast.error('Save failed')
+        return false
+    }
 
-    /* ── Save ── */
-    const handleSave = async () => {
-        setSaving(true)
-        try {
-            // Re-pack resources + references as before (preserve backward compat)
-            const combinedResources =
-                form.linkRaw || form.linkBroll || form.submissionFolder
-                    ? `RAW: ${form.linkRaw.trim()} | BROLL: ${form.linkBroll.trim()} | SUBMISSION: ${form.submissionFolder.trim()}`
-                    : ''
-            const combinedReferences = form.scriptLink
-                ? `REF:${form.references.trim()} | SCRIPT:${form.scriptLink.trim()}`
-                : form.references
-            const cleanNotes = DOMPurify.sanitize(form.notes)
+    /* ── Resources card: re-pack + save ── */
+    const saveResource = async (key: 'linkRaw' | 'linkBroll' | 'scriptLink' | 'submissionFolder', newValue: string) => {
+        const next = { ...form, [key]: newValue }
+        const combinedResources =
+            next.linkRaw || next.linkBroll || next.submissionFolder
+                ? `RAW: ${next.linkRaw.trim()} | BROLL: ${next.linkBroll.trim()} | SUBMISSION: ${next.submissionFolder.trim()}`
+                : ''
+        // For scriptLink we save into references packed string
+        const combinedReferences = next.scriptLink
+            ? `REF:${next.references.trim()} | SCRIPT:${next.scriptLink.trim()}`
+            : next.references
 
-            const res = await updateTaskDetails(
-                localTask.id,
-                {
-                    resources: combinedResources,
-                    references: combinedReferences,
-                    notes: cleanNotes,
-                    // Sprint H: notes_en consolidated into single `notes` field per Figma redesign
-                    notes_en: '',
-                    productLink: form.productLink,
-                    deadline: form.deadline || undefined,
-                    jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : undefined,
-                    value: isAdmin ? Number(form.value) : undefined,
-                    collectFilesLink: form.collectFilesLink,
-                },
-                workspaceId,
+        // submissionFolder is packed inside `resources` string (legacy backend format)
+        const ok = await saveSingle({
+            resources: combinedResources,
+            references: combinedReferences,
+        })
+        if (ok) {
+            setForm(next)
+            setLocalTask((prev) =>
+                prev ? { ...prev, resources: combinedResources, references: combinedReferences, submissionFolder: next.submissionFolder } : null,
             )
-
-            if (res?.success) {
-                setLocalTask((prev) =>
-                    prev
-                        ? {
-                            ...prev,
-                            resources: combinedResources,
-                            references: combinedReferences,
-                            notes_vi: cleanNotes,
-                            notes_en: null,
-                            productLink: form.productLink,
-                            value: isAdmin ? Number(form.value) : prev.value,
-                            jobPriceUSD: isAdmin ? Number(form.jobPriceUSD) : prev.jobPriceUSD,
-                            collectFilesLink: form.collectFilesLink,
-                            submissionFolder: form.submissionFolder,
-                        }
-                        : null,
-                )
-                setIsEditing(false)
-                toast.success('Task updated')
-            } else {
-                toast.error('Failed to update')
-            }
-        } catch (err: any) {
-            toast.error(err?.message || 'Save failed')
-        } finally {
-            setSaving(false)
         }
     }
 
-    const handleCancel = () => {
-        // Reset form from task (re-trigger sync via setLocalTask)
-        if (task) setLocalTask(task)
-        setIsEditing(false)
+    const saveReference = async (key: 'references' | 'collectFilesLink', newValue: string) => {
+        const next = { ...form, [key]: newValue }
+        const combinedReferences = next.scriptLink
+            ? `REF:${next.references.trim()} | SCRIPT:${next.scriptLink.trim()}`
+            : next.references
+
+        const ok = await saveSingle({
+            references: key === 'references' || key === 'collectFilesLink' ? combinedReferences : undefined,
+            collectFilesLink: key === 'collectFilesLink' ? newValue : undefined,
+        })
+        if (ok) {
+            setForm(next)
+            setLocalTask((prev) =>
+                prev ? { ...prev, references: combinedReferences, collectFilesLink: next.collectFilesLink } : null,
+            )
+        }
     }
 
-    /* ── Status info for header pill ── */
+    /* ── Card-level save handlers ── */
+    const handleSaveDelivery = async () => {
+        setSavingCard(true)
+        const ok = await saveSingle({ productLink: draftDelivery })
+        if (ok) {
+            setForm((p) => ({ ...p, productLink: draftDelivery }))
+            setLocalTask((p) => (p ? { ...p, productLink: draftDelivery } : null))
+            setEditingDelivery(false)
+        }
+        setSavingCard(false)
+    }
+
+    const handleSaveDeadline = async () => {
+        setSavingCard(true)
+        const ok = await saveSingle({ deadline: draftDeadline || undefined })
+        if (ok) {
+            setForm((p) => ({ ...p, deadline: draftDeadline }))
+            setLocalTask((p) => (p ? { ...p, deadline: draftDeadline ? new Date(draftDeadline) : null } : null))
+            setEditingDeadline(false)
+        }
+        setSavingCard(false)
+    }
+
+    const handleSaveFinance = async () => {
+        if (!isAdmin) return
+        setSavingCard(true)
+        const ok = await saveSingle({
+            jobPriceUSD: Number(draftFinance.jobPriceUSD),
+            value: Number(draftFinance.value),
+        })
+        if (ok) {
+            setForm((p) => ({ ...p, jobPriceUSD: Number(draftFinance.jobPriceUSD), value: Number(draftFinance.value) }))
+            setLocalTask((p) => (p ? { ...p, jobPriceUSD: Number(draftFinance.jobPriceUSD), value: Number(draftFinance.value) } : null))
+            setEditingFinance(false)
+        }
+        setSavingCard(false)
+    }
+
+    const handleSaveNotes = async () => {
+        setSavingCard(true)
+        const cleanNotes = DOMPurify.sanitize(draftNotes)
+        const ok = await saveSingle({ notes: cleanNotes, notes_en: '' })
+        if (ok) {
+            setForm((p) => ({ ...p, notes: cleanNotes }))
+            setLocalTask((p) => (p ? { ...p, notes_vi: cleanNotes, notes_en: null } : null))
+            setEditingNotes(false)
+        }
+        setSavingCard(false)
+    }
+
+    /* ── Edit mode entry helpers (set drafts from current form) ── */
+    const enterEditDelivery = () => {
+        setDraftDelivery(form.productLink)
+        setEditingDelivery(true)
+    }
+    const enterEditDeadline = () => {
+        setDraftDeadline(form.deadline)
+        setEditingDeadline(true)
+    }
+    const enterEditFinance = () => {
+        setDraftFinance({ jobPriceUSD: form.jobPriceUSD, value: form.value })
+        setEditingFinance(true)
+    }
+    const enterEditNotes = () => {
+        setDraftNotes(form.notes)
+        setEditingNotes(true)
+    }
+
+    /* ── Status info ── */
     const statusInfo = getStatusInfo(localTask.status)
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogPrimitive.Portal>
-                {/* Overlay */}
                 <DialogPrimitive.Overlay asChild>
                     <motion.div
                         className="fixed inset-0"
@@ -407,7 +612,6 @@ export function TaskDetailModal({
                     />
                 </DialogPrimitive.Overlay>
 
-                {/* Modal */}
                 <DialogPrimitive.Content asChild>
                     <motion.div
                         className="fixed left-1/2 top-1/2 flex flex-col outline-none"
@@ -429,7 +633,6 @@ export function TaskDetailModal({
                         exit={{ opacity: 0, scale: 0.96, y: '-48%', x: '-50%' }}
                         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                     >
-                        {/* Ambient orb (status-tinted) */}
                         <div
                             className="absolute pointer-events-none"
                             style={{
@@ -441,32 +644,19 @@ export function TaskDetailModal({
                             }}
                         />
 
-                        {/* ── HEADER ── */}
+                        {/* HEADER */}
                         <div className="flex flex-col gap-3 px-6 pt-6 pb-3 border-b border-white/5 relative z-[1]">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-[16px] font-extrabold text-white">Task Details</h2>
-                                <div className="flex items-center gap-2">
-                                    {isAdmin && !isEditing && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsEditing(true)}
-                                            className="flex items-center gap-1.5 h-8 px-3 rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.20)] text-[12px] font-semibold text-zinc-200 hover:bg-white/[0.08] transition-colors"
-                                        >
-                                            <Pencil size={12} />
-                                            Edit All
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={onClose}
-                                        className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.04] hover:bg-white/[0.10] text-zinc-400 hover:text-white transition-colors"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.04] hover:bg-white/[0.10] text-zinc-400 hover:text-white transition-colors"
+                                >
+                                    <X size={16} />
+                                </button>
                             </div>
 
-                            {/* Title + follow-up + pills */}
                             <div className="flex flex-col gap-2">
                                 <h3 className="text-[18px] font-extrabold text-white tracking-tight truncate">
                                     {localTask.title}
@@ -481,22 +671,37 @@ export function TaskDetailModal({
                             </div>
                         </div>
 
-                        {/* ── TAB NAV ── */}
+                        {/* TAB NAV */}
                         <TabNav activeTab={activeTab} onChange={setActiveTab} />
 
-                        {/* ── TAB CONTENT ── */}
+                        {/* TAB CONTENT */}
                         <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar relative z-[1]">
                             {/* TAB MAIN */}
                             {activeTab === 'main' && (
                                 <div className="grid grid-cols-2 gap-4">
-                                    {/* LEFT — Delivery */}
-                                    <Card title="Delivery" className="min-h-[220px]">
-                                        {isEditing ? (
+                                    {/* DELIVERY card */}
+                                    <Card
+                                        title="Delivery"
+                                        className="min-h-[220px]"
+                                        rightSlot={
+                                            isAdmin && !editingDelivery ? (
+                                                <EditButton onClick={enterEditDelivery} />
+                                            ) : editingDelivery ? (
+                                                <ConfirmCancelGroup
+                                                    onConfirm={handleSaveDelivery}
+                                                    onCancel={() => setEditingDelivery(false)}
+                                                    saving={savingCard}
+                                                />
+                                            ) : null
+                                        }
+                                    >
+                                        {editingDelivery ? (
                                             <textarea
-                                                value={form.productLink}
-                                                onChange={(e) => set('productLink', e.target.value)}
-                                                placeholder="Final products / delivery link / status note..."
-                                                className="flex-1 w-full rounded-xl bg-white/[0.04] border border-[rgba(139,92,246,0.12)] p-3 text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none focus:border-violet-500/50 resize-none min-h-[150px]"
+                                                value={draftDelivery}
+                                                onChange={(e) => setDraftDelivery(e.target.value)}
+                                                placeholder="Paste delivery link or status note…"
+                                                className="flex-1 w-full rounded-xl bg-white/[0.04] border border-violet-500/40 p-3 text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none focus:border-violet-500 resize-none min-h-[150px]"
+                                                autoFocus
                                             />
                                         ) : form.productLink?.trim() ? (
                                             form.productLink.startsWith('http') ? (
@@ -504,16 +709,24 @@ export function TaskDetailModal({
                                                     href={formatLink(form.productLink)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-[13px] text-violet-400 hover:text-violet-300 break-all inline-flex items-start gap-1"
+                                                    className="text-[13px] text-violet-400 hover:text-violet-300 inline-flex items-center gap-1"
                                                 >
-                                                    <span>{form.productLink}</span>
-                                                    <ExternalLink size={12} className="flex-shrink-0 mt-0.5" />
+                                                    <span>View delivery</span>
+                                                    <ExternalLink size={12} className="flex-shrink-0" />
                                                 </a>
                                             ) : (
                                                 <p className="text-[13px] text-zinc-300 leading-relaxed whitespace-pre-wrap">
                                                     {form.productLink}
                                                 </p>
                                             )
+                                        ) : isAdmin ? (
+                                            <button
+                                                type="button"
+                                                onClick={enterEditDelivery}
+                                                className="self-start inline-flex items-center gap-1 text-[12px] text-zinc-500 hover:text-violet-300 transition-colors"
+                                            >
+                                                <Plus size={12} /> Add delivery link
+                                            </button>
                                         ) : (
                                             <p className="text-[13px] text-zinc-600">Final products are pending.</p>
                                         )}
@@ -521,13 +734,27 @@ export function TaskDetailModal({
 
                                     {/* RIGHT — Deadline + Finance stacked */}
                                     <div className="flex flex-col gap-4">
-                                        <Card title="Deadline">
-                                            {isEditing ? (
+                                        <Card
+                                            title="Deadline"
+                                            rightSlot={
+                                                isAdmin && !editingDeadline ? (
+                                                    <EditButton onClick={enterEditDeadline} />
+                                                ) : editingDeadline ? (
+                                                    <ConfirmCancelGroup
+                                                        onConfirm={handleSaveDeadline}
+                                                        onCancel={() => setEditingDeadline(false)}
+                                                        saving={savingCard}
+                                                    />
+                                                ) : null
+                                            }
+                                        >
+                                            {editingDeadline ? (
                                                 <input
                                                     type="datetime-local"
-                                                    value={form.deadline}
-                                                    onChange={(e) => set('deadline', e.target.value)}
-                                                    className="h-10 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-3.5 text-[13px] text-zinc-300 outline-none focus:border-violet-500/50"
+                                                    value={draftDeadline}
+                                                    onChange={(e) => setDraftDeadline(e.target.value)}
+                                                    autoFocus
+                                                    className="h-9 w-full rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[13px] text-zinc-300 outline-none focus:border-violet-500"
                                                 />
                                             ) : (
                                                 <span className="text-[14px] font-semibold text-zinc-200">
@@ -536,25 +763,39 @@ export function TaskDetailModal({
                                             )}
                                         </Card>
 
-                                        <Card title="Finance">
-                                            {isEditing && isAdmin ? (
+                                        <Card
+                                            title="Finance"
+                                            rightSlot={
+                                                isAdmin && !editingFinance ? (
+                                                    <EditButton onClick={enterEditFinance} />
+                                                ) : editingFinance ? (
+                                                    <ConfirmCancelGroup
+                                                        onConfirm={handleSaveFinance}
+                                                        onCancel={() => setEditingFinance(false)}
+                                                        saving={savingCard}
+                                                    />
+                                                ) : null
+                                            }
+                                        >
+                                            {editingFinance && isAdmin ? (
                                                 <div className="flex flex-col gap-2">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-[12px] text-zinc-400">Client ($)</span>
                                                         <input
                                                             type="number"
-                                                            value={form.jobPriceUSD}
-                                                            onChange={(e) => set('jobPriceUSD', Number(e.target.value))}
-                                                            className="w-28 h-8 rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-3 text-[13px] text-zinc-300 text-right outline-none focus:border-violet-500/50"
+                                                            value={draftFinance.jobPriceUSD}
+                                                            onChange={(e) => setDraftFinance(d => ({ ...d, jobPriceUSD: Number(e.target.value) }))}
+                                                            autoFocus
+                                                            className="w-28 h-8 rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[13px] text-zinc-200 text-right outline-none focus:border-violet-500"
                                                         />
                                                     </div>
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-[12px] text-zinc-400">Staff (VND)</span>
                                                         <input
                                                             type="number"
-                                                            value={form.value}
-                                                            onChange={(e) => set('value', Number(e.target.value))}
-                                                            className="w-32 h-8 rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-3 text-[13px] text-zinc-300 text-right outline-none focus:border-violet-500/50"
+                                                            value={draftFinance.value}
+                                                            onChange={(e) => setDraftFinance(d => ({ ...d, value: Number(e.target.value) }))}
+                                                            className="w-32 h-8 rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[13px] text-zinc-200 text-right outline-none focus:border-violet-500"
                                                         />
                                                     </div>
                                                 </div>
@@ -582,50 +823,48 @@ export function TaskDetailModal({
                             {/* TAB ASSETS */}
                             {activeTab === 'assets' && (
                                 <div className="grid grid-cols-2 gap-4">
-                                    {/* Resources */}
                                     <Card title="Resources">
                                         <div className="flex flex-col">
-                                            <ResourceRow
+                                            <LinkRow
                                                 label="RAW Assets"
                                                 value={form.linkRaw}
-                                                isEditing={isEditing}
-                                                onChange={(v) => set('linkRaw', v)}
+                                                canEdit={isAdmin}
+                                                onSave={(v) => saveResource('linkRaw', v)}
                                             />
-                                            <ResourceRow
+                                            <LinkRow
                                                 label="B-Roll Assets"
                                                 value={form.linkBroll}
-                                                isEditing={isEditing}
-                                                onChange={(v) => set('linkBroll', v)}
+                                                canEdit={isAdmin}
+                                                onSave={(v) => saveResource('linkBroll', v)}
                                             />
-                                            <ResourceRow
+                                            <LinkRow
                                                 label="View Script"
                                                 value={form.scriptLink}
-                                                isEditing={isEditing}
-                                                onChange={(v) => set('scriptLink', v)}
+                                                canEdit={isAdmin}
+                                                onSave={(v) => saveResource('scriptLink', v)}
                                             />
-                                            <ResourceRow
+                                            <LinkRow
                                                 label="Submission Folder"
                                                 value={form.submissionFolder}
-                                                isEditing={isEditing}
-                                                onChange={(v) => set('submissionFolder', v)}
+                                                canEdit={isAdmin}
+                                                onSave={(v) => saveResource('submissionFolder', v)}
                                             />
                                         </div>
                                     </Card>
 
-                                    {/* References */}
                                     <Card title="References">
                                         <div className="flex flex-col">
-                                            <ResourceRow
+                                            <LinkRow
                                                 label="View Reference"
                                                 value={form.references}
-                                                isEditing={isEditing}
-                                                onChange={(v) => set('references', v)}
+                                                canEdit={isAdmin}
+                                                onSave={(v) => saveReference('references', v)}
                                             />
-                                            <ResourceRow
+                                            <LinkRow
                                                 label="Sample Project"
                                                 value={form.collectFilesLink}
-                                                isEditing={isEditing}
-                                                onChange={(v) => set('collectFilesLink', v)}
+                                                canEdit={isAdmin}
+                                                onSave={(v) => saveReference('collectFilesLink', v)}
                                             />
                                         </div>
                                     </Card>
@@ -634,12 +873,24 @@ export function TaskDetailModal({
 
                             {/* TAB NOTES */}
                             {activeTab === 'notes' && (
-                                <Card>
-                                    {isEditing ? (
+                                <Card
+                                    rightSlot={
+                                        isAdmin && !editingNotes ? (
+                                            <EditButton onClick={enterEditNotes} />
+                                        ) : editingNotes ? (
+                                            <ConfirmCancelGroup
+                                                onConfirm={handleSaveNotes}
+                                                onCancel={() => setEditingNotes(false)}
+                                                saving={savingCard}
+                                            />
+                                        ) : null
+                                    }
+                                >
+                                    {editingNotes ? (
                                         <div className="rounded-xl overflow-hidden border border-white/5 bg-white/[0.02] min-h-[260px]">
                                             <TiptapEditor
-                                                content={form.notes}
-                                                onChange={(html) => set('notes', html)}
+                                                content={draftNotes}
+                                                onChange={(html) => setDraftNotes(html)}
                                             />
                                         </div>
                                     ) : form.notes?.trim() ? (
@@ -653,28 +904,6 @@ export function TaskDetailModal({
                                 </Card>
                             )}
                         </div>
-
-                        {/* ── FOOTER (edit mode only) ── */}
-                        {isEditing && (
-                            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/5 relative z-[1]">
-                                <button
-                                    type="button"
-                                    onClick={handleCancel}
-                                    disabled={saving}
-                                    className="h-10 px-5 rounded-full bg-transparent border border-white/10 text-[13px] font-semibold text-zinc-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-50"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSave}
-                                    disabled={saving}
-                                    className="h-10 px-6 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-[13px] font-bold text-white shadow-[0_8px_20px_rgba(139,92,246,0.35)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {saving ? 'Saving…' : 'Save'}
-                                </button>
-                            </div>
-                        )}
                     </motion.div>
                 </DialogPrimitive.Content>
             </DialogPrimitive.Portal>

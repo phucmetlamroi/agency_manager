@@ -1,10 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Bell, MessageSquare, AtSign, ClipboardList, UserPlus, UserMinus, Clock, AlertTriangle, Megaphone, Trash2 } from 'lucide-react'
+import { Bell, MessageSquare, AtSign, ClipboardList, UserPlus, UserMinus, Clock, AlertTriangle, Megaphone, Trash2, Mail, Check, X, Loader2 } from 'lucide-react'
 import type { NotificationItem as NotificationItemData } from '@/types/notification'
 import { archiveNotification, markNotificationRead } from '@/actions/notification-actions'
+import { acceptWorkspaceInvitation, declineWorkspaceInvitation } from '@/actions/member-actions'
 import { useChatContext } from '@/components/chat/ChatProvider'
+import { toast } from 'sonner'
 
 interface Props {
     notification: NotificationItemData
@@ -26,6 +29,9 @@ const TYPE_ICON: Record<string, { icon: any; color: string; bg: string }> = {
     TASK_DEADLINE_APPROACHING: { icon: Clock,      color: 'text-amber-400',   bg: 'bg-amber-500/15' },
     TASK_OVERDUE:          { icon: AlertTriangle,  color: 'text-red-400',     bg: 'bg-red-500/15' },
     TASK_COMMENT:          { icon: MessageSquare,  color: 'text-violet-400',  bg: 'bg-violet-500/15' },
+    WORKSPACE_INVITATION_RECEIVED: { icon: Mail,    color: 'text-violet-400',  bg: 'bg-violet-500/15' },
+    WORKSPACE_INVITATION_ACCEPTED: { icon: UserPlus, color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
+    WORKSPACE_INVITATION_DECLINED: { icon: UserMinus, color: 'text-zinc-400',  bg: 'bg-zinc-500/15' },
 }
 
 function formatTime(iso: string) {
@@ -48,6 +54,56 @@ export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, o
     const meta = TYPE_ICON[notification.type] || { icon: Bell, color: 'text-zinc-400', bg: 'bg-zinc-500/15' }
     const Icon = meta.icon
     const messageCount = (notification.metadata?.messageCount as number) || 0
+    const [busy, setBusy] = useState(false)
+
+    // Workspace invitation inline actions (Accept/Decline buttons)
+    const isInvitationReceived = notification.type === 'WORKSPACE_INVITATION_RECEIVED'
+    const invitationId = (notification.metadata?.invitationId as string) || ''
+    const invitationWorkspaceId = (notification.metadata?.workspaceId as string) || ''
+    const showInvitationActions = isInvitationReceived && !!invitationId
+
+    const handleAccept = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!invitationId || busy) return
+        setBusy(true)
+        try {
+            const res = await acceptWorkspaceInvitation(invitationId)
+            if ((res as any)?.error) {
+                toast.error((res as any).error)
+                return
+            }
+            toast.success(`Đã tham gia workspace ${(res as any)?.workspaceName || ''}`)
+            onLocalRemove(notification.id)
+            void archiveNotification(notification.id)
+            onRequestClose?.()
+            const targetWs = (res as any)?.workspaceId || invitationWorkspaceId
+            if (targetWs) router.push(`/${targetWs}/dashboard`)
+        } catch (err: any) {
+            toast.error(err?.message || 'Lỗi khi chấp nhận lời mời.')
+        } finally {
+            setBusy(false)
+        }
+    }
+
+    const handleDecline = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!invitationId || busy) return
+        setBusy(true)
+        try {
+            const res = await declineWorkspaceInvitation(invitationId)
+            if ((res as any)?.error) {
+                toast.error((res as any).error)
+                return
+            }
+            toast.success('Đã từ chối lời mời.')
+            onLocalRemove(notification.id)
+            void archiveNotification(notification.id)
+        } catch (err: any) {
+            toast.error(err?.message || 'Lỗi khi từ chối lời mời.')
+        } finally {
+            setBusy(false)
+        }
+    }
 
     const handleClick = async () => {
         if (!notification.isRead) {
@@ -112,6 +168,28 @@ export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, o
                     {messageCount > 1 ? `${senderName} sent ${messageCount} messages — ` : ''}
                     {notification.body}
                 </div>
+
+                {/* Workspace invitation inline Accept/Decline */}
+                {showInvitationActions && (
+                    <div className="flex items-center gap-2 mt-2">
+                        <button
+                            onClick={handleAccept}
+                            disabled={busy}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-violet-500 hover:bg-violet-400 text-white text-[11px] font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-violet-500/30"
+                        >
+                            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            Tham gia
+                        </button>
+                        <button
+                            onClick={handleDecline}
+                            disabled={busy}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 text-[11px] font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                            Từ chối
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Unread dot */}

@@ -10,6 +10,81 @@ import { checkInviteRate } from '@/lib/rate-limit-upstash'
 
 const INVITATION_EXPIRY_DAYS = 14
 
+// ─── Helper: notify invitee via email + realtime notification ────────
+async function notifyInvitee(params: {
+    invitationId: string
+    inviteeUserId: string
+    inviterUserId: string
+    workspaceId: string
+    role: string
+}): Promise<void> {
+    const { invitationId, inviteeUserId, inviterUserId, workspaceId, role } = params
+
+    // Lookup data needed for email + notification
+    const [invitee, inviter, ws] = await Promise.all([
+        prisma.user.findUnique({
+            where: { id: inviteeUserId },
+            select: { email: true, displayName: true, nickname: true, username: true }
+        }),
+        prisma.user.findUnique({
+            where: { id: inviterUserId },
+            select: { displayName: true, nickname: true, username: true }
+        }),
+        prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { name: true }
+        }),
+    ])
+
+    const inviteeName = invitee?.displayName ?? invitee?.nickname ?? invitee?.username ?? 'Bạn'
+    const inviterName = inviter?.displayName ?? inviter?.nickname ?? inviter?.username ?? 'Một admin'
+    const workspaceName = ws?.name ?? 'workspace'
+
+    // 1. Send email (skip if no email — paranoia)
+    if (invitee?.email) {
+        try {
+            const { buildWorkspaceInvitationEmail } = await import(
+                '@/lib/notification-emails/templates/auth/workspace-invitation'
+            )
+            const { sendEmail } = await import('@/lib/email')
+            const emailContent = buildWorkspaceInvitationEmail({
+                inviteeName,
+                inviterName,
+                workspaceName,
+                role,
+                appUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://hustlytasker.xyz',
+                expiresHours: INVITATION_EXPIRY_DAYS * 24,
+            })
+            await sendEmail({
+                to: invitee.email,
+                subject: emailContent.subject,
+                html: emailContent.html,
+            })
+        } catch (e) {
+            console.warn('[notifyInvitee] email failed:', e)
+        }
+    }
+
+    // 2. Create realtime notification (bell badge + Accept/Decline inline)
+    try {
+        const { createNotificationInternal } = await import('./notification-actions')
+        const { broadcastNotificationToUser } = await import('@/lib/notification-broadcast')
+        const notif = await createNotificationInternal({
+            userId: inviteeUserId,
+            type: 'WORKSPACE_INVITATION_RECEIVED',
+            title: `${inviterName} mời bạn tham gia workspace`,
+            body: `${workspaceName} · Vai trò: ${role}`,
+            actorId: inviterUserId,
+            metadata: { invitationId, workspaceId, workspaceName, role },
+        })
+        if (notif) {
+            broadcastNotificationToUser(inviteeUserId, notif as any).catch(() => { })
+        }
+    } catch (e) {
+        console.warn('[notifyInvitee] notification failed:', e)
+    }
+}
+
 // ─── Get workspace members with roles ────────────────────────────
 /**
  * List members visible trong workspace.
@@ -203,7 +278,7 @@ export async function inviteToWorkspace(
     })
 
     if (!targetUser) {
-        return { error: `Không tìm thấy người dùng "${trimmedUsername}".` }
+        return { error: 'Tài khoản không tồn tại.' }
     }
 
     if (targetUser.id === inviterId) {
@@ -281,7 +356,7 @@ export async function inviteToWorkspace(
     )?.profileId
 
     if (isSameProfile) {
-        // Direct add for same-profile users
+        // Direct add for same-profile users (no Accept/Decline gate needed)
         await prisma.workspaceMember.create({
             data: {
                 userId: targetUser.id,
@@ -298,6 +373,16 @@ export async function inviteToWorkspace(
             targetId: targetUser.id,
             after: { username: targetUser.username, role, method: 'direct_add' },
         })
+
+        // Notify (email + realtime). Direct-add path: invitationId='' nên
+        // notification sẽ KHÔNG render Accept/Decline buttons — chỉ là info.
+        await notifyInvitee({
+            invitationId: '',  // empty = no Accept/Decline (already added)
+            inviteeUserId: targetUser.id,
+            inviterUserId: inviterId,
+            workspaceId,
+            role,
+        }).catch((err) => console.warn('[inviteToWorkspace direct] notify failed:', err))
 
         revalidatePath(`/${workspaceId}/admin/members`)
         revalidatePath(`/${workspaceId}/admin/users`)
@@ -327,6 +412,15 @@ export async function inviteToWorkspace(
             targetId: invitation.id,
             after: { targetUsername: targetUser.username, role },
         })
+
+        // Notify invitee + send email (best-effort, don't block on failure)
+        await notifyInvitee({
+            invitationId: invitation.id,
+            inviteeUserId: targetUser.id,
+            inviterUserId: inviterId,
+            workspaceId,
+            role,
+        }).catch((err) => console.warn('[inviteToWorkspace] notify failed:', err))
 
         revalidatePath(`/${workspaceId}/admin/members`)
         return { success: true, directAdd: false, username: targetUser.nickname || targetUser.username }

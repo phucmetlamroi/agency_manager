@@ -17,6 +17,7 @@ const TYPE_EMOJI: Record<string, string> = {
     TASK_COMMENT: '💬',
     WORKSPACE_INVITATION_ACCEPTED: '✅',
     WORKSPACE_INVITATION_DECLINED: '⛔',
+    WORKSPACE_INVITATION_RECEIVED: '📨',
 }
 
 function priorityRank(item: DigestNotificationItem): number {

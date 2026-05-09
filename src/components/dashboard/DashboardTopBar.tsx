@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, Bell, ChevronDown, Check, Loader2 } from "lucide-react"
+import { Search, ChevronDown, Check, Loader2 } from "lucide-react"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 
 interface ProfileItem {
   id: string
@@ -118,24 +119,8 @@ export default function DashboardTopBar({
           <Search size={18} strokeWidth={2} style={{ color: "#A1A1AA" }} />
         </button>
 
-        {/* Bell / notification button */}
-        <button
-          type="button"
-          className="flex h-12 w-12 items-center justify-center rounded-full transition-colors duration-200"
-          style={{
-            border: "1px solid rgba(139,92,246,0.15)",
-            background: "transparent",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#211B31"
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent"
-          }}
-          aria-label="Notifications"
-        >
-          <Bell size={18} strokeWidth={2} style={{ color: "#A1A1AA" }} />
-        </button>
+        {/* Notification bell — real component với badge + dropdown panel */}
+        <NotificationBell />
 
         {/* Profile pill + dropdown wrapper */}
         <div className="relative" ref={dropdownRef}>

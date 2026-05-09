@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Search, ChevronDown, Loader2, ArrowRightLeft, Check, Plus } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
+import { MarketplaceTriggerButton } from "@/components/marketplace/MarketplaceTriggerButton"
 import CreateProfileModal from "@/components/workspace/CreateProfileModal"
 
 interface ProfileItem {
@@ -186,6 +187,9 @@ export default function UserHomeTopBar({
                         </button>
                     )}
                 </div>
+
+                {/* Marketplace trigger — replaces old floating bottom-right button */}
+                <MarketplaceTriggerButton />
 
                 {/* Notification bell — real component với badge + dropdown panel */}
                 <NotificationBell />

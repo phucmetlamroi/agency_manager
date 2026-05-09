@@ -263,6 +263,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
             {/* Safe spacer */}
             <div className="h-10" />
+            {/* Marketplace modal portal lives in workspace layout (event mode) — top-bar Store icon dispatches open event */}
         </div>
     )
 }

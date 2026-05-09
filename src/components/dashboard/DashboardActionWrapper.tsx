@@ -49,8 +49,8 @@ export default function DashboardActionWrapper({
     frameUsername: string
     framePassword: string
     frameNote: string
-    notesVi: string
-    notesEn: string
+    /** Single rich-text Notes HTML (replaces notesVi/notesEn split per Figma redesign) */
+    notes: string
   }) => {
     const client = clients.find((c) => c.id === data.clientId)
     const clientLabel = client?.parent
@@ -89,8 +89,8 @@ export default function DashboardActionWrapper({
       fd.set("frameUsername", data.frameUsername || "")
       fd.set("framePassword", data.framePassword || "")
       fd.set("frameNote", data.frameNote || "")
-      fd.set("notes", data.notesVi || "")
-      fd.set("notes_en", data.notesEn || "")
+      fd.set("notes", data.notes || "")
+      fd.set("notes_en", "")
       fd.set("clientId", data.clientId || "")
 
       const result = await createTask(fd, workspaceId)
@@ -109,8 +109,8 @@ export default function DashboardActionWrapper({
           resources: data.rawFootage || null,
           references: data.references || null,
           collectFilesLink: data.collectFile || null,
-          notes: data.notesVi || null,
-          notes_en: data.notesEn || null,
+          notes: data.notes || null,
+          notes_en: null,
           type: data.taskType || "Short form",
           fileLink: data.bRoll || null,
           submissionFolder: data.submitFolder || null,

@@ -96,7 +96,7 @@ export async function deleteUser(userId: string, workspaceId: string) {
  */
 export async function deactivateUser(userId: string, workspaceId: string) {
     try {
-        const { userId: actorId, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId, workspaceRole: actorWorkspaceRole, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
@@ -121,6 +121,46 @@ export async function deactivateUser(userId: string, workspaceId: string) {
         // Super Admin Protection
         if (targetUser.username === 'admin') {
             return { success: false, error: 'KHÔNG THỂ DEACTIVATE SUPER ADMIN!' }
+        }
+
+        // [Audit] Workspace OWNER protection — chỉ OWNER hoặc global admin được
+        // deactivate OWNER. Trước đây ADMIN có thể call deactivateUser() trên
+        // OWNER → bypass guard của removeWorkspaceMember (đã có check OWNER).
+        const targetWorkspaceMember = await prisma.workspaceMember.findUnique({
+            where: { userId_workspaceId: { userId, workspaceId } },
+            select: { role: true },
+        })
+        const targetIsWorkspaceOwner = targetWorkspaceMember?.role === 'OWNER'
+        if (targetIsWorkspaceOwner && !callerIsGlobalAdmin && actorWorkspaceRole !== 'OWNER') {
+            return {
+                success: false,
+                error: 'Chỉ OWNER hoặc super admin mới có quyền deactivate OWNER khác.',
+            }
+        }
+
+        // [Profile owner protection] User được "trao quyền admin" qua
+        // ProfileAccess KHÔNG được phép deactivate user là native owner của
+        // profile (User.profileId === workspace.profileId AND target không có
+        // ProfileAccess elsewhere — họ là gốc của profile).
+        // Trước đây admin xâm nhập từ workspace invite có thể xoá owner profile gốc.
+        const workspace = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        if (workspace?.profileId && targetUser.profileId === workspace.profileId) {
+            // Target là native profile member. Caller phải cũng là native
+            // profile member (không phải invited admin via ProfileAccess).
+            const callerUser = await prisma.user.findUnique({
+                where: { id: actorId },
+                select: { profileId: true },
+            })
+            const callerIsNativeProfileMember = callerUser?.profileId === workspace.profileId
+            if (!callerIsGlobalAdmin && !callerIsNativeProfileMember) {
+                return {
+                    success: false,
+                    error: 'Bạn không phải native member của Profile này. Không thể deactivate user gốc.',
+                }
+            }
         }
 
         // Đã LOCKED rồi → idempotent

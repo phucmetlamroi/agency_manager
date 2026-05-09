@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Search, ChevronDown, Check, Loader2 } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
+import { MarketplaceTriggerButton } from "@/components/marketplace/MarketplaceTriggerButton"
 
 interface ProfileItem {
   id: string
@@ -121,6 +122,9 @@ export default function DashboardTopBar({
         >
           <Search size={18} strokeWidth={2} style={{ color: "#A1A1AA" }} />
         </button>
+
+        {/* Marketplace trigger — replaces old floating bottom-right button */}
+        <MarketplaceTriggerButton />
 
         {/* Notification bell — real component với badge + dropdown panel */}
         <NotificationBell />

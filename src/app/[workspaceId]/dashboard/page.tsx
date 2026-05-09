@@ -186,8 +186,9 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
 
             {/* ── Action row: Workspace picker pill (left) + Manage widgets (right)
                 — 1 row giống admin DashboardActionBar, giảm khoảng trắng dọc và
-                căn sát với widget grid bên dưới ── */}
-            <div className="flex items-center justify-between gap-3 px-1">
+                căn sát với widget grid bên dưới. Wrap on mobile so pills don't
+                squeeze into 2-line text. ── */}
+            <div className="flex items-center justify-between gap-3 px-1 flex-wrap">
                 <UserWorkspacePicker workspaceId={workspaceId} workspaces={workspacesForProfile} />
 
                 {/* Manage widgets — placeholder per plan D.8 */}
@@ -195,7 +196,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                     type="button"
                     disabled
                     title="Coming soon"
-                    className="flex items-center gap-1.5"
+                    className="flex items-center gap-1.5 whitespace-nowrap"
                     style={{
                         padding: '8px 16px',
                         borderRadius: 26,

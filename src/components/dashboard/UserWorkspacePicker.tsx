@@ -83,7 +83,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces }: Props) 
                 }}
             >
                 <Briefcase size={16} style={{ color: "#8B5CF6" }} />
-                <span className="text-sm font-medium" style={{ color: "#A1A1AA" }}>
+                <span className="text-sm font-medium whitespace-nowrap" style={{ color: "#A1A1AA" }}>
                     {currentName}
                 </span>
                 <ChevronDown

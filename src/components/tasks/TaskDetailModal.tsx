@@ -696,7 +696,7 @@ export function TaskDetailModal({
                         <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar relative z-[1]">
                             {/* TAB MAIN */}
                             {activeTab === 'main' && (
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {/* DELIVERY card — editable by BOTH admin and user (assignee submits delivery link here) */}
                                     <Card
                                         title="Delivery"
@@ -838,7 +838,7 @@ export function TaskDetailModal({
 
                             {/* TAB ASSETS */}
                             {activeTab === 'assets' && (
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <Card title="Resources">
                                         <div className="flex flex-col">
                                             <LinkRow

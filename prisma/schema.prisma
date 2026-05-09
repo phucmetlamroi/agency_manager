@@ -889,6 +889,7 @@ enum NotificationType {
   // Workspace invitations
   WORKSPACE_INVITATION_ACCEPTED
   WORKSPACE_INVITATION_DECLINED
+  WORKSPACE_INVITATION_RECEIVED
 }
 
 model Notification {

@@ -65,6 +65,7 @@ const BYPASS_CONFIG: Record<string, {
     TASK_COMMENT:              { bypassMute: false, bypassDigest: false, bypassQuietHours: false },
     WORKSPACE_INVITATION_ACCEPTED: { bypassMute: false, bypassDigest: true, bypassQuietHours: false },
     WORKSPACE_INVITATION_DECLINED: { bypassMute: false, bypassDigest: true, bypassQuietHours: false },
+    WORKSPACE_INVITATION_RECEIVED: { bypassMute: false, bypassDigest: true, bypassQuietHours: false },
 }
 
 const DEFAULT_BYPASS = { bypassMute: false, bypassDigest: false, bypassQuietHours: false }

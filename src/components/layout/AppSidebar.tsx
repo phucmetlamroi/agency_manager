@@ -43,7 +43,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { ProfileWorkspaceSwitcher } from "./ProfileWorkspaceSwitcher"
 
 type ViewRole = 'ADMIN' | 'USER'
@@ -179,7 +178,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                 </div>
 
                 <div className="flex items-center gap-1">
-                    <NotificationBell />
+                    {/* [bell-cleanup] NotificationBell removed — admin dùng DashboardTopBar bell, user view dùng PWS bell */}
                     <Sheet>
                         <SheetTrigger asChild>
                             <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-100">
@@ -345,7 +344,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                             </span>
                         </div>
                     )}
-                    {!collapsed && <NotificationBell />}
+                    {/* [bell-cleanup] NotificationBell removed — moved to DashboardTopBar (admin) + ProfileWorkspaceSwitcher (user view) */}
                 </div>
 
                 {/* ── Collapse toggle ── */}

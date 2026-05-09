@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import CreateWorkspaceModal from "@/components/workspace/CreateWorkspaceModal"
 import CreateProfileModal from "@/components/workspace/CreateProfileModal"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { getMyProfilesAndWorkspaces } from "@/actions/profile-actions"
 import { getWorkspacesForProfile } from "@/actions/workspace-actions"
 import { toast } from "sonner"
@@ -195,10 +196,10 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
 
     // ── Expanded mode ──
     return (
-        <div ref={dropdownRef} className="relative px-4 py-2">
+        <div ref={dropdownRef} className="relative px-4 py-2 flex items-center gap-2">
             <button
                 onClick={() => setOpen(!open)}
-                className="w-full flex items-center gap-2.5 py-2.5 px-3.5 transition-colors cursor-pointer"
+                className="flex-1 min-w-0 flex items-center gap-2.5 py-2.5 px-3.5 transition-colors cursor-pointer"
                 style={{
                     borderRadius: 14,
                     border: `1px solid ${BORDER}`,
@@ -242,6 +243,9 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
                     }}
                 />
             </button>
+
+            {/* NotificationBell — kế ô sổ chọn profile (user view chỉ có ở đây vì không có DashboardTopBar) */}
+            <NotificationBell className="flex-shrink-0" />
 
             <AnimatePresence>
                 {open && (

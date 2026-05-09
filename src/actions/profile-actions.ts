@@ -160,7 +160,6 @@ export async function updateProfile(userId: string, data: {
 
         revalidatePath(`/${workspaceId}/dashboard`)
         revalidatePath(`/${workspaceId}/dashboard/profile`)
-        revalidatePath(`/${workspaceId}/admin/users`) // Admin needs to see new nicknames
 
         return { success: true }
     } catch (error) {
@@ -248,7 +247,6 @@ export async function changePassword(userId: string, currentPass: string, newPas
         })
 
         revalidatePath(`/${workspaceId}/dashboard/profile`)
-        revalidatePath(`/${workspaceId}/admin/users`)
 
         return { success: true }
     } catch (error) {

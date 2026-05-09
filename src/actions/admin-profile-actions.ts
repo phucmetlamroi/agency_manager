@@ -24,7 +24,6 @@ export async function createProfile(data: { name: string, bannerUrl?: string, lo
         }
     })
 
-    revalidatePath('/[workspaceId]/admin/users', 'page')
     return { success: true, profile: newProfile }
 }
 
@@ -49,7 +48,6 @@ export async function updateProfile(id: string, data: { name: string, bannerUrl?
         }
     })
 
-    revalidatePath('/[workspaceId]/admin/users', 'page')
     return { success: true, profile: updatedProfile }
 }
 
@@ -75,7 +73,6 @@ export async function deleteProfile(id: string) {
         prisma.profile.delete({ where: { id } })
     ])
 
-    revalidatePath('/[workspaceId]/admin/users', 'page')
     return { success: true }
 }
 
@@ -90,7 +87,6 @@ export async function changeUserProfile(userId: string, newProfileId: string | n
             where: { id: userId },
             data: { profileId: newProfileId }
         })
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (e) {
         return { error: 'Failed to change user team' }

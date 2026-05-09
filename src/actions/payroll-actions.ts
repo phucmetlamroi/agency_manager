@@ -77,7 +77,6 @@ export async function confirmPayment(data: {
             },
         })
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         revalidatePath(`/${workspaceId}/admin/payroll`)
         return { success: true }
     } catch (error: any) {
@@ -187,7 +186,6 @@ export async function revertPayment(userId: string, month: number, year: number,
             },
         })
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         revalidatePath(`/${workspaceId}/admin/payroll`)
         return { success: true }
     } catch (error: any) {

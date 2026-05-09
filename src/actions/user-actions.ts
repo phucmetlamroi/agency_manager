@@ -29,7 +29,6 @@ export async function changePassword(formData: FormData, workspaceId: string) {
         })
 
         revalidatePath(`/${workspaceId}/dashboard`)
-        revalidatePath(`/${workspaceId}/admin/users`) // Make sure admin sees the change
         return { success: true }
     } catch (e) {
         return { error: 'Đổi mật khẩu thất bại' }
@@ -65,7 +64,6 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
             after: { role: newRole },
         })
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error: any) {
         if (error?.message?.startsWith('SECURITY_VIOLATION')) {
@@ -191,7 +189,6 @@ export async function deactivateUser(userId: string, workspaceId: string) {
             after: { role: 'LOCKED' },
         })
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true, message: 'User đã được deactivate. Account giữ nguyên data, không thể đăng nhập.' }
     } catch (error: any) {
         console.error(error)
@@ -234,7 +231,6 @@ export async function reactivateUser(userId: string, newRole: 'USER' | 'AGENCY_A
             after: { role: newRole },
         })
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error: any) {
         if (error?.message?.startsWith('SECURITY_VIOLATION')) {

@@ -61,9 +61,12 @@ export default function DashboardTopBar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profileId: newProfileId }),
       })
+      // Auto view-switch: API returns view based on user's role in target profile.
+      // OWNER/ADMIN → /admin, otherwise → /dashboard.
       const res = await fetch(`/api/workspace/first?profileId=${newProfileId}`)
-      const { workspaceId: newWsId } = await res.json()
-      window.location.href = newWsId ? `/${newWsId}/admin` : "/login"
+      const { workspaceId: newWsId, view } = await res.json()
+      const targetView = view === "admin" ? "admin" : "dashboard"
+      window.location.href = newWsId ? `/${newWsId}/${targetView}` : "/login"
     } catch {
       setSwitching(false)
     }

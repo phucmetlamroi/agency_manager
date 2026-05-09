@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { determineLandingForProfile } from '@/lib/profile-routing'
 
+/**
+ * Return first workspace + target view ('admin' or 'dashboard') for the given
+ * profileId. View is determined by user's role in workspaces of that profile —
+ * OWNER/ADMIN → admin view, otherwise dashboard view.
+ *
+ * Response: { workspaceId: string | null, view: 'admin' | 'dashboard' }
+ */
 export async function GET(req: Request) {
     const session = await getSession()
     if (!session?.user) {
@@ -13,11 +20,14 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Missing profileId' }, { status: 400 })
     }
 
-    const ws = await prisma.workspace.findFirst({
-        where: { profileId },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true }
-    })
+    const isGlobalAdmin =
+        session.user.role === 'ADMIN' || !!(session.user as any).isTreasurer
 
-    return NextResponse.json({ workspaceId: ws?.id ?? null })
+    const result = await determineLandingForProfile(
+        session.user.id,
+        profileId,
+        isGlobalAdmin,
+    )
+
+    return NextResponse.json(result)
 }

@@ -72,7 +72,6 @@ export async function createUser(formData: FormData, workspaceId: string) {
                 displayName: displayName ?? username,
             }
         })
-        revalidatePath(`/${workspaceId}/admin/users`)
         revalidatePath(`/${workspaceId}/admin`)
         return { success: true }
     } catch (e: any) {

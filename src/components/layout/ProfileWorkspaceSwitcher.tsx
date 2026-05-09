@@ -6,17 +6,13 @@ import { AnimatePresence, motion } from "framer-motion"
 import {
     ChevronDown,
     Check,
-    Users,
     Briefcase,
     Layers,
     Plus,
 } from "lucide-react"
 import CreateWorkspaceModal from "@/components/workspace/CreateWorkspaceModal"
-import CreateProfileModal from "@/components/workspace/CreateProfileModal"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { getMyProfilesAndWorkspaces } from "@/actions/profile-actions"
-import { getWorkspacesForProfile } from "@/actions/workspace-actions"
-import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 /* ── Types ── */
@@ -56,16 +52,15 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
     const router = useRouter()
     const pathname = usePathname()
     const [open, setOpen] = useState(false)
-    const [switching, setSwitching] = useState(false)
     const [showCreateModal, setShowCreateModal] = useState(false)
-    const [showCreateProfileModal, setShowCreateProfileModal] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
 
     const [profiles, setProfiles] = useState<ProfileItem[]>([])
     const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([])
     const [currentProfileId, setCurrentProfileId] = useState<string | null>(null)
 
-    // Load data on mount
+    // Load data on mount — keep profiles for trigger label only;
+    // profile switching itself moved to UserHomeTopBar dropdown.
     useEffect(() => {
         getMyProfilesAndWorkspaces().then((data) => {
             setProfiles(data.profiles)
@@ -89,46 +84,6 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
     const currentProfile = profiles.find((p) => p.id === currentProfileId)
     const currentWorkspace = workspaces.find((ws) => ws.id === workspaceId)
 
-    // ── Profile switch: re-sign JWT via API, then reload ──
-    const handleProfileSwitch = async (profileId: string) => {
-        if (profileId === currentProfileId) return
-        setSwitching(true)
-        try {
-            const res = await fetch("/api/profile/select", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ profileId }),
-            })
-            const data = await res.json()
-            if (!data.success) {
-                toast.error(data.error || "Khong the chuyen profile")
-                return
-            }
-            toast.success(`Đã chuyển sang ${profiles.find(p => p.id === profileId)?.name || 'profile mới'}`)
-            setOpen(false)
-
-            // After profile switch, navigate to the first workspace of the new profile.
-            // The cookie is already updated by the API response, so server actions
-            // will use the new session.
-            try {
-                const newWorkspaces = await getWorkspacesForProfile(profileId)
-                const firstWs = newWorkspaces?.[0]
-                if (firstWs) {
-                    const basePath = viewRole === "ADMIN" ? "admin" : "dashboard"
-                    window.location.href = `/${firstWs.id}/${basePath}`
-                    return
-                }
-            } catch { /* fallback below */ }
-
-            // Fallback: reload current page (will redirect if workspace doesn't belong to profile)
-            window.location.href = viewRole === "ADMIN" ? `/${workspaceId}/admin` : `/${workspaceId}/dashboard`
-        } catch {
-            toast.error("Loi khi chuyen profile")
-        } finally {
-            setSwitching(false)
-        }
-    }
-
     // ── Workspace switch: simple navigation ──
     const handleWorkspaceSwitch = (newWsId: string) => {
         if (newWsId === workspaceId) {
@@ -145,13 +100,11 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
         setShowCreateModal(true)
     }
 
-    const handleOpenCreateProfileModal = () => {
-        setOpen(false)
-        setShowCreateProfileModal(true)
-    }
-
     // Don't render the switcher trigger only if literally zero profiles (still allow when workspaces=0).
     if (profiles.length === 0) return null
+
+    // pathname is read but not used elsewhere — silence TS "declared but unused"
+    void pathname
 
     // ── Collapsed mode: icon only ──
     if (collapsed) {
@@ -174,22 +127,16 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
                     <AnimatePresence>
                         {open && (
                             <SwitcherDropdown
-                                profiles={profiles}
                                 workspaces={workspaces}
-                                currentProfileId={currentProfileId}
                                 workspaceId={workspaceId}
-                                switching={switching}
-                                onProfileSwitch={handleProfileSwitch}
                                 onWorkspaceSwitch={handleWorkspaceSwitch}
                                 onCreateWorkspace={handleOpenCreateModal}
-                                onCreateProfile={handleOpenCreateProfileModal}
                                 align="right"
                             />
                         )}
                     </AnimatePresence>
                 </div>
                 <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
-                <CreateProfileModal open={showCreateProfileModal} onClose={() => setShowCreateProfileModal(false)} />
             </>
         )
     }
@@ -250,21 +197,15 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
             <AnimatePresence>
                 {open && (
                     <SwitcherDropdown
-                        profiles={profiles}
                         workspaces={workspaces}
-                        currentProfileId={currentProfileId}
                         workspaceId={workspaceId}
-                        switching={switching}
-                        onProfileSwitch={handleProfileSwitch}
                         onWorkspaceSwitch={handleWorkspaceSwitch}
                         onCreateWorkspace={handleOpenCreateModal}
-                        onCreateProfile={handleOpenCreateProfileModal}
                         align="left"
                     />
                 )}
             </AnimatePresence>
             <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
-            <CreateProfileModal open={showCreateProfileModal} onClose={() => setShowCreateProfileModal(false)} />
         </div>
     )
 }
@@ -274,26 +215,16 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
 /* ────────────────────────────────────────────────────────────────────── */
 
 function SwitcherDropdown({
-    profiles,
     workspaces,
-    currentProfileId,
     workspaceId,
-    switching,
-    onProfileSwitch,
     onWorkspaceSwitch,
     onCreateWorkspace,
-    onCreateProfile,
     align,
 }: {
-    profiles: ProfileItem[]
     workspaces: WorkspaceItem[]
-    currentProfileId: string | null
     workspaceId: string
-    switching: boolean
-    onProfileSwitch: (id: string) => void
     onWorkspaceSwitch: (id: string) => void
     onCreateWorkspace: () => void
-    onCreateProfile: () => void
     align: "left" | "right"
 }) {
     return (
@@ -314,81 +245,7 @@ function SwitcherDropdown({
                 fontFamily: FONT,
             }}
         >
-            {/* ── Profiles Section ── (always show, with Create Profile button) */}
-            <div className="p-2">
-                <p
-                    className="px-2.5 pb-2 pt-1.5 text-[10px] font-bold uppercase tracking-[0.08em] flex items-center gap-1.5"
-                    style={{ color: MUTED }}
-                >
-                    <Users size={11} />
-                    Profile / Team
-                </p>
-                {profiles.map((profile) => {
-                    const isActive = profile.id === currentProfileId
-                    return (
-                        <button
-                            key={profile.id}
-                            type="button"
-                            disabled={switching}
-                            onClick={() => onProfileSwitch(profile.id)}
-                            className="flex w-full items-center gap-3 px-2.5 py-2 transition-colors duration-150 cursor-pointer disabled:opacity-50"
-                            style={{
-                                borderRadius: 12,
-                                background: isActive ? ACTIVE_BG : "transparent",
-                            }}
-                            onMouseEnter={(e) => {
-                                if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)"
-                            }}
-                            onMouseLeave={(e) => {
-                                if (!isActive) e.currentTarget.style.background = "transparent"
-                            }}
-                        >
-                            <div
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                                style={{ background: isActive ? "rgba(139,92,246,0.25)" : "rgba(139,92,246,0.10)" }}
-                            >
-                                <Users className="h-3.5 w-3.5" style={{ color: ACCENT }} />
-                            </div>
-                            <div className="flex flex-col items-start text-left overflow-hidden flex-1">
-                                <span className="truncate text-[13px] font-semibold text-zinc-100 w-full">
-                                    {profile.name}
-                                </span>
-                                <span className="text-[10px]" style={{ color: MUTED }}>
-                                    {profile.userCount} members &middot; {profile.workspaceCount} workspaces
-                                </span>
-                            </div>
-                            {isActive && (
-                                <Check className="ml-auto h-4 w-4 shrink-0" style={{ color: ACCENT }} />
-                            )}
-                        </button>
-                    )
-                })}
-
-                {/* Create Profile button */}
-                <button
-                    type="button"
-                    onClick={onCreateProfile}
-                    className="flex w-full items-center gap-3 px-2.5 py-2 mt-1 transition-colors duration-150 cursor-pointer"
-                    style={{ borderRadius: 12 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)" }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
-                >
-                    <div
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                        style={{ background: "rgba(139,92,246,0.10)", border: `1px dashed rgba(139,92,246,0.3)` }}
-                    >
-                        <Plus className="h-3.5 w-3.5" style={{ color: ACCENT }} />
-                    </div>
-                    <span className="text-[13px] font-semibold" style={{ color: MUTED_LIGHT }}>
-                        Tạo Profile mới
-                    </span>
-                </button>
-            </div>
-
-            {/* ── Divider ── */}
-            <div style={{ borderTop: `1px solid ${DIVIDER}` }} />
-
-            {/* ── Workspaces Section ── (always show with Create Workspace button) */}
+            {/* ── Workspaces Section ── (Profile section moved to UserHomeTopBar dropdown) */}
             <div className="p-2">
                 <p
                     className="px-2.5 pb-2 pt-1.5 text-[10px] font-bold uppercase tracking-[0.08em] flex items-center gap-1.5"

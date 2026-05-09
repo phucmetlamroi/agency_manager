@@ -405,7 +405,6 @@ export async function inviteToWorkspace(
         }).catch((err) => console.warn('[inviteToWorkspace direct] notify failed:', err))
 
         revalidatePath(`/${workspaceId}/admin/members`)
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true, directAdd: true, username: targetUser.nickname || targetUser.username }
     }
 
@@ -791,7 +790,6 @@ export async function changeWorkspaceMemberRole(
     })
 
     revalidatePath(`/${workspaceId}/admin/members`)
-    revalidatePath(`/${workspaceId}/admin/users`)
     return { success: true }
 }
 
@@ -853,7 +851,6 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
     })
 
     revalidatePath(`/${workspaceId}/admin/members`)
-    revalidatePath(`/${workspaceId}/admin/users`)
     return { success: true }
 }
 

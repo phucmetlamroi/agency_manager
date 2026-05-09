@@ -9,7 +9,6 @@ import {
     LayoutDashboard,
     ListTodo,
     Wallet,
-    Users,
     LogOut
 } from "lucide-react"
 
@@ -64,11 +63,6 @@ export function CommandMenu() {
                 </CommandGroup>
                 <CommandSeparator />
                 <CommandGroup heading="Management">
-                    <CommandItem onSelect={() => runCommand(() => router.push('/admin/users'))}>
-                        <Users className="mr-2 h-4 w-4" />
-                        <span>Users</span>
-                        <CommandShortcut>⌘U</CommandShortcut>
-                    </CommandItem>
                     <CommandItem onSelect={() => runCommand(() => router.push('/admin/crm'))}>
                         <Smile className="mr-2 h-4 w-4" />
                         <span>Clients Manager</span>

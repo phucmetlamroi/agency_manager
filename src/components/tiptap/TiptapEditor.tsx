@@ -95,6 +95,11 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                 defaultProtocol: 'https',
                 HTMLAttributes: {
                     class: 'text-blue-500 underline cursor-pointer hover:text-blue-700',
+                    // Ensure links saved by editor always open in a new tab when
+                    // rendered (preview/view mode) — prevents in-place navigation away
+                    // from the app.
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
                 },
             }),
             TaskList,

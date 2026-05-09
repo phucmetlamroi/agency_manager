@@ -381,7 +381,10 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             // Now read the invitation for workspace info (safe — we own the lock)
             const invitation = await tx.workspaceInvitation.findUnique({
                 where: { id: invitationId },
-                include: { workspace: { select: { id: true, name: true, status: true } } }
+                include: {
+                    workspace: { select: { id: true, name: true, status: true, profileId: true } },
+                    invitedBy: { select: { id: true, username: true, nickname: true } },
+                }
             })
 
             if (!invitation) return { error: 'Lời mời không tồn tại.' }
@@ -407,11 +410,38 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
                 })
             }
 
+            // CRITICAL: grant ProfileAccess so the new member shows up in
+            // profile-scoped queries (assignee picker, leaderboard, performance,
+            // etc.). Without this, the user has WorkspaceMember row nhưng KHÔNG
+            // có profile context → invisible trong các page filter theo profileId.
+            // Skip nếu user đã có profile khác (giữ profileId chính của họ),
+            // chỉ thêm ProfileAccess fallback.
+            if (invitation.workspace.profileId) {
+                const existingAccess = await tx.profileAccess.findUnique({
+                    where: {
+                        userId_profileId: {
+                            userId: session.user.id,
+                            profileId: invitation.workspace.profileId,
+                        }
+                    }
+                })
+                if (!existingAccess) {
+                    await tx.profileAccess.create({
+                        data: {
+                            userId: session.user.id,
+                            profileId: invitation.workspace.profileId,
+                        }
+                    })
+                }
+            }
+
             return {
                 success: true,
                 workspaceId: invitation.workspaceId,
                 workspaceName: invitation.workspace.name,
                 role: invitation.role,
+                inviterId: invitation.invitedBy?.id ?? null,
+                inviteeName: session.user.nickname || session.user.username || 'Một thành viên',
             }
         })
 
@@ -425,6 +455,27 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             targetId: session.user.id,
             after: { role: result.role, method: 'invitation_accepted' },
         })
+
+        // Notify the inviter (best-effort, don't block on failure)
+        if (result.inviterId) {
+            try {
+                const { createNotificationInternal } = await import('./notification-actions')
+                const { broadcastNotificationToUser } = await import('@/lib/notification-broadcast')
+                const notif = await createNotificationInternal({
+                    userId: result.inviterId,
+                    type: 'WORKSPACE_INVITATION_ACCEPTED',
+                    title: 'Đã có thành viên mới',
+                    body: `${result.inviteeName} đã tham gia workspace "${result.workspaceName}".`,
+                    actorId: session.user.id,
+                    metadata: { workspaceId: result.workspaceId, role: result.role },
+                })
+                if (notif) {
+                    broadcastNotificationToUser(result.inviterId, notif as any).catch(() => { })
+                }
+            } catch (e) {
+                console.warn('[acceptWorkspaceInvitation] notify inviter failed:', e)
+            }
+        }
 
         revalidatePath(`/${result.workspaceId}/admin/members`)
         revalidatePath('/workspace')
@@ -443,7 +494,11 @@ export async function declineWorkspaceInvitation(invitationId: string) {
 
     try {
         const invitation = await prisma.workspaceInvitation.findUnique({
-            where: { id: invitationId }
+            where: { id: invitationId },
+            include: {
+                workspace: { select: { name: true } },
+                invitedBy: { select: { id: true, username: true } },
+            }
         })
 
         if (!invitation) return { error: 'Lời mời không tồn tại.' }
@@ -454,6 +509,28 @@ export async function declineWorkspaceInvitation(invitationId: string) {
             where: { id: invitationId },
             data: { status: 'DECLINED', respondedAt: new Date() }
         })
+
+        // Notify the inviter
+        if (invitation.invitedBy?.id) {
+            try {
+                const { createNotificationInternal } = await import('./notification-actions')
+                const { broadcastNotificationToUser } = await import('@/lib/notification-broadcast')
+                const inviteeName = session.user.nickname || session.user.username || 'Một người'
+                const notif = await createNotificationInternal({
+                    userId: invitation.invitedBy.id,
+                    type: 'WORKSPACE_INVITATION_DECLINED',
+                    title: 'Lời mời bị từ chối',
+                    body: `${inviteeName} đã từ chối lời mời tham gia "${invitation.workspace.name}".`,
+                    actorId: session.user.id,
+                    metadata: { workspaceId: invitation.workspaceId, role: invitation.role },
+                })
+                if (notif) {
+                    broadcastNotificationToUser(invitation.invitedBy.id, notif as any).catch(() => { })
+                }
+            } catch (e) {
+                console.warn('[declineWorkspaceInvitation] notify inviter failed:', e)
+            }
+        }
 
         revalidatePath(`/${invitation.workspaceId}/admin/members`)
         return { success: true }

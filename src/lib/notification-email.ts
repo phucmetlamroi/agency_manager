@@ -63,6 +63,8 @@ const BYPASS_CONFIG: Record<string, {
     TASK_DEADLINE_APPROACHING: { bypassMute: true,  bypassDigest: true,  bypassQuietHours: m => m?.tier === '1h' },
     TASK_OVERDUE:              { bypassMute: true,  bypassDigest: true,  bypassQuietHours: true },
     TASK_COMMENT:              { bypassMute: false, bypassDigest: false, bypassQuietHours: false },
+    WORKSPACE_INVITATION_ACCEPTED: { bypassMute: false, bypassDigest: true, bypassQuietHours: false },
+    WORKSPACE_INVITATION_DECLINED: { bypassMute: false, bypassDigest: true, bypassQuietHours: false },
 }
 
 const DEFAULT_BYPASS = { bypassMute: false, bypassDigest: false, bypassQuietHours: false }

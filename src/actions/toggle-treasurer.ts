@@ -9,7 +9,6 @@ export async function toggleTreasurer(userId: string, currentStatus: boolean, wo
             where: { id: userId },
             data: { isTreasurer: !currentStatus }
         })
-        revalidatePath(`/${workspaceId}/admin/users`)
         revalidatePath(`/${workspaceId}/admin/finance`)
         return { success: true }
     } catch (error) {

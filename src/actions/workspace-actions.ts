@@ -221,7 +221,6 @@ export async function transferWorkspaceOwnership(workspaceId: string, newOwnerUs
             after: { ownerId: newOwnerUserId },
         })
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         revalidatePath('/workspace')
         return { success: true }
     } catch (error: any) {

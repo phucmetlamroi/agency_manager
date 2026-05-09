@@ -21,7 +21,6 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
             where: { id: userId },
             data: { role: newRole as UserRole }
         })
-        revalidatePath(`/${workspaceId}/admin/users`)
         revalidatePath(`/${workspaceId}/admin`)
         return { success: true }
     } catch (e: any) {

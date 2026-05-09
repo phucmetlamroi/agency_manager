@@ -1,261 +1,268 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import TaskTable from '@/components/TaskTable'
-import { isMobileDevice } from '@/lib/device'
-import Leaderboard from '@/components/dashboard/Leaderboard'
-import { Suspense } from 'react'
-import { serializeDecimal } from '@/lib/serialization'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
-import { SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
-import { getUserPerformanceScore } from '@/actions/analytics-actions'
-import {
-    TrendingUp, TrendingDown, Minus, AlertTriangle, ShieldCheck,
-    Clock, ListChecks, Flame, ArrowUp, ArrowDown, Zap
-} from 'lucide-react'
-import { MarketplaceProvider } from '@/components/marketplace/MarketplaceProvider'
-import PendingInvitationsBanner from '@/components/workspace/PendingInvitationsBanner'
 import { prisma } from '@/lib/db'
+import { Suspense } from 'react'
+import { Settings2 } from 'lucide-react'
+
+import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
+import { serializeDecimal } from '@/lib/serialization'
+import { getAvailableProfiles } from '@/actions/profile-actions'
+
+import UserHomeTopBar from '@/components/dashboard/UserHomeTopBar'
+import UserWorkspacePicker from '@/components/dashboard/UserWorkspacePicker'
+import WidgetRankings from '@/components/dashboard/widgets/WidgetRankings'
+import WidgetUpcomingDeadlines from '@/components/dashboard/widgets/WidgetUpcomingDeadlines'
+import WidgetNetSalary from '@/components/dashboard/widgets/WidgetNetSalary'
+import WidgetTotalTasks from '@/components/dashboard/widgets/WidgetTotalTasks'
+import UserWorkflowTabs from '@/components/dashboard/UserWorkflowTabs'
+import PendingInvitationsBanner from '@/components/workspace/PendingInvitationsBanner'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * UserDashboard — rebuilt to mirror Admin layout per Figma HOME-USER-VER-1.0.
+ *
+ * Hierarchy (top → bottom):
+ *   UserHomeTopBar  (workspace name + welcome + search + bell + profile)
+ *   ↓ This month / Manage widgets row
+ *   ↓ 4-widget grid: Rankings | Upcoming Deadlines | (NetSalary + TotalTasks stacked)
+ *   ↓ UserWorkflowTabs: 4 tabs + search + view + paginated TaskTable
+ */
 export default async function UserDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
     const session = await getSession()
     if (!session) redirect('/login')
 
-    const workspacePrisma = getWorkspacePrisma(workspaceId)
     const userId = session.user.id
+    const profileId = (session.user as any).sessionProfileId
+    const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
-    // Workspace-scoped admin check: use workspace membership role, not global User.role.
-    // Global admins and treasurers retain admin access across all workspaces.
+    // ── Workspace name + role context ────────────────────────────
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { name: true },
+    })
+    const workspaceName = workspace?.name ?? 'Workspace'
+
+    // Determine if this user can switch back to admin view
     const isGlobalAdmin = session.user.role === 'ADMIN' || !!(session.user as any).isTreasurer
-    let userIsAdmin = isGlobalAdmin
+    let canSwitchToAdmin = isGlobalAdmin
     if (!isGlobalAdmin) {
         const membership = await prisma.workspaceMember.findUnique({
             where: { userId_workspaceId: { userId, workspaceId } },
             select: { role: true },
         })
-        userIsAdmin = membership?.role === 'OWNER' || membership?.role === 'ADMIN'
+        canSwitchToAdmin = membership?.role === 'OWNER' || membership?.role === 'ADMIN'
     }
 
-    // ── Data Fetching (workspace isolated) ──────────────────────
-    const perfData = await getUserPerformanceScore(workspaceId, userId)
-
-    const userWithBonus = await (workspacePrisma as any).user.findUnique({
+    // ── User profile basics ──────────────────────────────────────
+    const currentUser = await (workspacePrisma as any).user.findUnique({
         where: { id: userId },
         select: {
-            id: true, username: true, role: true, nickname: true,
-            bonuses: { where: { workspaceId } },
-            payrolls: { where: { workspaceId } }
-        }
+            id: true,
+            username: true,
+            nickname: true,
+            role: true,
+            avatarUrl: true,
+        },
     })
 
-    // Note: ADMIN users can view the user dashboard via the "Switch to User View" button.
-    // No automatic redirect — they can switch back to admin view from the sidebar.
+    const displayName = currentUser?.nickname || currentUser?.username || 'User'
+    const initials =
+        displayName
+            .split(/\s+/)
+            .map((w: string) => w[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2) || 'US'
 
+    // ── User's tasks (for widgets + TaskTable) ───────────────────
     const tasks = await (workspacePrisma as any).task.findMany({
         where: { assigneeId: userId },
         include: {
             client: { include: { parent: true } },
             assignee: {
                 select: {
-                    id: true, username: true, role: true, nickname: true,
-                    monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } }
-                }
+                    id: true,
+                    username: true,
+                    role: true,
+                    nickname: true,
+                    monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } },
+                },
             },
-            taskTags: { include: { tagCategory: { select: { id: true, name: true } } } }
+            taskTags: { include: { tagCategory: { select: { id: true, name: true } } } },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
     })
 
-    // ── Marketplace task count ─────────────────────────────────
-    const marketplaceCount = await (workspacePrisma as any).task.count({
-        where: {
-            assigneeId: null,
-            isArchived: false,
-        }
+    // ── Salary calc (this month vs last month) ───────────────────
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+
+    const completedTasks = tasks.filter((t: any) => t.status === SALARY_COMPLETED_STATUS)
+    const completedThisMonth = completedTasks.filter((t: any) => {
+        const d = new Date(t.updatedAt || t.createdAt)
+        return d >= startOfMonth
+    })
+    const completedLastMonth = completedTasks.filter((t: any) => {
+        const d = new Date(t.updatedAt || t.createdAt)
+        return d >= startOfLastMonth && d <= endOfLastMonth
     })
 
-    // ── Salary Calculations (workspace scoped) ─────────────────
-    const pendingTasks = tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status))
-    const pendingSalary = pendingTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
+    const totalThisMonth = completedThisMonth.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
+    const totalLastMonth = completedLastMonth.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
 
-    const completedTasks = tasks.filter((t: any) => t.status === 'Hoàn tất')
-    
-    // We display all workspace earnings instead of filtering by calendar dates
-    const baseSalary = completedTasks.reduce((acc: number, t: any) => acc + Number(t.value || 0), 0)
+    // Daily sparkline for current month (1..today) — bucket completed earnings per day
+    const daysSoFar = now.getDate()
+    const sparkline = Array.from({ length: daysSoFar }, (_, i) => {
+        const dayStart = new Date(now.getFullYear(), now.getMonth(), i + 1)
+        const dayEnd = new Date(now.getFullYear(), now.getMonth(), i + 2)
+        return completedThisMonth
+            .filter((t: any) => {
+                const td = new Date(t.updatedAt || t.createdAt)
+                return td >= dayStart && td < dayEnd
+            })
+            .reduce((s: number, t: any) => s + Number(t.value || 0), 0)
+    })
 
-    const bonusData = userWithBonus?.bonuses[0]
-    const bonusAmount = bonusData ? Number(bonusData.bonusAmount) : 0
-    const totalWorkspaceSalary = baseSalary + bonusAmount
+    // ── Total Tasks breakdown ───────────────────────────────────
+    const inProgressTasks = tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status)).length
+    const completedCount = completedTasks.length
 
-    // ── Comparison message — Lucide icons only, no emoji ──────
-    const comparisonMsg = totalWorkspaceSalary > 0 ? 'Phong độ tuyệt vời!' : 'Hãy bắt đầu hành trình mới'
-    const CompareIcon = totalWorkspaceSalary > 0 ? Flame : Zap
+    // ── Tasks for calendar widget — already pre-filtered to current user
+    const calendarTasks = tasks
+        .filter((t: any) => !!t.deadline)
+        .map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            deadline: t.deadline,
+            status: t.status,
+        }))
 
-    // ── Rank badge config — muted gradient, no emoji ──────────
-    const rankConfig: Record<number, { label: string; color: string; shadow: string; textColor: string }> = {
-        1: { label: 'Top 1', color: 'from-amber-400/20 to-yellow-300/10', shadow: 'shadow-amber-500/20', textColor: 'text-amber-300' },
-        2: { label: 'Top 2', color: 'from-slate-400/20 to-zinc-300/10', shadow: 'shadow-slate-400/15', textColor: 'text-slate-300' },
-        3: { label: 'Top 3', color: 'from-orange-500/20 to-amber-600/10', shadow: 'shadow-orange-500/15', textColor: 'text-orange-400' },
-    }
-    const rankCfg = bonusData ? rankConfig[bonusData.rank] : null
+    // ── Profiles list cho top-bar dropdown (giống admin) ────────
+    const profilesRaw = await getAvailableProfiles()
+    const profiles = (profilesRaw as any[]).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        logoUrl: p.logoUrl ?? null,
+    }))
 
-    // ── Error Rate — dynamic color state ─────────────────────
-    const errorRate = perfData?.errorRate ?? 0
-    const errConfig = errorRate < 0.6
-        ? { text: 'text-emerald-400', label: 'Xuất sắc', icon: ShieldCheck, desc: 'Phong độ hoàn hảo' }
-        : errorRate < 1.0
-        ? { text: 'text-amber-400', label: 'Cẩn thận', icon: AlertTriangle, desc: 'Cần chú ý thêm' }
-        : { text: 'text-red-400', label: 'Nguy hiểm', icon: AlertTriangle, desc: 'Cần cải thiện gấp' }
-    const ErrIcon = errConfig.icon
-    const CompareTrendIcon = totalWorkspaceSalary > 0 ? TrendingUp : Minus
-    const trendColor = totalWorkspaceSalary > 0 ? 'text-emerald-400' : 'text-zinc-400'
+    // ── Workspaces của profile hiện tại — cho UserWorkspacePicker pill ──
+    const workspacesForProfile = profileId
+        ? await prisma.workspace.findMany({
+              where: { profileId },
+              orderBy: { createdAt: 'desc' },
+              select: { id: true, name: true, description: true },
+          })
+        : []
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8">
+        <div className="flex flex-col gap-5">
+            {/* ── Ambient neon glow (subtle purple radials) — match admin ── */}
+            <div
+                className="fixed inset-0 pointer-events-none z-0"
+                style={{
+                    background:
+                        'radial-gradient(800px 500px at 10% -8%, rgba(139,92,246,0.06), transparent 55%), ' +
+                        'radial-gradient(600px 400px at 95% 105%, rgba(168,85,247,0.04), transparent 50%)',
+                }}
+            />
 
-            {/* Pending Workspace Invitations Banner */}
+            {/* ── Top bar ────────────────────────────────────────── */}
+            <UserHomeTopBar
+                workspaceName={workspaceName}
+                displayName={displayName}
+                initials={initials}
+                workspaceId={workspaceId}
+                userRole={currentUser?.role || 'USER'}
+                profiles={profiles}
+                currentProfileId={profileId ?? null}
+                canSwitchToAdmin={canSwitchToAdmin}
+                avatarUrl={currentUser?.avatarUrl}
+            />
+
+            {/* ── Action row: Workspace picker pill (left) + Manage widgets (right)
+                — 1 row giống admin DashboardActionBar, giảm khoảng trắng dọc và
+                căn sát với widget grid bên dưới ── */}
+            <div className="flex items-center justify-between gap-3 px-1">
+                <UserWorkspacePicker workspaceId={workspaceId} workspaces={workspacesForProfile} />
+
+                {/* Manage widgets — placeholder per plan D.8 */}
+                <button
+                    type="button"
+                    disabled
+                    title="Coming soon"
+                    className="flex items-center gap-1.5"
+                    style={{
+                        padding: '8px 16px',
+                        borderRadius: 26,
+                        background: 'rgba(139,92,246,0.06)',
+                        border: '1px dashed rgba(139,92,246,0.20)',
+                        color: '#A1A1AA',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        cursor: 'not-allowed',
+                        opacity: 0.7,
+                    }}
+                >
+                    <Settings2 className="w-3.5 h-3.5" />
+                    Manage widgets
+                </button>
+            </div>
+
+            {/* ── Pending invitations banner ── */}
             <PendingInvitationsBanner />
 
-            {/* ══════════════════════════════════════════════════
-                BENTO BOX GRID
-                lg:grid-cols-5 → salary (3) + stats (2)
-                items-stretch  → equal height columns
-            ══════════════════════════════════════════════════ */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
-
-                {/* ─── COL LEFT 3/5: Salary Hero Card ───────── */}
-                <div className="lg:col-span-3 relative overflow-hidden rounded-2xl border border-white/8 bg-zinc-950/70 backdrop-blur-md shadow-xl shadow-black/40 p-6 flex flex-col">
-                    {/* Ambient glow */}
-                    <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-emerald-500/6 blur-3xl rounded-full pointer-events-none" />
-
-                    {/* Rank badge — muted glass, no bold gradient bg */}
-                    {rankCfg && (
-                        <div className={`absolute top-4 right-4 px-3 py-1 rounded-full bg-gradient-to-r ${rankCfg.color} border border-white/10 shadow-md ${rankCfg.shadow}`}>
-                            <span className={`text-xs font-bold ${rankCfg.textColor}`}>{rankCfg.label}</span>
-                        </div>
-                    )}
-
-                    {/* Section label */}
-                    <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Lương thực nhận (Workspace)</p>
-
-                    {/* Hero salary number */}
-                    <div className="flex items-end gap-2 mb-2">
-                        <span className="text-5xl font-black bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(52,211,153,0.4)]">
-                            {totalWorkspaceSalary.toLocaleString('vi-VN')}
-                        </span>
-                        <span className="text-2xl font-bold text-emerald-400 mb-1">đ</span>
-                    </div>
-
-                    {/* Bonus note — accessible amber */}
-                    {bonusData && (
-                        <p className="text-xs text-amber-400 mb-3">
-                            Bao gồm thưởng: <span className="font-bold">+{bonusAmount.toLocaleString('vi-VN')} đ</span>
-                        </p>
-                    )}
-
-                    {/* ── Bottom row: Trend + DỰ KIẾN block ──── */}
-                    <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between flex-wrap gap-3">
-
-                        {/* Trend vs last month */}
-                        <div className={`flex items-center gap-1.5 text-sm font-semibold ${trendColor}`}>
-                            <CompareTrendIcon className="w-4 h-4" strokeWidth={2} />
-                            <span>{comparisonMsg}</span>
-                        </div>
-
-                        {/* DỰ KIẾN — prominent indigo block, NOT a gray pill */}
-                        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-                            <Clock className="w-4 h-4 text-indigo-400 flex-shrink-0" strokeWidth={1.5} />
-                            <div>
-                                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider leading-none mb-0.5">Thu nhập dự kiến</p>
-                                <p className="text-base font-black text-zinc-100 leading-none">
-                                    {pendingSalary.toLocaleString('vi-VN')}<span className="text-xs text-zinc-400 font-normal ml-0.5">đ</span>
-                                </p>
-                                <p className="text-[10px] text-zinc-400 mt-0.5">{pendingTasks.length} task đang xử lý</p>
-                            </div>
-                        </div>
-                    </div>
+            {/* ── Widget grid: 12-col, Row 1 ─────────────────────── */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
+                {/* Rankings */}
+                <div className="xl:col-span-4 min-h-[328px]">
+                    <Suspense
+                        fallback={
+                            <div className="h-full rounded-[26px] bg-[#0A0A0A] border border-[rgba(139,92,246,0.15)] animate-pulse" />
+                        }
+                    >
+                        <WidgetRankings workspaceId={workspaceId} />
+                    </Suspense>
                 </div>
 
-                {/* ─── COL RIGHT 2/5: Stacked mini cards ────── */}
-                <div className="lg:col-span-2 flex flex-col gap-4">
+                {/* Upcoming Deadlines */}
+                <div className="xl:col-span-4 min-h-[328px]">
+                    <WidgetUpcomingDeadlines tasks={calendarTasks} />
+                </div>
 
-                    {/* Error Rate Card */}
-                    <div className="flex-1 relative overflow-hidden rounded-2xl border border-white/8 bg-zinc-950/60 p-5 backdrop-blur-md flex flex-col">
-                        {/* Label row */}
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">
-                            Tỉ lệ lỗi
-                            {perfData && <span className="text-zinc-600 ml-1">· Rank {perfData.rank}</span>}
-                        </p>
-                        {/* Rate number */}
-                        <div className="flex items-center gap-3 mb-3">
-                            <ErrIcon className={`w-7 h-7 flex-shrink-0 ${errConfig.text}`} strokeWidth={1.5} />
-                            <span className={`text-4xl font-black ${errConfig.text}`}>{errorRate}%</span>
-                        </div>
-                        {/* Status label — accessible text-zinc-400 for desc */}
-                        <p className={`text-xs font-bold mt-auto ${errConfig.text}`}>{errConfig.label}</p>
-                        <p className="text-xs text-zinc-400">{errConfig.desc}</p>
+                {/* Net Salary + Total Tasks stacked */}
+                <div className="xl:col-span-4 flex flex-col gap-4 min-h-[328px]">
+                    <div className="flex-1">
+                        <WidgetNetSalary
+                            totalThisMonth={totalThisMonth}
+                            totalLastMonth={totalLastMonth}
+                            sparkline={sparkline}
+                        />
                     </div>
-
-                    {/* Task Stats Card */}
-                    <div className="flex-1 rounded-2xl border border-white/8 bg-zinc-950/60 p-5 backdrop-blur-md flex flex-col">
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-4">Tasks tháng này</p>
-                        <div className="flex flex-col gap-3 flex-1">
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-zinc-400 flex items-center gap-2">
-                                    <ListChecks className="w-4 h-4" strokeWidth={1.5} />
-                                    Hoàn tất
-                                </span>
-                                <span className="text-lg font-black text-emerald-400">{completedTasks.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-zinc-400 flex items-center gap-2">
-                                    <Clock className="w-4 h-4" strokeWidth={1.5} />
-                                    Đang làm
-                                </span>
-                                <span className="text-lg font-black text-indigo-400">{pendingTasks.length}</span>
-                            </div>
-                            <div className="h-px bg-white/5" />
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-zinc-500">Tổng cộng</span>
-                                <span className="font-mono font-bold text-zinc-300">{tasks.length}</span>
-                            </div>
-                        </div>
+                    <div className="flex-1">
+                        <WidgetTotalTasks
+                            total={tasks.length}
+                            progress={inProgressTasks}
+                            completed={completedCount}
+                        />
                     </div>
                 </div>
             </div>
 
-            {/* ═══════════════════════════════════════════════════
-                LEADERBOARD
-            ═══════════════════════════════════════════════════ */}
-            <div className="h-[340px]">
-                <Suspense fallback={
-                    <div className="h-full rounded-2xl bg-zinc-950/60 border border-white/5 animate-pulse flex items-center justify-center text-zinc-500 text-sm">
-                        Đang tải Bảng Xếp Hạng...
-                    </div>
-                }>
-                    <Leaderboard workspaceId={workspaceId} />
-                </Suspense>
-            </div>
+            {/* ── Workflow tabs + table ──────────────────────────── */}
+            <UserWorkflowTabs
+                tasks={serializeDecimal(tasks) as any}
+                workspaceId={workspaceId}
+                currentUserId={userId}
+            />
 
-            {/* ═══════════════════════════════════════════════════
-                TASK TABLE
-            ═══════════════════════════════════════════════════ */}
-            <div>
-                <h3 className="text-xl font-bold text-zinc-100 mb-4 flex items-center gap-2">
-                    <ListChecks className="w-5 h-5 text-indigo-400" strokeWidth={1.5} />
-                    Danh sách Task của tôi
-                </h3>
-                <div className="rounded-2xl border border-white/8 bg-zinc-950/60 backdrop-blur-sm overflow-hidden shadow-lg">
-                    <TaskTable tasks={serializeDecimal(tasks) as any} isAdmin={userIsAdmin} isMobile={await isMobileDevice()} workspaceId={workspaceId} currentUserId={userId} />
-                </div>
-            </div>
-
-            {/* ═══════════════════════════════════════════════════
-                MARKETPLACE FAB
-            ═══════════════════════════════════════════════════ */}
-            <MarketplaceProvider workspaceId={workspaceId} initialTaskCount={marketplaceCount} />
+            {/* Safe spacer */}
+            <div className="h-10" />
         </div>
     )
 }

@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
     LayoutDashboard,
-    Users,
     UsersRound,
     Building2,
     Wallet,
@@ -24,7 +23,8 @@ import {
     AlertOctagon,
     ArrowRightLeft,
     Settings,
-    ScrollText
+    ScrollText,
+    LifeBuoy
 } from "lucide-react"
 
 import {
@@ -43,7 +43,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { ProfileWorkspaceSwitcher } from "./ProfileWorkspaceSwitcher"
 
 type ViewRole = 'ADMIN' | 'USER'
 
@@ -68,24 +67,31 @@ interface NavItem {
     icon: React.ComponentType<{ className?: string }>
     roles: ViewRole[]
     danger?: boolean
+    /** Render as <a> with target="_blank" instead of next/link (for mailto: / external) */
+    external?: boolean
 }
 
 const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
+    // [Sprint F.4] Unified nav: USER view shows ALL items same as ADMIN view.
+    // Page-level guards (admin layout `canAccessAdmin`) handle permission gating —
+    // non-admin click → admin layout redirects back to /dashboard automatically.
+    // [Sprint F.5] Hiệu suất entry removed entirely (page + actions deleted).
     const allItems: NavItem[] = [
         { label: "Dashboard", href: viewRole === 'USER' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`, icon: LayoutDashboard, roles: ['ADMIN', 'USER'] },
-        { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN'] },
-        { label: "Clients Manager", href: `/${workspaceId}/admin/crm`, icon: Smile, roles: ['ADMIN'] },
+        { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'] },
+        { label: "Clients Manager", href: `/${workspaceId}/admin/crm`, icon: Smile, roles: ['ADMIN', 'USER'] },
         { label: "Chat", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/chat` : `/${workspaceId}/admin/chat`, icon: MessageSquare, roles: ['ADMIN', 'USER'] },
         { label: "Schedule", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
         { label: "My Errors", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },
         { label: "Profile", href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, roles: ['USER'] },
-        { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN'] },
-        { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN'] },
-        { label: "Hiệu suất", href: `/${workspaceId}/admin/users`, icon: Users, roles: ['ADMIN'] },
-        { label: "Members", href: `/${workspaceId}/admin/members`, icon: UsersRound, roles: ['ADMIN'] },
-        { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN'] },
-        { label: "Audit Log", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText, roles: ['ADMIN'] },
-        { label: "Settings", href: `/${workspaceId}/admin/settings`, icon: Settings, roles: ['ADMIN'] },
+        { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN', 'USER'] },
+        { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN', 'USER'] },
+        { label: "Members", href: `/${workspaceId}/admin/members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
+        { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN', 'USER'] },
+        { label: "Audit Log", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText, roles: ['ADMIN', 'USER'] },
+        { label: "Settings", href: `/${workspaceId}/admin/settings`, icon: Settings, roles: ['ADMIN', 'USER'] },
+        // [User Dashboard Redesign D.7] Help & Feedback — placeholder mailto link
+        { label: "Help & Feedback", href: "mailto:support@hustlytasker.xyz", icon: LifeBuoy, roles: ['USER'], external: true },
     ]
     return allItems.filter(item => item.roles.includes(viewRole))
 }
@@ -139,12 +145,10 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
         return name.slice(0, 2).toUpperCase()
     }
 
-    // Filtered nav items based on view role + workspace-scoped permissions
-    const filteredNavItems = getNavItems(workspaceId, viewRole).filter(item => {
-        if (item.href.includes('/admin/finance')) return isAdminUser || user.isTreasurer
-        if (item.href.includes('/admin/analytics')) return isAdminUser
-        return true
-    })
+    // [Sprint F.4] Show ALL nav items per user spec: "tùy mỗi phân quyền thì họ ko
+    // có quyền xem/thao tác phần đó của bên profile đó thôi". Page-level guards
+    // (admin layout `canAccessAdmin` redirect) handle permission gating.
+    const filteredNavItems = getNavItems(workspaceId, viewRole)
 
     // ── Mobile: top bar + sheet drawer ──
     if (isMobile) {
@@ -221,22 +225,24 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 </div>
                             </div>
 
-                            {/* Profile & Workspace Switcher (user view only — admin has its own picker) */}
-                            {viewRole === 'USER' && (
-                                <ProfileWorkspaceSwitcher workspaceId={workspaceId} viewRole={viewRole} />
-                            )}
+                            {/* [User dashboard redesign] Profile/Workspace switcher moved to:
+                                - Profile picker → UserHomeTopBar dropdown (top-right)
+                                - Workspace picker → UserWorkspacePicker pill (inside content area) */}
 
                             {/* Sheet nav */}
                             <nav className="flex-1 px-4 py-5 flex flex-col gap-[16px] overflow-auto">
                                 {filteredNavItems.map((item) => {
-                                    const isActive = pathname === item.href
+                                    const isActive = !item.external && pathname === item.href
                                     const activeBg = item.danger ? "#EF4444" : ACTIVE_BG
                                     const activeGlow = item.danger ? "0 4px 20px rgba(239,68,68,0.35)" : ACTIVE_GLOW
                                     const inactiveColor = item.danger ? "#F87171" : INACTIVE_TEXT
+                                    const NavAnchor: React.ElementType = item.external ? "a" : Link
+                                    const externalProps = item.external ? { target: "_blank", rel: "noopener noreferrer" } : {}
                                     return (
-                                        <Link
+                                        <NavAnchor
                                             key={item.href}
                                             href={item.href}
+                                            {...externalProps}
                                             className="flex items-center gap-3 text-[14px] font-semibold transition-all duration-200"
                                             style={{
                                                 height: 52,
@@ -251,7 +257,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                         >
                                             <item.icon className="w-[20px] h-[20px] flex-shrink-0" />
                                             <span className="flex-1">{item.label}</span>
-                                        </Link>
+                                        </NavAnchor>
                                     )
                                 })}
                                 {isAdminUser && (
@@ -370,13 +376,9 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                     {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
                 </Button>
 
-                {/* ── Profile & Workspace Switcher (user view only — admin has its own picker) ── */}
-                {viewRole === 'USER' && (
-                    <>
-                        <ProfileWorkspaceSwitcher workspaceId={workspaceId} collapsed={collapsed} viewRole={viewRole} />
-                        <div style={{ borderBottom: `1px solid ${DIVIDER}` }} />
-                    </>
-                )}
+                {/* [User dashboard redesign] Profile/Workspace switcher đã chuyển khỏi sidebar:
+                    - Profile picker → UserHomeTopBar dropdown (top-right corner)
+                    - Workspace picker → UserWorkspacePicker pill (inside dashboard content area, kế "This month") */}
 
                 {/* ── Navigation ── */}
                 <nav className={cn(
@@ -384,19 +386,23 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                     collapsed ? "px-3 py-5 gap-2" : "px-4 py-5 gap-[16px]"
                 )}>
                     {filteredNavItems.map((item) => {
-                        const isActive = pathname === item.href
+                        const isActive = !item.external && pathname === item.href
                         const dangerActiveBg = "#EF4444"
                         const dangerGlow = "0 4px 20px rgba(239,68,68,0.35)"
                         const activeBg = item.danger ? dangerActiveBg : ACTIVE_BG
                         const activeGlow = item.danger ? dangerGlow : ACTIVE_GLOW
                         const inactiveColor = item.danger ? "#F87171" : INACTIVE_TEXT
+                        // External links (mailto:, https://…) bypass next/link to avoid runtime warnings.
+                        const NavAnchor: React.ElementType = item.external ? "a" : Link
+                        const externalProps = item.external ? { target: "_blank", rel: "noopener noreferrer" } : {}
 
                         if (collapsed) {
                             return (
                                 <Tooltip key={item.href}>
                                     <TooltipTrigger asChild>
-                                        <Link
+                                        <NavAnchor
                                             href={item.href}
+                                            {...externalProps}
                                             className="flex items-center justify-center w-[46px] h-[46px] mx-auto transition-all duration-200"
                                             style={{
                                                 borderRadius: 23,
@@ -404,21 +410,21 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                                 color: isActive ? "#FFFFFF" : inactiveColor,
                                                 boxShadow: isActive ? activeGlow : "none",
                                             }}
-                                            onMouseEnter={(e) => {
+                                            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                                                 if (!isActive) {
-                                                    e.currentTarget.style.background = INACTIVE_HOVER_BG
-                                                    e.currentTarget.style.color = "#FFFFFF"
+                                                    (e.currentTarget as HTMLElement).style.background = INACTIVE_HOVER_BG
+                                                    ;(e.currentTarget as HTMLElement).style.color = "#FFFFFF"
                                                 }
                                             }}
-                                            onMouseLeave={(e) => {
+                                            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                                                 if (!isActive) {
-                                                    e.currentTarget.style.background = "transparent"
-                                                    e.currentTarget.style.color = inactiveColor
+                                                    (e.currentTarget as HTMLElement).style.background = "transparent"
+                                                    ;(e.currentTarget as HTMLElement).style.color = inactiveColor
                                                 }
                                             }}
                                         >
                                             <item.icon className="w-[20px] h-[20px] flex-shrink-0" />
-                                        </Link>
+                                        </NavAnchor>
                                     </TooltipTrigger>
                                     <TooltipContent side="right">{item.label}</TooltipContent>
                                 </Tooltip>
@@ -426,9 +432,10 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                         }
 
                         return (
-                            <Link
+                            <NavAnchor
                                 key={item.href}
                                 href={item.href}
+                                {...externalProps}
                                 className="group flex items-center gap-3 text-[14px] font-semibold transition-all duration-200"
                                 style={{
                                     height: 52,
@@ -440,22 +447,22 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                     color: isActive ? "#FFFFFF" : inactiveColor,
                                     boxShadow: isActive ? activeGlow : "none",
                                 }}
-                                onMouseEnter={(e) => {
+                                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                                     if (!isActive) {
-                                        e.currentTarget.style.background = INACTIVE_HOVER_BG
-                                        e.currentTarget.style.color = "#FFFFFF"
+                                        (e.currentTarget as HTMLElement).style.background = INACTIVE_HOVER_BG
+                                        ;(e.currentTarget as HTMLElement).style.color = "#FFFFFF"
                                     }
                                 }}
-                                onMouseLeave={(e) => {
+                                onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                                     if (!isActive) {
-                                        e.currentTarget.style.background = "transparent"
-                                        e.currentTarget.style.color = inactiveColor
+                                        (e.currentTarget as HTMLElement).style.background = "transparent"
+                                        ;(e.currentTarget as HTMLElement).style.color = inactiveColor
                                     }
                                 }}
                             >
                                 <item.icon className="w-[20px] h-[20px] flex-shrink-0" />
                                 <span className="flex-1">{item.label}</span>
-                            </Link>
+                            </NavAnchor>
                         )
                     })}
                 </nav>

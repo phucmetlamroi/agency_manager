@@ -299,7 +299,10 @@ export function TaskDetailModal({ task, isOpen, onClose, isAdmin, bulkSelectedId
                 jobPriceUSD: task.jobPriceUSD || 0,
                 value: task.value || 0,
                 collectFilesLink: task.collectFilesLink || '',
-                submissionFolder: submission,
+                // Đọc từ column DB trước (createTask save vào đây), fallback
+                // parsing từ resources string cho legacy tasks (cũ pack
+                // "RAW:..|BROLL:..|SUBMISSION:.." vào resources).
+                submissionFolder: task.submissionFolder || submission,
                 scriptLink: scriptUrl,
                 duration: task.duration || ''
             })

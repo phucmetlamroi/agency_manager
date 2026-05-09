@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link' 
 import { usePathname } from 'next/navigation'
-import { Home, ListTodo, Users, Crown, CalendarDays, Wallet, Banknote, Building2, LayoutDashboard, Gift, AlertTriangle, ArrowLeftRight, LogOut, Smartphone } from 'lucide-react'
+import { Home, ListTodo, Crown, CalendarDays, Wallet, Banknote, Building2, LayoutDashboard, Gift, AlertTriangle, ArrowLeftRight, LogOut, Smartphone } from 'lucide-react'
 
 export default function DesktopLayoutShell({
     children,
@@ -36,9 +36,6 @@ export default function DesktopLayoutShell({
                         <>
                             <Link href={`/${workspaceId}/admin`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${pathname === `/${workspaceId}/admin` ? 'bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/30' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'}`}>
                                 <ListTodo className="w-5 h-5" /> Quản lý Task
-                            </Link>
-                            <Link href={`/${workspaceId}/admin/users`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${pathname === `/${workspaceId}/admin/users` ? 'bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/30' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'}`}>
-                                <Users className="w-5 h-5" /> Nhân sự
                             </Link>
                             <Link href={`/${workspaceId}/admin/dashboard`} className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 ${pathname === `/${workspaceId}/admin/dashboard` ? 'bg-indigo-600/10 text-indigo-400 font-bold border border-indigo-500/20' : 'text-zinc-400 hover:bg-white/5 border border-transparent'}`}>
                             <Crown className="w-6 h-6 mb-1 text-yellow-500" />

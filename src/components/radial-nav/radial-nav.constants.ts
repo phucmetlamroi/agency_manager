@@ -73,10 +73,8 @@ export const ROUTE_REGISTRY: RouteEntry[] = [
     { path: '/[workspaceId]/admin/crm',         label: 'CRM',            icon: 'Smile',           color: 'cyan',    allowedRoles: ['ADMIN'] },
     { path: '/[workspaceId]/admin/payroll',     label: 'Payroll',        icon: 'Wallet',          color: 'emerald', allowedRoles: ['ADMIN'] },
     { path: '/[workspaceId]/admin/finance',     label: 'Finance',        icon: 'CreditCard',      color: 'amber',   allowedRoles: ['ADMIN'] },
-    { path: '/[workspaceId]/admin/users',       label: 'Staff',          icon: 'Users',           color: 'blue',    allowedRoles: ['ADMIN'] },
     { path: '/[workspaceId]/admin/schedule',    label: 'Schedule',       icon: 'CalendarDays',    color: 'pink',    allowedRoles: ['ADMIN'] },
     { path: '/[workspaceId]/admin/analytics',   label: 'Analytics',      icon: 'BarChart3',       color: 'orange',  allowedRoles: ['ADMIN'] },
-    { path: '/[workspaceId]/admin/performance', label: 'Performance',    icon: 'TrendingUp',      color: 'rose',    allowedRoles: ['ADMIN'] },
 
     // User/member scope
     { path: '/[workspaceId]/dashboard',            label: 'My Dashboard', icon: 'Home',         color: 'teal',    allowedRoles: ['ADMIN', 'USER'] },

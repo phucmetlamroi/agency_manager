@@ -13,7 +13,7 @@ import { verifyWorkspaceAccess } from '@/lib/security'
  *
  * Trước đây code hardcode `month=0, year=0` cho mọi workspace → KHÔNG truy vết
  * được lương theo tháng (year-end report sai, audit khó). Pattern này thống nhất
- * với cách `src/app/[workspaceId]/admin/users/page.tsx` đã extract.
+ * với cách payroll/bonus actions đã extract trước đây.
  *
  * Fallback: nếu workspace.name không có format tháng/năm → dùng current date.
  */

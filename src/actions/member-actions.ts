@@ -160,9 +160,28 @@ export async function getWorkspaceMembers(workspaceId: string) {
         }))
     }
 
-    // Combine + tag source
+    // Members có ProfileAccess đến workspace.profileId → cũng tag 'profile'
+    // (giúp invitee accept lời mời hiện badge xanh "Profile" giống native member).
+    let profileAccessUserIds = new Set<string>()
+    if (workspace?.profileId && workspaceMembers.length > 0) {
+        const accesses = await prisma.profileAccess.findMany({
+            where: {
+                profileId: workspace.profileId,
+                userId: { in: workspaceMembers.map(m => m.userId) },
+            },
+            select: { userId: true },
+        })
+        profileAccessUserIds = new Set(accesses.map(a => a.userId))
+    }
+
+    // Combine + tag source. WorkspaceMember có ProfileAccess matching → 'profile'.
     const allMembers = [
-        ...workspaceMembers.map(m => ({ ...m, source: 'workspace' as const })),
+        ...workspaceMembers.map(m => ({
+            ...m,
+            source: profileAccessUserIds.has(m.userId)
+                ? ('profile' as const)
+                : ('workspace' as const),
+        })),
         ...profileMembers,
     ]
 
@@ -386,7 +405,6 @@ export async function inviteToWorkspace(
         }).catch((err) => console.warn('[inviteToWorkspace direct] notify failed:', err))
 
         revalidatePath(`/${workspaceId}/admin/members`)
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true, directAdd: true, username: targetUser.nickname || targetUser.username }
     }
 
@@ -772,7 +790,6 @@ export async function changeWorkspaceMemberRole(
     })
 
     revalidatePath(`/${workspaceId}/admin/members`)
-    revalidatePath(`/${workspaceId}/admin/users`)
     return { success: true }
 }
 
@@ -834,7 +851,6 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
     })
 
     revalidatePath(`/${workspaceId}/admin/members`)
-    revalidatePath(`/${workspaceId}/admin/users`)
     return { success: true }
 }
 

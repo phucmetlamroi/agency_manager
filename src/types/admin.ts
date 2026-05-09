@@ -10,6 +10,7 @@ export type TaskWithUser = { // Updated with Client Info
     fileLink: string | null
     productLink: string | null
     collectFilesLink?: string | null
+    submissionFolder?: string | null
     notes_vi: string | null
     notes_en: string | null
     assigneeId?: string | null

@@ -43,7 +43,6 @@ export async function requestCrossTeamAccess(userId: string, targetProfileId: st
                     where: { id: existingRequest.id },
                     data: { status: 'PENDING', requestedById }
                 })
-                revalidatePath(`/${workspaceId}/admin/users`)
                 return { success: true }
             }
         }
@@ -57,7 +56,6 @@ export async function requestCrossTeamAccess(userId: string, targetProfileId: st
             }
         })
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error) {
         console.error('requestCrossTeamAccess failed:', error)
@@ -90,7 +88,6 @@ export async function approveCrossTeamAccess(requestId: string, workspaceId: str
             })
         ])
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error) {
         console.error('approveCrossTeamAccess failed:', error)
@@ -112,7 +109,6 @@ export async function rejectCrossTeamAccess(requestId: string, workspaceId: stri
             data: { status: 'REJECTED', approvedById }
         })
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error) {
         console.error('rejectCrossTeamAccess failed:', error)
@@ -135,7 +131,6 @@ export async function removeCrossTeamAccess(userId: string, profileId: string, w
             })
         ])
 
-        revalidatePath(`/${workspaceId}/admin/users`)
         return { success: true }
     } catch (error) {
         console.error('removeCrossTeamAccess failed:', error)

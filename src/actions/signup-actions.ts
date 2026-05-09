@@ -5,7 +5,7 @@
  *
  * Flow (theo §4.1 spec login.md):
  *   1. Honeypot check (silent reject)
- *   2. Turnstile siteverify
+ *   2. Vercel BotID classify (passive — replaces Turnstile siteverify)
  *   3. Rate limit (IP 5/h, email 3/h)
  *   4. Validate input (Zod-style)
  *   5. HIBP password check
@@ -31,7 +31,7 @@ import { randomInt } from 'crypto'
 import { generateRandomToken, hashToken } from '@/lib/otp'
 import { validatePasswordFull } from '@/lib/password-validator'
 import { validateEmailForSignup } from '@/lib/email-validator'
-import { verifyTurnstileToken } from '@/lib/turnstile'
+import { checkBotId } from 'botid/server'
 import { checkSignupIp, checkSignupEmail } from '@/lib/rate-limit-upstash'
 import { sendEmail } from '@/lib/email'
 import { buildVerifyEmailEmail } from '@/lib/notification-emails/templates/auth/verify-email'
@@ -88,7 +88,8 @@ export type SignupInput = {
     password: string
     displayName: string
     acceptTos: boolean
-    turnstileToken: string
+    // [BotID migration] turnstileToken removed — Vercel BotID là passive,
+    // không cần client gửi token. Server gọi checkBotId() đọc signal headers.
     honeypot?: string  // Should be empty; bots fill it
 }
 
@@ -142,13 +143,17 @@ export async function signupAction(input: SignupInput): Promise<SignupResponse> 
     }
     const email = input.email.trim().toLowerCase()
 
-    // ── 5. Cloudflare Turnstile siteverify (server-side) ──
-    const turnstile = await verifyTurnstileToken(input.turnstileToken, ip)
-    if (!turnstile.success) {
+    // ── 5. Vercel BotID — passive bot detection (replaces Cloudflare Turnstile) ──
+    // BotID đọc passive signals từ client (set bởi src/instrumentation-client.ts)
+    // và classify request. Local dev returns isBot=false. Vercel platform
+    // fail-open nếu signal không khả dụng — đủ phù hợp với defense-in-depth
+    // hiện tại (Upstash rate-limit + honeypot + HIBP + bcrypt 12).
+    const botCheck = await checkBotId()
+    if (botCheck.isBot) {
         await paddingDelay()
         return {
             success: false,
-            errors: { turnstile: 'Vui lòng xác minh bạn là con người.' }
+            errors: { turnstile: 'Vui lòng thử lại.' }
         }
     }
 

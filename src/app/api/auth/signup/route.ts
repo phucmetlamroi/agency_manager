@@ -1,10 +1,13 @@
 /**
  * POST /api/auth/signup
  *
- * Body: { email, password, displayName, acceptTos, turnstileToken, honeypot? }
+ * Body: { email, password, displayName, acceptTos, honeypot? }
  * Response 200 (always — anti-enumeration): { success: true, message: '...' }
  * Response 400 (validation): { success: false, errors: { ... } }
  * Response 429 (rate-limited): { success: false, message, retryAfter }
+ *
+ * [BotID migration] Bỏ turnstileToken khỏi body. Vercel BotID là passive,
+ * server gọi checkBotId() đọc signal headers (set bởi initBotId client-side).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -19,7 +22,6 @@ export async function POST(req: NextRequest) {
             password: typeof body.password === 'string' ? body.password : '',
             displayName: typeof body.displayName === 'string' ? body.displayName : '',
             acceptTos: !!body.acceptTos,
-            turnstileToken: typeof body.turnstileToken === 'string' ? body.turnstileToken : '',
             honeypot: typeof body.honeypot === 'string' ? body.honeypot : '',
         }
 

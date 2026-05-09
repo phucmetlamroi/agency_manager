@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { withBotId } from "botid/next/config";
 
 const withNextIntl = createNextIntlPlugin();
 
@@ -63,4 +64,7 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default withNextIntl(nextConfig);
+// withBotId là outermost wrapper per Vercel docs — inject rewrites + bundler
+// aliases tại Next config level, cần thấy fully-resolved config (bao gồm
+// next-intl webpack alias).
+export default withBotId(withNextIntl(nextConfig) as NextConfig);

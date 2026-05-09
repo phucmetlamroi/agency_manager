@@ -132,7 +132,7 @@ export default function PrivacyPage() {
                                 <li><strong className="text-zinc-200">Vercel</strong> — Hosting (Mỹ, EU)</li>
                                 <li><strong className="text-zinc-200">Neon</strong> — Database PostgreSQL (Mỹ)</li>
                                 <li><strong className="text-zinc-200">Resend</strong> — Gửi email transactional</li>
-                                <li><strong className="text-zinc-200">Cloudflare Turnstile</strong> — Chống bot signup</li>
+                                <li><strong className="text-zinc-200">Vercel BotID</strong> — Chống bot signup (passive detection)</li>
                                 <li><strong className="text-zinc-200">Upstash Redis</strong> — Rate limiting</li>
                                 <li><strong className="text-zinc-200">Have I Been Pwned</strong> — Kiểm tra password leak (k-anonymity, không gửi password)</li>
                             </ul>

@@ -111,7 +111,8 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
         onUpdate: ({ editor }) => onChange(editor.getHTML()),
         editorProps: {
             attributes: {
-                class: 'prose prose-sm max-w-none focus:outline-none min-h-[150px] p-3',
+                // prose-invert for dark theme; explicit text color override + bright placeholder
+                class: 'tiptap-editor prose prose-invert prose-sm max-w-none focus:outline-none min-h-[150px] p-3 text-zinc-100 caret-violet-400',
             },
         },
     })

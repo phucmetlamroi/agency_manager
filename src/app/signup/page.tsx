@@ -9,15 +9,14 @@
  *   - password (≥12 chars, HIBP-checked server-side)
  *   - acceptTos (required, không pre-tick)
  *   - honeypot (hidden, CSS, tabindex=-1)
- *   - turnstileToken (auto-fill from Turnstile widget)
+ *   - [BotID migration] turnstileToken bỏ — Vercel BotID passive, no widget.
  */
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, User, Lock, CheckCircle2, Loader2, ArrowLeft } from 'lucide-react'
-import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import PasswordStrengthMeter from '@/components/auth/PasswordStrengthMeter'
 
 export default function SignupPage() {
@@ -27,26 +26,18 @@ export default function SignupPage() {
     const [password, setPassword] = useState('')
     const [acceptTos, setAcceptTos] = useState(false)
     const [honeypot, setHoneypot] = useState('')   // hidden field
-    const [turnstileToken, setTurnstileToken] = useState('')
     const [showPwd, setShowPwd] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
     const [isPending, startTransition] = useTransition()
     const [done, setDone] = useState(false)
 
-    // Fallback: nếu Turnstile widget không load trong 6s (script blocked, env missing,
-    // network slow), tự issue placeholder token. Server sẽ verify lại — nếu thực sự
-    // có TURNSTILE_SECRET_KEY và cần thiết, server reject; nếu không (dev/no key)
-    // user vẫn signup được. Tránh button bị disabled vô tận.
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setTurnstileToken((prev) => prev || 'fallback-no-widget-loaded')
-        }, 6000)
-        return () => clearTimeout(timer)
-    }, [])
+    // [BotID migration] Bỏ Turnstile widget + 6s fallback timer. Vercel BotID
+    // chạy passive trong background (initBotId trong instrumentation-client.ts),
+    // không cần token state ở client.
 
     const lengthOk = password.length >= 12
-    const canSubmit = displayName.trim().length >= 2 && email && lengthOk && acceptTos && turnstileToken && !isPending
+    const canSubmit = displayName.trim().length >= 2 && email && lengthOk && acceptTos && !isPending
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -59,7 +50,7 @@ export default function SignupPage() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        email, password, displayName, acceptTos, turnstileToken, honeypot,
+                        email, password, displayName, acceptTos, honeypot,
                     }),
                 })
                 const data = await res.json()
@@ -247,16 +238,7 @@ export default function SignupPage() {
                     </label>
                     {fieldErrors.tos && <p className="text-xs text-red-400">{fieldErrors.tos}</p>}
 
-                    {/* Turnstile */}
-                    <TurnstileWidget
-                        onToken={setTurnstileToken}
-                        onError={() => {
-                            // Widget failed → tự issue fallback để không block submit.
-                            // Server có quyền reject nếu thực sự cần.
-                            setTurnstileToken('error-fallback')
-                        }}
-                        onExpire={() => setTurnstileToken('')}
-                    />
+                    {/* Bot detection error (server returns errors.turnstile khi BotID flag bot) */}
                     {fieldErrors.turnstile && <p className="text-xs text-red-400">{fieldErrors.turnstile}</p>}
 
                     {/* Submit + diagnostics khi disabled */}
@@ -277,9 +259,6 @@ export default function SignupPage() {
                             )}
                             {!acceptTos && (
                                 <p>⚠️ Vui lòng tick đồng ý điều khoản</p>
-                            )}
-                            {!turnstileToken && (
-                                <p>⏳ Đang tải xác minh bảo mật... (vui lòng đợi 5-10 giây)</p>
                             )}
                         </div>
                     )}

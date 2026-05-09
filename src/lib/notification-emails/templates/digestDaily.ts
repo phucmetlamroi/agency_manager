@@ -15,6 +15,8 @@ const TYPE_EMOJI: Record<string, string> = {
     TASK_DEADLINE_APPROACHING: '⏰',
     TASK_OVERDUE: '❗',
     TASK_COMMENT: '💬',
+    WORKSPACE_INVITATION_ACCEPTED: '✅',
+    WORKSPACE_INVITATION_DECLINED: '⛔',
 }
 
 function priorityRank(item: DigestNotificationItem): number {

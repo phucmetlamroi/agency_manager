@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { TaskWithUser } from '@/types/admin'
 import { TaskDetailModal } from './tasks/TaskDetailModal'
+import { BulkEditTaskModal } from './tasks/BulkEditTaskModal'
 import { deleteTask } from '@/actions/task-management-actions'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
@@ -104,6 +105,8 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
     const [page, setPage] = useState(1)
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
     const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
+    // [Sprint Q] Bulk-edit modal state — only opens when admin chọn nhiều task
+    const [bulkEditOpen, setBulkEditOpen] = useState(false)
     const [sortField, setSortField] = useState<'title' | 'deadline' | 'price' | null>(null)
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -432,6 +435,49 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                 Delete Selected
                             </button>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* [Sprint Q] BULK ACTION BAR — admin only, hiển thị khi có row selected */}
+            {isAdmin && selectedIds.length > 0 && (
+                <div
+                    className="flex items-center justify-between gap-3"
+                    style={{
+                        padding: '10px 16px',
+                        borderRadius: 16,
+                        background: 'rgba(139,92,246,0.10)',
+                        border: '1px solid rgba(139,92,246,0.30)',
+                    }}
+                >
+                    <span className="text-[13px] font-semibold text-violet-200">
+                        Đang chọn <strong className="text-white">{selectedIds.length}</strong> task
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setBulkEditOpen(true)}
+                            className="px-4 py-2 rounded-full text-white font-semibold text-[12px] transition-all"
+                            style={{
+                                background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+                                boxShadow: '0 8px 20px rgba(139,92,246,0.35)',
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            }}
+                        >
+                            Edit selected ({selectedIds.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setRowSelection({})}
+                            className="px-3 py-2 rounded-full text-zinc-300 font-medium text-[12px]"
+                            style={{
+                                background: 'rgba(255,255,255,0.04)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            }}
+                        >
+                            Bỏ chọn
+                        </button>
                     </div>
                 </div>
             )}
@@ -961,6 +1007,18 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                 isAdmin={isAdmin ?? false}
                 bulkSelectedIds={selectedIds}
                 workspaceId={workspaceId}
+            />
+
+            {/* [Sprint Q] Bulk Edit Modal — dirty-tracking 4-tab modal cho admin */}
+            <BulkEditTaskModal
+                isOpen={bulkEditOpen}
+                onClose={() => {
+                    setBulkEditOpen(false)
+                    setRowSelection({})  // clear selection sau khi close
+                }}
+                selectedTaskIds={selectedIds}
+                workspaceId={workspaceId}
+                users={users}
             />
         </div>
     )

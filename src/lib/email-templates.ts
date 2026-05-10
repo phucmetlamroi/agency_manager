@@ -127,6 +127,52 @@ export const emailTemplates = {
         return wrapTemplate(content, `[HustlyTasker] ${userName} đã nộp video cho task`)
     },
 
+    // 4. Task Status Bulk Digest — [Sprint Q]
+    // Gửi 1 email duy nhất cho mỗi recipient với danh sách N task đã thay đổi
+    // status. Tránh spam khi admin bulk-edit nhiều task cùng lúc.
+    taskStatusBulkDigest: (
+        recipientName: string,
+        actorName: string,
+        newStatus: string,
+        items: Array<{ title: string; clientName: string; oldStatus: string }>,
+    ) => {
+        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin`
+        const rows = items.map((item) => `
+            <tr>
+                <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">
+                    <strong style="color: #111827;">${item.title}</strong>
+                    <div style="color: #6b7280; font-size: 11px; margin-top: 2px;">${item.clientName}</div>
+                </td>
+                <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; white-space: nowrap;">
+                    ${item.oldStatus} → <strong style="color: #7C3AED;">${newStatus}</strong>
+                </td>
+            </tr>
+        `).join('')
+
+        const content = `
+            <p>Xin chào <strong>${recipientName}</strong>,</p>
+            <p><strong>${actorName}</strong> vừa cập nhật status cho <strong>${items.length} task</strong> sang
+            <span class="highlight">${newStatus}</span>:</p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background: #fafafa; border-radius: 8px; overflow: hidden;">
+                <thead>
+                    <tr style="background: #f3f4f6;">
+                        <th style="padding: 10px 12px; text-align: left; font-size: 11px; color: #6b7280; text-transform: uppercase;">Task</th>
+                        <th style="padding: 10px 12px; text-align: left; font-size: 11px; color: #6b7280; text-transform: uppercase;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+
+            <p style="font-size: 13px; color: #4b5563;">Vui lòng vào hệ thống để review chi tiết.</p>
+
+            <div style="text-align: center;">
+                <a href="${link}" class="btn">VÀO HỆ THỐNG REVIEW</a>
+            </div>
+        `
+        return wrapTemplate(content, `[HustlyTasker] ${actorName} cập nhật status ${items.length} task`)
+    },
+
     // [Sprint A removed] taskSubmitted (sent khi → 'Review') — status Review đã bỏ.
 
     // Admin Feedback (To User)

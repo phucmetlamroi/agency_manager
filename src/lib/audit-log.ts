@@ -65,6 +65,9 @@ export type AuditAction =
     | 'task.started'    // User bấm "Bắt đầu" (Nhận task → Đang thực hiện) (GĐ3)
     | 'task.delivered'  // User submit productLink (Đang thực hiện → Revision) (GĐ4)
     | 'task.completed'  // Admin/User mark Hoàn tất
+    // [Sprint Q] Bulk edit lifecycle
+    | 'task.bulk_updated'         // Bulk update fields (productLink/notes/deadline/...) of N tasks
+    | 'task.bulk_status_updated'  // Bulk status change of N tasks (with digest email)
 
 /**
  * `workspaceId` value semantics (audit fix #2.9):

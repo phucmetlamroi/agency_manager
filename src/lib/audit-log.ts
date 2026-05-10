@@ -58,6 +58,13 @@ export type AuditAction =
     | 'data.export'
     | 'data.import'
     | 'permission.checked_denied'
+    // [Sprint P] Task lifecycle 4 phases — track ai làm gì + khi nào.
+    // Email + in-app notification routing dùng cùng logic, audit là fallback
+    // forensics khi email/notif fail.
+    | 'task.assigned'   // Admin tạo + assign task tới user (GĐ1)
+    | 'task.started'    // User bấm "Bắt đầu" (Nhận task → Đang thực hiện) (GĐ3)
+    | 'task.delivered'  // User submit productLink (Đang thực hiện → Revision) (GĐ4)
+    | 'task.completed'  // Admin/User mark Hoàn tất
 
 /**
  * `workspaceId` value semantics (audit fix #2.9):

@@ -103,31 +103,26 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
     // is a hard rule: even global admins viewing /dashboard get the user view.
     const tasks = sanitizeTaskListForUser(rawTasks, false)
 
-    // ── Salary calc (this month vs last month) ───────────────────
+    // ── [Sprint O] Salary calc — LIFETIME, not month-bound ─────────────
+    // Old behavior (this month only) caused widget to show 0 if user hadn't
+    // completed anything this month. User wants:
+    //   - earnedTotal: lifetime sum value của tasks status='Hoàn tất' (đã nhận)
+    //   - pendingTotal: lifetime sum value của tasks pending (Đang thực hiện,
+    //     Revision, Sửa frame, Gửi lại, Nhận task, etc.) = "lương dự kiến"
     const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
-
     const completedTasks = tasks.filter((t: any) => t.status === SALARY_COMPLETED_STATUS)
-    const completedThisMonth = completedTasks.filter((t: any) => {
-        const d = new Date(t.updatedAt || t.createdAt)
-        return d >= startOfMonth
-    })
-    const completedLastMonth = completedTasks.filter((t: any) => {
-        const d = new Date(t.updatedAt || t.createdAt)
-        return d >= startOfLastMonth && d <= endOfLastMonth
-    })
+    const pendingTasks = tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status))
 
-    const totalThisMonth = completedThisMonth.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
-    const totalLastMonth = completedLastMonth.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
+    const earnedTotal = completedTasks.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
+    const pendingTotal = pendingTasks.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
 
-    // Daily sparkline for current month (1..today) — bucket completed earnings per day
-    const daysSoFar = now.getDate()
-    const sparkline = Array.from({ length: daysSoFar }, (_, i) => {
-        const dayStart = new Date(now.getFullYear(), now.getMonth(), i + 1)
-        const dayEnd = new Date(now.getFullYear(), now.getMonth(), i + 2)
-        return completedThisMonth
+    // Sparkline: last 14 days completed daily totals (visual decoration only)
+    const sparkline = Array.from({ length: 14 }, (_, i) => {
+        const d = new Date(now)
+        d.setDate(d.getDate() - (13 - i))
+        const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+        const dayEnd = new Date(dayStart.getTime() + 86400000)
+        return completedTasks
             .filter((t: any) => {
                 const td = new Date(t.updatedAt || t.createdAt)
                 return td >= dayStart && td < dayEnd
@@ -247,8 +242,8 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                 <div className="xl:col-span-4 flex flex-col gap-4 min-h-[328px]">
                     <div className="flex-1">
                         <WidgetNetSalary
-                            totalThisMonth={totalThisMonth}
-                            totalLastMonth={totalLastMonth}
+                            earnedTotal={earnedTotal}
+                            pendingTotal={pendingTotal}
                             sparkline={sparkline}
                         />
                     </div>

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
 import { serializeDecimal } from '@/lib/serialization'
+import { computeWorkspaceFinance } from '@/lib/finance-helpers'
 import { Suspense } from 'react'
 
 import AutoRefresh from '@/components/AutoRefresh'
@@ -35,7 +36,13 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     await checkOverdueTasks(workspaceId)
 
     // 2. Fetch all tasks
+    // [Sprint O audit-fix] Filter `isArchived: false` to match Finance page
+    // semantics. Total Tasks card, tasksInProgress, tasksCompleted, lastMonth,
+    // clientsNew, BottleneckAlert, TaskWorkflowTabs đều phải exclude archived.
+    // Task đã archived nghĩa là admin đã "đóng sổ" — không nên xuất hiện ở
+    // dashboard hoạt động + workflow.
     const tasks = await workspacePrisma.task.findMany({
+        where: { isArchived: false },
         include: {
             assignee: {
                 select: {
@@ -81,13 +88,13 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
 
     const completedTasks = tasks.filter((t: any) => t.status === SALARY_COMPLETED_STATUS)
-    const completedLastMonth = completedTasks.filter((t: any) => {
-        const d = new Date(t.createdAt)
-        return d >= startOfLastMonth && d <= endOfLastMonth
-    })
 
-    const grossRevenue = completedTasks.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
-    const grossRevenuePrev = completedLastMonth.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
+    // [Sprint O] Single-source-of-truth via finance-helpers — same numbers as
+    // /admin/finance page. User chose "Dự kiến (all non-archived tasks)" =
+    // projectedRevenueVND. Display unit = VND (default), client toggles USD.
+    const finance = await computeWorkspaceFinance(workspaceId, profileId)
+    const grossRevenueVND = finance.projectedRevenueVND
+    const exchangeRate = finance.exchangeRate
 
     const tasksInProgress = tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status)).length
     const tasksCompleted = completedTasks.length
@@ -102,54 +109,43 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         return d >= startOfMonth && t.clientId
     }).reduce((s: Set<string>, t: any) => { s.add(t.clientId); return s }, new Set<string>()).size
 
-    // ── Sparkline: last 7 completed task values aggregated by creation ──
+    // ── Sparkline: last 7 days of projected revenue (VND) — visual decoration ──
+    // [Sprint O audit-fix] tasks query đã filter !isArchived → bỏ filter
+    // client-side dư thừa. Multiply per-task exchangeRate (với fallback).
     const sparklineData = Array.from({ length: 7 }, (_, i) => {
         const d = new Date(now)
         d.setDate(d.getDate() - (6 - i))
         const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate())
         const dayEnd = new Date(dayStart.getTime() + 86400000)
-        const dayTotal = completedTasks
+        const dayTotal = tasks
             .filter((t: any) => {
                 const td = new Date(t.updatedAt || t.createdAt)
                 return td >= dayStart && td < dayEnd
             })
-            .reduce((s: number, t: any) => s + Number(t.value || 0), 0)
+            .reduce(
+                (s: number, t: any) =>
+                    s + Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || exchangeRate),
+                0,
+            )
         return { v: dayTotal }
     })
 
-    // ── Revenue by weekday (Mon-Sun) ──────────────────────────────
+    // ── Revenue by weekday (cumulative all-time, VND) ──────────────────────
     const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     const revenueByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-    completedTasks.forEach((t: any) => {
+    tasks.forEach((t: any) => {
         const raw = new Date(t.updatedAt || t.createdAt).getDay()
         const mapped = (raw + 6) % 7
-        revenueByDay[mapped] = (revenueByDay[mapped] || 0) + Number(t.value || 0)
+        const vnd = Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || exchangeRate)
+        revenueByDay[mapped] = (revenueByDay[mapped] || 0) + vnd
     })
-    // ── Task count by weekday (for dual-line chart) ────────────
     const tasksByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-    completedTasks.forEach((t: any) => {
+    tasks.forEach((t: any) => {
         const raw = new Date(t.updatedAt || t.createdAt).getDay()
         const mapped = (raw + 6) % 7
         tasksByDay[mapped] = (tasksByDay[mapped] || 0) + 1
     })
     const revenueChartData = DAYS.map((day, i) => ({ day, revenue: revenueByDay[i] || 0, tasks: tasksByDay[i] || 0 }))
-
-    // Revenue totals this/prev week
-    const startOfWeek = new Date(now)
-    startOfWeek.setDate(now.getDate() - now.getDay() + 1)
-    startOfWeek.setHours(0, 0, 0, 0)
-    const startOfPrevWeek = new Date(startOfWeek)
-    startOfPrevWeek.setDate(startOfPrevWeek.getDate() - 7)
-
-    const weekRevenue = completedTasks
-        .filter((t: any) => new Date(t.updatedAt || t.createdAt) >= startOfWeek)
-        .reduce((s: number, t: any) => s + Number(t.value || 0), 0)
-    const prevWeekRevenue = completedTasks
-        .filter((t: any) => {
-            const d = new Date(t.updatedAt || t.createdAt)
-            return d >= startOfPrevWeek && d < startOfWeek
-        })
-        .reduce((s: number, t: any) => s + Number(t.value || 0), 0)
 
     const unassignedTasks = tasks.filter((t: any) => !t.assigneeId)
     const assignedTasks = tasks.filter((t: any) => t.assigneeId)
@@ -203,9 +199,12 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             />
 
             {/* ── KPI Widgets ──────────────────────────────────── */}
+            {/* [Sprint O] grossRevenueVND = finance.projectedRevenueVND (mirrors
+                Finance page TOTAL REVENUE bottom summary). exchangeRate passed
+                cho client toggle VND ↔ USD. */}
             <AdminKPIWidgets data={{
-                grossRevenue,
-                grossRevenuePrev,
+                grossRevenueVND,
+                exchangeRate,
                 totalTasks: tasks.length,
                 totalTasksPrev: lastMonthTasks.length,
                 tasksInProgress,
@@ -219,10 +218,12 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             {/* ── Revenue Chart + Rankings (flex 2 : 1) ──────── */}
             <div className="flex flex-col xl:flex-row gap-4">
                 <div className="xl:flex-[2] min-w-0">
+                    {/* [Sprint O] All-time workspace revenue (VND base).
+                        Client renders VND/USD toggle pill. */}
                     <AdminRevenueChart
                         data={revenueChartData}
-                        totalRevenue={weekRevenue}
-                        prevRevenue={prevWeekRevenue}
+                        totalRevenueVND={grossRevenueVND}
+                        exchangeRate={exchangeRate}
                     />
                 </div>
                 <div className="xl:flex-1 min-w-0">

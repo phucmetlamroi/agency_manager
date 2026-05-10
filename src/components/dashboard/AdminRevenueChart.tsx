@@ -1,6 +1,7 @@
 "use client"
 
-import { ChevronDown, TrendingUp } from "lucide-react"
+import { useCallback, useId, useState } from "react"
+import { ChevronDown } from "lucide-react"
 import {
     AreaChart,
     Area,
@@ -15,57 +16,80 @@ import type { ValueType, NameType } from "recharts/types/component/DefaultToolti
 
 interface RevenuePoint {
     day: string
-    revenue: number
+    revenue: number     // VND
     tasks: number
 }
 
 interface Props {
+    /** Daily revenue series in VND (oldest → newest) */
     data: RevenuePoint[]
-    totalRevenue: number
-    prevRevenue: number
-}
-
-/* -- Custom tooltip — Neon Purple Dark ----------------------------------- */
-
-const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
-    if (active && payload && payload.length) {
-        return (
-            <div
-                className="px-3.5 py-2.5 text-xs shadow-2xl"
-                style={{
-                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    background: "#121016",
-                    border: "1px solid rgba(139,92,246,0.2)",
-                    borderRadius: 14,
-                }}
-            >
-                <p style={{ color: "#A1A1AA", marginBottom: 4 }}>{label}</p>
-                <p style={{ color: "#D8B4FE", fontWeight: 700 }}>
-                    ${Number(payload[0].value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-            </div>
-        )
-    }
-    return null
+    /** [Sprint O] Lifetime workspace revenue in VND (= projectedRevenueVND).
+     *  Mirrors /admin/finance "TOTAL REVENUE" bottom summary. */
+    totalRevenueVND: number
+    /** Exchange rate for client-side VND ↔ USD toggle. */
+    exchangeRate: number
 }
 
 /* -- Main export --------------------------------------------------------- */
 
-export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
-    const pct =
-        prevRevenue > 0
-            ? ((totalRevenue - prevRevenue) / prevRevenue) * 100
-            : 0
-    const pctRounded = Math.round(pct * 100) / 100
-    const up = pct >= 0
+export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props) {
+    // [Sprint O audit-fix] useId for gradient — collision-safe if multiple
+    // AdminRevenueChart instances render on same page in future.
+    const uid = useId()
+    const gradId = `revGrad-${uid}`
 
-    const formattedRevenue = totalRevenue.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    })
+    // [Sprint O] Currency toggle state — default VND
+    const [currency, setCurrency] = useState<"VND" | "USD">("VND")
+    const toggleCurrency = () =>
+        setCurrency((c) => (c === "VND" ? "USD" : "VND"))
 
-    /* Split dollar value into whole and decimal parts for muted-decimal style */
-    const [wholeStr, decimalStr] = formattedRevenue.split(".")
+    const totalDisplay =
+        currency === "VND"
+            ? totalRevenueVND
+            : totalRevenueVND / Math.max(exchangeRate, 1)
+
+    const formattedRevenue =
+        currency === "VND"
+            ? Math.round(totalDisplay).toLocaleString("vi-VN")
+            : totalDisplay.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+              })
+
+    /* Split decimal for muted-decimal style (USD only — VND no decimals) */
+    const [wholeStr, decimalStr] =
+        currency === "USD" ? formattedRevenue.split(".") : [formattedRevenue, ""]
+
+    // [Sprint O audit-fix] Tooltip render fn memoized — avoid re-mount each render.
+    // Recharts re-renders Tooltip when content prop identity changes. useCallback
+    // re-creates only when currency or exchangeRate change.
+    const renderTooltip = useCallback(
+        ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
+            if (active && payload && payload.length) {
+                const rawVND = Number(payload[0].value ?? 0)
+                const display =
+                    currency === "VND"
+                        ? `${Math.round(rawVND).toLocaleString("vi-VN")} đ`
+                        : `$${(rawVND / Math.max(exchangeRate, 1)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                return (
+                    <div
+                        className="px-3.5 py-2.5 text-xs shadow-2xl"
+                        style={{
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            background: "#121016",
+                            border: "1px solid rgba(139,92,246,0.2)",
+                            borderRadius: 14,
+                        }}
+                    >
+                        <p style={{ color: "#A1A1AA", marginBottom: 4 }}>{label}</p>
+                        <p style={{ color: "#D8B4FE", fontWeight: 700 }}>{display}</p>
+                    </div>
+                )
+            }
+            return null
+        },
+        [currency, exchangeRate],
+    )
 
     return (
         <div
@@ -99,64 +123,71 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                         Revenue Overview
                     </span>
 
-                    {/* Value */}
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
-                        <span
-                            style={{
-                                fontSize: 32,
-                                fontWeight: 800,
-                                color: "#FFFFFF",
-                                lineHeight: 1.2,
-                            }}
-                        >
-                            ${wholeStr}
-                        </span>
-                        <span
-                            style={{
-                                fontSize: 32,
-                                fontWeight: 800,
-                                color: "#A1A1AA",
-                                lineHeight: 1.2,
-                            }}
-                        >
-                            .{decimalStr}
-                        </span>
+                    {/* Value — [Sprint O] VND/USD aware */}
+                    <div style={{ display: "flex", alignItems: "baseline", gap: currency === "USD" ? 0 : 6 }}>
+                        {currency === "USD" ? (
+                            <>
+                                <span
+                                    style={{
+                                        fontSize: 32,
+                                        fontWeight: 800,
+                                        color: "#FFFFFF",
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    ${wholeStr}
+                                </span>
+                                <span
+                                    style={{
+                                        fontSize: 32,
+                                        fontWeight: 800,
+                                        color: "#A1A1AA",
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    .{decimalStr}
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <span
+                                    style={{
+                                        fontSize: 32,
+                                        fontWeight: 800,
+                                        color: "#FFFFFF",
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    {wholeStr}
+                                </span>
+                                <span
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: 600,
+                                        color: "#A1A1AA",
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    đ
+                                </span>
+                            </>
+                        )}
                     </div>
 
-                    {/* Trend badge */}
-                    <div
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 5,
-                            background: "#211B31",
-                            borderRadius: 999,
-                            padding: "4px 10px",
-                            width: "fit-content",
-                        }}
-                    >
-                        <TrendingUp
-                            size={13}
-                            style={{
-                                color: "#D8B4FE",
-                                transform: up ? "none" : "scaleY(-1)",
-                            }}
-                        />
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#D8B4FE" }}>
-                            {pctRounded}% vs last week
-                        </span>
-                    </div>
-
-                    {/* Description */}
+                    {/* Description — [Sprint O] lifetime mirror of Finance page */}
                     <p style={{ fontSize: 13, color: "#A1A1AA", marginTop: 2, lineHeight: 1.5 }}>
-                        Revenue is maintaining a{" "}
-                        <span style={{ color: "#D8B4FE", fontWeight: 600 }}>steady growth</span>{" "}
-                        trend this week.
+                        Tổng doanh thu{" "}
+                        <span style={{ color: "#D8B4FE", fontWeight: 600 }}>workspace</span>{" "}
+                        (dự kiến toàn bộ task, mirror /admin/finance).
                     </p>
                 </div>
 
-                {/* Right: dropdown pill */}
-                <div
+                {/* Right: currency toggle — [Sprint O] click to switch VND ↔ USD */}
+                <button
+                    type="button"
+                    onClick={toggleCurrency}
+                    aria-label={`Toggle currency (current: ${currency})`}
+                    aria-pressed={currency === "USD"}
                     style={{
                         display: "flex",
                         alignItems: "center",
@@ -166,11 +197,21 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                         padding: "6px 12px",
                         cursor: "pointer",
                         flexShrink: 0,
+                        background: "transparent",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(139,92,246,0.06)"
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent"
                     }}
                 >
-                    <span style={{ fontSize: 12, color: "#A1A1AA", fontWeight: 500 }}>This week</span>
+                    <span style={{ fontSize: 12, color: "#A1A1AA", fontWeight: 500 }}>
+                        {currency}
+                    </span>
                     <ChevronDown size={14} style={{ color: "#A1A1AA" }} />
-                </div>
+                </button>
             </div>
 
             {/* ── Chart area ─────────────────────────────────────── */}
@@ -178,7 +219,7 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
                         <defs>
-                            <linearGradient id="neonPurpleGrad" x1="0" y1="0" x2="0" y2="1">
+                            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="rgba(139,92,246,0.25)" stopOpacity={1} />
                                 <stop offset="100%" stopColor="rgba(139,92,246,0)" stopOpacity={1} />
                             </linearGradient>
@@ -209,9 +250,19 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                             }}
                             axisLine={false}
                             tickLine={false}
+                            tickFormatter={(value: number) => {
+                                if (currency === "USD") {
+                                    const usd = value / Math.max(exchangeRate, 1)
+                                    if (usd >= 1000) return `$${(usd / 1000).toFixed(1)}k`
+                                    return `$${usd.toFixed(0)}`
+                                }
+                                if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+                                if (value >= 1_000) return `${(value / 1_000).toFixed(0)}k`
+                                return String(value)
+                            }}
                         />
 
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={renderTooltip} />
 
                         {/* Single line — Revenue only */}
                         <Area
@@ -219,7 +270,7 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                             dataKey="revenue"
                             stroke="#8B5CF6"
                             strokeWidth={2.5}
-                            fill="url(#neonPurpleGrad)"
+                            fill={`url(#${gradId})`}
                             dot={false}
                             activeDot={{
                                 r: 5,

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
+import { updateTaskStatus } from "@/actions/task-actions"
 import { toast } from "sonner"
 import { Dialog } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
@@ -29,6 +30,7 @@ if (typeof window !== 'undefined' && !globalThis.__taskDetailDompurifyLinkHookRe
 import { motion } from "framer-motion"
 import {
     X, Pencil, LayoutGrid, FolderOpen, StickyNote, ExternalLink, Check, Plus,
+    Lock, Play, Loader2,
 } from "lucide-react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 
@@ -391,6 +393,12 @@ interface TaskDetailModalProps {
     isAdmin: boolean
     bulkSelectedIds?: string[]
     workspaceId: string
+    /**
+     * Sprint M — viewer's user id. Required to gate non-admin task details
+     * behind a "Bắt đầu" button (assignee must explicitly start before reading).
+     * If omitted (admin views), gate is disabled — admin always sees full details.
+     */
+    currentUserId?: string
 }
 
 export function TaskDetailModal({
@@ -399,6 +407,7 @@ export function TaskDetailModal({
     onClose,
     isAdmin,
     workspaceId,
+    currentUserId,
 }: TaskDetailModalProps) {
     const [activeTab, setActiveTab] = useState<'main' | 'assets' | 'notes'>('main')
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
@@ -409,6 +418,13 @@ export function TaskDetailModal({
     const [editingFinance, setEditingFinance] = useState(false)
     const [editingNotes, setEditingNotes] = useState(false)
     const [savingCard, setSavingCard] = useState(false)
+
+    // [Sprint M] "Bắt đầu" gate — non-admin assignee must click before viewing details
+    const [starting, setStarting] = useState(false)
+
+    // [Sprint P GĐ4] Submit task — non-admin assignee paste productLink + click
+    // Submit → status Đang thực hiện → Revision, email tới admin assignedBy.
+    const [submitting, setSubmitting] = useState(false)
 
     // Drafts for cards in edit mode
     const [draftDelivery, setDraftDelivery] = useState('')
@@ -617,6 +633,69 @@ export function TaskDetailModal({
         setEditingNotes(true)
     }
 
+    /* ── [Sprint M] Start-task gate (non-admin assignee + status='Nhận task') ── */
+    const isLocked =
+        !isAdmin &&
+        !!currentUserId &&
+        localTask.assigneeId === currentUserId &&
+        (localTask.status === 'Nhận task' || localTask.status === 'Đã nhận task')
+
+    const handleStartTask = async () => {
+        if (starting) return
+        setStarting(true)
+        try {
+            const res = await updateTaskStatus(localTask.id, 'Đang thực hiện', workspaceId)
+            if (res?.success) {
+                toast.success('Đã bắt đầu task — chúc bạn làm việc hiệu quả!')
+                setLocalTask((prev) => (prev ? { ...prev, status: 'Đang thực hiện' } : prev))
+            } else {
+                toast.error(res?.error || 'Không thể bắt đầu task. Vui lòng thử lại.')
+            }
+        } catch {
+            toast.error('Không thể bắt đầu task. Vui lòng thử lại.')
+        } finally {
+            setStarting(false)
+        }
+    }
+
+    /* ── [Sprint P GĐ4] Submit task ──
+     * Non-admin assignee with status='Đang thực hiện' + productLink set →
+     * click Submit → status chuyển 'Revision', deadline cleared (Sprint A
+     * restrictedStatuses), email taskDelivered tới admin assignedBy.
+     * Server-side branch logic (task-actions.ts) tự detect isUserDelivery
+     * dựa trên (newStatus=Revision, oldStatus=Đang thực hiện, isAssignee, productLink).
+     */
+    const handleSubmitTask = async () => {
+        if (submitting) return
+        // Defensive UI guard — server cũng check productLink trước khi gửi taskDelivered
+        if (!form.productLink?.trim()) {
+            toast.error('Bạn cần dán link sản phẩm vào ô Delivery trước khi nộp.')
+            return
+        }
+        setSubmitting(true)
+        try {
+            const res = await updateTaskStatus(localTask.id, 'Revision', workspaceId)
+            if (res?.success) {
+                toast.success('Đã nộp bài — admin sẽ review sớm. Deadline đã được tạm dừng.')
+                setLocalTask((prev) => (prev ? { ...prev, status: 'Revision', deadline: null } : prev))
+            } else {
+                toast.error(res?.error || 'Không thể nộp task. Vui lòng thử lại.')
+            }
+        } catch {
+            toast.error('Không thể nộp task. Vui lòng thử lại.')
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    // [Sprint P GĐ4] Show Submit button: non-admin + status='Đang thực hiện' +
+    // viewer là assignee (Sprint M check).
+    const canSubmit =
+        !isAdmin &&
+        !!currentUserId &&
+        localTask.assigneeId === currentUserId &&
+        localTask.status === 'Đang thực hiện'
+
     /* ── Status info ── */
     const statusInfo = getStatusInfo(localTask.status)
 
@@ -694,6 +773,89 @@ export function TaskDetailModal({
                             </div>
                         </div>
 
+                        {/* [Sprint M] Locked state — non-admin assignee must click "Bắt đầu" first */}
+                        {isLocked ? (
+                            <div className="flex-1 flex items-center justify-center px-6 pb-6 pt-4 relative z-[1]">
+                                <div
+                                    className="w-full max-w-md mx-auto rounded-3xl p-8 flex flex-col items-center text-center"
+                                    style={{
+                                        background: 'rgba(139,92,246,0.04)',
+                                        border: '1px solid rgba(139,92,246,0.18)',
+                                        boxShadow: '0 24px 64px rgba(0,0,0,0.40)',
+                                    }}
+                                >
+                                    {/* Lock icon — pulse animation */}
+                                    <div className="relative mb-5">
+                                        <div
+                                            className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                                            style={{
+                                                background: 'rgba(139,92,246,0.12)',
+                                                border: '1px solid rgba(139,92,246,0.25)',
+                                            }}
+                                        >
+                                            <Lock className="w-7 h-7 text-violet-300" strokeWidth={1.8} />
+                                        </div>
+                                    </div>
+
+                                    <h3
+                                        className="text-[18px] font-extrabold text-white mb-2 tracking-tight"
+                                        style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                                    >
+                                        Bạn chưa bắt đầu task này
+                                    </h3>
+                                    <p className="text-[13px] text-zinc-400 mb-7 leading-relaxed max-w-xs">
+                                        Bấm <span className="text-violet-300 font-semibold">Bắt đầu</span> để xem chi tiết
+                                        và chính thức nhận task. Trạng thái sẽ chuyển sang{' '}
+                                        <span className="text-yellow-300 font-semibold">Progress</span>.
+                                    </p>
+
+                                    {/* Start button — big violet gradient with pulse ring */}
+                                    <button
+                                        type="button"
+                                        onClick={handleStartTask}
+                                        disabled={starting}
+                                        className="group relative inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-white font-bold transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                                        style={{
+                                            background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+                                            boxShadow: '0 12px 32px rgba(139,92,246,0.45)',
+                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                            fontSize: 14,
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (!starting) {
+                                                e.currentTarget.style.background = 'linear-gradient(135deg, #9D6FFF 0%, #8B5CF6 100%)'
+                                                e.currentTarget.style.boxShadow = '0 16px 40px rgba(139,92,246,0.60)'
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)'
+                                            e.currentTarget.style.boxShadow = '0 12px 32px rgba(139,92,246,0.45)'
+                                        }}
+                                    >
+                                        {starting ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Đang bắt đầu…
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Play className="w-4 h-4" strokeWidth={2.5} />
+                                                Bắt đầu
+                                            </>
+                                        )}
+                                        {/* Pulse ring */}
+                                        {!starting && (
+                                            <span className="absolute inset-0 rounded-full border-2 border-violet-400/40 animate-ping pointer-events-none" />
+                                        )}
+                                    </button>
+
+                                    <p className="text-[11px] text-zinc-500 mt-5">
+                                        Một khi bắt đầu, deadline sẽ được tính từ thời điểm này.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                          <>
                         {/* TAB NAV */}
                         <TabNav activeTab={activeTab} onChange={setActiveTab} />
 
@@ -929,6 +1091,54 @@ export function TaskDetailModal({
                                 </Card>
                             )}
                         </div>
+
+                        {/* [Sprint P GĐ4] Submit footer — non-admin assignee + 'Đang thực hiện'.
+                            Click → status Revision (deadline cleared), email tới admin assignedBy. */}
+                        {canSubmit && (
+                            <div
+                                className="flex items-center justify-between gap-3 px-6 py-4 border-t"
+                                style={{
+                                    borderColor: 'rgba(255,255,255,0.05)',
+                                    background: 'rgba(245,158,11,0.04)',
+                                }}
+                            >
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                    <p className="text-[12px] font-bold uppercase tracking-wide text-amber-300">
+                                        Sẵn sàng nộp bài?
+                                    </p>
+                                    <p className="text-[11px] text-zinc-500 truncate">
+                                        Đảm bảo bạn đã dán link sản phẩm vào ô Delivery.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmitTask}
+                                    disabled={submitting || !form.productLink?.trim()}
+                                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-white font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                                        boxShadow: '0 8px 20px rgba(245,158,11,0.35)',
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        fontSize: 13,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!submitting && form.productLink?.trim()) {
+                                            e.currentTarget.style.background =
+                                                'linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)'
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background =
+                                            'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                                    }}
+                                    title={!form.productLink?.trim() ? 'Cần dán link Delivery trước' : 'Nộp bài'}
+                                >
+                                    {submitting ? 'Đang nộp…' : 'Nộp bài'}
+                                </button>
+                            </div>
+                        )}
+                          </>
+                        )}
                     </motion.div>
                 </DialogPrimitive.Content>
             </DialogPrimitive.Portal>

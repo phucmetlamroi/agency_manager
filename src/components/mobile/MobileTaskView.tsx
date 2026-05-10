@@ -12,6 +12,7 @@ import PullToRefresh from './PullToRefresh'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
 import { TaskDrawer } from '@/components/mobile/TaskDrawer'
+import { PreStartBlockModal } from '@/components/tasks/PreStartBlockModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pause, CheckCircle2, Send, Play, Inbox } from 'lucide-react'
 import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
@@ -106,6 +107,9 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
 
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+
+    // [Sprint P GĐ2] Pre-start blocking popup — mobile parity với desktop.
+    const [preStartTask, setPreStartTask] = useState<TaskWithUser | null>(null)
     const [isHydrating, setIsHydrating] = useState(true)
 
     // Filter State
@@ -137,8 +141,10 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
     }
 
     const handleTaskClick = (task: TaskWithUser) => {
-        if (!isAdmin && task.status === 'Nhận task') {
-            toast.warning('🔒 Tap "Start" to unlock this task first.')
+        // [Sprint P GĐ2] Non-admin click task ở status 'Nhận task' / 'Đã nhận task'
+        // → mở PreStartBlockModal (BLOCKING popup) thay vì TaskDrawer.
+        if (!isAdmin && (task.status === 'Nhận task' || task.status === 'Đã nhận task')) {
+            setPreStartTask(task)
             return
         }
         setSelectedTask(task)
@@ -295,6 +301,19 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
                 users={users}
                 onStatusChange={handleStatusChangeFromDrawer}
                 onDelete={handleDelete}
+            />
+
+            {/* [Sprint P GĐ2] Pre-start blocking popup — mobile parity với desktop */}
+            <PreStartBlockModal
+                task={preStartTask}
+                isOpen={!!preStartTask}
+                workspaceId={workspaceId}
+                onClose={() => setPreStartTask(null)}
+                onStarted={(updatedTask) => {
+                    setPreStartTask(null)
+                    setSelectedTask(updatedTask)
+                    setIsDrawerOpen(true)
+                }}
             />
         </div>
     )

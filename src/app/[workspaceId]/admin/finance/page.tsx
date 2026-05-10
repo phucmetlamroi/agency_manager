@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
-import { getExchangeRate } from '@/lib/exchange-rate'
+import { computeWorkspaceFinance } from '@/lib/finance-helpers'
 import FinanceDashboardClient from '@/components/dashboard/FinanceDashboardClient'
 
 export default async function FinanceDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
@@ -28,42 +28,17 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
         )
     }
 
-    // Fetch current exchange rate
-    const exchangeRate = await getExchangeRate()
+    // [Sprint O] Compute aggregates via shared helper \u2014 guarantees parity with
+    // admin home dashboard's Gross Revenue + Revenue Overview cards.
+    // [Sprint O audit-fix] Reuse rawAllTasks from helper (already fetched +
+    // includes assignee) \u2014 avoids duplicate findMany previously here.
+    const finance = await computeWorkspaceFinance(workspaceId, profileId)
 
-    // Completed tasks
-    const tasks = await workspacePrisma.task.findMany({
-        where: { status: 'Ho\u00e0n t\u1ea5t' },
-        include: {
-            assignee: { select: { id: true, username: true, role: true, nickname: true } }
-        },
-        orderBy: { updatedAt: 'desc' }
-    })
-
-    // All tasks (for projections)
-    const allTasks = await workspacePrisma.task.findMany({
-        where: { isArchived: false },
-        include: {
-            assignee: { select: { id: true, username: true, role: true, nickname: true } }
-        },
-        orderBy: { updatedAt: 'desc' }
-    })
-
-    // Calculations
-    const totalRevenueVND = tasks.reduce((sum, t) => sum + (Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || exchangeRate)), 0)
-    const totalWageVND = tasks.reduce((sum, t) => sum + Number(t.wageVND || t.value || 0), 0)
-    const netProfit = totalRevenueVND - totalWageVND
-    const profitMargin = totalRevenueVND > 0 ? (netProfit / totalRevenueVND) * 100 : 0
-
-    const projectedRevenueVND = allTasks.reduce((sum, t) => sum + (Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || exchangeRate)), 0)
-    const projectedWageVND = allTasks.reduce((sum, t) => sum + Number(t.wageVND || t.value || 0), 0)
-    const projectedNetProfit = projectedRevenueVND - projectedWageVND
-    const projectedMargin = projectedRevenueVND > 0 ? (projectedNetProfit / projectedRevenueVND) * 100 : 0
-
-    // Build transactions for client
-    const transactions = allTasks.slice(0, 50).map(t => {
-        const rev = Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || exchangeRate)
-        const wage = Number(t.wageVND || t.value || 0)
+    const transactions = finance.rawAllTasks.slice(0, 50).map((t: any) => {
+        const rev = Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || finance.exchangeRate)
+        // [Sprint O audit-fix] Nullish coalescing — preserve legitimate
+        // wageVND=0 (pro-bono / free task) instead of falling back to `value`.
+        const wage = Number(t.wageVND ?? t.value ?? 0)
         return {
             id: t.id,
             title: t.title,
@@ -80,18 +55,18 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
     return (
         <FinanceDashboardClient
             data={{
-                totalRevenueVND,
-                totalWageVND,
-                netProfit,
-                profitMargin,
-                completedCount: tasks.length,
-                projectedRevenueVND,
-                projectedWageVND,
-                projectedNetProfit,
-                projectedMargin,
-                allTasksCount: allTasks.length,
-                pendingCount: allTasks.length - tasks.length,
-                exchangeRate,
+                totalRevenueVND: finance.totalRevenueVND,
+                totalWageVND: finance.totalWageVND,
+                netProfit: finance.netProfit,
+                profitMargin: finance.profitMargin,
+                completedCount: finance.completedCount,
+                projectedRevenueVND: finance.projectedRevenueVND,
+                projectedWageVND: finance.projectedWageVND,
+                projectedNetProfit: finance.projectedNetProfit,
+                projectedMargin: finance.projectedMargin,
+                allTasksCount: finance.allTasksCount,
+                pendingCount: finance.pendingCount,
+                exchangeRate: finance.exchangeRate,
                 transactions,
             }}
         />

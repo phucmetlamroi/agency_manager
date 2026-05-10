@@ -64,24 +64,67 @@ export const emailTemplates = {
         return wrapTemplate(content, `[New Task] Bạn được giao nhiệm vụ mới: ${taskTitle}`)
     },
 
-    // 2. Task Started (To Admin) -- Keeping existing logic as user didn't explicitly ask to change this one's text, but implied "Kịch bản 2" is Reviewing. 
-    // Wait, User Request Kich Ban 2 is "REVIEWING". Kich Ban 1 is Assign.
-    // User DID NOT mention "Start Task" email content in this request, but I should keep it functional.
-    // 2. Task Started (To Admin)
-    taskStarted: (userName: string, taskTitle: string, startTime: Date, taskId: string) => {
+    // 2. Task Started (To Admin who assigned the task)
+    // [Sprint P] Spec yêu cầu format mới:
+    //   Title: "[HustlyTasker] {Tên user} đã bắt đầu task"
+    //   Body: "{Tên user} đã bắt đầu thực hiện task {Tên task} của khách hàng
+    //          {Tên khách hàng} vào lúc {thời gian}."
+    // Signature changed: (userName, taskTitle, clientName, startTime).
+    // Recipient: ONLY admin who created/assigned the task (task.assignedBy.email).
+    // User KHÔNG nhận email này (bug cũ — task-actions.ts:164 hardcode env).
+    taskStarted: (userName: string, taskTitle: string, clientName: string, startTime: Date) => {
         const timeStr = new Date(startTime).toLocaleString('vi-VN')
-        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`
+        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin`
 
         const content = `
-            <p>Admin lưu ý,</p>
-            <p>Nhân viên <strong>${userName}</strong> vừa bấm bắt đầu làm việc vào lúc ${timeStr}.</p>
-            
+            <p>Xin chào,</p>
+            <p><strong>${userName}</strong> đã bắt đầu thực hiện task <strong>${taskTitle}</strong> của khách hàng <strong>${clientName}</strong> vào lúc ${timeStr}.</p>
+
             <div class="card">
+                <p><strong>Nhân viên:</strong> ${userName}</p>
                 <p><strong>Task:</strong> ${taskTitle}</p>
-                <p><strong>Link:</strong> <a href="${link}">${link}</a></p>
+                <p><strong>Khách hàng:</strong> ${clientName}</p>
+                <p><strong>Thời gian bắt đầu:</strong> ${timeStr}</p>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="${link}" class="btn">VÀO HỆ THỐNG XEM CHI TIẾT</a>
             </div>
         `
-        return wrapTemplate(content, `[STARTED] ${userName} đã bắt đầu task: ${taskTitle}`)
+        return wrapTemplate(content, `[HustlyTasker] ${userName} đã bắt đầu task`)
+    },
+
+    // 3. Task Delivered (To Admin who assigned the task)
+    // [Sprint P] User submitted productLink — task moved Đang thực hiện → Revision,
+    // deadline cleared. Admin được thông báo để review.
+    //   Title: "[HustlyTasker] {Tên user} đã nộp video cho task"
+    //   Body: "{Tên user} vừa nộp video cho task {Tên task} của khách hàng
+    //          {Tên khách hàng}. Link delivery: {link}. Vui lòng vào hệ thống để review."
+    // Recipient: ONLY admin assignedBy. User KHÔNG nhận.
+    taskDelivered: (userName: string, taskTitle: string, clientName: string, productLink: string) => {
+        const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin`
+        const safeProductLink = productLink && productLink.trim() ? productLink : '(Không có link)'
+
+        const content = `
+            <p>Xin chào,</p>
+            <p><strong>${userName}</strong> vừa nộp video cho task <strong>${taskTitle}</strong> của khách hàng <strong>${clientName}</strong>.</p>
+
+            <div class="card" style="border-left-color: #f59e0b; background-color: #fffbeb;">
+                <p><strong>Nhân viên:</strong> ${userName}</p>
+                <p><strong>Task:</strong> ${taskTitle}</p>
+                <p><strong>Khách hàng:</strong> ${clientName}</p>
+                <p><strong>Link delivery:</strong> ${productLink && productLink.startsWith('http')
+                    ? `<a href="${safeProductLink}" target="_blank" rel="noopener">${safeProductLink}</a>`
+                    : safeProductLink}</p>
+            </div>
+
+            <p>Vui lòng vào hệ thống để review.</p>
+
+            <div style="text-align: center;">
+                <a href="${link}" class="btn" style="background-color: #f59e0b;">VÀO REVIEW NGAY</a>
+            </div>
+        `
+        return wrapTemplate(content, `[HustlyTasker] ${userName} đã nộp video cho task`)
     },
 
     // [Sprint A removed] taskSubmitted (sent khi → 'Review') — status Review đã bỏ.

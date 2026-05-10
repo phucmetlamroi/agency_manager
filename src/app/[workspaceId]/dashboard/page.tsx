@@ -7,6 +7,7 @@ import { Settings2 } from 'lucide-react'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
 import { serializeDecimal } from '@/lib/serialization'
+import { sanitizeTaskListForUser } from '@/lib/task-sanitize'
 import { getAvailableProfiles } from '@/actions/profile-actions'
 
 import UserHomeTopBar from '@/components/dashboard/UserHomeTopBar'
@@ -78,7 +79,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
             .slice(0, 2) || 'US'
 
     // ── User's tasks (for widgets + TaskTable) ───────────────────
-    const tasks = await (workspacePrisma as any).task.findMany({
+    const rawTasks = await (workspacePrisma as any).task.findMany({
         where: { assigneeId: userId },
         include: {
             client: { include: { parent: true } },
@@ -95,6 +96,12 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
         },
         orderBy: { createdAt: 'desc' },
     })
+
+    // [Sprint J P0] Strip admin-only financial fields (jobPriceUSD, exchangeRate,
+    // profitVND) BEFORE passing to client. This /dashboard page is the USER view —
+    // global admin auto-routes to /admin per Sprint F.3. So `isAdmin = false` here
+    // is a hard rule: even global admins viewing /dashboard get the user view.
+    const tasks = sanitizeTaskListForUser(rawTasks, false)
 
     // ── Salary calc (this month vs last month) ───────────────────
     const now = new Date()

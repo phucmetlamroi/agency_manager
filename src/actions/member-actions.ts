@@ -196,8 +196,13 @@ export async function getWorkspaceMembers(workspaceId: string) {
         || access.workspaceRole === 'ADMIN'
 
     if (!isAdminOrAbove) {
+        // [Sprint J P0] Mask ALL emails (kể cả của caller chính họ) khi non-admin.
+        // Trước đây chỉ mask emails của other members → caller's own email vẫn lộ
+        // qua list. Vẫn là PII leak vì attacker control session có thể enumerate
+        // peer emails qua test cases khác. Strict policy: non-admin = không có
+        // email field nào trong response.
         for (const m of allMembers) {
-            if (m.user && m.user.id !== access.userId) {
+            if (m.user) {
                 m.user.email = null
             }
         }

@@ -817,12 +817,16 @@ export function TaskDetailModal({
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-col gap-2">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[12px] text-zinc-400">Client ($)</span>
-                                                        <span className="text-[14px] font-bold text-emerald-400">
-                                                            $ {Number(form.jobPriceUSD || 0).toLocaleString('en-US')}
-                                                        </span>
-                                                    </div>
+                                                    {/* [Sprint J P0] Client ($) = agency revenue. ADMIN-ONLY display.
+                                                        Non-admin (staff) chỉ thấy Staff (VND) — lương riêng của họ. */}
+                                                    {isAdmin && (
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[12px] text-zinc-400">Client ($)</span>
+                                                            <span className="text-[14px] font-bold text-emerald-400">
+                                                                $ {Number(form.jobPriceUSD || 0).toLocaleString('en-US')}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-[12px] text-zinc-400">Staff (VND)</span>
                                                         <span className="text-[14px] font-bold text-zinc-200">

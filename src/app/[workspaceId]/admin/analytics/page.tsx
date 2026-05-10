@@ -1,14 +1,21 @@
-import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import AnalyticsTable from '@/components/admin/analytics/AnalyticsTable'
 import { getAnalyticsData } from '@/actions/analytics-actions'
 import LivePresenceBoard from '@/components/admin/analytics/LivePresenceBoard'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 export default async function AdminAnalyticsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
-    const session = await getSession()
-    if (!session?.user || session.user.role !== 'ADMIN') redirect('/login')
-
     const { workspaceId } = await params
+
+    // [Sprint J P0] Workspace-scoped guard. Trước đây chỉ check global ADMIN —
+    // global admin của workspace A nhưng MEMBER ở workspace B vẫn vào được
+    // analytics workspace B nếu navigate URL trực tiếp. Giờ verify workspace
+    // role 'ADMIN' (OWNER/ADMIN/global admin/treasurer đều pass).
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    } catch {
+        redirect(`/${workspaceId}/dashboard`)
+    }
 
     const analyticsData = await getAnalyticsData(workspaceId)
 

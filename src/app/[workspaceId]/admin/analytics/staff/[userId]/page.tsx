@@ -3,14 +3,22 @@ import { redirect } from 'next/navigation'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { getUserPerformanceScore, getStaffErrorLogsDetail } from '@/actions/analytics-actions'
 import StaffErrorDetail from '@/components/admin/analytics/StaffErrorDetail'
+import { verifyWorkspaceAccess } from '@/lib/security'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
 export default async function StaffAnalyticsDetailPage({ params }: { params: Promise<{ workspaceId: string, userId: string }> }) {
-    const session = await getSession()
-    if (!session?.user || session.user.role !== 'ADMIN') redirect('/login')
-
     const { workspaceId, userId } = await params
+
+    // [Sprint J P0] Workspace-scoped guard — replace global-only check.
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    } catch {
+        redirect(`/${workspaceId}/dashboard`)
+    }
+
+    const session = await getSession()
+    if (!session?.user) redirect('/login')
 
     const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
     

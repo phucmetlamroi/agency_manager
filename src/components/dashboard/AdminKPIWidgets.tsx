@@ -124,6 +124,7 @@ function CurrencyToggle({
             type="button"
             onClick={onToggle}
             aria-label={`Toggle currency (current: ${currency})`}
+            aria-pressed={currency === "USD"}
             className="inline-flex items-center gap-1.5 text-[13px] font-medium px-3 py-1 rounded-[20px] transition-colors duration-150"
             style={{
                 border: "1px solid rgba(139,92,246,0.15)",

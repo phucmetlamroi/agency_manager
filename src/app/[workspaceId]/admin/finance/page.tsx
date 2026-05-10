@@ -30,19 +30,11 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
 
     // [Sprint O] Compute aggregates via shared helper \u2014 guarantees parity with
     // admin home dashboard's Gross Revenue + Revenue Overview cards.
+    // [Sprint O audit-fix] Reuse rawAllTasks from helper (already fetched +
+    // includes assignee) \u2014 avoids duplicate findMany previously here.
     const finance = await computeWorkspaceFinance(workspaceId, profileId)
 
-    // Transactions list still inline \u2014 only Finance page needs detail rows.
-    const allTasks = await workspacePrisma.task.findMany({
-        where: { isArchived: false },
-        include: {
-            assignee: { select: { id: true, username: true, role: true, nickname: true } }
-        },
-        orderBy: { updatedAt: 'desc' },
-        take: 50,
-    })
-
-    const transactions = allTasks.map((t: any) => {
+    const transactions = finance.rawAllTasks.slice(0, 50).map((t: any) => {
         const rev = Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || finance.exchangeRate)
         const wage = Number(t.wageVND || t.value || 0)
         return {

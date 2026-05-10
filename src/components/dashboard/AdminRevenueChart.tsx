@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useId, useState } from "react"
 import { ChevronDown } from "lucide-react"
 import {
     AreaChart,
@@ -30,38 +30,14 @@ interface Props {
     exchangeRate: number
 }
 
-/* -- Custom tooltip — Neon Purple Dark ----------------------------------- */
-
-function makeCustomTooltip(currency: "VND" | "USD", exchangeRate: number) {
-    return function CustomTooltip({ active, payload, label }: TooltipProps<ValueType, NameType>) {
-        if (active && payload && payload.length) {
-            const rawVND = Number(payload[0].value ?? 0)
-            const display =
-                currency === "VND"
-                    ? `${Math.round(rawVND).toLocaleString("vi-VN")} đ`
-                    : `$${(rawVND / Math.max(exchangeRate, 1)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-            return (
-                <div
-                    className="px-3.5 py-2.5 text-xs shadow-2xl"
-                    style={{
-                        fontFamily: "'Plus Jakarta Sans', sans-serif",
-                        background: "#121016",
-                        border: "1px solid rgba(139,92,246,0.2)",
-                        borderRadius: 14,
-                    }}
-                >
-                    <p style={{ color: "#A1A1AA", marginBottom: 4 }}>{label}</p>
-                    <p style={{ color: "#D8B4FE", fontWeight: 700 }}>{display}</p>
-                </div>
-            )
-        }
-        return null
-    }
-}
-
 /* -- Main export --------------------------------------------------------- */
 
 export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props) {
+    // [Sprint O audit-fix] useId for gradient — collision-safe if multiple
+    // AdminRevenueChart instances render on same page in future.
+    const uid = useId()
+    const gradId = `revGrad-${uid}`
+
     // [Sprint O] Currency toggle state — default VND
     const [currency, setCurrency] = useState<"VND" | "USD">("VND")
     const toggleCurrency = () =>
@@ -84,7 +60,36 @@ export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props
     const [wholeStr, decimalStr] =
         currency === "USD" ? formattedRevenue.split(".") : [formattedRevenue, ""]
 
-    const CustomTooltip = makeCustomTooltip(currency, exchangeRate)
+    // [Sprint O audit-fix] Tooltip render fn memoized — avoid re-mount each render.
+    // Recharts re-renders Tooltip when content prop identity changes. useCallback
+    // re-creates only when currency or exchangeRate change.
+    const renderTooltip = useCallback(
+        ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
+            if (active && payload && payload.length) {
+                const rawVND = Number(payload[0].value ?? 0)
+                const display =
+                    currency === "VND"
+                        ? `${Math.round(rawVND).toLocaleString("vi-VN")} đ`
+                        : `$${(rawVND / Math.max(exchangeRate, 1)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                return (
+                    <div
+                        className="px-3.5 py-2.5 text-xs shadow-2xl"
+                        style={{
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            background: "#121016",
+                            border: "1px solid rgba(139,92,246,0.2)",
+                            borderRadius: 14,
+                        }}
+                    >
+                        <p style={{ color: "#A1A1AA", marginBottom: 4 }}>{label}</p>
+                        <p style={{ color: "#D8B4FE", fontWeight: 700 }}>{display}</p>
+                    </div>
+                )
+            }
+            return null
+        },
+        [currency, exchangeRate],
+    )
 
     return (
         <div
@@ -182,6 +187,7 @@ export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props
                     type="button"
                     onClick={toggleCurrency}
                     aria-label={`Toggle currency (current: ${currency})`}
+                    aria-pressed={currency === "USD"}
                     style={{
                         display: "flex",
                         alignItems: "center",
@@ -213,7 +219,7 @@ export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
                         <defs>
-                            <linearGradient id="neonPurpleGrad" x1="0" y1="0" x2="0" y2="1">
+                            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="rgba(139,92,246,0.25)" stopOpacity={1} />
                                 <stop offset="100%" stopColor="rgba(139,92,246,0)" stopOpacity={1} />
                             </linearGradient>
@@ -256,7 +262,7 @@ export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props
                             }}
                         />
 
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={renderTooltip} />
 
                         {/* Single line — Revenue only */}
                         <Area
@@ -264,7 +270,7 @@ export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props
                             dataKey="revenue"
                             stroke="#8B5CF6"
                             strokeWidth={2.5}
-                            fill="url(#neonPurpleGrad)"
+                            fill={`url(#${gradId})`}
                             dot={false}
                             activeDot={{
                                 r: 5,

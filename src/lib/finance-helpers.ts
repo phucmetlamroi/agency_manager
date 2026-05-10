@@ -32,6 +32,11 @@ export interface WorkspaceFinanceData {
 
     // Convert helper
     exchangeRate: number
+
+    // Raw lists — callers that need transactions/details reuse instead of
+    // re-querying (avoids duplicate findMany on hot paths).
+    rawAllTasks: any[]
+    rawCompletedTasks: any[]
 }
 
 export async function computeWorkspaceFinance(
@@ -41,9 +46,20 @@ export async function computeWorkspaceFinance(
     const wsPrisma = getWorkspacePrisma(workspaceId, profileId)
     const exchangeRate = await getExchangeRate()
 
+    // [Sprint O audit-fix] Include assignee here so Finance page transactions
+    // list can reuse this result without a 3rd query. Admin home dashboard
+    // ignores the include (only sums numbers).
     const [completedTasks, allTasks] = await Promise.all([
-        wsPrisma.task.findMany({ where: { status: 'Hoàn tất' } }),
-        wsPrisma.task.findMany({ where: { isArchived: false } }),
+        wsPrisma.task.findMany({
+            where: { status: 'Hoàn tất' },
+            include: { assignee: { select: { id: true, username: true, role: true, nickname: true } } },
+            orderBy: { updatedAt: 'desc' },
+        }),
+        wsPrisma.task.findMany({
+            where: { isArchived: false },
+            include: { assignee: { select: { id: true, username: true, role: true, nickname: true } } },
+            orderBy: { updatedAt: 'desc' },
+        }),
     ])
 
     const totalRevenueVND = completedTasks.reduce(
@@ -82,5 +98,7 @@ export async function computeWorkspaceFinance(
         pendingCount: allTasks.length - completedTasks.length,
         allTasksCount: allTasks.length,
         exchangeRate,
+        rawAllTasks: allTasks,
+        rawCompletedTasks: completedTasks,
     }
 }

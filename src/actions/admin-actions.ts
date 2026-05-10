@@ -9,6 +9,7 @@ import { getSession } from '@/lib/auth'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { audit } from '@/lib/audit-log'
 
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
@@ -113,11 +114,27 @@ export async function createTask(formData: FormData, workspaceId: string) {
                 wageVND,
                 exchangeRate,
                 profitVND,
-                clientId
+                clientId,
+
+                // [Sprint P] Track admin who assigned this task \u2014 used by email +
+                // in-app notification routing in updateTaskStatus.
+                assignedById: session?.user?.id || null,
             }
         })
 
-        // Notify assignee via email + in-app notification
+        // [Sprint P] Audit log: task.assigned (G\u01101 \u2014 admin t\u1ea1o + assign)
+        if (session?.user?.id) {
+            void audit({
+                workspaceId,
+                actorUserId: session.user.id,
+                action: 'task.assigned',
+                targetType: 'Task',
+                targetId: task.id,
+                after: { title, assigneeId, status: task.status },
+            })
+        }
+
+        // Notify assignee via email + in-app notification (G\u01101 spec)
         if (assigneeId && session?.user?.id) {
             const actorId = session.user.id
             const actor = await prisma.user.findUnique({
@@ -128,6 +145,7 @@ export async function createTask(formData: FormData, workspaceId: string) {
 
             void (async () => {
                 try {
+                    // In-app notification
                     const notif = await createNotificationInternal({
                         userId: assigneeId,
                         type: 'TASK_ASSIGNED',
@@ -152,8 +170,27 @@ export async function createTask(formData: FormData, workspaceId: string) {
                         createdAt: notif.createdAt.toISOString(),
                         isRead: false,
                     })
+
+                    // [Sprint P] Email to assignee \u2014 G\u01101 (taskAssigned template)
+                    const assignee = await prisma.user.findUnique({
+                        where: { id: assigneeId },
+                        select: { email: true, username: true, nickname: true },
+                    }).catch(() => null)
+                    if (assignee?.email) {
+                        const { sendEmail } = await import('@/lib/email')
+                        const { emailTemplates } = await import('@/lib/email-templates')
+                        const userName = assignee.nickname || assignee.username || 'b\u1ea1n'
+                        const html = emailTemplates.taskAssigned(
+                            userName,
+                            title,
+                            task.deadline,
+                            task.id,
+                        )
+                        const subject = `[New Task] B\u1ea1n \u0111\u01b0\u1ee3c giao nhi\u1ec7m v\u1ee5 m\u1edbi: ${title}`
+                        await sendEmail({ to: assignee.email, subject, html })
+                    }
                 } catch (err) {
-                    console.error('[createTask] notification error:', err)
+                    console.error('[createTask] notification/email error:', err)
                 }
             })()
         }

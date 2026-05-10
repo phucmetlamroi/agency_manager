@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { TaskDetailModal } from "@/components/tasks/TaskDetailModal"
+import { PreStartBlockModal } from "@/components/tasks/PreStartBlockModal"
 import { Search, Filter, ChevronLeft, ChevronRight, CalendarDays, MoreHorizontal } from "lucide-react"
 import { formatClientHierarchy } from "@/lib/client-hierarchy"
 import {
@@ -89,6 +90,24 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: 
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
+
+    // [Sprint P GĐ2] Pre-start block popup — khi user click task ở status
+    // 'Nhận task' / 'Đã nhận task', hiện popup BLOCKING thay vì TaskDetailModal.
+    // User phải bấm "Bắt đầu" → status chuyển sang 'Đang thực hiện' → unlock.
+    const [preStartTask, setPreStartTask] = useState<TaskWithUser | null>(null)
+
+    /**
+     * [Sprint P] Row click handler — route theo status:
+     *  - status = 'Nhận task' / 'Đã nhận task' → PreStartBlockModal (block)
+     *  - other statuses → TaskDetailModal (full chi tiết)
+     */
+    const handleRowOpen = (task: TaskWithUser) => {
+        if (task.status === 'Nhận task' || task.status === 'Đã nhận task') {
+            setPreStartTask(task)
+        } else {
+            setSelectedTask(task)
+        }
+    }
 
     // External search event from UserHomeTopBar
     useEffect(() => {
@@ -343,7 +362,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: 
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.background = isOddRow ? NP.surfaceAlt : NP.surface
                             }}
-                            onClick={() => setSelectedTask(task)}
+                            onClick={() => handleRowOpen(task)}
                         >
                             {/* Task Name */}
                             <div className="min-w-0">
@@ -493,7 +512,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: 
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => setSelectedTask(task)}>
+                                        <DropdownMenuItem onClick={() => handleRowOpen(task)}>
                                             View details
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
@@ -590,9 +609,23 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: 
                 )}
             </div>
 
+            {/* [Sprint P GĐ2] Pre-start blocking popup — khi user click task ở
+                status 'Nhận task' / 'Đã nhận task', hiện popup BLOCKING thay vì
+                TaskDetailModal. Sprint M in-modal gate giữ làm defense-in-depth. */}
+            <PreStartBlockModal
+                task={preStartTask}
+                isOpen={!!preStartTask}
+                workspaceId={workspaceId}
+                onClose={() => setPreStartTask(null)}
+                onStarted={(updatedTask) => {
+                    setPreStartTask(null)
+                    setSelectedTask(updatedTask)  // open detail modal with new status
+                }}
+            />
+
             {/* Task detail modal — read-only for user.
-                [Sprint M] currentUserId enables "Bắt đầu" gate: assignee with
-                status='Nhận task' must click Start before viewing details. */}
+                [Sprint M] currentUserId enables "Bắt đầu" gate fallback: assignee
+                with status='Nhận task' (e.g. via direct URL) sees in-modal lock. */}
             <TaskDetailModal
                 task={selectedTask}
                 isOpen={!!selectedTask}

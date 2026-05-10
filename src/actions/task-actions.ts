@@ -8,6 +8,7 @@ import { getCurrentUser } from '@/lib/auth-guard'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
+import { audit } from '@/lib/audit-log'
 
 // Note (Sprint A simplification): bỏ parameter `feedbackData` (Feedback model
 // đã DROP). Backward-compat: caller cũ (nếu còn) vẫn gọi được, parameter
@@ -30,7 +31,19 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
                         nickname: true,
                         email: true
                     }
-                }
+                },
+                // [Sprint P] Need assignedBy (admin who created task) for email
+                // routing — email tới admin khi user start/deliver, KHÔNG gửi user.
+                assignedBy: {
+                    select: {
+                        id: true,
+                        username: true,
+                        nickname: true,
+                        email: true,
+                    }
+                },
+                // [Sprint P] Need client.name cho email body template (GĐ3 + GĐ4).
+                client: { select: { name: true } },
             }
         })
 
@@ -113,6 +126,7 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         }
 
         // Fetch updated task for Emails & Return
+        // [Sprint P] include assignedBy + client for new email routing logic.
         const updatedTaskResult = await workspacePrisma.task.findUnique({
             where: { id },
             include: {
@@ -124,119 +138,184 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
                         nickname: true,
                         email: true
                     }
-                }
+                },
+                assignedBy: {
+                    select: {
+                        id: true,
+                        username: true,
+                        nickname: true,
+                        email: true,
+                    }
+                },
+                client: { select: { name: true } },
             }
         })
 
         if (!updatedTaskResult) return { error: 'Error fetching updated task' }
 
-        // --- EMAIL TRIGGERS ---
-        console.log(`[Email Debug] Status changed to: ${newStatus}`)
+        // --- [Sprint P] EMAIL + IN-APP NOTIFICATION ROUTING ---
+        // Branch theo (newStatus, oldStatus, actor):
+        //   GĐ3: user start (Nhận task → Đang thực hiện by assignee) → email + notif tới assignedBy admin
+        //   GĐ4: user delivery (Đang thực hiện → Revision by assignee + productLink) → email + notif tới assignedBy admin
+        //   Admin resume (Revision → Đang thực hiện): email user (feedback resolution)
+        //   Admin reject (X → Revision by admin actor): email user (taskFeedback)
+        //   Admin complete (X → Hoàn tất): email user (taskCompleted)
+        //
+        // Nguyên tắc: hành động của ai → KHÔNG gửi cho chính họ.
+        const oldStatus = task.status
+        const isAssignee = user.id === task.assigneeId
+        const isUserStart = newStatus === 'Đang thực hiện'
+            && isAssignee
+            && (oldStatus === 'Nhận task' || oldStatus === 'Đã nhận task')
+        const isUserDelivery = newStatus === 'Revision'
+            && isAssignee
+            && oldStatus === 'Đang thực hiện'
+            && !!updatedTaskResult.productLink?.trim()
+        const isAdminResume = newStatus === 'Đang thực hiện' && oldStatus === 'Revision'
+        const isAdminReject = newStatus === 'Revision' && !isUserDelivery
+        const isComplete = newStatus === 'Hoàn tất'
+
+        console.log(`[Email] ${oldStatus} → ${newStatus}, actor=${user.id}, assignee=${task.assigneeId}, isUserStart=${isUserStart}, isUserDelivery=${isUserDelivery}`)
+
+        const userName = updatedTaskResult.assignee?.nickname || updatedTaskResult.assignee?.username || 'User'
+        const clientName = updatedTaskResult.client?.name || '—'
 
         try {
             const { sendEmail } = await import('@/lib/email')
             const { emailTemplates } = await import('@/lib/email-templates')
 
-                // FIRE-AND-FORGET EMAIL LOGIC (Non-blocking)
-                // We do NOT await this block to ensure UI is snappy
-                ; (async () => {
-                    try {
-                        // TRIGGER 2 & 2b: Employee Started Task OR Admin Resumed form Revision
-                        if (newStatus === 'Đang thực hiện' && updatedTaskResult.assignee) {
-                            // Check if we are resuming from Revision (Admin action "Đã FB")
-                            if (task.status === 'Revision') {
-                                // Notify User that they can continue
-                                if (updatedTaskResult.assignee.email) {
-                                    console.log(`[Email Debug] Triggering 'Feedback Resolved' email to ${updatedTaskResult.assignee.email}`)
-                                    await sendEmail({
-                                        to: updatedTaskResult.assignee.email,
-                                        subject: `[Update] Admin đã phản hồi task: ${updatedTaskResult.title}`,
-                                        html: emailTemplates.taskFeedback(
-                                            updatedTaskResult.assignee.username || 'User',
-                                            updatedTaskResult.title,
-                                            newNotes || "Admin đã hoàn tất feedback/check frame. Bạn có thể tiếp tục công việc." // Generic message since we don't have input
-                                        )
-                                    })
-                                }
-                            } else {
-                                // Normal Start (Notify Admin Fixed Email)
-                                // FALLBACK: If env is missing, use hardcoded email to ensure delivery for testing
-                                const adminEmail = process.env.ADMIN_EMAIL || process.env.RESEND_FROM_EMAIL || 'mullerjohannes762@gmail.com'
-
-                                console.log(`[Email Debug] START TASK DETECTED. Target Admin: ${adminEmail}`)
-
-                                if (adminEmail) {
-                                    try {
-                                        await sendEmail({
-                                            to: adminEmail,
-                                            subject: `[STARTED] ${updatedTaskResult.assignee.username} đã bắt đầu task: ${updatedTaskResult.title}`,
-                                            html: emailTemplates.taskStarted(
-                                                updatedTaskResult.assignee.nickname || updatedTaskResult.assignee.username, // Use Nickname
-                                                updatedTaskResult.title,
-                                                new Date(),
-                                                updatedTaskResult.id
-                                            )
-                                        })
-                                        console.log('[Email Debug] Start Email SENT successfully.')
-                                    } catch (err) {
-                                        console.error('[Email Debug] FAILED to send Start Email:', err)
-                                    }
-                                } else {
-                                    console.error('[Email Debug] Critical: No Admin Email found.')
-                                }
-                            }
-                        }
-
-                        // [REMOVED Sprint A] TRIGGER 2 'Review' email — status Review đã bỏ
-                        // User submit giờ đi thẳng Revision (không qua Review intermediate).
-
-                        // TRIGGER 3: Feedback / Revision (To User)
-                        if (newStatus === 'Revision') {
-                            if (updatedTaskResult.assignee?.email) {
-                                console.log(`[Email Debug] Triggering Feedback email to ${updatedTaskResult.assignee.email}`)
-                                await sendEmail({
-                                    to: updatedTaskResult.assignee.email,
-                                    subject: `[Action Required] Admin đã gửi Feedback cho task: ${updatedTaskResult.title}`,
-                                    html: emailTemplates.taskFeedback(
-                                        updatedTaskResult.assignee.username || 'User',
-                                        updatedTaskResult.title,
-                                        newNotes || updatedTaskResult.notes_vi || 'Vui lòng kiểm tra chi tiết trên hệ thống.'
-                                    )
-                                })
-                            } else {
-                                console.log('[Email Debug] Skipped Feedback email: Assignee has no email.')
-                            }
-                        }
-
-                        // TRIGGER 4: Completed (To User)
-                        if (newStatus === 'Hoàn tất') {
-                            if (updatedTaskResult.assignee?.email) {
-                                console.log(`[Email Debug] Triggering Completed email to ${updatedTaskResult.assignee.email}`)
-                                // NOTE: Removed [Approved] prefix as per User Request "Tiêu đề: [Success]..."
-                                await sendEmail({
-                                    to: updatedTaskResult.assignee.email,
-                                    subject: `[Success] Chúc mừng! Task "${updatedTaskResult.title}" đã hoàn thành 🎉`,
-                                    html: emailTemplates.taskCompleted(
-                                        updatedTaskResult.assignee.username || 'User',
-                                        updatedTaskResult.title,
-                                        Number(updatedTaskResult.wageVND || 0)
-                                    )
-                                })
-                            } else {
-                                console.log('[Email Debug] Skipped Completed email: Assignee has no email.')
-                            }
-                        }
-                    } catch (emailErr) {
-                        console.error('[Email Debug] Error in email logic (Async):', emailErr)
+            // FIRE-AND-FORGET (non-blocking — UI snappy)
+            void (async () => {
+                try {
+                    // ── GĐ3: User Start → email assignedBy admin ──
+                    if (isUserStart && updatedTaskResult.assignedBy?.email) {
+                        await sendEmail({
+                            to: updatedTaskResult.assignedBy.email,
+                            subject: `[HustlyTasker] ${userName} đã bắt đầu task`,
+                            html: emailTemplates.taskStarted(
+                                userName,
+                                updatedTaskResult.title,
+                                clientName,
+                                new Date(),
+                            ),
+                        })
+                        console.log(`[Email] GĐ3 START → admin ${updatedTaskResult.assignedBy.email}`)
+                    } else if (isUserStart && !updatedTaskResult.assignedBy?.email) {
+                        console.warn(`[Email] GĐ3 SKIPPED: legacy task no assignedBy.email (taskId=${id})`)
                     }
-                })()
+
+                    // ── GĐ4: User Delivery → email assignedBy admin (taskDelivered) ──
+                    if (isUserDelivery && updatedTaskResult.assignedBy?.email) {
+                        await sendEmail({
+                            to: updatedTaskResult.assignedBy.email,
+                            subject: `[HustlyTasker] ${userName} đã nộp video cho task`,
+                            html: emailTemplates.taskDelivered(
+                                userName,
+                                updatedTaskResult.title,
+                                clientName,
+                                updatedTaskResult.productLink || '',
+                            ),
+                        })
+                        console.log(`[Email] GĐ4 DELIVERY → admin ${updatedTaskResult.assignedBy.email}`)
+                    } else if (isUserDelivery && !updatedTaskResult.assignedBy?.email) {
+                        console.warn(`[Email] GĐ4 SKIPPED: legacy task no assignedBy.email (taskId=${id})`)
+                    }
+
+                    // ── Admin Resume (Revision → Đang thực hiện) → email user ──
+                    if (isAdminResume && updatedTaskResult.assignee?.email) {
+                        await sendEmail({
+                            to: updatedTaskResult.assignee.email,
+                            subject: `[Update] Admin đã phản hồi task: ${updatedTaskResult.title}`,
+                            html: emailTemplates.taskFeedback(
+                                updatedTaskResult.assignee.username || 'User',
+                                updatedTaskResult.title,
+                                newNotes || 'Admin đã hoàn tất feedback. Bạn có thể tiếp tục công việc.',
+                            ),
+                        })
+                    }
+
+                    // ── Admin Reject → email user (taskFeedback). KHÔNG fire khi isUserDelivery (đã handled above) ──
+                    if (isAdminReject && !isUserDelivery && updatedTaskResult.assignee?.email) {
+                        await sendEmail({
+                            to: updatedTaskResult.assignee.email,
+                            subject: `[Action Required] Admin đã gửi Feedback cho task: ${updatedTaskResult.title}`,
+                            html: emailTemplates.taskFeedback(
+                                updatedTaskResult.assignee.username || 'User',
+                                updatedTaskResult.title,
+                                newNotes || updatedTaskResult.notes_vi || 'Vui lòng kiểm tra chi tiết trên hệ thống.',
+                            ),
+                        })
+                    }
+
+                    // ── Admin Complete → email user ──
+                    if (isComplete && updatedTaskResult.assignee?.email) {
+                        await sendEmail({
+                            to: updatedTaskResult.assignee.email,
+                            subject: `[Success] Chúc mừng! Task "${updatedTaskResult.title}" đã hoàn thành 🎉`,
+                            html: emailTemplates.taskCompleted(
+                                updatedTaskResult.assignee.username || 'User',
+                                updatedTaskResult.title,
+                                Number(updatedTaskResult.wageVND || 0),
+                            ),
+                        })
+                    }
+                } catch (emailErr) {
+                    console.error('[Email] Async block error:', emailErr)
+                }
+            })()
         } catch (err) {
-            console.error('[Email Debug] Failed to load email module:', err)
+            console.error('[Email] Failed to load email module:', err)
         }
 
         // -----------------------
-        // NOTIFICATION FAN-OUT (in-app)
-        // Notify the assignee (if not the actor) that their task changed status.
+        // [Sprint P] IN-APP NOTIFICATION ROUTING
+        // GĐ3 + GĐ4: notify assignedBy admin (NEW — pre-Sprint-P chỉ notify
+        // assignee). Existing notifyTaskStatusChanged đã skip self-notify khi
+        // actor === assignee → admin reject + admin complete vẫn notify user OK.
+        const adminRecipientId = updatedTaskResult.assignedById
+        if ((isUserStart || isUserDelivery) && adminRecipientId
+            && adminRecipientId !== user.id) {
+            void (async () => {
+                try {
+                    const notifType = isUserStart ? 'TASK_STARTED' : 'TASK_DELIVERED'
+                    const notifTitle = isUserStart ? `${userName} đã bắt đầu task` : `${userName} đã nộp video cho task`
+                    const notifBody = isUserStart
+                        ? `${userName} bắt đầu task "${updatedTaskResult.title}" của khách ${clientName}`
+                        : `${userName} đã nộp link cho task "${updatedTaskResult.title}" của khách ${clientName}`
+
+                    const notif = await createNotificationInternal({
+                        userId: adminRecipientId,
+                        type: notifType as any,
+                        title: notifTitle,
+                        body: notifBody,
+                        taskId: updatedTaskResult.id,
+                        actorId: user.id,
+                        metadata: { taskTitle: updatedTaskResult.title, clientName },
+                    })
+                    if (notif) {
+                        void broadcastNotificationToUser(adminRecipientId, {
+                            id: notif.id,
+                            type: notif.type,
+                            title: notif.title,
+                            body: notif.body,
+                            avatarUrl: notif.avatarUrl,
+                            conversationId: notif.conversationId,
+                            messageId: notif.messageId,
+                            taskId: notif.taskId,
+                            actorId: notif.actorId,
+                            metadata: notif.metadata,
+                            createdAt: notif.createdAt.toISOString(),
+                            isRead: false,
+                        })
+                    }
+                } catch (notifErr) {
+                    console.error('[Notif] Admin notify error:', notifErr)
+                }
+            })()
+        }
+
+        // Existing assignee notify — fires for admin actions (reject/resume/complete)
+        // Auto-skip when actor === assignee (line 268 of notifyTaskStatusChanged).
         void notifyTaskStatusChanged(
             updatedTaskResult.id,
             updatedTaskResult.title,
@@ -245,6 +324,39 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             task.status,
             newStatus,
         ).catch(() => {/* swallow */})
+
+        // [Sprint P] Audit log: track 4 lifecycle transitions for forensics
+        if (isUserStart) {
+            void audit({
+                workspaceId,
+                actorUserId: user.id,
+                action: 'task.started',
+                targetType: 'Task',
+                targetId: id,
+                before: { status: oldStatus },
+                after: { status: newStatus },
+            })
+        } else if (isUserDelivery) {
+            void audit({
+                workspaceId,
+                actorUserId: user.id,
+                action: 'task.delivered',
+                targetType: 'Task',
+                targetId: id,
+                before: { status: oldStatus },
+                after: { status: newStatus, productLink: updatedTaskResult.productLink },
+            })
+        } else if (isComplete) {
+            void audit({
+                workspaceId,
+                actorUserId: user.id,
+                action: 'task.completed',
+                targetType: 'Task',
+                targetId: id,
+                before: { status: oldStatus },
+                after: { status: newStatus },
+            })
+        }
 
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/dashboard`)

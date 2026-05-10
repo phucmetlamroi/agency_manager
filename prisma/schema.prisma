@@ -150,6 +150,9 @@ model User {
   payrolls          Payroll[]
   metrics           PerformanceMetric[]
   tasks             Task[]              @relation("AssigneeTasks")
+  // [Sprint P] Reverse relation for Task.assignedBy — track tasks user has
+  // assigned to others (admin role). Used by email + notif routing.
+  tasksAssignedBy   Task[]              @relation("TaskAssigner")
 
   agency                 Agency?                 @relation("AgencyMembers", fields: [agencyId], references: [id])
   workspaces             WorkspaceMember[]
@@ -306,8 +309,17 @@ model Task {
   rating           Rating?
   conversation     Conversation?
 
+  // [Sprint P] Track admin who assigned/created the task. Used for email +
+  // in-app notification routing — when user starts/delivers a task, the
+  // ASSIGNER (assignedBy) gets notified, not the user themselves.
+  // Backward compat: nullable + onDelete: SetNull. Tasks created before
+  // migration get backfilled to workspace OWNER.
+  assignedById     String?
+  assignedBy       User?             @relation("TaskAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+
   @@index([workspaceId, status])
   @@index([workspaceId, isArchived])
+  @@index([assignedById])
 }
 
 model MonthlyBonus {
@@ -886,6 +898,9 @@ enum NotificationType {
   TASK_DEADLINE_APPROACHING
   TASK_OVERDUE
   TASK_COMMENT
+  // [Sprint P] Lifecycle email + in-app routing tới admin (assignedBy)
+  TASK_STARTED   // User bấm "Bắt đầu" → notify admin who created task
+  TASK_DELIVERED // User submit productLink → notify admin who created task
   // Workspace invitations
   WORKSPACE_INVITATION_ACCEPTED
   WORKSPACE_INVITATION_DECLINED

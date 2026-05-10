@@ -123,9 +123,9 @@ export async function claimTask(taskId: string, workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
 
-    // Block claims if marketplace is closed
-    const isOpen = await getMarketplaceStatus(workspaceId)
-    if (!isOpen) return { error: 'Phiên chợ hiện đang đóng. Vui lòng chờ admin mở.' }
+    // [Sprint K P1] Marketplace open check moved INSIDE transaction (line ~150)
+    // to close TOCTOU window. Trước đây check ngoài → admin có thể đóng giữa
+    // lúc check và lúc claim, user vẫn claim được.
 
     // SECURITY FIX: trước đây gọi `verifyWorkspaceAccess(userId, workspaceId)` —
     // sai args (signature là (workspaceId, requiredRole)). Code path này thực tế
@@ -147,6 +147,15 @@ export async function claimTask(taskId: string, workspaceId: string) {
     // Use transaction with optimistic locking to prevent race conditions
     try {
         const result = await (workspacePrisma as any).$transaction(async (tx: any) => {
+            // [Sprint K P1] Atomic marketplace open check inside transaction.
+            const ws = await tx.workspace.findUnique({
+                where: { id: workspaceId },
+                select: { marketplaceOpen: true },
+            })
+            if (!ws?.marketplaceOpen) {
+                throw new Error('Phiên chợ hiện đang đóng. Vui lòng chờ admin mở.')
+            }
+
             // Fetch task with current version
             const task = await tx.task.findUnique({
                 where: { id: taskId },

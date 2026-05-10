@@ -20,8 +20,14 @@ export default function ProfileSwitcher({
     const [loading, setLoading] = useState(false)
 
     const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        // [Sprint K P1] Prevent rapid double-fire: disable IMMEDIATELY before
+        // any await. Trước đây await confirm() chạy trước setLoading → user
+        // có thể trigger change event lần 2 trong khoảng thời gian đó (keyboard
+        // arrow + click) → 2 changeUserProfile() calls concurrent.
+        if (loading) return
+        setLoading(true)
         const newProfileId = e.target.value
-        
+
         const ok = await confirm({
             title: 'Chuyển Team',
             message: 'Bạn có chắc chắn muốn chuyển thành viên này sang Team khác? Họ sẽ mất quyền truy cập vào Workspace và Data của Team hiện tại.',
@@ -32,10 +38,10 @@ export default function ProfileSwitcher({
 
         if (!ok) {
             e.target.value = currentProfileId || ''
+            setLoading(false)
             return
         }
 
-        setLoading(true)
         const res = await changeUserProfile(userId, newProfileId || null, workspaceId)
         if (res.error) {
             toast.error(res.error)

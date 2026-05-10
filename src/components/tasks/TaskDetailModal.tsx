@@ -331,11 +331,13 @@ function LinkRow({
 /* ────────────────────────────────────────────────────────────────────── */
 
 function EditButton({ onClick, title }: { onClick: () => void; title?: string }) {
+    const label = title ?? "Edit"
     return (
         <button
             type="button"
             onClick={onClick}
-            title={title ?? "Edit"}
+            title={label}
+            aria-label={label}
             className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/[0.06] transition-colors"
         >
             <Pencil size={12} className="text-zinc-500 hover:text-violet-300" />
@@ -359,6 +361,7 @@ function ConfirmCancelGroup({
                 onClick={onConfirm}
                 disabled={saving}
                 title="Confirm"
+                aria-label="Confirm"
                 className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
             >
                 <Check size={13} strokeWidth={3} />
@@ -368,6 +371,7 @@ function ConfirmCancelGroup({
                 onClick={onCancel}
                 disabled={saving}
                 title="Cancel"
+                aria-label="Cancel"
                 className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 disabled:opacity-50 transition-colors"
             >
                 <X size={13} />
@@ -669,6 +673,7 @@ export function TaskDetailModal({
                                 <button
                                     type="button"
                                     onClick={onClose}
+                                    aria-label="Close task details"
                                     className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.04] hover:bg-white/[0.10] text-zinc-400 hover:text-white transition-colors"
                                 >
                                     <X size={16} />
@@ -696,7 +701,7 @@ export function TaskDetailModal({
                         <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar relative z-[1]">
                             {/* TAB MAIN */}
                             {activeTab === 'main' && (
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {/* DELIVERY card — editable by BOTH admin and user (assignee submits delivery link here) */}
                                     <Card
                                         title="Delivery"
@@ -817,12 +822,16 @@ export function TaskDetailModal({
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-col gap-2">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[12px] text-zinc-400">Client ($)</span>
-                                                        <span className="text-[14px] font-bold text-emerald-400">
-                                                            $ {Number(form.jobPriceUSD || 0).toLocaleString('en-US')}
-                                                        </span>
-                                                    </div>
+                                                    {/* [Sprint J P0] Client ($) = agency revenue. ADMIN-ONLY display.
+                                                        Non-admin (staff) chỉ thấy Staff (VND) — lương riêng của họ. */}
+                                                    {isAdmin && (
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[12px] text-zinc-400">Client ($)</span>
+                                                            <span className="text-[14px] font-bold text-emerald-400">
+                                                                $ {Number(form.jobPriceUSD || 0).toLocaleString('en-US')}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-[12px] text-zinc-400">Staff (VND)</span>
                                                         <span className="text-[14px] font-bold text-zinc-200">
@@ -838,7 +847,7 @@ export function TaskDetailModal({
 
                             {/* TAB ASSETS */}
                             {activeTab === 'assets' && (
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <Card title="Resources">
                                         <div className="flex flex-col">
                                             <LinkRow

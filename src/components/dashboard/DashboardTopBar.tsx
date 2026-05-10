@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, ChevronDown, Check, Loader2 } from "lucide-react"
+import { Search, ChevronDown, Check, Loader2, Plus } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { MarketplaceTriggerButton } from "@/components/marketplace/MarketplaceTriggerButton"
+import CreateProfileModal from "@/components/workspace/CreateProfileModal"
 
 interface ProfileItem {
   id: string
@@ -38,6 +39,7 @@ export default function DashboardTopBar({
 }: DashboardTopBarProps) {
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
+  const [showCreateProfile, setShowCreateProfile] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -67,7 +69,8 @@ export default function DashboardTopBar({
       const res = await fetch(`/api/workspace/first?profileId=${newProfileId}`)
       const { workspaceId: newWsId, view } = await res.json()
       const targetView = view === "admin" ? "admin" : "dashboard"
-      window.location.href = newWsId ? `/${newWsId}/${targetView}` : "/login"
+      // [Sprint L] Empty profile → /welcome instead of /login (no kick-out).
+      window.location.href = newWsId ? `/${newWsId}/${targetView}` : "/welcome"
     } catch {
       setSwitching(false)
     }
@@ -276,10 +279,53 @@ export default function DashboardTopBar({
                 })}
               </ul>
 
+              {/* [Sprint L] Tạo Profile mới — admin parity với UserHomeTopBar */}
+              <div className="h-px my-1.5 mx-1" style={{ background: "rgba(255,255,255,0.06)" }} />
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  setShowCreateProfile(true)
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors duration-150 rounded-lg"
+                style={{ color: "#A78BFA", background: "transparent" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(139,92,246,0.08)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent"
+                }}
+              >
+                <Plus size={14} style={{ color: "#A78BFA" }} />
+                <span
+                  className="text-sm font-semibold"
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  Tạo Profile mới
+                </span>
+              </button>
             </div>
           )}
         </div>
       </div>
+
+      {/* [Sprint L] Create Profile Modal cho admin (parity với UserHomeTopBar) */}
+      <CreateProfileModal
+        open={showCreateProfile}
+        onClose={() => setShowCreateProfile(false)}
+        onCreated={async (profileId) => {
+          try {
+            await fetch("/api/profile/select", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ profileId }),
+            })
+          } catch {
+            // Soft-fail — user can manually switch via dropdown
+          }
+          window.location.href = "/welcome"
+        }}
+      />
     </div>
   )
 }

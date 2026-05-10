@@ -44,11 +44,8 @@ export default async function PortalTaskDetail({
                                     {new Date(task.deadline).toLocaleDateString(locale === 'vi' ? 'vi-VN' : locale === 'zh' ? 'zh-CN' : locale === 'ru' ? 'ru-RU' : 'en-US')}
                                 </span>
                             )}
-                            {task.estimatedCost > 0 && (
-                                <span className="flex items-center gap-1.5 text-emerald-400 bg-emerald-500/[0.06] border border-emerald-500/15 px-2.5 py-1 rounded-lg text-xs font-medium">
-                                    <DollarSign size={12} /> {task.estimatedCost.toLocaleString()} USD
-                                </span>
-                            )}
+                            {/* [Sprint J P0] estimatedCost (jobPriceUSD) removed — agency revenue must
+                                not be exposed to clients on portal. */}
                             {task.type && (
                                 <span className="flex items-center gap-1.5 text-zinc-400 bg-white/[0.03] border border-white/[0.04] px-2.5 py-1 rounded-lg text-xs">
                                     <Tag size={12} className="text-zinc-500" /> {task.type}

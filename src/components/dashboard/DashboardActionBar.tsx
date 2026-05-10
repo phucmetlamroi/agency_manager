@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Briefcase, ChevronDown, Check, Plus } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 import { useRouter } from "next/navigation"
+import CreateWorkspaceModal from "@/components/workspace/CreateWorkspaceModal"
 
 interface WorkspaceItem {
   id: string
@@ -25,6 +26,7 @@ export default function DashboardActionBar({
   userRole,
 }: DashboardActionBarProps) {
   const [open, setOpen] = useState(false)
+  const [showCreateWs, setShowCreateWs] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -191,12 +193,51 @@ export default function DashboardActionBar({
                     )
                   })
                 )}
+
+                {/* [Sprint L] Tạo Workspace mới — admin parity với UserWorkspacePicker */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false)
+                    setShowCreateWs(true)
+                  }}
+                  className="flex w-full items-center gap-3 px-2.5 py-2 mt-1 transition-colors duration-150"
+                  style={{ borderRadius: 12 }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.04)"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent"
+                  }}
+                >
+                  <div
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                    style={{
+                      background: "rgba(139,92,246,0.10)",
+                      border: "1px dashed rgba(139,92,246,0.3)",
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5" style={{ color: "#8B5CF6" }} />
+                  </div>
+                  <span
+                    className="text-[13px] font-semibold"
+                    style={{
+                      color: "#A1A1AA",
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                  >
+                    Tạo Workspace mới
+                  </span>
+                </button>
               </div>
 
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {/* [Sprint L] Workspace creation modal — auto navigates /{wsId}/admin */}
+      <CreateWorkspaceModal open={showCreateWs} onClose={() => setShowCreateWs(false)} />
 
       {/* RIGHT: Add new task button */}
       <button

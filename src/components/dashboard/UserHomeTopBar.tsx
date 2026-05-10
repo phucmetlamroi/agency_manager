@@ -104,20 +104,21 @@ export default function UserHomeTopBar({
             const res = await fetch(`/api/workspace/first?profileId=${newProfileId}`)
             const { workspaceId: newWsId, view } = await res.json()
             const targetView = view === "admin" ? "admin" : "dashboard"
-            window.location.href = newWsId ? `/${newWsId}/${targetView}` : "/login"
+            // [Sprint L] Empty profile (0 workspaces) → /welcome instead of /login.
+            // Old behavior: kicked user to login screen — confusing.
+            window.location.href = newWsId ? `/${newWsId}/${targetView}` : "/welcome"
         } catch {
             setSwitching(false)
         }
     }
 
     return (
-        <div className="flex items-end justify-between gap-6 px-1 pb-2 pt-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6 px-1 pb-2 pt-2">
             {/* ---- Left: Workspace + welcome ---- */}
             <div className="min-w-0 flex flex-col">
                 <h1
-                    className="font-extrabold leading-tight tracking-tight text-white truncate"
+                    className="font-extrabold leading-tight tracking-tight text-white truncate text-[28px] sm:text-[40px]"
                     style={{
-                        fontSize: 40,
                         fontFamily: "'Plus Jakarta Sans', sans-serif",
                         letterSpacing: "-0.02em",
                     }}
@@ -137,19 +138,18 @@ export default function UserHomeTopBar({
             </div>
 
             {/* ---- Right: Actions row ---- */}
-            <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 flex-wrap">
                 {/* Search button — toggles input row inside top-bar */}
                 <div className="relative" ref={searchRef}>
                     {searchOpen ? (
                         <div
-                            className="flex items-center"
+                            className="flex items-center w-[180px] sm:w-[260px]"
                             style={{
                                 gap: 8,
                                 padding: "10px 14px",
                                 borderRadius: 26,
                                 border: "1px solid rgba(139,92,246,0.15)",
                                 background: "#0A0A0A",
-                                width: 260,
                             }}
                         >
                             <Search size={16} style={{ color: "#A1A1AA", flexShrink: 0 }} />
@@ -428,10 +428,30 @@ export default function UserHomeTopBar({
                 </div>
             </div>
 
-            {/* ─── Create Profile Modal (rendered at top-bar level, above sidebar) ─── */}
+            {/* ─── Create Profile Modal (rendered at top-bar level, above sidebar)
+                [Sprint L] onCreated flow:
+                  1. Profile created (DB) but session.sessionProfileId still old
+                  2. Auto-select new profile via /api/profile/select → updates JWT
+                  3. Navigate to /welcome (new profile has 0 workspaces)
+                  4. Welcome page guards: if profile has workspaces, auto-redirects
+                     to first one; else shows hero + "+" button → CreateWorkspaceModal
+                  5. After workspace created, modal redirects to /{wsId}/admin (OWNER) ─── */}
             <CreateProfileModal
                 open={showCreateProfile}
                 onClose={() => setShowCreateProfile(false)}
+                onCreated={async (profileId) => {
+                    try {
+                        await fetch("/api/profile/select", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ profileId }),
+                        })
+                    } catch {
+                        // If select fails, user stays on current profile — they can
+                        // manually switch via dropdown. Avoid hard-fail here.
+                    }
+                    window.location.href = "/welcome"
+                }}
             />
         </div>
     )

@@ -791,6 +791,10 @@ export default function AddTaskModal({
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
                     onClick={(e) => {
+                        // [Sprint K P1] Block backdrop click while submitting to prevent
+                        // closing modal mid-request (request still inflight, user loses
+                        // confirmation feedback).
+                        if (submitting) return
                         if (e.target === e.currentTarget) onClose()
                     }}
                 >
@@ -820,8 +824,13 @@ export default function AddTaskModal({
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={onClose}
-                                    className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[#A1A1AA] hover:text-white transition-colors"
+                                    onClick={() => {
+                                        // [Sprint K P1] Block close while submitting
+                                        if (submitting) return
+                                        onClose()
+                                    }}
+                                    disabled={submitting}
+                                    className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[#A1A1AA] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     <X size={16} />
                                 </button>

@@ -7,10 +7,10 @@ export default async function PortalTaskDetail({ params }: { params: Promise<{ i
     // const { id } = await params;
 
     // Abstracted task status & mock data
+    // [Sprint J P0] estimatedCost removed — agency revenue must not leak to clients
     const task = {
         title: 'TikTok Ads - Summer Sale',
         status: 'Revising',
-        estimatedCost: 350,
         deadline: '2026-03-08',
         frameActionUrl: 'https://frame.io/preview/abc-123',
     };
@@ -26,7 +26,6 @@ export default async function PortalTaskDetail({ params }: { params: Promise<{ i
                     <h1 className="text-3xl font-light text-white tracking-tight mb-2">{task.title}</h1>
                     <div className="flex items-center gap-4 text-sm text-zinc-400">
                         <span className="flex items-center gap-1"><Clock size={16} /> {task.deadline}</span>
-                        <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-medium">Estimated: ${task.estimatedCost}</span>
                     </div>
                 </div>
 

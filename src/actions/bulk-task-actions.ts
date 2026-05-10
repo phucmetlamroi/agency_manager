@@ -37,6 +37,21 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             return { error: 'Danh s\u00e1ch task tr\u1ed1ng' }
         }
 
+        // [Sprint K P1] Filter empty/whitespace titles BEFORE creation.
+        // Tr\u01b0\u1edbc \u0111\u00e2y batch loop c\u00f3 check `if (!title.trim()) continue` \u2014 task created
+        // v\u1edbi titles ko valid s\u1ebd b\u1ecb skip silently nh\u01b0ng valid count include c\u1ea3 invalid.
+        const validTitles = data.titles.map(t => t.trim()).filter(t => t.length > 0)
+        if (validTitles.length === 0) {
+            return { error: 'T\u1ea5t c\u1ea3 ti\u00eau \u0111\u1ec1 task \u0111\u1ec1u tr\u1ed1ng' }
+        }
+
+        // [Sprint K P1] Guard against NaN financial values to avoid silent
+        // data corruption. Prisma s\u1ebd accept NaN nh\u01b0ng query s\u1ebd fail ho\u1eb7c l\u01b0u 0
+        // t\u00f9y DB engine. Reject early.
+        if (!Number.isFinite(data.jobPriceUSD) || !Number.isFinite(data.wageVND) || !Number.isFinite(data.exchangeRate)) {
+            return { error: 'Gi\u00e1 tr\u1ecb t\u00e0i ch\u00ednh kh\u00f4ng h\u1ee3p l\u1ec7 (NaN)' }
+        }
+
         // Calculate financials once
         const revenueVND = data.jobPriceUSD * data.exchangeRate
         const profitVND = revenueVND - data.wageVND

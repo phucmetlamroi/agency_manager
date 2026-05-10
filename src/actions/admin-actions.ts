@@ -37,8 +37,21 @@ export async function createTask(formData: FormData, workspaceId: string) {
         // Verify caller has workspace ADMIN access (without subscription gate).
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
-        const title = formData.get('title') as string
-        const value = parseFloat(formData.get('value') as string) || 0
+        // [Sprint K P1] Title required + trim — block whitespace-only titles.
+        const title = (formData.get('title') as string || '').trim()
+        if (!title) {
+            return { error: 'Title is required' }
+        }
+
+        // [Sprint K P1] Safe number parsing — reject NaN explicitly.
+        // parseFloat('abc') = NaN, `|| 0` silently coerces NaN → 0, hiding bad input.
+        const safeNumber = (raw: unknown, fallback = 0): number => {
+            if (raw === null || raw === undefined || raw === '') return fallback
+            const n = parseFloat(String(raw))
+            return Number.isFinite(n) ? n : fallback
+        }
+
+        const value = safeNumber(formData.get('value'))
 
         let assigneeId: string | null = formData.get('assigneeId') as string
         if (!assigneeId || assigneeId === '' || assigneeId === 'null') {
@@ -59,9 +72,9 @@ export async function createTask(formData: FormData, workspaceId: string) {
         const framePassword = formData.get('framePassword') as string
         const frameNote = formData.get('frameNote') as string
 
-        const jobPriceUSD = parseFloat(formData.get('jobPriceUSD') as string) || 0
-        const exchangeRate = parseFloat(formData.get('exchangeRate') as string) || 26300
-        const wageVND = parseFloat(formData.get('value') as string) || 0
+        const jobPriceUSD = safeNumber(formData.get('jobPriceUSD'))
+        const exchangeRate = safeNumber(formData.get('exchangeRate'), 26300)
+        const wageVND = safeNumber(formData.get('value'))
 
         // Server-side calculation to ensure data integrity
         const revenueVND = jobPriceUSD * exchangeRate

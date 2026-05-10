@@ -104,7 +104,9 @@ export default function UserHomeTopBar({
             const res = await fetch(`/api/workspace/first?profileId=${newProfileId}`)
             const { workspaceId: newWsId, view } = await res.json()
             const targetView = view === "admin" ? "admin" : "dashboard"
-            window.location.href = newWsId ? `/${newWsId}/${targetView}` : "/login"
+            // [Sprint L] Empty profile (0 workspaces) → /welcome instead of /login.
+            // Old behavior: kicked user to login screen — confusing.
+            window.location.href = newWsId ? `/${newWsId}/${targetView}` : "/welcome"
         } catch {
             setSwitching(false)
         }
@@ -426,10 +428,30 @@ export default function UserHomeTopBar({
                 </div>
             </div>
 
-            {/* ─── Create Profile Modal (rendered at top-bar level, above sidebar) ─── */}
+            {/* ─── Create Profile Modal (rendered at top-bar level, above sidebar)
+                [Sprint L] onCreated flow:
+                  1. Profile created (DB) but session.sessionProfileId still old
+                  2. Auto-select new profile via /api/profile/select → updates JWT
+                  3. Navigate to /welcome (new profile has 0 workspaces)
+                  4. Welcome page guards: if profile has workspaces, auto-redirects
+                     to first one; else shows hero + "+" button → CreateWorkspaceModal
+                  5. After workspace created, modal redirects to /{wsId}/admin (OWNER) ─── */}
             <CreateProfileModal
                 open={showCreateProfile}
                 onClose={() => setShowCreateProfile(false)}
+                onCreated={async (profileId) => {
+                    try {
+                        await fetch("/api/profile/select", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ profileId }),
+                        })
+                    } catch {
+                        // If select fails, user stays on current profile — they can
+                        // manually switch via dropdown. Avoid hard-fail here.
+                    }
+                    window.location.href = "/welcome"
+                }}
             />
         </div>
     )

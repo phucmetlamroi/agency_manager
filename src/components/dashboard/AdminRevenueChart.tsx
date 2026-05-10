@@ -1,6 +1,7 @@
 "use client"
 
-import { ChevronDown, TrendingUp } from "lucide-react"
+import { useState } from "react"
+import { ChevronDown } from "lucide-react"
 import {
     AreaChart,
     Area,
@@ -15,57 +16,75 @@ import type { ValueType, NameType } from "recharts/types/component/DefaultToolti
 
 interface RevenuePoint {
     day: string
-    revenue: number
+    revenue: number     // VND
     tasks: number
 }
 
 interface Props {
+    /** Daily revenue series in VND (oldest → newest) */
     data: RevenuePoint[]
-    totalRevenue: number
-    prevRevenue: number
+    /** [Sprint O] Lifetime workspace revenue in VND (= projectedRevenueVND).
+     *  Mirrors /admin/finance "TOTAL REVENUE" bottom summary. */
+    totalRevenueVND: number
+    /** Exchange rate for client-side VND ↔ USD toggle. */
+    exchangeRate: number
 }
 
 /* -- Custom tooltip — Neon Purple Dark ----------------------------------- */
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
-    if (active && payload && payload.length) {
-        return (
-            <div
-                className="px-3.5 py-2.5 text-xs shadow-2xl"
-                style={{
-                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    background: "#121016",
-                    border: "1px solid rgba(139,92,246,0.2)",
-                    borderRadius: 14,
-                }}
-            >
-                <p style={{ color: "#A1A1AA", marginBottom: 4 }}>{label}</p>
-                <p style={{ color: "#D8B4FE", fontWeight: 700 }}>
-                    ${Number(payload[0].value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-            </div>
-        )
+function makeCustomTooltip(currency: "VND" | "USD", exchangeRate: number) {
+    return function CustomTooltip({ active, payload, label }: TooltipProps<ValueType, NameType>) {
+        if (active && payload && payload.length) {
+            const rawVND = Number(payload[0].value ?? 0)
+            const display =
+                currency === "VND"
+                    ? `${Math.round(rawVND).toLocaleString("vi-VN")} đ`
+                    : `$${(rawVND / Math.max(exchangeRate, 1)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            return (
+                <div
+                    className="px-3.5 py-2.5 text-xs shadow-2xl"
+                    style={{
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        background: "#121016",
+                        border: "1px solid rgba(139,92,246,0.2)",
+                        borderRadius: 14,
+                    }}
+                >
+                    <p style={{ color: "#A1A1AA", marginBottom: 4 }}>{label}</p>
+                    <p style={{ color: "#D8B4FE", fontWeight: 700 }}>{display}</p>
+                </div>
+            )
+        }
+        return null
     }
-    return null
 }
 
 /* -- Main export --------------------------------------------------------- */
 
-export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
-    const pct =
-        prevRevenue > 0
-            ? ((totalRevenue - prevRevenue) / prevRevenue) * 100
-            : 0
-    const pctRounded = Math.round(pct * 100) / 100
-    const up = pct >= 0
+export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props) {
+    // [Sprint O] Currency toggle state — default VND
+    const [currency, setCurrency] = useState<"VND" | "USD">("VND")
+    const toggleCurrency = () =>
+        setCurrency((c) => (c === "VND" ? "USD" : "VND"))
 
-    const formattedRevenue = totalRevenue.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    })
+    const totalDisplay =
+        currency === "VND"
+            ? totalRevenueVND
+            : totalRevenueVND / Math.max(exchangeRate, 1)
 
-    /* Split dollar value into whole and decimal parts for muted-decimal style */
-    const [wholeStr, decimalStr] = formattedRevenue.split(".")
+    const formattedRevenue =
+        currency === "VND"
+            ? Math.round(totalDisplay).toLocaleString("vi-VN")
+            : totalDisplay.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+              })
+
+    /* Split decimal for muted-decimal style (USD only — VND no decimals) */
+    const [wholeStr, decimalStr] =
+        currency === "USD" ? formattedRevenue.split(".") : [formattedRevenue, ""]
+
+    const CustomTooltip = makeCustomTooltip(currency, exchangeRate)
 
     return (
         <div
@@ -99,76 +118,70 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                         Revenue Overview
                     </span>
 
-                    {/* Value */}
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
-                        <span
-                            style={{
-                                fontSize: 32,
-                                fontWeight: 800,
-                                color: "#FFFFFF",
-                                lineHeight: 1.2,
-                            }}
-                        >
-                            ${wholeStr}
-                        </span>
-                        <span
-                            style={{
-                                fontSize: 32,
-                                fontWeight: 800,
-                                color: "#A1A1AA",
-                                lineHeight: 1.2,
-                            }}
-                        >
-                            .{decimalStr}
-                        </span>
-                    </div>
-
-                    {/* Trend badge — [Sprint N] hidden in all-time mode (prevRevenue=0) */}
-                    {prevRevenue > 0 && (
-                        <div
-                            style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 5,
-                                background: "#211B31",
-                                borderRadius: 999,
-                                padding: "4px 10px",
-                                width: "fit-content",
-                            }}
-                        >
-                            <TrendingUp
-                                size={13}
-                                style={{
-                                    color: "#D8B4FE",
-                                    transform: up ? "none" : "scaleY(-1)",
-                                }}
-                            />
-                            <span style={{ fontSize: 12, fontWeight: 600, color: "#D8B4FE" }}>
-                                {pctRounded}% vs last week
-                            </span>
-                        </div>
-                    )}
-
-                    {/* Description — [Sprint N] all-time mode shows lifetime text */}
-                    <p style={{ fontSize: 13, color: "#A1A1AA", marginTop: 2, lineHeight: 1.5 }}>
-                        {prevRevenue > 0 ? (
+                    {/* Value — [Sprint O] VND/USD aware */}
+                    <div style={{ display: "flex", alignItems: "baseline", gap: currency === "USD" ? 0 : 6 }}>
+                        {currency === "USD" ? (
                             <>
-                                Revenue is maintaining a{" "}
-                                <span style={{ color: "#D8B4FE", fontWeight: 600 }}>steady growth</span>{" "}
-                                trend this week.
+                                <span
+                                    style={{
+                                        fontSize: 32,
+                                        fontWeight: 800,
+                                        color: "#FFFFFF",
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    ${wholeStr}
+                                </span>
+                                <span
+                                    style={{
+                                        fontSize: 32,
+                                        fontWeight: 800,
+                                        color: "#A1A1AA",
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    .{decimalStr}
+                                </span>
                             </>
                         ) : (
                             <>
-                                Tổng doanh thu{" "}
-                                <span style={{ color: "#D8B4FE", fontWeight: 600 }}>workspace</span>{" "}
-                                tích lũy (USD, toàn thời gian).
+                                <span
+                                    style={{
+                                        fontSize: 32,
+                                        fontWeight: 800,
+                                        color: "#FFFFFF",
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    {wholeStr}
+                                </span>
+                                <span
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: 600,
+                                        color: "#A1A1AA",
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    đ
+                                </span>
                             </>
                         )}
+                    </div>
+
+                    {/* Description — [Sprint O] lifetime mirror of Finance page */}
+                    <p style={{ fontSize: 13, color: "#A1A1AA", marginTop: 2, lineHeight: 1.5 }}>
+                        Tổng doanh thu{" "}
+                        <span style={{ color: "#D8B4FE", fontWeight: 600 }}>workspace</span>{" "}
+                        (dự kiến toàn bộ task, mirror /admin/finance).
                     </p>
                 </div>
 
-                {/* Right: dropdown pill — [Sprint N] all-time label */}
-                <div
+                {/* Right: currency toggle — [Sprint O] click to switch VND ↔ USD */}
+                <button
+                    type="button"
+                    onClick={toggleCurrency}
+                    aria-label={`Toggle currency (current: ${currency})`}
                     style={{
                         display: "flex",
                         alignItems: "center",
@@ -178,13 +191,21 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                         padding: "6px 12px",
                         cursor: "pointer",
                         flexShrink: 0,
+                        background: "transparent",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(139,92,246,0.06)"
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent"
                     }}
                 >
                     <span style={{ fontSize: 12, color: "#A1A1AA", fontWeight: 500 }}>
-                        {prevRevenue > 0 ? "This week" : "All-time"}
+                        {currency}
                     </span>
                     <ChevronDown size={14} style={{ color: "#A1A1AA" }} />
-                </div>
+                </button>
             </div>
 
             {/* ── Chart area ─────────────────────────────────────── */}
@@ -223,6 +244,16 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                             }}
                             axisLine={false}
                             tickLine={false}
+                            tickFormatter={(value: number) => {
+                                if (currency === "USD") {
+                                    const usd = value / Math.max(exchangeRate, 1)
+                                    if (usd >= 1000) return `$${(usd / 1000).toFixed(1)}k`
+                                    return `$${usd.toFixed(0)}`
+                                }
+                                if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+                                if (value >= 1_000) return `${(value / 1_000).toFixed(0)}k`
+                                return String(value)
+                            }}
                         />
 
                         <Tooltip content={<CustomTooltip />} />

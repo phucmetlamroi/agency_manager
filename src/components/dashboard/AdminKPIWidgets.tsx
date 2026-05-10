@@ -1,13 +1,16 @@
 "use client"
 
-import { useId } from "react"
+import { useId, useState } from "react"
 import { motion } from "framer-motion"
 import { Check, ChevronDown, ArrowUp, ArrowDown } from "lucide-react"
 import { AreaChart, Area, ResponsiveContainer } from "recharts"
 
 interface KPIData {
-    grossRevenue: number
-    grossRevenuePrev: number
+    /** [Sprint O] Total workspace revenue in VND (= projectedRevenueVND from
+     *  finance helper, mirrors /admin/finance "TOTAL REVENUE" bottom). */
+    grossRevenueVND: number
+    /** Exchange rate for client-side VND ↔ USD toggle. */
+    exchangeRate: number
     totalTasks: number
     totalTasksPrev: number
     tasksInProgress: number
@@ -19,6 +22,12 @@ interface KPIData {
 }
 
 /* ── Helpers ─────────────────────────────────────────────────── */
+
+function formatVND(n: number): string {
+    return new Intl.NumberFormat("vi-VN", {
+        maximumFractionDigits: 0,
+    }).format(Math.round(n))
+}
 
 function formatUSD(n: number): string {
     return new Intl.NumberFormat("en-US", {
@@ -101,19 +110,62 @@ function DropdownPill({ label }: { label: string }) {
     )
 }
 
+/* ── [Sprint O] Currency toggle pill (VND ↔ USD) ───────────── */
+
+function CurrencyToggle({
+    currency,
+    onToggle,
+}: {
+    currency: "VND" | "USD"
+    onToggle: () => void
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            aria-label={`Toggle currency (current: ${currency})`}
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium px-3 py-1 rounded-[20px] transition-colors duration-150"
+            style={{
+                border: "1px solid rgba(139,92,246,0.15)",
+                color: "#A1A1AA",
+                background: "transparent",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(139,92,246,0.06)"
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent"
+            }}
+        >
+            {currency} <ChevronDown className="w-3.5 h-3.5" />
+        </button>
+    )
+}
+
 /* ── Main export ─────────────────────────────────────────────── */
 
 export function AdminKPIWidgets({ data }: { data: KPIData }) {
     const uid = useId()
     const gradId = `sparkGrad-${uid}`
 
+    // [Sprint O] Currency toggle state — default VND (matches Finance page)
+    const [currency, setCurrency] = useState<"VND" | "USD">("VND")
+    const toggleCurrency = () =>
+        setCurrency((c) => (c === "VND" ? "USD" : "VND"))
+
+    // Convert big number based on toggle. Sparkline stays VND (visual decor).
+    const grossRevenueDisplay =
+        currency === "VND"
+            ? data.grossRevenueVND
+            : data.grossRevenueVND / Math.max(data.exchangeRate, 1)
+
     const clientPct =
         data.totalClientsTarget > 0
             ? Math.round((data.totalClients / data.totalClientsTarget) * 100)
             : 0
 
-    const revDiff = data.grossRevenue - data.grossRevenuePrev
-    const revPct = pctChange(data.grossRevenue, data.grossRevenuePrev)
     const taskPct = pctChange(data.totalTasks, data.totalTasksPrev)
 
     return (
@@ -133,27 +185,36 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                     borderColor: "rgba(139,92,246,0.25)",
                 }}
             >
-                {/* Header row */}
+                {/* Header row — [Sprint O] toggle pill */}
                 <div className="flex justify-between items-center">
                     <span className="text-[18px] font-bold text-white">
                         Gross Revenue
                     </span>
-                    <DropdownPill label="USD" />
+                    <CurrencyToggle currency={currency} onToggle={toggleCurrency} />
                 </div>
 
                 {/* Value row + sparkline */}
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex flex-col gap-3">
-                        <div className="flex items-baseline gap-0.5">
-                            <span className="text-[36px] font-extrabold text-white tracking-[-0.02em] leading-none">
-                                ${formatUSD(data.grossRevenue).split(".")[0]}
-                            </span>
-                            <span className="text-[20px] font-medium leading-none" style={{ color: "#A1A1AA" }}>
-                                .{formatUSD(data.grossRevenue).split(".")[1]}
-                            </span>
-                        </div>
-                        {/* Trend badge */}
-                        <TrendBadge current={data.grossRevenue} prev={data.grossRevenuePrev} />
+                        {currency === "VND" ? (
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-[36px] font-extrabold text-white tracking-[-0.02em] leading-none">
+                                    {formatVND(grossRevenueDisplay)}
+                                </span>
+                                <span className="text-[18px] font-medium leading-none" style={{ color: "#A1A1AA" }}>
+                                    đ
+                                </span>
+                            </div>
+                        ) : (
+                            <div className="flex items-baseline gap-0.5">
+                                <span className="text-[36px] font-extrabold text-white tracking-[-0.02em] leading-none">
+                                    ${formatUSD(grossRevenueDisplay).split(".")[0]}
+                                </span>
+                                <span className="text-[20px] font-medium leading-none" style={{ color: "#A1A1AA" }}>
+                                    .{formatUSD(grossRevenueDisplay).split(".")[1]}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Sparkline */}
@@ -179,19 +240,9 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                     </div>
                 </div>
 
-                {/* Footer */}
-                {/* [Sprint N] Khi grossRevenuePrev = 0 → all-time mode (không có
-                    historical comparison). Show neutral lifetime text. */}
+                {/* Footer — [Sprint O] mirrors /admin/finance TOTAL REVENUE */}
                 <span className="text-[13px] mt-auto leading-snug" style={{ color: "#A1A1AA", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    {data.grossRevenuePrev > 0 ? (
-                        revDiff > 0
-                            ? <>You have extra <span style={{ color: "#D8B4FE", fontWeight: 600 }}>${formatUSD(revDiff)}</span> compared to last month.</>
-                            : revDiff < 0
-                                ? <>You have <span style={{ color: "#D8B4FE", fontWeight: 600 }}>${formatUSD(Math.abs(revDiff))}</span> less compared to last month.</>
-                                : "Same as last month."
-                    ) : (
-                        <>Tổng doanh thu <span style={{ color: "#D8B4FE", fontWeight: 600 }}>workspace</span> (toàn thời gian, USD).</>
-                    )}
+                    Tổng doanh thu <span style={{ color: "#D8B4FE", fontWeight: 600 }}>workspace</span> (dự kiến toàn bộ task chưa archive).
                 </span>
             </motion.div>
 

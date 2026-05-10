@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
 import { serializeDecimal } from '@/lib/serialization'
+import { computeWorkspaceFinance } from '@/lib/finance-helpers'
 import { Suspense } from 'react'
 
 import AutoRefresh from '@/components/AutoRefresh'
@@ -82,17 +83,12 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
 
     const completedTasks = tasks.filter((t: any) => t.status === SALARY_COMPLETED_STATUS)
 
-    // [Sprint N] User feedback: Gross Revenue + Revenue Overview phải show TOTAL
-    // workspace data (all-time, không filter tháng/tuần) và tính bằng USD
-    // (jobPriceUSD = client billing) chứ không phải `value` (= staff wage VND).
-    //
-    // Bug cũ: grossRevenue sum t.value (VND wage) → label USD → 450M VND hiển
-    // thị thành "$450K USD". Sai ý nghĩa nghiệp vụ + sai đơn vị.
-    //
-    // Fix: sum jobPriceUSD across ALL tasks (kể cả task chưa hoàn tất → vì đây
-    // là "Gross" = tổng billable, không phải "Net" = realized). Bỏ comparison
-    // tháng/tuần (set prev=0 → TrendBadge auto-hide via pctChange returning null).
-    const grossRevenueUSD = tasks.reduce((s: number, t: any) => s + Number(t.jobPriceUSD || 0), 0)
+    // [Sprint O] Single-source-of-truth via finance-helpers — same numbers as
+    // /admin/finance page. User chose "Dự kiến (all non-archived tasks)" =
+    // projectedRevenueVND. Display unit = VND (default), client toggles USD.
+    const finance = await computeWorkspaceFinance(workspaceId, profileId)
+    const grossRevenueVND = finance.projectedRevenueVND
+    const exchangeRate = finance.exchangeRate
 
     const tasksInProgress = tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status)).length
     const tasksCompleted = completedTasks.length
@@ -107,33 +103,40 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         return d >= startOfMonth && t.clientId
     }).reduce((s: Set<string>, t: any) => { s.add(t.clientId); return s }, new Set<string>()).size
 
-    // ── Sparkline: last 7 days of jobPriceUSD bookings (visual decoration only) ──
+    // ── Sparkline: last 7 days of projected revenue (VND) — visual decoration ──
+    // [Sprint O] Filter !isArchived for parity with helper. Multiply per-task
+    // exchangeRate (with fallback) so number aligns with finance page logic.
+    const nonArchivedTasks = tasks.filter((t: any) => !t.isArchived)
     const sparklineData = Array.from({ length: 7 }, (_, i) => {
         const d = new Date(now)
         d.setDate(d.getDate() - (6 - i))
         const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate())
         const dayEnd = new Date(dayStart.getTime() + 86400000)
-        const dayTotal = tasks
+        const dayTotal = nonArchivedTasks
             .filter((t: any) => {
                 const td = new Date(t.updatedAt || t.createdAt)
                 return td >= dayStart && td < dayEnd
             })
-            .reduce((s: number, t: any) => s + Number(t.jobPriceUSD || 0), 0)
+            .reduce(
+                (s: number, t: any) =>
+                    s + Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || exchangeRate),
+                0,
+            )
         return { v: dayTotal }
     })
 
-    // ── Revenue by weekday (cumulative across all-time, USD) ──────────────────────
-    // [Sprint N] Aggregate ALL tasks (no time filter) — chart shows lifetime
-    // weekday distribution of jobPriceUSD bookings.
+    // ── Revenue by weekday (cumulative all-time, VND) ──────────────────────
+    // [Sprint O] Same logic as helper (jobPriceUSD × exchangeRate, !isArchived).
     const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     const revenueByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-    tasks.forEach((t: any) => {
+    nonArchivedTasks.forEach((t: any) => {
         const raw = new Date(t.updatedAt || t.createdAt).getDay()
         const mapped = (raw + 6) % 7
-        revenueByDay[mapped] = (revenueByDay[mapped] || 0) + Number(t.jobPriceUSD || 0)
+        const vnd = Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || exchangeRate)
+        revenueByDay[mapped] = (revenueByDay[mapped] || 0) + vnd
     })
     const tasksByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-    tasks.forEach((t: any) => {
+    nonArchivedTasks.forEach((t: any) => {
         const raw = new Date(t.updatedAt || t.createdAt).getDay()
         const mapped = (raw + 6) % 7
         tasksByDay[mapped] = (tasksByDay[mapped] || 0) + 1
@@ -192,11 +195,12 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             />
 
             {/* ── KPI Widgets ──────────────────────────────────── */}
-            {/* [Sprint N] grossRevenuePrev=0 → TrendBadge auto-hides (pctChange null).
-                Footer falls into "lifetime" branch (see AdminKPIWidgets). */}
+            {/* [Sprint O] grossRevenueVND = finance.projectedRevenueVND (mirrors
+                Finance page TOTAL REVENUE bottom summary). exchangeRate passed
+                cho client toggle VND ↔ USD. */}
             <AdminKPIWidgets data={{
-                grossRevenue: grossRevenueUSD,
-                grossRevenuePrev: 0,
+                grossRevenueVND,
+                exchangeRate,
                 totalTasks: tasks.length,
                 totalTasksPrev: lastMonthTasks.length,
                 tasksInProgress,
@@ -210,12 +214,12 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             {/* ── Revenue Chart + Rankings (flex 2 : 1) ──────── */}
             <div className="flex flex-col xl:flex-row gap-4">
                 <div className="xl:flex-[2] min-w-0">
-                    {/* [Sprint N] All-time workspace revenue (no week filter).
-                        prevRevenue=0 → trend badge + week-comparison text auto-hide. */}
+                    {/* [Sprint O] All-time workspace revenue (VND base).
+                        Client renders VND/USD toggle pill. */}
                     <AdminRevenueChart
                         data={revenueChartData}
-                        totalRevenue={grossRevenueUSD}
-                        prevRevenue={0}
+                        totalRevenueVND={grossRevenueVND}
+                        exchangeRate={exchangeRate}
                     />
                 </div>
                 <div className="xl:flex-1 min-w-0">

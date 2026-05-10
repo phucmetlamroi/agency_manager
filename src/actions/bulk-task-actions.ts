@@ -194,46 +194,239 @@ export async function bulkDeleteTasks(taskIds: string[], workspaceId: string) {
 }
 
 // BULK UPDATE DETAILS
+// [Sprint Q] Dirty-tracking semantics:
+//   - Key absent in `data` → field UNTOUCHED (skip update, preserve old)
+//   - Key present with value '' → CLEAR field (set to null/empty per type)
+//   - Key present with value X → UPDATE to X
+// Caller (BulkEditTaskModal) only passes keys user actually interacted with.
 export async function bulkUpdateTaskDetails(taskIds: string[], data: any, workspaceId: string) {
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
-        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
-        // Filter out undefined/null values
+        // Build update payload — only include keys EXPLICITLY present in data.
+        // 'in' check distinguishes "untouched" (no key) vs "explicit empty" (key with '').
         const updateData: any = {}
-        if (data.resources !== undefined) updateData.resources = data.resources
-        if (data.references !== undefined) updateData.references = data.references
-        if (data.notes !== undefined) {
-            updateData.notes_vi = data.notes
-        }
-        if (data.notes_en !== undefined) {
-            updateData.notes_en = data.notes_en
-        }
-        if (data.productLink !== undefined) updateData.productLink = data.productLink
-        if (data.deadline !== undefined) updateData.deadline = data.deadline ? parseVietnamDate(data.deadline) : null
-        if (data.jobPriceUSD !== undefined) updateData.jobPriceUSD = data.jobPriceUSD
-        if (data.value !== undefined) updateData.value = data.value
-        if (data.collectFilesLink !== undefined) updateData.collectFilesLink = data.collectFilesLink
+        if ('resources' in data) updateData.resources = data.resources || null
+        if ('references' in data) updateData.references = data.references || null
+        if ('notes' in data) updateData.notes_vi = data.notes || null
+        if ('notes_en' in data) updateData.notes_en = data.notes_en || null
+        if ('productLink' in data) updateData.productLink = data.productLink || null
+        if ('deadline' in data) updateData.deadline = data.deadline ? parseVietnamDate(data.deadline) : null
+        if ('jobPriceUSD' in data) updateData.jobPriceUSD = data.jobPriceUSD
+        if ('value' in data) updateData.value = data.value
+        if ('collectFilesLink' in data) updateData.collectFilesLink = data.collectFilesLink || null
+        // [Sprint Q] NEW fields:
+        if ('type' in data && data.type) updateData.type = data.type  // type is required, cannot clear
+        if ('assigneeId' in data) updateData.assigneeId = data.assigneeId || null
 
+        if (Object.keys(updateData).length === 0) {
+            return { error: 'Không có field nào được chỉnh' }
+        }
+
+        // Bump version + commit in transaction
         await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
                 await tx.task.update({
                     where: {
                         id,
-                        workspaceId: workspaceId // Manual isolation
+                        workspaceId: workspaceId // Manual isolation (extra defensive)
                     },
-                    data: updateData
+                    data: { ...updateData, version: { increment: 1 } }
                 })
             }
         })
 
+        // [Sprint Q] Audit log — single entry summarizing bulk action.
+        // Per-task entries fired separately by bulkUpdateTaskStatus when status changes.
+        try {
+            const { audit } = await import('@/lib/audit-log')
+            await audit({
+                workspaceId,
+                actorUserId: session?.user?.id ?? null,
+                action: 'task.bulk_updated',
+                targetType: 'Task',
+                targetId: `${taskIds.length}-tasks`,
+                after: { fields: Object.keys(updateData), count: taskIds.length, taskIds },
+            })
+        } catch {
+            // best-effort, never block bulk update
+        }
+
         revalidatePath(`/${workspaceId}/admin/queue`)
+        revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/dashboard`)
         return { success: true, count: taskIds.length }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Bulk Update Error:", error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
         return { error: "Failed to update tasks" }
+    }
+}
+
+// BULK UPDATE STATUS — [Sprint Q] NEW
+// Atomic DB update + DIGEST emails (1 email per recipient với danh sách task)
+// thay vì N email riêng lẻ khi loop updateTaskStatus.
+// FSM check per-task — skip task nào transition không hợp lệ, return rejected list.
+export async function bulkUpdateTaskStatus(
+    taskIds: string[],
+    newStatus: string,
+    workspaceId: string,
+): Promise<
+    | { success: true; count: number; rejectedCount: number; emailsSent: number }
+    | { error: string }
+> {
+    if (!taskIds || taskIds.length === 0) return { error: 'No tasks selected' }
+    if (!newStatus) return { error: 'Status không hợp lệ' }
+
+    try {
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const actorId = session?.user?.id ?? null
+
+        // Load tasks + relationships
+        const tasks = await prisma.task.findMany({
+            where: { id: { in: taskIds }, workspaceId },
+            include: {
+                assignee: { select: { id: true, username: true, nickname: true, email: true } },
+                assignedBy: { select: { id: true, username: true, nickname: true, email: true } },
+                client: { select: { name: true } },
+            },
+        })
+
+        if (tasks.length === 0) return { error: 'Không tìm thấy task nào' }
+
+        // FSM validate
+        const { validateTransition } = await import('@/lib/fsm-config')
+        const validTasks: typeof tasks = []
+        const rejectedIds: string[] = []
+        for (const t of tasks) {
+            const check = validateTransition(t.status, newStatus)
+            if (check.isValid) validTasks.push(t)
+            else rejectedIds.push(t.id)
+        }
+
+        if (validTasks.length === 0) {
+            return { error: `Tất cả ${tasks.length} task có status không cho phép transition tới "${newStatus}"` }
+        }
+
+        // Atomic DB update for valid tasks
+        // Sprint A logic: 'Tạm ngưng' / 'Revision' → clear deadline.
+        const restrictedStatuses = ['Tạm ngưng', 'Revision']
+        const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}
+
+        await prisma.task.updateMany({
+            where: { id: { in: validTasks.map((t) => t.id) }, workspaceId },
+            data: { status: newStatus, ...deadlineUpdate, version: { increment: 1 } },
+        })
+
+        // Audit log per-task (forensics) + 1 entry tổng
+        try {
+            const { audit } = await import('@/lib/audit-log')
+            await audit({
+                workspaceId,
+                actorUserId: actorId,
+                action: 'task.bulk_status_updated',
+                targetType: 'Task',
+                targetId: `${validTasks.length}-tasks`,
+                after: { newStatus, count: validTasks.length, rejected: rejectedIds.length, taskIds: validTasks.map((t) => t.id) },
+            })
+        } catch {
+            // best-effort
+        }
+
+        // Digest emails — group by recipient
+        // Strategy:
+        //  - newStatus = 'Đang thực hiện' or 'Revision' (user-actor flows): notify assignedBy admin
+        //    grouped by admin email, 1 digest per admin với list task
+        //  - newStatus = 'Hoàn tất' (admin completes): notify each assignee individually
+        //    (assignees thường KHÁC nhau — nhóm theo user vẫn giảm spam)
+        //  - other admin actions (Revision reject, Đang thực hiện resume): notify assignee
+        let emailsSent = 0
+        try {
+            const { sendEmail } = await import('@/lib/email')
+            const { emailTemplates } = await import('@/lib/email-templates')
+
+            const isUserActorFlow =
+                newStatus === 'Đang thực hiện' || newStatus === 'Revision'
+
+            // Group by recipient email
+            type DigestItem = { title: string; clientName: string; oldStatus: string }
+            const groupByRecipient = new Map<string, { name: string; items: DigestItem[] }>()
+
+            for (const t of validTasks) {
+                const item: DigestItem = {
+                    title: t.title || 'Untitled',
+                    clientName: t.client?.name || '—',
+                    oldStatus: t.status,
+                }
+                let recipientEmail: string | null = null
+                let recipientName = ''
+
+                if (isUserActorFlow && t.assignedBy?.email && t.assignedBy.id !== actorId) {
+                    recipientEmail = t.assignedBy.email
+                    recipientName = t.assignedBy.nickname || t.assignedBy.username || 'Admin'
+                } else if (!isUserActorFlow && t.assignee?.email && t.assignee.id !== actorId) {
+                    recipientEmail = t.assignee.email
+                    recipientName = t.assignee.nickname || t.assignee.username || 'User'
+                }
+
+                if (!recipientEmail) continue
+
+                if (!groupByRecipient.has(recipientEmail)) {
+                    groupByRecipient.set(recipientEmail, { name: recipientName, items: [] })
+                }
+                groupByRecipient.get(recipientEmail)!.items.push(item)
+            }
+
+            // Get actor name for subject
+            let actorName = 'Hệ thống'
+            if (actorId) {
+                const actor = await prisma.user.findUnique({
+                    where: { id: actorId },
+                    select: { username: true, nickname: true },
+                })
+                actorName = actor?.nickname || actor?.username || 'Admin'
+            }
+
+            // Send digest emails (fire-and-forget but await for accurate count)
+            for (const [email, group] of groupByRecipient.entries()) {
+                try {
+                    const html = emailTemplates.taskStatusBulkDigest(
+                        group.name,
+                        actorName,
+                        newStatus,
+                        group.items,
+                    )
+                    const subject = `[HustlyTasker] ${actorName} đã cập nhật status ${group.items.length} task`
+                    await sendEmail({ to: email, subject, html })
+                    emailsSent++
+                } catch (err) {
+                    console.warn('[bulkUpdateTaskStatus] digest email failed:', email, err)
+                }
+            }
+        } catch (err) {
+            console.error('[bulkUpdateTaskStatus] email module error:', err)
+        }
+
+        revalidatePath(`/${workspaceId}/admin/queue`)
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/dashboard`)
+
+        return {
+            success: true,
+            count: validTasks.length,
+            rejectedCount: rejectedIds.length,
+            emailsSent,
+        }
+    } catch (error: any) {
+        console.error('Bulk Update Status Error:', error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
+        return { error: 'Failed to update statuses' }
     }
 }
 

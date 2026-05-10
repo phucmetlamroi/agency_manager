@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { TaskWithUser } from '@/types/admin'
 import { TaskDetailModal } from './tasks/TaskDetailModal'
+import { BulkEditTaskModal } from './tasks/BulkEditTaskModal'
 import { deleteTask } from '@/actions/task-management-actions'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
@@ -84,6 +85,8 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
     const [page, setPage] = useState(1)
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
     const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
+    // [Sprint Q] Bulk-edit modal state
+    const [bulkEditOpen, setBulkEditOpen] = useState(false)
     const [sortField, setSortField] = useState<'title' | 'deadline' | 'price' | null>(null)
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
     const { confirm } = useConfirm()
@@ -309,6 +312,49 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 Delete Selected
                             </button>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* [Sprint Q] BULK ACTION BAR — admin only */}
+            {isAdmin && selectedIds.length > 0 && (
+                <div
+                    className="flex items-center justify-between gap-3"
+                    style={{
+                        padding: '10px 16px',
+                        borderRadius: 12,
+                        background: 'rgba(139,92,246,0.10)',
+                        border: '1px solid rgba(139,92,246,0.30)',
+                    }}
+                >
+                    <span className="text-[12px] font-semibold text-violet-200">
+                        Đang chọn <strong className="text-white">{selectedIds.length}</strong> task
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setBulkEditOpen(true)}
+                            className="px-3 py-1.5 rounded-full text-white font-semibold text-[11px]"
+                            style={{
+                                background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+                                boxShadow: '0 6px 16px rgba(139,92,246,0.35)',
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            }}
+                        >
+                            Edit selected ({selectedIds.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setRowSelection({})}
+                            className="px-3 py-1.5 rounded-full text-zinc-300 font-medium text-[11px]"
+                            style={{
+                                background: 'rgba(255,255,255,0.04)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            }}
+                        >
+                            Bỏ chọn
+                        </button>
                     </div>
                 </div>
             )}
@@ -751,6 +797,18 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                 isAdmin={isAdmin}
                 bulkSelectedIds={selectedIds}
                 workspaceId={workspaceId}
+            />
+
+            {/* [Sprint Q] Bulk Edit Modal */}
+            <BulkEditTaskModal
+                isOpen={bulkEditOpen}
+                onClose={() => {
+                    setBulkEditOpen(false)
+                    setRowSelection({})
+                }}
+                selectedTaskIds={selectedIds}
+                workspaceId={workspaceId}
+                users={users}
             />
         </div>
     )

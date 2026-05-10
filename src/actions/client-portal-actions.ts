@@ -51,22 +51,33 @@ async function getRelatedClientIds(clientUserId: string) {
     }
 
     // PRIORITY 2 (fallback): name matching — legacy users chưa backfill xong
+    // [Sprint K P1] Scope name match by user's profileId để tránh cross-profile
+    // collision. Trước đây 2 user "John" ở 2 profile khác nhau cùng map với
+    // client "John, Inc." của profile bất kỳ → user A thấy data client B.
+    // Giờ chỉ match clients trong cùng profile với user.
     if (rootIds.length === 0) {
         console.warn(
             `[client-portal] User ${user.username} (id=${user.id}) chưa có clientId FK. ` +
-            `Falling back to name matching — nguy cơ collision. ` +
-            `Admin nên SET "clientId" cho user này.`
+            `Falling back to name matching (profile-scoped) — admin nên SET "clientId" cho user này.`
         )
         const username: string = user.username ?? ''
         const nickname: string = user.nickname ?? ''
-        const rootClients = await globalPrisma.client.findMany({
-            where: {
-                OR: [
-                    { name: username },
-                    { name: nickname }
-                ]
-            }
-        })
+        const userProfileId = user.profileId
+        const nameWhere: any = {
+            OR: [
+                { name: username },
+                { name: nickname },
+            ],
+        }
+        // If user has profileId, scope matches; otherwise no match (safer than collision)
+        if (userProfileId) {
+            nameWhere.profileId = userProfileId
+        } else {
+            // User without profileId can't match anything via legacy fallback —
+            // force backfill by admin setting clientId FK.
+            return []
+        }
+        const rootClients = await globalPrisma.client.findMany({ where: nameWhere })
         rootIds = rootClients.map(c => c.id)
     }
 

@@ -331,11 +331,13 @@ function LinkRow({
 /* ────────────────────────────────────────────────────────────────────── */
 
 function EditButton({ onClick, title }: { onClick: () => void; title?: string }) {
+    const label = title ?? "Edit"
     return (
         <button
             type="button"
             onClick={onClick}
-            title={title ?? "Edit"}
+            title={label}
+            aria-label={label}
             className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/[0.06] transition-colors"
         >
             <Pencil size={12} className="text-zinc-500 hover:text-violet-300" />
@@ -359,6 +361,7 @@ function ConfirmCancelGroup({
                 onClick={onConfirm}
                 disabled={saving}
                 title="Confirm"
+                aria-label="Confirm"
                 className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
             >
                 <Check size={13} strokeWidth={3} />
@@ -368,6 +371,7 @@ function ConfirmCancelGroup({
                 onClick={onCancel}
                 disabled={saving}
                 title="Cancel"
+                aria-label="Cancel"
                 className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 disabled:opacity-50 transition-colors"
             >
                 <X size={13} />
@@ -669,6 +673,7 @@ export function TaskDetailModal({
                                 <button
                                     type="button"
                                     onClick={onClose}
+                                    aria-label="Close task details"
                                     className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.04] hover:bg-white/[0.10] text-zinc-400 hover:text-white transition-colors"
                                 >
                                     <X size={16} />

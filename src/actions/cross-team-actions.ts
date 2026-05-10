@@ -13,6 +13,15 @@ export async function requestCrossTeamAccess(userId: string, targetProfileId: st
         const requestedById = session?.user?.id
         if (!requestedById) return { success: false, error: 'Chưa đăng nhập' }
 
+        // [Sprint K P1] Verify target profile exists trước khi tạo request.
+        // Trước đây create với targetProfileId không tồn tại → orphaned PENDING
+        // request, không bao giờ duyệt được vì không có admin profile target.
+        const targetProfile = await prisma.profile.findUnique({
+            where: { id: targetProfileId },
+            select: { id: true },
+        })
+        if (!targetProfile) return { success: false, error: 'Team đích không tồn tại' }
+
         // Kiểm tra xem user này đã thuộc Profile này chưa
         const user = await prisma.user.findUnique({
             where: { id: userId },

@@ -180,12 +180,18 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                 </div>
 
                 {/* Footer */}
+                {/* [Sprint N] Khi grossRevenuePrev = 0 → all-time mode (không có
+                    historical comparison). Show neutral lifetime text. */}
                 <span className="text-[13px] mt-auto leading-snug" style={{ color: "#A1A1AA", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    {revDiff > 0
-                        ? <>You have extra <span style={{ color: "#D8B4FE", fontWeight: 600 }}>${formatUSD(revDiff)}</span> compared to last month.</>
-                        : revDiff < 0
-                            ? <>You have <span style={{ color: "#D8B4FE", fontWeight: 600 }}>${formatUSD(Math.abs(revDiff))}</span> less compared to last month.</>
-                            : "Same as last month."}
+                    {data.grossRevenuePrev > 0 ? (
+                        revDiff > 0
+                            ? <>You have extra <span style={{ color: "#D8B4FE", fontWeight: 600 }}>${formatUSD(revDiff)}</span> compared to last month.</>
+                            : revDiff < 0
+                                ? <>You have <span style={{ color: "#D8B4FE", fontWeight: 600 }}>${formatUSD(Math.abs(revDiff))}</span> less compared to last month.</>
+                                : "Same as last month."
+                    ) : (
+                        <>Tổng doanh thu <span style={{ color: "#D8B4FE", fontWeight: 600 }}>workspace</span> (toàn thời gian, USD).</>
+                    )}
                 </span>
             </motion.div>
 

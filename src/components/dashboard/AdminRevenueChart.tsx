@@ -123,39 +123,51 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                         </span>
                     </div>
 
-                    {/* Trend badge */}
-                    <div
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 5,
-                            background: "#211B31",
-                            borderRadius: 999,
-                            padding: "4px 10px",
-                            width: "fit-content",
-                        }}
-                    >
-                        <TrendingUp
-                            size={13}
+                    {/* Trend badge — [Sprint N] hidden in all-time mode (prevRevenue=0) */}
+                    {prevRevenue > 0 && (
+                        <div
                             style={{
-                                color: "#D8B4FE",
-                                transform: up ? "none" : "scaleY(-1)",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                background: "#211B31",
+                                borderRadius: 999,
+                                padding: "4px 10px",
+                                width: "fit-content",
                             }}
-                        />
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#D8B4FE" }}>
-                            {pctRounded}% vs last week
-                        </span>
-                    </div>
+                        >
+                            <TrendingUp
+                                size={13}
+                                style={{
+                                    color: "#D8B4FE",
+                                    transform: up ? "none" : "scaleY(-1)",
+                                }}
+                            />
+                            <span style={{ fontSize: 12, fontWeight: 600, color: "#D8B4FE" }}>
+                                {pctRounded}% vs last week
+                            </span>
+                        </div>
+                    )}
 
-                    {/* Description */}
+                    {/* Description — [Sprint N] all-time mode shows lifetime text */}
                     <p style={{ fontSize: 13, color: "#A1A1AA", marginTop: 2, lineHeight: 1.5 }}>
-                        Revenue is maintaining a{" "}
-                        <span style={{ color: "#D8B4FE", fontWeight: 600 }}>steady growth</span>{" "}
-                        trend this week.
+                        {prevRevenue > 0 ? (
+                            <>
+                                Revenue is maintaining a{" "}
+                                <span style={{ color: "#D8B4FE", fontWeight: 600 }}>steady growth</span>{" "}
+                                trend this week.
+                            </>
+                        ) : (
+                            <>
+                                Tổng doanh thu{" "}
+                                <span style={{ color: "#D8B4FE", fontWeight: 600 }}>workspace</span>{" "}
+                                tích lũy (USD, toàn thời gian).
+                            </>
+                        )}
                     </p>
                 </div>
 
-                {/* Right: dropdown pill */}
+                {/* Right: dropdown pill — [Sprint N] all-time label */}
                 <div
                     style={{
                         display: "flex",
@@ -168,7 +180,9 @@ export function AdminRevenueChart({ data, totalRevenue, prevRevenue }: Props) {
                         flexShrink: 0,
                     }}
                 >
-                    <span style={{ fontSize: 12, color: "#A1A1AA", fontWeight: 500 }}>This week</span>
+                    <span style={{ fontSize: 12, color: "#A1A1AA", fontWeight: 500 }}>
+                        {prevRevenue > 0 ? "This week" : "All-time"}
+                    </span>
                     <ChevronDown size={14} style={{ color: "#A1A1AA" }} />
                 </div>
             </div>

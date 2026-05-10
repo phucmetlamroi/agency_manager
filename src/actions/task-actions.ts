@@ -171,8 +171,10 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             && isAssignee
             && oldStatus === 'Đang thực hiện'
             && !!updatedTaskResult.productLink?.trim()
-        const isAdminResume = newStatus === 'Đang thực hiện' && oldStatus === 'Revision'
-        const isAdminReject = newStatus === 'Revision' && !isUserDelivery
+        // [Sprint P audit-fix] Add `!isAssignee` — không gửi taskFeedback email
+        // cho user khi chính user là actor (admin reject ≠ user self-action).
+        const isAdminResume = newStatus === 'Đang thực hiện' && oldStatus === 'Revision' && !isAssignee
+        const isAdminReject = newStatus === 'Revision' && !isUserDelivery && !isAssignee
         const isComplete = newStatus === 'Hoàn tất'
 
         console.log(`[Email] ${oldStatus} → ${newStatus}, actor=${user.id}, assignee=${task.assigneeId}, isUserStart=${isUserStart}, isUserDelivery=${isUserDelivery}`)

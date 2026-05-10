@@ -36,7 +36,13 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     await checkOverdueTasks(workspaceId)
 
     // 2. Fetch all tasks
+    // [Sprint O audit-fix] Filter `isArchived: false` to match Finance page
+    // semantics. Total Tasks card, tasksInProgress, tasksCompleted, lastMonth,
+    // clientsNew, BottleneckAlert, TaskWorkflowTabs đều phải exclude archived.
+    // Task đã archived nghĩa là admin đã "đóng sổ" — không nên xuất hiện ở
+    // dashboard hoạt động + workflow.
     const tasks = await workspacePrisma.task.findMany({
+        where: { isArchived: false },
         include: {
             assignee: {
                 select: {
@@ -104,15 +110,14 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     }).reduce((s: Set<string>, t: any) => { s.add(t.clientId); return s }, new Set<string>()).size
 
     // ── Sparkline: last 7 days of projected revenue (VND) — visual decoration ──
-    // [Sprint O] Filter !isArchived for parity with helper. Multiply per-task
-    // exchangeRate (with fallback) so number aligns with finance page logic.
-    const nonArchivedTasks = tasks.filter((t: any) => !t.isArchived)
+    // [Sprint O audit-fix] tasks query đã filter !isArchived → bỏ filter
+    // client-side dư thừa. Multiply per-task exchangeRate (với fallback).
     const sparklineData = Array.from({ length: 7 }, (_, i) => {
         const d = new Date(now)
         d.setDate(d.getDate() - (6 - i))
         const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate())
         const dayEnd = new Date(dayStart.getTime() + 86400000)
-        const dayTotal = nonArchivedTasks
+        const dayTotal = tasks
             .filter((t: any) => {
                 const td = new Date(t.updatedAt || t.createdAt)
                 return td >= dayStart && td < dayEnd
@@ -126,17 +131,16 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     })
 
     // ── Revenue by weekday (cumulative all-time, VND) ──────────────────────
-    // [Sprint O] Same logic as helper (jobPriceUSD × exchangeRate, !isArchived).
     const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     const revenueByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-    nonArchivedTasks.forEach((t: any) => {
+    tasks.forEach((t: any) => {
         const raw = new Date(t.updatedAt || t.createdAt).getDay()
         const mapped = (raw + 6) % 7
         const vnd = Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || exchangeRate)
         revenueByDay[mapped] = (revenueByDay[mapped] || 0) + vnd
     })
     const tasksByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-    nonArchivedTasks.forEach((t: any) => {
+    tasks.forEach((t: any) => {
         const raw = new Date(t.updatedAt || t.createdAt).getDay()
         const mapped = (raw + 6) % 7
         tasksByDay[mapped] = (tasksByDay[mapped] || 0) + 1

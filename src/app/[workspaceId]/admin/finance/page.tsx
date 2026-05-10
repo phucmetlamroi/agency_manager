@@ -36,7 +36,9 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
 
     const transactions = finance.rawAllTasks.slice(0, 50).map((t: any) => {
         const rev = Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || finance.exchangeRate)
-        const wage = Number(t.wageVND || t.value || 0)
+        // [Sprint O audit-fix] Nullish coalescing — preserve legitimate
+        // wageVND=0 (pro-bono / free task) instead of falling back to `value`.
+        const wage = Number(t.wageVND ?? t.value ?? 0)
         return {
             id: t.id,
             title: t.title,

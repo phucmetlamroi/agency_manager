@@ -13,6 +13,17 @@ import { getExchangeRate } from '@/lib/exchange-rate'
  *  - Cost    = Σ wageVND ?? value
  *  - Actual ("thực tế") filter: status === 'Hoàn tất'
  *  - Projected ("dự kiến") filter: isArchived === false
+ *
+ * ⚠️ SECURITY WARNING — `rawAllTasks` + `rawCompletedTasks` chứa SENSITIVE
+ * fields (`jobPriceUSD`, `exchangeRate`, `wageVND`, `value`) — agency revenue
+ * + staff wages. Sprint J P0 đã đánh dấu các fields này là admin-only.
+ *
+ * **CHỈ gọi helper từ admin-guarded routes** (`/admin/*` đã có
+ * `canAccessAdmin` check ở layout). KHÔNG truyền `rawAllTasks` /
+ * `rawCompletedTasks` xuống client component nếu viewer là non-admin.
+ *
+ * Aggregate fields (totalRevenueVND, projectedRevenueVND, ...) có thể pass
+ * cho admin client widgets vì đã là sums (không lộ per-task data).
  */
 export interface WorkspaceFinanceData {
     // Actual — completed only ("Thực tế đã hoàn thành")
@@ -68,7 +79,10 @@ export async function computeWorkspaceFinance(
         0,
     )
     const totalWageVND = completedTasks.reduce(
-        (s: number, t: any) => s + Number((t as any).wageVND || t.value || 0),
+        // [Sprint O audit-fix] `??` instead of `||` — preserve legitimate
+        // wageVND=0 (free task / pro-bono). Falsy `||` would skip 0 and fall
+        // back to `value`, double-counting when both fields differ.
+        (s: number, t: any) => s + Number((t as any).wageVND ?? t.value ?? 0),
         0,
     )
     const projectedRevenueVND = allTasks.reduce(
@@ -77,7 +91,10 @@ export async function computeWorkspaceFinance(
         0,
     )
     const projectedWageVND = allTasks.reduce(
-        (s: number, t: any) => s + Number((t as any).wageVND || t.value || 0),
+        // [Sprint O audit-fix] `??` instead of `||` — preserve legitimate
+        // wageVND=0 (free task / pro-bono). Falsy `||` would skip 0 and fall
+        // back to `value`, double-counting when both fields differ.
+        (s: number, t: any) => s + Number((t as any).wageVND ?? t.value ?? 0),
         0,
     )
 

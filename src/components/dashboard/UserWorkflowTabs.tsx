@@ -590,7 +590,9 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: 
                 )}
             </div>
 
-            {/* Task detail modal — read-only for user */}
+            {/* Task detail modal — read-only for user.
+                [Sprint M] currentUserId enables "Bắt đầu" gate: assignee with
+                status='Nhận task' must click Start before viewing details. */}
             <TaskDetailModal
                 task={selectedTask}
                 isOpen={!!selectedTask}
@@ -598,6 +600,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: 
                 isAdmin={false}
                 bulkSelectedIds={[]}
                 workspaceId={workspaceId}
+                currentUserId={currentUserId}
             />
         </div>
     )

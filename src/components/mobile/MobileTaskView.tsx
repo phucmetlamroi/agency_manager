@@ -140,18 +140,17 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
         return tasks.length
     }
 
-    const handleTaskClick = (task: TaskWithUser) => {
+    // [Sprint P audit-fix] handleTaskClick is dead code — MobileTaskCard
+    // actually calls handleAction (line ~263 below: onAction={handleAction}).
+    // Gate moved to handleAction so mobile actually enforces PreStartBlockModal.
+
+    const handleAction = (task: TaskWithUser) => {
         // [Sprint P GĐ2] Non-admin click task ở status 'Nhận task' / 'Đã nhận task'
         // → mở PreStartBlockModal (BLOCKING popup) thay vì TaskDrawer.
         if (!isAdmin && (task.status === 'Nhận task' || task.status === 'Đã nhận task')) {
             setPreStartTask(task)
             return
         }
-        setSelectedTask(task)
-        setIsDrawerOpen(true)
-    }
-
-    const handleAction = (task: TaskWithUser) => {
         setSelectedTask(task)
         setIsDrawerOpen(true)
     }

@@ -340,187 +340,233 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: 
                     const clientLabel = formatClientHierarchy(task.client)
                     const isOddRow = idx % 2 === 1
                     const role = task.assigneeId === currentUserId ? "Assignee" : (task.assignee?.username ? "Member" : "Unassigned")
-
-                    // Mobile: card stack (flex col with field rows). Desktop md+: 7-col grid.
-                    const rowGridStyle: React.CSSProperties = {
-                        gridTemplateColumns: "2.4fr 0.8fr 0.9fr 0.7fr 0.8fr 0.6fr 40px",
-                    }
+                    const valueDisplay = formatAmount(task)
+                    const hasUnread = (unreadMap[task.id] ?? 0) > 0
 
                     return (
                         <div
                             key={task.id}
-                            className="relative transition-colors duration-150 cursor-pointer flex flex-col gap-2 md:grid md:gap-0 md:items-center"
+                            className="relative cursor-pointer transition-colors duration-150"
                             style={{
-                                ...rowGridStyle,
-                                padding: "16px 20px",
                                 borderBottom: `1px solid ${NP.borderSubtle}`,
                                 background: isOddRow ? NP.surfaceAlt : NP.surface,
                             }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = NP.rowHover
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = isOddRow ? NP.surfaceAlt : NP.surface
-                            }}
                             onClick={() => handleRowOpen(task)}
                         >
-                            {/* Task Name */}
-                            <div className="min-w-0">
-                                <div
-                                    style={{
-                                        display: "inline-flex",
-                                        flexDirection: "column",
-                                        padding: "6px 12px",
-                                        borderRadius: 14,
-                                        border: `1px solid ${NP.borderCell}`,
-                                        maxWidth: "100%",
-                                    }}
-                                >
+                            {/* ─────────────── MOBILE CARD (<md) ─────────────── */}
+                            {/* [Sprint V] Redesigned: 3-line compact card thay vì grid squashed.
+                                Tránh overlap text + đảm bảo readable trên iPhone width 374-414px. */}
+                            <div className="md:hidden flex flex-col gap-2 p-4">
+                                {/* Top row: status pill + value (right-aligned) */}
+                                <div className="flex items-center justify-between gap-2">
                                     <span
+                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0"
                                         style={{
-                                            fontSize: 14,
-                                            fontWeight: 700,
-                                            color: NP.textPrimary,
-                                            whiteSpace: "nowrap",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
+                                            border: `1px solid ${s.color}40`,
+                                            background: `${s.color}15`,
+                                            color: s.color,
                                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         }}
                                     >
-                                        {task.title}
-                                        {(unreadMap[task.id] ?? 0) > 0 && (
-                                            <span className="inline-block w-2 h-2 rounded-full bg-violet-500 animate-pulse ml-2" />
+                                        <span
+                                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                                            style={{ background: s.color }}
+                                        />
+                                        {s.label}
+                                    </span>
+                                    <span
+                                        className="text-[13px] font-bold whitespace-nowrap shrink-0"
+                                        style={{ color: NP.textPrimary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                                    >
+                                        {valueDisplay}
+                                    </span>
+                                </div>
+
+                                {/* Middle row: title + client (full width, truncated) */}
+                                <div className="min-w-0 flex flex-col">
+                                    <span
+                                        className="text-[14px] font-bold truncate"
+                                        style={{ color: NP.textPrimary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                                    >
+                                        {task.title || 'Untitled'}
+                                        {hasUnread && (
+                                            <span className="inline-block w-2 h-2 rounded-full bg-violet-500 animate-pulse ml-2 align-middle" />
                                         )}
                                     </span>
                                     {clientLabel && (
                                         <span
-                                            style={{
-                                                fontSize: 12,
-                                                fontWeight: 500,
-                                                color: NP.textSecondary,
-                                                marginTop: 1,
-                                                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                            }}
+                                            className="text-[12px] truncate mt-0.5"
+                                            style={{ color: NP.textSecondary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                                         >
                                             {clientLabel}
                                         </span>
                                     )}
                                 </div>
-                            </div>
 
-                            {/* Type — hidden on mobile (visible in modal) */}
-                            <span
-                                className="hidden md:inline"
-                                style={{
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    color: NP.textSecondary,
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                }}
-                            >
-                                {task.type || "Task"}
-                            </span>
-
-                            {/* Assignee — hidden on mobile */}
-                            <span
-                                className="hidden md:inline"
-                                style={{
-                                    fontSize: 13,
-                                    color: NP.textPrimary,
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                }}
-                            >
-                                {task.assignee?.username || "—"}
-                            </span>
-
-                            {/* Deadline */}
-                            <span
-                                className="self-start md:self-auto"
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 6,
-                                    fontSize: 13,
-                                    fontWeight: dlColor === "#EF4444" ? 700 : 500,
-                                    color: dlColor,
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                }}
-                            >
-                                <CalendarDays className="w-3 h-3" style={{ color: NP.textMuted }} />
-                                {formatDeadline(task.deadline)}
-                            </span>
-
-                            {/* Status pill */}
-                            <span
-                                className="inline-flex items-center self-start md:self-auto"
-                                style={{
-                                    gap: 5,
-                                    padding: "5px 10px",
-                                    borderRadius: 14,
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    border: `1px solid ${NP.borderCell}`,
-                                    background: "transparent",
-                                    color: s.color,
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                    width: "fit-content",
-                                }}
-                            >
-                                <span
-                                    style={{
-                                        width: 8,
-                                        height: 8,
-                                        borderRadius: "50%",
-                                        background: s.color,
-                                    }}
-                                />
-                                {s.label}
-                            </span>
-
-                            {/* Role — hidden on mobile */}
-                            <span
-                                className="hidden md:inline"
-                                style={{
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    color: NP.lilac,
-                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                }}
-                            >
-                                {role}
-                            </span>
-
-                            {/* Actions — hidden on mobile (whole row clickable opens modal) */}
-                            <div className="hidden md:block" onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <button
-                                            type="button"
-                                            className="flex items-center justify-center transition-colors"
+                                {/* Bottom row: type + deadline + chevron */}
+                                <div className="flex items-center justify-between gap-2 text-[12px]">
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <span
+                                            className="truncate"
+                                            style={{ color: NP.textMuted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                                        >
+                                            {task.type || "Task"}
+                                        </span>
+                                        <span style={{ color: NP.textMuted }}>·</span>
+                                        <span
+                                            className="inline-flex items-center gap-1 whitespace-nowrap shrink-0"
                                             style={{
-                                                width: 32,
-                                                height: 32,
-                                                borderRadius: 8,
-                                                background: "transparent",
-                                                border: "none",
-                                                color: NP.textMuted,
-                                                cursor: "pointer",
+                                                color: dlColor,
+                                                fontWeight: dlColor === "#EF4444" ? 700 : 500,
+                                                fontFamily: "'Plus Jakarta Sans', sans-serif",
                                             }}
                                         >
-                                            <MoreHorizontal style={{ width: 16, height: 16 }} />
-                                        </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => handleRowOpen(task)}>
-                                            View details
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(task.id)}>
-                                            Copy Task ID
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                            <CalendarDays className="w-3 h-3" />
+                                            {formatDeadline(task.deadline)}
+                                        </span>
+                                    </div>
+                                    <ChevronRight
+                                        className="w-4 h-4 shrink-0"
+                                        style={{ color: NP.textMuted }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* ─────────────── DESKTOP GRID (md+) ─────────────── */}
+                            <div
+                                className="hidden md:grid md:items-center"
+                                style={{
+                                    gridTemplateColumns: "2.4fr 0.8fr 0.9fr 0.7fr 0.8fr 0.6fr 40px",
+                                    padding: "16px 20px",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.parentElement!.style.background = NP.rowHover
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.parentElement!.style.background = isOddRow ? NP.surfaceAlt : NP.surface
+                                }}
+                            >
+                                {/* Task Name */}
+                                <div className="min-w-0">
+                                    <div
+                                        style={{
+                                            display: "inline-flex",
+                                            flexDirection: "column",
+                                            padding: "6px 12px",
+                                            borderRadius: 14,
+                                            border: `1px solid ${NP.borderCell}`,
+                                            maxWidth: "100%",
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                fontSize: 14,
+                                                fontWeight: 700,
+                                                color: NP.textPrimary,
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                            }}
+                                        >
+                                            {task.title}
+                                            {hasUnread && (
+                                                <span className="inline-block w-2 h-2 rounded-full bg-violet-500 animate-pulse ml-2" />
+                                            )}
+                                        </span>
+                                        {clientLabel && (
+                                            <span
+                                                style={{
+                                                    fontSize: 12,
+                                                    fontWeight: 500,
+                                                    color: NP.textSecondary,
+                                                    marginTop: 1,
+                                                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                                }}
+                                            >
+                                                {clientLabel}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <span style={{ fontSize: 12, fontWeight: 600, color: NP.textSecondary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                    {task.type || "Task"}
+                                </span>
+
+                                <span style={{ fontSize: 13, color: NP.textPrimary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                    {task.assignee?.username || "—"}
+                                </span>
+
+                                <span
+                                    style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 6,
+                                        fontSize: 13,
+                                        fontWeight: dlColor === "#EF4444" ? 700 : 500,
+                                        color: dlColor,
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                    }}
+                                >
+                                    <CalendarDays className="w-3 h-3" style={{ color: NP.textMuted }} />
+                                    {formatDeadline(task.deadline)}
+                                </span>
+
+                                <span
+                                    className="inline-flex items-center"
+                                    style={{
+                                        gap: 5,
+                                        padding: "5px 10px",
+                                        borderRadius: 14,
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        border: `1px solid ${NP.borderCell}`,
+                                        background: "transparent",
+                                        color: s.color,
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        width: "fit-content",
+                                    }}
+                                >
+                                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color }} />
+                                    {s.label}
+                                </span>
+
+                                <span style={{ fontSize: 12, fontWeight: 600, color: NP.lilac, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                    {role}
+                                </span>
+
+                                <div onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                type="button"
+                                                className="flex items-center justify-center transition-colors"
+                                                style={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    borderRadius: 8,
+                                                    background: "transparent",
+                                                    border: "none",
+                                                    color: NP.textMuted,
+                                                    cursor: "pointer",
+                                                }}
+                                            >
+                                                <MoreHorizontal style={{ width: 16, height: 16 }} />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                            <DropdownMenuItem onClick={() => handleRowOpen(task)}>
+                                                View details
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(task.id)}>
+                                                Copy Task ID
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
                             </div>
                         </div>
                     )

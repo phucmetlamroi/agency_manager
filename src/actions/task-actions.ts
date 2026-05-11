@@ -18,6 +18,17 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         // --- LAYER 1 & 2: AUTH & CONTEXT ---
         const user = await getCurrentUser()
 
+        // [Sprint W] Validate `newStatus` against canonical list. Bug history:
+        // user reported task "Ryan · 02 VSL" bị invisible khỏi UI vì status =
+        // 'Review' (legacy Sprint A removed) — không match bất kỳ tab filter
+        // nào (Assignee/Progress/Revise/Complete) → task vanish.
+        // Guard ở đây chặn mọi update set status invalid bất kể call site nào.
+        const { isValidStatus, VALID_TASK_STATUSES } = await import('@/lib/task-statuses')
+        if (!isValidStatus(newStatus)) {
+            console.error(`[updateTaskStatus] BLOCK: invalid status "${newStatus}". Allowed:`, VALID_TASK_STATUSES)
+            return { error: `Status "${newStatus}" không hợp lệ. Có thể là legacy status — vui lòng dùng UI canonical.` }
+        }
+
         // --- LAYER 3: DATA SCOPE ---
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const task = await workspacePrisma.task.findUnique({

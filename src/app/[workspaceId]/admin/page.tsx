@@ -10,7 +10,7 @@ import { computeWorkspaceFinance } from '@/lib/finance-helpers'
 import { Suspense } from 'react'
 
 import AutoRefresh from '@/components/AutoRefresh'
-import BottleneckAlert from '@/components/BottleneckAlert'
+// [Sprint S] BottleneckAlert removed entirely per user request.
 import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import Leaderboard from '@/components/dashboard/Leaderboard'
 import { AdminKPIWidgets } from '@/components/dashboard/AdminKPIWidgets'
@@ -38,7 +38,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     // 2. Fetch all tasks
     // [Sprint O audit-fix] Filter `isArchived: false` to match Finance page
     // semantics. Total Tasks card, tasksInProgress, tasksCompleted, lastMonth,
-    // clientsNew, BottleneckAlert, TaskWorkflowTabs đều phải exclude archived.
+    // clientsNew, TaskWorkflowTabs đều phải exclude archived.
     // Task đã archived nghĩa là admin đã "đóng sổ" — không nên xuất hiện ở
     // dashboard hoạt động + workflow.
     const tasks = await workspacePrisma.task.findMany({
@@ -237,8 +237,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 </div>
             </div>
 
-            {/* ── Bottleneck Alert ─────────────────────────────── */}
-            <BottleneckAlert tasks={serializeDecimal(tasks) as any} />
+            {/* [Sprint S] BottleneckAlert removed — user request: bỏ hoàn toàn
+                cảnh báo "Báo động đỏ" về Revision count khỏi admin dashboard. */}
 
             {/* ── Task Workflow Tabs ───────────────────────────── */}
             <TaskWorkflowTabs

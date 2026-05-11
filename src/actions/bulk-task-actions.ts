@@ -295,6 +295,13 @@ export async function bulkUpdateTaskStatus(
     if (!taskIds || taskIds.length === 0) return { error: 'No tasks selected' }
     if (!newStatus) return { error: 'Status không hợp lệ' }
 
+    // [Sprint W] Validate canonical status (chặn legacy 'Review' etc.)
+    const { isValidStatus, VALID_TASK_STATUSES } = await import('@/lib/task-statuses')
+    if (!isValidStatus(newStatus)) {
+        console.error(`[bulkUpdateTaskStatus] BLOCK: invalid status "${newStatus}". Allowed:`, VALID_TASK_STATUSES)
+        return { error: `Status "${newStatus}" không hợp lệ — chặn để tránh task ẩn khỏi UI.` }
+    }
+
     try {
         const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const actorId = session?.user?.id ?? null

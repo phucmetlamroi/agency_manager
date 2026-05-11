@@ -87,6 +87,20 @@ export async function createTask(formData: FormData, workspaceId: string) {
         // Replaces previous global `session.user.role === 'ADMIN'` check that ignored workspace boundary.
         const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const profileId = (session?.user as any)?.sessionProfileId
+
+        // [Sprint T] GUARD against orphan tasks. workspacePrisma middleware
+        // INJECTS workspaceId + profileId vào create payload, nhưng nếu các
+        // params bị empty/undefined → middleware inject undefined → DB lưu NULL
+        // → task orphan invisible khỏi admin queries.
+        if (!workspaceId || workspaceId.trim() === '') {
+            console.error('[createTask] BLOCK: workspaceId empty')
+            return { error: 'Lỗi nội bộ: workspaceId thiếu.' }
+        }
+        if (!profileId || typeof profileId !== 'string') {
+            console.error('[createTask] BLOCK: profileId missing from session', { workspaceId, userId: session?.user?.id })
+            return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile rồi thử lại.' }
+        }
+
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
         const task = await workspacePrisma.task.create({

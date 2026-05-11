@@ -313,8 +313,9 @@ export async function bulkUpdateTaskStatus(
         }
 
         // Atomic DB update for valid tasks
-        // Sprint A logic: 'Tạm ngưng' / 'Revision' → clear deadline.
-        const restrictedStatuses = ['Tạm ngưng', 'Revision']
+        // [Sprint R] Match updateTaskStatus rule: only 'Revision' + 'Hoàn tất'
+        // clear deadline (mọi status khác giữ deadline để admin theo dõi overdue).
+        const restrictedStatuses = ['Revision', 'Hoàn tất']
         const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}
 
         await prisma.task.updateMany({

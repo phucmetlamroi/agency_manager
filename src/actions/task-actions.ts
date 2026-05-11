@@ -70,13 +70,16 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             return { error: 'Task has been updated by someone else. Please refresh.' } // UI should handle this
         }
 
-        // Sprint A simplification: SUBMIT flow giờ là Đang thực hiện → Revision
-        // (không còn intermediate Review). Khi user nộp → status=Revision +
-        // deadline=null (cleared) → cron check-deadline KHÔNG flag Quá hạn oan.
+        // [Sprint R] User rule: chỉ status 'Revision' và 'Hoàn tất' clear deadline.
+        // Mọi status khác (Đang đợi giao, Nhận task, Đang thực hiện, Sửa frame,
+        // Gửi lại, Tạm ngưng, Quá hạn, Đã hủy) GIỮ deadline cũ.
         //
-        // 'Tạm ngưng': pause task, deadline cũng cleared.
-        // Khi cần resume / extend → admin manually set deadline mới.
-        const restrictedStatuses = ['Tạm ngưng', 'Revision']
+        // Rationale:
+        // - Revision: user submitted, admin review — chờ feedback, không bị overdue
+        // - Hoàn tất: completed, no more deadline meaning, lose overdue label
+        // - Tạm ngưng: task paused nhưng deadline vẫn relevant để admin biết lúc resume
+        // - Quá hạn: deadline preserved để hiển thị "overdue by N days" cho audit
+        const restrictedStatuses = ['Revision', 'Hoàn tất']
         const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}
 
         // --- SMART STOPWATCH LOGIC ---

@@ -22,27 +22,35 @@ import { toast } from 'sonner'
 // ★ Fire-and-forget: properly subscribe → send → cleanup
 // The old code created channels without subscribe() so send() silently failed.
 function notifyParticipantChannels(conversationId: string, senderId: string, message: any) {
+    if (!supabase) return  // [Sprint U] realtime disabled — silently skip
     fetch(`/api/chat/participants?conversationId=${conversationId}`)
         .then(r => r.json())
         .then(({ userIds }) => {
+            if (!supabase) return
             const senderName = message.sender?.nickname || message.sender?.username || ''
             ;(userIds || []).forEach((uid: string) => {
                 if (uid === senderId) return
-                const channelName = getUserNotificationChannel(uid)
-                const ch = supabase.channel(channelName)
-                ch.subscribe((status: string) => {
-                    if (status === 'SUBSCRIBED') {
-                        ch.send({
-                            type: 'broadcast',
-                            event: CHAT_EVENTS.NEW_MESSAGE,
-                            payload: { conversationId, senderId, senderName, message },
-                        }).finally(() => {
-                            setTimeout(() => supabase.removeChannel(ch), 500)
-                        })
-                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                        supabase.removeChannel(ch)
-                    }
-                })
+                try {
+                    const channelName = getUserNotificationChannel(uid)
+                    const ch = supabase!.channel(channelName)
+                    ch.subscribe((status: string) => {
+                        if (status === 'SUBSCRIBED') {
+                            ch.send({
+                                type: 'broadcast',
+                                event: CHAT_EVENTS.NEW_MESSAGE,
+                                payload: { conversationId, senderId, senderName, message },
+                            }).finally(() => {
+                                setTimeout(() => {
+                                    try { supabase?.removeChannel(ch) } catch {}
+                                }, 500)
+                            })
+                        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                            try { supabase?.removeChannel(ch) } catch {}
+                        }
+                    })
+                } catch (err) {
+                    console.warn('[chat broadcast] channel construction failed:', err)
+                }
             })
         })
         .catch(() => { /* Non-critical — polling catches up */ })
@@ -350,23 +358,31 @@ export function ChatWindow({ conversationId, conversationName }: ChatWindowProps
         setMeta(prev => prev ? { ...prev, name: newName } : prev)
         broadcast(CHAT_EVENTS.CONVERSATION_UPDATED, { conversationId, name: newName })
         // Also notify each participant's user channel so their sidebar updates
+        if (!supabase) return  // [Sprint U] realtime disabled
         fetch(`/api/chat/participants?conversationId=${conversationId}`)
             .then(r => r.json())
             .then(({ userIds }) => {
+                if (!supabase) return
                 ;(userIds || []).forEach((uid: string) => {
                     if (uid === currentUserId) return
-                    const ch = supabase.channel(getUserNotificationChannel(uid))
-                    ch.subscribe((status: string) => {
-                        if (status === 'SUBSCRIBED') {
-                            ch.send({
-                                type: 'broadcast',
-                                event: CHAT_EVENTS.CONVERSATION_UPDATED,
-                                payload: { conversationId, name: newName },
-                            }).finally(() => setTimeout(() => supabase.removeChannel(ch), 500))
-                        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                            supabase.removeChannel(ch)
-                        }
-                    })
+                    try {
+                        const ch = supabase!.channel(getUserNotificationChannel(uid))
+                        ch.subscribe((status: string) => {
+                            if (status === 'SUBSCRIBED') {
+                                ch.send({
+                                    type: 'broadcast',
+                                    event: CHAT_EVENTS.CONVERSATION_UPDATED,
+                                    payload: { conversationId, name: newName },
+                                }).finally(() => setTimeout(() => {
+                                    try { supabase?.removeChannel(ch) } catch {}
+                                }, 500))
+                            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                                try { supabase?.removeChannel(ch) } catch {}
+                            }
+                        })
+                    } catch (err) {
+                        console.warn('[chat renamed broadcast] failed:', err)
+                    }
                 })
             })
             .catch(() => {})

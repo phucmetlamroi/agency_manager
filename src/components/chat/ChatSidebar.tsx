@@ -18,17 +18,24 @@ import { supabase } from '@/lib/supabase'
 import { getConversationChannel, getUserNotificationChannel, CHAT_EVENTS } from '@/lib/chat-channels'
 import { toast } from 'sonner'
 
-// Fire-and-forget broadcast to a channel: subscribe → send → cleanup
+// [Sprint U] Resilient fire-and-forget broadcast: guard supabase=null + try/catch
 function fireBroadcast(channelName: string, event: string, payload: any) {
-    const ch = supabase.channel(channelName)
-    ch.subscribe((status: string) => {
-        if (status === 'SUBSCRIBED') {
-            ch.send({ type: 'broadcast', event, payload })
-                .finally(() => setTimeout(() => supabase.removeChannel(ch), 500))
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            supabase.removeChannel(ch)
-        }
-    })
+    if (!supabase) return  // realtime disabled
+    try {
+        const ch = supabase.channel(channelName)
+        ch.subscribe((status: string) => {
+            if (status === 'SUBSCRIBED') {
+                ch.send({ type: 'broadcast', event, payload })
+                    .finally(() => setTimeout(() => {
+                        try { supabase?.removeChannel(ch) } catch {}
+                    }, 500))
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                try { supabase?.removeChannel(ch) } catch {}
+            }
+        })
+    } catch (err) {
+        console.warn('[fireBroadcast] failed:', err)
+    }
 }
 
 type Tab = 'messages' | 'contacts' | 'requests'

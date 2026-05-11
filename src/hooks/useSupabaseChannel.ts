@@ -18,38 +18,61 @@ export function useSupabaseChannel(
 
     useEffect(() => {
         if (!enabled || !channelName) return
+        // [Sprint U] Resilience: supabase=null khi env missing/invalid
+        // → realtime disabled, app KHÔNG crash.
+        if (!supabase) return
 
         isSubscribedRef.current = false
         setIsSubscribed(false)
 
-        const channel = supabase.channel(channelName, {
-            config: { broadcast: { self: false } },
-        })
+        // [Sprint U] Wrap channel construction trong try/catch — iOS Safari
+        // có thể throw "WebSocket not available: The operation is insecure"
+        // nếu Supabase URL invalid hoặc CSP block WebSocket.
+        let channel: RealtimeChannel
+        try {
+            channel = supabase.channel(channelName, {
+                config: { broadcast: { self: false } },
+            })
+        } catch (err) {
+            console.warn('[useSupabaseChannel] channel construction failed (realtime disabled):', err)
+            return
+        }
 
-        channel
-            .on('broadcast', { event: '*' }, ({ event, payload }) => {
-                onEventRef.current(event, payload)
-            })
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    isSubscribedRef.current = true
-                    setIsSubscribed(true)
-                    // Flush any broadcasts that were queued while subscribing
-                    const pending = pendingBroadcasts.current.splice(0)
-                    pending.forEach(({ event, payload }) => {
-                        channel.send({ type: 'broadcast', event, payload }).catch(() => {})
-                    })
-                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                    isSubscribedRef.current = false
-                    setIsSubscribed(false)
-                    setTimeout(() => { channel.subscribe() }, 2000)
-                }
-            })
+        try {
+            channel
+                .on('broadcast', { event: '*' }, ({ event, payload }) => {
+                    onEventRef.current(event, payload)
+                })
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        isSubscribedRef.current = true
+                        setIsSubscribed(true)
+                        // Flush any broadcasts that were queued while subscribing
+                        const pending = pendingBroadcasts.current.splice(0)
+                        pending.forEach(({ event, payload }) => {
+                            channel.send({ type: 'broadcast', event, payload }).catch(() => {})
+                        })
+                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                        isSubscribedRef.current = false
+                        setIsSubscribed(false)
+                        // [Sprint U] Guard against retry loop on environments
+                        // where WebSocket always fails (iOS Safari + bad env).
+                        // Don't auto-retry indefinitely — log + give up.
+                        console.warn('[useSupabaseChannel] subscribe failed status=', status)
+                    }
+                })
+        } catch (err) {
+            console.warn('[useSupabaseChannel] subscribe call threw:', err)
+        }
 
         channelRef.current = channel
 
         return () => {
-            supabase.removeChannel(channel)
+            try {
+                supabase?.removeChannel(channel)
+            } catch {
+                // ignore — supabase or channel may have been torn down
+            }
             channelRef.current = null
             isSubscribedRef.current = false
             setIsSubscribed(false)

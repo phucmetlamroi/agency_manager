@@ -9,18 +9,25 @@
  * - "Đang đợi giao" — task chưa assign (marketplace state)
  * - "Nhận task" — vừa claim, chưa start
  * - "Đang thực hiện" — assignee đang làm
- * - "Review" — submitted, đợi admin review
- * - "Revision" — admin yêu cầu sửa
+ * - "Revision" — user submit → admin review (deadline cleared)
+ * - "Sửa frame" — admin yêu cầu sửa frame cụ thể
  * - "Gửi lại" — đã sửa, gửi lại review
  * - "Hoàn tất" — admin approve final
  * - "Tạm ngưng" — paused
+ * - "Quá hạn" — deadline qua (cron auto-set)
  * - "Hủy" — cancelled
  *
  * Rules:
  * - "Hoàn tất" là TERMINAL — chỉ admin được unlock (special action)
- * - Cycle Review → Revision → Gửi lại → Review allowed (multi-round revision)
+ * - Cycle Revision → Gửi lại → Revision allowed (multi-round revision)
  * - "Hủy" terminal (chỉ admin reset được)
  * - User-side transitions limited; admin có power broader
+ *
+ * [Sprint A] Bỏ 'Review' state — submit đi thẳng Revision (deadline cleared).
+ *   Trước đây: User submit → Review (deadline còn) → admin xác nhận → Revision.
+ *   Bug cũ: admin quên xác nhận → cron flag user Quá hạn oan trong giai đoạn chờ.
+ * [Sprint W] Validate canonical status at server-action layer để chặn legacy
+ *   'Review' bị set lại từ bất kỳ code path nào.
  */
 
 export type TaskStatus =

@@ -64,6 +64,19 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
         // Authorization checked above
         const currentProfileId = (user as any)?.sessionProfileId
 
+        // [Sprint T] GUARD: workspaceId + profileId BẮT BUỘC phải có để tránh
+        // orphan tasks (root cause của bug "task bị ẩn khỏi admin workspace").
+        // Bug trước: tasks tạo qua batch flow đôi khi có workspaceId/profileId
+        // NULL → admin query `WHERE workspaceId = X` skip chúng → invisible.
+        if (!workspaceId || workspaceId.trim() === '') {
+            console.error('[createBatchTasks] BLOCK: workspaceId empty/undefined')
+            return { error: 'Lỗi nội bộ: workspaceId thiếu — task không thể tạo orphan.' }
+        }
+        if (!currentProfileId || typeof currentProfileId !== 'string') {
+            console.error('[createBatchTasks] BLOCK: profileId missing from session', { workspaceId, userId: (user as any)?.id })
+            return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile rồi thử lại.' }
+        }
+
         // Use standard prisma instead of extension for this complex transaction
         const createdTasks: { id: string; title: string }[] = []
         await prisma.$transaction(async (tx) => {

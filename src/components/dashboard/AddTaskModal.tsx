@@ -100,6 +100,31 @@ const INITIAL_FORM: TaskFormData = {
 const USD_TO_VND = 25_000
 
 /* ------------------------------------------------------------------ */
+/*  Format helpers                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Format datetime-local string ("YYYY-MM-DDTHH:mm") thành "DD/MM/YYYY HH:mm" cho preview.
+ * Trả về raw string nếu không parse được (fallback an toàn).
+ */
+function formatDeadlinePreview(raw: string): string {
+    if (!raw) return ""
+    // datetime-local format: "YYYY-MM-DDTHH:mm" or "YYYY-MM-DDTHH:mm:ss"
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+    if (match) {
+        const [, y, m, d, hh, mm] = match
+        return `${d}/${m}/${y} ${hh}:${mm}`
+    }
+    // Fallback: date-only "YYYY-MM-DD" (legacy)
+    const dateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (dateMatch) {
+        const [, y, m, d] = dateMatch
+        return `${d}/${m}/${y}`
+    }
+    return raw
+}
+
+/* ------------------------------------------------------------------ */
 /*  Tailwind input styles                                              */
 /* ------------------------------------------------------------------ */
 
@@ -532,9 +557,9 @@ export default function AddTaskModal({
                             </div>
 
                             <div className="flex-1 flex flex-col gap-1.5">
-                                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Deadline</label>
+                                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Deadline (ngày & giờ)</label>
                                 <input
-                                    type="date"
+                                    type="datetime-local"
                                     className={inputBase}
                                     value={form.deadline}
                                     onChange={(e) => set("deadline", e.target.value)}
@@ -672,7 +697,7 @@ export default function AddTaskModal({
                                 <PreviewRow label="Client" value={clientFullName} />
                                 <PreviewRow label="Editor" value={assigneeName || "Unassigned (pool)"} />
                                 <PreviewRow label="Task type" value={form.taskType} />
-                                <PreviewRow label="Deadline" value={form.deadline} />
+                                <PreviewRow label="Deadline" value={formatDeadlinePreview(form.deadline)} />
                             </div>
                         </PreviewAccordion>
 

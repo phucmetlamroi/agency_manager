@@ -111,3 +111,94 @@ export async function uploadAvatar(userId: string, formData: FormData) {
         return { error: error.message || 'Lỗi khi tải ảnh đại diện' }
     }
 }
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  [Sprint Z+1] Profile banner + logo upload                            */
+/* ──────────────────────────────────────────────────────────────────── */
+
+import { getSession } from '@/lib/auth'
+
+async function verifyProfileOwner(profileId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.', userId: null }
+
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const role = await getProfileRole(session.user.id, profileId)
+    if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền upload.', userId: null }
+
+    return { error: null, userId: session.user.id }
+}
+
+/**
+ * [Sprint Z+1] Upload profile banner (1500x500 cover, webp).
+ */
+export async function uploadProfileBanner(profileId: string, formData: FormData) {
+    try {
+        const { error: authErr } = await verifyProfileOwner(profileId)
+        if (authErr) return { error: authErr }
+
+        const file = formData.get('file') as File
+        if (!file) return { error: 'Không tìm thấy tệp tin.' }
+        if (file.size > 10 * 1024 * 1024) return { error: 'Dung lượng tối đa 10MB.' }
+
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const optimizedBuffer = await sharp(buffer)
+            .resize(1500, 500, { fit: 'cover', position: 'center' })
+            .webp({ quality: 85 })
+            .toBuffer()
+
+        const filename = `profile-banner-${profileId}-${Date.now()}.webp`
+        const blob = await put(filename, optimizedBuffer, {
+            access: 'public',
+            contentType: 'image/webp',
+        })
+
+        await prisma.profile.update({
+            where: { id: profileId },
+            data: { bannerUrl: blob.url },
+        })
+
+        revalidatePath('/', 'layout')
+        return { success: true as const, url: blob.url }
+    } catch (error: any) {
+        console.error('Profile banner upload error:', error)
+        return { error: error.message || 'Lỗi khi tải banner.' }
+    }
+}
+
+/**
+ * [Sprint Z+1] Upload profile logo (512x512 square, webp lossless cho sharp icon).
+ */
+export async function uploadProfileLogo(profileId: string, formData: FormData) {
+    try {
+        const { error: authErr } = await verifyProfileOwner(profileId)
+        if (authErr) return { error: authErr }
+
+        const file = formData.get('file') as File
+        if (!file) return { error: 'Không tìm thấy tệp tin.' }
+        if (file.size > 5 * 1024 * 1024) return { error: 'Dung lượng tối đa 5MB.' }
+
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const optimizedBuffer = await sharp(buffer)
+            .resize(512, 512, { fit: 'cover', position: 'center' })
+            .webp({ quality: 90, lossless: false })
+            .toBuffer()
+
+        const filename = `profile-logo-${profileId}-${Date.now()}.webp`
+        const blob = await put(filename, optimizedBuffer, {
+            access: 'public',
+            contentType: 'image/webp',
+        })
+
+        await prisma.profile.update({
+            where: { id: profileId },
+            data: { logoUrl: blob.url },
+        })
+
+        revalidatePath('/', 'layout')
+        return { success: true as const, url: blob.url }
+    } catch (error: any) {
+        console.error('Profile logo upload error:', error)
+        return { error: error.message || 'Lỗi khi tải logo.' }
+    }
+}

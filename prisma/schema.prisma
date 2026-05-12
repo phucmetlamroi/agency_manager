@@ -19,6 +19,13 @@ model Profile {
 
   // [Sprint B] Trial/subscription columns dropped — tất cả profile đều free + full features.
 
+  // [Sprint Z+1] Soft-delete pattern (match Workspace).
+  // status: "ACTIVE" | "SOFT_DELETED". hardDeleteAfter set khi soft-delete (NOW + 30d).
+  // Cron /api/cron/hard-delete-profiles xóa khi hardDeleteAfter <= now → cascade workspaces.
+  status          String    @default("ACTIVE")
+  deletedAt       DateTime?
+  hardDeleteAfter DateTime?
+
   users               User[]
   workspaces          Workspace[]
   tasks               Task[]
@@ -39,6 +46,8 @@ model Profile {
   accessRequests      ProfileAccessRequest[] @relation("TargetProfileRequests")
   billingProfiles     BillingProfile[]
   tagCategories       TagCategory[]
+
+  @@index([status, deletedAt])
 }
 
 model Workspace {

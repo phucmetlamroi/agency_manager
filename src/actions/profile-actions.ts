@@ -246,6 +246,215 @@ export async function createProfileForUser(name: string) {
     }
 }
 
+/* ──────────────────────────────────────────────────────────────────── */
+/*  [Sprint Z+1] Profile settings + soft-delete                          */
+/* ──────────────────────────────────────────────────────────────────── */
+
+const PROFILE_HARD_DELETE_GRACE_DAYS = 30
+
+/**
+ * [Sprint Z+1] Get profile settings (name + banner + logo + soft-delete state).
+ * Any role can read. Owner uses kết quả này để render Settings UI.
+ */
+export async function getProfileSettings(profileId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const role = await getProfileRole(session.user.id, profileId)
+    if (!role) return { error: 'Bạn không có quyền truy cập Profile này.' }
+
+    const profile = await prisma.profile.findUnique({
+        where: { id: profileId },
+        select: {
+            id: true,
+            name: true,
+            bannerUrl: true,
+            logoUrl: true,
+            createdAt: true,
+            status: true as any,
+            deletedAt: true as any,
+            hardDeleteAfter: true as any,
+        } as any,
+    })
+    if (!profile) return { error: 'Profile không tồn tại.' }
+
+    return {
+        success: true as const,
+        profile: profile as any,
+        callerRole: role,
+    }
+}
+
+/**
+ * [Sprint Z+1] Owner update profile name + banner + logo.
+ */
+export async function updateProfileSettings(
+    profileId: string,
+    data: { name?: string; bannerUrl?: string | null; logoUrl?: string | null },
+) {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const role = await getProfileRole(session.user.id, profileId)
+    if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền cập nhật Profile.' }
+
+    const updateData: any = {}
+    if (data.name !== undefined) {
+        const trimmed = data.name.trim()
+        if (!trimmed) return { error: 'Tên Profile không được để trống.' }
+        if (trimmed.length > 50) return { error: 'Tên Profile không được quá 50 ký tự.' }
+        updateData.name = trimmed
+    }
+    if (data.bannerUrl !== undefined) updateData.bannerUrl = data.bannerUrl ?? null
+    if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl ?? null
+
+    if (Object.keys(updateData).length === 0) {
+        return { error: 'Không có thay đổi nào.' }
+    }
+
+    const updated = await prisma.profile.update({
+        where: { id: profileId },
+        data: updateData,
+        select: { id: true, name: true, bannerUrl: true, logoUrl: true },
+    })
+
+    const { audit } = await import('@/lib/audit-log')
+    await audit({
+        workspaceId: 'SYSTEM',
+        actorUserId: session.user.id,
+        action: 'profile.updated' as any,
+        targetType: 'Profile',
+        targetId: profileId,
+        after: updateData,
+    })
+
+    revalidatePath('/', 'layout')
+    return { success: true as const, profile: updated }
+}
+
+/**
+ * [Sprint Z+1] Owner soft-delete profile. 30-day grace period, then cron
+ * hard-deletes (cascade workspaces/tasks/members).
+ */
+export async function deleteProfileAction(profileId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const role = await getProfileRole(session.user.id, profileId)
+    if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền xóa Profile.' }
+
+    const hardDeleteAfter = new Date(Date.now() + PROFILE_HARD_DELETE_GRACE_DAYS * 24 * 3600 * 1000)
+
+    try {
+        await prisma.profile.update({
+            where: { id: profileId },
+            data: {
+                status: 'SOFT_DELETED',
+                deletedAt: new Date(),
+                hardDeleteAfter,
+            } as any,
+        })
+
+        const { audit } = await import('@/lib/audit-log')
+        await audit({
+            workspaceId: 'SYSTEM',
+            actorUserId: session.user.id,
+            action: 'profile.soft_deleted' as any,
+            targetType: 'Profile',
+            targetId: profileId,
+            after: { hardDeleteAfter: hardDeleteAfter.toISOString() },
+        })
+
+        revalidatePath('/', 'layout')
+        return { success: true as const, hardDeleteAfter: hardDeleteAfter.toISOString() }
+    } catch (e: any) {
+        console.error('deleteProfileAction error:', e)
+        return { error: 'Không thể xóa Profile. Vui lòng thử lại.' }
+    }
+}
+
+/**
+ * [Sprint Z+1] Restore soft-deleted profile within 30-day window.
+ */
+export async function restoreProfileAction(profileId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const role = await getProfileRole(session.user.id, profileId)
+    if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền khôi phục Profile.' }
+
+    try {
+        await prisma.profile.update({
+            where: { id: profileId },
+            data: {
+                status: 'ACTIVE',
+                deletedAt: null,
+                hardDeleteAfter: null,
+            } as any,
+        })
+
+        const { audit } = await import('@/lib/audit-log')
+        await audit({
+            workspaceId: 'SYSTEM',
+            actorUserId: session.user.id,
+            action: 'profile.restored' as any,
+            targetType: 'Profile',
+            targetId: profileId,
+        })
+
+        revalidatePath('/', 'layout')
+        return { success: true as const }
+    } catch (e: any) {
+        console.error('restoreProfileAction error:', e)
+        return { error: 'Không thể khôi phục Profile.' }
+    }
+}
+
+/**
+ * [Sprint Z+1] List soft-deleted profiles user owns (for Trash page).
+ */
+export async function getMyTrashedProfiles() {
+    const session = await getSession()
+    if (!session?.user?.id) return { profiles: [] }
+
+    const accesses = await prisma.profileAccess.findMany({
+        where: {
+            userId: session.user.id,
+            role: 'OWNER',
+            profile: { status: 'SOFT_DELETED' as any } as any,
+        },
+        select: {
+            profile: {
+                select: {
+                    id: true,
+                    name: true,
+                    deletedAt: true as any,
+                    hardDeleteAfter: true as any,
+                } as any,
+            },
+        },
+    })
+
+    return {
+        profiles: accesses.map((a: any) => {
+            const p = a.profile
+            return {
+                id: p.id,
+                name: p.name,
+                deletedAt: p.deletedAt?.toISOString?.() ?? null,
+                hardDeleteAfter: p.hardDeleteAfter?.toISOString?.() ?? null,
+                daysUntilHardDelete: p.hardDeleteAfter
+                    ? Math.max(0, Math.ceil((p.hardDeleteAfter.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+                    : 0,
+            }
+        }),
+    }
+}
+
 export async function changePassword(userId: string, currentPass: string, newPass: string, workspaceId: string) {
     try {
         const user = await prisma.user.findUnique({

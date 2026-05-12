@@ -32,9 +32,20 @@ export default async function ProfileMembersPage({ params }: { params: Promise<{
 
     const profile = await prisma.profile.findUnique({
         where: { id: profileId },
-        select: { id: true, name: true },
-    })
+        select: {
+            id: true,
+            name: true,
+            bannerUrl: true,
+            logoUrl: true,
+            status: true as any,
+        } as any,
+    }) as any
     if (!profile) redirect('/login')
+
+    // [Sprint Z+1] Block if profile is soft-deleted (shouldn't be reachable but defensive)
+    if (profile.status === 'SOFT_DELETED') {
+        redirect(`/${workspaceId}/admin/profile-trash`)
+    }
 
     const { error, members } = await getProfileMembers(profileId)
     if (error) {
@@ -63,6 +74,11 @@ export default async function ProfileMembersPage({ params }: { params: Promise<{
                 members={members}
                 currentUserId={userId}
                 currentUserRole={role}
+                profileSettings={{
+                    name: profile.name,
+                    bannerUrl: profile.bannerUrl ?? null,
+                    logoUrl: profile.logoUrl ?? null,
+                }}
             />
         </div>
     )

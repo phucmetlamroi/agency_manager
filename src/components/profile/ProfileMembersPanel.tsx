@@ -15,6 +15,7 @@ import {
 import InviteToProfileModal from './InviteToProfileModal'
 import TransferProfileOwnershipModal from './TransferProfileOwnershipModal'
 import GrantWorkspaceAccessModal from './GrantWorkspaceAccessModal'
+import ProfileSettingsSection from './ProfileSettingsSection'
 import type { ProfileRole } from '@prisma/client'
 
 type MemberItem = {
@@ -39,6 +40,12 @@ type Props = {
     members: MemberItem[]
     currentUserId: string
     currentUserRole: ProfileRole
+    /** [Sprint Z+1] Profile settings cho Settings section render (Owner only) */
+    profileSettings?: {
+        name: string
+        bannerUrl: string | null
+        logoUrl: string | null
+    }
 }
 
 const ROLE_BADGE: Record<ProfileRole, { label: string; color: string; icon: any }> = {
@@ -54,6 +61,7 @@ export default function ProfileMembersPanel({
     members,
     currentUserId,
     currentUserRole,
+    profileSettings,
 }: Props) {
     const router = useRouter()
     const [, startTransition] = useTransition()
@@ -109,6 +117,11 @@ export default function ProfileMembersPanel({
 
     return (
         <div className="space-y-4">
+            {/* [Sprint Z+1] Profile Settings section — Owner only */}
+            {isOwner && profileSettings && (
+                <ProfileSettingsSection profileId={profileId} initial={profileSettings} />
+            )}
+
             {/* Action buttons */}
             {canInvite && (
                 <div className="flex flex-wrap gap-2">

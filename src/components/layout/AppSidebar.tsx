@@ -89,6 +89,8 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
         { label: "Members", href: `/${workspaceId}/admin/members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
         // [Sprint Z] Profile-level member management — Owner/Admin only (page-level guard)
         { label: "Profile Members", href: `/${workspaceId}/admin/profile-members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
+        // [Sprint Z+1] Profile Trash — Owner only (page-level guard)
+        { label: "Profile Trash", href: `/${workspaceId}/admin/profile-trash`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
         { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN', 'USER'] },
         { label: "Audit Log", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText, roles: ['ADMIN', 'USER'] },
         { label: "Settings", href: `/${workspaceId}/admin/settings`, icon: Settings, roles: ['ADMIN', 'USER'] },

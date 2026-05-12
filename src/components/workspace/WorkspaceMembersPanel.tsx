@@ -15,7 +15,7 @@ import {
     leaveWorkspace,
     revokeWorkspaceInvitation,
 } from '@/actions/member-actions'
-import TransferOwnershipModal from './TransferOwnershipModal'
+// [Sprint Z+1] TransferOwnershipModal removed — workspace OWNER concept deprecated
 import InviteMemberModal from './InviteMemberModal'
 import type { WorkspaceRole } from '@/lib/workspace-roles'
 
@@ -80,7 +80,6 @@ export default function WorkspaceMembersPanel({
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [showInviteModal, setShowInviteModal] = useState(false)
-    const [showTransferModal, setShowTransferModal] = useState(false)
     const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -178,15 +177,8 @@ export default function WorkspaceMembersPanel({
                     </h3>
                 </div>
                 <div className="flex items-center gap-2">
-                    {isOwner && (
-                        <button
-                            onClick={() => setShowTransferModal(true)}
-                            className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-all flex items-center gap-1.5"
-                        >
-                            <ArrowRightLeft className="w-3.5 h-3.5" />
-                            Chuyển quyền
-                        </button>
-                    )}
+                    {/* [Sprint Z+1] Transfer ownership button removed — workspace OWNER concept
+                        đã loại bỏ. Để transfer Profile ownership, dùng Profile Members page. */}
                     {canManage && (
                         <button
                             onClick={() => setShowInviteModal(true)}
@@ -388,15 +380,8 @@ export default function WorkspaceMembersPanel({
                     onSuccess={refresh}
                 />
             )}
-            {showTransferModal && (
-                <TransferOwnershipModal
-                    workspaceId={workspaceId}
-                    members={initialMembers}
-                    currentUserId={currentUserId}
-                    onClose={() => setShowTransferModal(false)}
-                    onSuccess={refresh}
-                />
-            )}
+            {/* [Sprint Z+1] TransferOwnershipModal removed — workspace-level transfer
+                deprecated. Use Profile Members page for profile-level transfer. */}
         </div>
     )
 }

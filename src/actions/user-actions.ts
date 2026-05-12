@@ -40,14 +40,12 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
         // SECURITY: workspace-scoped admin check (was global ADMIN only).
         const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
-        // Super Admin Protection
+        // [Sprint Z] Super admin protection removed — admin user deleted in Z.12.
+        // Profile-level role changes use changeProfileRoleAction instead.
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { username: true, role: true },
+            select: { role: true },
         })
-        if (targetUser?.username === 'admin') {
-            return { success: false, error: 'KHÔNG THỂ THAY ĐỔI QUYỀN CỦA SUPER ADMIN!' }
-        }
 
         await prisma.user.update({
             where: { id: userId },
@@ -116,10 +114,7 @@ export async function deactivateUser(userId: string, workspaceId: string) {
             }
         }
 
-        // Super Admin Protection
-        if (targetUser.username === 'admin') {
-            return { success: false, error: 'KHÔNG THỂ DEACTIVATE SUPER ADMIN!' }
-        }
+        // [Sprint Z] Super admin protection removed — admin user deleted in Z.12.
 
         // [Audit] Workspace OWNER protection — chỉ OWNER hoặc global admin được
         // deactivate OWNER. Trước đây ADMIN có thể call deactivateUser() trên

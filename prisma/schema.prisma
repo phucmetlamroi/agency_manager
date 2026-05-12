@@ -19,6 +19,13 @@ model Profile {
 
   // [Sprint B] Trial/subscription columns dropped — tất cả profile đều free + full features.
 
+  // [Sprint Z+1] Soft-delete pattern (match Workspace).
+  // status: "ACTIVE" | "SOFT_DELETED". hardDeleteAfter set khi soft-delete (NOW + 30d).
+  // Cron /api/cron/hard-delete-profiles xóa khi hardDeleteAfter <= now → cascade workspaces.
+  status          String    @default("ACTIVE")
+  deletedAt       DateTime?
+  hardDeleteAfter DateTime?
+
   users               User[]
   workspaces          Workspace[]
   tasks               Task[]
@@ -39,6 +46,8 @@ model Profile {
   accessRequests      ProfileAccessRequest[] @relation("TargetProfileRequests")
   billingProfiles     BillingProfile[]
   tagCategories       TagCategory[]
+
+  @@index([status, deletedAt])
 }
 
 model Workspace {
@@ -205,15 +214,26 @@ model User {
 }
 
 model ProfileAccess {
-  id        String   @id @default(uuid())
+  id        String      @id @default(uuid())
   userId    String
   profileId String
-  grantedAt DateTime @default(now())
+  // [Sprint Z] Role-based access per profile (replaces binary access model).
+  // OWNER = profile creator with full quyền (incl. xóa member).
+  // ADMIN = invited + promoted, can create workspace + invite, can't remove.
+  // USER  = invited (default), read-only.
+  role      ProfileRole @default(USER)
+  // [Sprint Z] grantedAt also serves as cutoff for ADMIN workspace access:
+  // ADMIN sees workspaces with createdAt >= grantedAt automatically. Older
+  // workspaces need explicit WorkspaceMember row granted by Owner.
+  grantedAt DateTime    @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@unique([userId, profileId])
+  // [Sprint Z] Indices to speed up role+cutoff queries
+  @@index([userId, grantedAt])
+  @@index([profileId, role])
 }
 
 model ProfileAccessRequest {
@@ -578,6 +598,14 @@ enum UserRole {
   AGENCY_ADMIN
   CLIENT
   LOCKED
+}
+
+// [Sprint Z] Profile-level role (replaces super-admin model with SaaS RBAC).
+// Per-profile permissions: OWNER (creator) > ADMIN (promoted) > USER (default).
+enum ProfileRole {
+  OWNER
+  ADMIN
+  USER
 }
 
 enum InvoiceStatus {

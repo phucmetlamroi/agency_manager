@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/db'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { computeWorkspaceFinance } from '@/lib/finance-helpers'
 import FinanceDashboardClient from '@/components/dashboard/FinanceDashboardClient'
@@ -10,16 +11,26 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
     const profileId = (session?.user as any)?.sessionProfileId
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
+    if (!session?.user?.id) redirect('/login')
+
     const user = await workspacePrisma.user.findUnique({
-        where: { id: session?.user?.id },
-        select: { role: true, isTreasurer: true, username: true }
+        where: { id: session.user.id },
+        select: { id: true, role: true, isTreasurer: true, username: true }
     })
 
-    if (!user || user.role !== 'ADMIN') {
-        redirect(`/${workspaceId}/admin`)
-    }
+    if (!user) redirect('/login')
 
-    if (user.username !== 'admin' && !user.isTreasurer) {
+    // [Sprint Z] Super admin gate removed. Gate finance access b\u1eb1ng profile OWNER/ADMIN
+    // role (workspace's profile) HO\u1eb6C isTreasurer flag (financial role).
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true }
+    })
+    const profileRole = workspace?.profileId ? await getProfileRole(user.id, workspace.profileId) : null
+    const canViewFinance = profileRole === 'OWNER' || profileRole === 'ADMIN' || !!user.isTreasurer
+
+    if (!canViewFinance) {
         return (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>
                 <h3>{'\u26D4'} Quy\u1ec1n truy c\u1eadp b\u1ecb t\u1eeb ch\u1ed1i</h3>

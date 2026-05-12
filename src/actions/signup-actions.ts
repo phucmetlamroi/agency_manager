@@ -265,6 +265,17 @@ export async function signupAction(input: SignupInput): Promise<SignupResponse> 
                 },
             })
 
+            // [Sprint Z] Auto-create ProfileAccess(role=OWNER) — user là chủ profile
+            // họ vừa tạo lúc signup. Cần thiết để new RBAC system gate workspace
+            // creation + member invitation đúng.
+            await tx.profileAccess.create({
+                data: {
+                    userId: user.id,
+                    profileId: profile.id,
+                    role: 'OWNER',
+                },
+            })
+
             // Tạo EmailVerificationToken (purpose=EMAIL_VERIFICATION, TTL 24h)
             const raw = generateRandomToken()
             const tokenHash = hashToken(raw)

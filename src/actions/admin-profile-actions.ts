@@ -1,40 +1,41 @@
 'use server'
 
+/**
+ * [Sprint Z] DEPRECATED — super admin profile management.
+ *
+ * Trong SaaS multi-tenant model:
+ *   - createProfile: dùng `createProfileForUser` (src/actions/profile-actions.ts)
+ *     thay vì super admin. Mọi user tự tạo profile riêng của mình.
+ *   - updateProfile / deleteProfile: chỉ Owner của specific profile mới làm,
+ *     KHÔNG còn super admin override. Sẽ implement trong profile-member-actions
+ *     hoặc profile-settings flow sau.
+ *   - changeUserProfile: DELETED hoàn toàn. User chuyển profile bằng cách Owner
+ *     của target profile invite (qua inviteToProfileAction).
+ *
+ * Functions ở đây hiện CHỈ throw error để alert caller không nên dùng nữa.
+ */
+
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { revalidatePath } from 'next/cache'
+import { getProfileRole } from '@/lib/profile-permissions'
 
-export async function createProfile(data: { name: string, bannerUrl?: string, logoUrl?: string }) {
-    const session = await getSession()
-    if (session?.user?.username !== 'admin') {
-        throw new Error('Unauthorized')
-    }
+const DEPRECATED_ERROR = 'Function này đã được loại bỏ trong Sprint Z (SaaS RBAC). Dùng profile-member-actions hoặc createProfileForUser thay thế.'
 
-    const { name, bannerUrl, logoUrl } = data
-
-    if (!name || name.trim() === '') {
-        throw new Error('Profile name is required')
-    }
-
-    const newProfile = await prisma.profile.create({
-        data: {
-            name: name.trim(),
-            bannerUrl: bannerUrl?.trim() || null,
-            logoUrl: logoUrl?.trim() || null,
-        }
-    })
-
-    return { success: true, profile: newProfile }
+export async function createProfile(_data: { name: string; bannerUrl?: string; logoUrl?: string }) {
+    throw new Error(DEPRECATED_ERROR)
 }
 
-export async function updateProfile(id: string, data: { name: string, bannerUrl?: string, logoUrl?: string }) {
+export async function updateProfile(id: string, data: { name: string; bannerUrl?: string; logoUrl?: string }) {
     const session = await getSession()
-    if (session?.user?.username !== 'admin') {
-        throw new Error('Unauthorized')
+    if (!session?.user?.id) throw new Error('Unauthorized')
+
+    // [Sprint Z] Only profile Owner can update.
+    const role = await getProfileRole(session.user.id, id)
+    if (role !== 'OWNER') {
+        throw new Error('Chỉ Owner của Profile mới có quyền update.')
     }
 
     const { name, bannerUrl, logoUrl } = data
-
     if (!name || name.trim() === '') {
         throw new Error('Profile name is required')
     }
@@ -45,7 +46,7 @@ export async function updateProfile(id: string, data: { name: string, bannerUrl?
             name: name.trim(),
             bannerUrl: bannerUrl?.trim() || null,
             logoUrl: logoUrl?.trim() || null,
-        }
+        },
     })
 
     return { success: true, profile: updatedProfile }
@@ -53,14 +54,14 @@ export async function updateProfile(id: string, data: { name: string, bannerUrl?
 
 export async function deleteProfile(id: string) {
     const session = await getSession()
-    if (session?.user?.username !== 'admin') {
-        throw new Error('Unauthorized')
+    if (!session?.user?.id) throw new Error('Unauthorized')
+
+    // [Sprint Z] Only profile Owner can delete.
+    const role = await getProfileRole(session.user.id, id)
+    if (role !== 'OWNER') {
+        throw new Error('Chỉ Owner của Profile mới có quyền xóa.')
     }
 
-    // [Sprint K P1] Reject delete nếu profile có active references.
-    // Trước đây nullify FK trên 10 tables → orphaned data tạo ra không revert được.
-    // Yêu cầu super admin hard-delete deps trước (tasks/workspaces/etc.) để
-    // tránh "lost forever" data.
     const [userCount, workspaceCount, taskCount] = await Promise.all([
         prisma.user.count({ where: { profileId: id } }),
         prisma.workspace.count({ where: { profileId: id, status: { not: 'HARD_DELETED' as any } } }),
@@ -72,8 +73,6 @@ export async function deleteProfile(id: string) {
         }
     }
 
-    // Since we are "Super Admin", we can delete even if there are members.
-    // We will nullify the profileId on all related models to avoid foreign key violations.
     await prisma.$transaction([
         prisma.user.updateMany({ where: { profileId: id }, data: { profileId: null } }),
         prisma.workspace.updateMany({ where: { profileId: id }, data: { profileId: null } }),
@@ -85,49 +84,12 @@ export async function deleteProfile(id: string) {
         prisma.monthlyBonus.updateMany({ where: { profileId: id }, data: { profileId: null } }),
         prisma.payrollLock.updateMany({ where: { profileId: id }, data: { profileId: null } }),
         prisma.performanceMetric.updateMany({ where: { profileId: id }, data: { profileId: null } }),
-        prisma.profile.delete({ where: { id } })
+        prisma.profile.delete({ where: { id } }),
     ])
 
     return { success: true }
 }
 
-export async function changeUserProfile(userId: string, newProfileId: string | null, workspaceId: string) {
-    const session = await getSession()
-    if (session?.user?.username !== 'admin') {
-        throw new Error('Unauthorized')
-    }
-
-    try {
-        // [Sprint K P1] Validate target profile exists trước khi update.
-        // Trước đây ko check → super admin có thể set profileId = id ko tồn tại
-        // → User mồ côi profile, không vào được app.
-        if (newProfileId) {
-            const target = await prisma.profile.findUnique({
-                where: { id: newProfileId },
-                select: { id: true },
-            })
-            if (!target) return { error: 'Profile đích không tồn tại' }
-        }
-
-        // [Sprint K P1] Verify target user exists.
-        const targetUser = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true, profileId: true },
-        })
-        if (!targetUser) return { error: 'User không tồn tại' }
-        if (targetUser.profileId === newProfileId) {
-            return { error: 'User đã thuộc profile này' }
-        }
-
-        await prisma.user.update({
-            where: { id: userId },
-            data: { profileId: newProfileId }
-        })
-        // void workspaceId — kept for future audit logging context
-        void workspaceId
-        return { success: true }
-    } catch (e) {
-        console.error('changeUserProfile error:', e)
-        return { error: 'Failed to change user team' }
-    }
+export async function changeUserProfile(_userId: string, _newProfileId: string | null, _workspaceId: string) {
+    throw new Error(DEPRECATED_ERROR + ' (Dùng inviteToProfileAction thay vì assign cross-profile manually.)')
 }

@@ -47,7 +47,8 @@ export default function PayrollTable({ users, workspaceId }: { users: UserWithPa
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                        {users.filter(u => u.username !== 'admin').map(user => {
+                        {/* [Sprint Z] Admin filter removed (admin user deleted in Z.12) */}
+                        {users.map(user => {
                             // Calculate Financials
                             const validTasks = user.tasks || []
                             const baseSalary = validTasks.reduce((acc, t) => acc + (t.wageVND || 0), 0)

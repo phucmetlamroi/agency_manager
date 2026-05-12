@@ -18,24 +18,18 @@ export async function checkProfileAccess(profileId: string) {
 
     if (!user) return { success: false, error: 'User not found' }
 
-    if (user.username === 'admin') {
-        return { success: true }
-    }
-
-    if (user.profileId === profileId) {
-        return { success: true }
-    }
-
-    // Kiểm tra xem User có được cấp quyền Du Học vào Profile này không
+    // [Sprint Z] Super admin bypass removed. Access via ProfileAccess row only.
+    // Note: User.profileId không còn auto-grant access vì migration đã tạo
+    // ProfileAccess(role=OWNER) cho creator của mỗi profile.
     const hasAccess = await prisma.profileAccess.findUnique({
         where: { userId_profileId: { userId: user.id, profileId } }
     })
-    
+
     if (hasAccess) {
         return { success: true }
     }
 
-    return { success: false, error: 'Bạn không có quyền truy cập vào Team này. Vui lòng liên hệ Admin tối thượng.' }
+    return { success: false, error: 'Bạn không có quyền truy cập vào Profile này.' }
 }
 
 export async function selectProfile(profileId: string) {
@@ -65,30 +59,12 @@ export async function getAvailableProfiles() {
 
     if (!user) return []
 
-    // For Super Admin ('admin' username), fetch all profiles + member counts
-    if (user.username === 'admin') {
-        return prisma.profile.findMany({
-            include: {
-                _count: {
-                    select: { users: true, workspaces: true }
-                }
-            },
-            orderBy: { createdAt: 'asc' }
-        })
-    }
+    // [Sprint Z] Super admin bypass removed. All users go through ProfileAccess
+    // table. Migration tạo ProfileAccess(role=OWNER) cho creator + ProfileAccess(role=USER)
+    // cho cross-team grants → unified path.
+    const accessibleProfiles: any[] = []
 
-    // For any other user, fetch their home profile + any profiles they have cross-team access to
-    const accessibleProfiles = []
-
-    if (user.profileId) {
-        const homeProfile = await prisma.profile.findFirst({
-            where: { id: user.profileId },
-            include: { _count: { select: { users: true, workspaces: true } } }
-        })
-        if (homeProfile) accessibleProfiles.push(homeProfile)
-    }
-
-    const crossTeamAccesses = await prisma.profileAccess.findMany({
+    const profileAccesses = await prisma.profileAccess.findMany({
         where: { userId: user.id },
         include: {
             profile: {
@@ -97,48 +73,77 @@ export async function getAvailableProfiles() {
         }
     })
 
-    crossTeamAccesses.forEach((acc: any) => {
+    profileAccesses.forEach((acc: any) => {
         if (acc.profile) accessibleProfiles.push(acc.profile)
     })
 
     return accessibleProfiles
-
-    return []
 }
 
 /**
  * Returns the user's accessible profiles AND workspaces for the current profile.
  * Used by the sidebar ProfileWorkspaceSwitcher component.
  *
- * [Sprint Y] Each profile object includes `isOwner: boolean` — true iff
- * user.profileId === profile.id (home profile). Used to gate "Tạo Workspace mới"
- * button visibility (only profile owner can create workspaces).
+ * [Sprint Z] Each profile object includes `currentRole: ProfileRole | null`
+ * (OWNER/ADMIN/USER) from ProfileAccess.role. Workspace list is SCOPED:
+ *   - OWNER: thấy tất cả workspaces của profile
+ *   - ADMIN: workspaces createdAt >= grantedAt + những workspace có explicit WorkspaceMember
+ *   - USER: chỉ workspaces có explicit WorkspaceMember
  */
 export async function getMyProfilesAndWorkspaces() {
     const session = await getSession()
-    if (!session?.user) return { profiles: [], workspaces: [], currentProfileId: null }
+    if (!session?.user) return { profiles: [], workspaces: [], currentProfileId: null, currentProfileRole: null, currentProfileIsOwner: false }
 
+    const userId = session.user.id
     const currentProfileId: string | null = (session.user as any).sessionProfileId || null
 
-    // [Sprint Y] Fetch user.profileId once to determine ownership per profile
-    const me = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { profileId: true },
+    // [Sprint Z] Fetch all ProfileAccess rows once để map role per profile
+    const allAccesses = await prisma.profileAccess.findMany({
+        where: { userId },
+        select: { profileId: true, role: true, grantedAt: true },
     })
-    const homeProfileId = me?.profileId ?? null
+    const accessMap = new Map(allAccesses.map((a) => [a.profileId, a]))
 
     // Fetch accessible profiles
     const profiles = await getAvailableProfiles()
 
-    // Fetch workspaces for the current profile
+    // [Sprint Z] Workspaces scoped theo profile role
     let workspaces: { id: string; name: string; description: string | null }[] = []
     if (currentProfileId) {
-        workspaces = await prisma.workspace.findMany({
-            where: { profileId: currentProfileId },
-            select: { id: true, name: true, description: true },
-            orderBy: { createdAt: 'asc' }
-        })
+        const access = accessMap.get(currentProfileId)
+        if (access?.role === 'OWNER') {
+            workspaces = await prisma.workspace.findMany({
+                where: { profileId: currentProfileId },
+                select: { id: true, name: true, description: true },
+                orderBy: { createdAt: 'asc' }
+            })
+        } else if (access?.role === 'ADMIN') {
+            // Workspaces tạo SAU grantedAt + workspaces có explicit WorkspaceMember
+            const autoWs = await prisma.workspace.findMany({
+                where: { profileId: currentProfileId, createdAt: { gte: access.grantedAt } },
+                select: { id: true, name: true, description: true },
+                orderBy: { createdAt: 'asc' }
+            })
+            const explicitWs = await prisma.workspace.findMany({
+                where: { profileId: currentProfileId, members: { some: { userId } } },
+                select: { id: true, name: true, description: true },
+                orderBy: { createdAt: 'asc' }
+            })
+            const merged = new Map<string, typeof autoWs[number]>()
+            for (const w of [...autoWs, ...explicitWs]) merged.set(w.id, w)
+            workspaces = Array.from(merged.values())
+        } else if (access?.role === 'USER') {
+            // USER: chỉ workspaces có explicit WorkspaceMember
+            workspaces = await prisma.workspace.findMany({
+                where: { profileId: currentProfileId, members: { some: { userId } } },
+                select: { id: true, name: true, description: true },
+                orderBy: { createdAt: 'asc' }
+            })
+        }
+        // else: no access → workspaces = []
     }
+
+    const currentRole = currentProfileId ? accessMap.get(currentProfileId)?.role ?? null : null
 
     return {
         profiles: profiles.map((p: any) => ({
@@ -146,13 +151,17 @@ export async function getMyProfilesAndWorkspaces() {
             name: p.name,
             userCount: p._count?.users ?? 0,
             workspaceCount: p._count?.workspaces ?? 0,
-            // [Sprint Y] isOwner = is this user's home profile? Used to gate UI.
-            isOwner: homeProfileId === p.id,
+            // [Sprint Z] currentRole per profile — gate UI (only OWNER/ADMIN see create button)
+            currentRole: accessMap.get(p.id)?.role ?? null,
+            // [Sprint Y compat] isOwner kept for backward-compat; now means role===OWNER
+            isOwner: accessMap.get(p.id)?.role === 'OWNER',
         })),
         workspaces,
         currentProfileId,
-        // [Sprint Y] Expose for callers that need quick lookup
-        currentProfileIsOwner: currentProfileId !== null && currentProfileId === homeProfileId,
+        // [Sprint Z] role at current profile (replaces isOwner binary)
+        currentProfileRole: currentRole,
+        // [Sprint Y compat] keep boolean for old callers — now means canCreateWorkspace
+        currentProfileIsOwner: currentRole === 'OWNER' || currentRole === 'ADMIN',
     }
 }
 
@@ -220,9 +229,11 @@ export async function createProfileForUser(name: string) {
             const profile = await tx.profile.create({
                 data: { name: trimmed },
             })
-            // Grant access — user can switch to this profile
+            // [Sprint Z] Grant access với role=OWNER — user tạo profile = chủ profile.
+            // Sprint Y bug: ProfileAccess được tạo nhưng KHÔNG có role → user không
+            // tạo workspace được trong profile mình mới tạo. Sprint Z fix.
             await tx.profileAccess.create({
-                data: { userId: session.user.id, profileId: profile.id },
+                data: { userId: session.user.id, profileId: profile.id, role: 'OWNER' },
             })
             return profile
         })
@@ -232,6 +243,215 @@ export async function createProfileForUser(name: string) {
     } catch (e: any) {
         console.error('createProfileForUser error:', e)
         return { error: 'Không thể tạo profile. Vui lòng thử lại.' }
+    }
+}
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  [Sprint Z+1] Profile settings + soft-delete                          */
+/* ──────────────────────────────────────────────────────────────────── */
+
+const PROFILE_HARD_DELETE_GRACE_DAYS = 30
+
+/**
+ * [Sprint Z+1] Get profile settings (name + banner + logo + soft-delete state).
+ * Any role can read. Owner uses kết quả này để render Settings UI.
+ */
+export async function getProfileSettings(profileId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const role = await getProfileRole(session.user.id, profileId)
+    if (!role) return { error: 'Bạn không có quyền truy cập Profile này.' }
+
+    const profile = await prisma.profile.findUnique({
+        where: { id: profileId },
+        select: {
+            id: true,
+            name: true,
+            bannerUrl: true,
+            logoUrl: true,
+            createdAt: true,
+            status: true as any,
+            deletedAt: true as any,
+            hardDeleteAfter: true as any,
+        } as any,
+    })
+    if (!profile) return { error: 'Profile không tồn tại.' }
+
+    return {
+        success: true as const,
+        profile: profile as any,
+        callerRole: role,
+    }
+}
+
+/**
+ * [Sprint Z+1] Owner update profile name + banner + logo.
+ */
+export async function updateProfileSettings(
+    profileId: string,
+    data: { name?: string; bannerUrl?: string | null; logoUrl?: string | null },
+) {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const role = await getProfileRole(session.user.id, profileId)
+    if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền cập nhật Profile.' }
+
+    const updateData: any = {}
+    if (data.name !== undefined) {
+        const trimmed = data.name.trim()
+        if (!trimmed) return { error: 'Tên Profile không được để trống.' }
+        if (trimmed.length > 50) return { error: 'Tên Profile không được quá 50 ký tự.' }
+        updateData.name = trimmed
+    }
+    if (data.bannerUrl !== undefined) updateData.bannerUrl = data.bannerUrl ?? null
+    if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl ?? null
+
+    if (Object.keys(updateData).length === 0) {
+        return { error: 'Không có thay đổi nào.' }
+    }
+
+    const updated = await prisma.profile.update({
+        where: { id: profileId },
+        data: updateData,
+        select: { id: true, name: true, bannerUrl: true, logoUrl: true },
+    })
+
+    const { audit } = await import('@/lib/audit-log')
+    await audit({
+        workspaceId: 'SYSTEM',
+        actorUserId: session.user.id,
+        action: 'profile.updated' as any,
+        targetType: 'Profile',
+        targetId: profileId,
+        after: updateData,
+    })
+
+    revalidatePath('/', 'layout')
+    return { success: true as const, profile: updated }
+}
+
+/**
+ * [Sprint Z+1] Owner soft-delete profile. 30-day grace period, then cron
+ * hard-deletes (cascade workspaces/tasks/members).
+ */
+export async function deleteProfileAction(profileId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const role = await getProfileRole(session.user.id, profileId)
+    if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền xóa Profile.' }
+
+    const hardDeleteAfter = new Date(Date.now() + PROFILE_HARD_DELETE_GRACE_DAYS * 24 * 3600 * 1000)
+
+    try {
+        await prisma.profile.update({
+            where: { id: profileId },
+            data: {
+                status: 'SOFT_DELETED',
+                deletedAt: new Date(),
+                hardDeleteAfter,
+            } as any,
+        })
+
+        const { audit } = await import('@/lib/audit-log')
+        await audit({
+            workspaceId: 'SYSTEM',
+            actorUserId: session.user.id,
+            action: 'profile.soft_deleted' as any,
+            targetType: 'Profile',
+            targetId: profileId,
+            after: { hardDeleteAfter: hardDeleteAfter.toISOString() },
+        })
+
+        revalidatePath('/', 'layout')
+        return { success: true as const, hardDeleteAfter: hardDeleteAfter.toISOString() }
+    } catch (e: any) {
+        console.error('deleteProfileAction error:', e)
+        return { error: 'Không thể xóa Profile. Vui lòng thử lại.' }
+    }
+}
+
+/**
+ * [Sprint Z+1] Restore soft-deleted profile within 30-day window.
+ */
+export async function restoreProfileAction(profileId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const role = await getProfileRole(session.user.id, profileId)
+    if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền khôi phục Profile.' }
+
+    try {
+        await prisma.profile.update({
+            where: { id: profileId },
+            data: {
+                status: 'ACTIVE',
+                deletedAt: null,
+                hardDeleteAfter: null,
+            } as any,
+        })
+
+        const { audit } = await import('@/lib/audit-log')
+        await audit({
+            workspaceId: 'SYSTEM',
+            actorUserId: session.user.id,
+            action: 'profile.restored' as any,
+            targetType: 'Profile',
+            targetId: profileId,
+        })
+
+        revalidatePath('/', 'layout')
+        return { success: true as const }
+    } catch (e: any) {
+        console.error('restoreProfileAction error:', e)
+        return { error: 'Không thể khôi phục Profile.' }
+    }
+}
+
+/**
+ * [Sprint Z+1] List soft-deleted profiles user owns (for Trash page).
+ */
+export async function getMyTrashedProfiles() {
+    const session = await getSession()
+    if (!session?.user?.id) return { profiles: [] }
+
+    const accesses = await prisma.profileAccess.findMany({
+        where: {
+            userId: session.user.id,
+            role: 'OWNER',
+            profile: { status: 'SOFT_DELETED' as any } as any,
+        },
+        select: {
+            profile: {
+                select: {
+                    id: true,
+                    name: true,
+                    deletedAt: true as any,
+                    hardDeleteAfter: true as any,
+                } as any,
+            },
+        },
+    })
+
+    return {
+        profiles: accesses.map((a: any) => {
+            const p = a.profile
+            return {
+                id: p.id,
+                name: p.name,
+                deletedAt: p.deletedAt?.toISOString?.() ?? null,
+                hardDeleteAfter: p.hardDeleteAfter?.toISOString?.() ?? null,
+                daysUntilHardDelete: p.hardDeleteAfter
+                    ? Math.max(0, Math.ceil((p.hardDeleteAfter.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+                    : 0,
+            }
+        }),
     }
 }
 

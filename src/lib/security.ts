@@ -1,16 +1,24 @@
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { UserRole } from '@prisma/client'
+import type { ProfileRole } from '@prisma/client'
 import { hasAtLeastRole, isWorkspaceRole, type WorkspaceRole } from '@/lib/workspace-roles'
 
 /**
- * Mức độ đỏ (Critical Security Check): Hàm kiểm tra chéo (Cross-check) chống BOLA/IDOR.
- * Đảm bảo rằng Session ID hiện tại thực sự có quyền truy cập vào WorkspaceID đang được thao tác.
- * Tránh việc User F12 đổi thông số workspaceId để phá hoại team khác.
+ * [Sprint Z] BOLA/IDOR protection — verify caller có quyền access workspaceId.
+ *
+ * Access logic (post super-admin removal — SaaS multi-tenant model):
+ *   1. Profile OWNER → workspaceRole = OWNER (full access tất cả workspaces của profile)
+ *   2. Profile ADMIN + workspace.createdAt >= grantedAt → workspaceRole = ADMIN
+ *      (Admin chỉ thấy workspace tạo sau khi họ được promote/added)
+ *   3. Explicit WorkspaceMember row → dùng role của row đó (Owner cấp cho Admin
+ *      truy cập workspace cũ; User được invite vào workspace cụ thể)
+ *   4. Else → reject (SECURITY_VIOLATION)
+ *
+ * KHÔNG còn isGlobalAdmin bypass — mọi user phải có ProfileAccess hoặc WorkspaceMember
+ * explicit. Treasurer flag không còn override workspace access.
  *
  * @param workspaceId - The workspace being accessed (from URL/body — UNTRUSTED).
- * @param requiredRole - Minimum WorkspaceRole required. Default 'MEMBER' (just verify membership).
- *                      Use 'ADMIN' for management actions, 'OWNER' for destructive/billing actions.
+ * @param requiredRole - Minimum WorkspaceRole required. Default 'MEMBER'.
  */
 export async function verifyWorkspaceAccess(
     workspaceId: string,
@@ -20,6 +28,12 @@ export async function verifyWorkspaceAccess(
     user: NonNullable<NonNullable<Awaited<ReturnType<typeof getSession>>>['user']>
     userId: string
     workspaceRole: WorkspaceRole
+    /** [Sprint Z] Profile-level role (OWNER/ADMIN/USER) — null nếu không có ProfileAccess */
+    profileRole: ProfileRole | null
+    /**
+     * @deprecated [Sprint Z] Always false — super admin model removed. Kept for
+     * backward-compat with old callers; will remove in Sprint Z+1.
+     */
     isGlobalAdmin: boolean
 }> {
     const session = await getSession()
@@ -30,34 +44,46 @@ export async function verifyWorkspaceAccess(
 
     const userId = session.user.id
 
-    // REAL-TIME DB CHECK: Fetch genuine role + profileId, bypassing stateless JWT
+    // REAL-TIME DB CHECK: account active?
     const dbUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true, isTreasurer: true, avatarUrl: true, profileId: true }
+        select: { role: true, avatarUrl: true }
     })
-
     if (!dbUser || dbUser.role === 'LOCKED') {
         throw new Error('SECURITY_VIOLATION: Tài khoản đã bị khóa hoặc không tồn tại.')
     }
 
-    const globalRole = dbUser.role
+    // Get workspace + its profile
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true, createdAt: true }
+    })
+    if (!workspace) {
+        throw new Error('SECURITY_VIOLATION: Workspace không tồn tại.')
+    }
 
-    // Global ADMINs (hoặc Treasurer) có quyền ghi/đọc tất cả.
-    const isGlobalAdmin = globalRole === UserRole.ADMIN || dbUser.isTreasurer
+    // Profile-level role check (Sprint Z primary path)
+    let profileAccess: { role: ProfileRole; grantedAt: Date } | null = null
+    if (workspace.profileId) {
+        profileAccess = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId, profileId: workspace.profileId } },
+            select: { role: true, grantedAt: true }
+        })
+    }
 
-    // Nếu không phải Global Admin, check theo Profile-level membership pattern
-    // (giống Slack/Notion: workspace = "folder" trong Profile, member tính theo Profile).
-    let workspaceRole: WorkspaceRole = 'MEMBER'
+    let workspaceRole: WorkspaceRole | null = null
 
-    if (!isGlobalAdmin) {
-        // PRIORITY 1: Explicit WorkspaceMember row (OWNER/ADMIN/specific role)
+    if (profileAccess?.role === 'OWNER') {
+        // Profile OWNER → workspace OWNER implicit (full access tất cả workspaces)
+        workspaceRole = 'OWNER'
+    } else if (profileAccess?.role === 'ADMIN' && workspace.createdAt >= profileAccess.grantedAt) {
+        // Profile ADMIN: chỉ workspace tạo SAU khi họ được promote/granted
+        workspaceRole = 'ADMIN'
+    } else {
+        // Fall through: explicit WorkspaceMember row (for old workspaces granted
+        // by Owner to specific Admin/User)
         const membership = await prisma.workspaceMember.findUnique({
-            where: {
-                userId_workspaceId: {
-                    userId: userId,
-                    workspaceId: workspaceId
-                }
-            }
+            where: { userId_workspaceId: { userId, workspaceId } }
         })
 
         if (membership) {
@@ -66,36 +92,17 @@ export async function verifyWorkspaceAccess(
                 throw new Error('SECURITY_VIOLATION: Vai trò không hợp lệ trong Workspace này.')
             }
             workspaceRole = membership.role
-        } else {
-            // PRIORITY 2: Profile-level fallback — user thuộc cùng Profile với Workspace
-            // → tự động grant role MEMBER. Pattern này cho phép "join Profile = auto-access
-            // tất cả Workspace trong Profile" (giống Google Drive folder hierarchy).
-            const workspace = await prisma.workspace.findUnique({
-                where: { id: workspaceId },
-                select: { profileId: true }
-            })
-
-            const sameProfile = !!(
-                workspace?.profileId
-                && dbUser.profileId
-                && workspace.profileId === dbUser.profileId
-            )
-
-            if (!sameProfile) {
-                console.error(`[SECURITY] User ${userId} (profile=${dbUser.profileId}) attempted to access workspace ${workspaceId} (profile=${workspace?.profileId})`)
-                throw new Error('SECURITY_VIOLATION: Bạn không có quyền truy cập vào Workspace này (IDOR Blocked).')
-            }
-
-            // Profile member → default role MEMBER (không phải OWNER/ADMIN)
-            workspaceRole = 'MEMBER'
         }
+    }
 
-        if (!hasAtLeastRole(workspaceRole, requiredRole)) {
-            console.error(`[SECURITY] User ${userId} role=${workspaceRole} required=${requiredRole} on workspace ${workspaceId}`)
-            throw new Error('SECURITY_VIOLATION: Bạn không có đủ quyền cho hành động này tại Workspace.')
-        }
-    } else {
-        workspaceRole = 'ADMIN' // Global admins get local admin privileges
+    if (!workspaceRole) {
+        console.error(`[SECURITY] User ${userId} attempted to access workspace ${workspaceId} (profile=${workspace.profileId}) without permission`)
+        throw new Error('SECURITY_VIOLATION: Bạn không có quyền truy cập vào Workspace này (IDOR Blocked).')
+    }
+
+    if (!hasAtLeastRole(workspaceRole, requiredRole)) {
+        console.error(`[SECURITY] User ${userId} role=${workspaceRole} required=${requiredRole} on workspace ${workspaceId}`)
+        throw new Error('SECURITY_VIOLATION: Bạn không có đủ quyền cho hành động này tại Workspace.')
     }
 
     return {
@@ -103,7 +110,10 @@ export async function verifyWorkspaceAccess(
         user: session.user,
         userId: session.user.id,
         workspaceRole,
-        isGlobalAdmin
+        profileRole: profileAccess?.role ?? null,
+        // [Sprint Z] Backward-compat: isGlobalAdmin always false. Old callers
+        // that check `if (isGlobalAdmin)` will fall through to explicit checks.
+        isGlobalAdmin: false
     }
 }
 
@@ -173,6 +183,9 @@ export async function verifyActiveSession() {
         status: 'active',
         session,
         dbUser,
-        isAdmin: dbUser.role === 'ADMIN' || dbUser.isTreasurer
+        // [Sprint Z] isAdmin chỉ còn = isTreasurer (financial role).
+        // User.role='ADMIN' super-admin pattern bị remove — không còn bypass.
+        // Callers cần dùng profile-permissions helpers để check workspace/profile access.
+        isAdmin: !!dbUser.isTreasurer
     }
 }

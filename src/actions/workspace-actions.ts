@@ -13,17 +13,17 @@ export async function createWorkspaceAction(formData: FormData) {
         return { error: 'Bạn cần đăng nhập để tạo Workspace.' }
     }
 
-    // [Sprint Y] Profile-gated: chỉ chủ home profile (User.profileId === profileId)
-    // được tạo workspace. Cross-team invitees + global admin KHÔNG override (strict).
+    // [Sprint Z] Profile-gated: chỉ Owner/Admin của profile mới tạo workspace được.
+    // SaaS multi-tenant model — không có super admin override.
     const profileId = session.user.sessionProfileId
     if (!profileId) {
         return { error: 'Không tìm thấy Profile. Vui lòng đăng nhập lại.' }
     }
 
-    // [Sprint Y] Ownership gate — block cross-team users + global admin.
-    const { isProfileOwner } = await import('@/lib/profile-permissions')
-    if (!(await isProfileOwner(session.user.id, profileId))) {
-        return { error: 'Bạn không phải chủ Profile này. Chỉ chủ Profile mới có quyền tạo Workspace mới.' }
+    // [Sprint Z] RBAC gate — Owner hoặc Admin role mới được tạo workspace.
+    const { canCreateWorkspace } = await import('@/lib/profile-permissions')
+    if (!(await canCreateWorkspace(session.user.id, profileId))) {
+        return { error: 'Bạn không có quyền tạo Workspace trong Profile này. Chỉ Owner và Admin mới được tạo.' }
     }
 
     const name = formData.get('name') as string
@@ -160,84 +160,19 @@ export async function getWorkspacesForProfile(profileId: string) {
 }
 
 /**
- * Transfer workspace ownership from caller (current OWNER) to another existing member.
+ * [Sprint Z+1] DEPRECATED — workspace-level OWNER concept removed.
  *
- * Flow:
- * 1. Verify caller is OWNER of the workspace (or global admin).
- * 2. Verify target user is already a member of the same workspace.
- * 3. In a transaction: demote caller → ADMIN, promote target → OWNER.
+ * Profile Owner is implicit OWNER of all workspaces in the profile (via
+ * verifyWorkspaceAccess in src/lib/security.ts). To "transfer workspace
+ * ownership", transfer ownership of the parent Profile via
+ * `transferProfileOwnershipAction` in profile-member-actions.ts.
  *
- * Last-admin protection is bypassed here because we're performing an atomic
- * swap (the workspace will still have exactly one OWNER after the transaction).
- *
- * Reference: spec mục 4 "transfer ownership" + Slack "Primary Owner" pattern.
+ * This function now throws to alert old callers; UI components have been
+ * updated to remove the workspace-level transfer button (Sprint Z+1 Z+1.10).
  */
-export async function transferWorkspaceOwnership(workspaceId: string, newOwnerUserId: string) {
-    if (!newOwnerUserId) return { error: 'Phải chọn người nhận quyền sở hữu mới.' }
-
-    try {
-        // SECURITY: caller must be OWNER (not just ADMIN) to transfer ownership.
-        const { workspaceRole, isGlobalAdmin, userId: callerId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
-
-        if (!isGlobalAdmin && workspaceRole !== 'OWNER') {
-            return { error: 'Chỉ chủ sở hữu hiện tại (OWNER) mới có quyền chuyển nhượng.' }
-        }
-
-        if (callerId === newOwnerUserId) {
-            return { error: 'Bạn đã là chủ sở hữu.' }
-        }
-
-        // Target must already be a member of this workspace.
-        const targetMembership = await prisma.workspaceMember.findUnique({
-            where: {
-                userId_workspaceId: {
-                    userId: newOwnerUserId,
-                    workspaceId,
-                },
-            },
-        })
-        if (!targetMembership) {
-            return { error: 'Người được chuyển nhượng phải là thành viên của Workspace.' }
-        }
-
-        // Atomic swap: demote caller → ADMIN, promote target → OWNER.
-        // Skipping ensureNotLastOwner here because the swap preserves OWNER count.
-        await prisma.$transaction([
-            prisma.workspaceMember.update({
-                where: {
-                    userId_workspaceId: { userId: callerId, workspaceId },
-                },
-                data: { role: 'ADMIN' },
-            }),
-            prisma.workspaceMember.update({
-                where: {
-                    userId_workspaceId: { userId: newOwnerUserId, workspaceId },
-                },
-                data: { role: 'OWNER' },
-            }),
-        ])
-
-        await audit({
-            workspaceId,
-            actorUserId: callerId,
-            action: 'workspace.transferred_ownership',
-            targetType: 'Workspace',
-            targetId: workspaceId,
-            before: { ownerId: callerId },
-            after: { ownerId: newOwnerUserId },
-        })
-
-        revalidatePath('/workspace')
-        return { success: true }
-    } catch (error: any) {
-        console.error('transferWorkspaceOwnership error:', error)
-        if (error instanceof LastOwnerProtectionError) {
-            return { error: error.message }
-        }
-        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
-            return { error: error.message }
-        }
-        return { error: 'Lỗi khi chuyển quyền sở hữu Workspace.' }
+export async function transferWorkspaceOwnership(_workspaceId: string, _newOwnerUserId: string) {
+    return {
+        error: 'Transfer ownership đã chuyển sang Profile level (Sprint Z+1). Vào Profile Members → Transfer ownership của Profile thay vì workspace.',
     }
 }
 

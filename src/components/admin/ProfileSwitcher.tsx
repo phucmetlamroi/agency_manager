@@ -42,12 +42,13 @@ export default function ProfileSwitcher({
             return
         }
 
-        const res = await changeUserProfile(userId, newProfileId || null, workspaceId)
-        if (res.error) {
-            toast.error(res.error)
-            e.target.value = currentProfileId || ''
-        } else {
+        // [Sprint Z] changeUserProfile deprecated — throws error. Wrap in try/catch.
+        try {
+            await changeUserProfile(userId, newProfileId || null, workspaceId)
             toast.success('Đã chuyển Team thành công')
+        } catch (err: any) {
+            toast.error(err?.message ?? 'Function deprecated — dùng inviteToProfileAction thay thế.')
+            e.target.value = currentProfileId || ''
         }
         setLoading(false)
     }

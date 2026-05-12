@@ -1,41 +1,19 @@
-import { PrismaClient, UserRole } from '@prisma/client'
-import * as bcrypt from 'bcryptjs'
+import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+/**
+ * [Sprint Z] SaaS multi-tenant — no super admin. Users tự signup qua public form.
+ * Seed file no-op (chỉ giữ skeleton để Prisma không error khi `prisma db seed` được gọi).
+ *
+ * Pre-Sprint Z behavior (đã loại bỏ):
+ *   - Tạo user `admin` với role=ADMIN (super admin)
+ *   - Tạo user `staff` với role=USER
+ *
+ * Nếu cần test data: dùng signup flow + admin-profile-actions.ts (Owner-gated).
+ */
 async function main() {
-    console.log('🌱 Starting seeding...')
-
-    // 1. Create Super Admin
-    const adminPassword = await bcrypt.hash('admin123', 10)
-    const admin = await prisma.user.upsert({
-        where: { username: 'admin' },
-        update: {},
-        create: {
-            username: 'admin',
-            password: adminPassword,
-            role: UserRole.ADMIN,
-            nickname: 'Super Admin',
-            email: 'admin@example.com',
-        },
-    })
-    console.log('✅ Super Admin created/verified.')
-
-    // 2. Create Staff Member
-    const staffPass = await bcrypt.hash('staff123', 10)
-    await prisma.user.upsert({
-        where: { username: 'staff' },
-        update: {},
-        create: {
-            username: 'staff',
-            password: staffPass,
-            role: UserRole.USER,
-            nickname: 'Staff One'
-        }
-    })
-    console.log('✅ Staff created.')
-
-    console.log('🏁 Seeding completed.')
+    console.log('🌱 [Sprint Z] Seeding no-op — SaaS model uses public signup. Skipping.')
 }
 
 main()

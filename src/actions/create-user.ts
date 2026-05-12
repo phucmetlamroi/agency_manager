@@ -50,15 +50,12 @@ export async function createUser(formData: FormData, workspaceId: string) {
 
         if (!creator) return { error: 'Creator not found' }
 
-        // Super Admin check for Profile choice
-        let assignedProfileId = null
-        if (creator.username === 'admin') {
-            assignedProfileId = incomingProfileId
-        } else {
-            // Normal Admin creates users within their own profile
-            if (!creator.profileId) return { error: 'Admin không thuộc về Team nào nên không thể tạo nhân sự.' }
-            assignedProfileId = creator.profileId
-        }
+        // [Sprint Z] Super admin removed. Profile chỉ là profile của creator
+        // (User.profileId). Cross-profile assignment qua inviteToProfileAction.
+        if (!creator.profileId) return { error: 'Bạn không thuộc về Profile nào nên không thể tạo nhân sự.' }
+        const assignedProfileId = creator.profileId
+        // incomingProfileId từ caller bị ignored (no super admin to override)
+        void incomingProfileId
 
         const hashedPassword = await bcrypt.hash(password, 10)
         await prisma.user.create({

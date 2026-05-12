@@ -222,7 +222,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         const users = await workspacePrisma.user.findMany({
             where: {
                 id: { in: candidateUserIds },
-                username: { not: 'admin' },
+                // [Sprint Z] Admin username filter removed (admin user deleted)
                 role: { notIn: ['ADMIN', 'CLIENT', 'LOCKED'] }
             },
             select: {

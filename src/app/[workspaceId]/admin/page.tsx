@@ -64,7 +64,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     const users = await workspacePrisma.user.findMany({
         where: {
             AND: [
-                currentUser?.username === 'admin' ? {} : { username: { not: 'admin' } },
+                // [Sprint Z] Admin user filter removed (admin account deleted in Z.12)
                 { role: { notIn: ['CLIENT', 'LOCKED'] } }
             ]
         },

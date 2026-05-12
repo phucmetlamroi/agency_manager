@@ -149,7 +149,8 @@ export async function getSessionTrends() {
     try {
         const authSession = await getSession();
         const profileId = (authSession?.user as any)?.sessionProfileId;
-        if (!profileId && authSession?.user?.username !== 'admin') return [];
+        // [Sprint Z] Super admin bypass removed. Reject if no profile context.
+        if (!profileId) return [];
 
         const now = new Date()
         const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -197,7 +198,8 @@ export async function getRecentEventLogs(limit = 20) {
     try {
         const authSession = await getSession();
         const profileId = (authSession?.user as any)?.sessionProfileId;
-        if (!profileId && authSession?.user?.username !== 'admin') return [];
+        // [Sprint Z] Super admin bypass removed. Reject if no profile context.
+        if (!profileId) return [];
 
         const logs = await prisma.event.findMany({
             take: limit,
@@ -237,7 +239,8 @@ export async function getFrictionData() {
     try {
         const authSession = await getSession();
         const profileId = (authSession?.user as any)?.sessionProfileId;
-        if (!profileId && authSession?.user?.username !== 'admin') return [];
+        // [Sprint Z] Super admin bypass removed. Reject if no profile context.
+        if (!profileId) return [];
 
         const now = new Date()
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -285,7 +288,8 @@ export async function getLivePresence() {
     try {
         const authSession = await getSession();
         const profileId = (authSession?.user as any)?.sessionProfileId;
-        if (!profileId && authSession?.user?.username !== 'admin') return [];
+        // [Sprint Z] Super admin bypass removed. Reject if no profile context.
+        if (!profileId) return [];
 
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
 

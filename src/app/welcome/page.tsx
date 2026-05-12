@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { isProfileOwner } from '@/lib/profile-permissions'
 import WelcomeClient from './WelcomeClient'
 
 /**
@@ -53,5 +54,9 @@ export default async function WelcomePage() {
         redirect(`/${firstWorkspace.id}/${isAdmin ? 'admin' : 'dashboard'}`)
     }
 
-    return <WelcomeClient profileName={profile.name} />
+    // [Sprint Y] Gate "+" button visibility — only home-profile owner can create.
+    // Cross-team invitees see read-only message asking to contact profile owner.
+    const canCreateWorkspace = await isProfileOwner(userId, profileId)
+
+    return <WelcomeClient profileName={profile.name} canCreateWorkspace={canCreateWorkspace} />
 }

@@ -18,6 +18,7 @@ import { AdminRevenueChart } from '@/components/dashboard/AdminRevenueChart'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar'
 import DashboardActionWrapper from '@/components/dashboard/DashboardActionWrapper'
 import { getAvailableProfiles } from '@/actions/profile-actions'
+import { isProfileOwner } from '@/lib/profile-permissions'
 
 export default async function AdminDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -26,6 +27,9 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
 
     const profileId = (session.user as any).sessionProfileId
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+
+    // [Sprint Y] Profile ownership check để gate "Tạo Workspace mới" button visibility
+    const canCreateWorkspace = profileId ? await isProfileOwner(session.user.id, profileId) : false
 
     const currentUser = await workspacePrisma.user.findUnique({
         where: { id: session.user.id },
@@ -196,6 +200,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 users={users.map(u => ({ id: u.id, username: u.username, nickname: u.nickname }))}
                 workspaces={workspacesForProfile}
                 userRole={session.user.role}
+                canCreateWorkspace={canCreateWorkspace}
             />
 
             {/* ── KPI Widgets ──────────────────────────────────── */}

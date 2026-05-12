@@ -15,6 +15,12 @@ interface WorkspaceItem {
 interface Props {
     workspaceId: string
     workspaces: WorkspaceItem[]
+    /**
+     * [Sprint Y] true iff user là chủ home profile của profile hiện tại.
+     * Cross-team invitees + global admin (không sở hữu profile) → false → ẩn
+     * "Tạo Workspace mới" entry.
+     */
+    canCreateWorkspace?: boolean
 }
 
 /**
@@ -30,7 +36,7 @@ interface Props {
  * Different from admin's DashboardActionBar: no "Add new task" button (USER không
  * tạo task được).
  */
-export default function UserWorkspacePicker({ workspaceId, workspaces }: Props) {
+export default function UserWorkspacePicker({ workspaceId, workspaces, canCreateWorkspace = false }: Props) {
     const [open, setOpen] = useState(false)
     const [showCreateModal, setShowCreateModal] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
@@ -192,38 +198,40 @@ export default function UserWorkspacePicker({ workspaceId, workspaces }: Props) 
                                 })
                             )}
 
-                            {/* Create Workspace button */}
-                            <button
-                                type="button"
-                                onClick={handleOpenCreateModal}
-                                className="flex w-full items-center gap-3 px-2.5 py-2 mt-1 transition-colors duration-150"
-                                style={{ borderRadius: 12 }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "rgba(255,255,255,0.04)"
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "transparent"
-                                }}
-                            >
-                                <div
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                                    style={{
-                                        background: "rgba(139,92,246,0.10)",
-                                        border: "1px dashed rgba(139,92,246,0.3)",
+                            {/* Create Workspace button — [Sprint Y] gated by profile ownership */}
+                            {canCreateWorkspace && (
+                                <button
+                                    type="button"
+                                    onClick={handleOpenCreateModal}
+                                    className="flex w-full items-center gap-3 px-2.5 py-2 mt-1 transition-colors duration-150"
+                                    style={{ borderRadius: 12 }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = "rgba(255,255,255,0.04)"
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = "transparent"
                                     }}
                                 >
-                                    <Plus className="h-3.5 w-3.5" style={{ color: "#8B5CF6" }} />
-                                </div>
-                                <span
-                                    className="text-[13px] font-semibold"
-                                    style={{
-                                        color: "#A1A1AA",
-                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                    }}
-                                >
-                                    Tạo Workspace mới
-                                </span>
-                            </button>
+                                    <div
+                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                                        style={{
+                                            background: "rgba(139,92,246,0.10)",
+                                            border: "1px dashed rgba(139,92,246,0.3)",
+                                        }}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" style={{ color: "#8B5CF6" }} />
+                                    </div>
+                                    <span
+                                        className="text-[13px] font-semibold"
+                                        style={{
+                                            color: "#A1A1AA",
+                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        }}
+                                    >
+                                        Tạo Workspace mới
+                                    </span>
+                                </button>
+                            )}
                         </div>
                     </motion.div>
                 )}

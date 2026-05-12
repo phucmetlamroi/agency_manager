@@ -18,6 +18,8 @@ interface DashboardActionWrapperProps {
   users: Array<{ id: string; username: string; nickname?: string | null }>
   workspaces: Array<{ id: string; name: string; description: string | null }>
   userRole: string
+  /** [Sprint Y] Gate "Tạo Workspace mới" button visibility */
+  canCreateWorkspace?: boolean
   onTaskCreated?: () => void
 }
 
@@ -27,6 +29,7 @@ export default function DashboardActionWrapper({
   users,
   workspaces,
   userRole,
+  canCreateWorkspace = false,
 }: DashboardActionWrapperProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const router = useRouter()
@@ -136,6 +139,7 @@ export default function DashboardActionWrapper({
         onAddTask={() => setModalOpen(true)}
         workspaces={workspaces}
         userRole={userRole}
+        canCreateWorkspace={canCreateWorkspace}
       />
       <AddTaskModal
         open={modalOpen}

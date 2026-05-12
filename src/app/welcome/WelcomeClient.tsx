@@ -1,11 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Sparkles, LogOut } from 'lucide-react'
+import { Plus, Sparkles, LogOut, Lock } from 'lucide-react'
 import CreateWorkspaceModal from '@/components/workspace/CreateWorkspaceModal'
 
 interface Props {
     profileName: string
+    /**
+     * [Sprint Y] true iff current user is owner of this home profile.
+     * Cross-team invitees (qua ProfileAccess) → false → ẩn "+" button,
+     * hiển thị message "Liên hệ chủ Profile để được mời vào workspace".
+     */
+    canCreateWorkspace?: boolean
 }
 
 /**
@@ -15,8 +21,11 @@ interface Props {
  * land here instead of being kicked to /login. Click "+" → create their first
  * workspace → CreateWorkspaceModal already redirects to /{wsId}/admin since
  * creator becomes OWNER.
+ *
+ * [Sprint Y] Permission gate: only home-profile owner sees "+" button.
+ * Cross-team invitees see locked-state message.
  */
-export default function WelcomeClient({ profileName }: Props) {
+export default function WelcomeClient({ profileName, canCreateWorkspace = false }: Props) {
     const [createOpen, setCreateOpen] = useState(false)
 
     return (
@@ -46,27 +55,53 @@ export default function WelcomeClient({ profileName }: Props) {
                     >
                         Chào mừng đến với <span className="text-violet-400">{profileName}</span>!
                     </h1>
-                    <p className="text-sm text-zinc-400 mb-8 leading-relaxed">
-                        Profile mới của bạn chưa có workspace nào. Hãy tạo workspace đầu tiên
-                        để bắt đầu quản lý task và mời thành viên nhé.
-                    </p>
 
-                    {/* Plus button with tooltip */}
-                    <button
-                        type="button"
-                        onClick={() => setCreateOpen(true)}
-                        title="Bấm vào đây để tạo workspace đầu tiên của bạn nhé!"
-                        className="group relative w-20 h-20 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 hover:from-violet-400 hover:to-violet-600 flex items-center justify-center mx-auto mb-4 shadow-[0_8px_32px_rgba(139,92,246,0.45)] hover:shadow-[0_12px_40px_rgba(139,92,246,0.6)] transition-all duration-200 cursor-pointer"
-                        aria-label="Create your first workspace"
-                    >
-                        <Plus className="w-9 h-9 text-white group-hover:scale-110 transition-transform" strokeWidth={2.5} />
-                        {/* Pulse ring */}
-                        <span className="absolute inset-0 rounded-full border-2 border-violet-400/40 animate-ping" />
-                    </button>
+                    {canCreateWorkspace ? (
+                        <>
+                            <p className="text-sm text-zinc-400 mb-8 leading-relaxed">
+                                Profile mới của bạn chưa có workspace nào. Hãy tạo workspace đầu tiên
+                                để bắt đầu quản lý task và mời thành viên nhé.
+                            </p>
 
-                    <p className="text-xs text-violet-300 font-medium">
-                        Bấm vào đây để tạo workspace đầu tiên của bạn nhé!
-                    </p>
+                            {/* Plus button with tooltip */}
+                            <button
+                                type="button"
+                                onClick={() => setCreateOpen(true)}
+                                title="Bấm vào đây để tạo workspace đầu tiên của bạn nhé!"
+                                className="group relative w-20 h-20 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 hover:from-violet-400 hover:to-violet-600 flex items-center justify-center mx-auto mb-4 shadow-[0_8px_32px_rgba(139,92,246,0.45)] hover:shadow-[0_12px_40px_rgba(139,92,246,0.6)] transition-all duration-200 cursor-pointer"
+                                aria-label="Create your first workspace"
+                            >
+                                <Plus className="w-9 h-9 text-white group-hover:scale-110 transition-transform" strokeWidth={2.5} />
+                                {/* Pulse ring */}
+                                <span className="absolute inset-0 rounded-full border-2 border-violet-400/40 animate-ping" />
+                            </button>
+
+                            <p className="text-xs text-violet-300 font-medium">
+                                Bấm vào đây để tạo workspace đầu tiên của bạn nhé!
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            {/* [Sprint Y] Non-owner state — cross-team invitee không có quyền tạo */}
+                            <p className="text-sm text-zinc-400 mb-8 leading-relaxed">
+                                Profile này chưa có workspace nào. Bạn không phải là chủ của Profile này,
+                                hãy liên hệ <strong className="text-violet-300">chủ Profile</strong> để được mời
+                                vào workspace nhé.
+                            </p>
+
+                            {/* Locked state icon (replaces "+") */}
+                            <div
+                                className="w-20 h-20 rounded-full bg-zinc-800/40 border border-zinc-700/60 flex items-center justify-center mx-auto mb-4"
+                                aria-label="Tạo workspace bị khóa"
+                            >
+                                <Lock className="w-8 h-8 text-zinc-500" strokeWidth={1.8} />
+                            </div>
+
+                            <p className="text-xs text-zinc-500 font-medium">
+                                Chỉ chủ Profile mới có quyền tạo workspace.
+                            </p>
+                        </>
+                    )}
                 </div>
 
                 {/* Sign-out option (escape hatch) */}

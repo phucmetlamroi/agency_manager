@@ -13,11 +13,17 @@ export async function createWorkspaceAction(formData: FormData) {
         return { error: 'Bạn cần đăng nhập để tạo Workspace.' }
     }
 
-    // Self-service: any authenticated user with a valid profile can create a workspace.
-    // The creator automatically becomes OWNER.
+    // [Sprint Y] Profile-gated: chỉ chủ home profile (User.profileId === profileId)
+    // được tạo workspace. Cross-team invitees + global admin KHÔNG override (strict).
     const profileId = session.user.sessionProfileId
     if (!profileId) {
         return { error: 'Không tìm thấy Profile. Vui lòng đăng nhập lại.' }
+    }
+
+    // [Sprint Y] Ownership gate — block cross-team users + global admin.
+    const { isProfileOwner } = await import('@/lib/profile-permissions')
+    if (!(await isProfileOwner(session.user.id, profileId))) {
+        return { error: 'Bạn không phải chủ Profile này. Chỉ chủ Profile mới có quyền tạo Workspace mới.' }
     }
 
     const name = formData.get('name') as string

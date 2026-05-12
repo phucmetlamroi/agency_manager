@@ -109,12 +109,23 @@ export async function getAvailableProfiles() {
 /**
  * Returns the user's accessible profiles AND workspaces for the current profile.
  * Used by the sidebar ProfileWorkspaceSwitcher component.
+ *
+ * [Sprint Y] Each profile object includes `isOwner: boolean` — true iff
+ * user.profileId === profile.id (home profile). Used to gate "Tạo Workspace mới"
+ * button visibility (only profile owner can create workspaces).
  */
 export async function getMyProfilesAndWorkspaces() {
     const session = await getSession()
     if (!session?.user) return { profiles: [], workspaces: [], currentProfileId: null }
 
     const currentProfileId: string | null = (session.user as any).sessionProfileId || null
+
+    // [Sprint Y] Fetch user.profileId once to determine ownership per profile
+    const me = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { profileId: true },
+    })
+    const homeProfileId = me?.profileId ?? null
 
     // Fetch accessible profiles
     const profiles = await getAvailableProfiles()
@@ -135,9 +146,13 @@ export async function getMyProfilesAndWorkspaces() {
             name: p.name,
             userCount: p._count?.users ?? 0,
             workspaceCount: p._count?.workspaces ?? 0,
+            // [Sprint Y] isOwner = is this user's home profile? Used to gate UI.
+            isOwner: homeProfileId === p.id,
         })),
         workspaces,
         currentProfileId,
+        // [Sprint Y] Expose for callers that need quick lookup
+        currentProfileIsOwner: currentProfileId !== null && currentProfileId === homeProfileId,
     }
 }
 

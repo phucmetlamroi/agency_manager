@@ -9,6 +9,7 @@ import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '@/lib/task-sta
 import { serializeDecimal } from '@/lib/serialization'
 import { sanitizeTaskListForUser } from '@/lib/task-sanitize'
 import { getAvailableProfiles } from '@/actions/profile-actions'
+import { isProfileOwner } from '@/lib/profile-permissions'
 
 import UserHomeTopBar from '@/components/dashboard/UserHomeTopBar'
 import UserWorkspacePicker from '@/components/dashboard/UserWorkspacePicker'
@@ -38,6 +39,9 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
     const userId = session.user.id
     const profileId = (session.user as any).sessionProfileId
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+
+    // [Sprint Y] Profile ownership — gate "Tạo Workspace mới" trong UserWorkspacePicker
+    const canCreateWorkspace = profileId ? await isProfileOwner(userId, profileId) : false
 
     // ── Workspace name + role context ────────────────────────────
     const workspace = await prisma.workspace.findUnique({
@@ -191,7 +195,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                 căn sát với widget grid bên dưới. Wrap on mobile so pills don't
                 squeeze into 2-line text. ── */}
             <div className="flex items-center justify-between gap-3 px-1 flex-wrap">
-                <UserWorkspacePicker workspaceId={workspaceId} workspaces={workspacesForProfile} />
+                <UserWorkspacePicker workspaceId={workspaceId} workspaces={workspacesForProfile} canCreateWorkspace={canCreateWorkspace} />
 
                 {/* Manage widgets — placeholder per plan D.8 */}
                 <button

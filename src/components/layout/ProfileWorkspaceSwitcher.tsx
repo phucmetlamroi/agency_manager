@@ -21,6 +21,8 @@ interface ProfileItem {
     name: string
     userCount: number
     workspaceCount: number
+    /** [Sprint Y] true iff user là chủ home profile của profile này */
+    isOwner?: boolean
 }
 
 interface WorkspaceItem {
@@ -58,14 +60,17 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
     const [profiles, setProfiles] = useState<ProfileItem[]>([])
     const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([])
     const [currentProfileId, setCurrentProfileId] = useState<string | null>(null)
+    // [Sprint Y] Track ownership of current profile để gate "Tạo Workspace" button
+    const [currentProfileIsOwner, setCurrentProfileIsOwner] = useState(false)
 
     // Load data on mount — keep profiles for trigger label only;
     // profile switching itself moved to UserHomeTopBar dropdown.
     useEffect(() => {
-        getMyProfilesAndWorkspaces().then((data) => {
+        getMyProfilesAndWorkspaces().then((data: any) => {
             setProfiles(data.profiles)
             setWorkspaces(data.workspaces)
             setCurrentProfileId(data.currentProfileId)
+            setCurrentProfileIsOwner(!!data.currentProfileIsOwner)
         })
     }, [])
 
@@ -131,6 +136,7 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
                                 workspaceId={workspaceId}
                                 onWorkspaceSwitch={handleWorkspaceSwitch}
                                 onCreateWorkspace={handleOpenCreateModal}
+                                canCreate={currentProfileIsOwner}
                                 align="right"
                             />
                         )}
@@ -201,6 +207,7 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
                         workspaceId={workspaceId}
                         onWorkspaceSwitch={handleWorkspaceSwitch}
                         onCreateWorkspace={handleOpenCreateModal}
+                        canCreate={currentProfileIsOwner}
                         align="left"
                     />
                 )}
@@ -219,12 +226,15 @@ function SwitcherDropdown({
     workspaceId,
     onWorkspaceSwitch,
     onCreateWorkspace,
+    canCreate,
     align,
 }: {
     workspaces: WorkspaceItem[]
     workspaceId: string
     onWorkspaceSwitch: (id: string) => void
     onCreateWorkspace: () => void
+    /** [Sprint Y] true iff user là chủ home profile của profile hiện tại */
+    canCreate: boolean
     align: "left" | "right"
 }) {
     return (
@@ -301,25 +311,27 @@ function SwitcherDropdown({
                     )
                 })}
 
-                {/* Create Workspace button */}
-                <button
-                    type="button"
-                    onClick={onCreateWorkspace}
-                    className="flex w-full items-center gap-3 px-2.5 py-2 mt-1 transition-colors duration-150 cursor-pointer"
-                    style={{ borderRadius: 12 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)" }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
-                >
-                    <div
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                        style={{ background: "rgba(139,92,246,0.10)", border: `1px dashed rgba(139,92,246,0.3)` }}
+                {/* Create Workspace button — [Sprint Y] gated by profile ownership */}
+                {canCreate && (
+                    <button
+                        type="button"
+                        onClick={onCreateWorkspace}
+                        className="flex w-full items-center gap-3 px-2.5 py-2 mt-1 transition-colors duration-150 cursor-pointer"
+                        style={{ borderRadius: 12 }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)" }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
                     >
-                        <Plus className="h-3.5 w-3.5" style={{ color: ACCENT }} />
-                    </div>
-                    <span className="text-[13px] font-semibold" style={{ color: MUTED_LIGHT }}>
-                        Tạo Workspace mới
-                    </span>
-                </button>
+                        <div
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                            style={{ background: "rgba(139,92,246,0.10)", border: `1px dashed rgba(139,92,246,0.3)` }}
+                        >
+                            <Plus className="h-3.5 w-3.5" style={{ color: ACCENT }} />
+                        </div>
+                        <span className="text-[13px] font-semibold" style={{ color: MUTED_LIGHT }}>
+                            Tạo Workspace mới
+                        </span>
+                    </button>
+                )}
             </div>
         </motion.div>
     )

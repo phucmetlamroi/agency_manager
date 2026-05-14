@@ -136,6 +136,14 @@ export async function createTask(formData: FormData, workspaceId: string) {
             }
         })
 
+        // [Sprint Z+1 hotfix] Auto-create WorkspaceMember row cho assignee
+        // \u2192 fix bug "Save failed" khi USER role \u0111\u01b0\u1ee3c assign task m\u00e0 kh\u00f4ng c\u00f3
+        // WorkspaceMember row \u2192 verifyWorkspaceAccess throws.
+        if (assigneeId) {
+            const { ensureWorkspaceMembership } = await import('@/lib/workspace-membership')
+            await ensureWorkspaceMembership(assigneeId, workspaceId, 'MEMBER')
+        }
+
         // [Sprint P] Audit log: task.assigned (G\u01101 \u2014 admin t\u1ea1o + assign)
         if (session?.user?.id) {
             void audit({

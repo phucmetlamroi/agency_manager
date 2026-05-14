@@ -133,9 +133,13 @@ export async function getMyProfilesAndWorkspaces() {
             for (const w of [...autoWs, ...explicitWs]) merged.set(w.id, w)
             workspaces = Array.from(merged.values())
         } else if (access?.role === 'USER') {
-            // USER: chỉ workspaces có explicit WorkspaceMember
+            // [Sprint Z+1 hotfix] USER role thấy TẤT CẢ workspaces của profile
+            // (read access). Trước đây chỉ thấy workspaces có explicit
+            // WorkspaceMember, làm USER bị block khi assigned to task ngoài
+            // workspaces họ là member. Match Sprint Y behavior + role-based gating
+            // ở action layer (canCreateWorkspace cho create).
             workspaces = await prisma.workspace.findMany({
-                where: { profileId: currentProfileId, members: { some: { userId } } },
+                where: { profileId: currentProfileId },
                 select: { id: true, name: true, description: true },
                 orderBy: { createdAt: 'asc' }
             })

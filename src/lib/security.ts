@@ -92,6 +92,15 @@ export async function verifyWorkspaceAccess(
                 throw new Error('SECURITY_VIOLATION: Vai trò không hợp lệ trong Workspace này.')
             }
             workspaceRole = membership.role
+        } else if (profileAccess) {
+            // [Sprint Z+1 hotfix] Profile member (USER, hoặc ADMIN với workspace cũ hơn grantedAt)
+            // → fall back tới MEMBER access. Cần thiết cho USER assigned to task —
+            // họ cần permission update productLink/notes khi nộp delivery.
+            //
+            // CREATE gates (workspace creation, member invite, role change) đều dùng
+            // canCreateWorkspace/canInviteMember từ profile-permissions.ts (based on
+            // ProfileAccess.role), KHÔNG dựa workspaceRole — nên fallback này SAFE.
+            workspaceRole = 'MEMBER'
         }
     }
 

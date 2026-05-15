@@ -10,8 +10,11 @@ import {
     Check,
     Search,
     ChevronDown,
+    Cloud,
+    CloudOff,
 } from "lucide-react"
 import dynamic from "next/dynamic"
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft"
 
 // TiptapEditor uses browser-only APIs — load on client only
 const TiptapEditor = dynamic(() => import("@/components/tiptap/TiptapEditor"), { ssr: false })
@@ -318,6 +321,44 @@ function AutocompleteInput({
 }
 
 /* ------------------------------------------------------------------ */
+/*  AutoSaveIndicator — Google Docs–style "Đã lưu nháp Xs trước"       */
+/* ------------------------------------------------------------------ */
+
+function AutoSaveIndicator({ savedAt }: { savedAt: number | null }) {
+    const [now, setNow] = useState(Date.now())
+
+    useEffect(() => {
+        if (!savedAt) return
+        const interval = setInterval(() => setNow(Date.now()), 5000) // refresh "Xs ago" mỗi 5s
+        return () => clearInterval(interval)
+    }, [savedAt])
+
+    if (!savedAt) {
+        return (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] text-[10px] text-[#71717A]">
+                <CloudOff size={11} strokeWidth={2} />
+                <span>Chưa lưu</span>
+            </div>
+        )
+    }
+
+    const elapsed = Math.floor((now - savedAt) / 1000)
+    const label =
+        elapsed < 5
+            ? "Đã lưu nháp"
+            : elapsed < 60
+              ? `Đã lưu ${elapsed}s trước`
+              : `Đã lưu ${Math.floor(elapsed / 60)} phút trước`
+
+    return (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-300">
+            <Cloud size={11} strokeWidth={2} />
+            <span>{label}</span>
+        </div>
+    )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Step Indicator (5 steps per Figma)                                 */
 /* ------------------------------------------------------------------ */
 
@@ -429,6 +470,7 @@ function PreviewAccordion({
 export default function AddTaskModal({
     open,
     onClose,
+    workspaceId,
     clients,
     users,
     onSubmit,
@@ -438,12 +480,69 @@ export default function AddTaskModal({
     const [submitted, setSubmitted] = useState(false)
     const [submitting, setSubmitting] = useState(false)
 
+    // [Sprint Z+1] Auto-save draft tới localStorage (Google Docs–style).
+    // Reset trên mỗi keystroke; idle 3 phút → expire.
+    // Key per-workspace để tránh cross-contamination giữa các workspace.
+    const DRAFT_KEY = `addTask:draft:${workspaceId}`
+    const { restored, clearDraft, savedAt } = useAutoSaveDraft<{
+        form: TaskFormData
+        step: number
+    }>(
+        DRAFT_KEY,
+        { form, step },
+        (draft) => {
+            // Restore từ localStorage khi mở modal
+            setForm(draft.form)
+            setStep(draft.step)
+        },
+        {
+            ttlMs: 3 * 60 * 1000, // 3 phút sliding TTL
+            debounceMs: 500,
+            enabled: open && !submitted, // chỉ save khi modal đang mở + chưa submit
+            shouldSave: ({ form }) => {
+                // Bỏ qua nếu form hoàn toàn trống (tránh lưu draft empty)
+                return Boolean(
+                    form.clientId ||
+                        form.assigneeId ||
+                        form.taskType ||
+                        form.deadline ||
+                        form.videoList?.trim() ||
+                        form.jobPriceUSD ||
+                        form.editorFee ||
+                        form.notes?.replace(/<[^>]*>/g, "").trim() ||
+                        form.rawFootage ||
+                        form.bRoll ||
+                        form.references ||
+                        form.script ||
+                        form.submitFolder ||
+                        form.collectFile ||
+                        form.frameUsername ||
+                        form.framePassword ||
+                        form.frameNote,
+                )
+            },
+        },
+    )
+
+    // Toast khi restore từ localStorage (chỉ chạy 1 lần sau restore)
+    const toastedRestore = useRef(false)
+    useEffect(() => {
+        if (restored && !toastedRestore.current && open) {
+            toastedRestore.current = true
+            toast.success("Đã khôi phục bản nháp đang nhập dở", {
+                description: "Tự động xóa sau 3 phút không hoạt động.",
+                duration: 4000,
+            })
+        }
+    }, [restored, open])
+
     useEffect(() => {
         if (open) {
-            setStep(0)
-            setForm({ ...INITIAL_FORM })
+            // KHÔNG reset form ngay — để useAutoSaveDraft có cơ hội restore từ localStorage trước.
+            // Nếu không có draft hoặc draft đã expire, form vẫn ở INITIAL_FORM (state cũ).
             setSubmitted(false)
             setSubmitting(false)
+            toastedRestore.current = false
         }
     }, [open])
 
@@ -487,6 +586,8 @@ export default function AddTaskModal({
         try {
             await onSubmit?.(form)
             setSubmitted(true)
+            // [Auto-save] Clear draft khi submit success — không còn cần restore
+            clearDraft()
         } catch (err: any) {
             toast.error(err?.message || "Lỗi khi tạo task. Vui lòng thử lại.")
         } finally {
@@ -495,6 +596,9 @@ export default function AddTaskModal({
     }
 
     const handleDone = () => {
+        // [Auto-save] Reset form state cho lần mở next (submitted = đã clear draft rồi)
+        setForm({ ...INITIAL_FORM })
+        setStep(0)
         onClose()
     }
 
@@ -847,18 +951,22 @@ export default function AddTaskModal({
                                     </h2>
                                     <p className="text-xs text-[#A1A1AA] mt-0.5">{stepSubtitle}</p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        // [Sprint K P1] Block close while submitting
-                                        if (submitting) return
-                                        onClose()
-                                    }}
-                                    disabled={submitting}
-                                    className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[#A1A1AA] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <X size={16} />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    {/* [Auto-save] Indicator — Google Docs–style "Đã lưu nháp" */}
+                                    <AutoSaveIndicator savedAt={savedAt} />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            // [Sprint K P1] Block close while submitting
+                                            if (submitting) return
+                                            onClose()
+                                        }}
+                                        disabled={submitting}
+                                        className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[#A1A1AA] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
                             </div>
                         )}
 

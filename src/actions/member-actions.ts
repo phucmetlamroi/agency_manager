@@ -592,14 +592,22 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
 
         if ('error' in result) return result
 
-        await audit({
-            workspaceId: result.workspaceId!,
-            actorUserId: session.user.id,
-            action: 'member.joined',
-            targetType: 'WorkspaceMember',
-            targetId: session.user.id,
-            after: { role: result.role, method: 'invitation_accepted' },
-        })
+        // [Z+1.fix2] Audit best-effort — KHÔNG fail accept flow nếu audit throw.
+        // Trước đây audit() ở trong try/catch chính → fail = user thấy "Lỗi khi chấp nhận lời mời"
+        // dù transaction đã commit thành công. Workspace member + ProfileAccess đã tạo trong DB,
+        // chỉ audit/notification gặp issue.
+        try {
+            await audit({
+                workspaceId: result.workspaceId!,
+                actorUserId: session.user.id,
+                action: 'member.joined',
+                targetType: 'WorkspaceMember',
+                targetId: session.user.id,
+                after: { role: result.role, method: 'invitation_accepted' },
+            })
+        } catch (auditErr) {
+            console.warn('[acceptWorkspaceInvitation] audit failed (non-fatal):', auditErr)
+        }
 
         // Notify the inviter (best-effort, don't block on failure)
         if (result.inviterId) {
@@ -622,12 +630,32 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             }
         }
 
-        revalidatePath(`/${result.workspaceId}/admin/members`)
-        revalidatePath('/workspace')
+        // [Z+1.fix2] revalidatePath also best-effort
+        try {
+            revalidatePath(`/${result.workspaceId}/admin/members`)
+            revalidatePath('/workspace')
+        } catch (revalErr) {
+            console.warn('[acceptWorkspaceInvitation] revalidate failed (non-fatal):', revalErr)
+        }
+
         return { success: true, workspaceId: result.workspaceId, workspaceName: result.workspaceName }
     } catch (err: any) {
-        console.error('[acceptWorkspaceInvitation] error:', err)
-        return { error: 'Lỗi khi chấp nhận lời mời.' }
+        // [Z+1.fix2] Better error messaging — Prisma-aware + log full detail
+        console.error('[acceptWorkspaceInvitation] error:', {
+            code: err?.code,
+            message: err?.message,
+            meta: err?.meta,
+            stack: err?.stack?.split('\n').slice(0, 5).join('\n'),
+        })
+
+        // Prisma-specific errors
+        if (err?.code === 'P2002') return { error: 'Bạn đã là thành viên workspace này.' }
+        if (err?.code === 'P2025') return { error: 'Workspace hoặc lời mời không tồn tại / đã bị xóa.' }
+        if (err?.code === 'P2003') return { error: 'Reference dữ liệu không hợp lệ (FK constraint).' }
+
+        // Fallback với hint debug
+        const detail = err?.message?.slice(0, 80) || 'unknown'
+        return { error: `Lỗi khi chấp nhận lời mời: ${detail}` }
     }
 }
 
@@ -677,11 +705,25 @@ export async function declineWorkspaceInvitation(invitationId: string) {
             }
         }
 
-        revalidatePath(`/${invitation.workspaceId}/admin/members`)
+        // [Z+1.fix2] revalidatePath best-effort
+        try {
+            revalidatePath(`/${invitation.workspaceId}/admin/members`)
+        } catch (revalErr) {
+            console.warn('[declineWorkspaceInvitation] revalidate failed (non-fatal):', revalErr)
+        }
         return { success: true }
     } catch (err: any) {
-        console.error('[declineWorkspaceInvitation] error:', err)
-        return { error: 'Lỗi khi từ chối lời mời.' }
+        console.error('[declineWorkspaceInvitation] error:', {
+            code: err?.code,
+            message: err?.message,
+            meta: err?.meta,
+        })
+
+        if (err?.code === 'P2025') return { error: 'Lời mời không tồn tại / đã bị xóa.' }
+        if (err?.code === 'P2003') return { error: 'Reference dữ liệu không hợp lệ.' }
+
+        const detail = err?.message?.slice(0, 80) || 'unknown'
+        return { error: `Lỗi khi từ chối lời mời: ${detail}` }
     }
 }
 

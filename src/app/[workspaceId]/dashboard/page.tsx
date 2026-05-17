@@ -37,7 +37,25 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
     if (!session) redirect('/login')
 
     const userId = session.user.id
-    const profileId = (session.user as any).sessionProfileId
+
+    // [Z+1.fix3] Session profileId fallback — handle legacy sessions hoặc cross-profile nav.
+    // Workspace layout đã verify access, nhưng nếu sessionProfileId mismatch với
+    // workspace's profile, dùng workspace's profile cho prisma context.
+    let profileId = (session.user as any).sessionProfileId as string | null | undefined
+    if (!profileId) {
+        try {
+            const firstAccess = await prisma.profileAccess.findFirst({
+                where: { userId },
+                select: { profileId: true },
+                orderBy: { grantedAt: 'asc' },
+            })
+            profileId = firstAccess?.profileId ?? null
+        } catch (e) {
+            console.warn('[UserDashboard] ProfileAccess fallback failed:', e)
+        }
+        if (!profileId) redirect('/login')
+    }
+
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
     // [Sprint Y] Profile ownership — gate "Tạo Workspace mới" trong UserWorkspacePicker

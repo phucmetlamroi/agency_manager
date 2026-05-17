@@ -555,49 +555,43 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             if (!invitation) return { error: 'Lời mời không tồn tại.' }
             if (invitation.workspace.status !== 'ACTIVE') return { error: 'Workspace không còn hoạt động.' }
 
-            // Create membership (skip if already a member — edge case: direct-added while invite pending)
-            const existingMember = await tx.workspaceMember.findUnique({
+            // [Z+1.fix5] Create membership — upsert pattern to prevent P2002 race.
+            // Edge case: user was direct-added while invite was pending, OR
+            // ensureWorkspaceMembership created orphan row via task assignment.
+            // Upsert: if exists → keep existing role (don't downgrade); if not → create.
+            await tx.workspaceMember.upsert({
                 where: {
                     userId_workspaceId: {
                         userId: session.user.id,
                         workspaceId: invitation.workspaceId,
                     }
-                }
+                },
+                create: {
+                    userId: session.user.id,
+                    workspaceId: invitation.workspaceId,
+                    role: invitation.role,
+                },
+                update: {},  // don't override existing role (ADMIN stays ADMIN)
             })
 
-            if (!existingMember) {
-                await tx.workspaceMember.create({
-                    data: {
-                        userId: session.user.id,
-                        workspaceId: invitation.workspaceId,
-                        role: invitation.role,
-                    }
-                })
-            }
-
-            // CRITICAL: grant ProfileAccess so the new member shows up in
-            // profile-scoped queries (assignee picker, leaderboard, performance,
-            // etc.). Without this, the user has WorkspaceMember row nhưng KHÔNG
-            // có profile context → invisible trong các page filter theo profileId.
-            // Skip nếu user đã có profile khác (giữ profileId chính của họ),
-            // chỉ thêm ProfileAccess fallback.
+            // [Z+1.fix5] Grant ProfileAccess — upsert pattern (bulletproof).
+            // Without this, user has WorkspaceMember but is INVISIBLE in
+            // profile-scoped queries (assignee picker, admin user list, etc.).
             if (invitation.workspace.profileId) {
-                const existingAccess = await tx.profileAccess.findUnique({
+                await tx.profileAccess.upsert({
                     where: {
                         userId_profileId: {
                             userId: session.user.id,
                             profileId: invitation.workspace.profileId,
                         }
-                    }
+                    },
+                    create: {
+                        userId: session.user.id,
+                        profileId: invitation.workspace.profileId,
+                        role: 'USER',
+                    },
+                    update: {},  // don't override existing role
                 })
-                if (!existingAccess) {
-                    await tx.profileAccess.create({
-                        data: {
-                            userId: session.user.id,
-                            profileId: invitation.workspace.profileId,
-                        }
-                    })
-                }
             }
 
             return {

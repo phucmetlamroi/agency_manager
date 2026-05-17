@@ -86,12 +86,13 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
             id: true,
             username: true,
             nickname: true,
+            displayName: true,
             role: true,
             avatarUrl: true,
         },
     })
 
-    const displayName = currentUser?.nickname || currentUser?.username || 'User'
+    const displayName = currentUser?.displayName || currentUser?.nickname || currentUser?.username || 'User'
     const initials =
         displayName
             .split(/\s+/)

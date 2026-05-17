@@ -1001,6 +1001,7 @@ export async function getAvailableUsersForInvite(workspaceId: string) {
         select: {
             id: true,
             username: true,
+            displayName: true,
             nickname: true,
             email: true,
             avatarUrl: true,

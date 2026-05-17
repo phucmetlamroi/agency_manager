@@ -98,7 +98,7 @@ function buildSwipeActions(
 export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
     tasks: TaskWithUser[]
     isAdmin: boolean
-    users?: { id: string; username: string; nickname?: string | null }[]
+    users?: { id: string; username: string; nickname?: string | null; displayName?: string | null }[]
     workspaceId: string
 }) {
     const router = useRouter()

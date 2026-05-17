@@ -376,7 +376,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                                             .map(u => {
                                                                 return (
                                                                     <option key={u.id} value={u.id} className="text-black">
-                                                                        {u.username}
+                                                                        {(u as any).displayName || (u as any).nickname || u.username}
                                                                     </option>
                                                                 )
                                                             })}

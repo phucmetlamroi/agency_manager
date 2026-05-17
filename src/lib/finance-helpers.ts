@@ -63,12 +63,12 @@ export async function computeWorkspaceFinance(
     const [completedTasks, allTasks] = await Promise.all([
         wsPrisma.task.findMany({
             where: { status: 'Hoàn tất' },
-            include: { assignee: { select: { id: true, username: true, role: true, nickname: true } } },
+            include: { assignee: { select: { id: true, username: true, role: true, nickname: true, displayName: true } } },
             orderBy: { updatedAt: 'desc' },
         }),
         wsPrisma.task.findMany({
             where: { isArchived: false },
-            include: { assignee: { select: { id: true, username: true, role: true, nickname: true } } },
+            include: { assignee: { select: { id: true, username: true, role: true, nickname: true, displayName: true } } },
             orderBy: { updatedAt: 'desc' },
         }),
     ])

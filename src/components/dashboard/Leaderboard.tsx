@@ -91,7 +91,7 @@ export const getLeaderboardData = unstable_cache(
 
             return {
                 id: u.id,
-                username: u.username,
+                username: (u as any).displayName || (u as any).nickname || u.username,
                 taskCount,
                 errorRate,
                 revenue,

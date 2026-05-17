@@ -36,7 +36,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
         include: {
             assignee: {
                 select: {
-                    id: true, username: true, role: true, nickname: true, avatarUrl: true,
+                    id: true, username: true, displayName: true, role: true, nickname: true, avatarUrl: true,
                     monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } }
                 }
             },
@@ -50,7 +50,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
         where: { role: { notIn: ['CLIENT', 'LOCKED'] } },
         orderBy: { username: 'asc' },
         select: {
-            id: true, username: true, role: true, nickname: true, avatarUrl: true,
+            id: true, username: true, displayName: true, role: true, nickname: true, avatarUrl: true,
             monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } }
         }
     })

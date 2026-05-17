@@ -249,7 +249,7 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
                     {users.filter((u: any) => u.role !== 'LOCKED').map((u: any) => {
                         return (
                             <option key={u.id} value={u.id} disabled={u.role === 'LOCKED'}>
-                                {u.username}
+                                {u.displayName || u.nickname || u.username}
                             </option>
                         )
                     })}

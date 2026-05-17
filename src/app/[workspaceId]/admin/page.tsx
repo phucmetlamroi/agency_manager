@@ -48,7 +48,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
 
     const currentUser = await workspacePrisma.user.findUnique({
         where: { id: session.user.id },
-        select: { username: true, nickname: true }
+        select: { username: true, nickname: true, displayName: true }
     })
 
     // 1. Run overdue check
@@ -65,7 +65,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         include: {
             assignee: {
                 select: {
-                    id: true, username: true, role: true, nickname: true,
+                    id: true, username: true, displayName: true, role: true, nickname: true,
                     monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } }
                 }
             },
@@ -85,7 +85,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         },
         orderBy: [{ username: 'asc' }],
         select: {
-            id: true, username: true, role: true, nickname: true,
+            id: true, username: true, displayName: true, role: true, nickname: true,
             monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } }
         }
     })
@@ -181,7 +181,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         select: { id: true, name: true, description: true }
     })
 
-    const displayName = currentUser?.nickname || currentUser?.username || 'Admin'
+    const displayName = currentUser?.displayName || currentUser?.nickname || currentUser?.username || 'Admin'
     const initials = displayName.split(/\s+/).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || 'AD'
 
     return (
@@ -212,7 +212,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             <DashboardActionWrapper
                 workspaceId={workspaceId}
                 clients={allClients.map(c => ({ ...c, id: String(c.id), parentId: c.parentId ? String(c.parentId) : null }))}
-                users={users.map(u => ({ id: u.id, username: u.username, nickname: u.nickname }))}
+                users={users.map(u => ({ id: u.id, username: u.username, nickname: u.nickname, displayName: u.displayName }))}
                 workspaces={workspacesForProfile}
                 userRole={session.user.role}
                 canCreateWorkspace={canCreateWorkspace}

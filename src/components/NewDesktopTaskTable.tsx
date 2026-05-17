@@ -109,7 +109,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                 t.title.toLowerCase().includes(q) ||
                 (t.client?.name || '').toLowerCase().includes(q) ||
                 (t.client?.parent?.name || '').toLowerCase().includes(q) ||
-                (t.assignee?.username || '').toLowerCase().includes(q)
+                ((t.assignee as any)?.displayName || (t.assignee as any)?.nickname || t.assignee?.username || '').toLowerCase().includes(q)
             )
         }
         if (sortField) {

@@ -100,15 +100,24 @@ export async function uploadAvatar(userId: string, formData: FormData) {
             }
         })
 
-        // @ts-ignore
-        revalidateTag('leaderboard')
-        revalidatePath('/', 'layout')
-        
+        // [Z+1.fix2] BEFORE: revalidatePath('/', 'layout') — quá rộng, sau Sprint Z+1
+        //   RBAC migration có thể trigger downstream errors → Server Action trả về HTML
+        //   error page thay vì JSON → user thấy "An unexpected response was received from the server".
+        // AFTER: chỉ revalidateTag('leaderboard') (specific tag-based invalidation).
+        //   Avatar URL được fetch fresh trên next navigation; browser cache tự refresh.
+        try {
+            // @ts-ignore
+            revalidateTag('leaderboard')
+        } catch (e) {
+            console.warn('[uploadAvatar] revalidateTag failed (non-fatal):', e)
+        }
+
         return { success: true, url: blob.url }
 
     } catch (error: any) {
         console.error('Avatar upload error:', error)
-        return { error: error.message || 'Lỗi khi tải ảnh đại diện' }
+        // Always return JSON, never throw — prevents "unexpected response" error
+        return { error: error?.message?.slice(0, 200) || 'Lỗi khi tải ảnh đại diện. Vui lòng thử lại.' }
     }
 }
 
@@ -158,11 +167,13 @@ export async function uploadProfileBanner(profileId: string, formData: FormData)
             data: { bannerUrl: blob.url },
         })
 
-        revalidatePath('/', 'layout')
+        // [Z+1.fix2] Removed revalidatePath('/', 'layout') — too broad, can cascade
+        // through Sprint Z+1 RBAC layout → trigger HTML error response.
+        // Banner URL is on Profile row; consumers re-fetch on next navigation.
         return { success: true as const, url: blob.url }
     } catch (error: any) {
         console.error('Profile banner upload error:', error)
-        return { error: error.message || 'Lỗi khi tải banner.' }
+        return { error: error?.message?.slice(0, 200) || 'Lỗi khi tải banner. Vui lòng thử lại.' }
     }
 }
 
@@ -195,10 +206,10 @@ export async function uploadProfileLogo(profileId: string, formData: FormData) {
             data: { logoUrl: blob.url },
         })
 
-        revalidatePath('/', 'layout')
+        // [Z+1.fix2] Removed revalidatePath('/', 'layout') — see uploadProfileBanner comment.
         return { success: true as const, url: blob.url }
     } catch (error: any) {
         console.error('Profile logo upload error:', error)
-        return { error: error.message || 'Lỗi khi tải logo.' }
+        return { error: error?.message?.slice(0, 200) || 'Lỗi khi tải logo. Vui lòng thử lại.' }
     }
 }

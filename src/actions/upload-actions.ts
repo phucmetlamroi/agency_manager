@@ -5,33 +5,86 @@ import { prisma } from '@/lib/db'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import sharp from 'sharp'
 
+/* ──────────────────────────────────────────────────────────────────── */
+/*  [Z+1.fix3] Image upload helpers                                      */
+/* ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * Allowed image MIME types — Sharp supports tất cả these natively.
+ * iPhone HEIC/HEIF, modern AVIF, plus traditional JPG/PNG/GIF/WebP/TIFF.
+ */
+const ALLOWED_IMAGE_MIME = [
+    'image/jpeg', 'image/jpg', 'image/pjpeg',  // JPG
+    'image/png',                                 // PNG
+    'image/webp',                                // WebP
+    'image/gif',                                 // GIF
+    'image/avif',                                // AVIF (modern)
+    'image/heic', 'image/heif',                  // iPhone formats
+    'image/tiff', 'image/tif',                   // TIFF
+] as const
+
+/**
+ * Validate file is image type. Returns error message if invalid, null if OK.
+ */
+function validateImageFile(file: File | null): string | null {
+    if (!file) return 'Không tìm thấy tệp tin.'
+    // Some browsers / drag-drop scenarios set file.type empty — accept if size > 0,
+    // Sharp sẽ tự reject nếu không parse được.
+    if (file.type && !(ALLOWED_IMAGE_MIME as readonly string[]).includes(file.type)) {
+        return `Định dạng ${file.type} không hỗ trợ. Hãy dùng JPG/PNG/WebP/HEIC/AVIF.`
+    }
+    return null
+}
+
+/**
+ * [Z+1.fix3] Sharp pipeline builder với EXIF auto-orient.
+ *
+ * Critical: `.rotate()` no-args BEFORE `.resize()` để auto-orient theo EXIF tag.
+ * Without this, portrait photos từ phone (EXIF Orientation=6) bị xử lý ở raw
+ * landscape pixels → output rotated 90° (avatar lying on side).
+ *
+ * `failOn: 'none'` để Sharp lenient với metadata bất thường (corrupt EXIF,
+ * unusual color profile từ iPhone DisplayP3, v.v.) — KHÔNG throw, chỉ skip.
+ */
+function imagePipeline(buffer: Buffer) {
+    return sharp(buffer, { failOn: 'none' }).rotate()
+}
+
 export async function uploadPaymentQr(userId: string, formData: FormData) {
     try {
         const file = formData.get('file') as File
         const bankName = formData.get('bankName') as string
         const accountNum = formData.get('accountNum') as string
 
-        if (!file) return { error: 'No file provided' }
+        // [Z+1.fix3] Validate file early
+        const validateErr = validateImageFile(file)
+        if (validateErr) return { error: validateErr }
 
         // 1. Validate Size (Server-side double check)
         if (file.size > 4 * 1024 * 1024) {
             return { error: 'File too large (>4MB)' }
         }
 
-        // 2. Optimization Pipeline with Sharp
+        // 2. Optimization Pipeline with Sharp (auto-orient EXIF, lenient on metadata)
         const buffer = Buffer.from(await file.arrayBuffer())
 
-        const optimizedBuffer = await sharp(buffer)
-            .resize(800, 800, { // Limit max dimension, maintain aspect ratio
-                fit: 'inside',
-                withoutEnlargement: true
-            })
-            .webp({
-                quality: 90,
-                lossless: true, // Crucial for QR codes
-                effort: 6 // Higher effort = better compression
-            })
-            .toBuffer()
+        let optimizedBuffer: Buffer
+        try {
+            optimizedBuffer = await imagePipeline(buffer)
+                .resize(800, 800, { // Limit max dimension, maintain aspect ratio
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .webp({
+                    quality: 90,
+                    lossless: true, // Crucial for QR codes
+                    effort: 6 // Higher effort = better compression
+                })
+                .toBuffer()
+        } catch (sharpErr: any) {
+            console.error('[uploadPaymentQr] Sharp error:', sharpErr)
+            return { error: `Không xử lý được ảnh: ${sharpErr?.message?.slice(0, 100) || 'unknown'}. Vui lòng thử ảnh khác.` }
+        }
 
         // 3. Upload to Vercel Blob
         // Filename: user-id-timestamp.webp
@@ -65,23 +118,32 @@ export async function uploadPaymentQr(userId: string, formData: FormData) {
 export async function uploadAvatar(userId: string, formData: FormData) {
     try {
         const file = formData.get('file') as File
-        if (!file) return { error: 'Không tìm thấy tệp tin' }
+
+        // [Z+1.fix3] Validate file early
+        const validateErr = validateImageFile(file)
+        if (validateErr) return { error: validateErr }
 
         // 1. Validate Size (10MB)
         if (file.size > 10 * 1024 * 1024) {
             return { error: 'Dung lượng ảnh tối đa là 10MB' }
         }
 
-        // 2. Optimization Pipeline with Sharp
-        // We crop to square (512x512) to ensure it fits perfectly in circular UI components
+        // 2. Optimization Pipeline with Sharp (auto-orient EXIF cho phone portrait photos)
         const buffer = Buffer.from(await file.arrayBuffer())
-        const optimizedBuffer = await sharp(buffer)
-            .resize(512, 512, {
-                fit: 'cover',
-                position: 'center'
-            })
-            .webp({ quality: 85 })
-            .toBuffer()
+
+        let optimizedBuffer: Buffer
+        try {
+            optimizedBuffer = await imagePipeline(buffer)
+                .resize(512, 512, {
+                    fit: 'cover',
+                    position: 'center'
+                })
+                .webp({ quality: 85 })
+                .toBuffer()
+        } catch (sharpErr: any) {
+            console.error('[uploadAvatar] Sharp error:', sharpErr)
+            return { error: `Không xử lý được ảnh: ${sharpErr?.message?.slice(0, 100) || 'unknown'}. Vui lòng thử ảnh khác.` }
+        }
 
         // 3. Upload to Vercel Blob
         const filename = `avatar-${userId}-${Date.now()}.webp`
@@ -147,14 +209,25 @@ export async function uploadProfileBanner(profileId: string, formData: FormData)
         if (authErr) return { error: authErr }
 
         const file = formData.get('file') as File
-        if (!file) return { error: 'Không tìm thấy tệp tin.' }
+
+        // [Z+1.fix3] Validate file early
+        const validateErr = validateImageFile(file)
+        if (validateErr) return { error: validateErr }
+
         if (file.size > 10 * 1024 * 1024) return { error: 'Dung lượng tối đa 10MB.' }
 
         const buffer = Buffer.from(await file.arrayBuffer())
-        const optimizedBuffer = await sharp(buffer)
-            .resize(1500, 500, { fit: 'cover', position: 'center' })
-            .webp({ quality: 85 })
-            .toBuffer()
+
+        let optimizedBuffer: Buffer
+        try {
+            optimizedBuffer = await imagePipeline(buffer)
+                .resize(1500, 500, { fit: 'cover', position: 'center' })
+                .webp({ quality: 85 })
+                .toBuffer()
+        } catch (sharpErr: any) {
+            console.error('[uploadProfileBanner] Sharp error:', sharpErr)
+            return { error: `Không xử lý được ảnh: ${sharpErr?.message?.slice(0, 100) || 'unknown'}. Vui lòng thử ảnh khác.` }
+        }
 
         const filename = `profile-banner-${profileId}-${Date.now()}.webp`
         const blob = await put(filename, optimizedBuffer, {
@@ -186,14 +259,25 @@ export async function uploadProfileLogo(profileId: string, formData: FormData) {
         if (authErr) return { error: authErr }
 
         const file = formData.get('file') as File
-        if (!file) return { error: 'Không tìm thấy tệp tin.' }
+
+        // [Z+1.fix3] Validate file early
+        const validateErr = validateImageFile(file)
+        if (validateErr) return { error: validateErr }
+
         if (file.size > 5 * 1024 * 1024) return { error: 'Dung lượng tối đa 5MB.' }
 
         const buffer = Buffer.from(await file.arrayBuffer())
-        const optimizedBuffer = await sharp(buffer)
-            .resize(512, 512, { fit: 'cover', position: 'center' })
-            .webp({ quality: 90, lossless: false })
-            .toBuffer()
+
+        let optimizedBuffer: Buffer
+        try {
+            optimizedBuffer = await imagePipeline(buffer)
+                .resize(512, 512, { fit: 'cover', position: 'center' })
+                .webp({ quality: 90, lossless: false })
+                .toBuffer()
+        } catch (sharpErr: any) {
+            console.error('[uploadProfileLogo] Sharp error:', sharpErr)
+            return { error: `Không xử lý được ảnh: ${sharpErr?.message?.slice(0, 100) || 'unknown'}. Vui lòng thử ảnh khác.` }
+        }
 
         const filename = `profile-logo-${profileId}-${Date.now()}.webp`
         const blob = await put(filename, optimizedBuffer, {

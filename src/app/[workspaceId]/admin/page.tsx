@@ -25,7 +25,22 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     const session = await getSession()
     if (!session) redirect('/login')
 
-    const profileId = (session.user as any).sessionProfileId
+    // [Z+1.fix3] Session profileId fallback — same pattern như dashboard/page.tsx + layout
+    let profileId = (session.user as any).sessionProfileId as string | null | undefined
+    if (!profileId) {
+        try {
+            const firstAccess = await prisma.profileAccess.findFirst({
+                where: { userId: session.user.id },
+                select: { profileId: true },
+                orderBy: { grantedAt: 'asc' },
+            })
+            profileId = firstAccess?.profileId ?? null
+        } catch (e) {
+            console.warn('[AdminDashboard] ProfileAccess fallback failed:', e)
+        }
+        if (!profileId) redirect('/login')
+    }
+
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
     // [Sprint Y] Profile ownership check để gate "Tạo Workspace mới" button visibility

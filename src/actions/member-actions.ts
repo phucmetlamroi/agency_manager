@@ -344,6 +344,32 @@ export async function inviteToWorkspace(
     })
 
     if (existingMember) {
+        // [Z+1.fix5] Check if user has ProfileAccess for this workspace's profile.
+        // If NOT → this is an "orphan" membership (created by ensureWorkspaceMembership
+        // pre-fix, or accept flow bug). Auto-repair: create ProfileAccess so user
+        // becomes VISIBLE in profile-scoped queries (admin page, assignee dropdown).
+        if (workspace?.profileId) {
+            const hasProfileAccess = await prisma.profileAccess.findUnique({
+                where: { userId_profileId: { userId: targetUser.id, profileId: workspace.profileId } }
+            })
+            if (!hasProfileAccess) {
+                // Auto-repair: create missing ProfileAccess
+                await prisma.profileAccess.create({
+                    data: { userId: targetUser.id, profileId: workspace.profileId, role: 'USER' }
+                }).catch((e: any) => {
+                    // P2002 = race condition (another process created it), safe to ignore
+                    if (e?.code !== 'P2002') console.warn('[inviteToWorkspace] orphan repair failed:', e?.message)
+                })
+
+                revalidatePath(`/${workspaceId}/admin/members`)
+                return {
+                    success: true,
+                    directAdd: true,
+                    repaired: true,
+                    username: targetUser.nickname || targetUser.username,
+                }
+            }
+        }
         return { error: `${targetUser.nickname || targetUser.username} đã là thành viên của workspace này.` }
     }
 
@@ -367,18 +393,12 @@ export async function inviteToWorkspace(
         if (err?.code !== 'P2021') throw err
     }
 
-    // Check if user is in the same profile — if so, add directly
-    const inviter = await prisma.user.findUnique({
-        where: { id: inviterId },
-        select: { profileId: true }
-    })
-
-    const isSameProfile = inviter?.profileId && inviter.profileId === (
-        await prisma.user.findUnique({
-            where: { id: targetUser.id },
-            select: { profileId: true }
-        })
-    )?.profileId
+    // [Z+1.fix5] Check if target user is in the WORKSPACE's profile (not inviter's home profile).
+    // This correctly handles cross-profile admins inviting same-profile users.
+    // workspace.profileId already fetched at line 315 above.
+    // Old code compared inviter.profileId vs target.profileId — wrong semantics when
+    // a cross-profile admin invites a user who IS in the workspace's profile.
+    const isSameProfile = workspace?.profileId && workspace.profileId === targetUser.profileId
 
     if (isSameProfile) {
         // Direct add for same-profile users (no Accept/Decline gate needed)
@@ -939,17 +959,31 @@ export async function leaveWorkspace(workspaceId: string) {
     return { success: true }
 }
 
-// ─── Get users available to invite (same profile, not already members) ──
+// ─── Get users available to invite (workspace's profile members, not already workspace members) ──
 export async function getAvailableUsersForInvite(workspaceId: string) {
     const { userId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
-    // Get current user's profile
-    const currentUser = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { profileId: true }
+    // [Z+1.fix5] Use workspace's profileId (not inviter's home profileId).
+    // This ensures the "select mode" list matches admin page behavior
+    // (workspacePrisma queries OR: [{profileId}, {profileAccesses}]).
+    // Also include users with ProfileAccess to workspace's profile — they are
+    // legitimate profile members (e.g. cross-team invitees who already have access).
+    const ws = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
     })
 
-    if (!currentUser?.profileId) return { users: [] }
+    // Fallback to inviter's profileId if workspace has no profile (edge case)
+    let profileId = ws?.profileId
+    if (!profileId) {
+        const currentUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { profileId: true }
+        })
+        profileId = currentUser?.profileId
+    }
+
+    if (!profileId) return { users: [] }
 
     // Get existing member IDs
     const existingMembers = await prisma.workspaceMember.findMany({
@@ -958,12 +992,16 @@ export async function getAvailableUsersForInvite(workspaceId: string) {
     })
     const memberIds = new Set(existingMembers.map(m => m.userId))
 
-    // Get users in the same profile who aren't already members.
-    // SECURITY: Only query by profileId — do NOT include profileAccesses
-    // to prevent cross-profile user enumeration.
+    // [Z+1.fix5] Include users with ProfileAccess to workspace's profile
+    // (consistent with admin page user list behavior via workspacePrisma middleware).
+    // This ensures users who were granted ProfileAccess (e.g. via accept invitation)
+    // show up in the invite "select" mode list.
     const availableUsers = await prisma.user.findMany({
         where: {
-            profileId: currentUser.profileId,
+            OR: [
+                { profileId },
+                { profileAccesses: { some: { profileId } } },
+            ],
             role: { not: 'LOCKED' },
         },
         select: {
@@ -978,6 +1016,6 @@ export async function getAvailableUsersForInvite(workspaceId: string) {
     })
 
     return {
-        users: availableUsers.filter(u => !memberIds.has(u.id))
+        users: availableUsers.filter(u => !memberIds.has(u.id) && u.id !== userId)
     }
 }

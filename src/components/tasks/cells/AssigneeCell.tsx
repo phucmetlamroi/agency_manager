@@ -20,10 +20,15 @@ import {
 
 interface AssigneeCellProps {
     task: TaskWithUser
-    users: { id: string; username: string }[]
+    users: { id: string; username: string; displayName?: string | null; nickname?: string | null }[]
     isAdmin: boolean
     selectedIds?: string[]
     workspaceId: string
+}
+
+/** Resolve best display name: displayName > nickname > username */
+function displayName(user: { username: string; displayName?: string | null; nickname?: string | null }): string {
+    return user.displayName ?? user.nickname ?? user.username
 }
 
 export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspaceId }: AssigneeCellProps) {
@@ -86,13 +91,13 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                     <div className="relative">
                         <Avatar className="h-6 w-6">
                             <AvatarImage src={(task.assignee as any).avatarUrl || `https://avatar.vercel.sh/${task.assignee.username}`} className="object-cover" />
-                            <AvatarFallback>{task.assignee.username[0]}</AvatarFallback>
+                            <AvatarFallback>{displayName(task.assignee)[0]}</AvatarFallback>
                         </Avatar>
                         {flagColor && (
                             <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-zinc-900 ${flagColor} shadow-sm`} title={`Rank ${latestRank} Warning`} />
                         )}
                     </div>
-                    <span className="text-sm">{task.assignee.username}</span>
+                    <span className="text-sm">{displayName(task.assignee)}</span>
                 </div>
             )
         }
@@ -126,13 +131,13 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                         <div className="relative">
                                             <Avatar className="h-5 w-5">
                                                 <AvatarImage src={(u as any).avatarUrl || `https://avatar.vercel.sh/${u.username}`} className="object-cover" />
-                                                <AvatarFallback>{u.username[0]}</AvatarFallback>
+                                                <AvatarFallback>{displayName(u)[0]}</AvatarFallback>
                                             </Avatar>
                                             {flagColor && (
                                                 <div className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${flagColor} shadow-sm`} title={`Rank ${latestRank} Warning`} />
                                             )}
                                         </div>
-                                        <span>{u.username}</span>
+                                        <span>{displayName(u)}</span>
                                     </div>
                                 </SelectItem>
                             )

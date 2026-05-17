@@ -54,7 +54,7 @@ interface AddTaskModalProps {
         parentId?: string | null
         parent?: { name: string } | null
     }>
-    users: Array<{ id: string; username: string; nickname?: string | null }>
+    users: Array<{ id: string; username: string; nickname?: string | null; displayName?: string | null }>
     onSubmit?: (data: TaskFormData) => void | Promise<void>
 }
 
@@ -564,6 +564,7 @@ export default function AddTaskModal({
         return c.parent?.name ? `${c.parent.name} / ${c.name}` : c.name
     })()
     const assigneeName =
+        users.find((u) => u.id === form.assigneeId)?.displayName ??
         users.find((u) => u.id === form.assigneeId)?.nickname ??
         users.find((u) => u.id === form.assigneeId)?.username ??
         ""
@@ -615,7 +616,7 @@ export default function AddTaskModal({
                 }))
                 const userOptions = users.map((u) => ({
                     id: u.id,
-                    label: u.nickname ?? u.username,
+                    label: u.displayName ?? u.nickname ?? u.username,
                 }))
                 return (
                     <div className="flex flex-col gap-4">

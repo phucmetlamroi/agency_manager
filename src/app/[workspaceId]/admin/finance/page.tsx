@@ -54,7 +54,7 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
             id: t.id,
             title: t.title,
             status: t.status,
-            assignee: t.assignee?.nickname || t.assignee?.username || '\u2014',
+            assignee: t.assignee?.displayName || t.assignee?.nickname || t.assignee?.username || '\u2014',
             revenueVND: rev,
             wageVND: wage,
             netProfitVND: rev - wage,

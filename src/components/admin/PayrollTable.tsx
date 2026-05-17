@@ -9,6 +9,7 @@ type UserWithPayroll = {
     id: string
     username: string
     nickname: string | null
+    displayName: string | null
     paymentQrUrl: string | null
     paymentBankName: string | null
     paymentAccountNum: string | null
@@ -68,7 +69,7 @@ export default function PayrollTable({ users, workspaceId }: { users: UserWithPa
                                 <tr key={user.id} className="hover:bg-white/5 transition-colors">
                                     <td className="px-6 py-4 font-medium text-white">
                                         <div className="flex flex-col">
-                                            <span>{user.nickname || user.username}</span>
+                                            <span>{user.displayName || user.nickname || user.username}</span>
                                             <span className="text-xs text-gray-500">{user.username}</span>
                                         </div>
                                     </td>

@@ -15,7 +15,7 @@ interface DashboardActionWrapperProps {
     parentId?: string | null
     parent?: { name: string } | null
   }>
-  users: Array<{ id: string; username: string; nickname?: string | null }>
+  users: Array<{ id: string; username: string; nickname?: string | null; displayName?: string | null }>
   workspaces: Array<{ id: string; name: string; description: string | null }>
   userRole: string
   /** [Sprint Y] Gate "Tạo Workspace mới" button visibility */

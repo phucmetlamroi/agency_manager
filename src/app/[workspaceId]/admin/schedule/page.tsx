@@ -45,7 +45,7 @@ export default async function AdminSchedulePage({
       ],
       role: { not: 'CLIENT' }
     },
-    select: { id: true, nickname: true, username: true },
+    select: { id: true, nickname: true, username: true, displayName: true },
     orderBy: { username: 'asc' }
   })
 
@@ -107,7 +107,7 @@ export default async function AdminSchedulePage({
 
     return {
       id: staff.id,
-      name: staff.nickname || staff.username,
+      name: staff.displayName || staff.nickname || staff.username,
       items
     }
   })

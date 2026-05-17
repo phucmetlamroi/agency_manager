@@ -495,7 +495,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: 
                                 </span>
 
                                 <span style={{ fontSize: 13, color: NP.textPrimary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    {task.assignee?.username || "—"}
+                                    {(task.assignee as any)?.displayName ?? (task.assignee as any)?.nickname ?? (task.assignee?.username || "—")}
                                 </span>
 
                                 <span

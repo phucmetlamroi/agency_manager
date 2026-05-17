@@ -13,6 +13,10 @@ import { prisma } from '@/lib/db'
  * Idempotent: upsert pattern. Won't override existing role (e.g. don't downgrade
  * an OWNER—already converted to ADMIN—to MEMBER).
  *
+ * [Z+1.fix5] Also ensures ProfileAccess exists for workspace's profile.
+ * Without this, user is "a member" but INVISIBLE in profile-scoped queries
+ * (admin page users list, assignee dropdown, etc.) — the "orphan membership" bug.
+ *
  * @returns true if row was created, false if already existed
  */
 export async function ensureWorkspaceMembership(
@@ -33,6 +37,33 @@ export async function ensureWorkspaceMembership(
         await prisma.workspaceMember.create({
             data: { userId, workspaceId, role: defaultRole },
         })
+
+        // [Z+1.fix5] Also ensure ProfileAccess exists for workspace's profile.
+        // Without this, user has WorkspaceMember but is INVISIBLE in all
+        // profile-scoped queries (workspacePrisma.user.findMany filters by
+        // profileId OR profileAccesses). This caused the "orphan membership" bug
+        // where inviteToWorkspace sees existingMember but admin page doesn't
+        // show user in assignee dropdown.
+        try {
+            const ws = await prisma.workspace.findUnique({
+                where: { id: workspaceId },
+                select: { profileId: true },
+            })
+            if (ws?.profileId) {
+                await prisma.profileAccess.upsert({
+                    where: { userId_profileId: { userId, profileId: ws.profileId } },
+                    create: { userId, profileId: ws.profileId, role: 'USER' },
+                    update: {},  // don't override existing role (OWNER/ADMIN stays)
+                })
+            }
+        } catch (paErr: any) {
+            // Non-fatal — WorkspaceMember was created successfully.
+            // ProfileAccess creation is best-effort (race condition P2002 OK).
+            if (paErr?.code !== 'P2002') {
+                console.warn(`[ensureWorkspaceMembership] ProfileAccess upsert failed for user=${userId} ws=${workspaceId}:`, paErr?.message)
+            }
+        }
+
         return true
     } catch (e: any) {
         // P2002 unique constraint — race condition, treat as success

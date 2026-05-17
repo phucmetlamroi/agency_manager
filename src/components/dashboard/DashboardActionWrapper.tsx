@@ -73,6 +73,25 @@ export default function DashboardActionWrapper({
         ? videoNames.map((vn) => `${clientLabel} · ${vn}`)
         : [clientLabel]
 
+    // [BUG FIX] AddTaskModal field mapping — match TaskDetailModal's packed format expectations.
+    // CRITICAL bug user reported: `script` was sent to `productLink` (delivery field) →
+    //   script link hiển thị trong Delivery card khi mở task detail.
+    //   `productLink` là field cho USER (assignee) nộp link sản phẩm SAU khi làm xong.
+    //   Admin KHÔNG được set productLink lúc tạo task.
+    // Similar bug: `bRoll` was sent to `fileLink` (separate column) — TaskDetailModal
+    //   chỉ đọc B-roll từ packed `resources` string → B-roll value bị MẤT.
+    //
+    // TaskDetailModal expected packed formats:
+    //   resources: "RAW: <url> | BROLL: <url> | SUBMISSION: <url>"
+    //   references: "REF:<url> | SCRIPT:<url>"
+    const packedResources =
+      data.rawFootage || data.bRoll || data.submitFolder
+        ? `RAW: ${(data.rawFootage || '').trim()} | BROLL: ${(data.bRoll || '').trim()} | SUBMISSION: ${(data.submitFolder || '').trim()}`
+        : ''
+    const packedReferences = data.script
+      ? `REF:${(data.references || '').trim()} | SCRIPT:${(data.script || '').trim()}`
+      : (data.references || '')
+
     if (titles.length === 1) {
       // Single task — use the original createTask path
       const fd = new FormData()
@@ -83,12 +102,12 @@ export default function DashboardActionWrapper({
       fd.set("jobPriceUSD", data.jobPriceUSD || "0")
       fd.set("value", data.editorFee || "0")
       fd.set("exchangeRate", "25000")
-      fd.set("references", data.references || "")
-      fd.set("resources", data.rawFootage || "")
-      fd.set("fileLink", data.bRoll || "")
+      fd.set("references", packedReferences)
+      fd.set("resources", packedResources)
+      fd.set("fileLink", "")                     // [FIX] Empty — bRoll giờ packed trong resources
       fd.set("collectFilesLink", data.collectFile || "")
-      fd.set("submissionFolder", data.submitFolder || "")
-      fd.set("productLink", data.script || "")
+      fd.set("submissionFolder", data.submitFolder || "")  // Keep separate column (defensive backup)
+      fd.set("productLink", "")                  // [FIX] Empty — delivery field cho USER nộp, không phải admin
       fd.set("frameUsername", data.frameUsername || "")
       fd.set("framePassword", data.framePassword || "")
       fd.set("frameNote", data.frameNote || "")
@@ -109,15 +128,15 @@ export default function DashboardActionWrapper({
           jobPriceUSD: parseFloat(data.jobPriceUSD) || 0,
           exchangeRate: 25000,
           wageVND: parseFloat(data.editorFee) || 0,
-          resources: data.rawFootage || null,
-          references: data.references || null,
+          resources: packedResources || null,
+          references: packedReferences || null,
           collectFilesLink: data.collectFile || null,
           notes: data.notes || null,
           notes_en: null,
           type: data.taskType || "Short form",
-          fileLink: data.bRoll || null,
-          submissionFolder: data.submitFolder || null,
-          productLink: data.script || null,
+          fileLink: null,                        // [FIX] B-roll packed trong resources
+          submissionFolder: data.submitFolder || null,  // Keep separate column
+          productLink: null,                     // [FIX] Delivery field cho USER, không phải admin
           frameUsername: data.frameUsername || null,
           framePassword: data.framePassword || null,
           frameNote: data.frameNote || null,

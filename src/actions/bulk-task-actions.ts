@@ -6,6 +6,7 @@ import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
+import { enforceAssigneeStatusInvariant } from '@/lib/task-invariants'
 
 type BatchTaskInput = {
     titles: string[]
@@ -241,12 +242,24 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         // Bump version + commit in transaction
         await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
+                let taskUpdateData = { ...updateData }
+
+                // [Z+1.fix8] Enforce assigneeId ↔ status invariant per-task.
+                // Chỉ fetch current task khi assigneeId thay đổi (zero overhead cho edit thường).
+                if ('assigneeId' in data) {
+                    const currentTask = await tx.task.findUnique({
+                        where: { id, workspaceId },
+                        select: { assigneeId: true, status: true },
+                    })
+                    enforceAssigneeStatusInvariant(taskUpdateData, currentTask)
+                }
+
                 await tx.task.update({
                     where: {
                         id,
                         workspaceId: workspaceId // Manual isolation (extra defensive)
                     },
-                    data: { ...updateData, version: { increment: 1 } }
+                    data: { ...taskUpdateData, version: { increment: 1 } }
                 })
             }
         })
@@ -569,15 +582,24 @@ export async function bulkUpdateStatus(taskIds: string[], newStatus: string, wor
 
         await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
+                const taskData: any = {
+                    status: newStatus,
+                    version: { increment: 1 },
+                }
+
+                // [Z+1.fix8] Enforce assigneeId ↔ status invariant khi drag-drop.
+                // Nếu drag vào "Đang đợi giao" → auto-clear assigneeId + deadline.
+                if (newStatus === 'Đang đợi giao') {
+                    taskData.assigneeId = null
+                    taskData.deadline = null
+                }
+
                 await tx.task.update({
                     where: {
                         id,
                         workspaceId: workspaceId
                     },
-                    data: {
-                        status: newStatus,
-                        version: { increment: 1 }
-                    }
+                    data: taskData,
                 })
             }
         })

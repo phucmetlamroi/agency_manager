@@ -68,6 +68,7 @@ export type AuditAction =
     // [Sprint Q] Bulk edit lifecycle
     | 'task.bulk_updated'         // Bulk update fields (productLink/notes/deadline/...) of N tasks
     | 'task.bulk_status_updated'  // Bulk status change of N tasks (with digest email)
+    | 'task.invariant_auto_synced' // [Z+1.fix8] Auto-sync assigneeId ↔ status khi invariant bị vi phạm
 
 /**
  * `workspaceId` value semantics (audit fix #2.9):

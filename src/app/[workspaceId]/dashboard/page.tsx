@@ -31,8 +31,14 @@ export const dynamic = 'force-dynamic'
  *   ↓ 4-widget grid: Rankings | Upcoming Deadlines | (NetSalary + TotalTasks stacked)
  *   ↓ UserWorkflowTabs: 4 tabs + search + view + paginated TaskTable
  */
-export default async function UserDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
+export default async function UserDashboard({ params, searchParams }: {
+    params: Promise<{ workspaceId: string }>
+    searchParams?: Promise<{ taskId?: string }>
+}) {
     const { workspaceId } = await params
+    // [Z+1.fix6] Deep-link: notification click passes ?taskId= to auto-open task modal
+    const query = await searchParams
+    const initialTaskId = query?.taskId || null
     const session = await getSession()
     if (!session) redirect('/login')
 
@@ -285,6 +291,7 @@ export default async function UserDashboard({ params }: { params: Promise<{ work
                 tasks={serializeDecimal(tasks) as any}
                 workspaceId={workspaceId}
                 currentUserId={userId}
+                initialTaskId={initialTaskId}
             />
 
             {/* Safe spacer */}

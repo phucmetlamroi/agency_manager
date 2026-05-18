@@ -53,6 +53,13 @@ export async function updateTask(id: string, data: any, workspaceId: string) {
             delete data.isPenalized
         }
 
+        // [Z+1.fix8] Enforce assigneeId ↔ status invariant cho mọi update path.
+        // task đã fetch ở line 39 → reuse, không tốn thêm query.
+        if ('assigneeId' in data || 'status' in data) {
+            const { enforceAssigneeStatusInvariant } = await import('@/lib/task-invariants')
+            enforceAssigneeStatusInvariant(data, task)
+        }
+
         await workspacePrisma.task.update({ where: { id }, data })
 
         revalidatePath(`/${workspaceId}/admin`)

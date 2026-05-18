@@ -74,6 +74,8 @@ interface Props {
     workspaceId: string
     /** Current user's ID — for showing assignee role label */
     currentUserId: string
+    /** [Z+1.fix6] Deep-link: auto-open this task on mount (from notification click) */
+    initialTaskId?: string | null
 }
 
 /**
@@ -85,7 +87,7 @@ interface Props {
  * - Pagination: Back / numbered pages / Next.
  * - Row click → TaskDetailModal (read-only since user not admin).
  */
-export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: Props) {
+export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, initialTaskId }: Props) {
     const [activeTab, setActiveTab] = useState<TabId>("assignee")
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
@@ -108,6 +110,26 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId }: 
             setSelectedTask(task)
         }
     }
+
+    // [Z+1.fix6] Auto-open task modal when navigated from notification deep-link
+    useEffect(() => {
+        if (!initialTaskId) return
+        const target = tasks.find(t => t.id === initialTaskId)
+        if (!target) return
+
+        // Switch to the correct tab so user sees context after closing modal
+        const matchingTab = TABS.find(tab => tab.statuses.includes(target.status))
+        if (matchingTab) setActiveTab(matchingTab.id)
+
+        // Open task via existing handler (handles PreStartBlockModal vs TaskDetailModal)
+        handleRowOpen(target)
+
+        // Clean URL to prevent re-opening on refresh
+        const url = new URL(window.location.href)
+        url.searchParams.delete('taskId')
+        window.history.replaceState({}, '', url.toString())
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
 
     // External search event from UserHomeTopBar
     useEffect(() => {

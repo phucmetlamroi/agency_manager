@@ -55,7 +55,10 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
         }
     })
 
-    const unassignedTasks = tasks.filter(t => !t.assigneeId)
+    // [Z+1.fix7] "Đang đợi giao" = task chờ phân công/giao việc — thuộc về queue
+    // dù có thể đã có assignee tạm. Hiện trước đây chỉ filter !assigneeId →
+    // task có assignee + status "Đang đợi giao" bị invisible ở mọi trang.
+    const unassignedTasks = tasks.filter(t => !t.assigneeId || t.status === 'Đang đợi giao')
     const count = unassignedTasks.length
 
     // ── Task type breakdown for mini stats ───────────────────

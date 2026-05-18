@@ -118,7 +118,9 @@ export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, o
         } else if (notification.taskId && params?.workspaceId) {
             // Open task — link to workspace queue, the task detail modal handles deep-linking via URL?
             // For now navigate to admin queue and rely on user to find the task.
-            router.push(`/${params.workspaceId}/admin/queue?taskId=${notification.taskId}`)
+            // [Z+1.fix6] Route to dashboard (accessible by ALL users) instead of admin queue
+            // (which blocks non-admins + only shows unassigned tasks).
+            router.push(`/${params.workspaceId}/dashboard?taskId=${notification.taskId}`)
         }
 
         onRequestClose?.()

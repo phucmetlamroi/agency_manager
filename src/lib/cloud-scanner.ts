@@ -92,28 +92,34 @@ interface DropboxListFolderResponse {
 /**
  * Scan a Dropbox folder for video files.
  *
- * @param accessToken - Decrypted OAuth access token.
- * @param folderPath  - Folder path ('' for shared folder root, '/path/to/folder' for home folders).
+ * @param accessToken    - Decrypted OAuth access token.
+ * @param folderPath     - Path INSIDE the namespace (own folder) or shared link
+ *                         ('' = root). '/sub/path' to scan a sub-folder of shared link.
  * @param sharedFolderId - Optional shared folder ID for building preview URLs.
- * @param maxFiles    - Safety cap to prevent runaway scans (default 200).
+ * @param sharedLinkUrl  - [Quick Create fix] Full Dropbox shared URL. When set,
+ *                         path is INTERPRETED RELATIVE TO this shared link instead
+ *                         of user's own Dropbox root. Required for /scl/fo/ and /sh/
+ *                         links — without it the API lists user's home Dropbox.
+ * @param maxFiles       - Safety cap to prevent runaway scans (default 200).
  */
 export async function scanDropboxFolder(
   accessToken: string,
   folderPath: string,
   sharedFolderId?: string,
+  sharedLinkUrl?: string,
   maxFiles: number = 200,
 ): Promise<ScannedVideo[]> {
   const videos: ScannedVideo[] = []
 
   // Initial list_folder request
-  let response = await fetchDropboxListFolder(accessToken, folderPath)
+  let response = await fetchDropboxListFolder(accessToken, folderPath, sharedLinkUrl)
 
   // Process entries + handle pagination
-  processDropboxEntries(response.entries, videos, sharedFolderId)
+  processDropboxEntries(response.entries, videos, sharedFolderId, sharedLinkUrl)
 
   while (response.has_more && videos.length < maxFiles) {
     response = await fetchDropboxListFolderContinue(accessToken, response.cursor)
-    processDropboxEntries(response.entries, videos, sharedFolderId)
+    processDropboxEntries(response.entries, videos, sharedFolderId, sharedLinkUrl)
   }
 
   return videos.slice(0, maxFiles)
@@ -122,20 +128,30 @@ export async function scanDropboxFolder(
 async function fetchDropboxListFolder(
   accessToken: string,
   path: string,
+  sharedLinkUrl?: string,
 ): Promise<DropboxListFolderResponse> {
+  // [Quick Create fix] When sharedLinkUrl is set, pass it as shared_link so the
+  // API lists files INSIDE that shared folder. Otherwise path is interpreted as
+  // user's own Dropbox namespace (which gave wrong results — always returned
+  // user's home root files regardless of what user pasted).
+  const body: any = {
+    path: path || '',
+    recursive: false,
+    include_media_info: true,
+    include_deleted: false,
+    limit: 100,
+  }
+  if (sharedLinkUrl) {
+    body.shared_link = { url: sharedLinkUrl }
+  }
+
   const res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      path: path || '', // '' = root of shared folder
-      recursive: false,
-      include_media_info: true,
-      include_deleted: false,
-      limit: 100,
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) {
@@ -171,6 +187,7 @@ function processDropboxEntries(
   entries: DropboxFileEntry[],
   videos: ScannedVideo[],
   sharedFolderId?: string,
+  sharedLinkUrl?: string,
 ): void {
   for (const entry of entries) {
     if (entry['.tag'] !== 'file') continue
@@ -187,7 +204,12 @@ function processDropboxEntries(
     // Build preview URL
     const encodedName = encodeURIComponent(entry.name)
     let previewUrl: string
-    if (sharedFolderId) {
+    if (sharedLinkUrl) {
+      // [Quick Create fix] Use original shared link with ?preview= query — most reliable
+      // way to deep-link into the shared folder view.
+      const separator = sharedLinkUrl.includes('?') ? '&' : '?'
+      previewUrl = `${sharedLinkUrl}${separator}preview=${encodedName}`
+    } else if (sharedFolderId) {
       previewUrl = `https://www.dropbox.com/scl/fo/${sharedFolderId}?preview=${encodedName}`
     } else {
       // For /home/ paths, link to the file directly

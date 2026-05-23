@@ -9,7 +9,23 @@
  */
 
 export type CloudLink =
-  | { provider: 'dropbox'; folderPath: string; sharedFolderId?: string }
+  | {
+        provider: 'dropbox'
+        /**
+         * Path inside user's namespace (only set for /home/ links — user's own folders).
+         * Empty string when sharedLinkUrl is set — see scanner for shared_link handling.
+         */
+        folderPath: string
+        /** [Quick Create] Shared folder ID extracted from /scl/fo/{id}/ URLs (for building preview URLs) */
+        sharedFolderId?: string
+        /**
+         * [Quick Create fix] Original Dropbox shared URL — passed to files/list_folder
+         * as `shared_link.url` so API lists the SHARED FOLDER's content (not user's
+         * Dropbox root). Without this, path:'' would list user's own root.
+         * Set for /scl/fo/ and /sh/ links; unset for /home/ (user's own folder).
+         */
+        sharedLinkUrl?: string
+    }
   | { provider: 'google_drive'; folderId: string }
 
 /**
@@ -56,16 +72,20 @@ export function parseCloudLink(url: string): CloudLink | null {
       const sharedFolderId = decodeURIComponent(sclFolderMatch[1])
       return {
         provider: 'dropbox',
-        folderPath: '', // root of shared folder — Dropbox API uses '' for root
+        folderPath: '', // path inside shared link — '' = root of shared folder
         sharedFolderId,
+        sharedLinkUrl: trimmed, // [Quick Create fix] needed by files/list_folder
       }
     }
 
     // /sh/{path} — legacy shared folder link
     const shMatch = path.match(/^\/sh\/(.+?)(?:\?|$)/)
     if (shMatch) {
-      const folderPath = '/' + decodeURIComponent(shMatch[1]).replace(/\/+$/, '')
-      return { provider: 'dropbox', folderPath }
+      return {
+        provider: 'dropbox',
+        folderPath: '', // root of legacy shared folder
+        sharedLinkUrl: trimmed, // [Quick Create fix] needed by files/list_folder
+      }
     }
 
     // /home/{path} — user's own folder link (from web UI address bar)

@@ -156,6 +156,7 @@ export async function POST(req: Request) {
                 accessToken,
                 parsed.folderPath,
                 parsed.sharedFolderId,
+                parsed.sharedLinkUrl,
             )
             return NextResponse.json({
                 videos,

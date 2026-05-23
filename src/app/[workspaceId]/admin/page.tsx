@@ -100,6 +100,28 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         orderBy: { name: 'asc' },
     })
 
+    // [Quick Create] Fetch pricing rules for AddTaskModal's 🚀 Quick Create
+    const pricingRulesRaw = await prisma.pricingRule.findMany({
+        where: { workspaceId },
+        select: {
+            id: true,
+            name: true,
+            clientId: true,
+            ruleType: true,
+            config: true,
+            isDefault: true,
+        },
+        orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
+    })
+    const pricingRulesForModal = pricingRulesRaw.map((r) => ({
+        id: r.id,
+        name: r.name,
+        clientId: r.clientId,
+        ruleType: r.ruleType,
+        config: r.config,
+        isDefault: r.isDefault,
+    }))
+
     // ── KPI Calculations ──────────────────────────────────────────
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -216,6 +238,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 workspaces={workspacesForProfile}
                 userRole={session.user.role}
                 canCreateWorkspace={canCreateWorkspace}
+                pricingRules={pricingRulesForModal}
+                exchangeRate={exchangeRate}
             />
 
             {/* ── KPI Widgets ──────────────────────────────────── */}

@@ -12,9 +12,12 @@ import {
     ChevronDown,
     Cloud,
     CloudOff,
+    Rocket,
+    ClipboardList,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft"
+import QuickCreateMode from "./QuickCreateMode"
 
 // TiptapEditor uses browser-only APIs — load on client only
 const TiptapEditor = dynamic(() => import("@/components/tiptap/TiptapEditor"), { ssr: false })
@@ -56,6 +59,17 @@ interface AddTaskModalProps {
     }>
     users: Array<{ id: string; username: string; nickname?: string | null; displayName?: string | null }>
     onSubmit?: (data: TaskFormData) => void | Promise<void>
+    /** [Quick Create] Pricing rules available for this workspace */
+    pricingRules?: Array<{
+        id: string
+        name: string
+        clientId: number | null
+        ruleType: string
+        config: any
+        isDefault: boolean
+    }>
+    /** [Quick Create] Current exchange rate snapshot */
+    exchangeRate?: number
 }
 
 /* ------------------------------------------------------------------ */
@@ -474,10 +488,14 @@ export default function AddTaskModal({
     clients,
     users,
     onSubmit,
+    pricingRules = [],
+    exchangeRate = 26300,
 }: AddTaskModalProps) {
     const [step, setStep] = useState(0)
     const [form, setForm] = useState<TaskFormData>({ ...INITIAL_FORM })
     const [submitted, setSubmitted] = useState(false)
+    /** [Quick Create] Toggle between standard wizard (📋) and Quick Create mode (🚀) */
+    const [quickMode, setQuickMode] = useState(false)
     const [submitting, setSubmitting] = useState(false)
 
     // [Sprint Z+1] Auto-save draft tới localStorage (Google Docs–style).
@@ -948,13 +966,38 @@ export default function AddTaskModal({
                             <div className="flex items-start justify-between px-6 pt-6 pb-2">
                                 <div>
                                     <h2 className="text-[16px] font-extrabold text-white">
-                                        Step {step + 1}. {stepTitle}:
+                                        {quickMode ? (
+                                            <>
+                                                <Rocket size={14} className="inline mr-1.5 text-violet-300" />
+                                                Tạo Task Nhanh
+                                            </>
+                                        ) : (
+                                            <>Step {step + 1}. {stepTitle}:</>
+                                        )}
                                     </h2>
-                                    <p className="text-xs text-[#A1A1AA] mt-0.5">{stepSubtitle}</p>
+                                    <p className="text-xs text-[#A1A1AA] mt-0.5">
+                                        {quickMode
+                                            ? 'Quick Create — dán link folder, tạo batch trong 1 click'
+                                            : stepSubtitle}
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    {/* [Quick Create] Toggle between standard wizard and quick mode */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setQuickMode(!quickMode)}
+                                        disabled={submitting}
+                                        title={quickMode ? 'Chuyển sang form thường' : 'Chuyển sang Quick Create'}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-full transition-colors disabled:opacity-40 ${
+                                            quickMode
+                                                ? 'bg-violet-500/20 border border-violet-500/40 text-violet-200'
+                                                : 'bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 hover:text-violet-300'
+                                        }`}
+                                    >
+                                        {quickMode ? <ClipboardList size={16} /> : <Rocket size={16} />}
+                                    </button>
                                     {/* [Auto-save] Indicator — Google Docs–style "Đã lưu nháp" */}
-                                    <AutoSaveIndicator savedAt={savedAt} />
+                                    {!quickMode && <AutoSaveIndicator savedAt={savedAt} />}
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -972,9 +1015,22 @@ export default function AddTaskModal({
                         )}
 
                         {/* -------- Step Indicator -------- */}
-                        {!submitted && <StepIndicator current={step} total={STEPS.length} onStepClick={setStep} />}
+                        {!submitted && !quickMode && <StepIndicator current={step} total={STEPS.length} onStepClick={setStep} />}
 
                         {/* -------- Content -------- */}
+                        {quickMode && !submitted ? (
+                            <QuickCreateMode
+                                workspaceId={workspaceId}
+                                clients={clients.map((c) => ({ id: Number(c.id), name: c.name }))}
+                                users={users.map((u) => ({ id: u.id, username: u.username, nickname: u.nickname ?? null }))}
+                                pricingRules={pricingRules}
+                                exchangeRate={exchangeRate}
+                                onSuccess={() => {
+                                    setQuickMode(false)
+                                    onClose()
+                                }}
+                            />
+                        ) : (
                         <div className="flex-1 overflow-y-auto px-6 pb-2 custom-scrollbar">
                             {submitted ? (
                                 renderSuccess()
@@ -993,9 +1049,10 @@ export default function AddTaskModal({
                                 </AnimatePresence>
                             )}
                         </div>
+                        )}
 
-                        {/* -------- Footer -------- */}
-                        {!submitted && (
+                        {/* -------- Footer (hidden in quickMode — submit lives inside QuickCreateMode) -------- */}
+                        {!submitted && !quickMode && (
                             <div className="flex items-center justify-between px-6 py-4 border-t border-[rgba(139,92,246,0.08)]">
                                 <button
                                     type="button"

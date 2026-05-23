@@ -87,6 +87,10 @@ model Workspace {
   auditLogs           AuditLog[]
   tagCategories       TagCategory[]
 
+  // [Quick Create] OAuth tokens + pricing rules per-workspace
+  integrationTokens   IntegrationToken[]
+  pricingRules        PricingRule[]
+
   profile Profile? @relation(fields: [profileId], references: [id])
 
   @@index([name])
@@ -194,6 +198,9 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetOTPs       PasswordResetOTP[]
   loginAttempts           LoginAttempt[]
+
+  // [Quick Create] OAuth tokens for Dropbox / Google Drive per-user
+  integrationTokens       IntegrationToken[]
 
   // Chat relations
   contactsSent         Contact[]                 @relation("ContactRequester")
@@ -402,6 +409,9 @@ model Client {
   // Một Client record có thể có 0..N portal users (vd 1 client = nhiều người
   // truy cập portal cùng).
   portalUsers    User[]     @relation("ClientPortalUser")
+
+  // [Quick Create] Per-client pricing rules (null clientId = workspace default)
+  pricingRules   PricingRule[]
 }
 
 model Project {
@@ -1176,4 +1186,61 @@ model LoginAttempt {
   @@index([emailTried, createdAt])
   @@index([ipAddress, createdAt])
   @@index([userId, createdAt])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// [Quick Create] OAuth integration tokens — Dropbox & Google Drive per-user
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Per-user OAuth tokens for cloud storage providers (Dropbox, Google Drive).
+/// Tokens are AES-256-GCM encrypted at rest via INTEGRATION_TOKEN_SECRET env var.
+/// Each user can connect ONE provider per workspace (unique constraint).
+model IntegrationToken {
+  id           String    @id @default(uuid())
+  userId       String
+  workspaceId  String
+  provider     String    // "dropbox" | "google_drive"
+  accessToken  String    // AES-256-GCM encrypted
+  refreshToken String?   // AES-256-GCM encrypted (nullable — Dropbox offline access)
+  expiresAt    DateTime? // Token expiry; null = never expires (Dropbox legacy)
+  accountEmail String?   // Display: "Connected as user@gmail.com"
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId, provider])
+  @@index([workspaceId, provider])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// [Quick Create] Flexible pricing rules — per-client or workspace-default
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Pricing rules for automatic task pricing in Quick Create mode.
+/// Supports multiple rule types via JSON config:
+///   - "flat":             { priceUSD, wageVND }
+///   - "per_minute":       { ratePerMinuteUSD, wagePerMinuteVND, minimumUSD, minimumVND }
+///   - "tiered_duration":  { tiers: [{ maxSeconds, priceUSD, wageVND, extraPerBlock?, ... }] }
+///   - "custom":           { formula, variables } (future extensibility)
+/// clientId=null means workspace-wide default rule.
+model PricingRule {
+  id          String   @id @default(uuid())
+  name        String   // "Dr. Marwan Standard", "Default Short/Long"
+  clientId    Int?     // null = workspace default rule
+  workspaceId String
+  profileId   String
+  ruleType    String   // "flat" | "per_minute" | "tiered_duration" | "custom"
+  config      Json     // Flexible rule config — schema depends on ruleType
+  isDefault   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, isDefault])
 }

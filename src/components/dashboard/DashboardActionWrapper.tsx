@@ -20,6 +20,17 @@ interface DashboardActionWrapperProps {
   userRole: string
   /** [Sprint Y] Gate "Tạo Workspace mới" button visibility */
   canCreateWorkspace?: boolean
+  /** [Quick Create] Pricing rules available for this workspace */
+  pricingRules?: Array<{
+    id: string
+    name: string
+    clientId: number | null
+    ruleType: string
+    config: any
+    isDefault: boolean
+  }>
+  /** [Quick Create] Current exchange rate snapshot */
+  exchangeRate?: number
   onTaskCreated?: () => void
 }
 
@@ -30,6 +41,8 @@ export default function DashboardActionWrapper({
   workspaces,
   userRole,
   canCreateWorkspace = false,
+  pricingRules = [],
+  exchangeRate = 26300,
 }: DashboardActionWrapperProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const router = useRouter()
@@ -167,6 +180,8 @@ export default function DashboardActionWrapper({
         clients={clients}
         users={users}
         onSubmit={handleSubmit}
+        pricingRules={pricingRules}
+        exchangeRate={exchangeRate}
       />
     </>
   )

@@ -1,13 +1,37 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
     Settings, Edit3, Trash2, RotateCcw, Loader2,
-    Shield, AlertTriangle, Clock, Check
+    Shield, AlertTriangle, Clock, Check, Plug, DollarSign,
 } from 'lucide-react'
 import { renameWorkspaceAction, deleteWorkspaceAction, restoreWorkspaceAction } from '@/actions/workspace-actions'
 import { toast } from 'sonner'
+import ConnectorsPanel from '@/components/settings/ConnectorsPanel'
+import PricingRulesPanel from '@/components/settings/PricingRulesPanel'
+
+type IntegrationRow = {
+    provider: string
+    accountEmail: string | null
+    connectedAt: string | Date
+    updatedAt: string | Date
+}
+
+type PricingRuleRow = {
+    id: string
+    name: string
+    clientId: number | null
+    ruleType: string
+    config: any
+    isDefault: boolean
+    sortOrder: number
+    client: { id: number; name: string } | null
+}
+
+type ClientOption = { id: number; name: string }
+
+type TabId = 'general' | 'connectors' | 'pricing'
 
 type Props = {
     workspaceId: string
@@ -22,12 +46,20 @@ type Props = {
     currentUserRole: string
     isGlobalAdmin: boolean
     memberCount: number
+    /** [Quick Create] Connected integrations for the current user */
+    integrations?: IntegrationRow[]
+    /** [Quick Create] Pricing rules for this workspace */
+    pricingRules?: PricingRuleRow[]
+    /** [Quick Create] Clients available in this profile (for pricing rule scope) */
+    clients?: ClientOption[]
 }
 
 export default function WorkspaceSettingsPanel({
-    workspaceId, workspace, currentUserRole, isGlobalAdmin, memberCount
+    workspaceId, workspace, currentUserRole, isGlobalAdmin, memberCount,
+    integrations = [], pricingRules = [], clients = [],
 }: Props) {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [isPending, startTransition] = useTransition()
     const [editing, setEditing] = useState(false)
     const [newName, setNewName] = useState(workspace.name)
@@ -38,6 +70,18 @@ export default function WorkspaceSettingsPanel({
 
     const isOwner = currentUserRole === 'OWNER' || isGlobalAdmin
     const isSoftDeleted = workspace.status === 'SOFT_DELETED'
+
+    // [Quick Create] Tab navigation — restore tab from URL on mount (post-OAuth redirect)
+    const initialTab = (searchParams?.get('tab') as TabId | null) ?? 'general'
+    const [activeTab, setActiveTab] = useState<TabId>(
+        initialTab === 'connectors' || initialTab === 'pricing' ? initialTab : 'general',
+    )
+
+    const TABS: Array<{ id: TabId; label: string; icon: any }> = [
+        { id: 'general', label: 'Tổng quan', icon: Settings },
+        { id: 'connectors', label: 'Connectors', icon: Plug },
+        { id: 'pricing', label: 'Pricing Rules', icon: DollarSign },
+    ]
 
     async function handleRename() {
         if (!newName.trim() || newName.trim() === workspace.name) {
@@ -98,6 +142,40 @@ export default function WorkspaceSettingsPanel({
 
     return (
         <div className="space-y-6">
+            {/* [Quick Create] Tab nav */}
+            <div className="flex items-center gap-1 p-1 rounded-full bg-zinc-900/40 border border-white/5 w-fit">
+                {TABS.map((tab) => {
+                    const TabIcon = tab.icon
+                    const active = activeTab === tab.id
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-colors ${
+                                active
+                                    ? 'bg-violet-500/20 text-violet-200 border border-violet-500/40'
+                                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+                            }`}
+                        >
+                            <TabIcon size={13} />
+                            {tab.label}
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* Tab: Connectors */}
+            {activeTab === 'connectors' && (
+                <ConnectorsPanel workspaceId={workspaceId} integrations={integrations} />
+            )}
+
+            {/* Tab: Pricing Rules */}
+            {activeTab === 'pricing' && (
+                <PricingRulesPanel workspaceId={workspaceId} rules={pricingRules} clients={clients} />
+            )}
+
+            {/* Tab: General */}
+            {activeTab === 'general' && (<>
             {/* Soft-deleted warning */}
             {isSoftDeleted && (
                 <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5 flex items-start gap-3">
@@ -243,6 +321,7 @@ export default function WorkspaceSettingsPanel({
                     </div>
                 </div>
             )}
+            </>)}
         </div>
     )
 }

@@ -319,7 +319,34 @@ export default function QuickCreateMode({
 
     function updateRow(rowId: string, patch: Partial<PreviewRow>) {
         setPreviewRows((rows) =>
-            rows.map((r) => (r.rowId === rowId ? { ...r, ...patch } : r)),
+            rows.map((r) => {
+                if (r.rowId !== rowId) return r
+                const next = { ...r, ...patch }
+                // [Quick Create] When duration changes manually, recalc price via
+                // active rule (so user-input duration flows through tiered/per-minute pricing).
+                if (
+                    'durationSeconds' in patch &&
+                    toggles.applyPricing &&
+                    selectedRule &&
+                    next.durationSeconds > 0
+                ) {
+                    try {
+                        const pricing = calculatePrice(
+                            {
+                                ruleType: selectedRule.ruleType,
+                                config: selectedRule.config,
+                                name: selectedRule.name,
+                            },
+                            next.durationSeconds,
+                        )
+                        next.priceUSD = pricing.priceUSD
+                        next.wageVND = pricing.wageVND
+                    } catch (err) {
+                        console.warn('[QuickCreate] recalc price after duration edit failed:', err)
+                    }
+                }
+                return next
+            }),
         )
     }
 
@@ -621,7 +648,39 @@ export default function QuickCreateMode({
                                         disabled={!row.selected}
                                         className="bg-transparent border-0 px-1 py-0.5 text-xs focus:outline-none focus:bg-zinc-900/60 focus:rounded"
                                     />
-                                    <div className="font-mono">{formatDuration(row.durationSeconds)}</div>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        placeholder="m:ss"
+                                        value={row.durationSeconds > 0 ? formatDuration(row.durationSeconds) : ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value.trim()
+                                            // Parse "m:ss" or just seconds
+                                            let totalSec = 0
+                                            if (val.includes(':')) {
+                                                const [m, s] = val.split(':')
+                                                totalSec = (parseInt(m, 10) || 0) * 60 + (parseInt(s, 10) || 0)
+                                            } else {
+                                                totalSec = parseInt(val, 10) || 0
+                                            }
+                                            // Auto-reclassify Short/Long when toggle is on
+                                            const newType: 'Short form' | 'Long form' =
+                                                toggles.classifyDuration && totalSec > 120
+                                                    ? 'Long form'
+                                                    : toggles.classifyDuration && totalSec > 0
+                                                      ? 'Short form'
+                                                      : row.type
+                                            updateRow(row.rowId, {
+                                                durationSeconds: totalSec,
+                                                type: newType,
+                                            })
+                                        }}
+                                        disabled={!row.selected}
+                                        title={row.durationSeconds === 0 ? 'Dropbox không trả về độ dài — nhập tay (vd: 1:30 hoặc 90)' : ''}
+                                        className={`bg-transparent border-0 px-1 py-0.5 text-xs font-mono focus:outline-none focus:bg-zinc-900/60 focus:rounded w-full ${
+                                            row.durationSeconds === 0 ? 'text-amber-300/70 placeholder-amber-300/40' : ''
+                                        }`}
+                                    />
                                     <select
                                         value={row.type}
                                         onChange={(e) =>

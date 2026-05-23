@@ -122,7 +122,66 @@ export async function scanDropboxFolder(
     processDropboxEntries(response.entries, videos, sharedFolderId, sharedLinkUrl)
   }
 
-  return videos.slice(0, maxFiles)
+  const trimmed = videos.slice(0, maxFiles)
+
+  // [Quick Create fix] Per-file enrichment: Dropbox often omits media_info
+  // when files are accessed via shared_link. Re-query each video by its file ID
+  // (which works across namespaces) to try to get duration metadata.
+  // Best-effort — if it fails, durationSeconds stays 0 and user can input manually.
+  if (sharedLinkUrl) {
+    await enrichDropboxDurations(accessToken, trimmed)
+  }
+
+  return trimmed
+}
+
+/**
+ * [Quick Create fix] Attempt to fetch media_info for videos that lack it.
+ * Uses files/get_metadata with file ID (works cross-namespace).
+ * Runs in parallel with 8-way concurrency cap to keep total latency low.
+ */
+async function enrichDropboxDurations(
+  accessToken: string,
+  videos: ScannedVideo[],
+): Promise<void> {
+  const needEnrich = videos.filter((v) => v.durationSeconds === 0)
+  if (needEnrich.length === 0) return
+
+  // Run with concurrency cap to avoid hammering the API
+  const concurrency = 8
+  let cursor = 0
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (cursor < needEnrich.length) {
+        const idx = cursor++
+        const video = needEnrich[idx]
+        try {
+          const res = await fetch(
+            'https://api.dropboxapi.com/2/files/get_metadata',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                path: video.fileId, // file ID works across namespaces
+                include_media_info: true,
+              }),
+            },
+          )
+          if (!res.ok) continue // best-effort
+          const data = await res.json()
+          const durationMs = data?.media_info?.metadata?.duration
+          if (typeof durationMs === 'number' && durationMs > 0) {
+            video.durationSeconds = Math.round(durationMs / 1000)
+          }
+        } catch {
+          // swallow — duration stays 0, user inputs manually
+        }
+      }
+    }),
+  )
 }
 
 async function fetchDropboxListFolder(

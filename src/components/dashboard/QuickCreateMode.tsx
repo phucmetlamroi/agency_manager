@@ -34,6 +34,7 @@ import {
     type QuickCreateBatchInput,
     type QuickTaskInput,
 } from '@/actions/quick-create-actions'
+import { AutocompleteInput } from '@/components/ui/AutocompleteInput'
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Types                                                              */
@@ -42,6 +43,8 @@ import {
 interface ClientOption {
     id: number
     name: string
+    /** [Quick Create] Parent client name for hierarchical display "Parent / Child" */
+    parentName?: string | null
 }
 
 interface UserOption {
@@ -469,20 +472,18 @@ export default function QuickCreateMode({
                     <label className="block text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2">
                         Client
                     </label>
-                    <select
-                        value={clientId ?? ''}
-                        onChange={(e) =>
-                            setClientId(e.target.value ? Number(e.target.value) : null)
-                        }
-                        className="w-full px-3 py-3 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 focus:outline-none focus:border-violet-500/50"
-                    >
-                        <option value="">— Chọn client —</option>
-                        {clients.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.name}
-                            </option>
-                        ))}
-                    </select>
+                    {/* [Quick Create] Searchable autocomplete giống AddTaskModal — search theo
+                        "Parent name + Child name" + hiển thị "Parent / Child" cho hierarchy */}
+                    <AutocompleteInput
+                        selectedId={clientId != null ? String(clientId) : ''}
+                        onSelect={(id) => setClientId(id ? Number(id) : null)}
+                        options={clients.map((c) => ({
+                            id: String(c.id),
+                            label: c.name,
+                            parentLabel: c.parentName ?? undefined,
+                        }))}
+                        placeholder="Tìm client..."
+                    />
                 </div>
                 <div>
                     <label className="block text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2">

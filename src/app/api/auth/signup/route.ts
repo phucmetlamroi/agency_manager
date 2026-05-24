@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
             email: typeof body.email === 'string' ? body.email : '',
             password: typeof body.password === 'string' ? body.password : '',
             displayName: typeof body.displayName === 'string' ? body.displayName : '',
+            // [Username Handle] User-provided clean ASCII handle (validated server-side)
+            username: typeof body.username === 'string' ? body.username : '',
             acceptTos: !!body.acceptTos,
             honeypot: typeof body.honeypot === 'string' ? body.honeypot : '',
         }

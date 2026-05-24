@@ -155,10 +155,10 @@ export function TaskDrawer({
                                     </h4>
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold border border-indigo-500/30">
-                                            {(task.assignee?.displayName ?? task.assignee?.nickname ?? task.assignee?.username)?.[0]?.toUpperCase() || '?'}
+                                            {((task.assignee?.displayName?.trim() || task.assignee?.username))?.[0]?.toUpperCase() || '?'}
                                         </div>
                                         <div>
-                                            <p className="text-white font-medium">{task.assignee?.displayName ?? task.assignee?.nickname ?? task.assignee?.username ?? 'Unassigned'}</p>
+                                            <p className="text-white font-medium">{(task.assignee?.displayName?.trim() || task.assignee?.username) ?? 'Unassigned'}</p>
                                             <p className="text-xs text-zinc-500">
                                                 {task.assignee ? 'Staff member' : 'Tap "Return" to push back to marketplace'}
                                             </p>
@@ -233,10 +233,10 @@ export function TaskDrawer({
                                                 className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 active:bg-white/10 transition-colors text-left disabled:opacity-50"
                                             >
                                                 <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 text-xs font-bold">
-                                                    {(u.displayName || u.nickname || u.username)[0]?.toUpperCase()}
+                                                    {((u.displayName?.trim() || u.username))[0]?.toUpperCase()}
                                                 </div>
                                                 <span className="text-sm text-zinc-100">
-                                                    {u.displayName || u.nickname || u.username}
+                                                    {(u.displayName?.trim() || u.username)}
                                                 </span>
                                             </button>
                                         ))}

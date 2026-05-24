@@ -69,8 +69,9 @@ export default function PayrollTable({ users, workspaceId }: { users: UserWithPa
                                 <tr key={user.id} className="hover:bg-white/5 transition-colors">
                                     <td className="px-6 py-4 font-medium text-white">
                                         <div className="flex flex-col">
-                                            <span>{user.displayName || user.nickname || user.username}</span>
-                                            <span className="text-xs text-gray-500">{user.username}</span>
+                                            {/* [Username Handle] displayName → username, plus @handle below for clarity */}
+                                            <span>{user.displayName?.trim() || user.username}</span>
+                                            <span className="text-xs text-gray-500">@{user.username}</span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">

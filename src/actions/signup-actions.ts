@@ -87,6 +87,8 @@ export type SignupInput = {
     email: string
     password: string
     displayName: string
+    /** [Username Handle] User-chosen handle (vd "bao_phuc.7"). Required. Must match USERNAME_REGEX. */
+    username: string
     acceptTos: boolean
     // [BotID migration] turnstileToken removed — Vercel BotID là passive,
     // không cần client gửi token. Server gọi checkBotId() đọc signal headers.
@@ -129,6 +131,31 @@ export async function signupAction(input: SignupInput): Promise<SignupResponse> 
         return {
             success: false,
             errors: { displayName: `Tên hiển thị phải từ ${MIN_DISPLAY_NAME} đến ${MAX_DISPLAY_NAME} ký tự.` }
+        }
+    }
+
+    // ── 3b. [Username Handle] Validate username (clean ASCII handle) ──
+    const { validateUsername } = await import('@/lib/username-validation')
+    const username = (input.username ?? '').trim()
+    const usernameValidation = validateUsername(username)
+    if (!usernameValidation.valid) {
+        await paddingDelay()
+        return {
+            success: false,
+            errors: { username: usernameValidation.error ?? 'Username không hợp lệ.' }
+        }
+    }
+    // Pre-check uniqueness BEFORE transaction (gives better error message;
+    // DB unique constraint is the final guard inside the transaction)
+    const usernameTaken = await prisma.user.findUnique({
+        where: { username },
+        select: { id: true },
+    })
+    if (usernameTaken) {
+        await paddingDelay()
+        return {
+            success: false,
+            errors: { username: 'Username đã có người dùng — chọn tên khác.' }
         }
     }
 
@@ -221,21 +248,14 @@ export async function signupAction(input: SignupInput): Promise<SignupResponse> 
                 select: { id: true },
             })
 
-            // Tạo User. username = email (unique constraint requires unique username).
-            // Nếu email đã được dùng làm username (legacy migration), thêm suffix.
-            // Note: rất hiếm vì email mới và user cũ thường có Vietnamese username.
-            let username = email
-            const usernameTaken = await tx.user.findUnique({
-                where: { username },
-                select: { id: true },
-            })
-            if (usernameTaken) {
-                username = `${email}-${Date.now().toString(36)}`
-            }
-
+            // [Username Handle] User provided their own handle (validated above).
+            // username = user-chosen handle. usernameSetByUser=true → never trigger migration modal.
+            // Race condition: if username taken between pre-check and now, DB unique constraint
+            // throws P2002 → caught in outer catch → error response.
             const user = await tx.user.create({
                 data: {
                     username,
+                    usernameSetByUser: true,
                     email,
                     password: passwordHash,
                     role: 'USER',

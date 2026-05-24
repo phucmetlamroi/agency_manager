@@ -218,7 +218,8 @@ export default function WorkspaceMembersPanel({
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-sm font-semibold text-zinc-100 truncate">
-                                            {member.user.displayName || member.user.nickname || member.user.username}
+                                            {/* [Username Handle] displayName → username (clean handle, never email) */}
+                                            {member.user.displayName?.trim() || member.user.username}
                                         </span>
                                         {isSelf && (
                                             <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">

@@ -115,6 +115,10 @@ model WorkspaceMember {
 model User {
   id                String              @id @default(uuid())
   username          String              @unique
+  // [Username Handle] true = user đã chủ ý đặt username theo pattern mới
+  // (signup mới hoặc đã complete migration modal). false = username cũ
+  // (auto-derived từ email hoặc có dấu) → trigger migration modal khi user vào app.
+  usernameSetByUser Boolean             @default(false)
   password          String
   avatarUrl         String?
   createdAt         DateTime            @default(now())

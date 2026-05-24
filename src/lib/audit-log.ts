@@ -76,6 +76,9 @@ export type AuditAction =
     | 'pricing_rule.set_default'
     | 'integration.connected'
     | 'integration.disconnected'
+    // [Username Handle]
+    | 'user.username_migrated'
+    | 'user.username_changed'
 
 /**
  * `workspaceId` value semantics (audit fix #2.9):

@@ -428,11 +428,9 @@ export default function AddTaskModal({
         if (!c) return ""
         return c.parent?.name ? `${c.parent.name} / ${c.name}` : c.name
     })()
-    const assigneeName =
-        users.find((u) => u.id === form.assigneeId)?.displayName ??
-        users.find((u) => u.id === form.assigneeId)?.nickname ??
-        users.find((u) => u.id === form.assigneeId)?.username ??
-        ""
+    // [Username Handle] displayName → username (clean handle), never email fallback
+    const assigneeUser = users.find((u) => u.id === form.assigneeId)
+    const assigneeName = assigneeUser?.displayName?.trim() || assigneeUser?.username || ""
     const videoCount = form.videoList.split("\n").filter((l) => l.trim()).length
 
     const stepTitle = STEPS[step]?.label ?? ""
@@ -481,7 +479,8 @@ export default function AddTaskModal({
                 }))
                 const userOptions = users.map((u) => ({
                     id: u.id,
-                    label: u.displayName ?? u.nickname ?? u.username,
+                    // [Username Handle] displayName → username (clean handle, never email)
+                    label: u.displayName?.trim() || u.username,
                 }))
                 return (
                     <div className="flex flex-col gap-4">

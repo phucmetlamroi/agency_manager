@@ -92,7 +92,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                     <div className="flex items-center gap-4">
                         <div className="relative flex-shrink-0">
                             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-emerald-500/30">
-                                {(user.displayName || user.nickname || user.username).charAt(0).toUpperCase()}
+                                {(user.displayName?.trim() || user.username).charAt(0).toUpperCase()}
                             </div>
                             {isPaid && (
                                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-zinc-950 flex items-center justify-center">
@@ -101,7 +101,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                             )}
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-zinc-100 leading-tight">{user.displayName || user.nickname || user.username}</h3>
+                            <h3 className="text-lg font-bold text-zinc-100 leading-tight">{user.displayName?.trim() || user.username}</h3>
                             <span className="text-xs text-zinc-500 font-mono">ID: {user.id.slice(0, 8)}…</span>
                         </div>
                     </div>

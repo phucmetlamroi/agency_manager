@@ -7,6 +7,8 @@ import { ChatProvider } from '@/components/chat/ChatProvider'
 import { ChatFloatingPanel } from '@/components/chat/ChatFloatingPanel'
 import { MarketplaceProvider } from '@/components/marketplace/MarketplaceProvider'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { needsUsernameMigration } from '@/lib/username-validation'
+import { UsernameMigrationModal } from '@/components/auth/UsernameMigrationModal'
 
 export default async function WorkspaceLayout({
     children,
@@ -93,6 +95,29 @@ export default async function WorkspaceLayout({
         })
     } catch { /* ignore — badge starts at 0 */ }
 
+    // [Username Handle] Check if user needs forced migration to new ASCII handle.
+    // Triggered when: usernameSetByUser=false OR username has diacritic / email-like / pattern mismatch.
+    let usernameMigrationNeeded = false
+    let migrationUserData: { username: string; displayName: string | null } | null = null
+    try {
+        const userForMigrationCheck = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { username: true, usernameSetByUser: true, displayName: true },
+        })
+        if (userForMigrationCheck) {
+            usernameMigrationNeeded = needsUsernameMigration(
+                userForMigrationCheck.username,
+                userForMigrationCheck.usernameSetByUser,
+            )
+            migrationUserData = {
+                username: userForMigrationCheck.username,
+                displayName: userForMigrationCheck.displayName,
+            }
+        }
+    } catch (e) {
+        console.warn('[WorkspaceLayout] username migration check failed:', e)
+    }
+
     // We can inject the workspaceId context down if needed,
     // but React Server Components inside will also get `params.workspaceId` from their own props.
     return (
@@ -100,7 +125,7 @@ export default async function WorkspaceLayout({
             <div className="workspace-container h-full w-full relative flex flex-col">
                 {session.user.isImpersonating && (
                     <ImpersonationBanner
-                        username={session.user.nickname || session.user.username}
+                        username={(session.user as any).displayName || session.user.nickname || session.user.username}
                         workspaceId={workspaceId}
                     />
                 )}
@@ -115,6 +140,13 @@ export default async function WorkspaceLayout({
                     initialTaskCount={marketplaceCount}
                     triggerMode="event"
                 />
+                {/* [Username Handle] Forced migration modal — blocks UI until user picks new handle */}
+                {usernameMigrationNeeded && migrationUserData && (
+                    <UsernameMigrationModal
+                        currentUsername={migrationUserData.username}
+                        displayName={migrationUserData.displayName}
+                    />
+                )}
             </div>
         </ChatProvider>
     )

@@ -1,16 +1,32 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { UserPlus, X, Loader2, Search, Check } from 'lucide-react'
-import { inviteToWorkspace, getAvailableUsersForInvite } from '@/actions/member-actions'
+/**
+ * [Username Handle] Unified invite modal with autocomplete search.
+ *
+ * Replaces the previous 2-mode UI (select/search) with a single search-as-you-type
+ * input. Debounced query (300ms) hits `searchInviteCandidates` server action which
+ * matches against username OR email OR displayName, scoped to users with access
+ * to the workspace's profile.
+ *
+ * UX flow:
+ *   1. Admin types "bao" → dropdown shows matching users with handle + email
+ *   2. Click a user → invite fires immediately (uses inviteToWorkspace by username)
+ *   3. No match found + query looks like email → "Mời {email}" button to invite
+ *      external email (creates pending invitation)
+ */
+
+import { useState, useEffect, useRef } from 'react'
+import { UserPlus, X, Loader2, Search, Mail } from 'lucide-react'
+import { inviteToWorkspace } from '@/actions/member-actions'
+import { searchInviteCandidates } from '@/actions/username-actions'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { WorkspaceRole } from '@/lib/workspace-roles'
 
-type AvailableUser = {
+type Candidate = {
     id: string
     username: string
-    nickname: string | null
+    displayName: string | null
     email: string | null
     avatarUrl: string | null
     role: string
@@ -22,81 +38,54 @@ type Props = {
     onSuccess?: () => void
 }
 
+const isEmailLike = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim())
+
 export default function InviteMemberModal({ workspaceId, onClose, onSuccess }: Props) {
-    const [mode, setMode] = useState<'select' | 'search'>('select')
-    const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([])
-    const [loading, setLoading] = useState(true)
+    const [query, setQuery] = useState('')
+    const [candidates, setCandidates] = useState<Candidate[]>([])
+    const [searching, setSearching] = useState(false)
     const [inviting, setInviting] = useState(false)
-    const [searchQuery, setSearchQuery] = useState('')
     const [selectedRole, setSelectedRole] = useState<WorkspaceRole>('MEMBER')
+    const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
-    // For search mode
-    const [searchUsername, setSearchUsername] = useState('')
-
+    /* ── Debounced server search ───────────────────────────────────── */
     useEffect(() => {
-        loadAvailableUsers()
-    }, [workspaceId])
-
-    async function loadAvailableUsers() {
-        setLoading(true)
-        try {
-            const result = await getAvailableUsersForInvite(workspaceId)
-            setAvailableUsers(result.users)
-        } catch {
-            toast.error('Không thể tải danh sách người dùng')
-        } finally {
-            setLoading(false)
+        const trimmed = query.trim()
+        if (trimmed.length === 0) {
+            setCandidates([])
+            setSearching(false)
+            return
         }
-    }
-
-    const filteredUsers = availableUsers.filter(u => {
-        const q = searchQuery.toLowerCase()
-        return !q
-            || u.username.toLowerCase().includes(q)
-            || (u.nickname && u.nickname.toLowerCase().includes(q))
-            || (u.email && u.email.toLowerCase().includes(q))
-    })
-
-    async function handleInviteUser(userId: string) {
-        const user = availableUsers.find(u => u.id === userId)
-        if (!user) return
-
-        setInviting(true)
-        try {
-            const result = await inviteToWorkspace(workspaceId, user.username, selectedRole)
-            if (result.error) {
-                toast.error(result.error)
-            } else if (result.directAdd) {
-                toast.success(`${result.username} đã được thêm vào workspace!`)
-                onSuccess?.()
-                // Remove from available list
-                setAvailableUsers(prev => prev.filter(u => u.id !== userId))
-            } else {
-                toast.success(`Đã gửi lời mời đến ${result.username}`)
-                onSuccess?.()
-                setAvailableUsers(prev => prev.filter(u => u.id !== userId))
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+        setSearching(true)
+        debounceRef.current = setTimeout(async () => {
+            try {
+                const results = await searchInviteCandidates(workspaceId, trimmed)
+                setCandidates(results)
+            } catch {
+                setCandidates([])
+            } finally {
+                setSearching(false)
             }
-        } catch (err: any) {
-            toast.error(err?.message || 'Lỗi không xác định')
-        } finally {
-            setInviting(false)
+        }, 300)
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }
+    }, [query, workspaceId])
 
-    async function handleSearchInvite() {
-        if (!searchUsername.trim()) return
+    async function handleInvite(identifier: string) {
         setInviting(true)
         try {
-            const result = await inviteToWorkspace(workspaceId, searchUsername.trim(), selectedRole)
+            const result = await inviteToWorkspace(workspaceId, identifier, selectedRole)
             if (result.error) {
                 toast.error(result.error)
             } else if (result.directAdd) {
                 toast.success(`${result.username} đã được thêm vào workspace!`)
-                setSearchUsername('')
+                setQuery('')
                 onSuccess?.()
             } else {
                 toast.success(`Đã gửi lời mời đến ${result.username}`)
-                setSearchUsername('')
+                setQuery('')
                 onSuccess?.()
             }
         } catch (err: any) {
@@ -113,7 +102,7 @@ export default function InviteMemberModal({ workspaceId, onClose, onSuccess }: P
         >
             <div
                 className="bg-zinc-950/95 border border-white/10 rounded-2xl p-6 w-[90%] max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden"
-                onClick={e => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
             >
                 {/* Ambient Glow */}
                 <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-[80px] opacity-20 pointer-events-none bg-indigo-500" />
@@ -135,7 +124,7 @@ export default function InviteMemberModal({ workspaceId, onClose, onSuccess }: P
                         Vai trò
                     </label>
                     <div className="flex gap-2">
-                        {(['MEMBER', 'ADMIN', 'GUEST'] as WorkspaceRole[]).map(role => (
+                        {(['MEMBER', 'ADMIN', 'GUEST'] as WorkspaceRole[]).map((role) => (
                             <button
                                 key={role}
                                 type="button"
@@ -152,121 +141,92 @@ export default function InviteMemberModal({ workspaceId, onClose, onSuccess }: P
                     </div>
                 </div>
 
-                {/* Mode Tabs */}
-                <div className="relative z-10 flex gap-2 mb-4">
-                    <button
-                        onClick={() => setMode('select')}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${
-                            mode === 'select'
-                                ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
-                                : 'bg-zinc-900/40 border-white/5 text-zinc-500 hover:text-zinc-300'
-                        }`}
-                    >
-                        Chọn từ Team ({availableUsers.length})
-                    </button>
-                    <button
-                        onClick={() => setMode('search')}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${
-                            mode === 'search'
-                                ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
-                                : 'bg-zinc-900/40 border-white/5 text-zinc-500 hover:text-zinc-300'
-                        }`}
-                    >
-                        Tìm theo Username
-                    </button>
+                {/* Unified search input */}
+                <div className="relative z-10 mb-3">
+                    <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                        Tìm người dùng
+                    </label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                        <input
+                            type="text"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Username, email hoặc tên hiển thị..."
+                            autoFocus
+                            className="w-full bg-zinc-900/60 border border-white/10 rounded-xl pl-9 pr-9 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                        />
+                        {searching && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-zinc-500" />
+                        )}
+                    </div>
                 </div>
 
-                {/* Select Mode */}
-                {mode === 'select' && (
-                    <div className="relative z-10">
-                        {/* Search Filter */}
-                        <div className="relative mb-3">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                placeholder="Lọc theo tên..."
-                                className="w-full bg-zinc-900/60 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                            />
+                {/* Results list */}
+                <div className="relative z-10 max-h-[280px] overflow-y-auto pr-1 space-y-1.5">
+                    {query.trim().length === 0 ? (
+                        <div className="text-sm text-zinc-500 text-center py-8">
+                            Gõ username, email, hoặc tên để tìm người dùng.
                         </div>
-
-                        {/* User List */}
-                        <div className="space-y-1.5 max-h-[250px] overflow-y-auto pr-1">
-                            {loading ? (
-                                <div className="flex items-center justify-center py-8">
-                                    <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
-                                </div>
-                            ) : filteredUsers.length === 0 ? (
-                                <div className="text-sm text-zinc-500 text-center py-8">
-                                    {searchQuery ? 'Không tìm thấy.' : 'Tất cả nhân sự đã là thành viên.'}
-                                </div>
-                            ) : (
-                                filteredUsers.map(user => (
-                                    <div key={user.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-zinc-900/30 border border-white/5 hover:border-white/10 hover:bg-zinc-900/50 transition-all group">
-                                        <Avatar className="h-8 w-8 border border-white/10">
-                                            <AvatarImage src={user.avatarUrl || `https://avatar.vercel.sh/${user.username}`} />
-                                            <AvatarFallback className="bg-zinc-800 text-zinc-200 text-xs font-bold">
-                                                {user.username[0].toUpperCase()}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-semibold text-zinc-200 truncate">
-                                                {user.nickname || user.username}
-                                            </div>
-                                            <div className="text-[10px] text-zinc-500 truncate">
-                                                @{user.username} {user.email && `· ${user.email}`}
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => handleInviteUser(user.id)}
-                                            disabled={inviting}
-                                            className="px-3 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white text-xs font-bold transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50 flex items-center gap-1.5 shrink-0"
-                                        >
-                                            {inviting ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
-                                            Thêm
-                                        </button>
-                                    </div>
-                                ))
+                    ) : candidates.length === 0 && !searching ? (
+                        <div className="text-center py-6">
+                            <div className="text-sm text-zinc-500 mb-3">
+                                Không tìm thấy ai khớp với <span className="text-zinc-300 font-mono">"{query.trim()}"</span>
+                            </div>
+                            {/* Email-like → offer to send invite to external email */}
+                            {isEmailLike(query) && (
+                                <button
+                                    onClick={() => handleInvite(query.trim())}
+                                    disabled={inviting}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all disabled:opacity-50"
+                                >
+                                    {inviting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+                                    Mời {query.trim()} qua email
+                                </button>
                             )}
                         </div>
-                    </div>
-                )}
-
-                {/* Search Mode */}
-                {mode === 'search' && (
-                    <div className="relative z-10">
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={searchUsername}
-                                onChange={e => setSearchUsername(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleSearchInvite()}
-                                placeholder="Nhập username hoặc email..."
-                                className="flex-1 bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                            />
-                            <button
-                                onClick={handleSearchInvite}
-                                disabled={inviting || !searchUsername.trim()}
-                                className="px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
-                            >
-                                {inviting ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <UserPlus className="w-4 h-4" />
-                                )}
-                                Mời
-                            </button>
-                        </div>
-                        <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">
-                            Nhập chính xác username hoặc email. Nếu cùng Team, thành viên sẽ được thêm trực tiếp.
-                            Nếu khác Team, một lời mời sẽ được gửi.
-                        </p>
-                    </div>
-                )}
+                    ) : (
+                        candidates.map((user) => {
+                            const displayName = user.displayName?.trim() || user.username
+                            return (
+                                <button
+                                    key={user.id}
+                                    onClick={() => handleInvite(user.username)}
+                                    disabled={inviting}
+                                    className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-zinc-900/30 border border-white/5 hover:border-indigo-500/30 hover:bg-zinc-900/60 transition-all text-left disabled:opacity-50"
+                                >
+                                    <Avatar className="h-9 w-9 border border-white/10 shrink-0">
+                                        <AvatarImage src={user.avatarUrl || `https://avatar.vercel.sh/${user.username}`} />
+                                        <AvatarFallback className="bg-zinc-800 text-zinc-200 text-xs font-bold">
+                                            {displayName[0]?.toUpperCase() ?? '?'}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-semibold text-zinc-100 truncate">
+                                            {displayName}
+                                        </div>
+                                        <div className="text-[11px] text-zinc-500 truncate flex items-center gap-1.5">
+                                            <span className="text-indigo-400 font-mono">@{user.username}</span>
+                                            {user.email && (
+                                                <>
+                                                    <span className="opacity-50">·</span>
+                                                    <span>{user.email}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <UserPlus className="w-4 h-4 text-zinc-500 shrink-0" />
+                                </button>
+                            )
+                        })
+                    )}
+                </div>
 
                 {/* Footer */}
-                <div className="relative z-10 mt-5 flex justify-end">
+                <div className="relative z-10 mt-5 flex items-center justify-between gap-2">
+                    <p className="text-[10px] text-zinc-600 leading-relaxed flex-1">
+                        Tip: Gõ tên, @username hoặc email. Người cùng Team → thêm trực tiếp. Khác Team → gửi lời mời.
+                    </p>
                     <button
                         onClick={onClose}
                         className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-zinc-400 font-bold text-sm hover:bg-white/10 hover:text-white transition-colors"

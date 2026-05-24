@@ -98,14 +98,10 @@ export default async function UserDashboard({ params, searchParams }: {
         },
     })
 
-    const displayName = currentUser?.displayName || currentUser?.nickname || currentUser?.username || 'User'
-    const initials =
-        displayName
-            .split(/\s+/)
-            .map((w: string) => w[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2) || 'US'
+    // [Username Handle] Centralized display: displayName → username (never email fallback)
+    const { formatUserDisplay, formatUserInitials } = await import('@/lib/format-user')
+    const displayName = formatUserDisplay(currentUser) || 'User'
+    const initials = formatUserInitials(currentUser) || 'US'
 
     // ── User's tasks (for widgets + TaskTable) ───────────────────
     const rawTasks = await (workspacePrisma as any).task.findMany({

@@ -16,12 +16,16 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mail, User, Lock, CheckCircle2, Loader2, ArrowLeft } from 'lucide-react'
+import { Mail, User, Lock, CheckCircle2, Loader2, ArrowLeft, AtSign } from 'lucide-react'
 import PasswordStrengthMeter from '@/components/auth/PasswordStrengthMeter'
+import { UsernameInput } from '@/components/auth/UsernameInput'
 
 export default function SignupPage() {
     const router = useRouter()
     const [displayName, setDisplayName] = useState('')
+    const [username, setUsername] = useState('')
+    /** [Username Handle] tracks if username passes BOTH format + uniqueness check */
+    const [usernameValid, setUsernameValid] = useState(false)
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [acceptTos, setAcceptTos] = useState(false)
@@ -37,7 +41,13 @@ export default function SignupPage() {
     // không cần token state ở client.
 
     const lengthOk = password.length >= 12
-    const canSubmit = displayName.trim().length >= 2 && email && lengthOk && acceptTos && !isPending
+    const canSubmit =
+        displayName.trim().length >= 2 &&
+        usernameValid &&
+        email &&
+        lengthOk &&
+        acceptTos &&
+        !isPending
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -50,7 +60,7 @@ export default function SignupPage() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        email, password, displayName, acceptTos, honeypot,
+                        email, password, displayName, username, acceptTos, honeypot,
                     }),
                 })
                 const data = await res.json()
@@ -148,6 +158,26 @@ export default function SignupPage() {
                             />
                         </div>
                         {fieldErrors.displayName && <p className="text-xs text-red-400 mt-1">{fieldErrors.displayName}</p>}
+                    </div>
+
+                    {/* [Username Handle] Username (handle) */}
+                    <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                            Username <span className="text-zinc-600">· @handle dùng để mời / login</span>
+                        </label>
+                        <div className="relative">
+                            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
+                            <div className="pl-7">
+                                <UsernameInput
+                                    value={username}
+                                    onChange={(v, valid) => {
+                                        setUsername(v)
+                                        setUsernameValid(valid)
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        {fieldErrors.username && <p className="text-xs text-red-400 mt-1">{fieldErrors.username}</p>}
                     </div>
 
                     {/* Email */}

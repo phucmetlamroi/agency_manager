@@ -203,8 +203,10 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         select: { id: true, name: true, description: true }
     })
 
-    const displayName = currentUser?.displayName || currentUser?.nickname || currentUser?.username || 'Admin'
-    const initials = displayName.split(/\s+/).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || 'AD'
+    // [Username Handle] Centralized display: displayName → username (never email fallback)
+    const { formatUserDisplay, formatUserInitials } = await import('@/lib/format-user')
+    const displayName = formatUserDisplay(currentUser) || 'Admin'
+    const initials = formatUserInitials(currentUser) || 'AD'
 
     return (
         <div className="flex flex-col gap-5">

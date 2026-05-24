@@ -91,7 +91,8 @@ export const getLeaderboardData = unstable_cache(
 
             return {
                 id: u.id,
-                username: (u as any).displayName || (u as any).nickname || u.username,
+                // [Username Handle] displayName for nice Vietnamese name, fallback to username handle — never email
+                username: (u as any).displayName?.trim() || u.username,
                 taskCount,
                 errorRate,
                 revenue,

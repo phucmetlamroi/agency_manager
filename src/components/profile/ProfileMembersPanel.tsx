@@ -155,7 +155,7 @@ export default function ProfileMembersPanel({
                         const RoleIcon = badge.icon
                         const isSelf = m.userId === currentUserId
                         const isLoading = actionLoading === m.userId
-                        const displayName = m.user.displayName ?? m.user.nickname ?? m.user.username
+                        const displayName = (m.user.displayName?.trim() || m.user.username)
                         const canManageThisMember = isOwner && !isSelf && m.role !== 'OWNER'
 
                         return (
@@ -265,7 +265,7 @@ export default function ProfileMembersPanel({
                 <GrantWorkspaceAccessModal
                     profileId={profileId}
                     targetUserId={grantTarget.userId}
-                    targetUserName={grantTarget.user.displayName ?? grantTarget.user.nickname ?? grantTarget.user.username}
+                    targetUserName={grantTarget.user.displayName?.trim() || grantTarget.user.username}
                     onClose={() => setGrantTarget(null)}
                     onSuccess={() => {
                         setGrantTarget(null)

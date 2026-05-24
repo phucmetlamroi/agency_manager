@@ -517,7 +517,8 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                 </span>
 
                                 <span style={{ fontSize: 13, color: NP.textPrimary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    {(task.assignee as any)?.displayName ?? (task.assignee as any)?.nickname ?? (task.assignee?.username || "—")}
+                                    {/* [Username Handle] displayName → username, never email */}
+                                    {(task.assignee as any)?.displayName?.trim() || task.assignee?.username || "—"}
                                 </span>
 
                                 <span

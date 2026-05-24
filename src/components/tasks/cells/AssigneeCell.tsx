@@ -26,9 +26,12 @@ interface AssigneeCellProps {
     workspaceId: string
 }
 
-/** Resolve best display name: displayName > nickname > username */
+/**
+ * [Username Handle] Resolve best display name: displayName → username.
+ * (Never falls back to email; username is now the clean ASCII handle.)
+ */
 function displayName(user: { username: string; displayName?: string | null; nickname?: string | null }): string {
-    return user.displayName ?? user.nickname ?? user.username
+    return user.displayName?.trim() || user.username
 }
 
 export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspaceId }: AssigneeCellProps) {

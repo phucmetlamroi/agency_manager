@@ -195,7 +195,7 @@ export default function MobileTaskCard({
                         ) : (
                             task.assignee && (
                                 <span className="text-xs text-zinc-500 truncate">
-                                    @{(task.assignee as any).displayName ?? (task.assignee as any).nickname ?? task.assignee.username}
+                                    {(task.assignee as any).displayName?.trim() || `@${task.assignee.username}`}
                                 </span>
                             )
                         )}

@@ -31,17 +31,17 @@ const HiIcons = require('react-icons/hi')
 const COLORS = {
     bg: '0A0A0A',           // background main
     bgGradient: '1A0E3E',   // top-right glow
-    glassCard: '14101F',    // glass card fill (mimics rgba via solid+border)
-    glassBorder: '8B5CF6',  // violet border (with low opacity feel via 26)
+    glassCard: '1C1727',    // [BRIGHTER] glass card fill — more contrast vs bg
+    glassBorder: '8B5CF6',  // violet border
     violet: '8B5CF6',       // accent primary
-    violetLight: 'A78BFA',  // lighter violet
+    violetLight: 'C4B5FD',  // [BRIGHTER] violet-300 (was A78BFA violet-400)
     fuchsia: 'D946EF',      // gradient end
-    emerald: '34D399',      // success
-    amber: 'F59E0B',        // warning / pain
-    red: 'EF4444',          // danger / competitor weakness
-    textPrimary: 'E4E4E7',  // zinc-200
-    textSecondary: 'A1A1AA',// zinc-400
-    textMuted: '71717A',    // zinc-500
+    emerald: '6EE7B7',      // [BRIGHTER] emerald-300 (was 34D399 emerald-400)
+    amber: 'FBBF24',        // [BRIGHTER] amber-400 (was F59E0B amber-500)
+    red: 'F87171',          // [BRIGHTER] red-400 (was EF4444 red-500)
+    textPrimary: 'F4F4F5',  // [BRIGHTER] zinc-100 (was E4E4E7 zinc-200)
+    textSecondary: 'D4D4D8',// [BRIGHTER] zinc-300 (was A1A1AA zinc-400)
+    textMuted: 'A1A1AA',    // [BRIGHTER] zinc-400 (was 71717A zinc-500)
     white: 'FFFFFF',
 }
 
@@ -105,22 +105,22 @@ function glassCard(slide, { x, y, w, h, borderColor = COLORS.violet, borderTrans
 /** Slide title bar at top */
 function slideTitle(slide, text, subtitle = null) {
     slide.addText(text, {
-        x: 0.5, y: 0.35, w: SLIDE_W - 1, h: 0.7,
-        fontFace: FONT.heading, fontSize: 30, bold: true,
-        color: COLORS.textPrimary, align: 'left', valign: 'middle',
+        x: 0.5, y: 0.3, w: SLIDE_W - 1, h: 0.75,
+        fontFace: FONT.heading, fontSize: 36, bold: true,   // [READABILITY] 30 → 36
+        color: COLORS.white, align: 'left', valign: 'middle',
         margin: 0,
     })
     if (subtitle) {
         slide.addText(subtitle, {
-            x: 0.5, y: 1.0, w: SLIDE_W - 1, h: 0.4,
-            fontFace: FONT.body, fontSize: 14, italic: true,
-            color: COLORS.textSecondary, align: 'left', valign: 'top',
+            x: 0.5, y: 1.05, w: SLIDE_W - 1, h: 0.45,
+            fontFace: FONT.body, fontSize: 17, italic: true,  // [READABILITY] 14 → 17
+            color: COLORS.violetLight, align: 'left', valign: 'top',
             margin: 0,
         })
     }
     // Violet accent line under title
     slide.addShape('rect', {
-        x: 0.5, y: 1.05, w: 0.6, h: 0.05,
+        x: 0.5, y: 1.12, w: 0.8, h: 0.06,
         fill: { color: COLORS.violet },
         line: { type: 'none' },
     })
@@ -130,12 +130,12 @@ function slideTitle(slide, text, subtitle = null) {
 function slideFooter(slide, slideNum) {
     slide.addText('HustlyTasker · EXE101', {
         x: 0.5, y: SLIDE_H - 0.4, w: 4, h: 0.3,
-        fontFace: FONT.body, fontSize: 10, color: COLORS.textMuted,
+        fontFace: FONT.body, fontSize: 12, color: COLORS.textMuted,  // [READABILITY] 10 → 12
         align: 'left', valign: 'middle',
     })
     slide.addText(`${slideNum} / 13`, {
         x: SLIDE_W - 1.5, y: SLIDE_H - 0.4, w: 1, h: 0.3,
-        fontFace: FONT.body, fontSize: 10, color: COLORS.textMuted,
+        fontFace: FONT.body, fontSize: 12, color: COLORS.textMuted,
         align: 'right', valign: 'middle',
     })
 }
@@ -194,39 +194,39 @@ async function build() {
             line: { type: 'none' },
         })
 
-        // Brand "tag" small at top
+        // Brand "tag" small at top — bigger
         s.addText('HUSTLYTASKER', {
-            x: 0.5, y: 0.5, w: SLIDE_W - 1, h: 0.4,
-            fontFace: FONT.heading, fontSize: 11, bold: true,
+            x: 0.5, y: 0.5, w: SLIDE_W - 1, h: 0.45,
+            fontFace: FONT.heading, fontSize: 14, bold: true,  // [READABILITY] 11 → 14
             color: COLORS.violetLight, align: 'left', valign: 'middle',
-            charSpacing: 8,
+            charSpacing: 10,
         })
 
-        // Main hero title
+        // Main hero title — bigger
         s.addText('HustlyTasker', {
-            x: 0.5, y: 2.4, w: SLIDE_W - 1, h: 1.4,
-            fontFace: FONT.heading, fontSize: 84, bold: true,
+            x: 0.5, y: 2.3, w: SLIDE_W - 1, h: 1.5,
+            fontFace: FONT.heading, fontSize: 96, bold: true,  // [READABILITY] 84 → 96
             color: COLORS.white, align: 'center', valign: 'middle',
         })
 
-        // Tagline
+        // Tagline — bigger
         s.addText('Nền tảng quản lý công việc dành riêng cho Video Agency', {
-            x: 0.5, y: 3.9, w: SLIDE_W - 1, h: 0.6,
-            fontFace: FONT.body, fontSize: 22,
+            x: 0.5, y: 3.95, w: SLIDE_W - 1, h: 0.65,
+            fontFace: FONT.body, fontSize: 26,  // [READABILITY] 22 → 26
             color: COLORS.textPrimary, align: 'center', valign: 'middle',
         })
 
-        // Sub-tagline (italic)
+        // Sub-tagline (italic) — bigger
         s.addText('"Quản lý thông minh — Giao việc nhanh — Thanh toán minh bạch"', {
-            x: 0.5, y: 4.6, w: SLIDE_W - 1, h: 0.4,
-            fontFace: FONT.body, fontSize: 14, italic: true,
+            x: 0.5, y: 4.7, w: SLIDE_W - 1, h: 0.45,
+            fontFace: FONT.body, fontSize: 18, italic: true,  // [READABILITY] 14 → 18
             color: COLORS.violetLight, align: 'center',
         })
 
-        // Footer block
+        // Footer block — bigger
         s.addText('Nhóm thuyết trình · EXE101 — Khởi nghiệp · 2026', {
             x: 0.5, y: SLIDE_H - 0.8, w: SLIDE_W - 1, h: 0.4,
-            fontFace: FONT.body, fontSize: 12,
+            fontFace: FONT.body, fontSize: 15,  // [READABILITY] 12 → 15
             color: COLORS.textMuted, align: 'center',
         })
     }
@@ -256,33 +256,33 @@ async function build() {
             glassCard(s, { x, y: startY, w: cardW, h: cardH })
 
             // Icon on top
-            s.addImage({ data: c.icon, x: x + cardW/2 - 0.4, y: startY + 0.4, w: 0.8, h: 0.8 })
+            s.addImage({ data: c.icon, x: x + cardW/2 - 0.45, y: startY + 0.35, w: 0.9, h: 0.9 })
 
-            // Big number
+            // Big number — even bigger for impact
             s.addText(c.num, {
-                x: x + 0.2, y: startY + 1.35, w: cardW - 0.4, h: 1.4,
-                fontFace: FONT.heading, fontSize: 72, bold: true,
+                x: x + 0.2, y: startY + 1.35, w: cardW - 0.4, h: 1.5,
+                fontFace: FONT.heading, fontSize: 88, bold: true,  // [READABILITY] 72 → 88
                 color: c.color, align: 'center', valign: 'middle',
             })
 
             // Unit
             s.addText(c.unit, {
-                x: x + 0.2, y: startY + 2.65, w: cardW - 0.4, h: 0.35,
-                fontFace: FONT.body, fontSize: 14, bold: true,
-                color: COLORS.textPrimary, align: 'center',
+                x: x + 0.2, y: startY + 2.8, w: cardW - 0.4, h: 0.4,
+                fontFace: FONT.body, fontSize: 18, bold: true,  // [READABILITY] 14 → 18
+                color: COLORS.white, align: 'center',
             })
 
             // Label
             s.addText(c.label, {
-                x: x + 0.2, y: startY + 3.05, w: cardW - 0.4, h: 0.4,
-                fontFace: FONT.body, fontSize: 13,
-                color: COLORS.textSecondary, align: 'center',
+                x: x + 0.2, y: startY + 3.25, w: cardW - 0.4, h: 0.45,
+                fontFace: FONT.body, fontSize: 16,  // [READABILITY] 13 → 16
+                color: COLORS.textPrimary, align: 'center',
             })
 
             // Caption
             s.addText(c.caption, {
-                x: x + 0.2, y: startY + 3.55, w: cardW - 0.4, h: 0.4,
-                fontFace: FONT.body, fontSize: 10, italic: true,
+                x: x + 0.2, y: startY + 3.75, w: cardW - 0.4, h: 0.35,
+                fontFace: FONT.body, fontSize: 12, italic: true,  // [READABILITY] 10 → 12
                 color: COLORS.textMuted, align: 'center',
             })
         })
@@ -290,7 +290,7 @@ async function build() {
         // Bottom insight
         s.addText('Phỏng vấn 5 agency Việt Nam — đây không phải con số tưởng tượng.', {
             x: 0.5, y: 6.4, w: SLIDE_W - 1, h: 0.4,
-            fontFace: FONT.body, fontSize: 14, italic: true,
+            fontFace: FONT.body, fontSize: 18, italic: true,  // [READABILITY] 14 → 18
             color: COLORS.violetLight, align: 'center',
         })
 
@@ -311,25 +311,26 @@ async function build() {
         const startX = (SLIDE_W - (cardW * 3 + gap * 2)) / 2
         const startY = 1.7
 
+        // [READABILITY] Shortened body text for less cramped cards
         const pains = [
             {
                 icon: icons.clipboard,
                 title: 'Quản lý task rời rạc',
-                body: 'Excel + Zalo + Trello chắp vá. Admin phải hỏi từng editor để biết task đang ở bước nào. Thông tin tản mác, dễ sót, miss deadline.',
-                stat: '1.5 giờ/ngày',
-                statLabel: 'chỉ để track status',
+                body: 'Excel + Zalo + Trello chắp vá. Admin phải hỏi từng editor mới biết task đang ở đâu. Dễ sót, miss deadline.',
+                stat: '1.5h/ngày',
+                statLabel: 'để track status',
             },
             {
                 icon: icons.money,
-                title: 'Tài chính song tiền tệ chaos',
-                body: 'Client trả USD, editor lương VND — 2 file Excel khác nhau. Tỷ giá thay đổi, profit margin mơ hồ.',
+                title: 'Tài chính chaos',
+                body: 'Client trả USD, editor lương VND — 2 file Excel. Tỷ giá thay đổi, profit margin mơ hồ.',
                 stat: '5-10%',
-                statLabel: 'sai số payroll/tháng',
+                statLabel: 'sai số payroll',
             },
             {
                 icon: icons.chat,
                 title: 'Client không thấy tiến độ',
-                body: 'Không có nơi tập trung xem progress. Rào cản ngôn ngữ Việt-Anh-Trung. Admin spend hàng giờ reply DM.',
+                body: 'Không có nơi tập trung. Rào cản ngôn ngữ Việt-Anh-Trung. Admin reply DM hàng giờ.',
                 stat: '70%',
                 statLabel: 'client nhắn ≥1 lần/tuần',
             },
@@ -339,58 +340,58 @@ async function build() {
             const x = startX + i * (cardW + gap)
             glassCard(s, { x, y: startY, w: cardW, h: cardH })
 
-            // Pain # circle
+            // Pain # circle — bigger
             s.addShape('ellipse', {
-                x: x + 0.3, y: startY + 0.3, w: 0.45, h: 0.45,
-                fill: { color: COLORS.amber, transparency: 80 },
-                line: { color: COLORS.amber, width: 1 },
+                x: x + 0.3, y: startY + 0.3, w: 0.55, h: 0.55,
+                fill: { color: COLORS.amber, transparency: 75 },
+                line: { color: COLORS.amber, width: 1.5 },
             })
             s.addText(`${i + 1}`, {
-                x: x + 0.3, y: startY + 0.3, w: 0.45, h: 0.45,
-                fontFace: FONT.heading, fontSize: 16, bold: true,
+                x: x + 0.3, y: startY + 0.3, w: 0.55, h: 0.55,
+                fontFace: FONT.heading, fontSize: 20, bold: true,
                 color: COLORS.amber, align: 'center', valign: 'middle',
             })
 
             // Icon
-            s.addImage({ data: p.icon, x: x + cardW - 1.0, y: startY + 0.3, w: 0.55, h: 0.55 })
+            s.addImage({ data: p.icon, x: x + cardW - 1.05, y: startY + 0.3, w: 0.6, h: 0.6 })
 
-            // Title
+            // Title — bigger
             s.addText(p.title, {
-                x: x + 0.3, y: startY + 1.0, w: cardW - 0.6, h: 0.55,
-                fontFace: FONT.heading, fontSize: 18, bold: true,
+                x: x + 0.3, y: startY + 1.1, w: cardW - 0.6, h: 0.6,
+                fontFace: FONT.heading, fontSize: 22, bold: true,  // [READABILITY] 18 → 22
+                color: COLORS.white, valign: 'top',
+            })
+
+            // Body — bigger
+            s.addText(p.body, {
+                x: x + 0.3, y: startY + 1.85, w: cardW - 0.6, h: 1.6,
+                fontFace: FONT.body, fontSize: 16,  // [READABILITY] 13 → 16
                 color: COLORS.textPrimary, valign: 'top',
             })
 
-            // Body
-            s.addText(p.body, {
-                x: x + 0.3, y: startY + 1.7, w: cardW - 0.6, h: 1.8,
-                fontFace: FONT.body, fontSize: 13,
-                color: COLORS.textSecondary, valign: 'top',
-            })
-
-            // Stat box
+            // Stat box — bigger
             s.addShape('roundRect', {
-                x: x + 0.3, y: startY + 3.6, w: cardW - 0.6, h: 0.85,
-                fill: { color: COLORS.amber, transparency: 88 },
-                line: { color: COLORS.amber, width: 0.5, transparency: 60 },
+                x: x + 0.3, y: startY + 3.5, w: cardW - 0.6, h: 1.0,
+                fill: { color: COLORS.amber, transparency: 86 },
+                line: { color: COLORS.amber, width: 1, transparency: 50 },
                 rectRadius: 0.08,
             })
             s.addText(p.stat, {
-                x: x + 0.3, y: startY + 3.6, w: cardW - 0.6, h: 0.45,
-                fontFace: FONT.heading, fontSize: 22, bold: true,
+                x: x + 0.3, y: startY + 3.55, w: cardW - 0.6, h: 0.55,
+                fontFace: FONT.heading, fontSize: 30, bold: true,  // [READABILITY] 22 → 30
                 color: COLORS.amber, align: 'center', valign: 'middle',
             })
             s.addText(p.statLabel, {
-                x: x + 0.3, y: startY + 4.0, w: cardW - 0.6, h: 0.35,
-                fontFace: FONT.body, fontSize: 11,
-                color: COLORS.textPrimary, align: 'center', valign: 'middle',
+                x: x + 0.3, y: startY + 4.05, w: cardW - 0.6, h: 0.4,
+                fontFace: FONT.body, fontSize: 14,  // [READABILITY] 11 → 14
+                color: COLORS.white, align: 'center', valign: 'middle',
             })
         })
 
         // Bottom takeaway
-        s.addText('Đây là câu chuyện của HÀNG NGÀN agency video editing Việt Nam.', {
-            x: 0.5, y: 6.55, w: SLIDE_W - 1, h: 0.4,
-            fontFace: FONT.body, fontSize: 14, italic: true, bold: true,
+        s.addText('Câu chuyện của HÀNG NGÀN agency video editing Việt Nam.', {
+            x: 0.5, y: 6.6, w: SLIDE_W - 1, h: 0.4,
+            fontFace: FONT.body, fontSize: 17, italic: true, bold: true,  // [READABILITY] 14 → 17
             color: COLORS.violetLight, align: 'center',
         })
 
@@ -406,52 +407,52 @@ async function build() {
         slideTitle(s, 'HustlyTasker — Nền tảng SaaS chuyên biệt cho Video Agency')
 
         // Hero positioning quote (big glass card)
-        glassCard(s, { x: 1.5, y: 1.8, w: SLIDE_W - 3, h: 1.5 })
+        glassCard(s, { x: 1.0, y: 1.8, w: SLIDE_W - 2, h: 1.6 })
         s.addText('"Như Asana + Frame.io + QuickBooks gộp lại,', {
-            x: 1.7, y: 1.95, w: SLIDE_W - 3.4, h: 0.55,
-            fontFace: FONT.heading, fontSize: 22, italic: true,
+            x: 1.2, y: 1.95, w: SLIDE_W - 2.4, h: 0.6,
+            fontFace: FONT.heading, fontSize: 26, italic: true,  // [READABILITY] 22 → 26
             color: COLORS.textPrimary, align: 'center', valign: 'middle',
         })
         s.addText('build riêng cho Talking Head Video Editing."', {
-            x: 1.7, y: 2.5, w: SLIDE_W - 3.4, h: 0.55,
-            fontFace: FONT.heading, fontSize: 22, italic: true, bold: true,
+            x: 1.2, y: 2.55, w: SLIDE_W - 2.4, h: 0.6,
+            fontFace: FONT.heading, fontSize: 26, italic: true, bold: true,  // [READABILITY] 22 → 26
             color: COLORS.violetLight, align: 'center', valign: 'middle',
         })
 
         // 3 value props
-        const cardW = 3.8
-        const cardH = 2.8
+        const cardW = 3.9
+        const cardH = 2.9
         const gap = 0.3
         const startX = (SLIDE_W - (cardW * 3 + gap * 2)) / 2
-        const startY = 3.8
+        const startY = 3.85
 
         const props = [
-            { icon: icons.target, title: 'Chuyên biệt', body: 'Workflow + pricing logic riêng cho video editing — không phải tool chung chung.' },
-            { icon: icons.exchange, title: 'Dual-currency native', body: 'Theo dõi USD/VND song song, auto-payroll, profit margin real-time.' },
+            { icon: icons.target, title: 'Chuyên biệt', body: 'Workflow + pricing riêng cho video editing — không phải tool chung chung.' },
+            { icon: icons.exchange, title: 'Dual-currency native', body: 'USD/VND song song, auto-payroll, profit margin real-time.' },
             { icon: icons.globe, title: 'Multi-role visibility', body: 'Admin / Editor / Client view khác nhau, đa ngôn ngữ.' },
         ]
 
         props.forEach((p, i) => {
             const x = startX + i * (cardW + gap)
             glassCard(s, { x, y: startY, w: cardW, h: cardH })
-            s.addImage({ data: p.icon, x: x + 0.4, y: startY + 0.35, w: 0.7, h: 0.7 })
+            s.addImage({ data: p.icon, x: x + 0.4, y: startY + 0.35, w: 0.8, h: 0.8 })
             s.addText(p.title, {
-                x: x + 0.4, y: startY + 1.15, w: cardW - 0.8, h: 0.5,
-                fontFace: FONT.heading, fontSize: 18, bold: true,
-                color: COLORS.textPrimary,
+                x: x + 0.4, y: startY + 1.25, w: cardW - 0.8, h: 0.55,
+                fontFace: FONT.heading, fontSize: 22, bold: true,  // [READABILITY] 18 → 22
+                color: COLORS.white,
             })
             s.addText(p.body, {
-                x: x + 0.4, y: startY + 1.7, w: cardW - 0.8, h: 1.0,
-                fontFace: FONT.body, fontSize: 13,
-                color: COLORS.textSecondary, valign: 'top',
+                x: x + 0.4, y: startY + 1.85, w: cardW - 0.8, h: 0.95,
+                fontFace: FONT.body, fontSize: 15,  // [READABILITY] 13 → 15
+                color: COLORS.textPrimary, valign: 'top',
             })
         })
 
         // Bottom hint
         s.addText('"Chúng tôi không serve tất cả — chúng tôi serve sâu cho 1 niche."', {
-            x: 0.5, y: 6.85, w: SLIDE_W - 1, h: 0.35,
-            fontFace: FONT.body, fontSize: 12, italic: true,
-            color: COLORS.textMuted, align: 'center',
+            x: 0.5, y: 6.95, w: SLIDE_W - 1, h: 0.35,
+            fontFace: FONT.body, fontSize: 14, italic: true,  // [READABILITY] 12 → 14
+            color: COLORS.violetLight, align: 'center',
         })
 
         slideFooter(s, 4)
@@ -471,11 +472,12 @@ async function build() {
         const startX = (SLIDE_W - (cardW * 2 + gap)) / 2
         const startY = 1.7
 
+        // [READABILITY] Shorter body, simpler structure
         const diffs = [
-            { icon: icons.chart, title: 'Specialized Workflow', body: '11-stage task lifecycle riêng cho video editing. Auto-detect quá hạn, status history đầy đủ.', tag: 'Built-in' },
-            { icon: icons.store, title: 'Task Marketplace', body: 'Editor tự nhận task ưa thích. Admin tiết kiệm thời gian, editor được pick task phù hợp năng lực.', tag: 'Unique' },
-            { icon: icons.bolt, title: 'Smart Automation', body: 'AI-driven batch task creation. Tự phân loại Short/Long form, tự tính giá theo rule, tự gán editor.', tag: 'Differentiated' },
-            { icon: icons.wallet, title: 'Built-in Finance', body: 'Native dual-currency + auto-payroll + profit margin per-task. Không cần plugin trả phí thêm.', tag: 'Built-in' },
+            { icon: icons.chart, title: 'Specialized Workflow', body: '11-stage task lifecycle riêng cho video editing. Auto-detect quá hạn.', tag: 'Built-in' },
+            { icon: icons.store, title: 'Task Marketplace', body: 'Editor tự nhận task ưa thích. Tiết kiệm thời gian admin matching manual.', tag: 'Unique' },
+            { icon: icons.bolt, title: 'Smart Automation', body: 'AI-driven batch task creation. Tự phân loại, tự tính giá, tự gán editor.', tag: 'Differentiated' },
+            { icon: icons.wallet, title: 'Built-in Finance', body: 'Native dual-currency + auto-payroll. Không cần plugin trả phí thêm.', tag: 'Built-in' },
         ]
 
         diffs.forEach((d, i) => {
@@ -485,41 +487,41 @@ async function build() {
             const y = startY + row * (cardH + 0.25)
             glassCard(s, { x, y, w: cardW, h: cardH })
 
-            // Icon
-            s.addImage({ data: d.icon, x: x + 0.35, y: y + 0.35, w: 0.55, h: 0.55 })
+            // Icon — bigger
+            s.addImage({ data: d.icon, x: x + 0.35, y: y + 0.35, w: 0.7, h: 0.7 })
 
-            // Tag (top right)
+            // Tag (top right) — bigger
             s.addShape('roundRect', {
-                x: x + cardW - 1.5, y: y + 0.35, w: 1.3, h: 0.35,
-                fill: { color: COLORS.violet, transparency: 80 },
-                line: { color: COLORS.violet, width: 0.5, transparency: 50 },
-                rectRadius: 0.05,
+                x: x + cardW - 1.6, y: y + 0.4, w: 1.4, h: 0.4,
+                fill: { color: COLORS.violet, transparency: 75 },
+                line: { color: COLORS.violet, width: 0.5, transparency: 40 },
+                rectRadius: 0.06,
             })
             s.addText(d.tag, {
-                x: x + cardW - 1.5, y: y + 0.35, w: 1.3, h: 0.35,
-                fontFace: FONT.body, fontSize: 10, bold: true,
-                color: COLORS.violetLight, align: 'center', valign: 'middle',
+                x: x + cardW - 1.6, y: y + 0.4, w: 1.4, h: 0.4,
+                fontFace: FONT.body, fontSize: 12, bold: true,  // [READABILITY] 10 → 12
+                color: COLORS.white, align: 'center', valign: 'middle',
             })
 
-            // Title
+            // Title — bigger
             s.addText(d.title, {
-                x: x + 1.0, y: y + 0.35, w: cardW - 2.7, h: 0.55,
-                fontFace: FONT.heading, fontSize: 18, bold: true,
-                color: COLORS.textPrimary, valign: 'middle',
+                x: x + 1.2, y: y + 0.35, w: cardW - 2.95, h: 0.7,
+                fontFace: FONT.heading, fontSize: 22, bold: true,  // [READABILITY] 18 → 22
+                color: COLORS.white, valign: 'middle',
             })
 
-            // Body
+            // Body — bigger
             s.addText(d.body, {
-                x: x + 0.35, y: y + 1.05, w: cardW - 0.7, h: 1.15,
-                fontFace: FONT.body, fontSize: 13,
-                color: COLORS.textSecondary, valign: 'top',
+                x: x + 0.35, y: y + 1.2, w: cardW - 0.7, h: 1.1,
+                fontFace: FONT.body, fontSize: 16,  // [READABILITY] 13 → 16
+                color: COLORS.textPrimary, valign: 'top',
             })
         })
 
-        // Bottom takeaway
+        // Bottom takeaway — bigger
         s.addText('4 cái này gộp lại + niche focus = MOAT', {
             x: 0.5, y: 6.85, w: SLIDE_W - 1, h: 0.35,
-            fontFace: FONT.heading, fontSize: 14, bold: true,
+            fontFace: FONT.heading, fontSize: 18, bold: true,  // [READABILITY] 14 → 18
             color: COLORS.violetLight, align: 'center',
         })
 
@@ -557,25 +559,25 @@ async function build() {
             line: { color: COLORS.emerald, width: 1.5, transparency: 20 },
         })
 
-        // Labels on circles
+        // Labels on circles — bigger
         s.addText('TAM', {
             x: cx - 2.7, y: cy - 2.7, w: 1.5, h: 0.4,
-            fontFace: FONT.heading, fontSize: 14, bold: true,
-            color: COLORS.violetLight, align: 'left',
+            fontFace: FONT.heading, fontSize: 18, bold: true,  // [READABILITY] 14 → 18
+            color: COLORS.violetLight, align: 'left', charSpacing: 4,
         })
         s.addText('SAM', {
             x: cx - 1.8, y: cy - 1.8, w: 1.5, h: 0.4,
-            fontFace: FONT.heading, fontSize: 13, bold: true,
-            color: COLORS.violetLight, align: 'left',
+            fontFace: FONT.heading, fontSize: 16, bold: true,  // [READABILITY] 13 → 16
+            color: COLORS.violetLight, align: 'left', charSpacing: 4,
         })
         s.addText('SOM', {
-            x: cx - 0.5, y: cy - 0.3, w: 1, h: 0.4,
-            fontFace: FONT.heading, fontSize: 13, bold: true,
-            color: COLORS.emerald, align: 'center',
+            x: cx - 0.5, y: cy - 0.4, w: 1, h: 0.4,
+            fontFace: FONT.heading, fontSize: 16, bold: true,
+            color: COLORS.emerald, align: 'center', charSpacing: 4,
         })
         s.addText('$15M', {
-            x: cx - 0.6, y: cy + 0.05, w: 1.2, h: 0.5,
-            fontFace: FONT.heading, fontSize: 20, bold: true,
+            x: cx - 0.7, y: cy + 0.0, w: 1.4, h: 0.6,
+            fontFace: FONT.heading, fontSize: 26, bold: true,  // [READABILITY] 20 → 26
             color: COLORS.white, align: 'center',
         })
 
@@ -593,33 +595,33 @@ async function build() {
             const itemY = 1.9 + i * 1.6
 
             s.addText(item.label, {
-                x: legendX + 0.3, y: itemY, w: 1, h: 0.35,
-                fontFace: FONT.heading, fontSize: 13, bold: true,
+                x: legendX + 0.3, y: itemY, w: 1, h: 0.4,
+                fontFace: FONT.heading, fontSize: 16, bold: true,  // [READABILITY] 13 → 16
                 color: item.color, charSpacing: 4,
             })
 
             s.addText(item.value, {
-                x: legendX + 0.3, y: itemY + 0.4, w: 3.7, h: 0.6,
-                fontFace: FONT.heading, fontSize: 32, bold: true,
+                x: legendX + 0.3, y: itemY + 0.4, w: 3.7, h: 0.7,
+                fontFace: FONT.heading, fontSize: 38, bold: true,  // [READABILITY] 32 → 38
                 color: COLORS.white,
             })
 
             s.addText(item.sub, {
-                x: legendX + 0.3, y: itemY + 1.0, w: 3.7, h: 0.45,
-                fontFace: FONT.body, fontSize: 11,
-                color: COLORS.textSecondary, valign: 'top',
+                x: legendX + 0.3, y: itemY + 1.05, w: 3.7, h: 0.45,
+                fontFace: FONT.body, fontSize: 13,  // [READABILITY] 11 → 13
+                color: COLORS.textPrimary, valign: 'top',
             })
         })
 
         // Insight at bottom
         s.addText('Niche nhưng KHÔNG nhỏ — 1% market share = $1.5M MRR potential', {
             x: 0.5, y: 6.85, w: SLIDE_W - 1, h: 0.35,
-            fontFace: FONT.body, fontSize: 12, italic: true,
+            fontFace: FONT.body, fontSize: 15, italic: true, bold: true,  // [READABILITY] 12 → 15
             color: COLORS.violetLight, align: 'center',
         })
         s.addText('Source: Grand View Research, Statista 2024', {
             x: 0.5, y: 7.15, w: SLIDE_W - 1, h: 0.25,
-            fontFace: FONT.body, fontSize: 9,
+            fontFace: FONT.body, fontSize: 11,  // [READABILITY] 9 → 11
             color: COLORS.textMuted, align: 'center',
         })
 
@@ -640,22 +642,23 @@ async function build() {
         const startX = (SLIDE_W - (cardW * 3 + gap * 2)) / 2
         const startY = 1.7
 
+        // [READABILITY] Shorter quotes + 2 bullets only (was 3) for less density
         const personas = [
             {
                 icon: icons.admin,
                 name: 'Anh Hùng, 32 tuổi',
-                role: 'Chủ agency "Cinematic Studio"',
-                quote: '"10 editors, 15 clients quốc tế. Mất 40+ giờ/tháng vào admin việc thay vì grow business."',
-                jobs: ['Quản lý 50+ task/tháng không sót', 'Tính lương 10 editor không sai', 'Báo cáo profit cho investor'],
+                role: 'Chủ agency video editing',
+                quote: '"40+ giờ/tháng cho admin việc thay vì grow business."',
+                jobs: ['Quản lý 50+ task/tháng', 'Tính lương 10 editor chính xác'],
                 tier: 'Pro $29/mo',
                 color: COLORS.violet,
             },
             {
                 icon: icons.editor,
                 name: 'Bạn Linh, 24 tuổi',
-                role: 'Freelance editor 3 năm',
-                quote: '"Muốn biết task ưu tiên, được pick task mình giỏi, tracking lương rõ ràng."',
-                jobs: ['Xem deadline + priority rõ', 'Tự nhận task phù hợp (Marketplace)', 'Tracking lương real-time'],
+                role: 'Freelance editor',
+                quote: '"Muốn pick task mình giỏi, lương rõ ràng."',
+                jobs: ['Tự nhận task phù hợp', 'Tracking lương real-time'],
                 tier: 'Included in Pro',
                 color: COLORS.violetLight,
             },
@@ -663,8 +666,8 @@ async function build() {
                 icon: icons.creator,
                 name: 'Mark, 28 tuổi',
                 role: 'YouTuber 500K subs',
-                quote: '"I just want to see progress without sending DMs every day."',
-                jobs: ['Self-service progress view', 'Multi-language portal', 'Trust visibility'],
+                quote: '"See progress without sending DMs everyday."',
+                jobs: ['Self-service progress view', 'Multi-language portal'],
                 tier: 'Free via Portal',
                 color: COLORS.emerald,
             },
@@ -674,64 +677,64 @@ async function build() {
             const x = startX + i * (cardW + gap)
             glassCard(s, { x, y: startY, w: cardW, h: cardH, borderColor: p.color })
 
-            // Avatar circle
+            // Avatar circle — bigger
             s.addShape('ellipse', {
-                x: x + cardW/2 - 0.5, y: startY + 0.3, w: 1.0, h: 1.0,
-                fill: { color: p.color, transparency: 75 },
-                line: { color: p.color, width: 2, transparency: 30 },
+                x: x + cardW/2 - 0.55, y: startY + 0.3, w: 1.1, h: 1.1,
+                fill: { color: p.color, transparency: 70 },
+                line: { color: p.color, width: 2.5, transparency: 20 },
             })
-            s.addImage({ data: p.icon, x: x + cardW/2 - 0.35, y: startY + 0.45, w: 0.7, h: 0.7 })
+            s.addImage({ data: p.icon, x: x + cardW/2 - 0.4, y: startY + 0.45, w: 0.8, h: 0.8 })
 
-            // Name
+            // Name — bigger
             s.addText(p.name, {
-                x: x + 0.3, y: startY + 1.45, w: cardW - 0.6, h: 0.4,
-                fontFace: FONT.heading, fontSize: 16, bold: true,
-                color: COLORS.textPrimary, align: 'center',
+                x: x + 0.3, y: startY + 1.55, w: cardW - 0.6, h: 0.45,
+                fontFace: FONT.heading, fontSize: 20, bold: true,  // [READABILITY] 16 → 20
+                color: COLORS.white, align: 'center',
             })
 
-            // Role
+            // Role — bigger
             s.addText(p.role, {
-                x: x + 0.3, y: startY + 1.85, w: cardW - 0.6, h: 0.3,
-                fontFace: FONT.body, fontSize: 11,
-                color: COLORS.textMuted, align: 'center', italic: true,
+                x: x + 0.3, y: startY + 2.0, w: cardW - 0.6, h: 0.35,
+                fontFace: FONT.body, fontSize: 14, italic: true,  // [READABILITY] 11 → 14
+                color: COLORS.textMuted, align: 'center',
             })
 
-            // Quote
+            // Quote — bigger
             s.addText(p.quote, {
-                x: x + 0.3, y: startY + 2.25, w: cardW - 0.6, h: 0.85,
-                fontFace: FONT.body, fontSize: 11, italic: true,
+                x: x + 0.25, y: startY + 2.45, w: cardW - 0.5, h: 0.95,
+                fontFace: FONT.body, fontSize: 14, italic: true,  // [READABILITY] 11 → 14
                 color: COLORS.violetLight, align: 'center', valign: 'top',
             })
 
-            // Jobs-to-be-done
+            // Jobs-to-be-done — bigger
             const jobsItems = p.jobs.map((j, idx) => ({
                 text: j,
-                options: { bullet: true, color: COLORS.textSecondary, breakLine: idx < p.jobs.length - 1 },
+                options: { bullet: true, color: COLORS.textPrimary, breakLine: idx < p.jobs.length - 1 },
             }))
             s.addText(jobsItems, {
-                x: x + 0.3, y: startY + 3.2, w: cardW - 0.6, h: 1.0,
-                fontFace: FONT.body, fontSize: 10,
-                valign: 'top',
+                x: x + 0.35, y: startY + 3.55, w: cardW - 0.7, h: 0.7,
+                fontFace: FONT.body, fontSize: 13,  // [READABILITY] 10 → 13
+                paraSpaceAfter: 4, valign: 'top',
             })
 
-            // Tier badge
+            // Tier badge — bigger
             s.addShape('roundRect', {
-                x: x + 0.5, y: startY + cardH - 0.55, w: cardW - 1.0, h: 0.4,
-                fill: { color: p.color, transparency: 82 },
-                line: { color: p.color, width: 0.5, transparency: 50 },
-                rectRadius: 0.05,
+                x: x + 0.4, y: startY + cardH - 0.6, w: cardW - 0.8, h: 0.45,
+                fill: { color: p.color, transparency: 78 },
+                line: { color: p.color, width: 1, transparency: 30 },
+                rectRadius: 0.06,
             })
             s.addText(p.tier, {
-                x: x + 0.5, y: startY + cardH - 0.55, w: cardW - 1.0, h: 0.4,
-                fontFace: FONT.body, fontSize: 11, bold: true,
-                color: p.color, align: 'center', valign: 'middle',
+                x: x + 0.4, y: startY + cardH - 0.6, w: cardW - 0.8, h: 0.45,
+                fontFace: FONT.body, fontSize: 14, bold: true,  // [READABILITY] 11 → 14
+                color: COLORS.white, align: 'center', valign: 'middle',
             })
         })
 
         // Bottom takeaway
         s.addText('Khác Trello/Asana — chúng tôi serve cả 3 personas trên 1 platform.', {
-            x: 0.5, y: 6.55, w: SLIDE_W - 1, h: 0.35,
-            fontFace: FONT.body, fontSize: 13, italic: true, bold: true,
+            x: 0.5, y: 6.55, w: SLIDE_W - 1, h: 0.4,
+            fontFace: FONT.body, fontSize: 17, italic: true, bold: true,  // [READABILITY] 13 → 17
             color: COLORS.violetLight, align: 'center',
         })
 
@@ -754,16 +757,17 @@ async function build() {
 
         // Why NOW (left)
         glassCard(s, { x: startX, y: startY, w: colW, h: colH })
-        s.addImage({ data: icons.trending, x: startX + 0.3, y: startY + 0.3, w: 0.5, h: 0.5 })
+        s.addImage({ data: icons.trending, x: startX + 0.3, y: startY + 0.3, w: 0.6, h: 0.6 })
         s.addText('Why NOW — Market Timing', {
-            x: startX + 0.95, y: startY + 0.3, w: colW - 1.2, h: 0.5,
-            fontFace: FONT.heading, fontSize: 18, bold: true,
+            x: startX + 1.05, y: startY + 0.3, w: colW - 1.3, h: 0.6,
+            fontFace: FONT.heading, fontSize: 22, bold: true,  // [READABILITY] 18 → 22
             color: COLORS.emerald, valign: 'middle',
         })
+        // [READABILITY] Shorter bullets
         const nowItems = [
-            'YouTube Shorts + TikTok + Reels boom — demand talking head edit tăng 200% từ 2022',
+            'YouTube Shorts + TikTok boom — demand talking head edit tăng 200% từ 2022',
             '80% top YouTubers/Podcasters dùng talking head format',
-            'VN agency tăng nhanh — phục vụ client US/UK/AU với lợi thế chi phí',
+            'VN agency phục vụ client US/UK/AU với lợi thế chi phí',
         ]
         s.addText(
             nowItems.map((t, i) => ({
@@ -771,25 +775,25 @@ async function build() {
                 options: { bullet: true, color: COLORS.textPrimary, breakLine: i < nowItems.length - 1 },
             })),
             {
-                x: startX + 0.4, y: startY + 1.05, w: colW - 0.8, h: 3.0,
-                fontFace: FONT.body, fontSize: 14,
-                paraSpaceAfter: 8, valign: 'top',
+                x: startX + 0.4, y: startY + 1.15, w: colW - 0.8, h: 3.0,
+                fontFace: FONT.body, fontSize: 17,  // [READABILITY] 14 → 17
+                paraSpaceAfter: 14, valign: 'top',
             },
         )
 
         // Why US (right)
         const x2 = startX + colW + gap
         glassCard(s, { x: x2, y: startY, w: colW, h: colH })
-        s.addImage({ data: icons.crown, x: x2 + 0.3, y: startY + 0.3, w: 0.5, h: 0.5 })
+        s.addImage({ data: icons.crown, x: x2 + 0.3, y: startY + 0.3, w: 0.6, h: 0.6 })
         s.addText('Why US — Our Edge', {
-            x: x2 + 0.95, y: startY + 0.3, w: colW - 1.2, h: 0.5,
-            fontFace: FONT.heading, fontSize: 18, bold: true,
+            x: x2 + 1.05, y: startY + 0.3, w: colW - 1.3, h: 0.6,
+            fontFace: FONT.heading, fontSize: 22, bold: true,  // [READABILITY] 18 → 22
             color: COLORS.violetLight, valign: 'middle',
         })
         const usItems = [
-            'Founder team có lived experience — background video editing thực tế',
-            'Validation đã có — MVP đang chạy với agency thật + workspaces thật',
-            'Niche advantage — đi sâu 1 ngành, không phân tâm 1000 ngành',
+            'Founder team có lived experience trong video editing',
+            'Validation đã có — MVP đang chạy với agency thật',
+            'Niche advantage — đi sâu 1 ngành, không phân tâm',
         ]
         s.addText(
             usItems.map((t, i) => ({
@@ -797,16 +801,16 @@ async function build() {
                 options: { bullet: true, color: COLORS.textPrimary, breakLine: i < usItems.length - 1 },
             })),
             {
-                x: x2 + 0.4, y: startY + 1.05, w: colW - 0.8, h: 3.0,
-                fontFace: FONT.body, fontSize: 14,
-                paraSpaceAfter: 8, valign: 'top',
+                x: x2 + 0.4, y: startY + 1.15, w: colW - 0.8, h: 3.0,
+                fontFace: FONT.body, fontSize: 17,
+                paraSpaceAfter: 14, valign: 'top',
             },
         )
 
-        // Bottom big numbers bar
-        const barY = 6.3
-        const barH = 0.85
-        glassCard(s, { x: 0.5, y: barY, w: SLIDE_W - 1, h: barH, borderColor: COLORS.emerald, borderTransparency: 50 })
+        // Bottom big numbers bar — bigger
+        const barY = 6.25
+        const barH = 1.0
+        glassCard(s, { x: 0.5, y: barY, w: SLIDE_W - 1, h: barH, borderColor: COLORS.emerald, borderTransparency: 30 })
 
         const stats = [
             { num: '18', label: 'agency thực' },
@@ -818,13 +822,13 @@ async function build() {
             const x = 0.5 + i * statsW
             s.addText(st.num, {
                 x, y: barY + 0.05, w: statsW * 0.45, h: barH - 0.1,
-                fontFace: FONT.heading, fontSize: 32, bold: true,
+                fontFace: FONT.heading, fontSize: 42, bold: true,  // [READABILITY] 32 → 42
                 color: COLORS.emerald, align: 'right', valign: 'middle',
             })
             s.addText(st.label, {
                 x: x + statsW * 0.48, y: barY + 0.05, w: statsW * 0.5, h: barH - 0.1,
-                fontFace: FONT.body, fontSize: 13,
-                color: COLORS.textPrimary, align: 'left', valign: 'middle',
+                fontFace: FONT.body, fontSize: 17,  // [READABILITY] 13 → 17
+                color: COLORS.white, align: 'left', valign: 'middle',
             })
         })
 
@@ -839,84 +843,84 @@ async function build() {
         applyDarkBackground(s)
         slideTitle(s, 'Doanh thu đến từ đâu? — 5 nguồn doanh thu')
 
+        // [READABILITY] Shorter body for less density
         const streams = [
-            { icon: icons.sync, num: '1', title: 'SaaS Subscription', pct: '~60%', body: 'Phí thuê bao tháng/năm. Scale theo workspace + member count. Recurring revenue chính.', badge: 'Recurring', color: COLORS.violet },
-            { icon: icons.star, num: '2', title: 'Premium Add-ons', pct: '~20%', body: 'AI analytics, custom reports, advanced finance forecasting, integration extensions.', badge: 'Upsell', color: COLORS.amber },
-            { icon: icons.handshake, num: '3', title: 'Marketplace Fee', pct: '~10%', body: 'Phần trăm nhỏ trên task assigned cross-agency qua Marketplace mở rộng (future).', badge: 'Transactional', color: COLORS.violetLight },
-            { icon: icons.building, num: '4', title: 'Enterprise / White-label', pct: '~7%', body: 'Large agency rebrand HustlyTasker. Dedicated CSM, SLA, custom domain.', badge: 'Enterprise', color: COLORS.emerald },
-            { icon: icons.plug, num: '5', title: 'API / Integration Tier', pct: '~3%', body: 'Cho agency muốn build automation trên platform. Tiered API call pricing.', badge: 'Developer', color: COLORS.fuchsia },
+            { icon: icons.sync, num: '1', title: 'SaaS Subscription', pct: '~60%', body: 'Phí thuê bao tháng/năm. Recurring revenue chính.', badge: 'Recurring', color: COLORS.violet },
+            { icon: icons.star, num: '2', title: 'Premium Add-ons', pct: '~20%', body: 'AI analytics, custom reports, advanced forecasting.', badge: 'Upsell', color: COLORS.amber },
+            { icon: icons.handshake, num: '3', title: 'Marketplace Fee', pct: '~10%', body: 'Phần trăm nhỏ trên task cross-agency (future).', badge: 'Transactional', color: COLORS.violetLight },
+            { icon: icons.building, num: '4', title: 'Enterprise / White-label', pct: '~7%', body: 'Rebrand HustlyTasker. Dedicated CSM, SLA.', badge: 'Enterprise', color: COLORS.emerald },
+            { icon: icons.plug, num: '5', title: 'API / Integration Tier', pct: '~3%', body: 'Build automation trên platform. Tiered pricing.', badge: 'Developer', color: COLORS.fuchsia },
         ]
 
-        // Top row (3 cards)
-        const cardW = 3.9
-        const cardH = 2.3
-        const gap = 0.25
+        // Top row (3 cards) — bigger cards
+        const cardW = 3.95
+        const cardH = 2.45
+        const gap = 0.22
         const startX = (SLIDE_W - (cardW * 3 + gap * 2)) / 2
         const row1Y = 1.6
 
         // Bottom row (2 cards) — centered
-        const cardW2 = 3.9
-        const startX2 = (SLIDE_W - (cardW2 * 2 + gap)) / 2
-        const row2Y = 4.1
+        const startX2 = (SLIDE_W - (cardW * 2 + gap)) / 2
+        const row2Y = 4.2
 
         streams.forEach((st, i) => {
             const isTop = i < 3
             const col = isTop ? i : i - 3
-            const x = isTop ? startX + col * (cardW + gap) : startX2 + col * (cardW2 + gap)
+            const x = isTop ? startX + col * (cardW + gap) : startX2 + col * (cardW + gap)
             const y = isTop ? row1Y : row2Y
             glassCard(s, { x, y, w: cardW, h: cardH, borderColor: st.color })
 
-            // Stream number circle
+            // Stream number circle — bigger
             s.addShape('ellipse', {
-                x: x + 0.25, y: y + 0.25, w: 0.5, h: 0.5,
-                fill: { color: st.color, transparency: 75 },
-                line: { color: st.color, width: 1 },
+                x: x + 0.25, y: y + 0.25, w: 0.6, h: 0.6,
+                fill: { color: st.color, transparency: 70 },
+                line: { color: st.color, width: 1.5 },
             })
             s.addText(st.num, {
-                x: x + 0.25, y: y + 0.25, w: 0.5, h: 0.5,
-                fontFace: FONT.heading, fontSize: 14, bold: true,
-                color: st.color, align: 'center', valign: 'middle',
+                x: x + 0.25, y: y + 0.25, w: 0.6, h: 0.6,
+                fontFace: FONT.heading, fontSize: 18, bold: true,  // [READABILITY] 14 → 18
+                color: COLORS.white, align: 'center', valign: 'middle',
             })
 
-            // Percentage (top right, large)
+            // Percentage (top right, large) — bigger
             s.addText(st.pct, {
-                x: x + cardW - 1.4, y: y + 0.2, w: 1.2, h: 0.55,
-                fontFace: FONT.heading, fontSize: 22, bold: true,
+                x: x + cardW - 1.6, y: y + 0.2, w: 1.4, h: 0.65,
+                fontFace: FONT.heading, fontSize: 28, bold: true,  // [READABILITY] 22 → 28
                 color: st.color, align: 'right', valign: 'top',
             })
 
-            // Title
+            // Title — bigger
             s.addText(st.title, {
-                x: x + 0.9, y: y + 0.25, w: cardW - 2.3, h: 0.45,
-                fontFace: FONT.heading, fontSize: 14, bold: true,
-                color: COLORS.textPrimary, valign: 'middle',
+                x: x + 1.0, y: y + 0.25, w: cardW - 2.5, h: 0.6,
+                fontFace: FONT.heading, fontSize: 16, bold: true,  // [READABILITY] 14 → 16
+                color: COLORS.white, valign: 'middle',
             })
 
-            // Body
+            // Body — bigger
             s.addText(st.body, {
-                x: x + 0.3, y: y + 0.95, w: cardW - 0.6, h: 1.0,
-                fontFace: FONT.body, fontSize: 11,
-                color: COLORS.textSecondary, valign: 'top',
+                x: x + 0.3, y: y + 1.0, w: cardW - 0.6, h: 1.0,
+                fontFace: FONT.body, fontSize: 14,  // [READABILITY] 11 → 14
+                color: COLORS.textPrimary, valign: 'top',
             })
 
-            // Badge bottom left
+            // Badge bottom left — bigger
             s.addShape('roundRect', {
-                x: x + 0.3, y: y + cardH - 0.45, w: 1.4, h: 0.3,
-                fill: { color: st.color, transparency: 82 },
-                line: { color: st.color, width: 0.5, transparency: 50 },
-                rectRadius: 0.04,
+                x: x + 0.3, y: y + cardH - 0.5, w: 1.6, h: 0.36,
+                fill: { color: st.color, transparency: 78 },
+                line: { color: st.color, width: 0.6, transparency: 40 },
+                rectRadius: 0.05,
             })
             s.addText(st.badge, {
-                x: x + 0.3, y: y + cardH - 0.45, w: 1.4, h: 0.3,
-                fontFace: FONT.body, fontSize: 9, bold: true,
-                color: st.color, align: 'center', valign: 'middle',
+                x: x + 0.3, y: y + cardH - 0.5, w: 1.6, h: 0.36,
+                fontFace: FONT.body, fontSize: 11, bold: true,  // [READABILITY] 9 → 11
+                color: COLORS.white, align: 'center', valign: 'middle',
             })
         })
 
         // Bottom insight
-        s.addText('Recurring (60%) + 4 complementary streams = sustainable + multi-lever growth', {
-            x: 0.5, y: 6.85, w: SLIDE_W - 1, h: 0.4,
-            fontFace: FONT.body, fontSize: 13, italic: true,
+        s.addText('Recurring (60%) + 4 streams = sustainable + multi-lever growth', {
+            x: 0.5, y: 6.95, w: SLIDE_W - 1, h: 0.4,
+            fontFace: FONT.body, fontSize: 16, italic: true, bold: true,  // [READABILITY] 13 → 16
             color: COLORS.violetLight, align: 'center',
         })
 
@@ -978,83 +982,83 @@ async function build() {
                 borderTransparency: t.featured ? 20 : 60,
             })
 
-            // "Most Popular" tag (only for featured)
+            // "Most Popular" tag (only for featured) — bigger
             if (t.featured) {
                 s.addShape('roundRect', {
-                    x: x + cardW/2 - 1.0, y: y - 0.2, w: 2, h: 0.4,
+                    x: x + cardW/2 - 1.2, y: y - 0.25, w: 2.4, h: 0.5,
                     fill: { color: t.color },
                     line: { type: 'none' },
-                    rectRadius: 0.2,
+                    rectRadius: 0.25,
                 })
                 s.addText('★ MOST POPULAR', {
-                    x: x + cardW/2 - 1.0, y: y - 0.2, w: 2, h: 0.4,
-                    fontFace: FONT.heading, fontSize: 10, bold: true,
+                    x: x + cardW/2 - 1.2, y: y - 0.25, w: 2.4, h: 0.5,
+                    fontFace: FONT.heading, fontSize: 13, bold: true,  // [READABILITY] 10 → 13
                     color: COLORS.white, align: 'center', valign: 'middle',
                     charSpacing: 2,
                 })
             }
 
-            const innerY = y + (t.featured ? 0.35 : 0.3)
+            const innerY = y + (t.featured ? 0.4 : 0.3)
 
-            // Tier name
+            // Tier name — bigger
             s.addText(t.name, {
-                x: x + 0.3, y: innerY, w: cardW - 0.6, h: 0.5,
-                fontFace: FONT.heading, fontSize: 22, bold: true,
+                x: x + 0.3, y: innerY, w: cardW - 0.6, h: 0.55,
+                fontFace: FONT.heading, fontSize: 28, bold: true,  // [READABILITY] 22 → 28
                 color: t.color, align: 'center', valign: 'middle',
             })
 
-            // Subtitle
+            // Subtitle — bigger
             s.addText(t.subtitle, {
-                x: x + 0.3, y: innerY + 0.55, w: cardW - 0.6, h: 0.3,
-                fontFace: FONT.body, fontSize: 11, italic: true,
+                x: x + 0.3, y: innerY + 0.6, w: cardW - 0.6, h: 0.35,
+                fontFace: FONT.body, fontSize: 13, italic: true,  // [READABILITY] 11 → 13
                 color: COLORS.textMuted, align: 'center',
             })
 
-            // Price
+            // Price — bigger
             s.addText([
-                { text: t.price, options: { fontSize: 38, bold: true, color: COLORS.white } },
-                { text: t.period, options: { fontSize: 14, color: COLORS.textSecondary } },
+                { text: t.price, options: { fontSize: 48, bold: true, color: COLORS.white } },  // [READABILITY] 38 → 48
+                { text: t.period, options: { fontSize: 16, color: COLORS.textPrimary } },  // [READABILITY] 14 → 16
             ], {
-                x: x + 0.3, y: innerY + 0.95, w: cardW - 0.6, h: 0.85,
+                x: x + 0.3, y: innerY + 1.0, w: cardW - 0.6, h: 0.95,
                 fontFace: FONT.heading, align: 'center', valign: 'middle',
             })
 
-            // Features
+            // Features — bigger
             const featItems = t.features.map((f, idx) => ({
                 text: f,
                 options: { bullet: true, color: COLORS.textPrimary, breakLine: idx < t.features.length - 1 },
             }))
             s.addText(featItems, {
-                x: x + 0.3, y: innerY + 1.85, w: cardW - 0.6, h: 2.0,
-                fontFace: FONT.body, fontSize: 11,
-                paraSpaceAfter: 4, valign: 'top',
+                x: x + 0.3, y: innerY + 2.0, w: cardW - 0.6, h: 2.0,
+                fontFace: FONT.body, fontSize: 13,  // [READABILITY] 11 → 13
+                paraSpaceAfter: 5, valign: 'top',
             })
 
-            // CTA button
+            // CTA button — bigger
             s.addShape('roundRect', {
-                x: x + 0.4, y: innerY + (h - 1.1) + (t.featured ? 0.0 : -0.05), w: cardW - 0.8, h: 0.45,
-                fill: { color: t.color, transparency: t.featured ? 20 : 70 },
-                line: { color: t.color, width: 0.5, transparency: 30 },
+                x: x + 0.4, y: innerY + (h - 1.15) + (t.featured ? 0.0 : -0.05), w: cardW - 0.8, h: 0.5,
+                fill: { color: t.color, transparency: t.featured ? 15 : 65 },
+                line: { color: t.color, width: 1, transparency: 20 },
                 rectRadius: 0.08,
             })
             s.addText(t.cta, {
-                x: x + 0.4, y: innerY + (h - 1.1) + (t.featured ? 0.0 : -0.05), w: cardW - 0.8, h: 0.45,
-                fontFace: FONT.body, fontSize: 12, bold: true,
+                x: x + 0.4, y: innerY + (h - 1.15) + (t.featured ? 0.0 : -0.05), w: cardW - 0.8, h: 0.5,
+                fontFace: FONT.body, fontSize: 14, bold: true,  // [READABILITY] 12 → 14
                 color: t.featured ? COLORS.white : t.color, align: 'center', valign: 'middle',
             })
 
-            // Goal text
+            // Goal text — bigger
             s.addText(t.goal, {
-                x: x + 0.3, y: innerY + (h - 0.55) + (t.featured ? 0.0 : -0.05), w: cardW - 0.6, h: 0.3,
-                fontFace: FONT.body, fontSize: 9, italic: true,
+                x: x + 0.3, y: innerY + (h - 0.55) + (t.featured ? 0.0 : -0.05), w: cardW - 0.6, h: 0.32,
+                fontFace: FONT.body, fontSize: 11, italic: true,  // [READABILITY] 9 → 11
                 color: COLORS.textMuted, align: 'center',
             })
         })
 
         // Bottom comparison hint
         s.addText('Pro flat $29/agency — KHÔNG per-user như Trello/Asana ($5-30/user).', {
-            x: 0.5, y: 6.85, w: SLIDE_W - 1, h: 0.4,
-            fontFace: FONT.body, fontSize: 13, italic: true, bold: true,
+            x: 0.5, y: 6.95, w: SLIDE_W - 1, h: 0.4,
+            fontFace: FONT.body, fontSize: 16, italic: true, bold: true,  // [READABILITY] 13 → 16
             color: COLORS.violetLight, align: 'center',
         })
 
@@ -1105,52 +1109,52 @@ async function build() {
 
         years.forEach((y, i) => {
             const x = startX + i * (cardW + gap)
-            glassCard(s, { x, y: startY, w: cardW, h: cardH, borderColor: y.color, borderTransparency: 40 })
+            glassCard(s, { x, y: startY, w: cardW, h: cardH, borderColor: y.color, borderTransparency: 30 })
 
-            // Year tag
+            // Year tag — bigger
             s.addText(y.year, {
-                x: x + 0.3, y: startY + 0.25, w: cardW - 0.6, h: 0.35,
-                fontFace: FONT.heading, fontSize: 12, bold: true,
+                x: x + 0.3, y: startY + 0.3, w: cardW - 0.6, h: 0.45,
+                fontFace: FONT.heading, fontSize: 16, bold: true,  // [READABILITY] 12 → 16
                 color: y.color, align: 'center', charSpacing: 6,
             })
 
-            // Big MRR number
+            // Big MRR number — bigger
             s.addText(y.mrr, {
-                x: x + 0.2, y: startY + 0.75, w: cardW - 0.4, h: 1.3,
-                fontFace: FONT.heading, fontSize: 56, bold: true,
+                x: x + 0.2, y: startY + 0.85, w: cardW - 0.4, h: 1.4,
+                fontFace: FONT.heading, fontSize: 68, bold: true,  // [READABILITY] 56 → 68
                 color: COLORS.white, align: 'center', valign: 'middle',
             })
 
-            // MRR label
+            // MRR label — bigger
             s.addText(y.mrrLabel, {
-                x: x + 0.2, y: startY + 2.0, w: cardW - 0.4, h: 0.3,
-                fontFace: FONT.body, fontSize: 12, bold: true,
+                x: x + 0.2, y: startY + 2.2, w: cardW - 0.4, h: 0.35,
+                fontFace: FONT.body, fontSize: 15, bold: true,  // [READABILITY] 12 → 15
                 color: y.color, align: 'center',
             })
 
-            // Focus
+            // Focus — bigger
             s.addText(y.focus, {
-                x: x + 0.3, y: startY + 2.45, w: cardW - 0.6, h: 0.5,
-                fontFace: FONT.body, fontSize: 13, italic: true,
+                x: x + 0.3, y: startY + 2.65, w: cardW - 0.6, h: 0.55,
+                fontFace: FONT.body, fontSize: 15, italic: true,  // [READABILITY] 13 → 15
                 color: COLORS.textPrimary, align: 'center', valign: 'top',
             })
 
-            // Metrics bullets
+            // Metrics bullets — bigger
             const metricItems = y.metrics.map((m, idx) => ({
                 text: m,
-                options: { bullet: true, color: COLORS.textSecondary, breakLine: idx < y.metrics.length - 1 },
+                options: { bullet: true, color: COLORS.textPrimary, breakLine: idx < y.metrics.length - 1 },
             }))
             s.addText(metricItems, {
-                x: x + 0.4, y: startY + 3.0, w: cardW - 0.8, h: 1.1,
-                fontFace: FONT.body, fontSize: 10,
-                paraSpaceAfter: 4, valign: 'top',
+                x: x + 0.4, y: startY + 3.25, w: cardW - 0.8, h: 1.1,
+                fontFace: FONT.body, fontSize: 13,  // [READABILITY] 10 → 13
+                paraSpaceAfter: 5, valign: 'top',
             })
 
             // Arrow between cards
             if (i < years.length - 1) {
                 s.addShape('rightTriangle', {
-                    x: x + cardW + 0.05, y: startY + cardH/2 - 0.15, w: 0.2, h: 0.3,
-                    fill: { color: COLORS.violet, transparency: 50 },
+                    x: x + cardW + 0.05, y: startY + cardH/2 - 0.18, w: 0.22, h: 0.36,
+                    fill: { color: COLORS.violet, transparency: 40 },
                     line: { type: 'none' },
                     rotate: 90,
                 })
@@ -1160,13 +1164,13 @@ async function build() {
         // Bottom disclaimer
         s.addText('Conservative projection dựa trên benchmarks SaaS B2B niche (LTV/CAC 5:1 industry standard).', {
             x: 0.5, y: 6.5, w: SLIDE_W - 1, h: 0.35,
-            fontFace: FONT.body, fontSize: 11, italic: true,
-            color: COLORS.textMuted, align: 'center',
+            fontFace: FONT.body, fontSize: 13, italic: true,  // [READABILITY] 11 → 13
+            color: COLORS.textSecondary, align: 'center',
         })
         s.addText('Chưa launch chính thức — đây là target, không phải actuals.', {
-            x: 0.5, y: 6.8, w: SLIDE_W - 1, h: 0.35,
-            fontFace: FONT.body, fontSize: 11, italic: true,
-            color: COLORS.textMuted, align: 'center',
+            x: 0.5, y: 6.85, w: SLIDE_W - 1, h: 0.35,
+            fontFace: FONT.body, fontSize: 13, italic: true,
+            color: COLORS.textSecondary, align: 'center',
         })
 
         slideFooter(s, 11)
@@ -1190,13 +1194,13 @@ async function build() {
             ['Pricing per agency', '$5-30/user', '$8-24/user', '$15+/user', '$29 unlimited'],
         ]
 
-        // Build table data with styling
+        // Build table data with styling — bigger fonts throughout
         const headerStyle = {
             fill: { color: '1A0E3E' },
             color: COLORS.violetLight,
             bold: true,
             fontFace: FONT.heading,
-            fontSize: 12,
+            fontSize: 15,  // [READABILITY] 12 → 15
             align: 'center',
             valign: 'middle',
         }
@@ -1204,11 +1208,12 @@ async function build() {
             ...headerStyle,
             fill: { color: COLORS.violet },
             color: COLORS.white,
+            fontSize: 15,
         }
         const cellStyle = {
             color: COLORS.textPrimary,
             fontFace: FONT.body,
-            fontSize: 11,
+            fontSize: 13,  // [READABILITY] 11 → 13
             align: 'center',
             valign: 'middle',
         }
@@ -1216,13 +1221,15 @@ async function build() {
             ...cellStyle,
             bold: true,
             align: 'left',
-            color: COLORS.textSecondary,
+            color: COLORS.white,
+            fontSize: 13,
         }
         const ourCellStyle = {
             ...cellStyle,
             fill: { color: '14101F' },
             color: COLORS.emerald,
             bold: true,
+            fontSize: 13,
         }
 
         const tableData = [
@@ -1244,18 +1251,18 @@ async function build() {
         ]
 
         s.addTable(tableData, {
-            x: 0.5, y: 1.6, w: SLIDE_W - 1, h: 4.4,
+            x: 0.5, y: 1.6, w: SLIDE_W - 1, h: 4.6,  // [READABILITY] 4.4 → 4.6 taller
             colW: [3.0, 2.3, 2.3, 2.3, 2.4],
-            rowH: 0.55,
+            rowH: 0.58,  // [READABILITY] 0.55 → 0.58
             border: { type: 'solid', pt: 0.5, color: '2D2A3F' },
         })
 
-        // Bottom takeaway in glass box
-        glassCard(s, { x: 0.5, y: 6.3, w: SLIDE_W - 1, h: 0.95, borderColor: COLORS.violet, borderTransparency: 40 })
-        s.addText('Trello/Asana = chung chung. Frame.io = review tool. HustlyTasker = end-to-end agency operations cho niche talking head — flat pricing per agency.', {
-            x: 0.7, y: 6.4, w: SLIDE_W - 1.4, h: 0.75,
-            fontFace: FONT.body, fontSize: 13, italic: true,
-            color: COLORS.textPrimary, align: 'center', valign: 'middle',
+        // Bottom takeaway in glass box — bigger text
+        glassCard(s, { x: 0.5, y: 6.5, w: SLIDE_W - 1, h: 0.95, borderColor: COLORS.violet, borderTransparency: 30 })
+        s.addText('Trello/Asana = chung chung. Frame.io = review tool. HustlyTasker = end-to-end cho niche talking head.', {
+            x: 0.7, y: 6.55, w: SLIDE_W - 1.4, h: 0.85,
+            fontFace: FONT.body, fontSize: 16, italic: true, bold: true,  // [READABILITY] 13 → 16
+            color: COLORS.white, align: 'center', valign: 'middle',
         })
 
         slideFooter(s, 12)
@@ -1275,71 +1282,71 @@ async function build() {
             line: { type: 'none' },
         })
 
-        // Top tag
+        // Top tag — bigger
         s.addText('3-YEAR AMBITION', {
-            x: 0.5, y: 0.7, w: SLIDE_W - 1, h: 0.4,
-            fontFace: FONT.heading, fontSize: 11, bold: true,
+            x: 0.5, y: 0.6, w: SLIDE_W - 1, h: 0.45,
+            fontFace: FONT.heading, fontSize: 14, bold: true,  // [READABILITY] 11 → 14
             color: COLORS.violetLight, align: 'center', charSpacing: 8,
         })
 
-        // Big vision title
+        // Big vision title — bigger
         s.addText('Trở thành OS cho mọi', {
-            x: 0.5, y: 1.4, w: SLIDE_W - 1, h: 0.85,
-            fontFace: FONT.heading, fontSize: 44, bold: true,
+            x: 0.5, y: 1.3, w: SLIDE_W - 1, h: 0.95,
+            fontFace: FONT.heading, fontSize: 52, bold: true,  // [READABILITY] 44 → 52
             color: COLORS.textPrimary, align: 'center',
         })
         s.addText('Video Agency Đông Nam Á', {
-            x: 0.5, y: 2.2, w: SLIDE_W - 1, h: 0.95,
-            fontFace: FONT.heading, fontSize: 54, bold: true,
+            x: 0.5, y: 2.2, w: SLIDE_W - 1, h: 1.05,
+            fontFace: FONT.heading, fontSize: 60, bold: true,  // [READABILITY] 54 → 60
             color: COLORS.white, align: 'center',
         })
 
         // 3 milestone cards horizontal
         const milestones = [
             { year: '2025 Q4', body: 'Public beta launch', detail: '50 agency · 500 editors active' },
-            { year: '2026 Q4', body: '$50K MRR', detail: '200 agency · expand Indonesia + Philippines' },
-            { year: '2027', body: 'SEA leader', detail: '5 countries · Enterprise tier mature' },
+            { year: '2026 Q4', body: '$50K MRR', detail: '200 agency · expand SEA' },
+            { year: '2027', body: 'SEA leader', detail: '5 countries · Enterprise mature' },
         ]
 
         const mCardW = 3.9
-        const mCardH = 1.6
+        const mCardH = 1.75
         const mGap = 0.3
         const mStartX = (SLIDE_W - (mCardW * 3 + mGap * 2)) / 2
         const mStartY = 4.0
 
         milestones.forEach((m, i) => {
             const x = mStartX + i * (mCardW + mGap)
-            glassCard(s, { x, y: mStartY, w: mCardW, h: mCardH, borderColor: COLORS.violet, borderTransparency: 50 })
+            glassCard(s, { x, y: mStartY, w: mCardW, h: mCardH, borderColor: COLORS.violet, borderTransparency: 30 })
 
             s.addText(m.year, {
-                x: x + 0.2, y: mStartY + 0.15, w: mCardW - 0.4, h: 0.35,
-                fontFace: FONT.heading, fontSize: 12, bold: true,
+                x: x + 0.2, y: mStartY + 0.2, w: mCardW - 0.4, h: 0.4,
+                fontFace: FONT.heading, fontSize: 15, bold: true,  // [READABILITY] 12 → 15
                 color: COLORS.violetLight, align: 'center', charSpacing: 4,
             })
             s.addText(m.body, {
-                x: x + 0.2, y: mStartY + 0.5, w: mCardW - 0.4, h: 0.55,
-                fontFace: FONT.heading, fontSize: 20, bold: true,
+                x: x + 0.2, y: mStartY + 0.6, w: mCardW - 0.4, h: 0.6,
+                fontFace: FONT.heading, fontSize: 24, bold: true,  // [READABILITY] 20 → 24
                 color: COLORS.white, align: 'center',
             })
             s.addText(m.detail, {
-                x: x + 0.2, y: mStartY + 1.05, w: mCardW - 0.4, h: 0.45,
-                fontFace: FONT.body, fontSize: 11,
-                color: COLORS.textSecondary, align: 'center',
+                x: x + 0.2, y: mStartY + 1.2, w: mCardW - 0.4, h: 0.45,
+                fontFace: FONT.body, fontSize: 13,  // [READABILITY] 11 → 13
+                color: COLORS.textPrimary, align: 'center',
             })
         })
 
-        // Q&A title
+        // Q&A title — bigger
         s.addText('Câu hỏi & Thảo luận', {
-            x: 0.5, y: 6.0, w: SLIDE_W - 1, h: 0.7,
-            fontFace: FONT.heading, fontSize: 36, bold: true,
+            x: 0.5, y: 6.1, w: SLIDE_W - 1, h: 0.75,
+            fontFace: FONT.heading, fontSize: 44, bold: true,  // [READABILITY] 36 → 44
             color: COLORS.fuchsia, align: 'center',
         })
 
-        // Footer
+        // Footer — bigger
         s.addText('HustlyTasker · contact@hustlytasker.xyz', {
-            x: 0.5, y: 6.95, w: SLIDE_W - 1, h: 0.35,
-            fontFace: FONT.body, fontSize: 12, italic: true,
-            color: COLORS.textMuted, align: 'center',
+            x: 0.5, y: 7.0, w: SLIDE_W - 1, h: 0.35,
+            fontFace: FONT.body, fontSize: 14, italic: true,  // [READABILITY] 12 → 14
+            color: COLORS.textSecondary, align: 'center',
         })
     }
 

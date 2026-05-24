@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
-import { bulkUpdateTaskDetails } from "@/actions/bulk-task-actions"
+import { bulkUpdateTaskDetails, bulkUpdateTaskResourceSubfields } from "@/actions/bulk-task-actions"
 import { updateTaskStatus } from "@/actions/task-actions"
 import { toast } from "sonner"
 import { Dialog } from "@/components/ui/dialog"
@@ -549,7 +549,34 @@ export function TaskDetailModal({
     }
 
     /* ── Resources card: re-pack + save ── */
+    // [Bulk fix] CRITICAL data-integrity rule: in bulk mode this function must
+    // NEVER re-pack the current task's `resources`/`references` strings and
+    // apply them to other tasks (that would overwrite their unique RAW/BROLL/
+    // SCRIPT/SUBMISSION/REF subfields with the current task's values). Instead
+    // we send a surgical subfield update via bulkUpdateTaskResourceSubfields,
+    // and the server fetches each task's current packed string + merges only
+    // the subfield the user actually changed.
     const saveResource = async (key: 'linkRaw' | 'linkBroll' | 'scriptLink' | 'submissionFolder', newValue: string) => {
+        // ─── Bulk mode: per-task surgical subfield merge (server-side) ───
+        if (isBulkMode && bulkSelectedIds) {
+            const subfields: any = {}
+            if (key === 'linkRaw') subfields.linkRaw = newValue
+            else if (key === 'linkBroll') subfields.linkBroll = newValue
+            else if (key === 'scriptLink') subfields.scriptLink = newValue
+            else if (key === 'submissionFolder') subfields.submissionFolder = newValue
+
+            const res = await bulkUpdateTaskResourceSubfields(bulkSelectedIds, subfields, workspaceId) as any
+            if (res?.success) {
+                toast.success(`Đã cập nhật ${key} cho ${res.count ?? bulkSelectedIds.length} task`)
+                // Optimistic update for current task only (others refresh on revalidate)
+                setForm((prev) => ({ ...prev, [key]: newValue }))
+            } else {
+                toast.error(res?.error ?? 'Bulk save failed')
+            }
+            return
+        }
+
+        // ─── Single mode: existing pack-and-save flow ───
         const next = { ...form, [key]: newValue }
         const combinedResources =
             next.linkRaw || next.linkBroll || next.submissionFolder
@@ -574,6 +601,23 @@ export function TaskDetailModal({
     }
 
     const saveReference = async (key: 'references' | 'collectFilesLink', newValue: string) => {
+        // ─── Bulk mode: surgical subfield merge ───
+        if (isBulkMode && bulkSelectedIds) {
+            const subfields: any = {}
+            if (key === 'references') subfields.referenceLink = newValue
+            else if (key === 'collectFilesLink') subfields.collectFilesLink = newValue
+
+            const res = await bulkUpdateTaskResourceSubfields(bulkSelectedIds, subfields, workspaceId) as any
+            if (res?.success) {
+                toast.success(`Đã cập nhật ${key} cho ${res.count ?? bulkSelectedIds.length} task`)
+                setForm((prev) => ({ ...prev, [key]: newValue }))
+            } else {
+                toast.error(res?.error ?? 'Bulk save failed')
+            }
+            return
+        }
+
+        // ─── Single mode: existing pack-and-save flow ───
         const next = { ...form, [key]: newValue }
         const combinedReferences = next.scriptLink
             ? `REF:${next.references.trim()} | SCRIPT:${next.scriptLink.trim()}`

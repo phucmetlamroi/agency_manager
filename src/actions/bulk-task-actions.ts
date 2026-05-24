@@ -293,6 +293,142 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
     }
 }
 
+/* ════════════════════════════════════════════════════════════════════ */
+/*  [Bulk fix] bulkUpdateTaskResourceSubfields                         */
+/*                                                                      */
+/*  Surgical per-task subfield merge for legacy packed `resources` and  */
+/*  `references` strings. Used by TaskDetailModal Assets/References     */
+/*  cards in bulk mode — only the subfield the user actually changed    */
+/*  propagates; other subfields keep each task's own value.             */
+/*                                                                      */
+/*  Without this, saveResource() would pack the current task's entire   */
+/*  RAW/BROLL/SUBMISSION state into the combined string and apply that  */
+/*  same string to every task in the bulk selection — overwriting       */
+/*  other tasks' subfields with the current task's values.              */
+/* ════════════════════════════════════════════════════════════════════ */
+
+interface ResourceSubfieldUpdate {
+    linkRaw?: string
+    linkBroll?: string
+    submissionFolder?: string
+    /** Updates SCRIPT subfield inside packed `references` string */
+    scriptLink?: string
+    /** Updates REF subfield inside packed `references` string */
+    referenceLink?: string
+    /** Separate column — Sample Project link */
+    collectFilesLink?: string
+}
+
+export async function bulkUpdateTaskResourceSubfields(
+    taskIds: string[],
+    subfields: ResourceSubfieldUpdate,
+    workspaceId: string,
+) {
+    if (!taskIds || taskIds.length === 0) return { error: 'No tasks selected' }
+
+    try {
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
+        // Import format helpers (server-side use only — keep lib client-safe)
+        const {
+            parseResources, packResources, parseReferences, packReferences,
+        } = await import('@/lib/task-resource-format')
+
+        // Identify which packed strings need to be re-derived per task
+        const touchesResources =
+            'linkRaw' in subfields || 'linkBroll' in subfields || 'submissionFolder' in subfields
+        const touchesReferences =
+            'referenceLink' in subfields || 'scriptLink' in subfields
+
+        if (
+            !touchesResources &&
+            !touchesReferences &&
+            !('collectFilesLink' in subfields)
+        ) {
+            return { error: 'Không có subfield nào được chỉnh' }
+        }
+
+        await prisma.$transaction(async (tx) => {
+            for (const id of taskIds) {
+                // Fetch current packed strings for this specific task
+                const current = await tx.task.findUnique({
+                    where: { id, workspaceId },
+                    select: { resources: true, references: true },
+                })
+
+                const taskUpdateData: any = { version: { increment: 1 } }
+
+                // ─── Resources subfield merge (RAW / BROLL / SUBMISSION) ───
+                if (touchesResources) {
+                    const parsed = parseResources(current?.resources)
+                    if ('linkRaw' in subfields) parsed.linkRaw = subfields.linkRaw ?? ''
+                    if ('linkBroll' in subfields) parsed.linkBroll = subfields.linkBroll ?? ''
+                    if ('submissionFolder' in subfields) parsed.submissionFolder = subfields.submissionFolder ?? ''
+
+                    const packed = packResources(parsed)
+                    taskUpdateData.resources = packed || null
+                    // submissionFolder is ALSO mirrored to its own column
+                    // (defensive — modal does this too)
+                    if ('submissionFolder' in subfields) {
+                        taskUpdateData.submissionFolder = subfields.submissionFolder || null
+                    }
+                }
+
+                // ─── References subfield merge (REF / SCRIPT) ───
+                if (touchesReferences) {
+                    const parsed = parseReferences(current?.references)
+                    if ('referenceLink' in subfields) parsed.referenceLink = subfields.referenceLink ?? ''
+                    if ('scriptLink' in subfields) parsed.scriptLink = subfields.scriptLink ?? ''
+
+                    const packed = packReferences(parsed)
+                    taskUpdateData.references = packed || null
+                }
+
+                // ─── collectFilesLink — independent column ───
+                if ('collectFilesLink' in subfields) {
+                    taskUpdateData.collectFilesLink = subfields.collectFilesLink || null
+                }
+
+                await tx.task.update({
+                    where: { id, workspaceId },
+                    data: taskUpdateData,
+                })
+            }
+        })
+
+        // Best-effort audit log
+        try {
+            const { audit } = await import('@/lib/audit-log')
+            await audit({
+                workspaceId,
+                actorUserId: session?.user?.id ?? null,
+                action: 'task.bulk_updated',
+                targetType: 'Task',
+                targetId: `${taskIds.length}-tasks`,
+                after: {
+                    subfields: Object.keys(subfields),
+                    count: taskIds.length,
+                    taskIds,
+                    source: 'bulkUpdateTaskResourceSubfields',
+                },
+            })
+        } catch {
+            /* non-blocking */
+        }
+
+        revalidatePath(`/${workspaceId}/admin/queue`)
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/dashboard`)
+        return { success: true, count: taskIds.length }
+    } catch (error: any) {
+        console.error('[bulkUpdateTaskResourceSubfields] error:', error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
+        return { error: 'Lỗi khi cập nhật subfield hàng loạt' }
+    }
+}
+
 // BULK UPDATE STATUS — [Sprint Q] NEW
 // Atomic DB update + DIGEST emails (1 email per recipient với danh sách task)
 // thay vì N email riêng lẻ khi loop updateTaskStatus.

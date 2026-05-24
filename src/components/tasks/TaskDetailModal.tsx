@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
+import { bulkUpdateTaskDetails } from "@/actions/bulk-task-actions"
 import { updateTaskStatus } from "@/actions/task-actions"
 import { toast } from "sonner"
 import { Dialog } from "@/components/ui/dialog"
@@ -408,7 +409,18 @@ export function TaskDetailModal({
     isAdmin,
     workspaceId,
     currentUserId,
+    bulkSelectedIds,
 }: TaskDetailModalProps) {
+    // [Bulk fix] Determine if we're in bulk mode — user ticked multiple rows
+    // AND the currently-open task is one of them. Single edit clicks (no
+    // checkbox tick) fall through as normal single update.
+    const isBulkMode = !!(
+        bulkSelectedIds &&
+        bulkSelectedIds.length > 1 &&
+        task &&
+        bulkSelectedIds.includes(task.id)
+    )
+    const bulkCount = bulkSelectedIds?.length ?? 0
     const [activeTab, setActiveTab] = useState<'main' | 'assets' | 'notes'>('main')
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
 
@@ -509,10 +521,24 @@ export function TaskDetailModal({
     if (!isOpen || !localTask) return null
 
     /* ── Generic per-field save ── */
+    // [Bulk fix] Route to bulkUpdateTaskDetails when modal opens with multiple
+    // rows ticked — previously bulkSelectedIds was declared in props but never
+    // used, so save always hit only the current task. Now: if isBulkMode → save
+    // to ALL selected; else → single task save (existing behavior).
     const saveSingle = async (
         patch: Parameters<typeof updateTaskDetails>[1],
         successMsg = 'Updated',
     ) => {
+        if (isBulkMode && bulkSelectedIds) {
+            const res = await bulkUpdateTaskDetails(bulkSelectedIds, patch, workspaceId) as any
+            if (res?.success) {
+                toast.success(`Đã cập nhật ${res.count ?? bulkSelectedIds.length} task`)
+                return true
+            }
+            toast.error(res?.error ?? 'Bulk save failed')
+            return false
+        }
+
         const res = await updateTaskDetails(localTask.id, patch, workspaceId)
         if (res?.success) {
             toast.success(successMsg)
@@ -758,6 +784,29 @@ export function TaskDetailModal({
                                     <X size={16} />
                                 </button>
                             </div>
+
+                            {/* [Bulk fix] Bulk mode indicator — shows user that any edit will apply to N tasks */}
+                            {isBulkMode && (
+                                <div
+                                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
+                                    style={{
+                                        background: 'rgba(139,92,246,0.10)',
+                                        border: '1px solid rgba(139,92,246,0.30)',
+                                    }}
+                                >
+                                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-violet-500/20 text-violet-300 text-xs font-bold">
+                                        {bulkCount}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[12px] font-bold text-violet-200">
+                                            Bulk edit — đang chỉnh {bulkCount} task cùng lúc
+                                        </div>
+                                        <div className="text-[11px] text-violet-300/80">
+                                            Mọi thay đổi sẽ được áp dụng cho toàn bộ task đã tick.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="flex flex-col gap-2">
                                 <h3 className="text-[18px] font-extrabold text-white tracking-tight truncate">

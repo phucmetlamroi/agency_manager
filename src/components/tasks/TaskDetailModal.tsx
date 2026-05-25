@@ -434,10 +434,6 @@ export function TaskDetailModal({
     // [Sprint M] "Bắt đầu" gate — non-admin assignee must click before viewing details
     const [starting, setStarting] = useState(false)
 
-    // [Sprint P GĐ4] Submit task — non-admin assignee paste productLink + click
-    // Submit → status Đang thực hiện → Revision, email tới admin assignedBy.
-    const [submitting, setSubmitting] = useState(false)
-
     // Drafts for cards in edit mode
     const [draftDelivery, setDraftDelivery] = useState('')
     const [draftDeadline, setDraftDeadline] = useState('')
@@ -636,14 +632,65 @@ export function TaskDetailModal({
     }
 
     /* ── Card-level save handlers ── */
+    /**
+     * [One-Click Delivery Submit]
+     * Editor flow: paste link → click ✓ → link saved + (if non-admin assignee in
+     * 'Đang thực hiện', single-task mode) auto-transition to Revision.
+     *
+     * Replaces the old 2-step flow (save link + click "Nộp bài" footer button).
+     * Server-side `updateTaskStatus` detects isUserDelivery from runtime state
+     * (newStatus=Revision, oldStatus=Đang thực hiện, isAssignee, productLink) and
+     * fires email taskDelivered + audit task.delivered automatically.
+     *
+     * Bulk mode: skip auto-transition (multi-task status change via marker check
+     * is out of scope — admin can bulk-update status separately).
+     */
     const handleSaveDelivery = async () => {
-        setSavingCard(true)
-        const ok = await saveSingle({ productLink: draftDelivery })
-        if (ok) {
-            setForm((p) => ({ ...p, productLink: draftDelivery }))
-            setLocalTask((p) => (p ? { ...p, productLink: draftDelivery } : null))
-            setEditingDelivery(false)
+        const trimmed = draftDelivery.trim()
+        if (!trimmed) {
+            toast.error('Cần nhập link Delivery trước khi xác nhận.')
+            return
         }
+
+        setSavingCard(true)
+        const ok = await saveSingle({ productLink: trimmed })
+        if (!ok) {
+            setSavingCard(false)
+            return
+        }
+
+        // Update local state with saved productLink
+        setForm((p) => ({ ...p, productLink: trimmed }))
+        setLocalTask((p) => (p ? { ...p, productLink: trimmed } : null))
+        setEditingDelivery(false)
+
+        // Auto-submit gate: only fires in single-task mode for non-admin assignee
+        // whose task is currently 'Đang thực hiện'. Admin save / bulk save /
+        // status mismatch → just save link, no transition.
+        const shouldAutoSubmit =
+            !isAdmin &&
+            !!currentUserId &&
+            localTask.assigneeId === currentUserId &&
+            localTask.status === 'Đang thực hiện' &&
+            !isBulkMode
+
+        if (shouldAutoSubmit) {
+            try {
+                const res = await updateTaskStatus(localTask.id, 'Revision', workspaceId)
+                if (res?.success) {
+                    toast.success('Đã nộp bài — admin sẽ review sớm. Deadline đã được tạm dừng.')
+                    setLocalTask((prev) => (prev ? { ...prev, status: 'Revision', deadline: null } : prev))
+                } else {
+                    // Save succeeded in DB but transition failed — user can retry by
+                    // re-saving the same link (idempotent on productLink, FSM still
+                    // allows Đang thực hiện → Revision).
+                    toast.error(res?.error || 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')
+                }
+            } catch {
+                toast.error('Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')
+            }
+        }
+
         setSavingCard(false)
     }
 
@@ -727,44 +774,6 @@ export function TaskDetailModal({
             setStarting(false)
         }
     }
-
-    /* ── [Sprint P GĐ4] Submit task ──
-     * Non-admin assignee with status='Đang thực hiện' + productLink set →
-     * click Submit → status chuyển 'Revision', deadline cleared (Sprint A
-     * restrictedStatuses), email taskDelivered tới admin assignedBy.
-     * Server-side branch logic (task-actions.ts) tự detect isUserDelivery
-     * dựa trên (newStatus=Revision, oldStatus=Đang thực hiện, isAssignee, productLink).
-     */
-    const handleSubmitTask = async () => {
-        if (submitting) return
-        // Defensive UI guard — server cũng check productLink trước khi gửi taskDelivered
-        if (!form.productLink?.trim()) {
-            toast.error('Bạn cần dán link sản phẩm vào ô Delivery trước khi nộp.')
-            return
-        }
-        setSubmitting(true)
-        try {
-            const res = await updateTaskStatus(localTask.id, 'Revision', workspaceId)
-            if (res?.success) {
-                toast.success('Đã nộp bài — admin sẽ review sớm. Deadline đã được tạm dừng.')
-                setLocalTask((prev) => (prev ? { ...prev, status: 'Revision', deadline: null } : prev))
-            } else {
-                toast.error(res?.error || 'Không thể nộp task. Vui lòng thử lại.')
-            }
-        } catch {
-            toast.error('Không thể nộp task. Vui lòng thử lại.')
-        } finally {
-            setSubmitting(false)
-        }
-    }
-
-    // [Sprint P GĐ4] Show Submit button: non-admin + status='Đang thực hiện' +
-    // viewer là assignee (Sprint M check).
-    const canSubmit =
-        !isAdmin &&
-        !!currentUserId &&
-        localTask.assigneeId === currentUserId &&
-        localTask.status === 'Đang thực hiện'
 
     /* ── Status info ── */
     const statusInfo = getStatusInfo(localTask.status)
@@ -1185,51 +1194,6 @@ export function TaskDetailModal({
                             )}
                         </div>
 
-                        {/* [Sprint P GĐ4] Submit footer — non-admin assignee + 'Đang thực hiện'.
-                            Click → status Revision (deadline cleared), email tới admin assignedBy. */}
-                        {canSubmit && (
-                            <div
-                                className="flex items-center justify-between gap-3 px-6 py-4 border-t"
-                                style={{
-                                    borderColor: 'rgba(255,255,255,0.05)',
-                                    background: 'rgba(245,158,11,0.04)',
-                                }}
-                            >
-                                <div className="flex flex-col gap-0.5 min-w-0">
-                                    <p className="text-[12px] font-bold uppercase tracking-wide text-amber-300">
-                                        Sẵn sàng nộp bài?
-                                    </p>
-                                    <p className="text-[11px] text-zinc-500 truncate">
-                                        Đảm bảo bạn đã dán link sản phẩm vào ô Delivery.
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={handleSubmitTask}
-                                    disabled={submitting || !form.productLink?.trim()}
-                                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-white font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                                    style={{
-                                        background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                                        boxShadow: '0 8px 20px rgba(245,158,11,0.35)',
-                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                        fontSize: 13,
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (!submitting && form.productLink?.trim()) {
-                                            e.currentTarget.style.background =
-                                                'linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)'
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background =
-                                            'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
-                                    }}
-                                    title={!form.productLink?.trim() ? 'Cần dán link Delivery trước' : 'Nộp bài'}
-                                >
-                                    {submitting ? 'Đang nộp…' : 'Nộp bài'}
-                                </button>
-                            </div>
-                        )}
                           </>
                         )}
                     </motion.div>

@@ -1,21 +1,30 @@
 'use client'
 
 /**
- * [Quick Create] Single-screen UI for batch task creation from cloud folder.
+ * [Velox v1.0 — refactored Phase 1]
+ *
+ * Single-screen UI for prefilling AddTaskModal from cloud folder scan.
  *
  * Flow:
  *   1. Paste Dropbox/Google Drive folder URL → click "Scan"
  *   2. System lists video files with metadata (duration, filename)
  *   3. User picks Client + Pricing Rule
- *   4. 8 automation toggles auto-apply: video filter, Short/Long classify,
- *      pricing, footage link, auto-name, inherit notes, auto-assign, uniform deadline
+ *   4. 8 automation toggles compute values: Short/Long classify, pricing,
+ *      footage link, auto-name, inherit notes, auto-assign, uniform deadline
  *   5. Preview table shows per-video: title, duration, type, price USD, price VND
  *      — user can uncheck rows or edit inline
- *   6. Click "Tạo N tasks" → batch create via createQuickTasks
+ *   6. Click "Áp dụng vào form" → payload passed back to AddTaskModal via
+ *      `onApplyToForm` callback. AddTaskModal fills its TaskFormData (single
+ *      task path uses createTask; N≥2 routes to createBatchTasks automatically
+ *      via DashboardActionWrapper's handleSubmit).
+ *
+ * Legacy fallback: if `onApplyToForm` is NOT provided, old self-create path
+ * (createQuickTasks) is preserved for backward-compat. This will be removed
+ * in Phase 3 cleanup.
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { Loader2, Link2, Sparkles, Rocket, AlertCircle, Search, X, Check } from 'lucide-react'
+import { Loader2, Link2, Sparkles, Rocket, AlertCircle, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import {
     isCloudStorageUrl,
@@ -30,11 +39,12 @@ import type { ScannedVideo } from '@/lib/cloud-scanner'
 import {
     createQuickTasks,
     suggestRoundRobinAssignee,
-    getPreviousWorkspaceNotes,
     type QuickCreateBatchInput,
     type QuickTaskInput,
 } from '@/actions/quick-create-actions'
+import { getLastClientNote } from '@/actions/velox-helpers-actions'
 import { AutocompleteInput } from '@/components/ui/AutocompleteInput'
+import type { VeloxApplyPayload, VeloxRow } from '@/lib/velox-helpers'
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Types                                                              */
@@ -69,8 +79,12 @@ interface Props {
     pricingRules: PricingRule[]
     /** Current exchange rate snapshot — passed from parent */
     exchangeRate?: number
-    /** Called after successful batch create */
-    onSuccess: () => void
+    /** [Velox v1.0] Preferred callback: Velox returns payload to parent
+     *  (AddTaskModal) for form prefill — no self-create. */
+    onApplyToForm?: (payload: VeloxApplyPayload) => void
+    /** [Legacy fallback — Phase 3 cleanup target] Called after successful
+     *  self-create batch. Only invoked when `onApplyToForm` is NOT provided. */
+    onSuccess?: () => void
 }
 
 interface PreviewRow {
@@ -124,6 +138,7 @@ export default function QuickCreateMode({
     users,
     pricingRules,
     exchangeRate = 26300,
+    onApplyToForm,
     onSuccess,
 }: Props) {
     const [url, setUrl] = useState('')
@@ -137,9 +152,12 @@ export default function QuickCreateMode({
     const [assigneeId, setAssigneeId] = useState<string | null>(null)
     const [deadline, setDeadline] = useState('')
     const [titlePrefix, setTitlePrefix] = useState('')
+    /** [Velox v1.0 spec 6.1] Note inheritance preview: source task title + sub-client name + date */
     const [inheritedNotes, setInheritedNotes] = useState<{
-        notes: string | null
-        references: string | null
+        note: string
+        sourceTitle: string
+        sourceClientName: string
+        sourceDate: string
     } | null>(null)
 
     const [toggles, setToggles] = useState<Toggles>(DEFAULT_TOGGLES)
@@ -293,16 +311,18 @@ export default function QuickCreateMode({
         }
         let cancelled = false
         ;(async () => {
-            const prev = await getPreviousWorkspaceNotes(workspaceId, clientId)
+            // [Velox v1.0 spec 6.1] Recursive sub-client search for last completed
+            // task with non-empty notes_vi. Returns preview metadata.
+            const result = await getLastClientNote(clientId, workspaceId)
             if (cancelled) return
-            if (prev) {
-                setInheritedNotes({
-                    notes: prev.notes,
-                    references: prev.references,
-                })
-                toast.info('Đã kế thừa ghi chú từ workspace trước cho client này.')
+            if (result) {
+                setInheritedNotes(result)
+                toast.info(
+                    `Note kế thừa từ task "${result.sourceTitle}" (${result.sourceClientName}, ${result.sourceDate})`,
+                )
             } else {
                 setInheritedNotes(null)
+                toast.warning('Không có note để kế thừa từ client này.')
             }
         })()
         return () => {
@@ -360,7 +380,7 @@ export default function QuickCreateMode({
     async function handleSubmit() {
         const selectedRows = previewRows.filter((r) => r.selected)
         if (selectedRows.length === 0) {
-            toast.error('Vui lòng chọn ít nhất 1 video để tạo task.')
+            toast.error('Vui lòng chọn ít nhất 1 video để áp dụng vào form.')
             return
         }
         if (!clientId) {
@@ -372,6 +392,53 @@ export default function QuickCreateMode({
             return
         }
 
+        // [Velox v1.0] Preferred path: hand off payload to parent (AddTaskModal)
+        // for form prefill. AddTaskModal's submit flow then creates tasks via the
+        // single entry point (createTask for N=1, createBatchTasks for N≥2 via
+        // DashboardActionWrapper.handleSubmit).
+        if (onApplyToForm) {
+            const payload: VeloxApplyPayload = {
+                rows: selectedRows.map<VeloxRow>((r) => ({
+                    rowId: r.rowId,
+                    title: r.title,
+                    type: r.type as VeloxRow['type'],
+                    priceUSD: r.priceUSD,
+                    wageVND: r.wageVND,
+                    durationSeconds: r.durationSeconds,
+                    previewUrl: r.previewUrl,
+                    selected: r.selected,
+                })),
+                common: {
+                    clientId,
+                    assigneeId,
+                    deadline: toggles.uniformDeadline && deadline ? deadline : null,
+                    inheritedNote: toggles.inheritNotes ? inheritedNotes?.note ?? null : null,
+                },
+                toggles: {
+                    linkFootage: toggles.linkFootage,
+                    autoName: toggles.autoName,
+                    applyPricing: toggles.applyPricing,
+                    inheritNotes: toggles.inheritNotes,
+                    autoAssign: toggles.autoAssign,
+                    uniformDeadline: toggles.uniformDeadline,
+                },
+            }
+            onApplyToForm(payload)
+            // Phase 1 N≥2 caveat: row-level pricing/type lost when collapsing into common form fields.
+            // Phase 2 (Batch Table) will preserve per-row data.
+            if (selectedRows.length >= 2) {
+                toast.success(
+                    `Áp dụng ${selectedRows.length} task vào form. Phase 1: tất cả dùng config của video đầu — Batch Table review chi tiết ở update tiếp theo.`,
+                    { duration: 6000 },
+                )
+            } else {
+                toast.success('Đã áp dụng vào form. Review + bấm "Add task" để tạo.')
+            }
+            return
+        }
+
+        // [Legacy fallback — removed in Phase 3] Self-create via createQuickTasks
+        // when no `onApplyToForm` callback (older callers).
         setSubmitting(true)
         try {
             const input: QuickCreateBatchInput = {
@@ -388,7 +455,7 @@ export default function QuickCreateMode({
                 assigneeId,
                 deadline: toggles.uniformDeadline && deadline ? deadline : null,
                 exchangeRate,
-                notes: toggles.inheritNotes ? inheritedNotes?.notes ?? null : null,
+                notes: toggles.inheritNotes ? inheritedNotes?.note ?? null : null,
                 notes_en: null,
             }
             const res = await createQuickTasks(input, workspaceId)
@@ -396,7 +463,7 @@ export default function QuickCreateMode({
                 toast.error(res.error)
             } else {
                 toast.success(`Đã tạo ${res.count} task!`)
-                onSuccess()
+                onSuccess?.()
             }
         } catch (err: any) {
             toast.error(err?.message ?? 'Lỗi khi tạo batch.')
@@ -732,18 +799,42 @@ export default function QuickCreateMode({
                                 </span>
                             </div>
                         </div>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={submitting || selectedCount === 0 || !clientId}
-                            className="flex items-center gap-2 px-6 py-3 rounded-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm font-bold transition-colors"
-                        >
-                            {submitting ? (
-                                <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                                <Sparkles size={14} />
-                            )}
-                            Tạo {selectedCount} tasks
-                        </button>
+                        {(() => {
+                            // [Velox v1.0 spec 7.6] Disable when no video detected
+                            // OR all 8 automation toggles OFF (no value to apply).
+                            const allTogglesOff = !Object.values(toggles).some(Boolean)
+                            const disabled =
+                                submitting ||
+                                selectedCount === 0 ||
+                                !clientId ||
+                                (scannedVideos.length === 0 && allTogglesOff)
+                            const disableTitle =
+                                scannedVideos.length === 0 && allTogglesOff
+                                    ? 'Bật ít nhất 1 automation hoặc detect ít nhất 1 video'
+                                    : !clientId
+                                      ? 'Chọn Client trước'
+                                      : selectedCount === 0
+                                        ? 'Chọn ít nhất 1 video'
+                                        : ''
+                            const label = onApplyToForm
+                                ? 'Áp dụng vào form'
+                                : `Tạo ${selectedCount} task`
+                            return (
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={disabled}
+                                    title={disableTitle}
+                                    className="flex items-center gap-2 px-6 py-3 rounded-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors"
+                                >
+                                    {submitting ? (
+                                        <Loader2 size={14} className="animate-spin" />
+                                    ) : (
+                                        <Sparkles size={14} />
+                                    )}
+                                    {label}
+                                </button>
+                            )
+                        })()}
                     </div>
                 </div>
             )}

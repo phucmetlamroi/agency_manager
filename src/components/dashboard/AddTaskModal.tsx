@@ -18,7 +18,16 @@ import {
 import dynamic from "next/dynamic"
 import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft"
 import QuickCreateMode from "./QuickCreateMode"
+import VeloxConflictDialog, { type ConflictStrategy } from "./VeloxConflictDialog"
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput"
+import {
+    mapVeloxPayloadToFormData,
+    detectFieldConflicts,
+    applyPrefill,
+    getVeloxFieldMeta,
+    type VeloxApplyPayload,
+    type VeloxFormPrefill,
+} from "@/lib/velox-helpers"
 
 // TiptapEditor uses browser-only APIs — load on client only
 const TiptapEditor = dynamic(() => import("@/components/tiptap/TiptapEditor"), { ssr: false })
@@ -158,6 +167,50 @@ const textareaBase =
 /* ------------------------------------------------------------------ */
 /*  Sub-components                                                     */
 /* ------------------------------------------------------------------ */
+
+/**
+ * [Velox v1.0 spec 7.1] Wrapper that decorates a field with a Velox-filled
+ * indicator: subtle green border-left bar + small 🚀 chip top-right + tooltip
+ * "Điền tự động bởi Velox · [feature name]".
+ *
+ * Renders children passthrough when `filled=false` (no visual overhead for
+ * non-Velox fields).
+ */
+function VeloxField({
+    filled,
+    fieldName,
+    featureName,
+    children,
+}: {
+    filled: boolean
+    fieldName: string
+    featureName: string
+    children: React.ReactNode
+}) {
+    if (!filled) return <>{children}</>
+    return (
+        <div
+            className="relative"
+            data-velox-field={fieldName}
+            title={`Điền tự động bởi Velox · ${featureName}`}
+        >
+            {/* Green border-left bar — sits just outside the input */}
+            <span
+                className="pointer-events-none absolute -left-1.5 top-1.5 bottom-1.5 w-[2px] rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.55)]"
+                aria-hidden="true"
+            />
+            {/* Top-right Velox chip */}
+            <span
+                className="pointer-events-none absolute -top-1.5 right-2 z-10 flex items-center gap-1 px-1.5 py-[1px] rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[8px] font-bold uppercase tracking-wider text-emerald-300"
+                aria-hidden="true"
+            >
+                <Rocket size={7} strokeWidth={2.5} />
+                Velox
+            </span>
+            {children}
+        </div>
+    )
+}
 
 function SelectChevron() {
     return (
@@ -345,6 +398,18 @@ export default function AddTaskModal({
     const [quickMode, setQuickMode] = useState(false)
     const [submitting, setSubmitting] = useState(false)
 
+    // [Velox v1.0] Set of fields prefilled by Velox — drives the green-tint
+    // indicator + 🚀 icon per spec 7.1. Removed when user manually edits a field.
+    const [veloxFilledFields, setVeloxFilledFields] = useState<Set<keyof VeloxFormPrefill>>(
+        new Set(),
+    )
+    // [Velox v1.0] Pending prefill awaiting conflict resolution (spec 7.4 dialog)
+    const [pendingPrefill, setPendingPrefill] = useState<{
+        prefill: VeloxFormPrefill
+        filledFields: Set<keyof VeloxFormPrefill>
+        conflicts: Set<keyof VeloxFormPrefill>
+    } | null>(null)
+
     // [Sprint Z+1] Auto-save draft tới localStorage (Google Docs–style).
     // Reset trên mỗi keystroke; idle 3 phút → expire.
     // Key per-workspace để tránh cross-contamination giữa các workspace.
@@ -411,8 +476,91 @@ export default function AddTaskModal({
         }
     }, [open])
 
-    const set = <K extends keyof TaskFormData>(key: K, value: TaskFormData[K]) =>
+    const set = <K extends keyof TaskFormData>(key: K, value: TaskFormData[K]) => {
         setForm((prev) => ({ ...prev, [key]: value }))
+        // [Velox v1.0 spec 7.1] User manually edits a field → remove its Velox tag
+        // (field is now "of the user", not auto-filled).
+        if (veloxFilledFields.has(key as keyof VeloxFormPrefill)) {
+            setVeloxFilledFields((prev) => {
+                const next = new Set(prev)
+                next.delete(key as keyof VeloxFormPrefill)
+                return next
+            })
+        }
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+       [Velox v1.0] Apply prefill from Velox modal → form
+       ────────────────────────────────────────────────────────────── */
+
+    const applyVeloxPrefill = (
+        prefill: VeloxFormPrefill,
+        filledFields: Set<keyof VeloxFormPrefill>,
+        strategy: 'overwrite' | 'keep' | 'merge',
+    ) => {
+        setForm((prev) => applyPrefill(prev as unknown as Record<string, string>, prefill, strategy) as unknown as TaskFormData)
+        // Track filled fields — but only those actually written (strategy='keep'
+        // may have skipped some). Conservative: union the planned set.
+        setVeloxFilledFields((prev) => {
+            const next = new Set(prev)
+            filledFields.forEach((f) => {
+                // For 'keep' strategy, skip the field if the form already had a value
+                // (it wasn't actually written by Velox).
+                if (strategy === 'keep' && (prefill[f] ?? '').toString().trim() && (form as any)[f]?.toString().trim()) {
+                    return
+                }
+                next.add(f)
+            })
+            return next
+        })
+    }
+
+    const handleApplyVelox = (payload: VeloxApplyPayload) => {
+        const { prefill, filledFields } = mapVeloxPayloadToFormData(payload)
+
+        // Spec 7.4 exception: when kế thừa note ON + form notes already has content
+        // → automatic append (no dialog ask).
+        const noteAppendException =
+            payload.toggles.inheritNotes &&
+            Boolean(form.notes?.replace(/<[^>]*>/g, "").trim()) &&
+            Boolean(prefill.notes)
+
+        const conflicts = detectFieldConflicts(
+            form as unknown as Record<string, string>,
+            prefill,
+            { skipNotes: noteAppendException },
+        )
+
+        if (conflicts.size === 0) {
+            // No conflicts → apply directly with overwrite (writes only non-empty fields anyway)
+            applyVeloxPrefill(prefill, filledFields, 'overwrite')
+            if (noteAppendException && prefill.notes) {
+                // Manual append for notes (spec exception)
+                setForm((prev) => ({
+                    ...prev,
+                    notes: `${prev.notes}\n${prefill.notes}`,
+                }))
+                setVeloxFilledFields((prev) => new Set(prev).add('notes'))
+            }
+            setQuickMode(false) // close Velox modal — back to wizard
+            return
+        }
+
+        // Conflicts present → show dialog
+        setPendingPrefill({ prefill, filledFields, conflicts })
+    }
+
+    const handleConflictResolve = (strategy: ConflictStrategy) => {
+        if (!pendingPrefill) return
+        applyVeloxPrefill(pendingPrefill.prefill, pendingPrefill.filledFields, strategy)
+        setPendingPrefill(null)
+        setQuickMode(false) // back to wizard
+    }
+
+    const handleConflictCancel = () => {
+        setPendingPrefill(null)
+        // Stay in Velox modal so user can adjust toggles and retry
+    }
 
     const jobPriceNum = parseFloat(form.jobPriceUSD) || 0
     const editorFeeNum = parseFloat(form.editorFee) || 0
@@ -452,6 +600,8 @@ export default function AddTaskModal({
             setSubmitted(true)
             // [Auto-save] Clear draft khi submit success — không còn cần restore
             clearDraft()
+            // [Velox v1.0 spec 7.2] Reset cả form + Velox indicator state on successful create
+            setVeloxFilledFields(new Set())
         } catch (err: any) {
             toast.error(err?.message || "Lỗi khi tạo task. Vui lòng thử lại.")
         } finally {
@@ -463,6 +613,7 @@ export default function AddTaskModal({
         // [Auto-save] Reset form state cho lần mở next (submitted = đã clear draft rồi)
         setForm({ ...INITIAL_FORM })
         setStep(0)
+        setVeloxFilledFields(new Set())
         onClose()
     }
 
@@ -486,53 +637,77 @@ export default function AddTaskModal({
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1.5">
                             <label className="text-xs text-[#A1A1AA] font-medium pl-1">Client&apos;s name</label>
-                            <AutocompleteInput
-                                selectedId={form.clientId}
-                                onSelect={(id) => set("clientId", id)}
-                                options={clientOptions}
-                                placeholder="Search client..."
-                            />
+                            <VeloxField
+                                filled={veloxFilledFields.has('clientId')}
+                                fieldName="clientId"
+                                featureName={getVeloxFieldMeta('clientId')}
+                            >
+                                <AutocompleteInput
+                                    selectedId={form.clientId}
+                                    onSelect={(id) => set("clientId", id)}
+                                    options={clientOptions}
+                                    placeholder="Search client..."
+                                />
+                            </VeloxField>
                         </div>
 
                         <div className="flex flex-col gap-1.5">
                             <label className="text-xs text-[#A1A1AA] font-medium pl-1">Editor&apos;s name</label>
-                            <AutocompleteInput
-                                selectedId={form.assigneeId}
-                                onSelect={(id) => set("assigneeId", id)}
-                                options={userOptions}
-                                placeholder="Search assignee..."
-                                emptyLabel="Leave Blank (Task Pool)"
-                            />
+                            <VeloxField
+                                filled={veloxFilledFields.has('assigneeId')}
+                                fieldName="assigneeId"
+                                featureName={getVeloxFieldMeta('assigneeId')}
+                            >
+                                <AutocompleteInput
+                                    selectedId={form.assigneeId}
+                                    onSelect={(id) => set("assigneeId", id)}
+                                    options={userOptions}
+                                    placeholder="Search assignee..."
+                                    emptyLabel="Leave Blank (Task Pool)"
+                                />
+                            </VeloxField>
                         </div>
 
                         <div className="flex gap-3">
                             <div className="flex-1 flex flex-col gap-1.5">
                                 <label className="text-xs text-[#A1A1AA] font-medium pl-1">Task Type</label>
-                                <div className="relative">
-                                    <select
-                                        className={selectBase}
-                                        value={form.taskType}
-                                        onChange={(e) => set("taskType", e.target.value)}
-                                    >
-                                        <option value="">Select type...</option>
-                                        {TASK_TYPES.map((t) => (
-                                            <option key={t} value={t}>
-                                                {t}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <SelectChevron />
-                                </div>
+                                <VeloxField
+                                    filled={veloxFilledFields.has('taskType')}
+                                    fieldName="taskType"
+                                    featureName={getVeloxFieldMeta('taskType')}
+                                >
+                                    <div className="relative">
+                                        <select
+                                            className={selectBase}
+                                            value={form.taskType}
+                                            onChange={(e) => set("taskType", e.target.value)}
+                                        >
+                                            <option value="">Select type...</option>
+                                            {TASK_TYPES.map((t) => (
+                                                <option key={t} value={t}>
+                                                    {t}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <SelectChevron />
+                                    </div>
+                                </VeloxField>
                             </div>
 
                             <div className="flex-1 flex flex-col gap-1.5">
                                 <label className="text-xs text-[#A1A1AA] font-medium pl-1">Deadline (ngày & giờ)</label>
+                                <VeloxField
+                                    filled={veloxFilledFields.has('deadline')}
+                                    fieldName="deadline"
+                                    featureName={getVeloxFieldMeta('deadline')}
+                                >
                                 <input
                                     type="datetime-local"
                                     className={inputBase}
                                     value={form.deadline}
                                     onChange={(e) => set("deadline", e.target.value)}
                                 />
+                                </VeloxField>
                             </div>
                         </div>
                     </div>
@@ -545,6 +720,11 @@ export default function AddTaskModal({
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1.5">
                             <label className="text-xs text-[#A1A1AA] font-medium pl-1">Video list</label>
+                            <VeloxField
+                                filled={veloxFilledFields.has('videoList')}
+                                fieldName="videoList"
+                                featureName={getVeloxFieldMeta('videoList')}
+                            >
                             <textarea
                                 className={textareaBase}
                                 style={{ minHeight: 220 }}
@@ -552,6 +732,7 @@ export default function AddTaskModal({
                                 value={form.videoList}
                                 onChange={(e) => set("videoList", e.target.value)}
                             />
+                            </VeloxField>
                         </div>
                         <p className="text-[11px] text-zinc-600 pl-1">
                             {videoCount} video(s) added
@@ -566,24 +747,36 @@ export default function AddTaskModal({
                         <div className="flex gap-3">
                             <div className="flex-1 flex flex-col gap-1.5">
                                 <label className="text-xs text-[#A1A1AA] font-medium pl-1">Task Price (USD)</label>
-                                <input
-                                    type="number"
-                                    className={inputBase}
-                                    placeholder="0.00"
-                                    value={form.jobPriceUSD}
-                                    onChange={(e) => set("jobPriceUSD", e.target.value)}
-                                />
+                                <VeloxField
+                                    filled={veloxFilledFields.has('jobPriceUSD')}
+                                    fieldName="jobPriceUSD"
+                                    featureName={getVeloxFieldMeta('jobPriceUSD')}
+                                >
+                                    <input
+                                        type="number"
+                                        className={inputBase}
+                                        placeholder="0.00"
+                                        value={form.jobPriceUSD}
+                                        onChange={(e) => set("jobPriceUSD", e.target.value)}
+                                    />
+                                </VeloxField>
                             </div>
 
                             <div className="flex-1 flex flex-col gap-1.5">
                                 <label className="text-xs text-[#A1A1AA] font-medium pl-1">Editor Reward (VND)</label>
-                                <input
-                                    type="number"
-                                    className={inputBase}
-                                    placeholder="0"
-                                    value={form.editorFee}
-                                    onChange={(e) => set("editorFee", e.target.value)}
-                                />
+                                <VeloxField
+                                    filled={veloxFilledFields.has('editorFee')}
+                                    fieldName="editorFee"
+                                    featureName={getVeloxFieldMeta('editorFee')}
+                                >
+                                    <input
+                                        type="number"
+                                        className={inputBase}
+                                        placeholder="0"
+                                        value={form.editorFee}
+                                        onChange={(e) => set("editorFee", e.target.value)}
+                                    />
+                                </VeloxField>
                             </div>
                         </div>
 
@@ -630,9 +823,9 @@ export default function AddTaskModal({
                                     ["submitFolder", "Submit file", "Paste submit location"],
                                     ["script", "Scription", "Paste scription"],
                                 ] as const
-                            ).map(([key, label, placeholder]) => (
-                                <div key={key} className="flex flex-col gap-2">
-                                    <label className="text-[14px] text-white font-bold pl-1">{label}</label>
+                            ).map(([key, label, placeholder]) => {
+                                const isVeloxFilled = key === 'rawFootage' && veloxFilledFields.has('rawFootage')
+                                const fieldEl = (
                                     <input
                                         type="url"
                                         className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
@@ -640,19 +833,41 @@ export default function AddTaskModal({
                                         value={form[key]}
                                         onChange={(e) => set(key, e.target.value)}
                                     />
-                                </div>
-                            ))}
+                                )
+                                return (
+                                    <div key={key} className="flex flex-col gap-2">
+                                        <label className="text-[14px] text-white font-bold pl-1">{label}</label>
+                                        {isVeloxFilled ? (
+                                            <VeloxField
+                                                filled={true}
+                                                fieldName={key}
+                                                featureName={getVeloxFieldMeta('rawFootage')}
+                                            >
+                                                {fieldEl}
+                                            </VeloxField>
+                                        ) : (
+                                            fieldEl
+                                        )}
+                                    </div>
+                                )
+                            })}
                         </div>
 
                         {/* Notes — single TipTap rich-text editor (Figma's centerpiece in Step 4) */}
                         <div className="flex flex-col gap-2">
                             <label className="text-[14px] text-white font-bold pl-1">Notes</label>
-                            <div className="rounded-2xl bg-white/[0.04] border border-[rgba(139,92,246,0.12)] overflow-hidden">
-                                <TiptapEditor
-                                    content={form.notes}
-                                    onChange={(html) => set("notes", html)}
-                                />
-                            </div>
+                            <VeloxField
+                                filled={veloxFilledFields.has('notes')}
+                                fieldName="notes"
+                                featureName={getVeloxFieldMeta('notes')}
+                            >
+                                <div className="rounded-2xl bg-white/[0.04] border border-[rgba(139,92,246,0.12)] overflow-hidden">
+                                    <TiptapEditor
+                                        content={form.notes}
+                                        onChange={(html) => set("notes", html)}
+                                    />
+                                </div>
+                            </VeloxField>
                         </div>
                     </div>
                 )
@@ -828,19 +1043,33 @@ export default function AddTaskModal({
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {/* [Quick Create] Toggle between standard wizard and quick mode */}
+                                    {/* [Quick Create] Toggle between standard wizard and quick mode.
+                                        [Velox v1.0 spec 7.2] Green dot badge top-right when Velox has
+                                        already been applied to ≥1 field. */}
                                     <button
                                         type="button"
                                         onClick={() => setQuickMode(!quickMode)}
                                         disabled={submitting}
-                                        title={quickMode ? 'Chuyển sang form thường' : 'Chuyển sang Quick Create'}
-                                        className={`flex items-center justify-center w-8 h-8 rounded-full transition-colors disabled:opacity-40 ${
+                                        title={
+                                            quickMode
+                                                ? 'Chuyển sang form thường'
+                                                : veloxFilledFields.size > 0
+                                                  ? `Velox đã áp dụng cho ${veloxFilledFields.size} field`
+                                                  : 'Mở Velox (Tạo Task Nhanh)'
+                                        }
+                                        className={`relative flex items-center justify-center w-8 h-8 rounded-full transition-colors disabled:opacity-40 ${
                                             quickMode
                                                 ? 'bg-violet-500/20 border border-violet-500/40 text-violet-200'
                                                 : 'bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 hover:text-violet-300'
                                         }`}
                                     >
                                         {quickMode ? <ClipboardList size={16} /> : <Rocket size={16} />}
+                                        {!quickMode && veloxFilledFields.size > 0 && (
+                                            <span
+                                                className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
+                                                aria-hidden="true"
+                                            />
+                                        )}
                                     </button>
                                     {/* [Auto-save] Indicator — Google Docs–style "Đã lưu nháp" */}
                                     {!quickMode && <AutoSaveIndicator savedAt={savedAt} />}
@@ -875,10 +1104,9 @@ export default function AddTaskModal({
                                 users={users.map((u) => ({ id: u.id, username: u.username, nickname: u.nickname ?? null }))}
                                 pricingRules={pricingRules}
                                 exchangeRate={exchangeRate}
-                                onSuccess={() => {
-                                    setQuickMode(false)
-                                    onClose()
-                                }}
+                                // [Velox v1.0] Preferred: Velox returns payload → AddTaskModal
+                                // applies it to form. No self-create.
+                                onApplyToForm={handleApplyVelox}
                             />
                         ) : (
                         <div className="flex-1 overflow-y-auto px-6 pb-2 custom-scrollbar">
@@ -942,6 +1170,15 @@ export default function AddTaskModal({
                     </motion.div>
                 </motion.div>
             )}
+
+            {/* [Velox v1.0 spec 7.4] Conflict resolution dialog — renders above
+                AddTaskModal when prefill detects existing form values. Higher z-index. */}
+            <VeloxConflictDialog
+                open={pendingPrefill !== null}
+                conflicts={pendingPrefill?.conflicts ?? new Set()}
+                onResolve={handleConflictResolve}
+                onCancel={handleConflictCancel}
+            />
         </AnimatePresence>
     )
 }

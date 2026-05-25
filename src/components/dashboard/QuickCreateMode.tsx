@@ -224,49 +224,64 @@ export default function QuickCreateMode({
             setPreviewRows([])
             return
         }
-        const rows: PreviewRow[] = scannedVideos.map((v) => {
-            const type: 'Short form' | 'Long form' = toggles.classifyDuration
-                ? classifyVideoType(v.durationSeconds)
-                : 'Short form'
+        // [Bug fix] PRESERVE user-controlled state across rebuilds.
+        // Previously this effect rebuilt `previewRows` from scratch with
+        // `selected: true` for every row whenever any dependency changed —
+        // any reference churn (parent re-render with new prop ref, StrictMode
+        // double-effect in dev) would silently re-check rows the user had
+        // unchecked. Use functional setState + per-rowId lookup so user's
+        // `selected` choice survives recomputes. Computed fields (title,
+        // type, priceUSD, wageVND, duration) still refresh from toggles /
+        // pricing rule as intended.
+        setPreviewRows((prev) => {
+            const prevById = new Map(prev.map((r) => [r.rowId, r]))
+            return scannedVideos.map((v) => {
+                const existing = prevById.get(v.fileId)
 
-            let pricing: PricingResult = {
-                priceUSD: 0,
-                wageVND: 0,
-                ruleApplied: 'none',
-            }
-            if (toggles.applyPricing && selectedRule) {
-                try {
-                    pricing = calculatePrice(
-                        {
-                            ruleType: selectedRule.ruleType,
-                            config: selectedRule.config,
-                            name: selectedRule.name,
-                        },
-                        v.durationSeconds,
-                    )
-                } catch (err) {
-                    console.warn('[QuickCreate] pricing calc error:', err)
+                const type: 'Short form' | 'Long form' = toggles.classifyDuration
+                    ? classifyVideoType(v.durationSeconds)
+                    : 'Short form'
+
+                let pricing: PricingResult = {
+                    priceUSD: 0,
+                    wageVND: 0,
+                    ruleApplied: 'none',
                 }
-            }
+                if (toggles.applyPricing && selectedRule) {
+                    try {
+                        pricing = calculatePrice(
+                            {
+                                ruleType: selectedRule.ruleType,
+                                config: selectedRule.config,
+                                name: selectedRule.name,
+                            },
+                            v.durationSeconds,
+                        )
+                    } catch (err) {
+                        console.warn('[QuickCreate] pricing calc error:', err)
+                    }
+                }
 
-            const baseTitle = toggles.autoName ? v.name : v.fullName
-            const title = titlePrefix.trim()
-                ? `${titlePrefix.trim()} ${baseTitle}`
-                : baseTitle
+                const baseTitle = toggles.autoName ? v.name : v.fullName
+                const title = titlePrefix.trim()
+                    ? `${titlePrefix.trim()} ${baseTitle}`
+                    : baseTitle
 
-            return {
-                rowId: v.fileId,
-                fullName: v.fullName,
-                title,
-                durationSeconds: v.durationSeconds,
-                type,
-                priceUSD: pricing.priceUSD,
-                wageVND: pricing.wageVND,
-                previewUrl: v.previewUrl,
-                selected: true,
-            }
+                return {
+                    rowId: v.fileId,
+                    fullName: v.fullName,
+                    title,
+                    durationSeconds: v.durationSeconds,
+                    type,
+                    priceUSD: pricing.priceUSD,
+                    wageVND: pricing.wageVND,
+                    previewUrl: v.previewUrl,
+                    // Preserve user's checkbox state — default to true ONLY for
+                    // newly-discovered videos (no existing entry).
+                    selected: existing ? existing.selected : true,
+                }
+            })
         })
-        setPreviewRows(rows)
     }, [scannedVideos, toggles, selectedRule, titlePrefix])
 
     /* ────────────────────────────────────────────────────────────────

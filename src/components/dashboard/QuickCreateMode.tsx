@@ -424,14 +424,9 @@ export default function QuickCreateMode({
                 },
             }
             onApplyToForm(payload)
-            // Phase 1 N≥2 caveat: row-level pricing/type lost when collapsing into common form fields.
-            // Phase 2 (Batch Table) will preserve per-row data.
-            if (selectedRows.length >= 2) {
-                toast.success(
-                    `Áp dụng ${selectedRows.length} task vào form. Phase 1: tất cả dùng config của video đầu — Batch Table review chi tiết ở update tiếp theo.`,
-                    { duration: 6000 },
-                )
-            } else {
+            // Phase 2: parent (AddTaskModal) auto-switches to Batch Table mode khi
+            // N≥2; single form prefill khi N=1. Mỗi case có toast riêng phía parent.
+            if (selectedRows.length === 1) {
                 toast.success('Đã áp dụng vào form. Review + bấm "Add task" để tạo.')
             }
             return

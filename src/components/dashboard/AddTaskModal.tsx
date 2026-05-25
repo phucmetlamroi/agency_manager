@@ -19,6 +19,7 @@ import dynamic from "next/dynamic"
 import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft"
 import QuickCreateMode from "./QuickCreateMode"
 import VeloxConflictDialog, { type ConflictStrategy } from "./VeloxConflictDialog"
+import BatchTaskTable, { type BatchRow, type RowType } from "./BatchTaskTable"
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput"
 import {
     mapVeloxPayloadToFormData,
@@ -28,6 +29,8 @@ import {
     type VeloxApplyPayload,
     type VeloxFormPrefill,
 } from "@/lib/velox-helpers"
+import { createTasksFromBatch, type BatchTaskRow } from "@/actions/velox-batch-actions"
+import { useRouter } from "next/navigation"
 
 // TiptapEditor uses browser-only APIs — load on client only
 const TiptapEditor = dynamic(() => import("@/components/tiptap/TiptapEditor"), { ssr: false })
@@ -410,6 +413,13 @@ export default function AddTaskModal({
         conflicts: Set<keyof VeloxFormPrefill>
     } | null>(null)
 
+    // [Velox v1.0 Phase 2] Modal mode — 'single' (5-step wizard) vs 'batch'
+    // (BatchTaskTable). N≥2 from Velox switches to 'batch'.
+    const [mode, setMode] = useState<'single' | 'batch'>('single')
+    const [batchRows, setBatchRows] = useState<BatchRow[]>([])
+    const [exitBatchConfirmOpen, setExitBatchConfirmOpen] = useState(false)
+    const router = useRouter()
+
     // [Sprint Z+1] Auto-save draft tới localStorage (Google Docs–style).
     // Reset trên mỗi keystroke; idle 3 phút → expire.
     // Key per-workspace để tránh cross-contamination giữa các workspace.
@@ -516,6 +526,49 @@ export default function AddTaskModal({
     }
 
     const handleApplyVelox = (payload: VeloxApplyPayload) => {
+        // [Velox v1.0 Phase 2] N≥2 → switch to Batch Table mode (spec 5.1).
+        // Per-row data preserved, user can edit inline + bulk-apply common fields.
+        const selectedRows = payload.rows.filter((r) => r.selected)
+        if (selectedRows.length >= 2) {
+            const newBatch: BatchRow[] = selectedRows.map((r) => {
+                const veloxFilled = new Set<keyof BatchRow>()
+                veloxFilled.add('title')
+                if (payload.toggles.autoName || r.type) veloxFilled.add('type')
+                if (payload.toggles.applyPricing) {
+                    veloxFilled.add('jobPriceUSD')
+                    veloxFilled.add('wageVND')
+                }
+                if (payload.toggles.linkFootage && r.previewUrl) veloxFilled.add('rawFootage')
+                if (payload.common.clientId != null) veloxFilled.add('clientId')
+                if (payload.common.assigneeId) veloxFilled.add('assigneeId')
+                if (payload.toggles.uniformDeadline && payload.common.deadline) veloxFilled.add('deadline')
+                if (payload.toggles.inheritNotes && payload.common.inheritedNote) veloxFilled.add('notes')
+
+                return {
+                    rowId: r.rowId,
+                    title: r.title,
+                    type: r.type as RowType,
+                    rawFootage: payload.toggles.linkFootage ? r.previewUrl ?? '' : '',
+                    notes: payload.toggles.inheritNotes ? payload.common.inheritedNote ?? '' : '',
+                    assigneeId: payload.common.assigneeId ?? '',
+                    deadline:
+                        payload.toggles.uniformDeadline && payload.common.deadline
+                            ? payload.common.deadline
+                            : '',
+                    jobPriceUSD: payload.toggles.applyPricing ? r.priceUSD : 0,
+                    wageVND: payload.toggles.applyPricing ? r.wageVND : 0,
+                    clientId: payload.common.clientId != null ? String(payload.common.clientId) : '',
+                    veloxFilled,
+                }
+            })
+            setBatchRows(newBatch)
+            setMode('batch')
+            setQuickMode(false) // close Velox modal — back to wizard host
+            toast.success(`Đã áp dụng ${selectedRows.length} task vào Batch Table — chỉnh inline + bấm "Tạo tất cả"`)
+            return
+        }
+
+        // N=1 → single-mode prefill (Phase 1 behavior)
         const { prefill, filledFields } = mapVeloxPayloadToFormData(payload)
 
         // Spec 7.4 exception: when kế thừa note ON + form notes already has content
@@ -614,7 +667,63 @@ export default function AddTaskModal({
         setForm({ ...INITIAL_FORM })
         setStep(0)
         setVeloxFilledFields(new Set())
+        setMode('single')
+        setBatchRows([])
         onClose()
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+       [Velox v1.0 Phase 2] Batch mode handlers
+       ────────────────────────────────────────────────────────────── */
+
+    /** Confirm + leave batch mode → return to single wizard with empty form. */
+    const confirmExitBatch = () => {
+        setMode('single')
+        setBatchRows([])
+        setVeloxFilledFields(new Set())
+        setExitBatchConfirmOpen(false)
+    }
+
+    /** Submit batch → call createTasksFromBatch action. */
+    const handleBatchSubmit = async (skipInvalid: boolean) => {
+        setSubmitting(true)
+        try {
+            const payload: BatchTaskRow[] = batchRows.map((r) => ({
+                title: r.title,
+                type: r.type,
+                jobPriceUSD: r.jobPriceUSD,
+                wageVND: r.wageVND,
+                clientId: r.clientId ? Number(r.clientId) || null : null,
+                assigneeId: r.assigneeId || null,
+                deadline: r.deadline || null,
+                rawFootage: r.rawFootage || null,
+                notes: r.notes || null,
+            }))
+            const res = await createTasksFromBatch(
+                { rows: payload, exchangeRate, skipInvalid },
+                workspaceId,
+            )
+            if ('error' in res) {
+                toast.error(res.error)
+                return
+            }
+            toast.success(
+                res.skipped.length > 0
+                    ? `Đã tạo ${res.count} task. Bỏ qua ${res.skipped.length} row lỗi.`
+                    : `Đã tạo ${res.count} task!`,
+            )
+            // Treat batch submit as "submitted" → show success state, then reset
+            setSubmitted(true)
+            clearDraft()
+            setBatchRows([])
+            setMode('single')
+            setVeloxFilledFields(new Set())
+            router.refresh()
+        } catch (err: any) {
+            toast.error(err?.message || 'Lỗi khi tạo task hàng loạt.')
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     /* ---- step renderers ---- */
@@ -1008,8 +1117,15 @@ export default function AddTaskModal({
                     }}
                 >
                     <motion.div
-                        className="relative w-full max-w-[680px] max-h-[88vh] flex flex-col rounded-3xl border border-[rgba(139,92,246,0.15)] shadow-[0_32px_80px_rgba(0,0,0,0.60)] overflow-hidden"
-                        style={{ background: "rgba(10,10,10,0.95)", backdropFilter: "blur(24px)" }}
+                        className="relative w-full max-h-[88vh] flex flex-col rounded-3xl border border-[rgba(139,92,246,0.15)] shadow-[0_32px_80px_rgba(0,0,0,0.60)] overflow-hidden"
+                        style={{
+                            background: "rgba(10,10,10,0.95)",
+                            backdropFilter: "blur(24px)",
+                            // [Velox v1.0 Phase 2 spec 5.1] Animate width when mode switches:
+                            // single (680px wizard) ↔ batch (1200px table for 9 cols).
+                            maxWidth: mode === 'batch' ? 1200 : 680,
+                            transition: 'max-width 300ms ease-out',
+                        }}
                         initial={{ opacity: 0, y: 32, scale: 0.97 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 24, scale: 0.97 }}
@@ -1032,6 +1148,11 @@ export default function AddTaskModal({
                                                 <Rocket size={14} className="inline mr-1.5 text-violet-300" />
                                                 Tạo Task Nhanh
                                             </>
+                                        ) : mode === 'batch' ? (
+                                            <>
+                                                <Rocket size={14} className="inline mr-1.5 text-violet-300" />
+                                                Velox Batch — {batchRows.length} task
+                                            </>
                                         ) : (
                                             <>Step {step + 1}. {stepTitle}:</>
                                         )}
@@ -1039,7 +1160,9 @@ export default function AddTaskModal({
                                     <p className="text-xs text-[#A1A1AA] mt-0.5">
                                         {quickMode
                                             ? 'Quick Create — dán link folder, tạo batch trong 1 click'
-                                            : stepSubtitle}
+                                            : mode === 'batch'
+                                              ? 'Review + chỉnh sửa inline trước khi tạo tất cả'
+                                              : stepSubtitle}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1089,8 +1212,10 @@ export default function AddTaskModal({
                             </div>
                         )}
 
-                        {/* -------- Step Indicator -------- */}
-                        {!submitted && !quickMode && <StepIndicator current={step} total={STEPS.length} onStepClick={setStep} />}
+                        {/* -------- Step Indicator (single mode only) -------- */}
+                        {!submitted && !quickMode && mode === 'single' && (
+                            <StepIndicator current={step} total={STEPS.length} onStepClick={setStep} />
+                        )}
 
                         {/* -------- Content -------- */}
                         {quickMode && !submitted ? (
@@ -1107,6 +1232,17 @@ export default function AddTaskModal({
                                 // [Velox v1.0] Preferred: Velox returns payload → AddTaskModal
                                 // applies it to form. No self-create.
                                 onApplyToForm={handleApplyVelox}
+                            />
+                        ) : mode === 'batch' && !submitted ? (
+                            <BatchTaskTable
+                                rows={batchRows}
+                                onRowsChange={setBatchRows}
+                                onExit={() => setExitBatchConfirmOpen(true)}
+                                onSubmit={handleBatchSubmit}
+                                submitting={submitting}
+                                clients={clients}
+                                users={users}
+                                exchangeRate={exchangeRate}
                             />
                         ) : (
                         <div className="flex-1 overflow-y-auto px-6 pb-2 custom-scrollbar">
@@ -1129,8 +1265,8 @@ export default function AddTaskModal({
                         </div>
                         )}
 
-                        {/* -------- Footer (hidden in quickMode — submit lives inside QuickCreateMode) -------- */}
-                        {!submitted && !quickMode && (
+                        {/* -------- Footer (hidden in quickMode + batch mode — submit lives inside QuickCreateMode/BatchTaskTable) -------- */}
+                        {!submitted && !quickMode && mode === 'single' && (
                             <div className="flex items-center justify-between px-6 py-4 border-t border-[rgba(139,92,246,0.08)]">
                                 <button
                                     type="button"
@@ -1179,6 +1315,52 @@ export default function AddTaskModal({
                 onResolve={handleConflictResolve}
                 onCancel={handleConflictCancel}
             />
+
+            {/* [Velox v1.0 Phase 2 spec 5.4] Exit Batch confirmation — warns user
+                that switching back to single mode discards all batch data. */}
+            <AnimatePresence>
+                {exitBatchConfirmOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                        onClick={() => setExitBatchConfirmOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 16, scale: 0.97 }}
+                            transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-sm rounded-3xl bg-zinc-950/95 backdrop-blur-xl border border-[rgba(245,158,11,0.20)] shadow-[0_24px_64px_rgba(0,0,0,0.6)] overflow-hidden p-6"
+                        >
+                            <h3 className="text-[15px] font-extrabold text-white mb-2">Thoát Batch?</h3>
+                            <p className="text-[12px] text-zinc-400 mb-5 leading-relaxed">
+                                Toàn bộ dữ liệu Velox + chỉnh sửa inline trong batch sẽ mất.
+                                Bạn có chắc muốn quay về form single?
+                            </p>
+                            <div className="flex items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setExitBatchConfirmOpen(false)}
+                                    className="px-4 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.10] text-[12px] text-zinc-300 font-semibold transition-colors"
+                                >
+                                    Giữ batch
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={confirmExitBatch}
+                                    className="px-4 py-2 rounded-full bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-[12px] text-red-200 font-bold transition-colors"
+                                >
+                                    Thoát + xóa
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </AnimatePresence>
     )
 }

@@ -1,9 +1,10 @@
 'use client'
 
 /**
- * [Velox v1.0 — refactored Phase 1]
+ * [Velox v1.0 — Phase 3 cleanup]
  *
  * Single-screen UI for prefilling AddTaskModal from cloud folder scan.
+ * Velox is a STRICT prefill helper — never creates tasks itself.
  *
  * Flow:
  *   1. Paste Dropbox/Google Drive folder URL → click "Scan"
@@ -14,13 +15,12 @@
  *   5. Preview table shows per-video: title, duration, type, price USD, price VND
  *      — user can uncheck rows or edit inline
  *   6. Click "Áp dụng vào form" → payload passed back to AddTaskModal via
- *      `onApplyToForm` callback. AddTaskModal fills its TaskFormData (single
- *      task path uses createTask; N≥2 routes to createBatchTasks automatically
- *      via DashboardActionWrapper's handleSubmit).
+ *      `onApplyToForm` callback (required prop). AddTaskModal then routes:
+ *      - N=1 → single-form prefill (Phase 1)
+ *      - N≥2 → Batch Table mode (Phase 2)
  *
- * Legacy fallback: if `onApplyToForm` is NOT provided, old self-create path
- * (createQuickTasks) is preserved for backward-compat. This will be removed
- * in Phase 3 cleanup.
+ * Phase 3 removed: legacy `createQuickTasks` self-create fallback path +
+ * optional `onSuccess` prop.
  */
 
 import { useState, useEffect, useMemo } from 'react'
@@ -36,13 +36,7 @@ import {
     type PricingResult,
 } from '@/lib/pricing-engine'
 import type { ScannedVideo } from '@/lib/cloud-scanner'
-import {
-    createQuickTasks,
-    suggestRoundRobinAssignee,
-    type QuickCreateBatchInput,
-    type QuickTaskInput,
-} from '@/actions/quick-create-actions'
-import { getLastClientNote } from '@/actions/velox-helpers-actions'
+import { getLastClientNote, suggestRoundRobinAssignee } from '@/actions/velox-helpers-actions'
 import { AutocompleteInput } from '@/components/ui/AutocompleteInput'
 import type { VeloxApplyPayload, VeloxRow } from '@/lib/velox-helpers'
 
@@ -79,12 +73,9 @@ interface Props {
     pricingRules: PricingRule[]
     /** Current exchange rate snapshot — passed from parent */
     exchangeRate?: number
-    /** [Velox v1.0] Preferred callback: Velox returns payload to parent
-     *  (AddTaskModal) for form prefill — no self-create. */
-    onApplyToForm?: (payload: VeloxApplyPayload) => void
-    /** [Legacy fallback — Phase 3 cleanup target] Called after successful
-     *  self-create batch. Only invoked when `onApplyToForm` is NOT provided. */
-    onSuccess?: () => void
+    /** [Velox v1.0] Required callback: Velox returns payload to parent
+     *  (AddTaskModal) for form prefill. */
+    onApplyToForm: (payload: VeloxApplyPayload) => void
 }
 
 interface PreviewRow {
@@ -139,11 +130,9 @@ export default function QuickCreateMode({
     pricingRules,
     exchangeRate = 26300,
     onApplyToForm,
-    onSuccess,
 }: Props) {
     const [url, setUrl] = useState('')
     const [scanning, setScanning] = useState(false)
-    const [submitting, setSubmitting] = useState(false)
     const [scannedVideos, setScannedVideos] = useState<ScannedVideo[]>([])
     const [previewRows, setPreviewRows] = useState<PreviewRow[]>([])
 
@@ -392,78 +381,40 @@ export default function QuickCreateMode({
             return
         }
 
-        // [Velox v1.0] Preferred path: hand off payload to parent (AddTaskModal)
-        // for form prefill. AddTaskModal's submit flow then creates tasks via the
-        // single entry point (createTask for N=1, createBatchTasks for N≥2 via
-        // DashboardActionWrapper.handleSubmit).
-        if (onApplyToForm) {
-            const payload: VeloxApplyPayload = {
-                rows: selectedRows.map<VeloxRow>((r) => ({
-                    rowId: r.rowId,
-                    title: r.title,
-                    type: r.type as VeloxRow['type'],
-                    priceUSD: r.priceUSD,
-                    wageVND: r.wageVND,
-                    durationSeconds: r.durationSeconds,
-                    previewUrl: r.previewUrl,
-                    selected: r.selected,
-                })),
-                common: {
-                    clientId,
-                    assigneeId,
-                    deadline: toggles.uniformDeadline && deadline ? deadline : null,
-                    inheritedNote: toggles.inheritNotes ? inheritedNotes?.note ?? null : null,
-                },
-                toggles: {
-                    linkFootage: toggles.linkFootage,
-                    autoName: toggles.autoName,
-                    applyPricing: toggles.applyPricing,
-                    inheritNotes: toggles.inheritNotes,
-                    autoAssign: toggles.autoAssign,
-                    uniformDeadline: toggles.uniformDeadline,
-                },
-            }
-            onApplyToForm(payload)
-            // Phase 2: parent (AddTaskModal) auto-switches to Batch Table mode khi
-            // N≥2; single form prefill khi N=1. Mỗi case có toast riêng phía parent.
-            if (selectedRows.length === 1) {
-                toast.success('Đã áp dụng vào form. Review + bấm "Add task" để tạo.')
-            }
-            return
-        }
-
-        // [Legacy fallback — removed in Phase 3] Self-create via createQuickTasks
-        // when no `onApplyToForm` callback (older callers).
-        setSubmitting(true)
-        try {
-            const input: QuickCreateBatchInput = {
-                tasks: selectedRows.map<QuickTaskInput>((r) => ({
-                    title: r.title,
-                    type: r.type,
-                    jobPriceUSD: r.priceUSD,
-                    wageVND: r.wageVND,
-                    resources: toggles.linkFootage ? r.previewUrl : null,
-                    productLink: null,
-                    durationSeconds: r.durationSeconds,
-                })),
+        // [Velox v1.0 — Phase 3] Single entry point: hand off payload to parent
+        // (AddTaskModal). Parent decides:
+        //   - N=1  → single-form prefill (Phase 1)
+        //   - N≥2  → Batch Table mode (Phase 2)
+        // Velox NEVER creates tasks itself.
+        const payload: VeloxApplyPayload = {
+            rows: selectedRows.map<VeloxRow>((r) => ({
+                rowId: r.rowId,
+                title: r.title,
+                type: r.type as VeloxRow['type'],
+                priceUSD: r.priceUSD,
+                wageVND: r.wageVND,
+                durationSeconds: r.durationSeconds,
+                previewUrl: r.previewUrl,
+                selected: r.selected,
+            })),
+            common: {
                 clientId,
                 assigneeId,
                 deadline: toggles.uniformDeadline && deadline ? deadline : null,
-                exchangeRate,
-                notes: toggles.inheritNotes ? inheritedNotes?.note ?? null : null,
-                notes_en: null,
-            }
-            const res = await createQuickTasks(input, workspaceId)
-            if ('error' in res) {
-                toast.error(res.error)
-            } else {
-                toast.success(`Đã tạo ${res.count} task!`)
-                onSuccess?.()
-            }
-        } catch (err: any) {
-            toast.error(err?.message ?? 'Lỗi khi tạo batch.')
-        } finally {
-            setSubmitting(false)
+                inheritedNote: toggles.inheritNotes ? inheritedNotes?.note ?? null : null,
+            },
+            toggles: {
+                linkFootage: toggles.linkFootage,
+                autoName: toggles.autoName,
+                applyPricing: toggles.applyPricing,
+                inheritNotes: toggles.inheritNotes,
+                autoAssign: toggles.autoAssign,
+                uniformDeadline: toggles.uniformDeadline,
+            },
+        }
+        onApplyToForm(payload)
+        if (selectedRows.length === 1) {
+            toast.success('Đã áp dụng vào form. Review + bấm "Add task" để tạo.')
         }
     }
 
@@ -799,7 +750,6 @@ export default function QuickCreateMode({
                             // OR all 8 automation toggles OFF (no value to apply).
                             const allTogglesOff = !Object.values(toggles).some(Boolean)
                             const disabled =
-                                submitting ||
                                 selectedCount === 0 ||
                                 !clientId ||
                                 (scannedVideos.length === 0 && allTogglesOff)
@@ -811,9 +761,6 @@ export default function QuickCreateMode({
                                       : selectedCount === 0
                                         ? 'Chọn ít nhất 1 video'
                                         : ''
-                            const label = onApplyToForm
-                                ? 'Áp dụng vào form'
-                                : `Tạo ${selectedCount} task`
                             return (
                                 <button
                                     onClick={handleSubmit}
@@ -821,12 +768,8 @@ export default function QuickCreateMode({
                                     title={disableTitle}
                                     className="flex items-center gap-2 px-6 py-3 rounded-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors"
                                 >
-                                    {submitting ? (
-                                        <Loader2 size={14} className="animate-spin" />
-                                    ) : (
-                                        <Sparkles size={14} />
-                                    )}
-                                    {label}
+                                    <Sparkles size={14} />
+                                    Áp dụng vào form
                                 </button>
                             )
                         })()}

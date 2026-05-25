@@ -11,11 +11,11 @@
  *   3. Sort: updatedAt DESC
  *   4. Take first record + return preview metadata (source task title, sub-client name, date)
  *
- * Differs from existing `getPreviousWorkspaceNotes` (quick-create-actions.ts):
- *   - Walks Client.subsidiaries tree (not just exact clientId match)
- *   - Filters by status='Hoàn tất' (vs. any status)
+ * Behavior:
+ *   - Walks Client.subsidiaries tree (recursive, depth-limit 5)
+ *   - Filters by status='Hoàn tất' + non-empty notes_vi
  *   - Returns preview metadata for "Note kế thừa từ task '[Title]' (Client con: Y, ngày Z)"
- *   - Scoped to current workspace + any sibling workspaces in same profile (not just "previous workspace")
+ *   - Scoped to all workspaces in the current profile (any sibling workspace)
  */
 
 import { prisma } from '@/lib/db'
@@ -126,6 +126,66 @@ export async function getLastClientNote(
         }
     } catch (err) {
         console.error('[getLastClientNote]', err)
+        return null
+    }
+}
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  Action — suggestRoundRobinAssignee                                  */
+/* ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * [Velox v1.0 — "Gán editor tự động" toggle]
+ *
+ * Suggest the editor with the lowest current workload (count of non-completed
+ * tasks assigned in this workspace). Used by Velox's auto-assign toggle.
+ *
+ * Round-robin MVP — tie-breaker is the natural sort order of the count list.
+ * Returns null if no MEMBER role users exist or if user lacks ADMIN access.
+ *
+ * Moved from quick-create-actions.ts during Phase 3 cleanup.
+ */
+export async function suggestRoundRobinAssignee(
+    workspaceId: string,
+): Promise<{ userId: string; username: string; nickname: string | null; activeCount: number } | null> {
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
+        // Get all workspace members with role MEMBER (editors)
+        const members = await prisma.workspaceMember.findMany({
+            where: { workspaceId, role: 'MEMBER' },
+            select: {
+                userId: true,
+                user: { select: { id: true, username: true, nickname: true } },
+            },
+        })
+
+        if (members.length === 0) return null
+
+        // Count each member's active (non-completed) task load
+        const counts = await Promise.all(
+            members.map(async (m) => {
+                const count = await prisma.task.count({
+                    where: {
+                        workspaceId,
+                        assigneeId: m.userId,
+                        status: { notIn: ['Hoàn tất', 'Đã hủy'] },
+                    },
+                })
+                return {
+                    userId: m.userId,
+                    username: m.user?.username ?? '',
+                    nickname: m.user?.nickname ?? null,
+                    activeCount: count,
+                }
+            }),
+        )
+
+        // Pick the one with lowest active count (round-robin tie-break = natural order)
+        counts.sort((a, b) => a.activeCount - b.activeCount)
+        return counts[0]
+    } catch (err) {
+        console.error('[suggestRoundRobinAssignee]', err)
         return null
     }
 }

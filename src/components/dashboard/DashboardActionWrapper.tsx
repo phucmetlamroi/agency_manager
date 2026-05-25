@@ -6,6 +6,7 @@ import DashboardActionBar from "./DashboardActionBar"
 import AddTaskModal from "./AddTaskModal"
 import { createTask } from "@/actions/admin-actions"
 import { createBatchTasks } from "@/actions/bulk-task-actions"
+import { createTasksFromBatch, type BatchTaskRow } from "@/actions/velox-batch-actions"
 
 interface DashboardActionWrapperProps {
   workspaceId: string
@@ -48,26 +49,29 @@ export default function DashboardActionWrapper({
   const router = useRouter()
   const [, startTransition] = useTransition()
 
-  const handleSubmit = async (data: {
-    clientId: string
-    taskType: string
-    deadline: string
-    assigneeId: string
-    videoList: string
-    jobPriceUSD: string
-    editorFee: string
-    rawFootage: string
-    collectFile: string
-    bRoll: string
-    references: string
-    submitFolder: string
-    script: string
-    frameUsername: string
-    framePassword: string
-    frameNote: string
-    /** Single rich-text Notes HTML (replaces notesVi/notesEn split per Figma redesign) */
-    notes: string
-  }) => {
+  const handleSubmit = async (
+    data: {
+      clientId: string
+      taskType: string
+      deadline: string
+      assigneeId: string
+      videoList: string
+      jobPriceUSD: string
+      editorFee: string
+      rawFootage: string
+      collectFile: string
+      bRoll: string
+      references: string
+      submitFolder: string
+      script: string
+      frameUsername: string
+      framePassword: string
+      frameNote: string
+      /** Single rich-text Notes HTML (replaces notesVi/notesEn split per Figma redesign) */
+      notes: string
+    },
+    options?: { veloxBatchRaw?: string[] },
+  ) => {
     const client = clients.find((c) => c.id === data.clientId)
     const clientLabel = client?.parent
       ? `${client.parent.name} / ${client.name}`
@@ -105,7 +109,43 @@ export default function DashboardActionWrapper({
       ? `REF:${(data.references || '').trim()} | SCRIPT:${(data.script || '').trim()}`
       : (data.references || '')
 
-    if (titles.length === 1) {
+    // [Velox v1.0 Phase 2 redesign] When Velox applied N≥2 videos with linkFootage
+    // toggle ON, options.veloxBatchRaw carries per-video URLs (1:1 with videoNames).
+    // Route to createTasksFromBatch with per-row resources instead of the shared
+    // createBatchTasks (which would force all tasks to use the same rawFootage).
+    const hasVeloxBatch =
+      options?.veloxBatchRaw &&
+      options.veloxBatchRaw.length === videoNames.length &&
+      videoNames.length >= 2
+
+    if (hasVeloxBatch) {
+      const veloxUrls = options!.veloxBatchRaw!
+      const rows: BatchTaskRow[] = titles.map((title, idx) => {
+        // Pack THIS row's rawFootage with shared bRoll + submitFolder values
+        const rowRaw = (veloxUrls[idx] || '').trim()
+        const rowResources =
+          rowRaw || data.bRoll || data.submitFolder
+            ? `RAW: ${rowRaw} | BROLL: ${(data.bRoll || '').trim()} | SUBMISSION: ${(data.submitFolder || '').trim()}`
+            : ''
+        return {
+          title,
+          type: data.taskType || 'Short form',
+          jobPriceUSD: parseFloat(data.jobPriceUSD) || 0,
+          wageVND: parseFloat(data.editorFee) || 0,
+          clientId: data.clientId ? parseInt(data.clientId) : null,
+          assigneeId: data.assigneeId || null,
+          deadline: data.deadline || null,
+          // rawFootage in createTasksFromBatch maps to `resources` field
+          rawFootage: rowResources || null,
+          notes: data.notes || null,
+        }
+      })
+      const result = await createTasksFromBatch(
+        { rows, exchangeRate: 25000 },
+        workspaceId,
+      )
+      if ('error' in result) throw new Error(result.error)
+    } else if (titles.length === 1) {
       // Single task — use the original createTask path
       const fd = new FormData()
       fd.set("title", titles[0])
@@ -131,7 +171,7 @@ export default function DashboardActionWrapper({
       const result = await createTask(fd, workspaceId)
       if (result?.error) throw new Error(result.error)
     } else {
-      // Multiple videos → batch create
+      // Multiple videos (non-Velox batch) → shared-resources batch create
       const result = await createBatchTasks(
         {
           titles,

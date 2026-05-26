@@ -24,6 +24,7 @@ import type {
     MainItemPair,
     MainItemFolderBundle,
     BriefingDoc,
+    ScriptDoc,
     PrimaryPattern,
     BrollV3,
     BrollFolder,
@@ -39,6 +40,8 @@ import {
     isImageFile,
     isDocumentFile,
     getBriefingDocType,
+    getScriptDocType,
+    isScriptDoc,
     detectBrollVariant,
     scoreSubfolder,
     classifySubfolderFromScores,
@@ -228,6 +231,27 @@ function buildSubfolderProfile(raw: RawScanSubfolder): SubfolderProfile {
  *   - briefingDocs harvested from outer wrapper (only when isWrapper)
  *   - rootSubfolderProfiles classified
  */
+/**
+ * Split document files into briefs vs scripts. Script keyword wins (checked
+ * first via isScriptDoc), remaining docs become briefs.
+ */
+function splitDocsIntoBriefsAndScripts(files: FileEntry[]): {
+    briefs: BriefingDoc[]
+    scripts: ScriptDoc[]
+} {
+    const briefs: BriefingDoc[] = []
+    const scripts: ScriptDoc[] = []
+    for (const f of files) {
+        if (!f.isDocument) continue
+        if (isScriptDoc(f.fullName)) {
+            scripts.push({ type: getScriptDocType(f.fullName), file: f })
+        } else {
+            briefs.push({ type: getBriefingDocType(f.fullName), file: f })
+        }
+    }
+    return { briefs, scripts }
+}
+
 function runPhase0to2(tree: RawScanTree): {
     effectiveTree: RawScanTree
     rootSubfolderProfiles: SubfolderProfile[]
@@ -237,6 +261,7 @@ function runPhase0to2(tree: RawScanTree): {
     wrapperBreakdown: WrapperConfidenceBreakdown
     wrapperName?: string
     briefingDocs: BriefingDoc[]
+    scriptDocs: ScriptDoc[]
     warnings: string[]
 } {
     const warnings: string[] = []
@@ -246,19 +271,17 @@ function runPhase0to2(tree: RawScanTree): {
     let effectiveTree = tree
     let wrapperName: string | undefined
     let briefingDocs: BriefingDoc[] = []
+    let scriptDocs: ScriptDoc[] = []
 
     if (breakdown.total >= 4) {
         // Confirmed (≥6) or soft (4-5) wrapper
         isWrapper = true
         wrapperName = tree.rootPath.split('/').filter(Boolean).pop()
 
-        // Harvest briefing docs at outer level
-        briefingDocs = tree.rootFiles
-            .filter((f) => f.isDocument)
-            .map<BriefingDoc>((f) => ({
-                type: getBriefingDocType(f.fullName),
-                file: f,
-            }))
+        // Harvest brief + script docs at outer level (split by keyword)
+        const split = splitDocsIntoBriefsAndScripts(tree.rootFiles)
+        briefingDocs = split.briefs
+        scriptDocs = split.scripts
 
         // Drill into the (single) subfolder. Per spec: max depth 1 — no recurse-of-wrapper.
         if (tree.rootSubfolders.length === 1) {
@@ -286,6 +309,12 @@ function runPhase0to2(tree: RawScanTree): {
         }
     }
 
+    // ALSO scan effective root level for brief/script docs (whether wrapper
+    // drilled or not). Script + brief can be at any level.
+    const innerSplit = splitDocsIntoBriefsAndScripts(effectiveTree.rootFiles)
+    briefingDocs = [...briefingDocs, ...innerSplit.briefs]
+    scriptDocs = [...scriptDocs, ...innerSplit.scripts]
+
     // Build profile tree (Phase 1 + Phase 2)
     const rootSubfolderProfiles = effectiveTree.rootSubfolders.map(buildSubfolderProfile)
 
@@ -298,6 +327,7 @@ function runPhase0to2(tree: RawScanTree): {
         wrapperBreakdown: breakdown,
         wrapperName,
         briefingDocs,
+        scriptDocs,
         warnings,
     }
 }
@@ -1005,6 +1035,7 @@ export function classifyScan(tree: RawScanTree): ScanResultV3 {
         brollMatchPolicy,
         sharedAssets,
         briefingDocs: phase02.briefingDocs,
+        scriptDocs: phase02.scriptDocs,
         warnings,
         diagnostics,
     }

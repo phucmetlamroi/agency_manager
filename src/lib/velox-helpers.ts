@@ -25,6 +25,9 @@ export interface VeloxFormPrefill {
     jobPriceUSD?: string
     editorFee?: string
     rawFootage?: string
+    /** Script URL (form.script in Step 4 Assets) — set when Velox detects
+     *  a .txt / .docx / .pdf file với name containing script/transcript keyword. */
+    script?: string
     notes?: string
 }
 
@@ -190,6 +193,7 @@ const FIELD_META: Record<keyof VeloxFormPrefill, string> = {
     jobPriceUSD: 'Áp dụng bảng giá',
     editorFee: 'Áp dụng bảng giá',
     rawFootage: 'Gắn link footage gốc',
+    script: 'Script / transcript từ Velox',
     notes: 'Kế thừa ghi chú',
 }
 
@@ -443,6 +447,15 @@ export interface BriefingDoc {
     file: FileEntry
 }
 
+/** Script / transcript doc — split from BriefingDoc when filename contains
+ *  script/transcript/caption keyword. URL goes into form.script (Scription field). */
+export type ScriptDocType = 'pdf' | 'docx' | 'doc' | 'rtf' | 'txt' | 'other'
+
+export interface ScriptDoc {
+    type: ScriptDocType
+    file: FileEntry
+}
+
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Top-level scan result + diagnostics                                 */
 /* ──────────────────────────────────────────────────────────────────── */
@@ -520,6 +533,8 @@ export interface VeloxApplyPayloadV3 {
     sharedAssets: SharedAsset[]
     /** Briefing docs detected */
     briefingDocs: BriefingDoc[]
+    /** Script / transcript docs detected — URL flows into form.script */
+    scriptDocs: ScriptDoc[]
     /** D4 — auto-append brief URL to notes_vi? */
     appendBriefToNotes: boolean
     /** D1 — taskName mode user picked (A/B/C) */
@@ -790,6 +805,13 @@ export function mapPayloadV3ToFormData(
         filledFields.add('notes')
     }
 
+    // Script (Scription field) — first scriptDoc URL. If multiple, join với '; '
+    // để user thấy tất cả URLs trong field. Form's script field accept any string.
+    if (payload.scriptDocs && payload.scriptDocs.length > 0) {
+        prefill.script = payload.scriptDocs.map((s) => s.file.previewUrl).join('; ')
+        filledFields.add('script')
+    }
+
     return { prefill, filledFields }
 }
 
@@ -820,6 +842,8 @@ export interface ScanResultV3 {
     sharedAssets: SharedAsset[]
     /** D4 briefing docs (PDF / DOCX / ...) — auto-append URL to notes if toggle ON */
     briefingDocs: BriefingDoc[]
+    /** Script / transcript docs — URL prefilled vào form.script (Scription field) */
+    scriptDocs: ScriptDoc[]
 
     /** Non-fatal warnings for UI (soft wrapper, ambiguous classification, ...) */
     warnings: string[]

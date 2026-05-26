@@ -17,6 +17,8 @@ import {
     scoreSubfolder,
     classifySubfolderFromScores,
     computeCameraDumpRatio,
+    isScriptDoc,
+    RX_SCRIPT_KEYWORD,
 } from '../src/lib/scan-classifier-helpers'
 import {
     encodeResourcesV3,
@@ -503,6 +505,69 @@ group('encodeResourcesV3 (D3)', () => {
             briefingDocs: [{ type: 'pdf', file: brief }],
         })
         expectTruthy(encoded.includes('BRIEF:'), 'has BRIEF')
+    })
+})
+
+group('Script detection — split docs into briefs vs scripts', () => {
+    test('isScriptDoc("script.txt") → true', () => {
+        expectTruthy(isScriptDoc('script.txt'), '.txt with "script" name')
+    })
+
+    test('isScriptDoc("Transcript v2.docx") → true', () => {
+        expectTruthy(isScriptDoc('Transcript v2.docx'), 'docx with "transcript"')
+    })
+
+    test('isScriptDoc("Final Caption.pdf") → true', () => {
+        expectTruthy(isScriptDoc('Final Caption.pdf'), 'pdf with "caption"')
+    })
+
+    test('isScriptDoc("subtitles.srt") → false (not document type)', () => {
+        if (isScriptDoc('subtitles.srt')) {
+            throw new Error('Expected false — .srt is not a document type')
+        }
+    })
+
+    test('isScriptDoc("brief.pdf") → false (brief keyword, not script)', () => {
+        if (isScriptDoc('brief.pdf')) {
+            throw new Error('Expected false — brief.pdf is brief, not script')
+        }
+    })
+
+    test('isScriptDoc("Dialog v3.docx") → true', () => {
+        expectTruthy(isScriptDoc('Dialog v3.docx'), 'dialog keyword')
+    })
+
+    test('classifyScan splits docs at wrapper level', () => {
+        const t = tree(
+            [
+                file({ name: 'Reno Ads - May 2026.pdf' }),
+                file({ name: 'Final Script v2.txt' }),
+                file({ name: 'Transcript.docx' }),
+            ],
+            [
+                folder('Inner', 1, [file({ name: 'video1.mp4', duration: 30 })]),
+            ],
+        )
+        t.rootPath = '/12. Align West'
+        const result = classifyScan(t)
+        expect(result.briefingDocs.length, 1, 'briefingDocs = 1 (Reno Ads PDF)')
+        expect(result.scriptDocs.length, 2, 'scriptDocs = 2 (Script + Transcript)')
+    })
+
+    test('Script keyword wins over brief — single file matched as script', () => {
+        const t = tree(
+            [
+                file({ name: 'brief script.docx' }),  // both keywords present
+            ],
+            [
+                folder('Inner', 1, [file({ name: 'video.mp4', duration: 30 })]),
+            ],
+        )
+        t.rootPath = '/Wrapper'
+        const result = classifyScan(t)
+        // Script regex checked first → wins
+        expectTruthy(result.scriptDocs.length === 1, 'classified as script (wins over brief)')
+        expect(result.briefingDocs.length, 0, 'briefing list empty')
     })
 })
 

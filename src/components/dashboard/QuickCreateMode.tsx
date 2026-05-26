@@ -484,6 +484,7 @@ export default function QuickCreateMode({
                 broll: scanResult.broll,
                 sharedAssets: scanResult.sharedAssets,
                 briefingDocs: scanResult.briefingDocs,
+                scriptDocs: scanResult.scriptDocs ?? [],
                 appendBriefToNotes: toggles.appendBriefToNotes,
                 taskNameMode,
                 common: {
@@ -778,6 +779,7 @@ export default function QuickCreateMode({
                     <VeloxPatternBanner result={scanResult} />
                     <VeloxBriefBanner
                         briefingDocs={scanResult.briefingDocs}
+                        scriptDocs={scanResult.scriptDocs ?? []}
                         appendToNotes={toggles.appendBriefToNotes}
                         onToggleAppend={(v) => setToggles({ ...toggles, appendBriefToNotes: v })}
                     />

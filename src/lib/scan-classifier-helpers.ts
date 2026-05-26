@@ -14,6 +14,7 @@ import type {
     BrollVariant,
     SharedAssetType,
     BriefingDocType,
+    ScriptDocType,
     TaskNameMode,
 } from './velox-helpers'
 
@@ -83,6 +84,16 @@ export const RX_SHARED_ASSET =
 /** Briefing keyword (for non-video files at root) */
 export const RX_BRIEFING_KEYWORD =
     /brief|spec|brand|guideline|requirements|deck|kit|sow|scope|outline/i
+
+/**
+ * Script / transcript keyword (for non-video text files).
+ *
+ * User confirm: ".txt files với tên là script, transcript, ... là file
+ * script của khách → link đi vào Scription (form.script)". Apply liberally
+ * across document types (.txt/.doc/.docx/.pdf/.rtf) khi tên match.
+ */
+export const RX_SCRIPT_KEYWORD =
+    /\b(scripts?|transcripts?|captions?|subs?|subtitles?|dialog(ue)?s?)\b/i
 
 /** Wrapper folder name keywords (D5 signal 3) */
 export const RX_WRAPPER_FOLDER_HINT =
@@ -154,6 +165,29 @@ export function getBriefingDocType(filename: string): BriefingDocType {
         case '.txt': return 'txt'
         default: return 'other'
     }
+}
+
+/** Categorize a document file into ScriptDocType — same mapping as briefing
+ *  (script & brief share document type set). */
+export function getScriptDocType(filename: string): ScriptDocType {
+    const ext = getExtension(filename)
+    switch (ext) {
+        case '.txt': return 'txt'
+        case '.docx': return 'docx'
+        case '.doc': return 'doc'
+        case '.pdf': return 'pdf'
+        case '.rtf': return 'rtf'
+        default: return 'other'
+    }
+}
+
+/**
+ * Is this filename a script doc? Document file (PDF/DOC/DOCX/TXT/RTF) AND
+ * filename contains script keyword. Script wins over briefing classification
+ * (caller checks isScriptDoc first, falls back to BriefingDoc).
+ */
+export function isScriptDoc(filename: string): boolean {
+    return isDocumentFile(filename) && RX_SCRIPT_KEYWORD.test(filename)
 }
 
 /* ════════════════════════════════════════════════════════════════════════ */

@@ -120,6 +120,14 @@ export default function DashboardActionWrapper({
     // path. Used khi user vào Velox với deep scan toggle ON.
     if (options?.veloxV3Payload) {
       const v3 = options.veloxV3Payload
+
+      // Pack references field: REF:formRef | SCRIPT:formScript+veloxScript
+      // Velox scriptDocs URLs đã được merged vào data.script via mapPayloadV3ToFormData
+      // tại apply time, nên data.script đã chứa script URL(s). Same pattern như V1.
+      const v3PackedReferences = data.script
+        ? `REF:${(data.references || '').trim()} | SCRIPT:${(data.script || '').trim()}`
+        : (data.references || null)
+
       const rows: BatchTaskRow[] = v3.mainItems.map((m: MainItem) => {
         const resolvedTitle = m.taskNameByMode[v3.taskNameMode] ?? m.taskName
         const customForTask =
@@ -159,6 +167,7 @@ export default function DashboardActionWrapper({
           assigneeId: v3.common.assigneeId ?? data.assigneeId ?? null,
           deadline: v3.common.deadline ?? data.deadline ?? null,
           rawFootage: encodedResources,
+          references: v3PackedReferences,
           notes: notesWithBrief || null,
         }
       })
@@ -202,6 +211,7 @@ export default function DashboardActionWrapper({
           deadline: data.deadline || null,
           // rawFootage in createTasksFromBatch maps to `resources` field
           rawFootage: rowResources || null,
+          references: packedReferences || null,
           notes: data.notes || null,
         }
       })

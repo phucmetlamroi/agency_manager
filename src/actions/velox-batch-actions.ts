@@ -46,6 +46,8 @@ export interface BatchTaskRow {
     deadline: string | null
     /** Original footage link → stored in `resources` */
     rawFootage: string | null
+    /** Packed references string ("REF:url | SCRIPT:url") → stored in `references` */
+    references?: string | null
     /** Per-row notes (notes_vi). null → empty */
     notes: string | null
 }
@@ -164,6 +166,7 @@ export async function createTasksFromBatch(
                         type: row.type,
                         deadline: deadlineDate,
                         resources: row.rawFootage,
+                        references: row.references ?? null,
                         notes_vi: row.notes,
                         notes_en: null,
                         productLink: null,

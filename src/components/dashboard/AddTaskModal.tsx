@@ -457,26 +457,55 @@ export default function AddTaskModal({
     // [Sprint Z+1] Auto-save draft tới localStorage (Google Docs–style).
     // Reset trên mỗi keystroke; idle 3 phút → expire.
     // Key per-workspace để tránh cross-contamination giữa các workspace.
+    //
+    // [Velox v1.1 fix] Draft now also includes veloxBatchRaw (per-video raw
+    // URLs) + veloxFilledFields (green badge tracker for fields auto-filled
+    // by Velox). Set is serialized as string[] for JSON compat. This way,
+    // user close modal sau Velox apply → re-open vẫn thấy:
+    //   - Common form data (đã có sẵn ở v1.0)
+    //   - The "X link đã được trích xuất từ Velox" summary chip ở Step 4
+    //   - Green 🚀 badge trên các field được Velox prefill
     const DRAFT_KEY = `addTask:draft:${workspaceId}`
     const { restored, clearDraft, savedAt } = useAutoSaveDraft<{
         form: TaskFormData
         step: number
+        veloxBatchRaw: string[]
+        veloxFilledFields: string[]
     }>(
         DRAFT_KEY,
-        { form, step },
+        {
+            form,
+            step,
+            veloxBatchRaw,
+            veloxFilledFields: Array.from(veloxFilledFields),
+        },
         (draft) => {
             // Restore từ localStorage khi mở modal
             setForm(draft.form)
             setStep(draft.step)
+            // Velox state restore — guard against older draft shapes (pre-v1.1)
+            // that lack these keys → default to empty.
+            if (Array.isArray(draft.veloxBatchRaw)) {
+                setVeloxBatchRaw(draft.veloxBatchRaw)
+            }
+            if (Array.isArray(draft.veloxFilledFields)) {
+                setVeloxFilledFields(
+                    new Set(draft.veloxFilledFields as (keyof VeloxFormPrefill)[]),
+                )
+            }
         },
         {
             ttlMs: 3 * 60 * 1000, // 3 phút sliding TTL
             debounceMs: 500,
             enabled: open && !submitted, // chỉ save khi modal đang mở + chưa submit
-            shouldSave: ({ form }) => {
-                // Bỏ qua nếu form hoàn toàn trống (tránh lưu draft empty)
+            shouldSave: ({ form, veloxBatchRaw, veloxFilledFields }) => {
+                // Save nếu form có content HOẶC Velox đã apply (kể cả form chưa
+                // hoàn chỉnh, có Velox state là đáng save vì user đã đầu tư công
+                // scan folder).
                 return Boolean(
-                    form.clientId ||
+                    veloxBatchRaw.length > 0 ||
+                        veloxFilledFields.length > 0 ||
+                        form.clientId ||
                         form.assigneeId ||
                         form.taskType ||
                         form.deadline ||

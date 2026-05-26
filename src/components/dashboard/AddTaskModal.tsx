@@ -443,25 +443,22 @@ export default function AddTaskModal({
      */
     const [veloxV3Payload, setVeloxV3Payload] = useState<VeloxApplyPayloadV3 | null>(null)
 
-    // Keep veloxBatchRaw aligned with videoList lines (pad with '' when user
-    // adds lines, truncate when user removes lines).
+    // [Bug fix] Pad veloxBatchRaw with '' khi user thêm dòng vào videoList.
+    // KHÔNG truncate khi user xóa dòng — vì truncate có thể MẤT URLs nếu
+    // form.videoList tạm thời chưa match (vd: sau conflict dialog 'keep'
+    // hoặc khi user undo videoList changes). veloxBatchRaw là source of
+    // truth cho per-video URLs; videoList chỉ ảnh hưởng UI hiển thị.
     useEffect(() => {
         if (veloxBatchRaw.length === 0) return
         const lineCount = form.videoList
             .split('\n')
             .map((s) => s.trim())
             .filter(Boolean).length
-        if (lineCount === veloxBatchRaw.length) return
-        if (lineCount === 0) {
-            setVeloxBatchRaw([])
-            return
-        }
-        setVeloxBatchRaw((prev) => {
-            if (lineCount > prev.length) {
-                return [...prev, ...Array(lineCount - prev.length).fill('')]
-            }
-            return prev.slice(0, lineCount)
-        })
+        if (lineCount <= veloxBatchRaw.length) return
+        setVeloxBatchRaw((prev) => [
+            ...prev,
+            ...Array(lineCount - prev.length).fill(''),
+        ])
     }, [form.videoList, veloxBatchRaw.length])
 
     // [Sprint Z+1] Auto-save draft tới localStorage (Google Docs–style).
@@ -613,12 +610,14 @@ export default function AddTaskModal({
 
         const { prefill, filledFields } = mapPayloadV3ToFormData(payload, pricingHints)
 
-        // [Velox v1.0 Phase 2 redesign] For pair items with multi raw URL, store
-        // per-task primary URL into veloxBatchRaw. Step 4 chip shows count.
-        // (Spec D3 encoding happens later at submit time.)
-        if (payload.mainItems.length >= 2 && payload.broll !== null) {
-            // We use mainItem.previewUrl (primary RAW). RAW_HOOKS / SHARED_* /
-            // BROLL_* encoded fully at submit via DashboardActionWrapper.
+        // [Bug fix] Drop the `payload.broll !== null` gate — chip + popup should
+        // hiển thị cho MỌI multi-item case (≥2), bất kể có broll hay không.
+        // Trước đây, 18 video không có broll subfolder → veloxBatchRaw bị clear,
+        // chip không render → user mất khả năng review/edit URLs.
+        if (payload.mainItems.length >= 2) {
+            // Multi-item: store per-task primary RAW URL. Encoding cuối cùng
+            // (RAW_HOOKS / RAW_AROLL / SHARED / BROLL / BRIEF) xử lý ở submit time
+            // qua DashboardActionWrapper.encodeResourcesV3.
             delete prefill.rawFootage
             filledFields.delete('rawFootage')
             setVeloxBatchRaw(payload.mainItems.map((m) => m.previewUrl ?? ''))

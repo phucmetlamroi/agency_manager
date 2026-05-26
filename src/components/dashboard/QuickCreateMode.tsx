@@ -53,6 +53,7 @@ import VeloxTaskNameSelector from './VeloxTaskNameSelector'
 import VeloxBrollMatchSelector from './VeloxBrollMatchSelector'
 import VeloxBrollManagerModal from './VeloxBrollManagerModal'
 import VeloxPairExpandRow from './VeloxPairExpandRow'
+import VeloxDiagnosticPanel from './VeloxDiagnosticPanel'
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Types                                                              */
@@ -232,10 +233,10 @@ export default function QuickCreateMode({
         setExpandedItemIds(new Set())
         setCustomBrollMap({})
         try {
-            // [Velox Deep Scan v3.1] When deepScan toggle ON, request v=3 →
-            // get full ScanResultV3 with pattern + mainItems + broll + briefs.
-            // OFF → V1 flat scan (legacy behavior).
-            const queryString = toggles.deepScan ? '?v=3' : ''
+            // [Velox Deep Scan v3.1 — PR4 flip] V3 is now default. When user
+            // turns OFF deepScan toggle, explicitly request ?v=1 for legacy
+            // flat scan behavior.
+            const queryString = toggles.deepScan ? '' : '?v=1'
             const res = await fetch(`/api/integrations/scan-folder${queryString}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -892,6 +893,9 @@ export default function QuickCreateMode({
                             </p>
                         )}
                     </div>
+
+                    {/* Diagnostic panel — collapsed by default */}
+                    <VeloxDiagnosticPanel result={scanResult} />
 
                     {/* Custom B-Roll Manager Modal (D2 CUSTOM) */}
                     <VeloxBrollManagerModal

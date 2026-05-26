@@ -157,18 +157,17 @@ export async function POST(req: Request) {
     // ---------------------------------------------------------------------------
     // 7. Scan folder via provider API
     //
-    // [Velox Deep Scan v3.1] API versioning:
-    //   - ?v=3 (or any value)  → recursiveScanFolder + classifyScan → ScanResultV3
-    //   - default (no ?v param) → V1 flat scan (backward compat for any client
-    //     not yet on v3). When PR4 ships, default flips to v=3.
-    //   - ?v=1 explicit         → force V1 (escape hatch if v3 regresses)
+    // [Velox Deep Scan v3.1 — PR4 flip] API versioning:
+    //   - default (no ?v param)  → V3 Deep Scan (recursiveScanFolder + classifyScan)
+    //   - ?v=3 explicit          → same as default
+    //   - ?v=1 explicit          → V1 flat scan (escape hatch)
     //
     // V3 response also includes a flat `videos[]` field (= mainItems flattened
-    // back to ScannedVideo shape) so V1 callers keep working transparently.
+    // back to ScannedVideo shape) so any V1 caller keeps working transparently.
     // ---------------------------------------------------------------------------
     const url0 = new URL(req.url)
     const apiVersion = url0.searchParams.get('v')
-    const useV3 = apiVersion === '3'
+    const useV3 = apiVersion !== '1' // default V3, explicit ?v=1 → V1
 
     try {
         if (useV3) {

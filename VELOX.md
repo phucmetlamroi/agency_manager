@@ -1091,12 +1091,87 @@ npm run build            # ✓ Compiled successfully
 | 1.0.4 | 2026-05-26 | Bug fix: checkbox bounce-back (preserve `selected` state qua previewRows rebuild). |
 | **1.1** | 2026-05-26 | **Rebrand "Tạo Task Nhanh" / "Quick Create" → "Velox"** ở mọi user-visible string. "Kế thừa ghi chú tháng trước" → "Kế thừa ghi chú" + drop status filter (ANY status with notes, không chỉ Hoàn tất). |
 | 1.1.1 | 2026-05-26 | Bug fix: autoSave flush-on-disable + include `veloxBatchRaw` + `veloxFilledFields` trong draft state. |
+| **3.1** | 2026-05-26 | **Velox Deep Scan v3.1** — recursive scan depth 4 + 7 pattern detection (P1-P7) + 6 manager decisions (D1-D6). 4 PR phasing: PR1 backend foundation (Phase 0-2 + types + recursive scan), PR2 classifier finish (Phase 3-5 + D1/D2/D6), PR3 frontend V3 (6 components + 3 toggles + encoding), PR4 polish (diagnostic panel + flip ?v=3 default + tests). Spec: `VELOX-DEEP-SCAN.md`. |
 
 ---
 
-## 21. References
+## 21. Velox Deep Scan v3.1 (shipped 2026-05-26)
+
+**Spec source**: `VELOX-DEEP-SCAN.md` (1253 dòng, manager-approved, evidence base = 4 client thật).
+
+Major upgrade từ flat scan sang **recursive deep scan** với pattern recognition:
+
+### Key features
+- **Recursive scan depth 4** (Dropbox + GDrive) với cap 500 files
+- **7 pattern detection** (P1 Flat / P2 Pair / P3 Bundles / P4 Triplet / P5 Hybrid / P6 Wrapper / P7 Chaos)
+- **Wrapper auto-drill** với D5 layered confidence scoring (3 signals: structure + non-video files + keywords)
+- **Body+Hooks pairing** với D1 3-mode taskName (A=Video N / B=LGR Video N / C=LGR Video N Body)
+- **B-Roll classification** (general / per-video / loose / variants slo-mo/drone/aerial/wide)
+- **D2 brollMatchPolicy** với PENDING_USER_CONFIRM gating + CUSTOM per-task modal
+- **Shared assets** (CTA / Outro / Intro / Logo / Bumper) appended vào mọi task
+- **Briefing PDF auto-append** vào notes_vi (D4, default ON, idempotent)
+- **P7 strict 50% threshold** cho camera-dump folders (D6)
+- **Per-task encoded resources**: RAW + RAW_HOOKS + RAW_AROLL + SHARED_xxx + BROLL_GENERAL/PERVIDEO/LOOSE + BRIEF
+
+### Implementation files
+
+**Backend**:
+- `src/lib/cloud-scanner.ts` — `recursiveScanFolder()` (Dropbox + GDrive)
+- `src/lib/scan-classifier.ts` — Phase 0-5 orchestrator
+- `src/lib/scan-classifier-helpers.ts` — regex, scoring, taskName resolver, prefix detector
+- `src/lib/velox-helpers.ts` — V3 types + encodeResourcesV3 + maybeAppendBriefToNotes
+- `src/actions/velox-batch-actions.ts` — createTasksFromBatch (no changes — accepts V3 encoded resources string)
+- `src/app/api/integrations/scan-folder/route.ts` — V3 default, `?v=1` escape hatch
+
+**Frontend components (6 new)**:
+- `src/components/dashboard/VeloxPatternBanner.tsx` — pattern-specific banner P1-P7
+- `src/components/dashboard/VeloxBriefBanner.tsx` — D4 briefing list + auto-append toggle
+- `src/components/dashboard/VeloxTaskNameSelector.tsx` — D1 3-mode dropdown với live preview
+- `src/components/dashboard/VeloxBrollMatchSelector.tsx` — D2 inline picker (4 options) + gating
+- `src/components/dashboard/VeloxBrollManagerModal.tsx` — D2 CUSTOM per-task grid
+- `src/components/dashboard/VeloxPairExpandRow.tsx` — inline pair/bundle expansion
+- `src/components/dashboard/VeloxDiagnosticPanel.tsx` — "Xem chi tiết" collapsible diagnostic
+
+**QuickCreateMode toggles (3 new)**:
+- `deepScan` — gates V3 vs V1 API (default ON)
+- `pairBodyHooks` — gates Phase 4 pairing (default ON)
+- `appendBriefToNotes` — D4 (default ON)
+
+### Output shape
+
+API now returns `ScanResultV3`:
+```ts
+{
+  videos: ScannedVideo[]               // V1 backward-compat
+  primaryPattern: 'P1'|'P2'|'P3'|'P4'|'P5'|'P7'
+  isWrapper: boolean
+  wrapperConfidence: number            // 0-10
+  confidence: number                   // 0.0-1.0
+  mainItems: MainItem[]                // per-task: file/pair/folder-bundle
+  broll: BrollV3 | null
+  brollMatchPolicy: 'PENDING_USER_CONFIRM' | ...
+  sharedAssets: SharedAsset[]
+  briefingDocs: BriefingDoc[]
+  warnings: string[]
+  diagnostics: ScanDiagnosticsV3
+}
+```
+
+### Test scenarios verified
+
+| Client | primaryPattern | Output |
+|---|---|---|
+| Align West outer | P6 wrapper drill → P3 | 4 bundle tasks + BROLL + BRIEF auto-append |
+| A1 Decking | P2 | 2 pair tasks + BROLL_GENERAL + BROLL_PERVIDEO + BROLL_LOOSE (5 DJI) |
+| Barmoor | P4 | 4 pair tasks từ output container + RAW_HOOKS + BROLL SLO MO |
+| LGR | P5 | 3 pair tasks + RAW_AROLL per-video + SHARED_CTA |
+
+---
+
+## 22. References
 
 - **Original spec v1.0**: `C:\Users\Dareu\Downloads\Velox-Spec.md` (manager Dareu, 2026-05-25)
+- **Deep Scan v3.1 spec**: `C:\Users\Dareu\Downloads\VELOX-DEEP-SCAN.md` (1253 lines, manager-approved 2026-05-26)
 - **Plan file**: `C:\Users\Dareu\.claude\plans\kind-gliding-wren.md` (executed plan history)
 - **UI/UX standards**: `.claude/rules/ui-ux-standards.md`
 - **Safety protocol**: `.claude/rules/safety-protocol.md`

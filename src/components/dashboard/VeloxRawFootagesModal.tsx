@@ -48,14 +48,14 @@ export default function VeloxRawFootagesModal({
         if (open) setDraft(urls)
     }, [open, urls])
 
-    // Ensure draft length always matches title count
+    // [Bug fix] Pad draft khi videoTitles dài hơn — KHÔNG truncate khi
+    // videoTitles ngắn hơn (tránh mất URLs). Số row hiển thị = max(draft,
+    // videoTitles) để user thấy được tất cả URLs đã extract, kể cả khi
+    // videoList trên form chính tạm thời chưa khớp.
     useEffect(() => {
         setDraft((prev) => {
-            if (prev.length === videoTitles.length) return prev
-            if (videoTitles.length > prev.length) {
-                return [...prev, ...Array(videoTitles.length - prev.length).fill('')]
-            }
-            return prev.slice(0, videoTitles.length)
+            if (videoTitles.length <= prev.length) return prev
+            return [...prev, ...Array(videoTitles.length - prev.length).fill('')]
         })
     }, [videoTitles.length])
 
@@ -125,45 +125,61 @@ export default function VeloxRawFootagesModal({
 
                         {/* Body — scrollable mini table */}
                         <div className="flex-1 overflow-auto custom-scrollbar px-6 py-4">
-                            {videoTitles.length === 0 ? (
-                                <div className="text-center py-8 text-zinc-500 text-[13px]">
-                                    Chưa có video nào trong videoList. Quay về form và thêm video trước.
-                                </div>
-                            ) : (
-                                <table className="w-full text-[12px] border-collapse">
-                                    <thead className="sticky top-0 bg-zinc-950/95 backdrop-blur z-10">
-                                        <tr className="text-[10px] font-bold uppercase text-zinc-500">
-                                            <th className="text-left px-2 py-2 border-b border-white/5 w-[8%]">#</th>
-                                            <th className="text-left px-2 py-2 border-b border-white/5 w-[35%]">
-                                                Video title
-                                            </th>
-                                            <th className="text-left px-2 py-2 border-b border-white/5">
-                                                Raw URL
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {videoTitles.map((title, idx) => (
-                                            <tr
-                                                key={idx}
-                                                className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-                                            >
-                                                <td className="px-2 py-2 text-zinc-500 font-mono">{idx + 1}</td>
-                                                <td className="px-2 py-2 text-zinc-200 truncate">{title}</td>
-                                                <td className="px-2 py-2">
-                                                    <input
-                                                        type="url"
-                                                        value={draft[idx] ?? ''}
-                                                        onChange={(e) => updateRow(idx, e.target.value)}
-                                                        placeholder="https://..."
-                                                        className="w-full bg-zinc-900/60 border border-white/10 rounded-md px-2.5 py-1.5 text-[11px] font-mono text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:bg-zinc-900/80"
-                                                    />
-                                                </td>
+                            {(() => {
+                                // [Bug fix] Render rows = max(titles, urls). Show all
+                                // extracted URLs kể cả khi videoList trên form chính
+                                // tạm thời chưa khớp về số dòng.
+                                const rowCount = Math.max(videoTitles.length, draft.length)
+                                if (rowCount === 0) {
+                                    return (
+                                        <div className="text-center py-8 text-zinc-500 text-[13px]">
+                                            Chưa có video nào trong videoList. Quay về form và thêm video trước.
+                                        </div>
+                                    )
+                                }
+                                return (
+                                    <table className="w-full text-[12px] border-collapse">
+                                        <thead className="sticky top-0 bg-zinc-950/95 backdrop-blur z-10">
+                                            <tr className="text-[10px] font-bold uppercase text-zinc-500">
+                                                <th className="text-left px-2 py-2 border-b border-white/5 w-[8%]">#</th>
+                                                <th className="text-left px-2 py-2 border-b border-white/5 w-[35%]">
+                                                    Video title
+                                                </th>
+                                                <th className="text-left px-2 py-2 border-b border-white/5">
+                                                    Raw URL
+                                                </th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
+                                        </thead>
+                                        <tbody>
+                                            {Array.from({ length: rowCount }).map((_, idx) => {
+                                                const title = videoTitles[idx] ?? `(no title for row ${idx + 1})`
+                                                return (
+                                                    <tr
+                                                        key={idx}
+                                                        className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+                                                    >
+                                                        <td className="px-2 py-2 text-zinc-500 font-mono">{idx + 1}</td>
+                                                        <td className={`px-2 py-2 truncate ${
+                                                            videoTitles[idx] ? 'text-zinc-200' : 'text-zinc-600 italic'
+                                                        }`}>
+                                                            {title}
+                                                        </td>
+                                                        <td className="px-2 py-2">
+                                                            <input
+                                                                type="url"
+                                                                value={draft[idx] ?? ''}
+                                                                onChange={(e) => updateRow(idx, e.target.value)}
+                                                                placeholder="https://..."
+                                                                className="w-full bg-zinc-900/60 border border-white/10 rounded-md px-2.5 py-1.5 text-[11px] font-mono text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40 focus:bg-zinc-900/80"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                )
+                            })()}
                         </div>
 
                         {/* Footer */}

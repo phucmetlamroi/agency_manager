@@ -237,3 +237,295 @@ export function applyPrefill<T extends Record<string, string>>(
 
     return next
 }
+
+/* ════════════════════════════════════════════════════════════════════════ */
+/*  Velox Deep Scan v3.1 — type definitions                                */
+/*  Spec: VELOX-DEEP-SCAN.md v3.1 FINAL, section 5                          */
+/* ════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Single file entry returned by recursive cloud scan.
+ * Extends V1 ScannedVideo with classification-friendly fields.
+ */
+export interface FileEntry {
+    fileId: string
+    /** Filename without extension */
+    name: string
+    /** Filename with extension */
+    fullName: string
+    mimeType: string
+    durationSeconds: number
+    previewUrl: string
+    sizeBytes: number
+    isVideo: boolean
+    isAudio: boolean
+    isImage: boolean
+    isDocument: boolean
+    /** Depth from scan root (0 = root file, 1 = one folder deep, ...) */
+    depth: number
+    parentFolderName: string
+    /** Full path inside the cloud storage */
+    parentFolderPath: string
+}
+
+/** Classified role of a subfolder after Phase 2 scoring */
+export type SubfolderRole =
+    | 'broll'
+    | 'per-video-broll'
+    | 'bundle'
+    | 'aroll-shared'
+    | 'aroll-pervideo'
+    | 'output-container'
+    | 'images'
+    | 'ambiguous'
+
+/** B-roll variant — sub-classification when role ∈ {broll, per-video-broll} */
+export type BrollVariant = 'general' | 'slomo' | 'drone' | 'aerial' | 'wide' | 'other'
+
+/**
+ * Subfolder profile after Phase 1-2. Recursive — `subSubfolders` carries the tree.
+ * Scoring breakdown stored for diagnostics.
+ */
+export interface SubfolderProfile {
+    name: string
+    fullPath: string
+    /** Provider-specific shared URL for this subfolder */
+    url: string
+    depth: number
+    videoFiles: FileEntry[]
+    audioFiles: FileEntry[]
+    imageFiles: FileEntry[]
+    documentFiles: FileEntry[]
+    /** Count of video files in this folder + all descendants */
+    totalVideoCountRecursive: number
+    subSubfolders: SubfolderProfile[]
+    scores: {
+        broll: number
+        perVideoBroll: number
+        bundle: number
+        arollShared: number
+        arollPerVideo: number
+        outputContainer: number
+        images: number
+    }
+    classifiedAs: SubfolderRole | null
+    /** Set when classified per-video-broll or aroll-pervideo */
+    perVideoTag?: { videoIndex: number; prefix: string }
+    brollVariant?: BrollVariant
+}
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  TaskName mode (D1)                                                  */
+/* ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * D1 — 3 mode taskName generation. Applied to pair-type MainItem.
+ *   A — Base raw ("Video 1")
+ *   B — Base + client prefix ("LGR Video 1") [default if prefix detected]
+ *   C — Full body filename ("LGR Video 1 Body")
+ */
+export type TaskNameMode = 'A' | 'B' | 'C'
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  MainItem — discriminated union of 3 task-source shapes              */
+/* ──────────────────────────────────────────────────────────────────── */
+
+interface MainItemBase {
+    /** Resolved task name per current mode (mode picked by user at apply time) */
+    taskName: string
+    /** All 3 mode resolutions — UI updates `taskName` from this dict when user changes D1 dropdown */
+    taskNameByMode: Record<TaskNameMode, string>
+    /** Default mode (auto-detect: B if client prefix found, else A) */
+    defaultTaskNameMode: TaskNameMode
+    /** URL used in `Task.resources` RAW: field */
+    previewUrl: string
+    durationSeconds: number
+    /** Human-friendly label shown in preview table "Source" column */
+    sourceLabel: string
+    /** Set when MainItem corresponds to a numbered video (Video 1, AD 2, etc.) */
+    videoIndex?: number
+    /** Per-video broll folder URLs matched via videoIndex (Phase 5 step 2) */
+    perVideoBrollUrls?: string[]
+    /** Per-video A-roll folder URL matched via videoIndex (P5 pattern) */
+    perVideoArollUrl?: string
+}
+
+/** Single file → 1 task (no pairing) */
+export interface MainItemFile extends MainItemBase {
+    kind: 'file'
+    file: FileEntry
+}
+
+/** Body + Hooks pair → 1 task (D1 applies) */
+export interface MainItemPair extends MainItemBase {
+    kind: 'pair'
+    /** Pair's basePart (vd: "LGR Video 1") */
+    basePart: string
+    body: FileEntry | null
+    hooks: FileEntry | null
+    /** Extra files in the same group (vd: outro, intro) */
+    extras: FileEntry[]
+    /** URLs cho RAW_HOOKS + RAW_EXTRA encoding in Task.resources */
+    additionalUrls: string[]
+}
+
+/** Folder bundle → 1 task (P3 — Align West inner) */
+export interface MainItemFolderBundle extends MainItemBase {
+    kind: 'folder-bundle'
+    folder: SubfolderProfile
+}
+
+export type MainItem = MainItemFile | MainItemPair | MainItemFolderBundle
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  Broll structure (D2)                                                */
+/* ──────────────────────────────────────────────────────────────────── */
+
+export interface BrollFolder {
+    url: string
+    name: string
+    fileCount: number
+    variant?: BrollVariant
+}
+
+export interface PerVideoBrollFolder extends BrollFolder {
+    videoIndex: number
+    prefix: string
+}
+
+export interface BrollV3 {
+    /** Shared broll folders (general / variants) */
+    generalFolders: BrollFolder[]
+    /** Per-video-tagged broll folders (matched to MainItem.videoIndex in Phase 5) */
+    perVideoFolders: PerVideoBrollFolder[]
+    /** Loose broll files at root (DJI_*, camera-dump signatures) */
+    looseFiles: FileEntry[]
+    totalCount: number
+}
+
+/**
+ * D2 — How broll URLs flow into each task's `resources` field.
+ * - PENDING_USER_CONFIRM: both general + per-video exist; user must pick before Apply
+ * - GENERAL_ONLY / PERVIDEO_ONLY / BOTH: explicit policy
+ * - CUSTOM: per-task mapping (manager modal)
+ * - NONE: no broll detected
+ */
+export type BrollMatchPolicy =
+    | 'PENDING_USER_CONFIRM'
+    | 'GENERAL_ONLY'
+    | 'PERVIDEO_ONLY'
+    | 'BOTH'
+    | 'CUSTOM'
+    | 'NONE'
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  Shared assets + briefing docs (D3, D4)                              */
+/* ──────────────────────────────────────────────────────────────────── */
+
+export type SharedAssetType =
+    | 'cta'
+    | 'intro'
+    | 'outro'
+    | 'logo'
+    | 'bumper'
+    | 'transition'
+    | 'unknown'
+
+export interface SharedAsset {
+    type: SharedAssetType
+    file: FileEntry
+}
+
+export type BriefingDocType = 'pdf' | 'docx' | 'doc' | 'pptx' | 'rtf' | 'txt' | 'other'
+
+export interface BriefingDoc {
+    type: BriefingDocType
+    file: FileEntry
+}
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  Top-level scan result + diagnostics                                 */
+/* ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * Primary pattern detected by Phase 5. P6 is composed with inner pattern
+ * (recorded separately via `isWrapper` flag — primaryPattern reflects inner).
+ */
+export type PrimaryPattern = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P7'
+
+export interface ScanDiagnosticsV3 {
+    isWrapper: boolean
+    wrapperName?: string
+    /** D5 layered confidence breakdown */
+    wrapperConfidenceBreakdown?: {
+        structure: number
+        nonVideoFiles: number
+        keywordMatch: number
+        total: number
+    }
+    /** Effective root URL after wrapper drill (= original URL if not wrapper) */
+    effectiveRootUrl: string
+    /** Human-readable explanation of why primaryPattern was chosen */
+    patternDetectionRationale: string
+    totalVideoCountRecursive: number
+    totalSubfolderCount: number
+    /** Files dropped because depth > 4 limit */
+    ignoredDeepFiles: string[]
+    /** Per-subfolder scores + classification (UI diagnostic panel) */
+    subfolderScores: Array<{
+        name: string
+        depth: number
+        scores: SubfolderProfile['scores']
+        classifiedAs: SubfolderRole | null
+        perVideoTag?: { videoIndex: number; prefix: string }
+    }>
+    /** Per-root-file scores (Phase 3) — optional, populated when relevant */
+    fileScores?: Array<{
+        name: string
+        scores: { main: number; broll: number; sharedAsset: number }
+        classifiedAs: 'main' | 'broll' | 'shared_asset' | 'ambiguous'
+    }>
+    /** Pair groupings from Phase 4 */
+    pairingGroups?: Array<{
+        basePart: string
+        bodyFile?: string
+        hooksFile?: string
+        extras: string[]
+    }>
+    /** Batch-wide prefix auto-detected (vd: "LGR", "Barmoor") */
+    prefixDetected?: string
+}
+
+/**
+ * V3 scan output — drop-in replacement for V1 `{ videos, provider, count }`.
+ * V1 backward compat: `videos` field still populated (= mainItems flattened).
+ */
+export interface ScanResultV3 {
+    /** V1 backward compat — flat array of "videos" derived from mainItems */
+    videos: import('./cloud-scanner').ScannedVideo[]
+
+    /** Pattern detected by Phase 5 (inner pattern if wrapper) */
+    primaryPattern: PrimaryPattern
+    /** D5 wrapper detection */
+    isWrapper: boolean
+    wrapperConfidence: number
+    /** Phase 5 overall confidence (0.0 - 1.0) */
+    confidence: number
+
+    /** Tasks to create (1 per MainItem) */
+    mainItems: MainItem[]
+    /** Broll structure (null if no broll detected) */
+    broll: BrollV3 | null
+    /** D2 policy — UI may prompt user to pick when PENDING_USER_CONFIRM */
+    brollMatchPolicy: BrollMatchPolicy
+
+    /** D3 shared assets (CTA / Intro / Outro / ...) — append to all tasks' resources */
+    sharedAssets: SharedAsset[]
+    /** D4 briefing docs (PDF / DOCX / ...) — auto-append URL to notes if toggle ON */
+    briefingDocs: BriefingDoc[]
+
+    /** Non-fatal warnings for UI (soft wrapper, ambiguous classification, ...) */
+    warnings: string[]
+    /** Diagnostic dump for the "Xem chi tiết" panel */
+    diagnostics: ScanDiagnosticsV3
+}

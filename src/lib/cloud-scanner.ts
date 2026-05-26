@@ -396,3 +396,403 @@ async function fetchGoogleDriveFiles(
 
   return res.json()
 }
+
+/* ════════════════════════════════════════════════════════════════════════ */
+/*  Velox Deep Scan v3.1 — Recursive scanner                                */
+/*                                                                          */
+/*  Returns a RawScanTree (defined in scan-classifier.ts) that the          */
+/*  classifier can run Phase 0-2 over. Caps:                                */
+/*    - Max depth: 4 levels                                                 */
+/*    - Max files: 500 across the whole scan                                */
+/*    - Sequential per-folder traversal (rate-limit friendly)               */
+/* ════════════════════════════════════════════════════════════════════════ */
+
+import type {
+  RawScanTree,
+  RawScanSubfolder,
+} from './scan-classifier'
+import type { FileEntry } from './velox-helpers'
+import {
+  isVideoFile as isVideoFn,
+  isAudioFile as isAudioFn,
+  isImageFile as isImageFn,
+  isDocumentFile as isDocFn,
+} from './scan-classifier-helpers'
+
+const MAX_DEPTH = 4
+const MAX_FILES_PER_SCAN = 500
+
+interface RecursiveContext {
+  /** Total files seen so far (across whole scan tree) — soft cap */
+  fileCount: number
+  /** Files skipped because cap reached (for diagnostics) */
+  ignoredDeepFiles: string[]
+}
+
+/** Build a FileEntry from raw provider entry data */
+function buildFileEntry(args: {
+  fileId: string
+  name: string
+  mimeType: string
+  durationSeconds: number
+  sizeBytes: number
+  previewUrl: string
+  depth: number
+  parentFolderName: string
+  parentFolderPath: string
+}): FileEntry {
+  const { name } = args
+  const stripped = stripExtension(name)
+  return {
+    fileId: args.fileId,
+    name: stripped,
+    fullName: name,
+    mimeType: args.mimeType,
+    durationSeconds: args.durationSeconds,
+    sizeBytes: args.sizeBytes,
+    previewUrl: args.previewUrl,
+    isVideo: isVideoFn(name, args.mimeType),
+    isAudio: isAudioFn(name, args.mimeType),
+    isImage: isImageFn(name, args.mimeType),
+    isDocument: isDocFn(name, args.mimeType),
+    depth: args.depth,
+    parentFolderName: args.parentFolderName,
+    parentFolderPath: args.parentFolderPath,
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════ */
+/*  Dropbox recursive scanner                                               */
+/* ════════════════════════════════════════════════════════════════════════ */
+
+/** All entries (file + folder) at a single Dropbox folder level */
+interface DropboxRawEntries {
+  files: FileEntry[]
+  subfolders: Array<{ name: string; pathLower: string; pathDisplay: string }>
+}
+
+async function listDropboxLevel(
+  accessToken: string,
+  folderPath: string,
+  sharedLinkUrl: string | undefined,
+  sharedFolderId: string | undefined,
+  depth: number,
+  parentFolderName: string,
+  ctx: RecursiveContext,
+): Promise<DropboxRawEntries> {
+  const files: FileEntry[] = []
+  const subfolders: DropboxRawEntries['subfolders'] = []
+
+  let response = await fetchDropboxListFolder(accessToken, folderPath, sharedLinkUrl)
+  let safetyBreak = false
+  while (true) {
+    for (const entry of response.entries) {
+      if (ctx.fileCount >= MAX_FILES_PER_SCAN) {
+        ctx.ignoredDeepFiles.push((entry as any).name ?? '(unknown)')
+        safetyBreak = true
+        break
+      }
+      if (entry['.tag'] === 'folder') {
+        // @ts-expect-error — folder entries in Dropbox API have path_lower
+        const pathLower = entry.path_lower ?? entry.path_display
+        subfolders.push({
+          name: entry.name,
+          pathLower,
+          pathDisplay: entry.path_display,
+        })
+      } else if (entry['.tag'] === 'file') {
+        const durationMs = entry.media_info?.metadata?.duration ?? 0
+        const durationSeconds = Math.round(durationMs / 1000)
+
+        // Build preview URL — same logic as processDropboxEntries
+        const encodedName = encodeURIComponent(entry.name)
+        let previewUrl: string
+        if (sharedLinkUrl) {
+          const separator = sharedLinkUrl.includes('?') ? '&' : '?'
+          previewUrl = `${sharedLinkUrl}${separator}preview=${encodedName}`
+        } else if (sharedFolderId) {
+          previewUrl = `https://www.dropbox.com/scl/fo/${sharedFolderId}?preview=${encodedName}`
+        } else {
+          previewUrl = `https://www.dropbox.com/home${entry.path_display}`
+        }
+
+        files.push(
+          buildFileEntry({
+            fileId: entry.id,
+            name: entry.name,
+            mimeType: entry.media_info?.metadata?.['.tag']
+              ? `video/${entry.media_info.metadata['.tag']}`
+              : '', // empty — extension fallback handles it
+            durationSeconds,
+            sizeBytes: entry.size,
+            previewUrl,
+            depth,
+            parentFolderName,
+            parentFolderPath: folderPath,
+          }),
+        )
+        ctx.fileCount++
+      }
+    }
+
+    if (safetyBreak || !response.has_more) break
+    response = await fetchDropboxListFolderContinue(accessToken, response.cursor)
+  }
+
+  return { files, subfolders }
+}
+
+async function recursiveScanDropbox(
+  accessToken: string,
+  folderPath: string,
+  sharedLinkUrl: string | undefined,
+  sharedFolderId: string | undefined,
+  ctx: RecursiveContext,
+  depth: number,
+  parentFolderName: string,
+): Promise<{ files: FileEntry[]; subfolders: RawScanSubfolder[] }> {
+  if (depth >= MAX_DEPTH) {
+    return { files: [], subfolders: [] }
+  }
+
+  const level = await listDropboxLevel(
+    accessToken,
+    folderPath,
+    sharedLinkUrl,
+    sharedFolderId,
+    depth,
+    parentFolderName,
+    ctx,
+  )
+
+  // Sequential recurse into subfolders (rate-limit friendly)
+  const subProfiles: RawScanSubfolder[] = []
+  for (const sub of level.subfolders) {
+    if (ctx.fileCount >= MAX_FILES_PER_SCAN) break
+    // Build sub-path relative to shared link root, or absolute path
+    const subPath = sub.pathDisplay
+    const inner = await recursiveScanDropbox(
+      accessToken,
+      subPath,
+      sharedLinkUrl,
+      sharedFolderId,
+      ctx,
+      depth + 1,
+      sub.name,
+    )
+
+    // Build subfolder URL — for shared links append &path=, for absolute paths use /home/
+    let subUrl: string
+    if (sharedLinkUrl) {
+      const separator = sharedLinkUrl.includes('?') ? '&' : '?'
+      // Strip the parent shared path prefix — keep only the sub-path
+      subUrl = `${sharedLinkUrl}${separator}preview=${encodeURIComponent(sub.name)}`
+    } else if (sharedFolderId) {
+      subUrl = `https://www.dropbox.com/scl/fo/${sharedFolderId}?path=${encodeURIComponent(subPath)}`
+    } else {
+      subUrl = `https://www.dropbox.com/home${subPath}`
+    }
+
+    subProfiles.push({
+      name: sub.name,
+      fullPath: subPath,
+      url: subUrl,
+      depth: depth + 1,
+      files: inner.files,
+      subSubfolders: inner.subfolders,
+    })
+  }
+
+  return { files: level.files, subfolders: subProfiles }
+}
+
+/* ════════════════════════════════════════════════════════════════════════ */
+/*  Google Drive recursive scanner                                          */
+/* ════════════════════════════════════════════════════════════════════════ */
+
+interface GoogleDriveAllListResponse {
+  files: Array<{
+    id: string
+    name: string
+    mimeType: string
+    size?: string
+    videoMediaMetadata?: { durationMillis?: string }
+  }>
+  nextPageToken?: string
+}
+
+/** GDrive list — returns BOTH files and folders for a given parent ID */
+async function fetchGoogleDriveLevel(
+  accessToken: string,
+  folderId: string,
+  pageToken?: string,
+): Promise<GoogleDriveAllListResponse> {
+  const params = new URLSearchParams({
+    q: `'${folderId}' in parents and trashed = false`,
+    fields: 'nextPageToken,files(id,name,mimeType,size,videoMediaMetadata)',
+    pageSize: '100',
+    orderBy: 'name',
+  })
+  if (pageToken) params.set('pageToken', pageToken)
+
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  )
+  if (!res.ok) {
+    const errText = await res.text().catch(() => 'unknown')
+    throw new Error(`Google Drive files.list failed: ${res.status} — ${errText}`)
+  }
+  return res.json()
+}
+
+async function recursiveScanGoogleDrive(
+  accessToken: string,
+  folderId: string,
+  folderName: string,
+  folderPath: string,
+  ctx: RecursiveContext,
+  depth: number,
+): Promise<{ files: FileEntry[]; subfolders: RawScanSubfolder[] }> {
+  if (depth >= MAX_DEPTH) {
+    return { files: [], subfolders: [] }
+  }
+
+  const files: FileEntry[] = []
+  const subfolderRefs: Array<{ id: string; name: string }> = []
+  let pageToken: string | undefined
+
+  do {
+    const response = await fetchGoogleDriveLevel(accessToken, folderId, pageToken)
+    for (const file of response.files) {
+      if (ctx.fileCount >= MAX_FILES_PER_SCAN) {
+        ctx.ignoredDeepFiles.push(file.name)
+        break
+      }
+      const isFolder = file.mimeType === 'application/vnd.google-apps.folder'
+      if (isFolder) {
+        subfolderRefs.push({ id: file.id, name: file.name })
+      } else {
+        const durationMs = file.videoMediaMetadata?.durationMillis
+          ? parseInt(file.videoMediaMetadata.durationMillis, 10)
+          : 0
+        files.push(
+          buildFileEntry({
+            fileId: file.id,
+            name: file.name,
+            mimeType: file.mimeType,
+            durationSeconds: Math.round(durationMs / 1000),
+            sizeBytes: file.size ? parseInt(file.size, 10) : 0,
+            previewUrl: `https://drive.google.com/file/d/${file.id}/view`,
+            depth,
+            parentFolderName: folderName,
+            parentFolderPath: folderPath,
+          }),
+        )
+        ctx.fileCount++
+      }
+    }
+    pageToken = response.nextPageToken
+  } while (pageToken && ctx.fileCount < MAX_FILES_PER_SCAN)
+
+  // Sequential recurse subfolders
+  const subProfiles: RawScanSubfolder[] = []
+  for (const sub of subfolderRefs) {
+    if (ctx.fileCount >= MAX_FILES_PER_SCAN) break
+    const subPath = `${folderPath}/${sub.name}`
+    const inner = await recursiveScanGoogleDrive(
+      accessToken,
+      sub.id,
+      sub.name,
+      subPath,
+      ctx,
+      depth + 1,
+    )
+    subProfiles.push({
+      name: sub.name,
+      fullPath: subPath,
+      url: `https://drive.google.com/drive/folders/${sub.id}`,
+      depth: depth + 1,
+      files: inner.files,
+      subSubfolders: inner.subfolders,
+    })
+  }
+
+  return { files, subfolders: subProfiles }
+}
+
+/* ════════════════════════════════════════════════════════════════════════ */
+/*  Unified entry: recursiveScanFolder                                      */
+/* ════════════════════════════════════════════════════════════════════════ */
+
+export interface RecursiveScanInput {
+  provider: 'dropbox' | 'google_drive'
+  accessToken: string
+  /** Dropbox: folder path. GDrive: folder ID. */
+  folderIdentifier: string
+  /** Dropbox only — the original shared link URL (for shared folders) */
+  sharedLinkUrl?: string
+  /** Dropbox only — the shared folder ID for preview URL construction */
+  sharedFolderId?: string
+  /** Display name of the root folder (last path segment) */
+  rootName?: string
+}
+
+/**
+ * Recursive scan entry point for Velox Deep Scan v3.1. Walks the cloud folder
+ * tree up to depth 4, caps at 500 files. Returns a RawScanTree ready for
+ * `classifyScan` in scan-classifier.ts.
+ *
+ * Sequential traversal (no parallel folder walking) → respects provider rate
+ * limits. The 500-file cap protects against runaway scans on huge folders.
+ */
+export async function recursiveScanFolder(
+  input: RecursiveScanInput,
+): Promise<RawScanTree> {
+  const ctx: RecursiveContext = {
+    fileCount: 0,
+    ignoredDeepFiles: [],
+  }
+
+  const rootName = input.rootName ?? 'root'
+
+  if (input.provider === 'dropbox') {
+    const result = await recursiveScanDropbox(
+      input.accessToken,
+      input.folderIdentifier,
+      input.sharedLinkUrl,
+      input.sharedFolderId,
+      ctx,
+      0,
+      rootName,
+    )
+    return {
+      originalUrl: input.sharedLinkUrl ?? '',
+      rootPath: input.folderIdentifier || '/',
+      rootUrl: input.sharedLinkUrl ?? '',
+      rootFiles: result.files,
+      rootSubfolders: result.subfolders,
+      ignoredDeepFiles: ctx.ignoredDeepFiles,
+    }
+  }
+
+  // google_drive
+  const result = await recursiveScanGoogleDrive(
+    input.accessToken,
+    input.folderIdentifier,
+    rootName,
+    `/${rootName}`,
+    ctx,
+    0,
+  )
+  return {
+    originalUrl: `https://drive.google.com/drive/folders/${input.folderIdentifier}`,
+    rootPath: `/${rootName}`,
+    rootUrl: `https://drive.google.com/drive/folders/${input.folderIdentifier}`,
+    rootFiles: result.files,
+    rootSubfolders: result.subfolders,
+    ignoredDeepFiles: ctx.ignoredDeepFiles,
+  }
+}

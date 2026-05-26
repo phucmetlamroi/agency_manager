@@ -28,11 +28,18 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { parseCloudLink } from '@/lib/cloud-link-parser'
-import { scanDropboxFolder, scanGoogleDriveFolder } from '@/lib/cloud-scanner'
+import {
+    scanDropboxFolder,
+    scanGoogleDriveFolder,
+    recursiveScanFolder,
+} from '@/lib/cloud-scanner'
+import { classifyScan } from '@/lib/scan-classifier'
 import { refreshTokenIfNeeded } from '@/actions/integration-actions'
 
-// Allow up to 60s for large folder scans (default would be 10s on Vercel hobby)
-export const maxDuration = 60
+// [Velox Deep Scan v3.1] Bumped 60→90s for recursive depth-4 scans on large
+// folders (some clients have 30+ DJI files at root + nested broll subfolders).
+// Sequential traversal + 500-file cap should keep us under the limit.
+export const maxDuration = 90
 
 export async function POST(req: Request) {
     // ---------------------------------------------------------------------------
@@ -149,8 +156,56 @@ export async function POST(req: Request) {
 
     // ---------------------------------------------------------------------------
     // 7. Scan folder via provider API
+    //
+    // [Velox Deep Scan v3.1 — PR4 flip] API versioning:
+    //   - default (no ?v param)  → V3 Deep Scan (recursiveScanFolder + classifyScan)
+    //   - ?v=3 explicit          → same as default
+    //   - ?v=1 explicit          → V1 flat scan (escape hatch)
+    //
+    // V3 response also includes a flat `videos[]` field (= mainItems flattened
+    // back to ScannedVideo shape) so any V1 caller keeps working transparently.
     // ---------------------------------------------------------------------------
+    const url0 = new URL(req.url)
+    const apiVersion = url0.searchParams.get('v')
+    const useV3 = apiVersion !== '1' // default V3, explicit ?v=1 → V1
+
     try {
+        if (useV3) {
+            // ─── V3 Deep Scan path ──────────────────────────────────────────
+            const rootName =
+                parsed.provider === 'dropbox'
+                    ? (parsed.folderPath?.split('/').filter(Boolean).pop() ??
+                        parsed.sharedFolderId ?? 'root')
+                    : 'root'
+
+            const tree =
+                parsed.provider === 'dropbox'
+                    ? await recursiveScanFolder({
+                        provider: 'dropbox',
+                        accessToken,
+                        folderIdentifier: parsed.folderPath,
+                        sharedLinkUrl: parsed.sharedLinkUrl,
+                        sharedFolderId: parsed.sharedFolderId,
+                        rootName,
+                    })
+                    : await recursiveScanFolder({
+                        provider: 'google_drive',
+                        accessToken,
+                        folderIdentifier: parsed.folderId,
+                        rootName,
+                    })
+
+            const result = classifyScan(tree)
+
+            return NextResponse.json({
+                ...result,
+                provider: parsed.provider,
+                count: result.videos.length,
+                apiVersion: 'v3',
+            })
+        }
+
+        // ─── V1 flat scan path (default, backward compat) ──────────────────
         if (parsed.provider === 'dropbox') {
             const videos = await scanDropboxFolder(
                 accessToken,

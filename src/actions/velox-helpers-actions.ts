@@ -1,21 +1,27 @@
 'use server'
 
 /**
- * [Velox v1.0 — Spec section 6: Kế thừa ghi chú theo Client]
+ * [Velox v1.1 — "Kế thừa ghi chú" (renamed from "Kế thừa ghi chú tháng trước")]
  *
  * Server action for note inheritance with sub-client recursion.
  *
- * Spec 6.1 query:
+ * Query (Velox v1.1 — status filter removed):
  *   1. Tasks thuộc Client X **hoặc** bất kỳ client con nào của X
- *   2. Filter: status = "Hoàn tất" AND notes_vi IS NOT NULL AND notes_vi != ""
+ *   2. Filter: notes_vi IS NOT NULL AND notes_vi != ""  (NO status filter — any task with notes qualifies)
  *   3. Sort: updatedAt DESC
  *   4. Take first record + return preview metadata (source task title, sub-client name, date)
  *
  * Behavior:
  *   - Walks Client.subsidiaries tree (recursive, depth-limit 5)
- *   - Filters by status='Hoàn tất' + non-empty notes_vi
+ *   - Inclusive — pulls notes from tasks of ANY status (Đang thực hiện / Revision /
+ *     Hoàn tất / etc.) so long as notes_vi is non-empty. Rationale: user wants to
+ *     reuse notes from in-flight tasks too, not just completed templates.
  *   - Returns preview metadata for "Note kế thừa từ task '[Title]' (Client con: Y, ngày Z)"
  *   - Scoped to all workspaces in the current profile (any sibling workspace)
+ *
+ * Velox v1.0 → v1.1 change: drop `status: 'Hoàn tất'` filter per user request
+ * — "lấy ghi chú của những task giống với của khách hàng trước đó" (any task,
+ * not just completed).
  */
 
 import { prisma } from '@/lib/db'
@@ -103,7 +109,9 @@ export async function getLastClientNote(
             where: {
                 workspaceId: { in: workspaceIds },
                 clientId: { in: clientIds },
-                status: 'Hoàn tất',
+                // [Velox v1.1] No status filter — pull from ANY task of this client
+                // (or sub-clients) with non-empty notes. Inclusive: in-progress /
+                // revision / completed all count as valid source.
                 isArchived: false,
                 NOT: [{ notes_vi: null }, { notes_vi: '' }],
             },

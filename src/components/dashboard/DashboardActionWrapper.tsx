@@ -7,6 +7,12 @@ import AddTaskModal from "./AddTaskModal"
 import { createTask } from "@/actions/admin-actions"
 import { createBatchTasks } from "@/actions/bulk-task-actions"
 import { createTasksFromBatch, type BatchTaskRow } from "@/actions/velox-batch-actions"
+import {
+    encodeResourcesV3,
+    maybeAppendBriefToNotes,
+    type VeloxApplyPayloadV3,
+    type MainItem,
+} from "@/lib/velox-helpers"
 
 interface DashboardActionWrapperProps {
   workspaceId: string
@@ -70,7 +76,7 @@ export default function DashboardActionWrapper({
       /** Single rich-text Notes HTML (replaces notesVi/notesEn split per Figma redesign) */
       notes: string
     },
-    options?: { veloxBatchRaw?: string[] },
+    options?: { veloxBatchRaw?: string[]; veloxV3Payload?: VeloxApplyPayloadV3 },
   ) => {
     const client = clients.find((c) => c.id === data.clientId)
     const clientLabel = client?.parent
@@ -108,6 +114,65 @@ export default function DashboardActionWrapper({
     const packedReferences = data.script
       ? `REF:${(data.references || '').trim()} | SCRIPT:${(data.script || '').trim()}`
       : (data.references || '')
+
+    // [Velox Deep Scan v3.1] V3 payload — full per-task encoding với
+    // RAW_HOOKS/RAW_AROLL/SHARED_*/BROLL_*/BRIEF. Takes priority over V1
+    // path. Used khi user vào Velox với deep scan toggle ON.
+    if (options?.veloxV3Payload) {
+      const v3 = options.veloxV3Payload
+      const rows: BatchTaskRow[] = v3.mainItems.map((m: MainItem) => {
+        const resolvedTitle = m.taskNameByMode[v3.taskNameMode] ?? m.taskName
+        const customForTask =
+          v3.brollPolicy === 'CUSTOM' && v3.customBrollMap
+            ? v3.customBrollMap[
+                m.kind === 'file'
+                  ? m.file.fileId
+                  : m.kind === 'pair'
+                    ? m.basePart
+                    : m.folder.url
+              ]
+            : undefined
+        const encodedResources = encodeResourcesV3({
+          mainItem: m,
+          broll: v3.broll,
+          brollPolicy: v3.brollPolicy,
+          sharedAssets: v3.sharedAssets,
+          briefingDocs: v3.briefingDocs,
+          customBrollForTask: customForTask,
+          extraBRoll: data.bRoll,
+          extraSubmissionFolder: data.submitFolder,
+        })
+        // D4 — maybe-append brief block to notes per task
+        const notesWithBrief = maybeAppendBriefToNotes(
+          data.notes,
+          v3.briefingDocs,
+          v3.appendBriefToNotes,
+        )
+        return {
+          title: resolvedTitle,
+          // Use form-level taskType (one global type for the batch — UI prevents
+          // mixed types at apply time)
+          type: data.taskType || 'Short form',
+          jobPriceUSD: parseFloat(data.jobPriceUSD) || 0,
+          wageVND: parseFloat(data.editorFee) || 0,
+          clientId: v3.common.clientId ?? (data.clientId ? parseInt(data.clientId) : null),
+          assigneeId: v3.common.assigneeId ?? data.assigneeId ?? null,
+          deadline: v3.common.deadline ?? data.deadline ?? null,
+          rawFootage: encodedResources,
+          notes: notesWithBrief || null,
+        }
+      })
+      const result = await createTasksFromBatch(
+        { rows, exchangeRate: 25000 },
+        workspaceId,
+      )
+      if ('error' in result) throw new Error(result.error)
+
+      startTransition(() => {
+        router.refresh()
+      })
+      return
+    }
 
     // [Velox v1.0 Phase 2 redesign] When Velox applied N≥2 videos with linkFootage
     // toggle ON, options.veloxBatchRaw carries per-video URLs (1:1 with videoNames).

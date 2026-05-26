@@ -49,7 +49,7 @@ const PROVIDERS: ProviderMeta[] = [
         id: 'dropbox',
         label: 'Dropbox',
         description:
-            'Cho phép Quick Create scan video files trong folder Dropbox của bạn để tạo task hàng loạt.',
+            'Cho phép Velox scan video files trong folder Dropbox của bạn để tạo task hàng loạt.',
         icon: CloudUpload,
         color: 'blue',
         authorizeUrl: '/api/integrations/dropbox/authorize',
@@ -58,7 +58,7 @@ const PROVIDERS: ProviderMeta[] = [
         id: 'google_drive',
         label: 'Google Drive',
         description:
-            'Cho phép Quick Create scan video files trong folder Google Drive của bạn để tạo task hàng loạt.',
+            'Cho phép Velox scan video files trong folder Google Drive của bạn để tạo task hàng loạt.',
         icon: HardDrive,
         color: 'emerald',
         authorizeUrl: '/api/integrations/google-drive/authorize',
@@ -111,7 +111,7 @@ export default function ConnectorsPanel({ workspaceId, integrations }: Props) {
             <div>
                 <h3 className="text-lg font-bold text-zinc-100">Connectors</h3>
                 <p className="text-sm text-zinc-400 mt-1">
-                    Kết nối tài khoản Dropbox / Google Drive cá nhân để Quick Create có thể scan folder video và tạo task hàng loạt.
+                    Kết nối tài khoản Dropbox / Google Drive cá nhân để Velox có thể scan folder video và tạo task hàng loạt.
                 </p>
             </div>
 

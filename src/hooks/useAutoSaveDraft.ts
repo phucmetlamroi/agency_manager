@@ -48,9 +48,48 @@ export function useAutoSaveDraft<T>(
     const restoredRef = useRef(false)
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+    // ── Latest-value refs cho flush-on-disable (avoid adding deps to enabled effect) ──
+    const stateRef = useRef(state)
+    const keyRef = useRef(key)
+    const ttlMsRef = useRef(ttlMs)
+    const shouldSaveRef = useRef(shouldSave)
+    useEffect(() => {
+        stateRef.current = state
+        keyRef.current = key
+        ttlMsRef.current = ttlMs
+        shouldSaveRef.current = shouldSave
+    })
+
     // ── Reset restore flag khi disabled (modal đóng) → cho phép re-restore lần sau ──
     useEffect(() => {
         if (!enabled) {
+            // [Bug fix] Flush pending debounced save SYNCHRONOUSLY before disabling.
+            // Otherwise, if user closes modal within `debounceMs` (500ms) of a
+            // state change (vd: Velox apply → user click X ngay sau), the pending
+            // timer gets cleared (by the save effect's cleanup) and data is lost.
+            // We read state/key/ttl from refs so this effect doesn't need to
+            // re-fire on every state change.
+            if (debounceTimer.current) {
+                clearTimeout(debounceTimer.current)
+                debounceTimer.current = null
+            }
+            if (typeof window !== 'undefined' && restoredRef.current) {
+                try {
+                    const s = stateRef.current
+                    if (shouldSaveRef.current(s)) {
+                        const payload = JSON.stringify({
+                            state: s,
+                            expiresAt: Date.now() + ttlMsRef.current,
+                        })
+                        localStorage.setItem(keyRef.current, payload)
+                    }
+                } catch (err) {
+                    console.warn(
+                        `[useAutoSaveDraft] flush-on-disable failed key=${keyRef.current}:`,
+                        err,
+                    )
+                }
+            }
             restoredRef.current = false
             setRestored(false)
             setSavedAt(null)

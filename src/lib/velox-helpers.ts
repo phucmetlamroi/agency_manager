@@ -190,7 +190,7 @@ const FIELD_META: Record<keyof VeloxFormPrefill, string> = {
     jobPriceUSD: 'Áp dụng bảng giá',
     editorFee: 'Áp dụng bảng giá',
     rawFootage: 'Gắn link footage gốc',
-    notes: 'Kế thừa ghi chú tháng trước',
+    notes: 'Kế thừa ghi chú',
 }
 
 /** Get human-readable Velox feature name for a field — used in tooltips

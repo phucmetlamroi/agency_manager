@@ -457,7 +457,7 @@ export default function QuickCreateMode({
                     <Rocket size={18} className="text-violet-300" />
                 </div>
                 <div className="flex-1">
-                    <h3 className="text-sm font-extrabold text-violet-100">Tạo Task Nhanh</h3>
+                    <h3 className="text-sm font-extrabold text-violet-100">Velox</h3>
                     <p className="text-xs text-violet-200/70 mt-0.5 leading-relaxed">
                         Dán link folder Dropbox/Google Drive → tự động scan video, phân loại, tính giá và tạo task hàng loạt.
                     </p>
@@ -568,7 +568,7 @@ export default function QuickCreateMode({
                         onChange={(v) => setToggles({ ...toggles, applyPricing: v })}
                     />
                     <ToggleRow
-                        label="Kế thừa ghi chú tháng trước"
+                        label="Kế thừa ghi chú"
                         checked={toggles.inheritNotes}
                         onChange={(v) => setToggles({ ...toggles, inheritNotes: v })}
                     />

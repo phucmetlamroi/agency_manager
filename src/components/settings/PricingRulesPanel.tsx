@@ -102,7 +102,7 @@ export default function PricingRulesPanel({ workspaceId, rules, clients }: Props
                 <div>
                     <h3 className="text-lg font-bold text-zinc-100">Pricing Rules</h3>
                     <p className="text-sm text-zinc-400 mt-1">
-                        Định nghĩa cách tính giá tự động theo độ dài video. Quick Create dùng các rule này khi tạo task hàng loạt.
+                        Định nghĩa cách tính giá tự động theo độ dài video. Velox dùng các rule này khi tạo task hàng loạt.
                     </p>
                 </div>
                 <button
@@ -119,7 +119,7 @@ export default function PricingRulesPanel({ workspaceId, rules, clients }: Props
                     <Layers size={32} className="mx-auto text-zinc-600 mb-3" />
                     <p className="text-sm text-zinc-400 mb-1">Chưa có pricing rule nào.</p>
                     <p className="text-xs text-zinc-500">
-                        Tạo rule đầu tiên để Quick Create có thể tự động tính giá task.
+                        Tạo rule đầu tiên để Velox có thể tự động tính giá task.
                     </p>
                 </div>
             ) : (

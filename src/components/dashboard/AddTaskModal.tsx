@@ -1132,7 +1132,7 @@ export default function AddTaskModal({
                                         {quickMode ? (
                                             <>
                                                 <Rocket size={14} className="inline mr-1.5 text-violet-300" />
-                                                Tạo Task Nhanh
+                                                Velox
                                             </>
                                         ) : (
                                             <>Step {step + 1}. {stepTitle}:</>
@@ -1140,7 +1140,7 @@ export default function AddTaskModal({
                                     </h2>
                                     <p className="text-xs text-[#A1A1AA] mt-0.5">
                                         {quickMode
-                                            ? 'Quick Create — dán link folder, tạo batch trong 1 click'
+                                            ? 'Velox — dán link folder, tạo batch trong 1 click'
                                             : stepSubtitle}
                                     </p>
                                 </div>
@@ -1157,7 +1157,7 @@ export default function AddTaskModal({
                                                 ? 'Chuyển sang form thường'
                                                 : veloxFilledFields.size > 0
                                                   ? `Velox đã áp dụng cho ${veloxFilledFields.size} field`
-                                                  : 'Mở Velox (Tạo Task Nhanh)'
+                                                  : 'Mở Velox'
                                         }
                                         className={`relative flex items-center justify-center w-8 h-8 rounded-full transition-colors disabled:opacity-40 ${
                                             quickMode

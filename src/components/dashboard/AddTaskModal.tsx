@@ -23,10 +23,12 @@ import VeloxRawFootagesModal from "./VeloxRawFootagesModal"
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput"
 import {
     mapVeloxPayloadToFormData,
+    mapPayloadV3ToFormData,
     detectFieldConflicts,
     applyPrefill,
     getVeloxFieldMeta,
     type VeloxApplyPayload,
+    type VeloxApplyPayloadV3,
     type VeloxFormPrefill,
 } from "@/lib/velox-helpers"
 
@@ -70,14 +72,16 @@ interface AddTaskModalProps {
     }>
     users: Array<{ id: string; username: string; nickname?: string | null; displayName?: string | null }>
     /**
-     * Called on Add task click. `options.veloxBatchRaw` is populated when Velox
-     * applied N≥2 with linkFootage toggle ON — it carries 1 URL per videoList
-     * line. Caller should use it to route to createTasksFromBatch (per-row
-     * resources) instead of createBatchTasks (shared resources).
+     * Called on Add task click. Options:
+     *   - veloxBatchRaw (V1): per-row primary URL array (1-to-1 với videoList).
+     *     Used for V1 path → createTasksFromBatch with shared metadata.
+     *   - veloxV3Payload: full V3 payload with mainItems + broll + sharedAssets +
+     *     briefingDocs. Used for V3 path → createTasksFromBatch with per-task
+     *     encoded resources (RAW_HOOKS, RAW_AROLL, SHARED_xxx, BROLL_xxx, BRIEF).
      */
     onSubmit?: (
         data: TaskFormData,
-        options?: { veloxBatchRaw?: string[] },
+        options?: { veloxBatchRaw?: string[]; veloxV3Payload?: VeloxApplyPayloadV3 },
     ) => void | Promise<void>
     /** [Quick Create] Pricing rules available for this workspace */
     pricingRules?: Array<{
@@ -432,6 +436,12 @@ export default function AddTaskModal({
     // (shared rawFootage).
     const [veloxBatchRaw, setVeloxBatchRaw] = useState<string[]>([])
     const [rawFootagesModalOpen, setRawFootagesModalOpen] = useState(false)
+    /**
+     * [Velox Deep Scan v3.1] Stash full V3 payload after apply. Used at submit
+     * time to encode per-task resources (RAW_HOOKS, RAW_AROLL, SHARED_xxx,
+     * BROLL_xxx). Cleared on close / successful submit / V1 apply.
+     */
+    const [veloxV3Payload, setVeloxV3Payload] = useState<VeloxApplyPayloadV3 | null>(null)
 
     // Keep veloxBatchRaw aligned with videoList lines (pad with '' when user
     // adds lines, truncate when user removes lines).
@@ -588,8 +598,73 @@ export default function AddTaskModal({
         })
     }
 
-    const handleApplyVelox = (payload: VeloxApplyPayload) => {
-        const selectedRows = payload.rows.filter((r) => r.selected)
+    /* ────────────────────────────────────────────────────────────────
+       [Velox Deep Scan v3.1] V3 apply handler
+       ──────────────────────────────────────────────────────────────── */
+
+    const handleApplyVeloxV3 = (payload: VeloxApplyPayloadV3) => {
+        // Build pricing hints from MainItems (V3 doesn't carry per-row price in
+        // mainItem directly — only via taskNameByMode. Pricing happens server-side
+        // at createTasksFromBatch time. For form prefill we use durationSeconds
+        // for taskType classification.)
+        const pricingHints = payload.mainItems.map((m) => ({
+            durationSeconds: m.durationSeconds,
+        }))
+
+        const { prefill, filledFields } = mapPayloadV3ToFormData(payload, pricingHints)
+
+        // [Velox v1.0 Phase 2 redesign] For pair items with multi raw URL, store
+        // per-task primary URL into veloxBatchRaw. Step 4 chip shows count.
+        // (Spec D3 encoding happens later at submit time.)
+        if (payload.mainItems.length >= 2 && payload.broll !== null) {
+            // We use mainItem.previewUrl (primary RAW). RAW_HOOKS / SHARED_* /
+            // BROLL_* encoded fully at submit via DashboardActionWrapper.
+            delete prefill.rawFootage
+            filledFields.delete('rawFootage')
+            setVeloxBatchRaw(payload.mainItems.map((m) => m.previewUrl ?? ''))
+        } else if (payload.mainItems.length === 1) {
+            // Single — prefill rawFootage from primary
+            prefill.rawFootage = payload.mainItems[0].previewUrl
+            filledFields.add('rawFootage')
+            setVeloxBatchRaw([])
+        } else {
+            setVeloxBatchRaw([])
+        }
+
+        // Stash V3 result on form via assetsContext (consumed at submit)
+        setVeloxV3Payload(payload)
+
+        // Conflict detection (notes append exception)
+        const noteAppendException =
+            payload.appendBriefToNotes &&
+            Boolean(form.notes?.replace(/<[^>]*>/g, '').trim()) &&
+            payload.briefingDocs.length > 0
+
+        const conflicts = detectFieldConflicts(
+            form as unknown as Record<string, string>,
+            prefill,
+            { skipNotes: noteAppendException },
+        )
+
+        if (conflicts.size === 0) {
+            applyVeloxPrefill(prefill, filledFields, 'overwrite')
+            setQuickMode(false)
+            return
+        }
+
+        setPendingPrefill({ prefill, filledFields, conflicts })
+    }
+
+    const handleApplyVelox = (payload: VeloxApplyPayload | VeloxApplyPayloadV3) => {
+        // ─── V3 path: Deep Scan with full ScanResult ────────────────
+        if ('version' in payload && payload.version === 'v3') {
+            handleApplyVeloxV3(payload)
+            return
+        }
+
+        // ─── V1 path: legacy flat scan ──────────────────────────────
+        const v1 = payload as VeloxApplyPayload
+        const selectedRows = v1.rows.filter((r) => r.selected)
 
         // [Velox v1.0 Phase 2 redesign] N≥2 → keep wizard UI 100% (no Batch
         // Table). Map common fields normally via mapVeloxPayloadToFormData
@@ -599,9 +674,12 @@ export default function AddTaskModal({
         // "X link đã được trích xuất từ Velox" summary that opens an edit
         // popup. On submit, parent routes to createTasksFromBatch when this
         // state is set.
-        const { prefill, filledFields } = mapVeloxPayloadToFormData(payload)
+        const { prefill, filledFields } = mapVeloxPayloadToFormData(v1)
 
-        if (selectedRows.length >= 2 && payload.toggles.linkFootage) {
+        // Clear V3 state when V1 apply fires (mutually exclusive flow)
+        setVeloxV3Payload(null)
+
+        if (selectedRows.length >= 2 && v1.toggles.linkFootage) {
             // Drop rawFootage from prefill — UI uses the summary marker instead
             delete prefill.rawFootage
             filledFields.delete('rawFootage')
@@ -614,7 +692,7 @@ export default function AddTaskModal({
         // Spec 7.4 exception: when kế thừa note ON + form notes already has content
         // → automatic append (no dialog ask).
         const noteAppendException =
-            payload.toggles.inheritNotes &&
+            v1.toggles.inheritNotes &&
             Boolean(form.notes?.replace(/<[^>]*>/g, "").trim()) &&
             Boolean(prefill.notes)
 
@@ -689,13 +767,17 @@ export default function AddTaskModal({
     const handleSubmit = async () => {
         setSubmitting(true)
         try {
-            // [Velox v1.0 Phase 2 redesign] Pass per-video raw footage URLs
-            // (when Velox batch mode is active) so parent can route to
-            // createTasksFromBatch with per-row resources instead of the
-            // default createBatchTasks (which shares one rawFootage across
-            // all tasks).
+            // [Velox v1.0 Phase 2 + v3.1] Pass either V1 (veloxBatchRaw) or V3
+            // (veloxV3Payload) to parent. Parent routes accordingly:
+            //  - V3 payload → createTasksFromBatch với per-task encoded resources
+            //  - V1 batchRaw → createTasksFromBatch với primary RAW only
+            //  - Neither → standard createTask / createBatchTasks
             const options =
-                veloxBatchRaw.length > 0 ? { veloxBatchRaw } : undefined
+                veloxV3Payload != null
+                    ? { veloxV3Payload }
+                    : veloxBatchRaw.length > 0
+                      ? { veloxBatchRaw }
+                      : undefined
             await onSubmit?.(form, options)
             setSubmitted(true)
             // [Auto-save] Clear draft khi submit success — không còn cần restore
@@ -703,6 +785,7 @@ export default function AddTaskModal({
             // [Velox v1.0 spec 7.2] Reset cả form + Velox indicator state on successful create
             setVeloxFilledFields(new Set())
             setVeloxBatchRaw([])
+            setVeloxV3Payload(null)
         } catch (err: any) {
             toast.error(err?.message || "Lỗi khi tạo task. Vui lòng thử lại.")
         } finally {
@@ -716,6 +799,7 @@ export default function AddTaskModal({
         setStep(0)
         setVeloxFilledFields(new Set())
         setVeloxBatchRaw([])
+        setVeloxV3Payload(null)
         onClose()
     }
 

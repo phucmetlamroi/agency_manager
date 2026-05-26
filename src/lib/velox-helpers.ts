@@ -496,6 +496,303 @@ export interface ScanDiagnosticsV3 {
     prefixDetected?: string
 }
 
+/* ──────────────────────────────────────────────────────────────────── */
+/*  V3 Apply Payload + encoding                                         */
+/* ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * V3 Apply payload — what QuickCreateMode emits when user clicks "Áp dụng
+ * vào form". AddTaskModal.handleApplyVelox consumes this.
+ *
+ * Carries everything needed to render Step 4 textarea + per-task encoded
+ * resources at submit time.
+ */
+export interface VeloxApplyPayloadV3 {
+    /** Discriminator — distinguishes from VeloxApplyPayload V1 */
+    version: 'v3'
+    /** All MainItems user kept selected */
+    mainItems: MainItem[]
+    /** D2 final policy after user picked (PENDING resolved) */
+    brollPolicy: BrollMatchPolicy
+    /** Broll structure (null if no broll) */
+    broll: BrollV3 | null
+    /** Shared assets to append to every task */
+    sharedAssets: SharedAsset[]
+    /** Briefing docs detected */
+    briefingDocs: BriefingDoc[]
+    /** D4 — auto-append brief URL to notes_vi? */
+    appendBriefToNotes: boolean
+    /** D1 — taskName mode user picked (A/B/C) */
+    taskNameMode: TaskNameMode
+    /** Common fields (mirrored from V1 — client/assignee/deadline/inheritedNote) */
+    common: {
+        clientId: number | null
+        assigneeId: string | null
+        deadline: string | null
+        inheritedNote: string | null
+    }
+    /** Pattern detected (for diagnostics + UI feedback) */
+    primaryPattern: PrimaryPattern
+    /** Selected MainItem map (per-task custom broll if user used VeloxBrollManagerModal) */
+    customBrollMap?: Record<string, { generalUrls?: string[]; perVideoUrls?: string[]; looseUrls?: string[] }>
+}
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  Resources encoding (D3)                                             */
+/* ──────────────────────────────────────────────────────────────────── */
+
+/** Cap loose broll files at 5 per task to keep resources string readable */
+const BROLL_LOOSE_CAP = 5
+
+/**
+ * D3 — Encode resources field for ONE task created from a MainItem.
+ *
+ * Format (multiline):
+ *   RAW: <primary>
+ *   RAW_HOOKS: <hooks>          (only if pair)
+ *   RAW_EXTRA: <extras...>      (if any)
+ *   RAW_AROLL: <per-video aroll>
+ *   SHARED_CTA: <url>
+ *   SHARED_INTRO: <url>
+ *   SHARED_OUTRO: <url>
+ *   BROLL_GENERAL: <urls; >    (per D2 policy)
+ *   BROLL_PERVIDEO: <urls; >   (per D2 policy)
+ *   BROLL_LOOSE: <urls; >      (cap 5)
+ *   BRIEF: <urls>
+ */
+export function encodeResourcesV3(args: {
+    mainItem: MainItem
+    broll: BrollV3 | null
+    brollPolicy: BrollMatchPolicy
+    sharedAssets: SharedAsset[]
+    briefingDocs: BriefingDoc[]
+    /** Custom per-task override (from VeloxBrollManagerModal) */
+    customBrollForTask?: { generalUrls?: string[]; perVideoUrls?: string[]; looseUrls?: string[] }
+    /** Optional extra fields from form (bRoll/submitFolder) — appended for compat */
+    extraBRoll?: string
+    extraSubmissionFolder?: string
+}): string {
+    const lines: string[] = []
+    const {
+        mainItem,
+        broll,
+        brollPolicy,
+        sharedAssets,
+        briefingDocs,
+        customBrollForTask,
+        extraBRoll,
+        extraSubmissionFolder,
+    } = args
+
+    // RAW (primary)
+    lines.push(`RAW: ${mainItem.previewUrl}`)
+
+    // RAW_HOOKS + RAW_EXTRA (pair items)
+    if (mainItem.kind === 'pair') {
+        if (mainItem.hooks) {
+            lines.push(`RAW_HOOKS: ${mainItem.hooks.previewUrl}`)
+        }
+        for (const extra of mainItem.extras) {
+            lines.push(`RAW_EXTRA: ${extra.previewUrl}`)
+        }
+    }
+
+    // RAW_AROLL (per-video A-Roll)
+    if ('perVideoArollUrl' in mainItem && mainItem.perVideoArollUrl) {
+        lines.push(`RAW_AROLL: ${mainItem.perVideoArollUrl}`)
+    }
+
+    // SHARED assets (D3) — append cho mọi task
+    for (const sa of sharedAssets) {
+        const key = `SHARED_${sa.type.toUpperCase()}`
+        lines.push(`${key}: ${sa.file.previewUrl}`)
+    }
+
+    // BROLL per policy (D2)
+    if (customBrollForTask) {
+        // Custom per-task overrides
+        if (customBrollForTask.generalUrls?.length) {
+            lines.push(`BROLL_GENERAL: ${customBrollForTask.generalUrls.join('; ')}`)
+        }
+        if (customBrollForTask.perVideoUrls?.length) {
+            lines.push(`BROLL_PERVIDEO: ${customBrollForTask.perVideoUrls.join('; ')}`)
+        }
+        if (customBrollForTask.looseUrls?.length) {
+            const cap = customBrollForTask.looseUrls.slice(0, BROLL_LOOSE_CAP).join('; ')
+            const suffix =
+                customBrollForTask.looseUrls.length > BROLL_LOOSE_CAP
+                    ? ` (+${customBrollForTask.looseUrls.length - BROLL_LOOSE_CAP} more)`
+                    : ''
+            lines.push(`BROLL_LOOSE: ${cap}${suffix}`)
+        }
+    } else if (broll) {
+        const wantGeneral = brollPolicy === 'BOTH' || brollPolicy === 'GENERAL_ONLY'
+        const wantPerVideo = brollPolicy === 'BOTH' || brollPolicy === 'PERVIDEO_ONLY'
+
+        if (wantGeneral && broll.generalFolders.length > 0) {
+            const urls = broll.generalFolders.map((g) => g.url).join('; ')
+            lines.push(`BROLL_GENERAL: ${urls}`)
+        }
+        if (wantPerVideo && 'perVideoBrollUrls' in mainItem && mainItem.perVideoBrollUrls?.length) {
+            lines.push(`BROLL_PERVIDEO: ${mainItem.perVideoBrollUrls.join('; ')}`)
+        }
+        if (broll.looseFiles.length > 0) {
+            const capped = broll.looseFiles
+                .slice(0, BROLL_LOOSE_CAP)
+                .map((f) => f.previewUrl)
+                .join('; ')
+            const suffix =
+                broll.looseFiles.length > BROLL_LOOSE_CAP
+                    ? ` (+${broll.looseFiles.length - BROLL_LOOSE_CAP} more)`
+                    : ''
+            lines.push(`BROLL_LOOSE: ${capped}${suffix}`)
+        }
+    }
+
+    // BRIEF — append URL trong resources cho audit (notes_vi append xử lý riêng)
+    for (const brief of briefingDocs) {
+        lines.push(`BRIEF: ${brief.file.previewUrl}`)
+    }
+
+    // Form extras (user gõ tay vào form bRoll / submitFolder)
+    if (extraBRoll?.trim()) {
+        lines.push(`BROLL: ${extraBRoll.trim()}`)
+    }
+    if (extraSubmissionFolder?.trim()) {
+        lines.push(`SUBMISSION: ${extraSubmissionFolder.trim()}`)
+    }
+
+    return lines.join('\n')
+}
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  D4 — Append briefing URL to notes_vi                                */
+/* ──────────────────────────────────────────────────────────────────── */
+
+const BRIEF_MARKER = '[Brief đính kèm]'
+
+/**
+ * D4 — Maybe append briefing block to existing notes_vi (HTML).
+ *
+ * - Toggle OFF → return currentNotes unchanged
+ * - No briefs → return unchanged
+ * - Already has marker → skip (idempotent — re-apply doesn't double-append)
+ * - Empty notes → set block directly
+ * - Has content → append with 2 newline separator
+ *
+ * Format (plain text wrapped in <pre> for TipTap):
+ *   [Brief đính kèm]
+ *   📄 Name.pdf
+ *      https://...
+ */
+export function maybeAppendBriefToNotes(
+    currentNotes: string,
+    briefingDocs: BriefingDoc[],
+    toggleEnabled: boolean,
+): string {
+    if (!toggleEnabled || briefingDocs.length === 0) return currentNotes
+    // Idempotency check — if marker already in notes, don't double-append
+    if (currentNotes.includes(BRIEF_MARKER)) return currentNotes
+
+    const briefLines = briefingDocs
+        .map((b) => `📄 ${b.file.fullName}\n   ${b.file.previewUrl}`)
+        .join('\n')
+    const briefBlock = `${BRIEF_MARKER}\n${briefLines}`
+
+    // Strip HTML tags for empty check
+    const stripped = currentNotes.replace(/<[^>]*>/g, '').trim()
+    if (!stripped) {
+        // Empty notes — set as plain (caller may wrap in <p> if needed)
+        return briefBlock
+    }
+
+    return `${currentNotes}\n\n${briefBlock}`
+}
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  V3 → form prefill mapper                                            */
+/* ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * Convert V3 payload → form prefill. Different from V1's mapVeloxPayloadToFormData:
+ *
+ * - videoList: join all MainItem.taskName resolved per chosen mode
+ * - jobPriceUSD / editorFee: use row 1 as canonical (form has single fields,
+ *   per-task pricing only saved via createTasksFromBatch)
+ * - rawFootage: encoded for row 1 ONLY (Step 4 chip xử lý multi-row case)
+ * - notes: from inheritedNote + maybe appended brief
+ *
+ * The actual per-task resources encoding happens at submit time in
+ * DashboardActionWrapper (consumes payload + form bRoll/submitFolder).
+ */
+export function mapPayloadV3ToFormData(
+    payload: VeloxApplyPayloadV3,
+    pricingHints?: { priceUSD?: number; wageVND?: number; durationSeconds?: number }[],
+): { prefill: VeloxFormPrefill; filledFields: Set<keyof VeloxFormPrefill> } {
+    const filledFields = new Set<keyof VeloxFormPrefill>()
+    const prefill: VeloxFormPrefill = {}
+
+    // videoList — resolved taskName per mode
+    if (payload.mainItems.length > 0) {
+        const titles = payload.mainItems.map((m) => {
+            // Re-resolve with current mode (mainItem.taskName may have been from default)
+            const resolved = m.taskNameByMode[payload.taskNameMode] ?? m.taskName
+            return resolved
+        })
+        prefill.videoList = titles.join('\n')
+        filledFields.add('videoList')
+
+        // taskType — peek first MainItem (Short/Long classification needed but V3
+        // doesn't carry it explicitly per MainItem). Pricing hints can carry it.
+        // Default to 'Short form' if no hint.
+        const firstHint = pricingHints?.[0]
+        if (firstHint) {
+            prefill.taskType =
+                (firstHint.durationSeconds ?? 0) > 120 ? 'Long form' : 'Short form'
+            filledFields.add('taskType')
+            if (firstHint.priceUSD) {
+                prefill.jobPriceUSD = String(firstHint.priceUSD)
+                filledFields.add('jobPriceUSD')
+            }
+            if (firstHint.wageVND) {
+                prefill.editorFee = String(firstHint.wageVND)
+                filledFields.add('editorFee')
+            }
+        }
+    }
+
+    // Common fields
+    if (payload.common.clientId != null) {
+        prefill.clientId = String(payload.common.clientId)
+        filledFields.add('clientId')
+    }
+    if (payload.common.assigneeId) {
+        prefill.assigneeId = payload.common.assigneeId
+        filledFields.add('assigneeId')
+    }
+    if (payload.common.deadline) {
+        prefill.deadline = payload.common.deadline
+        filledFields.add('deadline')
+    }
+
+    // Notes — combine inherited + brief
+    if (payload.common.inheritedNote) {
+        prefill.notes = payload.common.inheritedNote
+        filledFields.add('notes')
+    }
+    const withBrief = maybeAppendBriefToNotes(
+        prefill.notes ?? '',
+        payload.briefingDocs,
+        payload.appendBriefToNotes,
+    )
+    if (withBrief && withBrief !== prefill.notes) {
+        prefill.notes = withBrief
+        filledFields.add('notes')
+    }
+
+    return { prefill, filledFields }
+}
+
 /**
  * V3 scan output — drop-in replacement for V1 `{ videos, provider, count }`.
  * V1 backward compat: `videos` field still populated (= mainItems flattened).

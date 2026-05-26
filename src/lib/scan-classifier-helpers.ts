@@ -167,8 +167,7 @@ export function getBriefingDocType(filename: string): BriefingDocType {
     }
 }
 
-/** Categorize a document file into ScriptDocType — same mapping as briefing
- *  (script & brief share document type set). */
+/** Categorize a doc or subtitle file into ScriptDocType. */
 export function getScriptDocType(filename: string): ScriptDocType {
     const ext = getExtension(filename)
     switch (ext) {
@@ -177,14 +176,24 @@ export function getScriptDocType(filename: string): ScriptDocType {
         case '.doc': return 'doc'
         case '.pdf': return 'pdf'
         case '.rtf': return 'rtf'
+        case '.srt': return 'srt'
+        case '.vtt': return 'vtt'
         default: return 'other'
     }
 }
 
+/** Subtitle file extensions (.srt SubRip, .vtt WebVTT). Treated as script
+ *  fallback when no doc với script keyword detected. */
+const SUBTITLE_EXTENSIONS = new Set(['.srt', '.vtt'])
+
+export function isSubtitleFile(filename: string): boolean {
+    return SUBTITLE_EXTENSIONS.has(getExtension(filename))
+}
+
 /**
- * Is this filename a script doc? Document file (PDF/DOC/DOCX/TXT/RTF) AND
- * filename contains script keyword. Script wins over briefing classification
- * (caller checks isScriptDoc first, falls back to BriefingDoc).
+ * Is this filename a script doc by KEYWORD match? Document file (PDF/DOC/DOCX/
+ * TXT/RTF) AND filename contains script/transcript/caption keyword. Subtitle
+ * files (.srt/.vtt) handled SEPARATELY as fallback.
  */
 export function isScriptDoc(filename: string): boolean {
     return isDocumentFile(filename) && RX_SCRIPT_KEYWORD.test(filename)

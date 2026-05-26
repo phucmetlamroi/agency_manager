@@ -36,6 +36,8 @@ const SCRIPT_ICON: Record<ScriptDoc['type'], string> = {
     doc: '📜',
     rtf: '📜',
     txt: '📜',
+    srt: '💬', // subtitle file
+    vtt: '💬',
     other: '📜',
 }
 

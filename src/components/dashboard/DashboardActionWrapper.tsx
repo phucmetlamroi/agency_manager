@@ -150,11 +150,13 @@ export default function DashboardActionWrapper({
           extraBRoll: data.bRoll,
           extraSubmissionFolder: data.submitFolder,
         })
-        // D4 — maybe-append brief block to notes per task
+        // D4 — maybe-append brief HTML block per task. Hyperlink format với
+        // per-task title: "📄 Brief của video <strong>X</strong>: <a>...</a>"
         const notesWithBrief = maybeAppendBriefToNotes(
           data.notes,
           v3.briefingDocs,
           v3.appendBriefToNotes,
+          resolvedTitle,
         )
         return {
           title: resolvedTitle,

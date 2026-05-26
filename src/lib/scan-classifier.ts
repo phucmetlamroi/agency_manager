@@ -42,6 +42,7 @@ import {
     getBriefingDocType,
     getScriptDocType,
     isScriptDoc,
+    isSubtitleFile,
     detectBrollVariant,
     scoreSubfolder,
     classifySubfolderFromScores,
@@ -232,8 +233,16 @@ function buildSubfolderProfile(raw: RawScanSubfolder): SubfolderProfile {
  *   - rootSubfolderProfiles classified
  */
 /**
- * Split document files into briefs vs scripts. Script keyword wins (checked
- * first via isScriptDoc), remaining docs become briefs.
+ * Split document/subtitle files into briefs vs scripts.
+ *
+ * Logic priority:
+ *  1. Docs với script keyword (script/transcript/caption/sub/subtitle/dialog) → scripts
+ *  2. Remaining docs (PDF/DOC/DOCX/TXT/RTF không match script keyword) → briefs
+ *  3. .srt / .vtt subtitle files → FALLBACK script (chỉ khi không có script-keyword doc)
+ *
+ * Subtitle là sub file. Nếu khách có sẵn file tên 'script.docx' → dùng đó làm
+ * script, sub bị ignore. Nếu không có script-named doc nhưng có .srt → .srt
+ * lấp chỗ trống làm script.
  */
 function splitDocsIntoBriefsAndScripts(files: FileEntry[]): {
     briefs: BriefingDoc[]
@@ -241,7 +250,13 @@ function splitDocsIntoBriefsAndScripts(files: FileEntry[]): {
 } {
     const briefs: BriefingDoc[] = []
     const scripts: ScriptDoc[] = []
+    const subtitleCandidates: FileEntry[] = []
+
     for (const f of files) {
+        if (isSubtitleFile(f.fullName)) {
+            subtitleCandidates.push(f)
+            continue
+        }
         if (!f.isDocument) continue
         if (isScriptDoc(f.fullName)) {
             scripts.push({ type: getScriptDocType(f.fullName), file: f })
@@ -249,6 +264,16 @@ function splitDocsIntoBriefsAndScripts(files: FileEntry[]): {
             briefs.push({ type: getBriefingDocType(f.fullName), file: f })
         }
     }
+
+    // Fallback — nếu không có doc nào tên là script, subtitle files (.srt/.vtt)
+    // được promote thành script. Cover case khách cung cấp file phụ đề thay vì
+    // tài liệu script chính thức.
+    if (scripts.length === 0 && subtitleCandidates.length > 0) {
+        for (const sub of subtitleCandidates) {
+            scripts.push({ type: getScriptDocType(sub.fullName), file: sub })
+        }
+    }
+
     return { briefs, scripts }
 }
 

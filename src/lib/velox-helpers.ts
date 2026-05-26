@@ -448,8 +448,10 @@ export interface BriefingDoc {
 }
 
 /** Script / transcript doc — split from BriefingDoc when filename contains
- *  script/transcript/caption keyword. URL goes into form.script (Scription field). */
-export type ScriptDocType = 'pdf' | 'docx' | 'doc' | 'rtf' | 'txt' | 'other'
+ *  script/transcript/caption keyword. URL goes into form.script (Scription field).
+ *  'srt'/'vtt' subtitle files cũng treated as script (fallback when no
+ *  script-keyword doc found). */
+export type ScriptDocType = 'pdf' | 'docx' | 'doc' | 'rtf' | 'txt' | 'srt' | 'vtt' | 'other'
 
 export interface ScriptDoc {
     type: ScriptDocType
@@ -684,44 +686,71 @@ export function encodeResourcesV3(args: {
 /*  D4 — Append briefing URL to notes_vi                                */
 /* ──────────────────────────────────────────────────────────────────── */
 
-const BRIEF_MARKER = '[Brief đính kèm]'
+/**
+ * Idempotent marker — text fragment xuất hiện trong every brief block. Used
+ * for skip-re-append check. Marker phải đủ unique để không match user's
+ * existing notes content.
+ */
+const BRIEF_MARKER = '📄 Brief của video'
+
+/** Escape user-input strings (filename, task title) trước khi embed vào HTML.
+ *  TipTap dùng HTML, nên cần escape để tránh broken markup / XSS. */
+function escapeHtml(s: string): string {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+}
 
 /**
- * D4 — Maybe append briefing block to existing notes_vi (HTML).
+ * D4 — Maybe append briefing block to existing notes_vi (HTML format cho TipTap).
  *
  * - Toggle OFF → return currentNotes unchanged
  * - No briefs → return unchanged
  * - Already has marker → skip (idempotent — re-apply doesn't double-append)
  * - Empty notes → set block directly
- * - Has content → append with 2 newline separator
+ * - Has content → append with empty <p></p> separator (TipTap newline)
  *
- * Format (plain text wrapped in <pre> for TipTap):
- *   [Brief đính kèm]
- *   📄 Name.pdf
- *      https://...
+ * HTML format (per-task, với hyperlink):
+ *   <p>📄 Brief của video "<strong>${taskTitle}</strong>":
+ *     <a href="${url}" target="_blank" rel="noopener">${filename}</a>
+ *   </p>
+ *
+ * Multiple briefs → list trong cùng paragraph:
+ *   <p>📄 Brief của video "<strong>X</strong>":
+ *     <a href="url1">name1</a>, <a href="url2">name2</a>
+ *   </p>
  */
 export function maybeAppendBriefToNotes(
     currentNotes: string,
     briefingDocs: BriefingDoc[],
     toggleEnabled: boolean,
+    taskTitle?: string,
 ): string {
     if (!toggleEnabled || briefingDocs.length === 0) return currentNotes
     // Idempotency check — if marker already in notes, don't double-append
     if (currentNotes.includes(BRIEF_MARKER)) return currentNotes
 
-    const briefLines = briefingDocs
-        .map((b) => `📄 ${b.file.fullName}\n   ${b.file.previewUrl}`)
-        .join('\n')
-    const briefBlock = `${BRIEF_MARKER}\n${briefLines}`
+    const titleHtml = taskTitle ? `"<strong>${escapeHtml(taskTitle)}</strong>"` : 'này'
+    const linksHtml = briefingDocs
+        .map((b) => {
+            const safeName = escapeHtml(b.file.fullName)
+            const safeUrl = escapeHtml(b.file.previewUrl)
+            return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeName}</a>`
+        })
+        .join(', ')
+
+    const briefBlock = `<p>${BRIEF_MARKER} ${titleHtml}: ${linksHtml}</p>`
 
     // Strip HTML tags for empty check
     const stripped = currentNotes.replace(/<[^>]*>/g, '').trim()
     if (!stripped) {
-        // Empty notes — set as plain (caller may wrap in <p> if needed)
         return briefBlock
     }
 
-    return `${currentNotes}\n\n${briefBlock}`
+    return `${currentNotes}<p></p>${briefBlock}`
 }
 
 /* ──────────────────────────────────────────────────────────────────── */
@@ -790,18 +819,12 @@ export function mapPayloadV3ToFormData(
         filledFields.add('deadline')
     }
 
-    // Notes — combine inherited + brief
+    // Notes — chỉ set inheritedNote ở form prefill. Brief append với hyperlink
+    // + per-task title CHẠY Ở SUBMIT TIME (DashboardActionWrapper V3) để mỗi
+    // task có brief context riêng. Form-level apply không có task name nên
+    // không thể tạo per-task hyperlink.
     if (payload.common.inheritedNote) {
         prefill.notes = payload.common.inheritedNote
-        filledFields.add('notes')
-    }
-    const withBrief = maybeAppendBriefToNotes(
-        prefill.notes ?? '',
-        payload.briefingDocs,
-        payload.appendBriefToNotes,
-    )
-    if (withBrief && withBrief !== prefill.notes) {
-        prefill.notes = withBrief
         filledFields.add('notes')
     }
 

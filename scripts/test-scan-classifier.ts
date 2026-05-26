@@ -571,7 +571,7 @@ group('Script detection — split docs into briefs vs scripts', () => {
     })
 })
 
-group('maybeAppendBriefToNotes (D4)', () => {
+group('maybeAppendBriefToNotes (D4 — hyperlink HTML + per-task title)', () => {
     test('Toggle OFF → no change', () => {
         const before = '<p>Original</p>'
         const brief = file({ name: 'Brief.pdf' })
@@ -579,22 +579,139 @@ group('maybeAppendBriefToNotes (D4)', () => {
         expect(result, before, 'unchanged when toggle off')
     })
 
-    test('Toggle ON + empty notes → set brief block', () => {
-        const result = maybeAppendBriefToNotes('', [{ type: 'pdf', file: file({ name: 'B.pdf' }) }], true)
-        expectTruthy(result.includes('[Brief đính kèm]'), 'has marker')
-        expectTruthy(result.includes('B.pdf'), 'has filename')
+    test('Toggle ON + empty notes → set hyperlink HTML block', () => {
+        const result = maybeAppendBriefToNotes(
+            '',
+            [{ type: 'pdf', file: file({ name: 'B.pdf' }) }],
+            true,
+            'Video 1',
+        )
+        expectTruthy(result.includes('📄 Brief của video'), 'has marker')
+        expectTruthy(result.includes('<strong>Video 1</strong>'), 'task title bolded')
+        expectTruthy(result.includes('<a href='), 'hyperlink anchor')
+        expectTruthy(result.includes('B.pdf</a>'), 'anchor text = filename')
+        expectTruthy(result.includes('target="_blank"'), 'new tab')
     })
 
-    test('Toggle ON + notes has content → append với 2 newline', () => {
-        const result = maybeAppendBriefToNotes('Existing', [{ type: 'pdf', file: file({ name: 'B.pdf' }) }], true)
-        expectTruthy(result.startsWith('Existing'), 'preserves existing')
-        expectTruthy(result.includes('\n\n[Brief đính kèm]'), '2 newline separator')
+    test('Toggle ON + notes has content → append với <p></p> separator', () => {
+        const result = maybeAppendBriefToNotes(
+            '<p>Existing</p>',
+            [{ type: 'pdf', file: file({ name: 'B.pdf' }) }],
+            true,
+            'Test Task',
+        )
+        expectTruthy(result.startsWith('<p>Existing</p>'), 'preserves existing')
+        expectTruthy(result.includes('<p></p><p>📄 Brief của video'), 'empty <p> separator')
+    })
+
+    test('Multiple briefs → joined trong cùng paragraph', () => {
+        const result = maybeAppendBriefToNotes(
+            '',
+            [
+                { type: 'pdf', file: file({ name: 'B1.pdf' }) },
+                { type: 'docx', file: file({ name: 'B2.docx' }) },
+            ],
+            true,
+            'Video',
+        )
+        expectTruthy(result.includes('B1.pdf</a>, <a'), '2 hyperlinks separated by comma')
+        expectTruthy(result.includes('B2.docx</a>'), '2nd link present')
+    })
+
+    test('No task title → fallback "này"', () => {
+        const result = maybeAppendBriefToNotes(
+            '',
+            [{ type: 'pdf', file: file({ name: 'B.pdf' }) }],
+            true,
+            // taskTitle omitted
+        )
+        expectTruthy(result.includes('video này'), 'fallback "này" when no title')
     })
 
     test('Idempotent — re-append skips when marker already there', () => {
-        const first = maybeAppendBriefToNotes('Note', [{ type: 'pdf', file: file({ name: 'B.pdf' }) }], true)
-        const second = maybeAppendBriefToNotes(first, [{ type: 'pdf', file: file({ name: 'B.pdf' }) }], true)
+        const first = maybeAppendBriefToNotes(
+            '',
+            [{ type: 'pdf', file: file({ name: 'B.pdf' }) }],
+            true,
+            'Task 1',
+        )
+        const second = maybeAppendBriefToNotes(
+            first,
+            [{ type: 'pdf', file: file({ name: 'B.pdf' }) }],
+            true,
+            'Task 1',
+        )
         expect(first, second, 'second call no-op')
+    })
+
+    test('XSS safe — special chars escaped', () => {
+        const result = maybeAppendBriefToNotes(
+            '',
+            [{ type: 'pdf', file: file({ name: 'evil<script>.pdf' }) }],
+            true,
+            'Task <img>',
+        )
+        expectTruthy(!result.includes('<script>'), 'script tag escaped')
+        expectTruthy(result.includes('&lt;script&gt;'), 'filename escaped')
+        expectTruthy(result.includes('&lt;img&gt;'), 'task title escaped')
+    })
+})
+
+group('SRT fallback — subtitle files as script', () => {
+    test('SRT alone → promoted to script', () => {
+        const t = tree(
+            [
+                file({ name: 'subtitles.srt' }),
+            ],
+            [
+                folder('Inner', 1, [file({ name: 'video.mp4', duration: 30 })]),
+            ],
+        )
+        t.rootPath = '/Wrapper'
+        const result = classifyScan(t)
+        expect(result.scriptDocs.length, 1, '.srt promoted to script')
+        expect(result.scriptDocs[0].type, 'srt', 'type = srt')
+    })
+
+    test('SRT + script.txt → script.txt wins, srt ignored', () => {
+        const t = tree(
+            [
+                file({ name: 'subtitles.srt' }),
+                file({ name: 'Final Script.txt' }),
+            ],
+            [
+                folder('Inner', 1, [file({ name: 'video.mp4', duration: 30 })]),
+            ],
+        )
+        t.rootPath = '/Wrapper'
+        const result = classifyScan(t)
+        expect(result.scriptDocs.length, 1, 'only script.txt in scripts')
+        expect(result.scriptDocs[0].file.fullName, 'Final Script.txt', 'script-keyword file wins')
+    })
+
+    test('VTT alone → promoted to script', () => {
+        const t = tree(
+            [file({ name: 'captions.vtt' })],
+            [folder('Inner', 1, [file({ name: 'video.mp4', duration: 30 })])],
+        )
+        t.rootPath = '/Wrapper'
+        const result = classifyScan(t)
+        expect(result.scriptDocs.length, 1, '.vtt promoted')
+        expect(result.scriptDocs[0].type, 'vtt', 'type = vtt')
+    })
+
+    test('SRT + brief.pdf → srt becomes script, pdf stays brief', () => {
+        const t = tree(
+            [
+                file({ name: 'subtitles.srt' }),
+                file({ name: 'brief.pdf' }),
+            ],
+            [folder('Inner', 1, [file({ name: 'video.mp4', duration: 30 })])],
+        )
+        t.rootPath = '/Wrapper'
+        const result = classifyScan(t)
+        expect(result.scriptDocs.length, 1, 'srt = 1 script')
+        expect(result.briefingDocs.length, 1, 'brief = 1 brief')
     })
 })
 

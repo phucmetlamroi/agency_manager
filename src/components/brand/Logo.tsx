@@ -1,0 +1,29 @@
+import * as React from 'react'
+
+/**
+ * HustlyTasker brand logo (wordmark/icon, aspect ~2:1).
+ *
+ * Inline SVG → `fill="currentColor"` thừa kế từ CSS `color`. Dùng class
+ * `text-white` / `text-violet-300` / etc. để theme. Glow effect tự thêm
+ * qua className `drop-shadow-[...]`.
+ *
+ * Source file: public/logo.svg (cùng path data).
+ */
+export function Logo({ className, ...props }: React.SVGProps<SVGSVGElement>) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 669 333"
+            preserveAspectRatio="xMidYMid meet"
+            role="img"
+            aria-label="HustlyTasker"
+            fill="currentColor"
+            className={className}
+            {...props}
+        >
+            <g transform="translate(0,333) scale(0.1,-0.1)" stroke="none">
+                <path d="M2440 2441 c-14 -27 -14 -2165 0 -2192 10 -18 23 -19 198 -19 133 0 192 4 200 12 9 9 12 74 12 230 0 240 1 238 -66 326 -86 112 -140 262 -164 452 -11 95 0 127 18 49 52 -224 206 -421 410 -523 179 -90 411 -92 585 -5 209 105 356 288 418 519 13 47 29 75 29 49 0 -42 -23 -193 -40 -259 -22 -86 -65 -186 -106 -245 -15 -22 -43 -62 -61 -89 l-33 -48 0 -222 c0 -159 3 -225 12 -234 19 -19 382 -17 397 2 9 11 12 271 10 1074 -1 582 -5 1077 -8 1098 l-6 39 -194 3 c-134 2 -198 -1 -207 -9 -12 -9 -14 -94 -14 -479 0 -377 -3 -485 -15 -556 -46 -260 -234 -434 -470 -434 -207 0 -369 126 -449 350 l-31 85 -3 510 c-2 338 -7 514 -14 522 -8 10 -60 13 -204 13 -181 0 -194 -1 -204 -19z" />
+            </g>
+        </svg>
+    )
+}

@@ -1009,7 +1009,11 @@ export default function AddTaskModal({
                                     ["script", "Scription", "Paste scription"],
                                 ] as const
                             ).map(([key, label, placeholder]) => {
-                                const isVeloxFilled = key === 'rawFootage' && veloxFilledFields.has('rawFootage')
+                                // VeloxField indicator: 'rawFootage' (link footage) hoặc 'script'
+                                // (script/transcript). Other fields chưa được Velox prefill.
+                                const isVeloxFilled =
+                                    (key === 'rawFootage' && veloxFilledFields.has('rawFootage')) ||
+                                    (key === 'script' && veloxFilledFields.has('script'))
 
                                 // [Velox v1.0 Phase 2 redesign] When N≥2 raw links exist, show
                                 // a clickable summary instead of the single input. Click opens
@@ -1055,7 +1059,9 @@ export default function AddTaskModal({
                                             <VeloxField
                                                 filled={true}
                                                 fieldName={key}
-                                                featureName={getVeloxFieldMeta('rawFootage')}
+                                                featureName={getVeloxFieldMeta(
+                                                    key === 'script' ? 'script' : 'rawFootage',
+                                                )}
                                             >
                                                 {fieldEl}
                                             </VeloxField>

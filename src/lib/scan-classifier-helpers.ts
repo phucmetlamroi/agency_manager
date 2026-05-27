@@ -14,6 +14,7 @@ import type {
     BrollVariant,
     SharedAssetType,
     BriefingDocType,
+    ScriptDocType,
     TaskNameMode,
 } from './velox-helpers'
 
@@ -83,6 +84,16 @@ export const RX_SHARED_ASSET =
 /** Briefing keyword (for non-video files at root) */
 export const RX_BRIEFING_KEYWORD =
     /brief|spec|brand|guideline|requirements|deck|kit|sow|scope|outline/i
+
+/**
+ * Script / transcript keyword (for non-video text files).
+ *
+ * User confirm: ".txt files với tên là script, transcript, ... là file
+ * script của khách → link đi vào Scription (form.script)". Apply liberally
+ * across document types (.txt/.doc/.docx/.pdf/.rtf) khi tên match.
+ */
+export const RX_SCRIPT_KEYWORD =
+    /\b(scripts?|transcripts?|captions?|subs?|subtitles?|dialog(ue)?s?)\b/i
 
 /** Wrapper folder name keywords (D5 signal 3) */
 export const RX_WRAPPER_FOLDER_HINT =
@@ -154,6 +165,38 @@ export function getBriefingDocType(filename: string): BriefingDocType {
         case '.txt': return 'txt'
         default: return 'other'
     }
+}
+
+/** Categorize a doc or subtitle file into ScriptDocType. */
+export function getScriptDocType(filename: string): ScriptDocType {
+    const ext = getExtension(filename)
+    switch (ext) {
+        case '.txt': return 'txt'
+        case '.docx': return 'docx'
+        case '.doc': return 'doc'
+        case '.pdf': return 'pdf'
+        case '.rtf': return 'rtf'
+        case '.srt': return 'srt'
+        case '.vtt': return 'vtt'
+        default: return 'other'
+    }
+}
+
+/** Subtitle file extensions (.srt SubRip, .vtt WebVTT). Treated as script
+ *  fallback when no doc với script keyword detected. */
+const SUBTITLE_EXTENSIONS = new Set(['.srt', '.vtt'])
+
+export function isSubtitleFile(filename: string): boolean {
+    return SUBTITLE_EXTENSIONS.has(getExtension(filename))
+}
+
+/**
+ * Is this filename a script doc by KEYWORD match? Document file (PDF/DOC/DOCX/
+ * TXT/RTF) AND filename contains script/transcript/caption keyword. Subtitle
+ * files (.srt/.vtt) handled SEPARATELY as fallback.
+ */
+export function isScriptDoc(filename: string): boolean {
+    return isDocumentFile(filename) && RX_SCRIPT_KEYWORD.test(filename)
 }
 
 /* ════════════════════════════════════════════════════════════════════════ */

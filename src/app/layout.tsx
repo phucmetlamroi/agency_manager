@@ -16,13 +16,13 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Agency Manager',
-  description: 'Task & Payroll Management',
+  title: 'HustlyTasker',
+  description: 'Quản lý task chuyên biệt cho agency dựng video — task lifecycle, dual-currency payroll, Velox auto-batch.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'AgencyManager',
+    title: 'HustlyTasker',
   },
 }
 

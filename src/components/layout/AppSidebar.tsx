@@ -43,6 +43,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Logo } from "@/components/brand/Logo"
 
 type ViewRole = 'ADMIN' | 'USER'
 
@@ -167,22 +168,11 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                 }}
             >
                 {/* Mobile logo */}
-                <div className="flex items-center gap-3">
-                    <div
-                        className="w-9 h-9 flex items-center justify-center flex-shrink-0"
-                        style={{
-                            borderRadius: 10,
-                            background: LOGO_ICON_BG,
-                            boxShadow: LOGO_ICON_GLOW,
-                        }}
-                    >
-                        <span className="text-white font-extrabold text-lg" style={{ fontFamily: FONT }}>H</span>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="font-extrabold text-base text-white tracking-tight" style={{ fontFamily: FONT }}>
-                            Hustly<span style={{ color: "#8B5CF6" }}>Tasker</span>
-                        </span>
-                    </div>
+                <div className="flex items-center gap-2">
+                    <Logo
+                        className="h-7 w-auto text-white"
+                        style={{ filter: "drop-shadow(0 0 8px rgba(139,92,246,0.35))" }}
+                    />
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -209,24 +199,13 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 className="flex items-center gap-3 h-[72px] px-5"
                                 style={{ borderBottom: `1px solid ${DIVIDER}` }}
                             >
-                                <div
-                                    className="w-9 h-9 flex items-center justify-center flex-shrink-0"
-                                    style={{
-                                        borderRadius: 10,
-                                        background: LOGO_ICON_BG,
-                                        boxShadow: LOGO_ICON_GLOW,
-                                    }}
-                                >
-                                    <span className="text-white font-extrabold text-lg" style={{ fontFamily: FONT }}>H</span>
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="font-extrabold text-base text-white tracking-tight" style={{ fontFamily: FONT }}>
-                                        Hustly<span style={{ color: "#8B5CF6" }}>Tasker</span>
-                                    </span>
-                                    <span className="text-[9px] uppercase font-mono tracking-[0.18em]" style={{ color: INACTIVE_TEXT }}>
-                                        {viewRole === 'ADMIN' ? 'Admin' : 'User'} &middot; v2.4
-                                    </span>
-                                </div>
+                                <Logo
+                                    className="h-8 w-auto text-white shrink-0"
+                                    style={{ filter: "drop-shadow(0 0 10px rgba(139,92,246,0.4))" }}
+                                />
+                                <span className="text-[9px] uppercase font-mono tracking-[0.18em] ml-auto" style={{ color: INACTIVE_TEXT }}>
+                                    {viewRole === 'ADMIN' ? 'Admin' : 'User'} &middot; v2.4
+                                </span>
                             </div>
 
                             {/* [User dashboard redesign] Profile/Workspace switcher moved to:
@@ -334,27 +313,33 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                     )}
                     style={{ borderBottom: `1px solid ${DIVIDER}` }}
                 >
-                    <div
-                        className="w-10 h-10 flex items-center justify-center flex-shrink-0"
-                        style={{
-                            borderRadius: 12,
-                            background: LOGO_ICON_BG,
-                            boxShadow: LOGO_ICON_GLOW,
-                        }}
-                    >
-                        <span className="text-white font-extrabold text-xl" style={{ fontFamily: FONT }}>H</span>
-                    </div>
-                    {!collapsed && (
-                        <div className="flex flex-col overflow-hidden flex-1">
-                            <span className="font-extrabold text-[18px] text-white tracking-tight whitespace-nowrap" style={{ fontFamily: FONT, letterSpacing: "-0.02em" }}>
-                                Hustly<span style={{ color: "#8B5CF6" }}>Tasker</span>
-                            </span>
-                            <span className="text-[9px] uppercase font-mono tracking-[0.18em] whitespace-nowrap" style={{ color: INACTIVE_TEXT }}>
+                    {collapsed ? (
+                        // Collapsed → small icon trong violet box (logo wordmark ratio 2:1 ko fit square)
+                        <div
+                            className="w-10 h-10 flex items-center justify-center flex-shrink-0 overflow-hidden"
+                            style={{
+                                borderRadius: 12,
+                                background: LOGO_ICON_BG,
+                                boxShadow: LOGO_ICON_GLOW,
+                            }}
+                        >
+                            <Logo className="h-6 w-auto text-white" />
+                        </div>
+                    ) : (
+                        // Expanded → full wordmark + version badge
+                        <div className="flex items-center gap-3 overflow-hidden flex-1">
+                            <Logo
+                                className="h-9 w-auto text-white shrink-0"
+                                style={{ filter: "drop-shadow(0 0 12px rgba(139,92,246,0.45))" }}
+                            />
+                            <span
+                                className="text-[9px] uppercase font-mono tracking-[0.18em] whitespace-nowrap ml-auto"
+                                style={{ color: INACTIVE_TEXT, fontFamily: FONT }}
+                            >
                                 {viewRole === 'ADMIN' ? 'Admin' : 'User'} &middot; v2.4
                             </span>
                         </div>
                     )}
-                    {/* [bell-cleanup] NotificationBell removed — moved to DashboardTopBar (admin) + ProfileWorkspaceSwitcher (user view) */}
                 </div>
 
                 {/* ── Collapse toggle ── */}

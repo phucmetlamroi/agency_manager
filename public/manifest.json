@@ -1,17 +1,19 @@
 {
-    "name": "Agency Task Manager",
-    "short_name": "AgencyManager",
+    "name": "HustlyTasker",
+    "short_name": "HustlyTasker",
+    "description": "Quản lý task chuyên biệt cho agency dựng video — task lifecycle, dual-currency payroll, Velox auto-batch.",
     "start_url": "/login",
     "scope": "/",
     "display": "standalone",
-    "background_color": "#000000",
-    "theme_color": "#000000",
+    "background_color": "#0A0A0A",
+    "theme_color": "#8B5CF6",
     "orientation": "portrait-primary",
     "icons": [
         {
             "src": "/favicon.ico",
-            "sizes": "any",
-            "type": "image/x-icon"
+            "sizes": "16x16 32x32 48x48",
+            "type": "image/x-icon",
+            "purpose": "any"
         }
     ]
 }

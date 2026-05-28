@@ -90,8 +90,13 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         // - Hoàn tất: completed, no more deadline meaning, lose overdue label
         // - Tạm ngưng: task paused nhưng deadline vẫn relevant để admin biết lúc resume
         // - Quá hạn: deadline preserved để hiển thị "overdue by N days" cho audit
-        const restrictedStatuses = ['Revision', 'Hoàn tất']
-        const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}
+        //
+        // [Status↔Deadline] Centralized rule trong task-invariants.ts.
+        // STATUS_REQUIRES_NULL_DEADLINE = ['Revision', 'Hoàn tất'].
+        const { STATUS_REQUIRES_NULL_DEADLINE } = await import('@/lib/task-invariants')
+        const deadlineUpdate = STATUS_REQUIRES_NULL_DEADLINE.includes(newStatus as any)
+            ? { deadline: null }
+            : {}
 
         // --- SMART STOPWATCH LOGIC ---
         // (Removed to save database usage)

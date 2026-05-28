@@ -60,6 +60,13 @@ export async function updateTask(id: string, data: any, workspaceId: string) {
             enforceAssigneeStatusInvariant(data, task)
         }
 
+        // [Status↔Deadline] Enforce status='Revision'/'Hoàn tất' → deadline=null.
+        // Reuse task fetched at line 39 — no extra query needed.
+        if ('status' in data || 'deadline' in data) {
+            const { enforceStatusDeadlineInvariant } = await import('@/lib/task-invariants')
+            enforceStatusDeadlineInvariant(data, task)
+        }
+
         await workspacePrisma.task.update({ where: { id }, data })
 
         revalidatePath(`/${workspaceId}/admin`)

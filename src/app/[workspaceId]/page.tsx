@@ -1,10 +1,11 @@
 import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 
-// UUID v4 / v7 / cuid pattern — workspace IDs from Prisma uuid() helper.
-// Prevents static-asset paths like /icon.png from being matched as a workspaceId
-// route (manifest.json scan + 404 fallthrough → infinite redirect chain bug).
-const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// [Workspace ID] Permissive regex — allows UUID + legacy slug IDs (vd:
+// 'legacy-feb-2026', 'legacy-mar-2026' của Hustly Team được migrate từ legacy
+// data). Vẫn reject file paths có dấu chấm như '/icon.png' từ PWA scan
+// (prevents infinite redirect chain bug).
+const WORKSPACE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/
 
 export default async function WorkspaceRootRedirect({
     params

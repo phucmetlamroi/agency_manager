@@ -1,15 +1,18 @@
 import { logout } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
-import { verifyActiveSession } from '@/lib/security'
+import { verifyActiveSession, getWorkspaceMembership } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import MobileLayoutShell from '@/components/layout/MobileLayoutShell'
-import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
 import { isMobileDevice } from '@/lib/device'
 
-const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// [Workspace ID] Permissive regex — allows UUID format AND legacy slug IDs
+// (vd: 'legacy-feb-2026', 'legacy-mar-2026' của Hustly Team profile được migrate
+// từ legacy data). Strict UUID check trước đây block 404 cho 2 workspace này.
+// Vẫn reject file paths (có dấu chấm) như '/icon.png/dashboard' từ PWA scan.
+const WORKSPACE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/
 
 // User Layout — uses the unified AppSidebar with viewRole='USER'
 // Mirrors AdminLayout structure for visual & UX parity.
@@ -42,10 +45,8 @@ export default async function UserLayout({
     const dbUserRole = dbUser.role
 
     // Query workspace membership for role-based nav filtering
-    const membership = await prisma.workspaceMember.findUnique({
-        where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
-        select: { role: true },
-    })
+    // [Perf] Uses request-scoped cache — deduped if page also calls verifyWorkspaceAccess.
+    const membership = await getWorkspaceMembership(dbUser.id, workspaceId)
     const workspaceRole = membership?.role ?? undefined
 
     // [Sprint B] Trial banner removed.

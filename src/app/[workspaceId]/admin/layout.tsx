@@ -1,16 +1,19 @@
 import { logout } from '@/lib/auth'
 // Removed duplicate globals.css import
 import { redirect, notFound } from 'next/navigation'
-import { verifyActiveSession } from '@/lib/security'
+import { verifyActiveSession, getWorkspaceMembership } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import MobileLayoutShell from '@/components/layout/MobileLayoutShell'
-import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
 import { isMobileDevice } from '@/lib/device'
 
-const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// [Workspace ID] Permissive regex — allows UUID format AND legacy slug IDs
+// (vd: 'legacy-feb-2026', 'legacy-mar-2026' của Hustly Team profile được migrate
+// từ legacy data). Strict UUID check trước đây block 404 cho 2 workspace này.
+// Vẫn reject file paths (có dấu chấm) như '/icon.png/admin' từ PWA scan.
+const WORKSPACE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/
 
 export default async function AdminLayout({
     children,
@@ -38,10 +41,8 @@ export default async function AdminLayout({
 
     // Workspace-scoped authorization: allow access if user is
     // (a) global ADMIN/treasurer, OR (b) OWNER/ADMIN of this workspace.
-    const membership = await prisma.workspaceMember.findUnique({
-        where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
-        select: { role: true },
-    })
+    // [Perf] Uses request-scoped cache — deduped if page also calls verifyWorkspaceAccess.
+    const membership = await getWorkspaceMembership(dbUser.id, workspaceId)
     const workspaceRole = membership?.role ?? null
     const canAccessAdmin = isAdmin || workspaceRole === 'OWNER' || workspaceRole === 'ADMIN'
 

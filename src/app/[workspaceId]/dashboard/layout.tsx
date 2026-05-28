@@ -1,9 +1,10 @@
 import { logout } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
-import { verifyActiveSession, getWorkspaceMembership } from '@/lib/security'
+import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import MobileLayoutShell from '@/components/layout/MobileLayoutShell'
+import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
 import { isMobileDevice } from '@/lib/device'
@@ -45,8 +46,10 @@ export default async function UserLayout({
     const dbUserRole = dbUser.role
 
     // Query workspace membership for role-based nav filtering
-    // [Perf] Uses request-scoped cache — deduped if page also calls verifyWorkspaceAccess.
-    const membership = await getWorkspaceMembership(dbUser.id, workspaceId)
+    const membership = await prisma.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
+        select: { role: true },
+    })
     const workspaceRole = membership?.role ?? undefined
 
     // [Sprint B] Trial banner removed.

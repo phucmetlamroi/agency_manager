@@ -1,10 +1,11 @@
 import { logout } from '@/lib/auth'
 // Removed duplicate globals.css import
 import { redirect, notFound } from 'next/navigation'
-import { verifyActiveSession, getWorkspaceMembership } from '@/lib/security'
+import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import MobileLayoutShell from '@/components/layout/MobileLayoutShell'
+import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
 import { isMobileDevice } from '@/lib/device'
@@ -41,8 +42,10 @@ export default async function AdminLayout({
 
     // Workspace-scoped authorization: allow access if user is
     // (a) global ADMIN/treasurer, OR (b) OWNER/ADMIN of this workspace.
-    // [Perf] Uses request-scoped cache — deduped if page also calls verifyWorkspaceAccess.
-    const membership = await getWorkspaceMembership(dbUser.id, workspaceId)
+    const membership = await prisma.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
+        select: { role: true },
+    })
     const workspaceRole = membership?.role ?? null
     const canAccessAdmin = isAdmin || workspaceRole === 'OWNER' || workspaceRole === 'ADMIN'
 

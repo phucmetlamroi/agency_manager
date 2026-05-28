@@ -92,3 +92,73 @@ export function isAssigneeStatusConsistent(
     if (task.assigneeId && task.status === QUEUE_STATUS) return false
     return true
 }
+
+/* ════════════════════════════════════════════════════════════════════════ */
+/*  Status ↔ Deadline invariant                                             */
+/*                                                                          */
+/*  Spec (Sprint A finalized + bug fix sau Timeline 6+7):                   */
+/*    - status ∈ ['Revision', 'Hoàn tất']  →  deadline phải = null          */
+/*      (task đã ở giai đoạn review/done → không còn deadline để overdue)   */
+/*    - status khác                        →  deadline không bị đụng       */
+/*                                                                          */
+/*  Reason: Cron `check-deadline` chạy mỗi giờ flag task có deadline đã     */
+/*  qua mà status không in ['Hoàn tất','Đã hủy','Quá hạn'] → user bị flag  */
+/*  "Quá hạn" oan trong khi đang ở Revision chờ admin review.              */
+/*                                                                          */
+/*  Single source of truth — apply ở mọi path mutate task.status:          */
+/*    - task-actions.ts updateTaskStatus (single)                          */
+/*    - bulk-task-actions.ts bulkUpdateStatus (drag-drop)                  */
+/*    - bulk-task-actions.ts bulkUpdateTaskStatus (BulkEditTaskModal)     */
+/*    - bulk-task-actions.ts bulkUpdateTaskDetails (superadmin raw)       */
+/*    - task-management-actions.ts updateTask (superadmin)                */
+/* ════════════════════════════════════════════════════════════════════════ */
+
+/** Status nào yêu cầu deadline=null (per Sprint A spec). */
+export const STATUS_REQUIRES_NULL_DEADLINE = ['Revision', 'Hoàn tất'] as const
+
+/**
+ * Enforce status → deadline=null invariant.
+ * Mutates `updateData` in-place: nếu status mới (trong updateData hoặc fall-back
+ * currentTask) thuộc STATUS_REQUIRES_NULL_DEADLINE → set deadline=null.
+ *
+ * Safe to call ngay cả khi updateData không chứa status — sẽ check currentTask.status.
+ *
+ * @param updateData - Object pass vào prisma.task.update({ data: updateData }).
+ *                     Mutated in-place khi cần clear deadline.
+ * @param currentTask - Task hiện tại trong DB (optional, dùng nếu updateData
+ *                      không có status field nhưng task đã ở Revision).
+ */
+export function enforceStatusDeadlineInvariant(
+    updateData: Record<string, any>,
+    currentTask?: { status: string } | null,
+): InvariantResult {
+    // Status sau update (merge updateData lên currentTask)
+    const effectiveStatus = 'status' in updateData
+        ? updateData.status
+        : currentTask?.status
+
+    if (!effectiveStatus) return { synced: false }
+
+    // Nếu status thuộc list "deadline-null required" và deadline hiện tại
+    // không null (hoặc explicit set non-null trong updateData) → clear.
+    if (STATUS_REQUIRES_NULL_DEADLINE.includes(effectiveStatus as any)) {
+        // Chỉ sync nếu deadline chưa được clear explicit trong updateData
+        if (!('deadline' in updateData) || updateData.deadline !== null) {
+            const from = 'deadline' in updateData ? updateData.deadline : 'unknown'
+            updateData.deadline = null
+            return { synced: true, field: 'status' as any, from, to: null }
+        }
+    }
+
+    return { synced: false }
+}
+
+/** Read-only check — task có consistent status/deadline không? */
+export function isStatusDeadlineConsistent(
+    task: { status: string; deadline: Date | null },
+): boolean {
+    if (STATUS_REQUIRES_NULL_DEADLINE.includes(task.status as any) && task.deadline !== null) {
+        return false
+    }
+    return true
+}

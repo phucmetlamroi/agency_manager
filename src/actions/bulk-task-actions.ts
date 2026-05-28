@@ -6,7 +6,7 @@ import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
-import { enforceAssigneeStatusInvariant } from '@/lib/task-invariants'
+import { enforceAssigneeStatusInvariant, enforceStatusDeadlineInvariant, STATUS_REQUIRES_NULL_DEADLINE } from '@/lib/task-invariants'
 
 type BatchTaskInput = {
     titles: string[]
@@ -254,6 +254,17 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
                     enforceAssigneeStatusInvariant(taskUpdateData, currentTask)
                 }
 
+                // [Status↔Deadline] Defense-in-depth — nếu deadline được set
+                // explicit trong bulk edit nhưng task hiện đang ở Revision/Hoàn tất
+                // → clear deadline. Cần fetch nếu chưa fetch ở trên.
+                if ('deadline' in data && taskUpdateData.deadline !== null) {
+                    const currentTask = await tx.task.findUnique({
+                        where: { id, workspaceId },
+                        select: { status: true },
+                    })
+                    enforceStatusDeadlineInvariant(taskUpdateData, currentTask)
+                }
+
                 await tx.task.update({
                     where: {
                         id,
@@ -482,14 +493,14 @@ export async function bulkUpdateTaskStatus(
         }
 
         // Atomic DB update for valid tasks
-        // [Sprint R] Match updateTaskStatus rule: only 'Revision' + 'Hoàn tất'
-        // clear deadline (mọi status khác giữ deadline để admin theo dõi overdue).
-        const restrictedStatuses = ['Revision', 'Hoàn tất']
-        const deadlineUpdate = restrictedStatuses.includes(newStatus) ? { deadline: null } : {}
+        // [Status↔Deadline] Use shared invariant — single source of truth.
+        // status ∈ ['Revision', 'Hoàn tất'] → clear deadline.
+        const updateData: any = { status: newStatus, version: { increment: 1 } }
+        enforceStatusDeadlineInvariant(updateData)
 
         await prisma.task.updateMany({
             where: { id: { in: validTasks.map((t) => t.id) }, workspaceId },
-            data: { status: newStatus, ...deadlineUpdate, version: { increment: 1 } },
+            data: updateData,
         })
 
         // Audit log per-task (forensics) + 1 entry tổng
@@ -714,7 +725,8 @@ export async function bulkUpdateStatus(taskIds: string[], newStatus: string, wor
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
     try {
-        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const actorId = session?.user?.id ?? null
 
         await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
@@ -730,6 +742,12 @@ export async function bulkUpdateStatus(taskIds: string[], newStatus: string, wor
                     taskData.deadline = null
                 }
 
+                // [Status↔Deadline invariant] Clear deadline khi drag sang
+                // 'Revision' hoặc 'Hoàn tất' (Sprint A spec). Trước đây bug:
+                // drag-drop nhiều task cùng lúc → deadline KHÔNG cleared →
+                // task ở Revision nhưng cron flag overdue oan.
+                enforceStatusDeadlineInvariant(taskData)
+
                 await tx.task.update({
                     where: {
                         id,
@@ -739,6 +757,27 @@ export async function bulkUpdateStatus(taskIds: string[], newStatus: string, wor
                 })
             }
         })
+
+        // Audit log — forensics cho drag-drop path (trước đây silent).
+        try {
+            const { audit } = await import('@/lib/audit-log')
+            await audit({
+                workspaceId,
+                actorUserId: actorId,
+                action: 'task.bulk_status_updated',
+                targetType: 'Task',
+                targetId: `${taskIds.length}-tasks`,
+                after: {
+                    newStatus,
+                    count: taskIds.length,
+                    taskIds,
+                    source: 'drag_drop',
+                    deadlineCleared: STATUS_REQUIRES_NULL_DEADLINE.includes(newStatus as any) || newStatus === 'Đang đợi giao',
+                },
+            })
+        } catch {
+            // best-effort, never block drag-drop
+        }
 
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/admin/queue`)

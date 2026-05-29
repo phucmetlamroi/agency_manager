@@ -1,13 +1,23 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect } from 'react'
 import { loginAction } from '@/actions/auth-actions'
 import Link from 'next/link'
 import { Eye, EyeOff, Lock, Mail, Loader2 } from 'lucide-react'
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton'
 
 export default function LoginPage() {
     const [state, formAction, isPending] = useActionState(loginAction, null)
     const [showPassword, setShowPassword] = useState(false)
+    const [urlError, setUrlError] = useState<string | null>(null)
+
+    // Surface Google sign-in errors passed back as ?error= (read from
+    // window.location to avoid a useSearchParams Suspense requirement).
+    useEffect(() => {
+        const err = new URLSearchParams(window.location.search).get('error')
+        if (err === 'google') setUrlError('Đăng nhập bằng Google thất bại. Vui lòng thử lại.')
+        else if (err === 'google_unverified') setUrlError('Email Google của bạn chưa được xác minh.')
+    }, [])
 
     return (
         <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-[#1a0e3d] via-[#0a0014] to-black px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -31,11 +41,21 @@ export default function LoginPage() {
                 </div>
 
                 {/* Error */}
-                {state?.error && (
+                {(state?.error || urlError) && (
                     <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm text-center">
-                        {state.error}
+                        {state?.error || urlError}
                     </div>
                 )}
+
+                {/* Google sign-in */}
+                <GoogleSignInButton />
+
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-xs text-zinc-500 font-medium">hoặc</span>
+                    <div className="flex-1 h-px bg-white/10" />
+                </div>
 
                 {/* Email field */}
                 <div className="flex flex-col gap-2">

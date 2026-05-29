@@ -3,12 +3,6 @@ import { wrapTemplate, heading, ctaRow, COLORS } from '../shared/wrapTemplate'
 import { escapeHtml, formatRelativePast, truncate } from '../shared/format'
 
 const TYPE_EMOJI: Record<string, string> = {
-    NEW_MESSAGE: '💬',
-    MENTION: '🔔',
-    GROUP_MEMBER_ADDED: '👥',
-    GROUP_MEMBER_REMOVED: '👤',
-    GROUP_MEMBER_LEFT: '🚪',
-    GROUP_DELETED: '❌',
     TASK_ASSIGNED: '📋',
     TASK_UNASSIGNED: '📋',
     TASK_STATUS_CHANGED: '📋',
@@ -23,10 +17,8 @@ const TYPE_EMOJI: Record<string, string> = {
 function priorityRank(item: DigestNotificationItem): number {
     if (item.type === 'TASK_OVERDUE') return 0
     if (item.type === 'TASK_DEADLINE_APPROACHING') return 1
-    if (item.type === 'MENTION') return 2
     if (item.type === 'TASK_ASSIGNED') return 3
     if (item.type === 'TASK_STATUS_CHANGED') return 4
-    if (item.type === 'NEW_MESSAGE') return 5
     return 6
 }
 
@@ -60,18 +52,12 @@ export async function digestHourly(params: DigestParams): Promise<RenderedEmail>
     const wsId = params.workspaceId
     const homeLink = wsId ? `${params.appUrl}/${wsId}/dashboard` : params.appUrl
 
-    const previewLine = [
-        params.chatCount > 0 ? `${params.chatCount} tin nhắn` : null,
-        params.taskCount > 0 ? `${params.taskCount} cập nhật task` : null,
-        params.groupCount > 0 ? `${params.groupCount} sự kiện group` : null,
-    ].filter(Boolean).join(', ')
+    const previewLine = params.taskCount > 0 ? `${params.taskCount} cập nhật task` : ''
 
     const body = `
 ${heading('📬', 'Tóm tắt thông báo')}
 <div style="color:${COLORS.TEXT_SECONDARY};font-size:13px;margin-bottom:16px;">${escapeHtml(params.timeRange)} · ${escapeHtml(previewLine || 'Không có thông báo mới')}</div>
-${renderSection('💬 Chat', params.chatCount, params.chatNotifications)}
-${renderSection('📋 Task', params.taskCount, params.taskNotifications)}
-${renderSection('👥 Group', params.groupCount, params.groupNotifications)}
+${renderSection('📋 Cập nhật task', params.taskCount, params.taskNotifications)}
 ${ctaRow([{ text: '🚀 Mở HustlyTasker →', url: homeLink }])}`
 
     const html = await wrapTemplate({

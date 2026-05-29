@@ -14,7 +14,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useTaskChatNotifications } from "@/hooks/useTaskChatNotifications"
 
 // ─── Status colors per ui-ux-standards ────────────
 const STATUS_COLORS: Record<string, { label: string; color: string }> = {
@@ -142,8 +141,6 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
         return () => window.removeEventListener("user-home-search", handler as EventListener)
     }, [])
 
-    const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks])
-    const { unreadMap } = useTaskChatNotifications(taskIds)
 
     // ─── Filter ────────────────────────────────────
     const filtered = useMemo(() => {
@@ -363,7 +360,6 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                     const isOddRow = idx % 2 === 1
                     const role = task.assigneeId === currentUserId ? "Assignee" : (task.assignee?.username ? "Member" : "Unassigned")
                     const valueDisplay = formatAmount(task)
-                    const hasUnread = (unreadMap[task.id] ?? 0) > 0
 
                     return (
                         <div
@@ -411,9 +407,6 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                         style={{ color: NP.textPrimary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                                     >
                                         {task.title || 'Untitled'}
-                                        {hasUnread && (
-                                            <span className="inline-block w-2 h-2 rounded-full bg-violet-500 animate-pulse ml-2 align-middle" />
-                                        )}
                                     </span>
                                     {clientLabel && (
                                         <span
@@ -492,9 +485,6 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                             }}
                                         >
                                             {task.title}
-                                            {hasUnread && (
-                                                <span className="inline-block w-2 h-2 rounded-full bg-violet-500 animate-pulse ml-2" />
-                                            )}
                                         </span>
                                         {clientLabel && (
                                             <span

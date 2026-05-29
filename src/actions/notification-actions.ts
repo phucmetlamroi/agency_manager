@@ -25,40 +25,8 @@ const GROUPING_WINDOW_MS = 5 * 60 * 1000  // 5 minutes
 export async function createNotificationInternal(params: CreateNotificationParams) {
     const {
         userId, type, title, body,
-        avatarUrl, conversationId, messageId, taskId, actorId, metadata,
+        avatarUrl, taskId, actorId, metadata,
     } = params
-
-    // Grouping path — only for NEW_MESSAGE within same conversation
-    if (type === 'NEW_MESSAGE' && conversationId) {
-        const existing = await prisma.notification.findFirst({
-            where: {
-                userId,
-                type: 'NEW_MESSAGE',
-                conversationId,
-                isRead: false,
-                isArchived: false,
-                createdAt: { gte: new Date(Date.now() - GROUPING_WINDOW_MS) },
-            },
-            orderBy: { createdAt: 'desc' },
-        })
-        if (existing) {
-            const existingMeta = (existing.metadata as Record<string, any> | null) || {}
-            const messageCount = ((existingMeta.messageCount as number) || 1) + 1
-            const updated = await prisma.notification.update({
-                where: { id: existing.id },
-                data: {
-                    title,
-                    body,  // overwrite with the latest message body so panel always shows latest
-                    avatarUrl: avatarUrl || existing.avatarUrl,
-                    messageId: messageId || existing.messageId,
-                    actorId: actorId || existing.actorId,
-                    metadata: { ...existingMeta, ...(metadata || {}), messageCount },
-                    createdAt: new Date(),  // bump so it stays at top of panel
-                },
-            })
-            return updated
-        }
-    }
 
     const created = await prisma.notification.create({
         data: {
@@ -67,8 +35,6 @@ export async function createNotificationInternal(params: CreateNotificationParam
             title,
             body,
             avatarUrl: avatarUrl || null,
-            conversationId: conversationId || null,
-            messageId: messageId || null,
             taskId: taskId || null,
             actorId: actorId || null,
             metadata: (metadata as any) || undefined,
@@ -148,8 +114,6 @@ export async function getNotifications(params?: {
                 body: n.body,
                 avatarUrl: n.avatarUrl,
                 isRead: n.isRead,
-                conversationId: n.conversationId,
-                messageId: n.messageId,
                 taskId: n.taskId,
                 actorId: n.actorId,
                 metadata: n.metadata as Record<string, any> | null,

@@ -3,7 +3,7 @@
 // This is a fire-and-forget broadcast — if it fails, the user will still see
 // the notification next time they poll or open the panel.
 
-import { CHAT_EVENTS, getUserNotificationChannel } from './chat-channels'
+import { NOTIFICATION_EVENTS, getUserNotificationChannel } from './notification-channels'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -25,7 +25,7 @@ export async function broadcastNotificationToUser(userId: string, payload: any) 
             body: JSON.stringify({
                 messages: [{
                     topic: channelName,
-                    event: CHAT_EVENTS.NOTIFICATION_NEW,
+                    event: NOTIFICATION_EVENTS.NOTIFICATION_NEW,
                     payload,
                 }],
             }),

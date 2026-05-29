@@ -10,59 +10,6 @@ export interface BaseParams {
     workspaceId?: string | null
 }
 
-export interface MessageDMParams extends BaseParams {
-    senderName: string
-    senderAvatarUrl?: string | null
-    messagePreview: string
-    messageTime: Date
-    conversationId: string
-    msgType?: string | null
-}
-
-export interface MessageGroupParams extends MessageDMParams {
-    groupName: string
-    groupAvatarUrl?: string | null
-}
-
-export interface MentionParams extends BaseParams {
-    senderName: string
-    senderAvatarUrl?: string | null
-    conversationName: string
-    conversationType: 'DIRECT' | 'GROUP'
-    messagePreview: string
-    messageTime: Date
-    conversationId: string
-}
-
-export interface GroupAddedParams extends BaseParams {
-    groupName: string
-    groupAvatarUrl?: string | null
-    adderName: string
-    memberCount: number
-    memberNames: string[]
-    createdAt: Date
-    conversationId: string
-}
-
-export interface GroupRemovedParams extends BaseParams {
-    groupName: string
-    removerName: string
-}
-
-export interface GroupLeftParams extends BaseParams {
-    groupName: string
-    leaverName: string
-    leaverAvatarUrl?: string | null
-    leftAt: Date
-    remainingMemberCount: number
-    conversationId: string
-}
-
-export interface GroupDeletedParams extends BaseParams {
-    groupName: string
-    creatorName: string
-}
-
 export interface TaskAssignedParams extends BaseParams {
     taskTitle: string
     assignerName: string
@@ -72,7 +19,6 @@ export interface TaskAssignedParams extends BaseParams {
     deadline?: Date | null
     description?: string | null
     taskId: string
-    conversationId?: string | null
 }
 
 export interface TaskUnassignedParams extends BaseParams {
@@ -97,7 +43,6 @@ export interface TaskDeadlineParams extends BaseParams {
     deadline: Date
     assignerName?: string | null
     taskId: string
-    conversationId?: string | null
 }
 
 export interface TaskOverdueParams extends BaseParams {
@@ -129,18 +74,13 @@ export interface DigestNotificationItem {
 
 export interface DigestParams extends BaseParams {
     timeRange: string
-    chatNotifications: DigestNotificationItem[]
     taskNotifications: DigestNotificationItem[]
-    groupNotifications: DigestNotificationItem[]
-    chatCount: number
     taskCount: number
-    groupCount: number
     totalCount: number
     overview?: {
         completedTasksCount: number
         pendingTasksCount: number
         overdueTasksCount: number
-        unreadMessagesCount: number
     }
 }
 

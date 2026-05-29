@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ClipboardList, CalendarDays, Wallet, MessageSquare } from 'lucide-react'
+import { Home, ClipboardList, CalendarDays, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function BottomNav({ role, workspaceId }: { role: string, workspaceId: string }) {
@@ -20,12 +20,6 @@ export default function BottomNav({ role, workspaceId }: { role: string, workspa
             href: role === 'ADMIN' ? `/${workspaceId}/admin` : `/${workspaceId}/dashboard`,
             label: 'Tasks',
             icon: ClipboardList,
-            show: true,
-        },
-        {
-            href: `/${workspaceId}/admin/chat`,
-            label: 'Chat',
-            icon: MessageSquare,
             show: true,
         },
         {

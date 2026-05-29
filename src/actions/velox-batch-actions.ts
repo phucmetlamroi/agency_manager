@@ -242,8 +242,6 @@ export async function createTasksFromBatch(
                             title: notif.title,
                             body: notif.body,
                             avatarUrl: notif.avatarUrl,
-                            conversationId: notif.conversationId,
-                            messageId: notif.messageId,
                             taskId: notif.taskId,
                             actorId: notif.actorId,
                             metadata: notif.metadata,

@@ -11,7 +11,7 @@ interface Props {
 /**
  * MarketplaceTriggerButton — compact top-bar variant of the marketplace
  * button. Renders next to the notification bell (replaces the old floating
- * bottom-right button which collided with ChatFloatingPanel).
+ * bottom-right button).
  *
  * Click → dispatches `open-marketplace` event. `MarketplaceProvider` (with
  * `triggerMode='event'`) listens and opens the modal.

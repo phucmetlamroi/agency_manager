@@ -125,33 +125,6 @@ export async function respondToContactRequest(contactId: string, accept: boolean
         data: { status: newStatus },
     })
 
-    if (accept) {
-        const existingConv = await prisma.conversation.findFirst({
-            where: {
-                type: 'DIRECT',
-                AND: [
-                    { participants: { some: { userId } } },
-                    { participants: { some: { userId: contact.requesterId } } },
-                ],
-            },
-        })
-
-        if (!existingConv) {
-            await prisma.conversation.create({
-                data: {
-                    type: 'DIRECT',
-                    createdById: userId,
-                    participants: {
-                        create: [
-                            { userId },
-                            { userId: contact.requesterId },
-                        ],
-                    },
-                },
-            })
-        }
-    }
-
     return { data: { status: newStatus } }
 }
 

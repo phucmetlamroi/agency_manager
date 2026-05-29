@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Bell, MessageSquare, AtSign, ClipboardList, UserPlus, UserMinus, Clock, AlertTriangle, Megaphone, Trash2, Mail, Check, X, Loader2 } from 'lucide-react'
+import { Bell, MessageSquare, ClipboardList, UserPlus, UserMinus, Clock, AlertTriangle, Trash2, Mail, Check, X, Loader2 } from 'lucide-react'
 import type { NotificationItem as NotificationItemData } from '@/types/notification'
 import { archiveNotification, markNotificationRead } from '@/actions/notification-actions'
 import { acceptWorkspaceInvitation, declineWorkspaceInvitation } from '@/actions/member-actions'
-import { useChatContext } from '@/components/chat/ChatProvider'
 import { toast } from 'sonner'
 
 interface Props {
@@ -17,12 +16,6 @@ interface Props {
 }
 
 const TYPE_ICON: Record<string, { icon: any; color: string; bg: string }> = {
-    NEW_MESSAGE:           { icon: MessageSquare,  color: 'text-violet-400',  bg: 'bg-violet-500/15' },
-    MENTION:               { icon: AtSign,         color: 'text-amber-400',   bg: 'bg-amber-500/15' },
-    GROUP_MEMBER_ADDED:    { icon: UserPlus,       color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
-    GROUP_MEMBER_REMOVED:  { icon: UserMinus,      color: 'text-red-400',     bg: 'bg-red-500/15' },
-    GROUP_MEMBER_LEFT:     { icon: UserMinus,      color: 'text-zinc-400',    bg: 'bg-zinc-500/15' },
-    GROUP_DELETED:         { icon: Megaphone,      color: 'text-red-400',     bg: 'bg-red-500/15' },
     TASK_ASSIGNED:         { icon: ClipboardList,  color: 'text-violet-400',  bg: 'bg-violet-500/15' },
     TASK_UNASSIGNED:       { icon: ClipboardList,  color: 'text-zinc-400',    bg: 'bg-zinc-500/15' },
     TASK_STATUS_CHANGED:   { icon: ClipboardList,  color: 'text-indigo-400',  bg: 'bg-indigo-500/15' },
@@ -50,10 +43,8 @@ function formatTime(iso: string) {
 export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, onRequestClose }: Props) {
     const router = useRouter()
     const params = useParams<{ workspaceId?: string }>()
-    const { openConversation } = useChatContext()
     const meta = TYPE_ICON[notification.type] || { icon: Bell, color: 'text-zinc-400', bg: 'bg-zinc-500/15' }
     const Icon = meta.icon
-    const messageCount = (notification.metadata?.messageCount as number) || 0
     const [busy, setBusy] = useState(false)
 
     // Workspace invitation inline actions (Accept/Decline buttons)
@@ -111,15 +102,10 @@ export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, o
             void markNotificationRead(notification.id)
         }
 
-        // Navigate based on type
-        if (notification.conversationId) {
-            const convName = (notification.metadata?.convLabel as string) || notification.title
-            openConversation(notification.conversationId, convName)
-        } else if (notification.taskId && params?.workspaceId) {
-            // Open task — link to workspace queue, the task detail modal handles deep-linking via URL?
-            // For now navigate to admin queue and rely on user to find the task.
-            // [Z+1.fix6] Route to dashboard (accessible by ALL users) instead of admin queue
-            // (which blocks non-admins + only shows unassigned tasks).
+        // Navigate to the related task on the dashboard.
+        // [Z+1.fix6] Route to dashboard (accessible by ALL users) instead of admin queue
+        // (which blocks non-admins + only shows unassigned tasks).
+        if (notification.taskId && params?.workspaceId) {
             router.push(`/${params.workspaceId}/dashboard?taskId=${notification.taskId}`)
         }
 
@@ -131,8 +117,6 @@ export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, o
         onLocalRemove(notification.id)
         void archiveNotification(notification.id)
     }
-
-    const senderName = notification.title.split(' · ')[0]
 
     return (
         <div
@@ -167,7 +151,6 @@ export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, o
                     <span className="text-[10px] text-zinc-600 shrink-0">{formatTime(notification.createdAt)}</span>
                 </div>
                 <div className="text-[11px] text-zinc-400 line-clamp-2 mt-0.5">
-                    {messageCount > 1 ? `${senderName} sent ${messageCount} messages — ` : ''}
                     {notification.body}
                 </div>
 

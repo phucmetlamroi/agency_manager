@@ -11,9 +11,6 @@ export async function taskDeadline1h(params: TaskDeadlineParams): Promise<Render
     const taskLink = wsId
         ? `${params.appUrl}/${wsId}/dashboard?taskId=${params.taskId}`
         : params.appUrl
-    const chatLink = params.conversationId && wsId
-        ? `${params.appUrl}/${wsId}/dashboard?conversationId=${params.conversationId}`
-        : null
 
     const inner = `
 <div style="font-size:18px;font-weight:800;color:${COLORS.TEXT_PRIMARY};margin-bottom:14px;">📋 ${titleEsc}</div>
@@ -27,7 +24,6 @@ ${assignerEsc ? `<tr><td style="padding:5px 0;color:${COLORS.TEXT_SECONDARY};fon
     const buttons: { text: string, url: string, variant?: 'primary' | 'secondary' }[] = [
         { text: '📋 Xem task →', url: taskLink },
     ]
-    if (chatLink) buttons.push({ text: '💬 Chat manager', url: chatLink, variant: 'secondary' })
 
     const body = `
 ${heading('⚠️', 'Deadline sắp đến')}

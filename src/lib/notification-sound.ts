@@ -21,7 +21,7 @@ function getAudioContext(): AudioContext {
 async function loadAudioBuffer(): Promise<AudioBuffer | null> {
     if (audioBuffer) return audioBuffer
     try {
-        const response = await fetch('/sounds/chat-notification.wav')
+        const response = await fetch('/sounds/notification.wav')
         const arrayBuffer = await response.arrayBuffer()
         const ctx = getAudioContext()
         audioBuffer = await ctx.decodeAudioData(arrayBuffer)
@@ -44,7 +44,7 @@ function unlockAudio() {
     loadAudioBuffer()
 }
 
-// Attach unlock listeners ONCE — call this from ChatProvider on mount
+// Attach unlock listeners ONCE — call this from NotificationProvider on mount
 export function initNotificationSound() {
     if (unlockListenersAdded || typeof window === 'undefined') return
     unlockListenersAdded = true
@@ -63,7 +63,7 @@ export function initNotificationSound() {
 
 // ── Play notification sound ────────────────────────────────────
 export function playNotificationSound() {
-    const muted = localStorage.getItem('chat-muted') === 'true'
+    const muted = localStorage.getItem('notification-muted') === 'true'
     if (muted) return
 
     const ctx = getAudioContext()
@@ -96,7 +96,7 @@ function playBuffer(ctx: AudioContext, buffer: AudioBuffer) {
     } catch {
         // Fallback to HTML Audio API
         try {
-            const audio = new Audio('/sounds/chat-notification.wav')
+            const audio = new Audio('/sounds/notification.wav')
             audio.volume = 0.5
             audio.play().catch(() => {})
         } catch {
@@ -105,38 +105,3 @@ function playBuffer(ctx: AudioContext, buffer: AudioBuffer) {
     }
 }
 
-// ── Tab title flash (Google Chat style) ────────────────────────
-let originalTitle = ''
-let flashInterval: ReturnType<typeof setInterval> | null = null
-
-export function flashTabTitle(senderName: string) {
-    if (document.hasFocus()) return
-
-    if (!originalTitle) originalTitle = document.title
-    let isFlashing = false
-
-    if (flashInterval) clearInterval(flashInterval)
-
-    flashInterval = setInterval(() => {
-        document.title = isFlashing ? originalTitle : `${senderName} sent a message`
-        isFlashing = !isFlashing
-    }, 1500)
-
-    const onFocus = () => {
-        if (flashInterval) clearInterval(flashInterval)
-        flashInterval = null
-        document.title = originalTitle
-        originalTitle = ''
-        window.removeEventListener('focus', onFocus)
-    }
-    window.addEventListener('focus', onFocus)
-}
-
-// ── Mute controls ──────────────────────────────────────────────
-export function isChatMuted(): boolean {
-    return localStorage.getItem('chat-muted') === 'true'
-}
-
-export function setChatMuted(muted: boolean) {
-    localStorage.setItem('chat-muted', String(muted))
-}

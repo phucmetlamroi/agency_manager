@@ -177,10 +177,7 @@ async function main() {
     if (baoPhuc) {
         // Transfer all admin's NOT NULL FK references to Bảo Phúc
         const transferTargets: Array<[string, () => Promise<{ count: number }>]> = [
-            ['conversations', () => prisma.conversation.updateMany({ where: { createdById: admin.id }, data: { createdById: baoPhuc.userId } })],
-            ['messages', () => prisma.message.updateMany({ where: { senderId: admin.id }, data: { senderId: baoPhuc.userId } })],
             ['errorLogs.detectedBy', () => prisma.errorLog.updateMany({ where: { detectedById: admin.id }, data: { detectedById: baoPhuc.userId } })],
-            ['messagePins', () => prisma.messagePin.updateMany({ where: { pinnedById: admin.id }, data: { pinnedById: baoPhuc.userId } })],
             ['ratings.client', () => prisma.rating.updateMany({ where: { clientId: admin.id }, data: { clientId: baoPhuc.userId } })],
             ['ratings.staff', () => prisma.rating.updateMany({ where: { staffId: admin.id }, data: { staffId: baoPhuc.userId } })],
         ]

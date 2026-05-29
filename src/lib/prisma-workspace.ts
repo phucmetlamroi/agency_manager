@@ -11,12 +11,7 @@ const bypassModels = [
     'WorkspaceMember',
     'BillingProfile',
     'ErrorDictionary',
-    'Contact',
-    'Conversation',
-    'ConversationParticipant',
-    'Message',
-    'MessageReaction',
-    'MessageReadReceipt'
+    'Contact'
 ]
 
 /**
@@ -33,12 +28,7 @@ const noProfileModels = [
     'Event',
     'UserPresence',
     'Agency',
-    'Contact',
-    'Conversation',
-    'ConversationParticipant',
-    'Message',
-    'MessageReaction',
-    'MessageReadReceipt'
+    'Contact'
 ]
 
 /**

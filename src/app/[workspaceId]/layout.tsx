@@ -3,8 +3,7 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import PresenceTracker from '@/components/tracking/PresenceTracker'
 import ImpersonationBanner from '@/components/layout/ImpersonationBanner'
-import { ChatProvider } from '@/components/chat/ChatProvider'
-import { ChatFloatingPanel } from '@/components/chat/ChatFloatingPanel'
+import { NotificationProvider } from '@/components/notifications/NotificationProvider'
 import { MarketplaceProvider } from '@/components/marketplace/MarketplaceProvider'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { needsUsernameMigration } from '@/lib/username-validation'
@@ -121,7 +120,7 @@ export default async function WorkspaceLayout({
     // We can inject the workspaceId context down if needed,
     // but React Server Components inside will also get `params.workspaceId` from their own props.
     return (
-        <ChatProvider userId={session.user.id}>
+        <NotificationProvider userId={session.user.id}>
             <div className="workspace-container h-full w-full relative flex flex-col">
                 {session.user.isImpersonating && (
                     <ImpersonationBanner
@@ -133,7 +132,6 @@ export default async function WorkspaceLayout({
                 <div className="flex-1 min-h-0 overflow-hidden relative">
                     {children}
                 </div>
-                <ChatFloatingPanel workspaceId={workspaceId} profileId={profileId} />
                 {/* Marketplace modal portal — opened by Store icon in top-bars (event mode) */}
                 <MarketplaceProvider
                     workspaceId={workspaceId}
@@ -148,6 +146,6 @@ export default async function WorkspaceLayout({
                     />
                 )}
             </div>
-        </ChatProvider>
+        </NotificationProvider>
     )
 }

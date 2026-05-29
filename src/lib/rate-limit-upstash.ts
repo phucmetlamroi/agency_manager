@@ -121,22 +121,6 @@ function getInviteLimiter() {
     return _inviteLimiter
 }
 
-let _chatMessageLimiter: Ratelimit | null = null
-function getChatMessageLimiter() {
-    if (_chatMessageLimiter) return _chatMessageLimiter
-    const redis = getRedis()
-    if (!redis) return null
-    // 30 messages / 1 phút / user / conversation.
-    // Audit finding #3.3: Chat không rate-limit → user có thể spam 1000 msg/s
-    // → DoS storage + email notification spam.
-    // 30/min đủ cho trao đổi nhanh; spam thực sự cần >30 msg/min.
-    _chatMessageLimiter = new Ratelimit({
-        redis, limiter: Ratelimit.slidingWindow(30, '1 m'),
-        analytics: true, prefix: 'rl:chat',
-    })
-    return _chatMessageLimiter
-}
-
 // ─── Public API ──────────────────────────────────────────────────
 
 export type RateLimitResult = {
@@ -237,23 +221,6 @@ export async function checkInviteRate(workspaceId: string, targetUserId: string)
     const limiter = getInviteLimiter()
     if (!limiter) return { success: true }
     const r = await limiter.limit(`ws:${workspaceId}:user:${targetUserId}`)
-    return {
-        success: r.success,
-        limit: r.limit,
-        remaining: r.remaining,
-        reset: r.reset,
-        retryAfter: r.success ? undefined : Math.max(1, Math.ceil((r.reset - Date.now()) / 1000)),
-    }
-}
-
-/**
- * Check chat message rate limit theo (user, conversation). 30/phút.
- * Chống spam chat → DoS storage + email notification.
- */
-export async function checkChatMessageRate(userId: string, conversationId: string): Promise<RateLimitResult> {
-    const limiter = getChatMessageLimiter()
-    if (!limiter) return { success: true }
-    const r = await limiter.limit(`user:${userId}:conv:${conversationId}`)
     return {
         success: r.success,
         limit: r.limit,

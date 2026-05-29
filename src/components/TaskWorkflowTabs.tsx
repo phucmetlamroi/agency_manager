@@ -9,8 +9,6 @@ import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Search, Filter, ChevronLeft, ChevronRight, MoreHorizontal, Pen, Trash2, GripVertical, Timer, Undo2, CalendarDays, ChevronDown, MessageSquare } from 'lucide-react'
-import TaskChatMenuItem from './tasks/TaskChatMenuItem'
-import { useTaskChatNotifications } from '@/hooks/useTaskChatNotifications'
 import { AssigneeCell } from './tasks/cells/AssigneeCell'
 import { StatusCell } from './tasks/cells/StatusCell'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
@@ -117,8 +115,6 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
     const router = useRouter()
     const { confirm } = useConfirm()
 
-    const taskIds = useMemo(() => tasks.map(t => t.id), [tasks])
-    const { unreadMap, chatStatusMap } = useTaskChatNotifications(taskIds)
 
     const selectedIds = Object.keys(rowSelection).filter(k => rowSelection[k])
 
@@ -694,9 +690,6 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                         onMouseLeave={e => (e.currentTarget.style.color = NP.textPrimary)}
                                     >
                                         {task.title}
-                                        {(unreadMap[task.id] ?? 0) > 0 && (
-                                            <span className="inline-block w-2 h-2 rounded-full bg-violet-500 animate-pulse ml-2 flex-shrink-0" />
-                                        )}
                                     </div>
                                     {clientLabel && (
                                         <div style={{
@@ -876,12 +869,6 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                         <DropdownMenuItem onClick={() => handleTaskClick(task)}>
                                             <Pen className="mr-2 h-4 w-4" /> Edit Details
                                         </DropdownMenuItem>
-                                        <TaskChatMenuItem
-                                            taskId={task.id}
-                                            workspaceId={workspaceId}
-                                            hasConversation={chatStatusMap[task.id]?.hasConversation ?? false}
-                                            conversationId={chatStatusMap[task.id]?.conversationId ?? null}
-                                        />
                                         {/* Return task for MARKET claims */}
                                         {(() => {
                                             const cs = (task as any).claimSource

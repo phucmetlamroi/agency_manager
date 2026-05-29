@@ -14,9 +14,6 @@ export async function taskAssigned(params: TaskAssignedParams): Promise<Rendered
     const taskLink = wsId
         ? `${params.appUrl}/${wsId}/dashboard?taskId=${params.taskId}`
         : params.appUrl
-    const chatLink = params.conversationId && wsId
-        ? `${params.appUrl}/${wsId}/dashboard?conversationId=${params.conversationId}`
-        : null
 
     // Deadline urgency check (< 24h)
     const urgent = params.deadline
@@ -46,7 +43,6 @@ ${detailRows}
 ${descBlock}`
 
     const buttons = [{ text: '📋 Xem task →', url: taskLink }]
-    if (chatLink) buttons.push({ text: '💬 Chat ngay', url: chatLink })
 
     const body = `
 ${heading('📋', 'Task mới được giao cho bạn')}

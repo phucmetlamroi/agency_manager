@@ -184,8 +184,6 @@ export async function createTask(formData: FormData, workspaceId: string) {
                         title: notif.title,
                         body: notif.body,
                         avatarUrl: notif.avatarUrl,
-                        conversationId: notif.conversationId,
-                        messageId: notif.messageId,
                         taskId: notif.taskId,
                         actorId: notif.actorId,
                         metadata: notif.metadata,

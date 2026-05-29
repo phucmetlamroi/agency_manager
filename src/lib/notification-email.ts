@@ -15,13 +15,6 @@ import { templates, pickTemplate } from '@/lib/notification-emails'
 import type {
     DigestNotificationItem,
     DigestParams,
-    GroupAddedParams,
-    GroupDeletedParams,
-    GroupLeftParams,
-    GroupRemovedParams,
-    MentionParams,
-    MessageDMParams,
-    MessageGroupParams,
     RenderedEmail,
     TaskAssignedParams,
     TaskCommentParams,
@@ -51,12 +44,6 @@ const BYPASS_CONFIG: Record<string, {
     bypassDigest: boolean
     bypassQuietHours: boolean | ((meta: any) => boolean)
 }> = {
-    NEW_MESSAGE:               { bypassMute: false, bypassDigest: false, bypassQuietHours: false },
-    MENTION:                   { bypassMute: true,  bypassDigest: true,  bypassQuietHours: false },
-    GROUP_MEMBER_ADDED:        { bypassMute: false, bypassDigest: false, bypassQuietHours: false },
-    GROUP_MEMBER_REMOVED:      { bypassMute: false, bypassDigest: true,  bypassQuietHours: false },
-    GROUP_MEMBER_LEFT:         { bypassMute: false, bypassDigest: false, bypassQuietHours: false },
-    GROUP_DELETED:             { bypassMute: true,  bypassDigest: true,  bypassQuietHours: false },
     TASK_ASSIGNED:             { bypassMute: true,  bypassDigest: true,  bypassQuietHours: false },
     TASK_UNASSIGNED:           { bypassMute: false, bypassDigest: false, bypassQuietHours: false },
     TASK_STATUS_CHANGED:       { bypassMute: false, bypassDigest: false, bypassQuietHours: false },
@@ -78,8 +65,6 @@ interface NotificationForEmail {
     type: NotificationType | string
     title: string
     body: string
-    conversationId: string | null
-    messageId: string | null
     taskId: string | null
     actorId: string | null
     metadata: Record<string, any> | null
@@ -101,18 +86,6 @@ function isInQuietHours(start: number | null, end: number | null): boolean {
     const nowHour = new Date().getUTCHours()
     if (start <= end) return nowHour >= start && nowHour < end
     return nowHour >= start || nowHour < end
-}
-
-async function isConversationMutedForUser(
-    userId: string,
-    conversationId: string | null,
-): Promise<boolean> {
-    if (!conversationId) return false
-    const participant = await prisma.conversationParticipant.findFirst({
-        where: { conversationId, userId },
-        select: { isMuted: true },
-    })
-    return participant?.isMuted === true
 }
 
 function resolveBypass(
@@ -164,110 +137,6 @@ async function buildTemplateParams(ctx: EnrichmentContext): Promise<RenderedEmai
     const actorAvatar = actor?.avatarUrl ?? null
 
     switch (templateName) {
-        case 'messageDM': {
-            if (!notification.conversationId) return null
-            const params: MessageDMParams = {
-                ...baseParams,
-                senderName: actorName,
-                senderAvatarUrl: actorAvatar,
-                messagePreview: meta.preview || notification.body || '',
-                messageTime: notification.createdAt,
-                conversationId: notification.conversationId,
-                msgType: meta.msgType ?? null,
-            }
-            return await templates.messageDM(params)
-        }
-        case 'messageGroup': {
-            if (!notification.conversationId) return null
-            const params: MessageGroupParams = {
-                ...baseParams,
-                senderName: actorName,
-                senderAvatarUrl: actorAvatar,
-                messagePreview: meta.preview || notification.body || '',
-                messageTime: notification.createdAt,
-                conversationId: notification.conversationId,
-                msgType: meta.msgType ?? null,
-                groupName: meta.convLabel || meta.groupName || 'Group',
-                groupAvatarUrl: meta.groupAvatarUrl ?? null,
-            }
-            return await templates.messageGroup(params)
-        }
-        case 'mention': {
-            if (!notification.conversationId) return null
-            const params: MentionParams = {
-                ...baseParams,
-                senderName: actorName,
-                senderAvatarUrl: actorAvatar,
-                conversationName: meta.convLabel || meta.groupName || actorName,
-                conversationType: meta.convType === 'GROUP' ? 'GROUP' : 'DIRECT',
-                messagePreview: meta.preview || notification.body || '',
-                messageTime: notification.createdAt,
-                conversationId: notification.conversationId,
-            }
-            return await templates.mention(params)
-        }
-        case 'groupMemberAdded': {
-            if (!notification.conversationId) return null
-            // Fetch participants for member preview
-            const participants = await prisma.conversationParticipant.findMany({
-                where: { conversationId: notification.conversationId },
-                include: { user: { select: { username: true, nickname: true } } },
-                orderBy: { joinedAt: 'asc' },
-                take: 8,
-            }).catch(() => [])
-            const memberNames = participants
-                .map(p => p.user?.nickname || p.user?.username || '')
-                .filter(Boolean)
-            const conv = await prisma.conversation.findUnique({
-                where: { id: notification.conversationId },
-                select: { name: true, avatarUrl: true, createdAt: true, participants: { select: { id: true } } },
-            }).catch(() => null)
-            const params: GroupAddedParams = {
-                ...baseParams,
-                groupName: conv?.name || meta.groupName || 'Group',
-                groupAvatarUrl: conv?.avatarUrl ?? null,
-                adderName: actorName,
-                memberCount: conv?.participants.length ?? memberNames.length,
-                memberNames,
-                createdAt: conv?.createdAt ?? notification.createdAt,
-                conversationId: notification.conversationId,
-            }
-            return await templates.groupMemberAdded(params)
-        }
-        case 'groupMemberRemoved': {
-            const params: GroupRemovedParams = {
-                ...baseParams,
-                groupName: meta.groupName || 'Group',
-                removerName: actorName,
-            }
-            return await templates.groupMemberRemoved(params)
-        }
-        case 'groupMemberLeft': {
-            if (!notification.conversationId) return null
-            const conv = await prisma.conversation.findUnique({
-                where: { id: notification.conversationId },
-                select: { name: true, participants: { select: { id: true } } },
-            }).catch(() => null)
-            const leaverName = (meta.leaverName as string) || actorName
-            const params: GroupLeftParams = {
-                ...baseParams,
-                groupName: conv?.name || meta.groupName || 'Group',
-                leaverName,
-                leaverAvatarUrl: actorAvatar,
-                leftAt: notification.createdAt,
-                remainingMemberCount: conv?.participants.length ?? 0,
-                conversationId: notification.conversationId,
-            }
-            return await templates.groupMemberLeft(params)
-        }
-        case 'groupDeleted': {
-            const params: GroupDeletedParams = {
-                ...baseParams,
-                groupName: meta.groupName || 'Group',
-                creatorName: actorName,
-            }
-            return await templates.groupDeleted(params)
-        }
         case 'taskAssigned': {
             if (!notification.taskId) return null
             const task = await prisma.task.findUnique({
@@ -277,7 +146,6 @@ async function buildTemplateParams(ctx: EnrichmentContext): Promise<RenderedEmai
                     status: true,
                     deadline: true,
                     project: { select: { name: true } },
-                    conversation: { select: { id: true } },
                 },
             }).catch(() => null)
             const params: TaskAssignedParams = {
@@ -290,7 +158,6 @@ async function buildTemplateParams(ctx: EnrichmentContext): Promise<RenderedEmai
                 deadline: task?.deadline ?? null,
                 description: (meta.description as string) || null,
                 taskId: notification.taskId,
-                conversationId: task?.conversation?.id ?? null,
             }
             return await templates.taskAssigned(params)
         }
@@ -326,7 +193,7 @@ async function buildTemplateParams(ctx: EnrichmentContext): Promise<RenderedEmai
             if (!notification.taskId) return null
             const task = await prisma.task.findUnique({
                 where: { id: notification.taskId },
-                select: { title: true, status: true, deadline: true, conversation: { select: { id: true } } },
+                select: { title: true, status: true, deadline: true },
             }).catch(() => null)
             const deadline = task?.deadline ?? (meta.deadline ? new Date(meta.deadline) : null)
             if (!deadline) return null
@@ -337,7 +204,6 @@ async function buildTemplateParams(ctx: EnrichmentContext): Promise<RenderedEmai
                 deadline,
                 assignerName: meta.assignerName ?? null,
                 taskId: notification.taskId,
-                conversationId: task?.conversation?.id ?? null,
             }
             return templateName === 'taskDeadline1h'
                 ? await templates.taskDeadline1h(params)
@@ -408,13 +274,6 @@ async function workspaceIdForNotification(n: NotificationForEmail): Promise<stri
         }).catch(() => null)
         if (t?.workspaceId) return t.workspaceId
     }
-    if (n.conversationId) {
-        const c = await prisma.conversation.findUnique({
-            where: { id: n.conversationId },
-            select: { workspaceId: true },
-        }).catch(() => null)
-        if (c?.workspaceId) return c.workspaceId
-    }
     return null
 }
 
@@ -468,16 +327,7 @@ export async function maybeSendNotificationEmail(
         // All notifications must be emailed immediately regardless of online status.
         // Previously: skipped email when user was online for non-bypass-digest types.
 
-        // 5. Conversation mute
-        if (notification.conversationId && !cfg.bypassMute) {
-            const muted = await isConversationMutedForUser(notification.userId, notification.conversationId)
-            if (muted) {
-                console.log(`${tag} SKIP: conversation muted`)
-                return
-            }
-        }
-
-        // 6. Atomically claim
+        // 5. Atomically claim
         const claimed = await claimForEmail(notification.id)
         if (!claimed) {
             console.log(`${tag} SKIP: claim failed (already claimed)`)
@@ -522,32 +372,6 @@ export async function maybeSendNotificationEmail(
 
 // ── Public: Digest email ────────────────────────────────────────────────────
 
-function bucketByCategory(notifs: NotificationForEmail[]): {
-    chat: DigestNotificationItem[]
-    task: DigestNotificationItem[]
-    group: DigestNotificationItem[]
-} {
-    const chat: DigestNotificationItem[] = []
-    const task: DigestNotificationItem[] = []
-    const group: DigestNotificationItem[] = []
-
-    for (const n of notifs) {
-        const item: DigestNotificationItem = {
-            type: String(n.type),
-            title: n.title,
-            body: n.body,
-            metadata: n.metadata,
-            createdAt: n.createdAt,
-        }
-        if (n.type === 'NEW_MESSAGE' || n.type === 'MENTION' || n.type === 'TASK_COMMENT') chat.push(item)
-        else if (String(n.type).startsWith('TASK_')) task.push(item)
-        else if (String(n.type).startsWith('GROUP_')) group.push(item)
-        else chat.push(item) // fallback
-    }
-
-    return { chat, task, group }
-}
-
 function formatTimeRangeHourly(now: Date): string {
     const lastHour = new Date(now.getTime() - 60 * 60 * 1000)
     const fmt = (d: Date) =>
@@ -581,7 +405,7 @@ function formatTimeRangeDaily(now: Date): string {
 
 async function loadDailyOverview(userId: string): Promise<DigestParams['overview']> {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    const [completedTasksCount, pendingTasksCount, overdueTasksCount, unreadMessagesCount] =
+    const [completedTasksCount, pendingTasksCount, overdueTasksCount] =
         await Promise.all([
             prisma.task.count({
                 where: { assigneeId: userId, status: 'Hoàn tất', updatedAt: { gte: oneDayAgo } },
@@ -592,11 +416,8 @@ async function loadDailyOverview(userId: string): Promise<DigestParams['overview
             prisma.task.count({
                 where: { assigneeId: userId, status: 'Quá hạn' },
             }).catch(() => 0),
-            prisma.notification.count({
-                where: { userId, isRead: false, isArchived: false, type: { in: ['NEW_MESSAGE', 'MENTION'] } },
-            }).catch(() => 0),
         ])
-    return { completedTasksCount, pendingTasksCount, overdueTasksCount, unreadMessagesCount }
+    return { completedTasksCount, pendingTasksCount, overdueTasksCount }
 }
 
 export async function sendDigestEmails(
@@ -652,15 +473,19 @@ export async function sendDigestEmails(
                     type: n.type,
                     title: n.title,
                     body: n.body,
-                    conversationId: n.conversationId,
-                    messageId: n.messageId,
                     taskId: n.taskId,
                     actorId: n.actorId,
                     metadata: n.metadata as Record<string, any> | null,
                     emailSentAt: n.emailSentAt,
                     createdAt: n.createdAt,
                 }))
-                const buckets = bucketByCategory(enriched)
+                const digestItems: DigestNotificationItem[] = enriched.map(n => ({
+                    type: String(n.type),
+                    title: n.title,
+                    body: n.body,
+                    metadata: n.metadata,
+                    createdAt: n.createdAt,
+                }))
 
                 const params: DigestParams = {
                     recipientName,
@@ -668,12 +493,8 @@ export async function sendDigestEmails(
                     appUrl: APP_URL,
                     workspaceId: wsId,
                     timeRange,
-                    chatNotifications: buckets.chat,
-                    taskNotifications: buckets.task,
-                    groupNotifications: buckets.group,
-                    chatCount: buckets.chat.length,
-                    taskCount: buckets.task.length,
-                    groupCount: buckets.group.length,
+                    taskNotifications: digestItems,
+                    taskCount: digestItems.length,
                     totalCount: enriched.length,
                     overview: mode === 'DAILY' ? await loadDailyOverview(pref.userId) : undefined,
                 }

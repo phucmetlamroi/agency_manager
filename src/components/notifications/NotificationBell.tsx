@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Bell } from 'lucide-react'
 import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
-import { getUserNotificationChannel, CHAT_EVENTS } from '@/lib/chat-channels'
+import { getUserNotificationChannel, NOTIFICATION_EVENTS } from '@/lib/notification-channels'
 import { getUnreadNotificationCount } from '@/actions/notification-actions'
-import { useChatContext } from '@/components/chat/ChatProvider'
+import { useNotificationContext } from './NotificationProvider'
 import { playNotificationSound } from '@/lib/notification-sound'
 import { NotificationPanel } from './NotificationPanel'
 import type { NotificationItem as NotificationItemData } from '@/types/notification'
@@ -16,7 +16,7 @@ interface Props {
 }
 
 export function NotificationBell({ className = '' }: Props) {
-    const { currentUserId } = useChatContext()
+    const { currentUserId } = useNotificationContext()
     const [open, setOpen] = useState(false)
     const [unreadCount, setUnreadCount] = useState(0)
     const [incoming, setIncoming] = useState<NotificationItemData[]>([])
@@ -47,7 +47,7 @@ export function NotificationBell({ className = '' }: Props) {
 
     // Realtime listener — receive NOTIFICATION_NEW from server-side broadcast
     const handleEvent = useCallback((event: string, payload: any) => {
-        if (event === CHAT_EVENTS.NOTIFICATION_NEW && payload?.id) {
+        if (event === NOTIFICATION_EVENTS.NOTIFICATION_NEW && payload?.id) {
             setIncoming(prev => [payload, ...prev])
             setUnreadCount(prev => prev + 1)
             // Play subtle sound — server already gates by mute, but this is a final UX

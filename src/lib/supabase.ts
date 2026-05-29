@@ -12,7 +12,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
  * exception → toàn app crash (user thấy "Có lỗi xảy ra").
  *
  * Now: nếu env thiếu hoặc invalid → export `null`. Callers (NotificationBell,
- * ChatProvider, useSupabaseChannel, ...) early-return khi `supabase` null →
+ * useSupabaseChannel, ...) early-return khi `supabase` null →
  * app vẫn render bình thường, chỉ mất realtime features (user refresh thủ công).
  */
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

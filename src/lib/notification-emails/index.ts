@@ -5,13 +5,6 @@
  * Returns `null` if the notification type has no template (caller should skip).
  */
 
-import { messageDM } from './templates/messageDM'
-import { messageGroup } from './templates/messageGroup'
-import { mention } from './templates/mention'
-import { groupMemberAdded } from './templates/groupMemberAdded'
-import { groupMemberRemoved } from './templates/groupMemberRemoved'
-import { groupMemberLeft } from './templates/groupMemberLeft'
-import { groupDeleted } from './templates/groupDeleted'
 import { taskAssigned } from './templates/taskAssigned'
 import { taskUnassigned } from './templates/taskUnassigned'
 import { taskStatusChanged } from './templates/taskStatusChanged'
@@ -24,13 +17,6 @@ import { digestDaily } from './templates/digestDaily'
 import type { RenderedEmail } from './shared/types'
 
 export const templates = {
-    messageDM,
-    messageGroup,
-    mention,
-    groupMemberAdded,
-    groupMemberRemoved,
-    groupMemberLeft,
-    groupDeleted,
     taskAssigned,
     taskUnassigned,
     taskStatusChanged,
@@ -53,18 +39,6 @@ export function pickTemplate(
     metadata: Record<string, any> | null,
 ): TemplateName | null {
     switch (type) {
-        case 'NEW_MESSAGE':
-            return metadata?.convType === 'GROUP' ? 'messageGroup' : 'messageDM'
-        case 'MENTION':
-            return 'mention'
-        case 'GROUP_MEMBER_ADDED':
-            return 'groupMemberAdded'
-        case 'GROUP_MEMBER_REMOVED':
-            return 'groupMemberRemoved'
-        case 'GROUP_MEMBER_LEFT':
-            return 'groupMemberLeft'
-        case 'GROUP_DELETED':
-            return 'groupDeleted'
         case 'TASK_ASSIGNED':
             return 'taskAssigned'
         case 'TASK_UNASSIGNED':

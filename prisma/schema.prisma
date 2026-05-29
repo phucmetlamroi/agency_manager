@@ -206,15 +206,9 @@ model User {
   // [Quick Create] OAuth tokens for Dropbox / Google Drive per-user
   integrationTokens       IntegrationToken[]
 
-  // Chat relations
+  // Contact relations
   contactsSent         Contact[]                 @relation("ContactRequester")
   contactsReceived     Contact[]                 @relation("ContactReceiver")
-  chatParticipations   ConversationParticipant[]
-  createdConversations Conversation[]            @relation("ConversationCreator")
-  messagesSent         Message[]                 @relation("MessageSender")
-  messageReactions     MessageReaction[]
-  messageReadReceipts  MessageReadReceipt[]
-  pinnedMessages       MessagePin[]
   notifications        Notification[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
@@ -338,7 +332,6 @@ model Task {
   claimedAt        DateTime?
   taskTags         TaskTag[]
   rating           Rating?
-  conversation     Conversation?
 
   // [Sprint P] Track admin who assigned/created the task. Used for email +
   // in-app notification routing — when user starts/delivers a task, the
@@ -911,20 +904,6 @@ enum ContactStatus {
   BLOCKED
 }
 
-enum ConversationType {
-  DIRECT
-  GROUP
-  TASK
-}
-
-enum MessageType {
-  TEXT
-  IMAGE
-  FILE
-  SYSTEM
-  ANNOUNCEMENT
-}
-
 enum NotificationType {
   // Chat
   NEW_MESSAGE
@@ -959,8 +938,6 @@ model Notification {
   isRead         Boolean          @default(false)
   isArchived     Boolean          @default(false)
   // Source links (nullable, depends on type)
-  conversationId String?
-  messageId      String?
   taskId         String?
   actorId        String?
   // Flexible metadata (group name, task title, oldStatus, newStatus, messageCount, ...)
@@ -974,7 +951,6 @@ model Notification {
 
   @@index([userId, isRead, createdAt])
   @@index([userId, type, createdAt])
-  @@index([userId, conversationId, type, createdAt])
 }
 
 model NotificationPreference {
@@ -1006,119 +982,6 @@ model Contact {
   @@index([requesterId, status])
 }
 
-model Conversation {
-  id          String           @id @default(uuid())
-  type        ConversationType
-  name        String?
-  avatarUrl   String?
-  taskId      String?          @unique
-  workspaceId String?
-  createdById String
-  deletedFor  Json? // { userId: ISOdate } per-participant soft delete
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-
-  task         Task?                     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  createdBy    User                      @relation("ConversationCreator", fields: [createdById], references: [id])
-  participants ConversationParticipant[]
-  messages     Message[]
-  pins         MessagePin[]
-
-  @@index([type, workspaceId])
-  @@index([taskId])
-}
-
-model ConversationParticipant {
-  id             String   @id @default(uuid())
-  conversationId String
-  userId         String
-  role           String   @default("MEMBER")
-  lastReadAt     DateTime @default(now())
-  joinedAt       DateTime @default(now())
-  isMuted        Boolean  @default(false)
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([conversationId, userId])
-  @@index([userId, lastReadAt])
-}
-
-model Message {
-  id                          String      @id @default(uuid())
-  conversationId              String
-  senderId                    String
-  content                     String?     @db.Text
-  type                        MessageType @default(TEXT)
-  fileUrl                     String?
-  fileName                    String?
-  fileSize                    Int?
-  replyToId                   String?
-  isEdited                    Boolean     @default(false)
-  isDeleted                   Boolean     @default(false)
-  editedAt                    DateTime?
-  deletedAt                   DateTime?
-  viewOnce                    Boolean     @default(false)
-  viewedBy                    Json? // { userId: ISOdate } map of who viewed
-  deletedForUsers             Json? // { userId: ISOdate } per-user "delete for me" hide
-  isImportant                 Boolean     @default(false) // sender flagged as needs response
-  mentions                    Json? // string[] of userIds mentioned via @
-  forwardedFromMessageId      String?
-  forwardedFromConversationId String?
-  createdAt                   DateTime    @default(now())
-  updatedAt                   DateTime    @updatedAt
-
-  conversation Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User                 @relation("MessageSender", fields: [senderId], references: [id])
-  replyTo      Message?             @relation("MessageReply", fields: [replyToId], references: [id])
-  replies      Message[]            @relation("MessageReply")
-  reactions    MessageReaction[]
-  readReceipts MessageReadReceipt[]
-  pin          MessagePin?
-
-  @@index([conversationId, createdAt])
-  @@index([senderId])
-}
-
-model MessagePin {
-  id             String   @id @default(uuid())
-  messageId      String   @unique
-  conversationId String
-  pinnedById     String
-  pinnedAt       DateTime @default(now())
-
-  message      Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  pinnedBy     User         @relation(fields: [pinnedById], references: [id])
-
-  @@index([conversationId, pinnedAt])
-}
-
-model MessageReaction {
-  id        String   @id @default(uuid())
-  messageId String
-  userId    String
-  emoji     String
-  createdAt DateTime @default(now())
-
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([messageId, userId, emoji])
-}
-
-model MessageReadReceipt {
-  id        String   @id @default(uuid())
-  messageId String
-  userId    String
-  readAt    DateTime @default(now())
-
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([messageId, userId])
-  @@index([messageId])
-}
 
 // ─────────────────────────────────────────────────────────────────────
 //  Auth Phase 1: signup / login email-only / forgot password / migration

@@ -119,7 +119,13 @@ model User {
   // (signup mới hoặc đã complete migration modal). false = username cũ
   // (auto-derived từ email hoặc có dấu) → trigger migration modal khi user vào app.
   usernameSetByUser Boolean             @default(false)
-  password          String
+  // [Google OAuth] password nullable — Google sign-in users have no password
+  // (có thể đặt sau qua luồng "Quên mật khẩu"). googleId = Google account id
+  // (canonical OAuth identity, dùng để nhận diện user quay lại). authProvider
+  // = nguồn tạo tài khoản ("email" | "google") cho tracking/UI.
+  password          String?
+  googleId          String?             @unique
+  authProvider      String?             @default("email")
   avatarUrl         String?
   createdAt         DateTime            @default(now())
   isTreasurer       Boolean             @default(false)

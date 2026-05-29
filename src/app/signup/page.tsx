@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, User, Lock, CheckCircle2, Loader2, ArrowLeft, AtSign } from 'lucide-react'
 import PasswordStrengthMeter from '@/components/auth/PasswordStrengthMeter'
 import { UsernameInput } from '@/components/auth/UsernameInput'
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton'
 
 export default function SignupPage() {
     const router = useRouter()
@@ -138,6 +139,14 @@ export default function SignupPage() {
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* Google sign-up */}
+                <GoogleSignInButton label="Đăng ký với Google" />
+                <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-xs text-zinc-500 font-medium">hoặc</span>
+                    <div className="flex-1 h-px bg-white/10" />
+                </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* DisplayName */}

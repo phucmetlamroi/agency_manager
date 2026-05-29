@@ -239,6 +239,24 @@ export async function loginAction(prevState: any, formData: FormData) {
             return { error: GENERIC_AUTH_ERROR }
         }
 
+        // [Google OAuth] User created via Google Sign-In has no password.
+        // Reject password login the SAME way as a wrong password (generic error,
+        // bump attempts, timing-safe) so we don't leak that the account is
+        // Google-only — and so compare() never runs against a null hash.
+        if (!user.password) {
+            await bumpFailedAttempts(user.id)
+            await logLoginAttempt({
+                userId: user.id,
+                emailTried: emailOrUsername,
+                success: false,
+                failReason: 'invalid_password',
+                ipAddress: ip,
+                userAgent,
+            })
+            await paddingDelay()
+            return { error: GENERIC_AUTH_ERROR }
+        }
+
         // ── Verify password ──
         const isValid = await compare(password, user.password)
         if (!isValid) {

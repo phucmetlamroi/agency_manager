@@ -469,6 +469,12 @@ export async function changePassword(userId: string, currentPass: string, newPas
             return { error: 'User not found' }
         }
 
+        // [Google OAuth] Tài khoản đăng nhập bằng Google chưa có mật khẩu →
+        // không có mật khẩu cũ để xác minh. Hướng dẫn đặt qua luồng "Quên mật khẩu".
+        if (!user.password) {
+            return { error: 'Tài khoản này đăng nhập bằng Google. Dùng "Quên mật khẩu" để đặt mật khẩu lần đầu.' }
+        }
+
         // Verify old password
         const isValid = await compare(currentPass, user.password)
         if (!isValid) {

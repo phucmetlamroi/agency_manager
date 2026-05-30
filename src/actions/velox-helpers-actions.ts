@@ -1,27 +1,24 @@
 'use server'
 
 /**
- * [Velox v1.1 — "Kế thừa ghi chú" (renamed from "Kế thừa ghi chú tháng trước")]
+ * [Velox v1.2 — "Kế thừa ghi chú"]
  *
- * Server action for note inheritance with sub-client recursion.
+ * Note inheritance matched by client NAME-PATH across the whole profile
+ * (NOT by client id).
  *
- * Query (Velox v1.1 — status filter removed):
- *   1. Tasks thuộc Client X **hoặc** bất kỳ client con nào của X
- *   2. Filter: notes_vi IS NOT NULL AND notes_vi != ""  (NO status filter — any task with notes qualifies)
- *   3. Sort: updatedAt DESC
- *   4. Take first record + return preview metadata (source task title, sub-client name, date)
+ * Why: clients are re-created per workspace, so the same logical client "Jacob"
+ * has a DIFFERENT id in every month's workspace (vd tháng 4 id 213, tháng 5 id
+ * 216). Matching by id could never reach previous months. We instead identify a
+ * client by its hierarchical name-path ("Jacob" / "Jacob/Unit") and gather every
+ * record sharing that path across all ACTIVE workspaces of the profile.
  *
- * Behavior:
- *   - Walks Client.subsidiaries tree (recursive, depth-limit 5)
- *   - Inclusive — pulls notes from tasks of ANY status (Đang thực hiện / Revision /
- *     Hoàn tất / etc.) so long as notes_vi is non-empty. Rationale: user wants to
- *     reuse notes from in-flight tasks too, not just completed templates.
- *   - Returns preview metadata for "Note kế thừa từ task '[Title]' (Client con: Y, ngày Z)"
- *   - Scoped to all workspaces in the current profile (any sibling workspace)
- *
- * Velox v1.0 → v1.1 change: drop `status: 'Hoàn tất'` filter per user request
- * — "lấy ghi chú của những task giống với của khách hàng trước đó" (any task,
- * not just completed).
+ * Query:
+ *   1. Compute the selected client's name-path (walk parent chain).
+ *   2. Collect all client ids in the profile with the SAME path — EXACT, so
+ *      "Jacob" ≠ "Jacob/Unit" (sub-client notes stay separate from the parent).
+ *   3. Tasks of those ids, across all ACTIVE profile workspaces, notes_vi
+ *      non-empty, isArchived=false. NO status filter (any task with a note).
+ *   4. Sort updatedAt DESC → take first → preview metadata.
  */
 
 import { prisma } from '@/lib/db'
@@ -43,34 +40,37 @@ export interface InheritedNotePreview {
 }
 
 /* ──────────────────────────────────────────────────────────────────── */
-/*  Helper — recursive sub-client walker                               */
+/*  Helper — cross-workspace client identity via hierarchical name-path  */
 /* ──────────────────────────────────────────────────────────────────── */
 
 /**
- * Walk Client.subsidiaries tree starting at rootClientId, return all
- * descendant client ids (including root itself). Depth-limited to prevent
- * infinite loops on bad data.
+ * Clients are re-created per workspace, so the SAME logical client ("Jacob")
+ * exists as many records with different ids across the profile's workspaces.
+ * We therefore identify a client by its hierarchical NAME-PATH instead of its id:
+ *   - parent "Jacob"        → "jacob"
+ *   - child  "Jacob/Unit"   → "jacob/unit"
+ *
+ * Matching is EXACT on the path: "Jacob" ≠ "Jacob/Unit" (a sub-client's notes
+ * are kept separate from the parent's). Each segment is normalised (trim +
+ * lowercase) so casing/spacing differences across months still collapse to one
+ * identity.
  */
-async function collectClientAndSubsidiaries(
-    rootClientId: number,
-    maxDepth = 5,
-): Promise<number[]> {
-    const result: number[] = [rootClientId]
-    let currentLevel: number[] = [rootClientId]
-
-    for (let depth = 0; depth < maxDepth; depth++) {
-        if (currentLevel.length === 0) break
-        const children = await prisma.client.findMany({
-            where: { parentId: { in: currentLevel } },
-            select: { id: true },
-        })
-        if (children.length === 0) break
-        const childIds = children.map((c) => c.id)
-        result.push(...childIds)
-        currentLevel = childIds
+function buildClientPath(
+    clientId: number,
+    byId: Map<number, { name: string; parentId: number | null }>,
+    maxDepth = 6,
+): string {
+    const names: string[] = []
+    let current: number | null = clientId
+    let depth = 0
+    while (current != null && depth < maxDepth) {
+        const c = byId.get(current)
+        if (!c) break
+        names.push((c.name ?? '').trim().toLowerCase())
+        current = c.parentId
+        depth++
     }
-
-    return result
+    return names.reverse().join('/')
 }
 
 /* ──────────────────────────────────────────────────────────────────── */
@@ -78,12 +78,13 @@ async function collectClientAndSubsidiaries(
 /* ──────────────────────────────────────────────────────────────────── */
 
 /**
- * Find the most recent completed task (with non-empty notes_vi) belonging to
- * the given client OR any of its sub-clients. Scoped to the current profile's
- * workspaces.
+ * Inherit the most recent note (non-empty notes_vi) of the SAME client —
+ * identified by hierarchical name-path — across ALL ACTIVE workspaces in the
+ * current profile. EXACT match: picking "Jacob" pulls only "Jacob" notes, not
+ * "Jacob/Unit". Solves the cross-month problem where each workspace has its own
+ * "Jacob" record with a different client id.
  *
  * Returns null if no matching task found (caller shows "Không có note để kế thừa").
- *
  * Admin-only (Velox is admin-gated per spec).
  */
 export async function getLastClientNote(
@@ -95,23 +96,50 @@ export async function getLastClientNote(
         const profileId = (user as any)?.sessionProfileId
         if (!profileId) return null
 
-        // Walk sub-client tree
-        const clientIds = await collectClientAndSubsidiaries(clientId)
-
-        // All workspaces in current profile (scope query to profile, not just current workspace)
+        // All ACTIVE workspaces in the current profile
         const profileWorkspaces = await prisma.workspace.findMany({
             where: { profileId, status: 'ACTIVE' },
             select: { id: true },
         })
         const workspaceIds = profileWorkspaces.map((w) => w.id)
 
+        // Load every client in the profile (workspace-scoped OR profile-scoped) so
+        // we can compute name-paths in memory (no N+1). ~hundreds of rows — cheap.
+        const clients = await prisma.client.findMany({
+            where: { OR: [{ profileId }, { workspaceId: { in: workspaceIds } }] },
+            select: { id: true, name: true, parentId: true },
+        })
+        const byId = new Map<number, { name: string; parentId: number | null }>(
+            clients.map((c) => [c.id, { name: c.name, parentId: c.parentId }]),
+        )
+
+        // Ensure the selected client is loaded (defensive — it normally lives in
+        // the current ACTIVE workspace and is already present in `clients` along
+        // with its ancestors).
+        if (!byId.has(clientId)) {
+            const sel = await prisma.client.findUnique({
+                where: { id: clientId },
+                select: { id: true, name: true, parentId: true },
+            })
+            if (!sel) return null
+            byId.set(sel.id, { name: sel.name, parentId: sel.parentId })
+        }
+
+        const targetPath = buildClientPath(clientId, byId)
+        if (!targetPath) return null
+
+        // Every client id in the profile sharing the SAME name-path (i.e. the same
+        // logical client across all months/workspaces). EXACT → excludes sub-clients.
+        const matchingIds = clients
+            .filter((c) => buildClientPath(c.id, byId) === targetPath)
+            .map((c) => c.id)
+        if (!matchingIds.includes(clientId)) matchingIds.push(clientId)
+
         const task = await prisma.task.findFirst({
             where: {
                 workspaceId: { in: workspaceIds },
-                clientId: { in: clientIds },
-                // [Velox v1.1] No status filter — pull from ANY task of this client
-                // (or sub-clients) with non-empty notes. Inclusive: in-progress /
-                // revision / completed all count as valid source.
+                clientId: { in: matchingIds },
+                // No status filter — any task of this client with a note qualifies.
                 isArchived: false,
                 NOT: [{ notes_vi: null }, { notes_vi: '' }],
             },

@@ -1,22 +1,33 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Plus, Loader2, Layers } from 'lucide-react'
 import { createWorkspaceAction } from '@/actions/workspace-actions'
+import { copyClientsToWorkspace } from '@/actions/workspace-clone-actions'
+import { CopyClientsSection, type CopyClientsState } from '@/components/workspace/CopyClientsSection'
 import { toast } from 'sonner'
+
+interface WorkspaceItem {
+    id: string
+    name: string
+    description?: string | null
+}
 
 interface Props {
     open: boolean
     onClose: () => void
+    /** Profile's existing workspaces — enables the "copy clients" option. */
+    workspaces?: WorkspaceItem[]
 }
 
-export default function CreateWorkspaceModal({ open, onClose }: Props) {
+export default function CreateWorkspaceModal({ open, onClose, workspaces = [] }: Props) {
     const router = useRouter()
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [creating, setCreating] = useState(false)
+    const copyStateRef = useRef<CopyClientsState>({ enabled: false, sourceId: null, selectedIds: [], copyPricing: true })
 
     async function handleCreate() {
         if (!name.trim()) {
@@ -38,11 +49,23 @@ export default function CreateWorkspaceModal({ open, onClose }: Props) {
             if (result.error) {
                 toast.error(result.error)
             } else if (result.success && result.workspaceId) {
-                toast.success('Workspace mới đã được tạo!')
+                const newWsId = result.workspaceId
+                // [Copy clients] If opted in, clone the selected clients into the new workspace.
+                const cs = copyStateRef.current
+                if (cs.enabled && cs.sourceId && cs.selectedIds.length > 0) {
+                    const copyRes = await copyClientsToWorkspace(cs.sourceId, newWsId, cs.selectedIds, cs.copyPricing)
+                    if ('success' in copyRes) {
+                        toast.success(`Workspace tạo xong · đã sao chép ${copyRes.count} khách hàng`)
+                    } else {
+                        toast.warning(`Workspace đã tạo, nhưng sao chép khách lỗi: ${copyRes.error}`)
+                    }
+                } else {
+                    toast.success('Workspace mới đã được tạo!')
+                }
                 onClose()
                 setName('')
                 setDescription('')
-                router.push(`/${result.workspaceId}/admin`)
+                router.push(`/${newWsId}/admin`)
             }
         } catch (err: any) {
             toast.error(err?.message || 'Lỗi tạo Workspace')
@@ -89,7 +112,7 @@ export default function CreateWorkspaceModal({ open, onClose }: Props) {
                         </div>
 
                         {/* Form */}
-                        <div className="px-6 pb-6 space-y-4 relative z-10">
+                        <div className="px-6 pb-6 space-y-4 relative z-10 max-h-[70vh] overflow-y-auto">
                             <div>
                                 <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
                                     Tên Workspace *
@@ -120,6 +143,9 @@ export default function CreateWorkspaceModal({ open, onClose }: Props) {
                                     className="w-full bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all resize-none"
                                 />
                             </div>
+
+                            {/* Copy clients from a previous workspace */}
+                            <CopyClientsSection workspaces={workspaces} onChange={(c) => { copyStateRef.current = c }} />
 
                             {/* Info note */}
                             <div className="bg-violet-500/5 border border-violet-500/10 rounded-xl p-3">

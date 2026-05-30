@@ -142,7 +142,7 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
                         )}
                     </AnimatePresence>
                 </div>
-                <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+                <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} workspaces={workspaces} />
             </>
         )
     }
@@ -212,7 +212,7 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
                     />
                 )}
             </AnimatePresence>
-            <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+            <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} workspaces={workspaces} />
         </div>
     )
 }

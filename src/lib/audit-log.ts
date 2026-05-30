@@ -35,6 +35,7 @@ export type AuditAction =
     | 'workspace.restored'
     | 'workspace.hard_deleted'
     | 'workspace.transferred_ownership'
+    | 'workspace.clients_cloned'
     | 'member.invited'
     | 'member.invitation_revoked'
     | 'member.joined'

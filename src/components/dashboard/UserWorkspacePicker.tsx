@@ -237,7 +237,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces, canCreate
                 )}
             </AnimatePresence>
 
-            <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+            <CreateWorkspaceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} workspaces={workspaces} />
         </div>
     )
 }

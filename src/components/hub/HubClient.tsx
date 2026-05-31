@@ -172,6 +172,9 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                         channel={selected}
                         currentUserId={currentUserId}
                         isAdmin={isAdmin}
+                        onChannelUpdated={(patch) =>
+                            setChannels((prev) => prev.map((c) => (c.id === selected.id ? { ...c, ...patch } : c)))
+                        }
                     />
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center px-6">

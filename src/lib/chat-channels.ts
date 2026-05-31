@@ -9,6 +9,7 @@ export const CHAT_EVENTS = {
     MESSAGE_NEW: 'message_new',
     MESSAGE_EDIT: 'message_edit',
     MESSAGE_DELETE: 'message_delete',
+    REACTION: 'reaction',
 } as const
 
 export type ChatEvent = (typeof CHAT_EVENTS)[keyof typeof CHAT_EVENTS]

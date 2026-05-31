@@ -1,18 +1,25 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Hash, Lock, Loader2, Send, Trash2 } from 'lucide-react'
+import { Hash, Lock, Loader2, Send, Trash2, SmilePlus, Settings } from 'lucide-react'
 import { toast } from 'sonner'
+import type { ChannelVisibility, PostPolicy } from '@prisma/client'
 import type { HubChannelDTO } from '@/actions/channel-actions'
-import { getMessages, sendMessage, deleteMessage, type MessageDTO } from '@/actions/message-actions'
+import ChannelSettingsModal from './ChannelSettingsModal'
+import { getMessages, sendMessage, deleteMessage, type MessageDTO, type ReactionDTO } from '@/actions/message-actions'
+import { toggleReaction } from '@/actions/reaction-actions'
 import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
 import { CHAT_EVENTS, getChannelBroadcastTopic } from '@/lib/chat-channels'
+
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '✅', '🔥', '🙏']
 
 interface Props {
     workspaceId: string
     channel: HubChannelDTO
     currentUserId: string
     isAdmin: boolean
+    /** Called after channel settings change so the parent can update its state. */
+    onChannelUpdated?: (patch: { visibility: ChannelVisibility; postPolicy: PostPolicy }) => void
 }
 
 function initials(name: string) {
@@ -24,11 +31,13 @@ function fmtTime(iso: string) {
     return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function ChannelView({ workspaceId, channel, currentUserId, isAdmin }: Props) {
+export default function ChannelView({ workspaceId, channel, currentUserId, isAdmin, onChannelUpdated }: Props) {
     const [messages, setMessages] = useState<MessageDTO[]>([])
     const [loading, setLoading] = useState(true)
     const [content, setContent] = useState('')
     const [sending, setSending] = useState(false)
+    const [pickerFor, setPickerFor] = useState<string | null>(null)
+    const [showSettings, setShowSettings] = useState(false)
     const scrollRef = useRef<HTMLDivElement>(null)
 
     // UX-only: hide composer when the channel is admins-only and the user isn't an admin.
@@ -80,10 +89,23 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                 setMessages((prev) =>
                     prev.map((m) => (m.id === id ? { ...m, deletedAt: new Date().toISOString(), content: '' } : m)),
                 )
+            } else if (event === CHAT_EVENTS.REACTION) {
+                const { messageId, reactions } = payload as { messageId: string; reactions: ReactionDTO[] }
+                setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions } : m)))
             }
         },
         true,
     )
+
+    async function handleToggleReaction(messageId: string, emoji: string) {
+        setPickerFor(null)
+        const res = await toggleReaction(workspaceId, messageId, emoji)
+        if ('error' in res) {
+            toast.error(res.error)
+            return
+        }
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions: res.reactions } : m)))
+    }
 
     async function handleSend() {
         const text = content.trim()
@@ -127,6 +149,15 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                     <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-amber-400/80 border border-amber-400/20 rounded-full px-2 py-0.5">
                         Chỉ admin đăng
                     </span>
+                )}
+                {isAdmin && channel.type !== 'TASK' && (
+                    <button
+                        onClick={() => setShowSettings(true)}
+                        className="ml-auto p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
+                        title="Cài đặt kênh"
+                    >
+                        <Settings className="w-4 h-4" />
+                    </button>
                 )}
             </div>
 
@@ -173,7 +204,53 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                                     {m.deletedAt ? (
                                         <p className="text-sm italic text-zinc-600">(tin nhắn đã xoá)</p>
                                     ) : (
-                                        <p className="text-sm text-zinc-300 whitespace-pre-wrap break-words">{m.content}</p>
+                                        <>
+                                            <p className="text-sm text-zinc-300 whitespace-pre-wrap break-words">{m.content}</p>
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                                {m.reactions.map((r) => {
+                                                    const mine = currentUserId ? r.userIds.includes(currentUserId) : false
+                                                    return (
+                                                        <button
+                                                            key={r.emoji}
+                                                            type="button"
+                                                            onClick={() => handleToggleReaction(m.id, r.emoji)}
+                                                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                                                                mine
+                                                                    ? 'border-violet-500/50 bg-violet-500/15 text-zinc-100'
+                                                                    : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10'
+                                                            }`}
+                                                        >
+                                                            <span>{r.emoji}</span>
+                                                            <span className="tabular-nums">{r.userIds.length}</span>
+                                                        </button>
+                                                    )
+                                                })}
+                                                <div className="relative">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPickerFor(pickerFor === m.id ? null : m.id)}
+                                                        className="opacity-0 group-hover:opacity-100 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-zinc-400 hover:text-zinc-100 transition-opacity"
+                                                        title="Thêm cảm xúc"
+                                                    >
+                                                        <SmilePlus className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {pickerFor === m.id && (
+                                                        <div className="absolute z-20 mt-1 flex gap-0.5 rounded-xl border border-white/10 bg-zinc-900 p-1 shadow-xl">
+                                                            {QUICK_EMOJIS.map((e) => (
+                                                                <button
+                                                                    key={e}
+                                                                    type="button"
+                                                                    onClick={() => handleToggleReaction(m.id, e)}
+                                                                    className="rounded-lg px-1.5 py-0.5 text-base hover:bg-white/10"
+                                                                >
+                                                                    {e}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -213,6 +290,15 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                     </div>
                 )}
             </div>
+
+            {showSettings && (
+                <ChannelSettingsModal
+                    workspaceId={workspaceId}
+                    channel={channel}
+                    onClose={() => setShowSettings(false)}
+                    onSaved={(patch) => onChannelUpdated?.(patch)}
+                />
+            )}
         </div>
     )
 }

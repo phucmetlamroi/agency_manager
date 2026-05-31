@@ -202,3 +202,95 @@ export async function getOrCreateTaskChannel(
         return { error: 'Không mở được kênh thảo luận' }
     }
 }
+
+/* ─── [Phase 3] Channel settings + private membership (admin-only) ─────────── */
+
+export interface ChannelMemberDTO {
+    userId: string
+    username: string
+    displayName: string | null
+    role: string
+}
+export interface WorkspaceMemberOption {
+    id: string
+    username: string
+    displayName: string | null
+}
+
+export async function updateChannelSettings(
+    workspaceId: string,
+    channelId: string,
+    input: { visibility?: ChannelVisibility; postPolicy?: PostPolicy },
+) {
+    const { workspaceRole } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    if (!hasAtLeastRole(workspaceRole, 'ADMIN')) return { error: 'Không có quyền' }
+
+    const data: { visibility?: ChannelVisibility; postPolicy?: PostPolicy } = {}
+    if (input.visibility) data.visibility = input.visibility
+    if (input.postPolicy) data.postPolicy = input.postPolicy
+    if (Object.keys(data).length === 0) return { success: true }
+
+    // Never alter a TASK channel's nature.
+    await prisma.channel.updateMany({
+        where: { id: channelId, workspaceId, type: { in: ['TEXT', 'FORUM', 'WIKI'] } },
+        data,
+    })
+    revalidatePath(`/${workspaceId}/admin/hub`)
+    return { success: true }
+}
+
+export async function getChannelAccess(
+    workspaceId: string,
+    channelId: string,
+): Promise<{ members: ChannelMemberDTO[]; workspaceMembers: WorkspaceMemberOption[] } | { error: string }> {
+    const { workspaceRole } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    if (!hasAtLeastRole(workspaceRole, 'ADMIN')) return { error: 'Không có quyền' }
+
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, workspaceId }, select: { id: true } })
+    if (!channel) return { error: 'Không tìm thấy kênh' }
+
+    const [members, wsMembers] = await Promise.all([
+        prisma.channelMember.findMany({
+            where: { channelId },
+            select: { userId: true, role: true, user: { select: { username: true, displayName: true } } },
+        }),
+        prisma.workspaceMember.findMany({
+            where: { workspaceId },
+            select: { user: { select: { id: true, username: true, displayName: true } } },
+            orderBy: { joinedAt: 'asc' },
+        }),
+    ])
+
+    return {
+        members: members.map((m) => ({ userId: m.userId, role: m.role, username: m.user.username, displayName: m.user.displayName })),
+        workspaceMembers: wsMembers.map((w) => ({ id: w.user.id, username: w.user.username, displayName: w.user.displayName })),
+    }
+}
+
+export async function setChannelMembers(workspaceId: string, channelId: string, userIds: string[]) {
+    const { user, workspaceRole } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    if (!hasAtLeastRole(workspaceRole, 'ADMIN')) return { error: 'Không có quyền' }
+
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, workspaceId }, select: { id: true } })
+    if (!channel) return { error: 'Không tìm thấy kênh' }
+    const profileId = await resolveProfileId(workspaceId, user)
+    if (!profileId) return { error: 'Workspace chưa gắn profile' }
+
+    // Only real workspace members may be added.
+    const valid = await prisma.workspaceMember.findMany({
+        where: { workspaceId, userId: { in: userIds } },
+        select: { userId: true },
+    })
+    const target = new Set(valid.map((v) => v.userId))
+    const existing = await prisma.channelMember.findMany({ where: { channelId }, select: { userId: true } })
+    const existingIds = new Set(existing.map((e) => e.userId))
+    const toAdd = Array.from(target).filter((id) => !existingIds.has(id))
+    const toRemove = Array.from(existingIds).filter((id) => !target.has(id))
+
+    await prisma.$transaction([
+        ...(toRemove.length ? [prisma.channelMember.deleteMany({ where: { channelId, userId: { in: toRemove } } })] : []),
+        ...toAdd.map((userId) => prisma.channelMember.create({ data: { workspaceId, profileId, channelId, userId, role: 'MEMBER' } })),
+    ])
+    revalidatePath(`/${workspaceId}/admin/hub`)
+    return { success: true }
+}

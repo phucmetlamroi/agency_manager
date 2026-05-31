@@ -2,23 +2,30 @@
 
 import { prisma } from '@/lib/db'
 import { authorizeChannel, type ChannelAuthzContext } from '@/lib/channel-permissions'
-import { broadcastToChannel } from '@/lib/notification-broadcast'
+import { broadcastToChannel, broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { CHAT_EVENTS } from '@/lib/chat-channels'
 import { revalidatePath } from 'next/cache'
 
 /**
  * Knowledge Hub — message read/write (server actions). Every call goes through
- * authorizeChannel() (default-deny, server-side). Persist-only here; realtime
- * broadcast is layered on in Phase 2.
+ * authorizeChannel() (default-deny, server-side). Persist to Neon → broadcast.
  */
 
 const AUTHOR_SELECT = { id: true, username: true, displayName: true, avatarUrl: true } as const
+const MESSAGE_INCLUDE = {
+    author: { select: AUTHOR_SELECT },
+    reactions: { select: { emoji: true, userId: true } },
+} as const
 
 export interface MessageAuthorDTO {
     id: string
     username: string
     displayName: string | null
     avatarUrl: string | null
+}
+export interface ReactionDTO {
+    emoji: string
+    userIds: string[]
 }
 export interface MessageDTO {
     id: string
@@ -28,9 +35,19 @@ export interface MessageDTO {
     author: MessageAuthorDTO | null
     parentId: string | null
     replyCount: number
+    reactions: ReactionDTO[]
     editedAt: string | null
     deletedAt: string | null
     createdAt: string
+}
+
+function groupReactions(rows: { emoji: string; userId: string }[]): ReactionDTO[] {
+    const map = new Map<string, string[]>()
+    for (const r of rows) {
+        if (!map.has(r.emoji)) map.set(r.emoji, [])
+        map.get(r.emoji)!.push(r.userId)
+    }
+    return Array.from(map.entries()).map(([emoji, userIds]) => ({ emoji, userIds }))
 }
 
 function serialize(m: any): MessageDTO {
@@ -42,18 +59,75 @@ function serialize(m: any): MessageDTO {
         author: m.author ?? null,
         parentId: m.parentId ?? null,
         replyCount: m.replyCount ?? 0,
+        reactions: groupReactions(m.reactions ?? []),
         editedAt: m.editedAt ? new Date(m.editedAt).toISOString() : null,
         deletedAt: m.deletedAt ? new Date(m.deletedAt).toISOString() : null,
         createdAt: new Date(m.createdAt).toISOString(),
     }
 }
 
-/** Resolve the profileId for create injection (session → workspace fallback). */
 async function resolveProfileId(ctx: ChannelAuthzContext, workspaceId: string): Promise<string> {
     if (ctx.profileId) return ctx.profileId
     const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
     if (!ws?.profileId) throw new Error('SECURITY_VIOLATION: workspace has no profile')
     return ws.profileId
+}
+
+/** Extract @username tokens (lowercased, deduped) from message text. */
+function parseMentions(content: string): string[] {
+    const re = /@([a-zA-Z0-9_.\-]{2,32})/g
+    const out = new Set<string>()
+    let m: RegExpExecArray | null
+    while ((m = re.exec(content)) !== null) out.add(m[1].toLowerCase())
+    return Array.from(out)
+}
+
+/** Create Mention + Notification rows and realtime-notify each mentioned member. */
+async function notifyMentions(opts: {
+    workspaceId: string
+    profileId: string
+    channelId: string
+    messageId: string
+    authorId: string
+    authorName: string
+    content: string
+}) {
+    const tokens = parseMentions(opts.content)
+    if (tokens.length === 0) return
+
+    const members = await prisma.workspaceMember.findMany({
+        where: { workspaceId: opts.workspaceId },
+        select: { user: { select: { id: true, username: true } } },
+    })
+    const matched = new Set<string>()
+    for (const m of members) {
+        if (m.user.id !== opts.authorId && tokens.includes(m.user.username.toLowerCase())) matched.add(m.user.id)
+    }
+    if (matched.size === 0) return
+
+    const title = `${opts.authorName} đã nhắc đến bạn`
+    const body = opts.content.replace(/\s+/g, ' ').trim().slice(0, 140)
+
+    await Promise.allSettled(
+        Array.from(matched).map(async (userId) => {
+            await prisma.mention
+                .create({ data: { workspaceId: opts.workspaceId, profileId: opts.profileId, messageId: opts.messageId, userId } })
+                .catch(() => {})
+            await prisma.notification
+                .create({
+                    data: {
+                        userId,
+                        type: 'MENTION',
+                        title,
+                        body,
+                        actorId: opts.authorId,
+                        metadata: { channelId: opts.channelId, messageId: opts.messageId },
+                    },
+                })
+                .catch(() => {})
+            broadcastNotificationToUser(userId, { type: 'MENTION', title, body, channelId: opts.channelId, messageId: opts.messageId })
+        }),
+    )
 }
 
 /** Paginated channel history (top-level messages), oldest→newest for display. */
@@ -70,13 +144,12 @@ export async function getMessages(
         orderBy: { createdAt: 'desc' },
         take: limit + 1,
         ...(opts?.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
-        include: { author: { select: AUTHOR_SELECT } },
+        include: MESSAGE_INCLUDE,
     })
 
     const hasMore = rows.length > limit
     const page = hasMore ? rows.slice(0, limit) : rows
     const nextCursor = hasMore ? page[page.length - 1].id : null
-    // rows are newest-first → reverse for chronological render.
     return { messages: page.reverse().map(serialize), nextCursor }
 }
 
@@ -101,19 +174,24 @@ export async function sendMessage(
 
     const created = await prisma.message.create({
         data: { workspaceId, profileId, channelId, authorId: ctx.userId, content: clean, parentId: parentId ?? null },
-        include: { author: { select: AUTHOR_SELECT } },
+        include: MESSAGE_INCLUDE,
     })
 
-    // Maintain denormalized replyCount on the parent (scoped to workspace).
     if (parentId) {
-        await prisma.message.updateMany({
-            where: { id: parentId, workspaceId },
-            data: { replyCount: { increment: 1 } },
-        })
+        await prisma.message.updateMany({ where: { id: parentId, workspaceId }, data: { replyCount: { increment: 1 } } })
     }
 
     const dto = serialize(created)
     await broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_NEW, dto)
+
+    // Mentions → notifications (best-effort, never blocks the send).
+    try {
+        const authorName = created.author?.displayName || created.author?.username || 'Ai đó'
+        await notifyMentions({ workspaceId, profileId, channelId, messageId: created.id, authorId: ctx.userId, authorName, content: clean })
+    } catch {
+        /* ignore */
+    }
+
     return { success: true, message: dto }
 }
 
@@ -137,14 +215,13 @@ export async function editMessage(
     } catch {
         return { error: 'Không có quyền' }
     }
-    // Author can edit own message; channel/workspace managers can edit any.
     const canEdit = existing.authorId === ctx.userId || ctx.isWorkspaceAdmin || ctx.channelMemberRole === 'MODERATOR'
     if (!canEdit) return { error: 'Không có quyền sửa tin nhắn này' }
 
     const updated = await prisma.message.update({
         where: { id: messageId },
         data: { content: clean.slice(0, 4000), editedAt: new Date() },
-        include: { author: { select: AUTHOR_SELECT } },
+        include: MESSAGE_INCLUDE,
     })
     const dto = serialize(updated)
     await broadcastToChannel(existing.channelId, CHAT_EVENTS.MESSAGE_EDIT, dto)

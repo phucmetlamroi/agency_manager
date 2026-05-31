@@ -158,3 +158,47 @@ export async function deleteChannel(workspaceId: string, channelId: string) {
     revalidatePath(`/${workspaceId}/admin/hub`)
     return { success: true }
 }
+
+/**
+ * [Phase 6] Lazily get-or-create the discussion channel for a task. Callable by
+ * any workspace MEMBER (it's the chat for a task they can already open). The
+ * `taskId @unique` constraint makes concurrent creation race-safe.
+ */
+export async function getOrCreateTaskChannel(
+    workspaceId: string,
+    taskId: string,
+): Promise<{ channel: HubChannelDTO } | { error: string }> {
+    const { user } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+
+    // The task must belong to this workspace.
+    const task = await prisma.task.findFirst({ where: { id: taskId, workspaceId }, select: { id: true, title: true } })
+    if (!task) return { error: 'Không tìm thấy task' }
+
+    const existing = await prisma.channel.findFirst({ where: { taskId, workspaceId }, select: CHANNEL_SELECT })
+    if (existing) return { channel: existing }
+
+    const profileId = await resolveProfileId(workspaceId, user)
+    if (!profileId) return { error: 'Workspace chưa gắn profile' }
+
+    try {
+        const channel = await prisma.channel.create({
+            data: {
+                workspaceId,
+                profileId,
+                taskId,
+                name: task.title.trim().slice(0, 80) || 'Thảo luận task',
+                type: 'TASK',
+                visibility: 'PUBLIC',
+                postPolicy: 'EVERYONE',
+                position: 0,
+            },
+            select: CHANNEL_SELECT,
+        })
+        return { channel }
+    } catch {
+        // Race: a concurrent open created it first (unique taskId) → refetch.
+        const again = await prisma.channel.findFirst({ where: { taskId, workspaceId }, select: CHANNEL_SELECT })
+        if (again) return { channel: again }
+        return { error: 'Không mở được kênh thảo luận' }
+    }
+}

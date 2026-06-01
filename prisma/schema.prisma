@@ -46,6 +46,8 @@ model Profile {
   accessRequests      ProfileAccessRequest[] @relation("TargetProfileRequests")
   billingProfiles     BillingProfile[]
   tagCategories       TagCategory[]
+  // [Bonus Config] 1 cấu hình thưởng / team (profile), dùng lại mọi tháng.
+  bonusConfig         BonusConfig?
 
   @@index([status, deletedAt])
 }
@@ -375,6 +377,8 @@ model MonthlyBonus {
   revenue            Decimal
   executionTimeHours Float
   bonusAmount        Decimal
+  // [Bonus Config] % đã áp cho hạng này (snapshot config tại thời điểm tính).
+  bonusPercent       Decimal?  @default(0)
   calculatedAt       DateTime  @default(now())
   user               User      @relation(fields: [userId], references: [id])
   workspaceId        String
@@ -1324,4 +1328,25 @@ model Attachment {
 
   @@index([messageId])
   @@index([wikiPageId])
+}
+
+// ============================================================
+// PAYROLL BONUS CONFIG — cấu hình tính thưởng riêng theo team (profile).
+// 1 config / profile (dùng lại mọi tháng/workspace). Top 1/2/3: bật/tắt + %.
+// Không có workspaceId → truy vấn bằng prisma thường (lọc profileId), KHÔNG
+// qua getWorkspacePrisma.
+// ============================================================
+model BonusConfig {
+  id          String   @id @default(cuid())
+  profileId   String   @unique
+  top1Enabled Boolean  @default(true)
+  top1Percent Decimal  @default(0)
+  top2Enabled Boolean  @default(false)
+  top2Percent Decimal  @default(0)
+  top3Enabled Boolean  @default(false)
+  top3Percent Decimal  @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }

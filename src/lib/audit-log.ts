@@ -56,6 +56,7 @@ export type AuditAction =
     | 'payroll.bonus_reverted'
     | 'payroll.locked'
     | 'payroll.unlocked'
+    | 'bonus_config.updated'
     | 'data.export'
     | 'data.import'
     | 'permission.checked_denied'

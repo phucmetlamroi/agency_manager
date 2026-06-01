@@ -19,6 +19,12 @@ interface Props {
      * Visual decoration only.
      */
     sparkline?: number[]
+    /** Tiền thưởng tháng này (MonthlyBonus.bonusAmount) — đã cộng vào "Lương đã nhận". */
+    bonusAmount?: number
+    /** Thứ hạng thưởng (1/2/3) nếu được Top — hiện huy chương. */
+    rank?: number | null
+    /** % thưởng đã áp (để hiện "Top N · X%"). */
+    bonusPercent?: number
     locale?: string
     currency?: string
 }
@@ -32,20 +38,28 @@ const NP = {
     textMuted: "#71717A",
 }
 
+const MEDALS: Record<number, { grad: string; text: string; emoji: string }> = {
+    1: { grad: "linear-gradient(135deg,#FFE08A,#F5A524)", text: "#3a2705", emoji: "🥇" },
+    2: { grad: "linear-gradient(135deg,#EEF2F7,#A9B6C6)", text: "#22262b", emoji: "🥈" },
+    3: { grad: "linear-gradient(135deg,#F0B584,#C26B3F)", text: "#2a1505", emoji: "🥉" },
+}
+
 /**
  * [Sprint O] Net Salary widget — user dashboard.
  *
- * Hero:        "Lương đã nhận"  (lifetime, completed tasks, emerald)
+ * Hero:        "Lương đã nhận"  (completed tasks + thưởng tháng này)
  * Secondary:  "Lương dự kiến"  (pending tasks, violet)
  *
- * Old behavior (showing 0 when user hasn't completed anything this month) was
- * replaced because users wanted lifetime visibility + projected income from
- * in-progress work.
+ * [Bonus] Nếu user được Top 1/2/3, tiền thưởng được CỘNG vào "Lương đã nhận"
+ * và hiện rõ huy chương + dòng "Thưởng Top N · +X đ" để nhân viên biết.
  */
 export default function WidgetNetSalary({
     earnedTotal,
     pendingTotal,
     sparkline = [],
+    bonusAmount = 0,
+    rank = null,
+    bonusPercent = 0,
     locale = "vi-VN",
     currency = "VND",
 }: Props) {
@@ -53,6 +67,9 @@ export default function WidgetNetSalary({
     const chartData = sparkline.length > 0
         ? sparkline.map((v, i) => ({ i, v }))
         : [{ i: 0, v: 0 }]
+
+    const netReceived = earnedTotal + (bonusAmount || 0)
+    const medal = rank ? MEDALS[rank] : null
 
     return (
         <div
@@ -65,17 +82,27 @@ export default function WidgetNetSalary({
                 minHeight: 160,
             }}
         >
-            {/* Header label */}
-            <span
-                className="text-[11px] font-bold uppercase tracking-widest z-10 relative"
-                style={{ color: NP.textMuted }}
-            >
-                Net Salary
-            </span>
+            {/* Header label + huy chương Top */}
+            <div className="flex items-center justify-between gap-2 z-10 relative">
+                <span
+                    className="text-[11px] font-bold uppercase tracking-widest"
+                    style={{ color: NP.textMuted }}
+                >
+                    Net Salary
+                </span>
+                {medal && (
+                    <span
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold flex-shrink-0"
+                        style={{ background: medal.grad, color: medal.text, boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}
+                    >
+                        <span className="text-[13px] leading-none">{medal.emoji}</span> Top {rank}
+                    </span>
+                )}
+            </div>
 
-            {/* Body — 2 stacked rows */}
+            {/* Body — stacked rows */}
             <div className="flex flex-col gap-2.5 z-10 relative mt-1">
-                {/* Hero — Lương đã nhận (emerald) */}
+                {/* Hero — Lương đã nhận (gồm thưởng) */}
                 <div className="flex flex-col gap-0.5">
                     <span
                         className="text-[10px] font-semibold uppercase tracking-wide"
@@ -84,9 +111,14 @@ export default function WidgetNetSalary({
                         Lương đã nhận
                     </span>
                     <span className="text-[22px] font-extrabold leading-tight bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-                        {earnedTotal.toLocaleString(locale)}{" "}
+                        {netReceived.toLocaleString(locale)}{" "}
                         <span className="text-[13px] font-semibold opacity-80">{currency}</span>
                     </span>
+                    {bonusAmount > 0 && (
+                        <span className="text-[11px] font-bold mt-0.5" style={{ color: "#F5C451" }}>
+                            🏆 Thưởng Top {rank}{bonusPercent ? ` · ${bonusPercent}%` : ""}: +{bonusAmount.toLocaleString(locale)} {currency}
+                        </span>
+                    )}
                 </div>
 
                 {/* Secondary — Lương dự kiến (violet) */}

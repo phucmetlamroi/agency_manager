@@ -58,8 +58,14 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
     const donePct = totalTasksCount > 0 ? (completedTasks.length / totalTasksCount) * 100 : 0
     const procPct = totalTasksCount > 0 ? (pendingTasks.length / totalTasksCount) * 100 : 0
 
-    // Podium tím (đồng bộ Leaderboard): Top1 #8B5CF6 · Top2 #4C1D95 · Top3 #211B31
-    const rankBg: Record<number, string> = { 1: '#8B5CF6', 2: '#4C1D95', 3: '#211B31' }
+    // Huy chương Top 1/2/3 — vàng/bạc/đồng (nổi bật) kèm glow + viền card
+    const rankStyle: Record<number, { grad: string; glow: string; ring: string; text: string }> = {
+        1: { grad: 'linear-gradient(135deg,#FFE08A,#F5A524)', glow: 'rgba(245,165,36,0.55)', ring: 'rgba(245,165,36,0.55)', text: '#3a2705' },
+        2: { grad: 'linear-gradient(135deg,#EEF2F7,#A9B6C6)', glow: 'rgba(169,182,198,0.45)', ring: 'rgba(169,182,198,0.45)', text: '#22262b' },
+        3: { grad: 'linear-gradient(135deg,#F0B584,#C26B3F)', glow: 'rgba(194,107,63,0.5)', ring: 'rgba(194,107,63,0.5)', text: '#2a1505' },
+    }
+    const rank: number | undefined = bonusData?.rank
+    const rs = rank ? rankStyle[rank] : null
 
     const displayName = user.displayName?.trim() || user.username
     const detailTasks = showPending ? pendingTasks : completedTasks
@@ -69,9 +75,14 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: 'easeOut' }}
-            whileHover={{ borderColor: 'rgba(139,92,246,0.25)', y: -2 }}
+            whileHover={{ borderColor: rs ? rs.ring : 'rgba(139,92,246,0.25)', y: -2 }}
             className={`relative overflow-hidden rounded-[26px] transition-colors duration-150 ${isPaid ? 'opacity-70' : ''} ${totalIncome === 0 ? 'opacity-60' : ''}`}
-            style={{ backgroundColor: '#0A0A0A', border: '1px solid rgba(139,92,246,0.15)', fontFamily: FONT }}
+            style={{
+                backgroundColor: '#0A0A0A',
+                border: `1px solid ${rs ? rs.ring : 'rgba(139,92,246,0.15)'}`,
+                boxShadow: rs ? `0 0 28px ${rs.glow}` : undefined,
+                fontFamily: FONT,
+            }}
         >
             {/* Vạch accent trái — chưa thanh toán */}
             {!isPaid && (
@@ -90,15 +101,18 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                 document.body
             )}
 
-            {/* Rank badge (Top 1/2/3) */}
-            {bonusData?.rank && (
-                <div
-                    className="absolute top-0 right-6 px-3.5 py-1 rounded-b-xl font-bold text-xs text-white flex items-center gap-1.5 z-10"
-                    style={{ backgroundColor: rankBg[bonusData.rank] || '#211B31' }}
+            {/* Rank badge (Top 1/2/3) — huy chương nổi bật */}
+            {rank && rs && (
+                <motion.div
+                    initial={false}
+                    animate={rank === 1 ? { scale: [1, 1.06, 1] } : undefined}
+                    transition={rank === 1 ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : undefined}
+                    className="absolute top-0 right-5 px-4 py-1.5 rounded-b-2xl font-extrabold text-[13px] flex items-center gap-1.5 z-20"
+                    style={{ background: rs.grad, color: rs.text, boxShadow: `0 6px 22px ${rs.glow}` }}
                 >
-                    <Trophy className="w-3.5 h-3.5" />
-                    {rankEmoji} Top {bonusData.rank}
-                </div>
+                    <span className="text-[16px] leading-none">{rankEmoji}</span>
+                    Top {rank}
+                </motion.div>
             )}
 
             {/* ── Hàng chính ───────────────────────────────────── */}

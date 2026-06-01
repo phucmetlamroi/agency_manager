@@ -19,6 +19,7 @@ import WidgetNetSalary from '@/components/dashboard/widgets/WidgetNetSalary'
 import WidgetTotalTasks from '@/components/dashboard/widgets/WidgetTotalTasks'
 import UserWorkflowTabs from '@/components/dashboard/UserWorkflowTabs'
 import PendingInvitationsBanner from '@/components/workspace/PendingInvitationsBanner'
+import BonusRankBanner from '@/components/dashboard/BonusRankBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,6 +96,8 @@ export default async function UserDashboard({ params, searchParams }: {
             displayName: true,
             role: true,
             avatarUrl: true,
+            // [Bonus] thưởng tháng này (MonthlyBonus) — để user thấy rank + tiền thưởng
+            bonuses: { where: { workspaceId } },
         },
     })
 
@@ -140,6 +143,12 @@ export default async function UserDashboard({ params, searchParams }: {
 
     const earnedTotal = completedTasks.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
     const pendingTotal = pendingTasks.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
+
+    // ── [Bonus] Thưởng tháng này của user — hiện rank + cộng vào "Lương đã nhận" ──
+    const bonusData = currentUser?.bonuses?.[0]
+    const bonusAmount = Number(bonusData?.bonusAmount ?? 0)
+    const bonusRank: number | null = bonusData?.rank ?? null
+    const bonusPercent = Number(bonusData?.bonusPercent ?? 0)
 
     // Sparkline: last 14 days completed daily totals (visual decoration only)
     const sparkline = Array.from({ length: 14 }, (_, i) => {
@@ -245,6 +254,16 @@ export default async function UserDashboard({ params, searchParams }: {
             {/* ── Pending invitations banner ── */}
             <PendingInvitationsBanner />
 
+            {/* ── [Bonus] Chúc mừng Top N + tiền thưởng (nếu được xếp hạng) ── */}
+            {bonusRank && (
+                <BonusRankBanner
+                    rank={bonusRank}
+                    bonusAmount={bonusAmount}
+                    bonusPercent={bonusPercent}
+                    period={workspaceName}
+                />
+            )}
+
             {/* ── Widget grid: 12-col, Row 1 ─────────────────────── */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
                 {/* Rankings */}
@@ -270,6 +289,9 @@ export default async function UserDashboard({ params, searchParams }: {
                             earnedTotal={earnedTotal}
                             pendingTotal={pendingTotal}
                             sparkline={sparkline}
+                            bonusAmount={bonusAmount}
+                            rank={bonusRank}
+                            bonusPercent={bonusPercent}
                         />
                     </div>
                     <div className="flex-1">

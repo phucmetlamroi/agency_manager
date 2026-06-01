@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { createPortal } from "react-dom"
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react"
 
 interface DeadlineTask {
@@ -31,6 +32,24 @@ const NP = {
     textMuted: "#71717A",
 }
 
+/** Màu + nhãn theo trạng thái từng task (khớp logic dấu chấm lịch). */
+function taskStatusMeta(t: DeadlineTask): { color: string; label: string } {
+    if (t.status === "Hoàn tất") return { color: "#10B981", label: "Hoàn tất" }
+    if (t.deadline && new Date(t.deadline).getTime() < Date.now()) return { color: "#EF4444", label: "Quá hạn" }
+    return { color: "#6366F1", label: t.status }
+}
+
+/** Giờ deadline (HH:mm) — chỉ hiện nếu khác 00:00. */
+function deadlineTime(t: DeadlineTask): string | null {
+    if (!t.deadline) return null
+    const d = new Date(t.deadline)
+    if (isNaN(d.getTime())) return null
+    if (d.getHours() === 0 && d.getMinutes() === 0) return null
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+}
+
+type Hovered = { rect: DOMRect; items: DeadlineTask[]; label: string }
+
 /**
  * Calendar grid widget showing days with deadline dots.
  *
@@ -38,6 +57,8 @@ const NP = {
  *     - emerald (success)  → status === 'Hoàn tất'
  *     - red (overdue)      → deadline < now AND status !== 'Hoàn tất'
  *     - indigo (pending)   → otherwise
+ * - Hover một ngày CÓ task → popover liệt kê các task deadline ngày đó
+ *   (render qua portal nên không bị card cắt); rời chuột → ẩn.
  * - Prev/next month navigation, "Today" pill highlights current day.
  */
 export default function WidgetUpcomingDeadlines({ tasks }: Props) {
@@ -45,6 +66,7 @@ export default function WidgetUpcomingDeadlines({ tasks }: Props) {
         const now = new Date()
         return { year: now.getFullYear(), month: now.getMonth() }
     })
+    const [hovered, setHovered] = useState<Hovered | null>(null)
 
     // Pre-bucket tasks by yyyy-mm-dd for O(1) lookup during render.
     const tasksByDay = useMemo(() => {
@@ -93,14 +115,14 @@ export default function WidgetUpcomingDeadlines({ tasks }: Props) {
         && today.getMonth() === month
         && today.getDate() === day
 
-    const goPrev = () => setCursor(({ year, month }) => {
+    const goPrev = () => { setHovered(null); setCursor(({ year, month }) => {
         const m = month - 1
         return m < 0 ? { year: year - 1, month: 11 } : { year, month: m }
-    })
-    const goNext = () => setCursor(({ year, month }) => {
+    }) }
+    const goNext = () => { setHovered(null); setCursor(({ year, month }) => {
         const m = month + 1
         return m > 11 ? { year: year + 1, month: 0 } : { year, month: m }
-    })
+    }) }
 
     function dotColorForTasks(items: DeadlineTask[]): string {
         const allDone = items.every(t => t.status === "Hoàn tất")
@@ -181,13 +203,19 @@ export default function WidgetUpcomingDeadlines({ tasks }: Props) {
                         return <div key={idx} aria-hidden />
                     }
                     const dayItems = cell.key ? (tasksByDay[cell.key] || []) : []
+                    const hasTasks = dayItems.length > 0
                     const isToday = isTodayCell(cursor.year, cursor.month, cell.day)
-                    const dot = dayItems.length > 0 ? dotColorForTasks(dayItems) : null
+                    const dot = hasTasks ? dotColorForTasks(dayItems) : null
                     return (
                         <div
                             key={idx}
-                            title={dayItems.length > 0 ? dayItems.map(t => t.title).join(" • ") : undefined}
-                            className="relative flex flex-col items-center justify-start py-1"
+                            className={`relative flex flex-col items-center justify-start py-1 rounded-xl transition-colors ${hasTasks ? "cursor-pointer hover:bg-[rgba(139,92,246,0.08)]" : ""}`}
+                            onMouseEnter={hasTasks ? (e) => setHovered({
+                                rect: e.currentTarget.getBoundingClientRect(),
+                                items: dayItems,
+                                label: `${cell.day} ${MONTHS_EN[cursor.month]} ${cursor.year}`,
+                            }) : undefined}
+                            onMouseLeave={hasTasks ? () => setHovered(null) : undefined}
                         >
                             <span
                                 className="flex items-center justify-center"
@@ -220,6 +248,75 @@ export default function WidgetUpcomingDeadlines({ tasks }: Props) {
                     )
                 })}
             </div>
+
+            {/* ── Hover popover (portal → không bị card cắt) ── */}
+            {hovered && typeof window !== "undefined" && createPortal(
+                <div
+                    className="fixed z-[200] pointer-events-none animate-in fade-in zoom-in-95 duration-150"
+                    style={{
+                        left: Math.min(Math.max(hovered.rect.left + hovered.rect.width / 2, 132), window.innerWidth - 132),
+                        width: 248,
+                        transform: "translateX(-50%)",
+                        ...(hovered.rect.top < 210
+                            ? { top: hovered.rect.bottom + 8 }
+                            : { bottom: window.innerHeight - hovered.rect.top + 8 }),
+                    }}
+                >
+                    <div
+                        className="rounded-2xl p-3"
+                        style={{
+                            background: "rgba(10,10,12,0.96)",
+                            backdropFilter: "blur(12px)",
+                            WebkitBackdropFilter: "blur(12px)",
+                            border: "1px solid rgba(139,92,246,0.25)",
+                            boxShadow: "0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.06)",
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        }}
+                    >
+                        <div className="flex items-center gap-1.5 mb-2 pb-2" style={{ borderBottom: "1px solid rgba(139,92,246,0.12)" }}>
+                            <CalendarIcon className="w-3.5 h-3.5" style={{ color: NP.accent }} />
+                            <span className="text-[12px] font-bold text-white">{hovered.label}</span>
+                            <span
+                                className="ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-md leading-none"
+                                style={{ background: "rgba(139,92,246,0.15)", color: "#D8B4FE" }}
+                            >
+                                {hovered.items.length}
+                            </span>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            {hovered.items.slice(0, 6).map((t) => {
+                                const meta = taskStatusMeta(t)
+                                const time = deadlineTime(t)
+                                return (
+                                    <div key={t.id} className="flex items-center gap-2">
+                                        <span
+                                            className="flex-shrink-0"
+                                            style={{ width: 6, height: 6, borderRadius: "50%", background: meta.color, boxShadow: `0 0 6px ${meta.color}` }}
+                                        />
+                                        <span className="text-[12px] truncate flex-1" style={{ color: "rgba(255,255,255,0.92)" }}>
+                                            {t.title}
+                                        </span>
+                                        {time && (
+                                            <span className="text-[10px] flex-shrink-0 tabular-nums" style={{ color: NP.textMuted }}>
+                                                {time}
+                                            </span>
+                                        )}
+                                        <span className="text-[10px] flex-shrink-0 font-semibold" style={{ color: meta.color }}>
+                                            {meta.label}
+                                        </span>
+                                    </div>
+                                )
+                            })}
+                            {hovered.items.length > 6 && (
+                                <span className="text-[11px] mt-0.5" style={{ color: NP.textMuted }}>
+                                    +{hovered.items.length - 6} task khác…
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     )
 }

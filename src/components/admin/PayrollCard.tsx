@@ -33,6 +33,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
 
     const bonusData = user.bonuses?.[0]
     const bonusAmount = bonusData ? bonusData.bonusAmount : 0
+    const bonusPercent = bonusData ? Number(bonusData.bonusPercent ?? 0) : 0
     const totalIncome = taskIncome + bonusAmount
 
     const payrollRecord = user.payrolls?.[0]
@@ -244,10 +245,12 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                                         <td className="py-2.5 px-2">
                                             <div className="font-bold text-amber-400 flex items-center gap-2">
                                                 <Trophy className="w-3.5 h-3.5" />
-                                                {rankEmoji} Thưởng Top {bonusData.rank} Doanh Thu
+                                                {rankEmoji} Thưởng Top {bonusData.rank}{bonusPercent > 0 ? ` · ${bonusPercent}%` : ''}
                                             </div>
                                             <div className="text-[11px] text-amber-500/70 mt-0.5">
-                                                Doanh thu: {bonusData.revenue.toLocaleString()}đ • Tổng giờ: {bonusData.executionTimeHours.toFixed(1)}h
+                                                {bonusPercent > 0
+                                                    ? `${bonusPercent}% × Thực nhận ${Number(bonusData.revenue).toLocaleString()}đ`
+                                                    : `Thực nhận: ${Number(bonusData.revenue).toLocaleString()}đ`}
                                             </div>
                                         </td>
                                         <td className="py-2.5 px-2 text-right font-mono font-bold text-amber-400">

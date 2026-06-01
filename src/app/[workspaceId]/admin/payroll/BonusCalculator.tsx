@@ -5,11 +5,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
+import { Settings } from 'lucide-react'
+import BonusConfigModal from '@/components/admin/BonusConfigModal'
 
 export default function BonusCalculator({ workspaceId }: { workspaceId: string }) {
     const { confirm } = useConfirm()
     const [isLoading, setIsLoading] = useState(false)
     const [isLocked, setIsLocked] = useState(false)
+    const [showConfig, setShowConfig] = useState(false)
     const router = useRouter()
 
     useEffect(() => {
@@ -135,6 +138,29 @@ export default function BonusCalculator({ workspaceId }: { workspaceId: string }
                     {isLoading ? 'Đang tính toán...' : '🏆 Tính Thưởng Tháng Này'}
                 </button>
             )}
+
+            {/* [Bonus Config] Nút cấu hình thưởng theo team (Top 1/2/3 + %) */}
+            <button
+                type="button"
+                onClick={() => setShowConfig(true)}
+                className="btn glass-panel"
+                title="Cấu hình thưởng (Top 1/2/3)"
+                style={{
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    border: 'none',
+                    padding: '0.8rem 1rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                }}
+            >
+                <Settings className="w-4 h-4" />
+            </button>
+
+            {showConfig && <BonusConfigModal workspaceId={workspaceId} onClose={() => setShowConfig(false)} />}
         </div>
     )
 }

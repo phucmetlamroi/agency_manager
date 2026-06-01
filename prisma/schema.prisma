@@ -46,6 +46,8 @@ model Profile {
   accessRequests      ProfileAccessRequest[] @relation("TargetProfileRequests")
   billingProfiles     BillingProfile[]
   tagCategories       TagCategory[]
+  // [Bonus Config] 1 cấu hình thưởng / team (profile), dùng lại mọi tháng.
+  bonusConfig         BonusConfig?
 
   @@index([status, deletedAt])
 }
@@ -90,6 +92,11 @@ model Workspace {
   // [Quick Create] OAuth tokens + pricing rules per-workspace
   integrationTokens   IntegrationToken[]
   pricingRules        PricingRule[]
+
+  // [Knowledge Hub] chat channels + categories + wiki pages
+  channels   Channel[]
+  categories Category[]
+  wikiPages  WikiPage[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 
@@ -217,6 +224,13 @@ model User {
   contactsReceived     Contact[]                 @relation("ContactReceiver")
   notifications        Notification[]
 
+  // [Knowledge Hub] authored messages + reactions + mentions + memberships + wiki
+  channelMessages    Message[]
+  channelReactions   Reaction[]
+  channelMentions    Mention[]
+  channelMemberships ChannelMember[]
+  wikiPages          WikiPage[]
+
   profile Profile? @relation(fields: [profileId], references: [id])
 
   // Auth Phase 1 indexes
@@ -338,6 +352,8 @@ model Task {
   claimedAt        DateTime?
   taskTags         TaskTag[]
   rating           Rating?
+  // [Knowledge Hub] auto-created TASK-type discussion channel (1-1, lazy)
+  channel          Channel?
 
   // [Sprint P] Track admin who assigned/created the task. Used for email +
   // in-app notification routing — when user starts/delivers a task, the
@@ -361,6 +377,8 @@ model MonthlyBonus {
   revenue            Decimal
   executionTimeHours Float
   bonusAmount        Decimal
+  // [Bonus Config] % đã áp cho hạng này (snapshot config tại thời điểm tính).
+  bonusPercent       Decimal?  @default(0)
   calculatedAt       DateTime  @default(now())
   user               User      @relation(fields: [userId], references: [id])
   workspaceId        String
@@ -928,6 +946,10 @@ enum NotificationType {
   // [Sprint P] Lifecycle email + in-app routing tới admin (assignedBy)
   TASK_STARTED   // User bấm "Bắt đầu" → notify admin who created task
   TASK_DELIVERED // User submit productLink → notify admin who created task
+  // [Knowledge Hub] chat / wiki notifications
+  CHANNEL_MESSAGE // new message in a channel the user belongs to
+  THREAD_REPLY    // reply to a message the user authored / participated in
+  TASK_CHAT       // new message in a task's discussion channel
   // Workspace invitations
   WORKSPACE_INVITATION_ACCEPTED
   WORKSPACE_INVITATION_DECLINED
@@ -1116,4 +1138,215 @@ model PricingRule {
 
   @@index([workspaceId, clientId])
   @@index([workspaceId, isDefault])
+}
+
+// ============================================================
+// KNOWLEDGE HUB — unified Channel model (chat + forum + wiki + task-chat)
+// Every row carries workspaceId + profileId → getWorkspacePrisma auto-scopes
+// them. DO NOT add these models to bypassModels / noProfileModels.
+// ============================================================
+
+enum ChannelType {
+  TEXT // realtime team chat stream
+  FORUM // post-based (UI deferred)
+  WIKI // container for wiki pages
+  TASK // auto-created, attached to one task
+}
+
+enum ChannelVisibility {
+  PUBLIC // all workspace members can view
+  PRIVATE // only explicit ChannelMember rows
+}
+
+enum PostPolicy {
+  EVERYONE // any viewer can post
+  ADMINS_ONLY // only workspace OWNER/ADMIN (or channel MODERATOR) can post
+}
+
+enum ChannelRole {
+  MEMBER
+  MODERATOR
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  workspaceId String
+  profileId   String
+  name        String
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channels  Channel[]
+
+  @@index([workspaceId])
+}
+
+model Channel {
+  id          String            @id @default(cuid())
+  workspaceId String
+  profileId   String
+  categoryId  String?
+  name        String
+  description String?
+  type        ChannelType       @default(TEXT)
+  visibility  ChannelVisibility @default(PUBLIC)
+  postPolicy  PostPolicy        @default(EVERYONE)
+  position    Int               @default(0)
+  // Task linkage: when set, this channel is the discussion thread for one task
+  taskId      String?           @unique
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category  Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  task      Task?           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  members   ChannelMember[]
+  wikiPages WikiPage[]
+
+  @@index([workspaceId, type])
+  @@index([categoryId])
+}
+
+model Message {
+  id          String    @id @default(cuid())
+  workspaceId String
+  profileId   String
+  channelId   String
+  authorId    String
+  content     String    @db.Text
+  // Threading (Slack-style): null = top-level; else points to parent (root) message
+  parentId    String?
+  replyCount  Int       @default(0)
+  editedAt    DateTime?
+  deletedAt   DateTime? // soft delete
+  createdAt   DateTime  @default(now())
+
+  channel     Channel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author      User         @relation(fields: [authorId], references: [id])
+  parent      Message?     @relation("MessageThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies     Message[]    @relation("MessageThread")
+  reactions   Reaction[]
+  mentions    Mention[]
+  attachments Attachment[]
+
+  @@index([channelId, createdAt])
+  @@index([parentId])
+}
+
+model Reaction {
+  id          String   @id @default(cuid())
+  workspaceId String
+  profileId   String
+  messageId   String
+  userId      String
+  emoji       String
+  createdAt   DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model Mention {
+  id          String   @id @default(cuid())
+  workspaceId String
+  profileId   String
+  messageId   String
+  userId      String
+  createdAt   DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([messageId])
+}
+
+model ChannelMember {
+  id          String      @id @default(cuid())
+  workspaceId String
+  profileId   String
+  channelId   String
+  userId      String
+  role        ChannelRole @default(MEMBER)
+  lastReadAt  DateTime?
+  muted       Boolean     @default(false)
+  joinedAt    DateTime    @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@index([userId])
+}
+
+model WikiPage {
+  id          String   @id @default(cuid())
+  workspaceId String
+  profileId   String
+  channelId   String?
+  parentId    String?
+  title       String
+  icon        String?
+  content     String   @db.Text // Tiptap HTML document
+  position    Int      @default(0)
+  authorId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel     Channel?     @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  parent      WikiPage?    @relation("WikiTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    WikiPage[]   @relation("WikiTree")
+  author      User         @relation(fields: [authorId], references: [id])
+  attachments Attachment[]
+
+  @@index([workspaceId])
+  @@index([parentId])
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  workspaceId String
+  profileId   String
+  messageId   String?
+  wikiPageId  String?
+  url         String
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  width       Int?
+  height      Int?
+  createdAt   DateTime @default(now())
+
+  message  Message?  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  wikiPage WikiPage? @relation(fields: [wikiPageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([wikiPageId])
+}
+
+// ============================================================
+// PAYROLL BONUS CONFIG — cấu hình tính thưởng riêng theo team (profile).
+// 1 config / profile (dùng lại mọi tháng/workspace). Top 1/2/3: bật/tắt + %.
+// Không có workspaceId → truy vấn bằng prisma thường (lọc profileId), KHÔNG
+// qua getWorkspacePrisma.
+// ============================================================
+model BonusConfig {
+  id          String   @id @default(cuid())
+  profileId   String   @unique
+  top1Enabled Boolean  @default(true)
+  top1Percent Decimal  @default(0)
+  top2Enabled Boolean  @default(false)
+  top2Percent Decimal  @default(0)
+  top3Enabled Boolean  @default(false)
+  top3Percent Decimal  @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }

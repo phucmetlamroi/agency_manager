@@ -266,15 +266,6 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             incomeScore: number
         }
 
-        const rankPriority = (rank: string) => {
-            if (rank === 'S') return 5
-            if (rank === 'A') return 4
-            if (rank === 'B') return 3
-            if (rank === 'C') return 2
-            if (rank === 'D') return 1
-            return 0
-        }
-
         const rankings: UserRanking[] = []
         for (const user of users) {
             const completed = completedByUserId.get(user.id)
@@ -316,28 +307,33 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         }
 
         stage = 'sort-rankings'
+        // [Bonus Config] Xếp hạng theo "Thực nhận" = tổng doanh thu (task.value) từ task
+        // Hoàn tất, giảm dần (khớp đúng cột 'Thực nhận' trên thẻ). Phá hòa: nhiều task
+        // hơn → username (ổn định).
         rankings.sort((a, b) => {
-            if (Math.abs(b.incomeScore - a.incomeScore) > 0.01) return b.incomeScore - a.incomeScore
-            if (a.errorRate !== b.errorRate) return a.errorRate - b.errorRate
-
-            const aRank = rankPriority(a.rankScore)
-            const bRank = rankPriority(b.rankScore)
-            if (aRank !== bRank) return bRank - aRank
-
-            if (b.tasksCompleted !== a.tasksCompleted) return b.tasksCompleted - a.tasksCompleted
             if (Math.abs(b.revenue - a.revenue) > 0.01) return b.revenue - a.revenue
+            if (b.tasksCompleted !== a.tasksCompleted) return b.tasksCompleted - a.tasksCompleted
             return a.username.localeCompare(b.username, 'vi')
         })
 
-        // Identify the 'Hustly Team' profile (for custom % bonus)
+        // [Bonus Config] Tải cấu hình thưởng theo team (profile). Chưa có → luật cũ.
+        const cfg = workspace.profileId
+            ? await prisma.bonusConfig.findUnique({ where: { profileId: workspace.profileId } })
+            : null
         const isHustly = workspace.profileId === '61f25775-eb95-4ece-96e8-99ae97542af1'
-        const bonusPercentages = isHustly ? [0.15, 0.1] : [0.1, 0.05]
-        const maxWinners = 2
+        // tiers = % cho từng hạng đang BẬT (Top1 → Top3). maxWinners = số hạng bật.
+        const tiers: number[] = []
+        if (cfg) {
+            if (cfg.top1Enabled) tiers.push(toSafeNumber(cfg.top1Percent))
+            if (cfg.top2Enabled) tiers.push(toSafeNumber(cfg.top2Percent))
+            if (cfg.top3Enabled) tiers.push(toSafeNumber(cfg.top3Percent))
+        } else {
+            tiers.push(isHustly ? 15 : 10, isHustly ? 10 : 5)
+        }
+        const maxWinners = tiers.length
 
-        // Filter eligible users: 
-        // 1. Must have revenue > 0
-        // 2. Per new policy, users with Rank 'S' are EXCLUDED from the monetary bonus
-        const eligibleForBonus = rankings.filter(r => r.incomeScore > 0 && r.rankScore !== 'S')
+        // Đủ điều kiện = có "Thực nhận" (tổng task.value Hoàn tất) > 0.
+        const eligibleForBonus = rankings.filter(r => r.revenue > 0)
 
 
         // ── 5. PERSISTENCE ───────────────────────────────────────────
@@ -383,6 +379,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             userId: string
             username: string
             rank: number
+            percent: number
             bonusAmount: number
         }> = []
 
@@ -391,7 +388,9 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             stage = 'persist-create-bonuses'
             for (let i = 0; i < Math.min(maxWinners, eligibleForBonus.length); i++) {
                 const user = eligibleForBonus[i]
-                const bonusAmount = user.monthlySalary * bonusPercentages[i]
+                const percent = tiers[i]
+                // [Bonus Config] Thưởng = % × "Thực nhận" (tổng task.value Hoàn tất) của người đó.
+                const bonusAmount = user.revenue * (percent / 100)
 
                 await prisma.monthlyBonus.create({
                     data: {
@@ -403,6 +402,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                         rank: i + 1,
                         revenue: user.revenue,
                         executionTimeHours: 0,
+                        bonusPercent: percent,
                         bonusAmount
                     }
                 })
@@ -411,6 +411,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                     userId: user.userId,
                     username: user.username,
                     rank: i + 1,
+                    percent,
                     bonusAmount
                 })
             }
@@ -434,6 +435,20 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             stage = 'persist-create-ranks'
             await prisma.monthlyRank.createMany({ data: monthlyRankData })
         }
+
+        // [Bonus Config] Audit: ghi snapshot cấu hình + kết quả (trước đây chưa ghi).
+        try {
+            await prisma.auditLog.create({
+                data: {
+                    workspaceId,
+                    actorUserId: session.user.id,
+                    action: 'payroll.bonus_calculated',
+                    targetType: 'PayrollLock',
+                    targetId: `${currentMonth}-${currentYear}`,
+                    afterData: { baseAmount: 'completed_task_value', tiers, awarded: awardedBonuses } as any,
+                }
+            })
+        } catch { /* non-blocking */ }
 
         stage = 'revalidate'
         revalidatePath(`/${workspaceId}/admin/payroll`)

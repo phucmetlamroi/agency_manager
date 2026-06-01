@@ -23,7 +23,9 @@ import {
     ArrowRightLeft,
     Settings,
     ScrollText,
-    LifeBuoy
+    LifeBuoy,
+    MessagesSquare,
+    BookOpen
 } from "lucide-react"
 
 import {
@@ -79,6 +81,8 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
     const allItems: NavItem[] = [
         { label: "Dashboard", href: viewRole === 'USER' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`, icon: LayoutDashboard, roles: ['ADMIN', 'USER'] },
         { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'] },
+        { label: "Knowledge Hub", href: `/${workspaceId}/admin/hub`, icon: MessagesSquare, roles: ['ADMIN', 'USER'] },
+        { label: "Wiki", href: `/${workspaceId}/admin/wiki`, icon: BookOpen, roles: ['ADMIN', 'USER'] },
         { label: "Clients Manager", href: `/${workspaceId}/admin/crm`, icon: Smile, roles: ['ADMIN', 'USER'] },
         { label: "Schedule", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
         { label: "My Errors", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },

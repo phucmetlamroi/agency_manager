@@ -58,12 +58,13 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="relative w-full max-w-lg bg-[#111] border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
+                    className="relative w-full max-w-lg border rounded-[26px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+                    style={{ backgroundColor: '#0A0A0A', borderColor: 'rgba(139,92,246,0.15)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                 >
                     {/* Header */}
-                    <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 shrink-0">
+                    <div className="p-4 border-b flex justify-between items-center shrink-0" style={{ borderColor: 'rgba(139,92,246,0.1)', backgroundColor: 'rgba(139,92,246,0.04)' }}>
                         <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                            <CreditCard className="w-5 h-5 text-blue-400" />
+                            <CreditCard className="w-5 h-5" style={{ color: '#D8B4FE' }} />
                             Thanh Toán Lương
                         </h3>
                         <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full text-gray-400">
@@ -77,7 +78,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                         {/* Salary Info */}
                         <div className="text-center shrink-0">
                             <div className="text-sm text-gray-400 mb-1">Tổng thực nhận</div>
-                            <div className="text-4xl font-black bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+                            <div className="text-4xl font-black bg-gradient-to-r from-[#8B5CF6] to-[#D8B4FE] bg-clip-text text-transparent">
                                 {payrollData.totalAmount.toLocaleString()} đ
                             </div>
                             <div className="text-xs text-gray-500 mt-1">
@@ -86,7 +87,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                         </div>
 
                         {/* QR Scanner Area */}
-                        <div className="relative aspect-square w-full max-w-[280px] mx-auto bg-black rounded-xl overflow-hidden border border-white/20 shadow-inner group shrink-0">
+                        <div className="relative aspect-square w-full max-w-[280px] mx-auto bg-black rounded-xl overflow-hidden border border-[rgba(139,92,246,0.2)] shadow-inner group shrink-0">
                             {user.paymentQrUrl ? (
                                 <>
                                     <Image
@@ -97,11 +98,11 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                                     />
                                     {/* Scan Line Animation */}
                                     <motion.div
-                                        className="absolute w-full h-1 bg-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.8)]"
+                                        className="absolute w-full h-1 bg-[#8B5CF6]/60 shadow-[0_0_10px_rgba(139,92,246,0.8)]"
                                         animate={{ top: ['0%', '100%', '0%'] }}
                                         transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                                     />
-                                    <div className="absolute inset-0 bg-blue-500/5 pointer-events-none" />
+                                    <div className="absolute inset-0 bg-[rgba(139,92,246,0.05)] pointer-events-none" />
                                 </>
                             ) : (
                                 <div className="flex items-center justify-center h-full text-gray-500 italic">
@@ -112,7 +113,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
 
                         <div className="mt-auto flex flex-col gap-4">
                             {/* Bank Details */}
-                            <div className="bg-white/5 rounded-lg p-3 flex justify-between items-center border border-white/5">
+                            <div className="rounded-lg p-3 flex justify-between items-center border" style={{ backgroundColor: '#121016', borderColor: 'rgba(139,92,246,0.1)' }}>
                                 <div>
                                     <div className="text-xs text-gray-500 uppercase">Ngân hàng</div>
                                     <div className="font-bold text-gray-200">{user.paymentBankName || '---'}</div>
@@ -121,7 +122,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                                     <div className="text-xs text-gray-500 uppercase">STK</div>
                                     <button
                                         onClick={copyAccount}
-                                        className="flex items-center gap-2 font-mono text-blue-400 hover:text-blue-300 hover:underline"
+                                        className="flex items-center gap-2 font-mono text-[#D8B4FE] hover:text-[#C4A5F5] hover:underline"
                                     >
                                         {user.paymentAccountNum || '---'}
                                         <Copy className="w-3 h-3" />
@@ -133,7 +134,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                             <button
                                 onClick={handleConfirm}
                                 disabled={loading}
-                                className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:scale-[1.02] hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-3 bg-gradient-to-r from-[#8B5CF6] to-[#A855F7] text-white font-bold rounded-xl shadow-lg shadow-violet-500/30 hover:scale-[1.02] hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                             >
                                 {loading ? (
                                     'Processing...'

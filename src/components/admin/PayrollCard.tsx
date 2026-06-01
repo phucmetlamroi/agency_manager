@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import PaymentModal from './PaymentModal'
-import { CheckCircle2, CircleDashed, RotateCcw, TrendingUp, Clock, Trophy, Banknote, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Trophy, Wallet, Hourglass, ChevronDown } from 'lucide-react'
 import { revertPayment } from '@/actions/payroll-actions'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -16,13 +17,15 @@ type PayrollCardProps = {
     workspaceId: string
 }
 
+const FONT = "'Plus Jakarta Sans', sans-serif"
+
 export default function PayrollCard({ user, currentMonth, currentYear, workspaceId }: PayrollCardProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
     const [showPending, setShowPending] = useState(false)
     const [isExpanded, setIsExpanded] = useState(false)
 
-    // ── Logic (unchanged) ──────────────────────────────────────
+    // ── Logic (UNCHANGED) ──────────────────────────────────────
     const completedTasks = user.tasks.filter((t: any) =>
         t.status === 'Hoàn tất'
     )
@@ -39,14 +42,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
     const payrollRecord = user.payrolls?.[0]
     const isPaid = payrollRecord?.status === 'PAID'
 
-    const rankColors: Record<number, { gradient: string; border: string; badge: string; glow: string }> = {
-        1: { gradient: 'from-yellow-500/20 to-amber-500/5', border: 'border-yellow-500/40', badge: 'bg-yellow-500 text-black', glow: 'shadow-yellow-500/20' },
-        2: { gradient: 'from-zinc-400/20 to-zinc-500/5', border: 'border-zinc-400/40', badge: 'bg-zinc-400 text-black', glow: 'shadow-zinc-400/20' },
-        3: { gradient: 'from-amber-700/20 to-amber-800/5', border: 'border-amber-700/40', badge: 'bg-amber-700 text-white', glow: 'shadow-amber-700/20' },
-    }
-
     const rankEmoji = bonusData?.rank === 1 ? '🥇' : bonusData?.rank === 2 ? '🥈' : bonusData?.rank === 3 ? '🥉' : ''
-    const rankStyle = bonusData?.rank ? rankColors[bonusData.rank] : null
 
     const handleRevert = () => {
         if (!confirm('Bạn có chắc chắn muốn hoàn tác (hủy) trạng thái thanh toán này?')) return
@@ -57,13 +53,30 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
         })
     }
 
-    // ── Sparkline (mini bar chart from task lengths) ──────────
-    const maxIncome = Math.max(taskIncome, pendingIncome, 1)
-    const completedPct = Math.round((taskIncome / maxIncome) * 100)
-    const pendingPct = Math.round((pendingIncome / maxIncome) * 100)
+    // ── Segmented progress theo SỐ task (done + proc) ──────────
+    const totalTasksCount = completedTasks.length + pendingTasks.length
+    const donePct = totalTasksCount > 0 ? (completedTasks.length / totalTasksCount) * 100 : 0
+    const procPct = totalTasksCount > 0 ? (pendingTasks.length / totalTasksCount) * 100 : 0
+
+    // Podium tím (đồng bộ Leaderboard): Top1 #8B5CF6 · Top2 #4C1D95 · Top3 #211B31
+    const rankBg: Record<number, string> = { 1: '#8B5CF6', 2: '#4C1D95', 3: '#211B31' }
+
+    const displayName = user.displayName?.trim() || user.username
+    const detailTasks = showPending ? pendingTasks : completedTasks
 
     return (
-        <div className={`relative overflow-hidden rounded-2xl border transition-all duration-500 ${rankStyle ? `bg-gradient-to-br ${rankStyle.gradient} ${rankStyle.border} shadow-xl ${rankStyle.glow}` : 'bg-zinc-950/60 border-white/10 shadow-xl shadow-black/40'} backdrop-blur-md`}>
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            whileHover={{ borderColor: 'rgba(139,92,246,0.25)', y: -2 }}
+            className={`relative overflow-hidden rounded-[26px] transition-colors duration-150 ${isPaid ? 'opacity-70' : ''} ${totalIncome === 0 ? 'opacity-60' : ''}`}
+            style={{ backgroundColor: '#0A0A0A', border: '1px solid rgba(139,92,246,0.15)', fontFamily: FONT }}
+        >
+            {/* Vạch accent trái — chưa thanh toán */}
+            {!isPaid && (
+                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: '#8B5CF6' }} />
+            )}
 
             {/* Payment Modal */}
             {typeof window !== 'undefined' && isModalOpen && createPortal(
@@ -77,200 +90,221 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                 document.body
             )}
 
-            {/* Rank Badge (Top 1/2/3) */}
-            {bonusData && rankStyle && (
-                <div className={`absolute top-0 right-6 px-4 py-1 rounded-b-xl ${rankStyle.badge} font-black text-xs shadow-lg flex items-center gap-1.5 z-10`}>
+            {/* Rank badge (Top 1/2/3) */}
+            {bonusData?.rank && (
+                <div
+                    className="absolute top-0 right-6 px-3.5 py-1 rounded-b-xl font-bold text-xs text-white flex items-center gap-1.5 z-10"
+                    style={{ backgroundColor: rankBg[bonusData.rank] || '#211B31' }}
+                >
                     <Trophy className="w-3.5 h-3.5" />
                     {rankEmoji} Top {bonusData.rank}
                 </div>
             )}
 
-            {/* ── Card Header ─────────────────────────────────── */}
-            <div className="p-5 md:p-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            {/* ── Hàng chính ───────────────────────────────────── */}
+            <div className="p-5 flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
 
-                    {/* Left: User Identity */}
-                    <div className="flex items-center gap-4">
-                        <div className="relative flex-shrink-0">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-emerald-500/30">
-                                {(user.displayName?.trim() || user.username).charAt(0).toUpperCase()}
-                            </div>
-                            {isPaid && (
-                                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-zinc-950 flex items-center justify-center">
-                                    <CheckCircle2 className="w-3 h-3 text-white" />
-                                </div>
-                            )}
+                {/* Định danh */}
+                <div className="flex items-center gap-3.5 md:w-[220px] md:flex-shrink-0">
+                    <div className="relative flex-shrink-0">
+                        <div
+                            className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg"
+                            style={{ background: 'linear-gradient(135deg,#A855F7,#6366F1)' }}
+                        >
+                            {displayName.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-zinc-100 leading-tight">{user.displayName?.trim() || user.username}</h3>
-                            <span className="text-xs text-zinc-500 font-mono">ID: {user.id.slice(0, 8)}…</span>
-                        </div>
-                    </div>
-
-                    {/* Right: Numbers + CTA */}
-                    <div className="flex items-center gap-4 md:gap-8 flex-wrap">
-
-                        {/* Pending (projected) */}
-                        <div className="text-center md:text-right">
-                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1 justify-center md:justify-end">
-                                <Clock className="w-3 h-3" /> Dự kiến
+                        {isPaid && (
+                            <div
+                                className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                                style={{ backgroundColor: '#8B5CF6', borderColor: '#0A0A0A' }}
+                            >
+                                <CheckCircle2 className="w-3 h-3 text-white" />
                             </div>
-                            <div className="text-xl font-bold text-indigo-400/80 tabular-nums">
-                                {pendingIncome.toLocaleString()} đ
-                            </div>
-                        </div>
-
-                        {/* Divider */}
-                        <div className="hidden md:block w-px h-10 bg-white/10" />
-
-                        {/* Actual earned */}
-                        <div className="text-center md:text-right">
-                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1 justify-center md:justify-end">
-                                <Banknote className="w-3 h-3" /> Thực nhận
-                            </div>
-                            <div className="text-2xl font-black text-emerald-400 tabular-nums drop-shadow-[0_0_10px_rgba(52,211,153,0.4)]">
-                                {totalIncome.toLocaleString()} đ
-                            </div>
-                        </div>
-
-                        {/* Payment CTA */}
-                        {isPaid ? (
-                            <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-2 text-emerald-400 font-bold bg-emerald-500/10 px-3 py-2 rounded-xl border border-emerald-500/30 text-sm shadow-inner">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    ĐÃ THANH TOÁN
-                                </div>
-                                <Button variant="ghost" size="icon" onClick={handleRevert} disabled={isPending}
-                                    className="h-9 w-9 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-xl"
-                                    title="Hoàn tác thanh toán">
-                                    <RotateCcw className={`w-4 h-4 ${isPending ? 'animate-spin' : ''}`} />
-                                </Button>
-                            </div>
-                        ) : (
-                            <button onClick={() => setIsModalOpen(true)}
-                                className="bg-gradient-to-r from-indigo-600 to-blue-500 hover:brightness-110 text-white font-bold py-2.5 px-5 rounded-xl text-sm shadow-lg shadow-indigo-500/25 flex items-center gap-2 transition-all duration-200 active:scale-95">
-                                <CircleDashed className="w-4 h-4" />
-                                Thanh toán
-                            </button>
                         )}
+                    </div>
+                    <div className="min-w-0">
+                        <h3 className="text-[15px] font-bold text-white leading-tight truncate">{displayName}</h3>
+                        <span className="text-[11px] font-mono" style={{ color: '#52525B' }}>ID: {user.id.slice(0, 8)}…</span>
                     </div>
                 </div>
 
-                {/* ── Mini Sparkline ─────────────────────────────── */}
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                    <div>
-                        <div className="flex justify-between text-[10px] text-zinc-500 mb-1.5">
-                            <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3 text-emerald-400" /> Đã hoàn tất</span>
-                            <span className="font-mono text-zinc-400">{completedTasks.length} task</span>
-                        </div>
-                        <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                            <div className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-500 shadow-[0_0_6px_rgba(52,211,153,0.5)]"
-                                style={{ width: `${completedPct}%` }} />
-                        </div>
-                        <div className="text-right text-[10px] text-emerald-400/70 font-mono mt-1">{taskIncome.toLocaleString()} đ</div>
+                {/* Thanh tiến độ gộp */}
+                <div className="flex-1 min-w-0">
+                    <div
+                        className="h-2.5 rounded-full overflow-hidden flex"
+                        style={{ backgroundColor: '#211B31' }}
+                        title={`${completedTasks.length} hoàn tất · ${pendingTasks.length} đang xử lý`}
+                    >
+                        <div className="h-full transition-[width] duration-500" style={{ width: `${donePct}%`, backgroundColor: '#8B5CF6' }} />
+                        <div className="h-full transition-[width] duration-500" style={{ width: `${procPct}%`, backgroundColor: '#A855F7' }} />
                     </div>
-                    <div>
-                        <div className="flex justify-between text-[10px] text-zinc-500 mb-1.5">
-                            <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-indigo-400" /> Đang xử lý</span>
-                            <span className="font-mono text-zinc-400">{pendingTasks.length} task</span>
-                        </div>
-                        <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                            <div className="h-full rounded-full bg-gradient-to-r from-indigo-700 to-indigo-400 transition-all duration-500 shadow-[0_0_6px_rgba(99,102,241,0.4)]"
-                                style={{ width: `${pendingPct}%` }} />
-                        </div>
-                        <div className="text-right text-[10px] text-indigo-400/70 font-mono mt-1">{pendingIncome.toLocaleString()} đ</div>
+                    <div className="flex items-center gap-3.5 mt-2 text-[11px]" style={{ color: '#A1A1AA' }}>
+                        <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#8B5CF6' }} />
+                            {completedTasks.length} hoàn tất
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#A855F7' }} />
+                            {pendingTasks.length} đang xử lý
+                        </span>
                     </div>
+                </div>
+
+                {/* Tiền + CTA */}
+                <div className="flex items-center gap-5 md:gap-6 flex-wrap">
+                    {/* Dự kiến */}
+                    <div className="text-left md:text-right">
+                        <div className="flex items-center gap-1.5 text-[11px] mb-1 md:justify-end" style={{ color: '#A1A1AA' }}>
+                            <Hourglass className="w-3 h-3" /> Dự kiến
+                        </div>
+                        <div className="text-lg font-bold tabular-nums" style={{ color: pendingIncome > 0 ? '#D8B4FE' : '#52525B' }}>
+                            {pendingIncome.toLocaleString()} đ
+                        </div>
+                    </div>
+
+                    <div className="hidden md:block w-px h-10" style={{ backgroundColor: 'rgba(139,92,246,0.15)' }} />
+
+                    {/* Thực nhận — hero */}
+                    <div className="text-left md:text-right">
+                        <div className="flex items-center gap-1.5 text-[11px] mb-1 md:justify-end" style={{ color: '#A1A1AA' }}>
+                            <Wallet className="w-3 h-3" /> Thực nhận
+                        </div>
+                        <div className="text-2xl font-extrabold tabular-nums text-white drop-shadow-[0_0_10px_rgba(139,92,246,0.45)]">
+                            {totalIncome.toLocaleString()} đ
+                        </div>
+                    </div>
+
+                    {/* CTA */}
+                    {isPaid ? (
+                        <div className="flex items-center gap-2">
+                            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-[20px] text-[13px] font-bold bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.3)] text-[#D8B4FE]">
+                                <CheckCircle2 className="w-4 h-4" />
+                                Đã thanh toán
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleRevert}
+                                disabled={isPending}
+                                className="h-9 w-9 rounded-xl text-[#71717A] hover:text-[#F87171] hover:bg-[rgba(239,68,68,0.1)]"
+                                title="Hoàn tác thanh toán"
+                            >
+                                <RotateCcw className={`w-4 h-4 ${isPending ? 'animate-spin' : ''}`} />
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button
+                            onClick={() => setIsModalOpen(true)}
+                            className="gap-2 font-bold rounded-xl shadow-lg shadow-violet-500/30 active:scale-95"
+                        >
+                            <Wallet className="w-4 h-4" />
+                            Thanh toán
+                        </Button>
+                    )}
                 </div>
             </div>
 
-            {/* ── Expand / Collapse Toggle ────────────────────── */}
-            <div className="border-t border-white/5">
-                <div className="flex items-center gap-3 px-5 md:px-6 py-2">
+            {/* ── Tabs + mở rộng ───────────────────────────────── */}
+            <div className="border-t" style={{ borderColor: 'rgba(139,92,246,0.1)' }}>
+                <div className="flex items-center gap-2 px-5 py-2.5">
                     <button
                         onClick={() => setShowPending(false)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 ${!showPending ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'text-zinc-500 hover:text-zinc-300 border border-transparent'}`}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${!showPending ? 'bg-[rgba(139,92,246,0.15)] text-[#D8B4FE] border-[rgba(139,92,246,0.3)]' : 'text-[#71717A] hover:text-[#A1A1AA] border-transparent'}`}
                     >
                         Hoàn tất ({completedTasks.length})
                     </button>
                     <button
                         onClick={() => setShowPending(true)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 ${showPending ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30' : 'text-zinc-500 hover:text-zinc-300 border border-transparent'}`}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${showPending ? 'bg-[rgba(139,92,246,0.15)] text-[#D8B4FE] border-[rgba(139,92,246,0.3)]' : 'text-[#71717A] hover:text-[#A1A1AA] border-transparent'}`}
                     >
                         Dự kiến ({pendingTasks.length})
                     </button>
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className="ml-auto text-zinc-600 hover:text-zinc-300 transition-colors"
+                        className="ml-auto p-1.5 rounded-lg text-[#71717A] hover:text-[#D8B4FE] hover:bg-[rgba(139,92,246,0.08)] transition-colors"
                         title={isExpanded ? 'Thu gọn' : 'Xem chi tiết'}
                     >
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                     </button>
                 </div>
 
-                {/* Expandable Task Table */}
-                {isExpanded && (
-                    <div className="px-5 md:px-6 pb-5 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-white/10 text-zinc-500 text-xs">
-                                    <th className="py-2 px-2 text-left font-medium">Hạng Mục</th>
-                                    <th className="py-2 px-2 text-right font-medium">Thành Tiền</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(showPending ? pendingTasks : completedTasks).map((task: any) => (
-                                    <tr key={task.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                                        <td className="py-2.5 px-2">
-                                            <div className="font-medium text-zinc-300 flex items-center gap-2 flex-wrap">
-                                                {task.title}
-                                                {showPending && (
-                                                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                                                        {task.status}
-                                                    </span>
-                                                )}
+                <AnimatePresence initial={false}>
+                    {isExpanded && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="overflow-hidden"
+                        >
+                            <div className="px-5 pb-5 pt-1">
+                                <div className="rounded-2xl p-2" style={{ backgroundColor: '#121016', border: '1px solid rgba(139,92,246,0.08)' }}>
+                                    {detailTasks.map((task: any, idx: number) => (
+                                        <motion.div
+                                            key={task.id}
+                                            initial={{ opacity: 0, x: -6 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: idx * 0.03, duration: 0.2 }}
+                                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[rgba(139,92,246,0.05)] transition-colors"
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-sm font-medium text-zinc-200 flex items-center gap-2 flex-wrap">
+                                                    {task.title}
+                                                    {showPending && (
+                                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[rgba(139,92,246,0.1)] text-[#D8B4FE] border border-[rgba(139,92,246,0.2)] flex-shrink-0">
+                                                            {task.status}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-[11px] mt-0.5" style={{ color: '#52525B' }}>
+                                                    {new Date(task.updatedAt).toLocaleDateString('vi-VN')}
+                                                </div>
                                             </div>
-                                            <div className="text-[11px] text-zinc-600 mt-0.5">
-                                                {new Date(task.updatedAt).toLocaleDateString('vi-VN')}
+                                            <div className="font-mono text-sm text-zinc-300 tabular-nums flex-shrink-0">
+                                                {task.value.toLocaleString()} đ
                                             </div>
-                                        </td>
-                                        <td className="py-2.5 px-2 text-right font-mono text-zinc-300">
-                                            {task.value.toLocaleString()} đ
-                                        </td>
-                                    </tr>
-                                ))}
+                                        </motion.div>
+                                    ))}
 
-                                {/* Bonus Row */}
-                                {bonusData && !showPending && (
-                                    <tr className="bg-amber-500/5">
-                                        <td className="py-2.5 px-2">
-                                            <div className="font-bold text-amber-400 flex items-center gap-2">
-                                                <Trophy className="w-3.5 h-3.5" />
-                                                {rankEmoji} Thưởng Top {bonusData.rank}{bonusPercent > 0 ? ` · ${bonusPercent}%` : ''}
-                                            </div>
-                                            <div className="text-[11px] text-amber-500/70 mt-0.5">
-                                                {bonusPercent > 0
-                                                    ? `${bonusPercent}% × Thực nhận ${Number(bonusData.revenue).toLocaleString()}đ`
-                                                    : `Thực nhận: ${Number(bonusData.revenue).toLocaleString()}đ`}
-                                            </div>
-                                        </td>
-                                        <td className="py-2.5 px-2 text-right font-mono font-bold text-amber-400">
-                                            +{bonusData.bonusAmount.toLocaleString()} đ
-                                        </td>
-                                    </tr>
-                                )}
+                                    {detailTasks.length === 0 && (
+                                        <div className="text-center py-6 text-sm" style={{ color: '#52525B' }}>
+                                            Không có task nào.
+                                        </div>
+                                    )}
 
-                                {/* Total Row */}
-                                <tr className="bg-emerald-500/5 border-t-2 border-white/10">
-                                    <td className="py-3 px-2 text-right text-zinc-400 font-semibold">Tổng cộng:</td>
-                                    <td className="py-3 px-2 text-right font-black text-emerald-400 text-lg font-mono">
-                                        {totalIncome.toLocaleString()} đ
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                    {/* Dòng thưởng */}
+                                    {bonusData && !showPending && (
+                                        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl mt-1" style={{ backgroundColor: 'rgba(139,92,246,0.08)' }}>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-sm font-bold text-[#D8B4FE] flex items-center gap-2">
+                                                    <Trophy className="w-3.5 h-3.5" />
+                                                    {rankEmoji} Thưởng Top {bonusData.rank}{bonusPercent > 0 ? ` · ${bonusPercent}%` : ''}
+                                                </div>
+                                                <div className="text-[11px] mt-0.5" style={{ color: '#A1A1AA' }}>
+                                                    {bonusPercent > 0
+                                                        ? `${bonusPercent}% × Thực nhận ${Number(bonusData.revenue).toLocaleString()}đ`
+                                                        : `Thực nhận: ${Number(bonusData.revenue).toLocaleString()}đ`}
+                                                </div>
+                                            </div>
+                                            <div className="font-mono text-sm font-bold text-[#D8B4FE] tabular-nums flex-shrink-0">
+                                                +{bonusData.bonusAmount.toLocaleString()} đ
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Tổng cộng */}
+                                    <div className="flex items-center justify-between px-3 py-3 mt-1 border-t" style={{ borderColor: 'rgba(139,92,246,0.12)' }}>
+                                        <span className="text-sm font-semibold" style={{ color: '#A1A1AA' }}>Tổng cộng</span>
+                                        <span className="text-lg font-extrabold text-white font-mono tabular-nums drop-shadow-[0_0_10px_rgba(139,92,246,0.45)]">
+                                            {totalIncome.toLocaleString()} đ
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
-        </div>
+        </motion.div>
     )
 }

@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
-import { Settings } from 'lucide-react'
+import { Settings, Gift, RotateCcw, Lock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import BonusConfigModal from '@/components/admin/BonusConfigModal'
 
 export default function BonusCalculator({ workspaceId }: { workspaceId: string }) {
@@ -84,81 +85,52 @@ export default function BonusCalculator({ workspaceId }: { workspaceId: string }
     }
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {/* Status Badge */}
-            <div style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                background: isLocked ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                color: isLocked ? '#f87171' : '#34d399',
-                border: isLocked ? '1px solid #7f1d1d' : '1px solid #064e3b',
-                fontWeight: 'bold',
-                fontSize: '0.9rem',
-                display: 'flex', alignItems: 'center', gap: '0.5rem'
-            }}>
-                <span style={{ fontSize: '1.2rem' }}>{isLocked ? '🔒' : '🔓'}</span>
-                {isLocked ? 'ĐÃ KHÓA SỔ' : 'ĐANG MỞ'}
-            </div>
+        <div className="flex flex-wrap items-center gap-3" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            {/* Trạng thái kỳ lương — pill đồng bộ Dashboard */}
+            {isLocked ? (
+                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-[20px] text-[13px] font-bold bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.3)] text-[#F87171]">
+                    <Lock className="w-3.5 h-3.5" />
+                    ĐÃ KHÓA SỔ
+                </div>
+            ) : (
+                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-[20px] text-[13px] font-bold bg-[#121016] border border-[rgba(139,92,246,0.1)] text-[#D8B4FE]">
+                    <span className="w-2 h-2 rounded-full bg-[#8B5CF6] animate-pulse" />
+                    ĐANG MỞ
+                </div>
+            )}
 
             {isLocked ? (
-                <button
+                <Button
                     onClick={handleRevert}
                     disabled={isLoading}
-                    className="btn glass-panel"
-                    style={{
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        color: '#f87171',
-                        border: '1px solid rgba(239, 68, 68, 0.5)',
-                        fontWeight: 'bold',
-                        padding: '0.8rem 1.5rem',
-                        cursor: isLoading ? 'not-allowed' : 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '0.5rem'
-                    }}
+                    variant="ghost"
+                    className="gap-2 font-bold rounded-xl border border-[rgba(239,68,68,0.4)] text-[#F87171] hover:bg-[rgba(239,68,68,0.1)] hover:text-[#F87171]"
                 >
-                    {isLoading ? 'Đang xử lý...' : '↩️ Hoàn tác & Tính lại'}
-                </button>
+                    <RotateCcw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    {isLoading ? 'Đang xử lý...' : 'Hoàn tác & Tính lại'}
+                </Button>
             ) : (
-                <button
+                <Button
                     onClick={handleCalculate}
                     disabled={isLoading}
-                    className="btn glass-panel"
-                    style={{
-                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                        color: 'white',
-                        fontWeight: 'bold',
-                        border: 'none',
-                        padding: '0.8rem 1.5rem',
-                        fontSize: '1rem',
-                        boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)',
-                        cursor: isLoading ? 'not-allowed' : 'pointer',
-                        opacity: isLoading ? 0.7 : 1,
-                        display: 'flex', alignItems: 'center', gap: '0.5rem'
-                    }}
+                    className="gap-2 font-bold rounded-xl shadow-lg shadow-violet-500/30"
                 >
-                    {isLoading ? 'Đang tính toán...' : '🏆 Tính Thưởng Tháng Này'}
-                </button>
+                    <Gift className="w-4 h-4" />
+                    {isLoading ? 'Đang tính toán...' : 'Tính Thưởng Tháng Này'}
+                </Button>
             )}
 
             {/* [Bonus Config] Nút cấu hình thưởng theo team (Top 1/2/3 + %) */}
-            <button
+            <Button
                 type="button"
                 onClick={() => setShowConfig(true)}
-                className="btn glass-panel"
+                variant="ghost"
+                size="icon"
                 title="Cấu hình thưởng (Top 1/2/3)"
-                style={{
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    border: 'none',
-                    padding: '0.8rem 1rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                }}
+                className="rounded-xl border border-[rgba(139,92,246,0.15)] text-[#A1A1AA] hover:bg-[rgba(139,92,246,0.1)] hover:text-[#D8B4FE]"
             >
                 <Settings className="w-4 h-4" />
-            </button>
+            </Button>
 
             {showConfig && <BonusConfigModal workspaceId={workspaceId} onClose={() => setShowConfig(false)} />}
         </div>

@@ -3,8 +3,10 @@ import { redirect } from 'next/navigation'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import BonusCalculator from './BonusCalculator'
 import PayrollCard from '@/components/admin/PayrollCard'
+import PayrollKpiStrip from '@/components/admin/PayrollKpiStrip'
 import { serializeDecimal } from '@/lib/serialization'
 import { SALARY_COMPLETED_STATUS, SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
+import { Download } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,6 +82,25 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
 
     const serializedUsers = serializeDecimal(activeUsers)
 
+    // ── KPI tổng quan (thuần tổng hợp dữ liệu ĐÃ fetch để hiển thị; khớp đúng
+    //    cách tính của PayrollCard — không chạm DB/API/logic) ──────────────
+    const kpiTotals = serializedUsers.reduce(
+        (acc: { net: number; est: number; people: number; done: number; unpaid: number }, u: any) => {
+            const completed = u.tasks.filter((t: any) => t.status === SALARY_COMPLETED_STATUS)
+            const pending = u.tasks.filter((t: any) => SALARY_PENDING_STATUSES.includes(t.status))
+            const taskIncome = completed.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
+            const pendingIncome = pending.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
+            const bonusAmount = Number(u.bonuses?.[0]?.bonusAmount || 0)
+            const isPaid = u.payrolls?.[0]?.status === 'PAID'
+            acc.net += taskIncome + bonusAmount
+            acc.est += pendingIncome
+            acc.done += completed.length
+            if (!isPaid) acc.unpaid += 1
+            return acc
+        },
+        { net: 0, est: 0, people: serializedUsers.length, done: 0, unpaid: 0 }
+    )
+
     const session = await getSession()
     if (!session) redirect('/login')
 
@@ -109,15 +130,22 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                     {canExportMonthlyXlsx && (
                         <a
                             href={exportUrl}
-                            className="inline-flex items-center px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-sm font-bold no-underline hover:bg-slate-800 transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[20px] border border-[rgba(139,92,246,0.15)] text-[#D8B4FE] text-[13px] font-semibold no-underline hover:bg-[rgba(139,92,246,0.06)] transition-colors"
                         >
+                            <Download className="w-4 h-4" />
                             Export XLSX
                         </a>
                     )}
-                    <div className="px-3 py-2 rounded-xl bg-zinc-800 text-zinc-400 text-xs font-medium">
+                    <div className="inline-flex items-center gap-2 px-3 py-2 rounded-[20px] bg-[#121016] border border-[rgba(139,92,246,0.1)] text-[#A1A1AA] text-xs font-medium">
+                        <span className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
                         Workspace · Isolated
                     </div>
                 </div>
+            </div>
+
+            {/* KPI tổng quan — đồng bộ chất liệu với Dashboard */}
+            <div className="mb-6 sm:mb-8">
+                <PayrollKpiStrip totals={kpiTotals} />
             </div>
 
             {canCalculateBonus && (

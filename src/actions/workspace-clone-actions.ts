@@ -29,7 +29,7 @@ export async function getWorkspaceClientsForCopy(
     try {
         await verifyWorkspaceAccess(sourceWorkspaceId, 'ADMIN')
         const clients = await prisma.client.findMany({
-            where: { workspaceId: sourceWorkspaceId },
+            where: { workspaceId: sourceWorkspaceId, status: { not: 'SOFT_DELETED' } },
             select: { id: true, name: true, parentId: true },
             orderBy: { name: 'asc' },
         })
@@ -71,7 +71,7 @@ export async function copyClientsToWorkspace(
 
         // Load ALL source clients to resolve ancestors + validate selection.
         const sourceClients = await prisma.client.findMany({
-            where: { workspaceId: sourceWorkspaceId },
+            where: { workspaceId: sourceWorkspaceId, status: { not: 'SOFT_DELETED' } },
             select: {
                 id: true, name: true, parentId: true,
                 tier: true, inputQuality: true, paymentRating: true,

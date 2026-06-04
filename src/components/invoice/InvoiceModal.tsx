@@ -20,6 +20,8 @@ interface InvoiceModalProps {
     clientAddress?: string
     depositBalance?: number
     workspaceId: string
+    /** Render inline (lấp đầy ô) thay vì modal overlay — dùng cho cấp-3 in-place. */
+    embedded?: boolean
 }
 
 interface InvoiceItem {
@@ -33,7 +35,7 @@ interface InvoiceItem {
     taskId?: string
 }
 
-export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddress, depositBalance = 0, workspaceId }: InvoiceModalProps) {
+export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddress, depositBalance = 0, workspaceId, embedded = false }: InvoiceModalProps) {
     const router = useRouter()
     // Data State
     const [tasks, setTasks] = useState<any[]>([])
@@ -375,10 +377,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
         }
     }
 
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 gap-0 overflow-hidden flex flex-row bg-zinc-900 border border-zinc-700">
-
+    const body = (
+        <>
                 {/* LEFT PANEL: CONTROL (zinc-800) */}
                 <div className="w-[420px] shrink-0 bg-zinc-800 border-r border-zinc-700 flex flex-col h-full">
                     <div className="px-5 py-4 border-b border-zinc-700">
@@ -424,9 +424,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                         <div className="flex items-center gap-2 flex-wrap">
                             <button
                                 onClick={() => setGroupByBrand(v => !v)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all duration-200 ${groupByBrand ? 'bg-indigo-500/20 border-indigo-500/60 text-indigo-300' : 'bg-zinc-700 border-zinc-600 text-zinc-400'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all duration-200 ${groupByBrand ? 'bg-violet-500/20 border-violet-500/60 text-violet-300' : 'bg-zinc-700 border-zinc-600 text-zinc-400'}`}
                             >
-                                <span className={`w-2 h-2 rounded-full ${groupByBrand ? 'bg-indigo-400' : 'bg-zinc-500'}`} />
+                                <span className={`w-2 h-2 rounded-full ${groupByBrand ? 'bg-violet-400' : 'bg-zinc-500'}`} />
                                 Gộp theo Brand
                             </button>
 
@@ -463,10 +463,10 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                     <div
                                                         key={task.id}
                                                         onClick={() => toggleTask(task.id)}
-                                                        className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${selectedTaskIds.includes(task.id) ? 'bg-indigo-500/15 border-indigo-500/40' : 'bg-zinc-800/60 border-zinc-700 hover:border-indigo-500/30'}`}
+                                                        className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${selectedTaskIds.includes(task.id) ? 'bg-violet-500/15 border-violet-500/40' : 'bg-zinc-800/60 border-zinc-700 hover:border-violet-500/30'}`}
                                                     >
                                                         <div className="flex items-center gap-3 overflow-hidden">
-                                                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0 ${selectedTaskIds.includes(task.id) ? 'bg-indigo-500 border-indigo-500' : 'border-zinc-600 bg-transparent'}`}>
+                                                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0 ${selectedTaskIds.includes(task.id) ? 'bg-violet-500 border-violet-500' : 'border-zinc-600 bg-transparent'}`}>
                                                                 {selectedTaskIds.includes(task.id) && <Plus className="text-white rotate-45" size={10} />}
                                                             </div>
                                                             <div className="flex flex-col min-w-0">
@@ -493,7 +493,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                 setEditingItemId(newItem.id)
                                 setEditForm({ description: newItem.description, unitPrice: 0, quantity: 1 })
                             }}
-                            className="w-full py-2.5 border border-dashed border-zinc-700 rounded-xl text-sm text-zinc-500 hover:border-indigo-500/50 hover:text-indigo-400 hover:bg-indigo-500/5 flex items-center justify-center gap-2 transition-all"
+                            className="w-full py-2.5 border border-dashed border-zinc-700 rounded-xl text-sm text-zinc-500 hover:border-violet-500/50 hover:text-violet-400 hover:bg-violet-500/5 flex items-center justify-center gap-2 transition-all"
                         >
                             <Plus size={14} /> Thêm hạng mục thủ công
                         </button>
@@ -514,7 +514,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                             </div>
                             
                             <select
-                                className="w-full h-11 rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer hover:border-zinc-500"
+                                className="w-full h-11 rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all cursor-pointer hover:border-zinc-500"
                                 value={billingProfileId}
                                 onChange={e => setBillingProfileId(e.target.value)}
                             >
@@ -528,7 +528,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                         <button
                             onClick={handleGenerate}
                             disabled={isGenerating || activeItems.length === 0}
-                            className="w-full h-12 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:scale-[1.02] active:scale-[0.98] text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/40 disabled:opacity-40 disabled:cursor-not-allowed group"
+                            className="w-full h-12 rounded-xl bg-gradient-to-r from-violet-600 to-violet-600 hover:scale-[1.02] active:scale-[0.98] text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-violet-900/40 disabled:opacity-40 disabled:cursor-not-allowed group"
                         >
                             {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileDown size={18} className="group-hover:translate-y-0.5 transition-transform" />}
                             {isGenerating ? 'Đang tạo...' : 'Xuất & Lưu'}
@@ -546,7 +546,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                         <span className="ml-auto text-[11px] text-zinc-600 font-mono">{invoiceNumber}</span>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto py-16 px-10 flex justify-center custom-scrollbar bg-zinc-950">
+                    <div className="flex-1 overflow-y-auto py-8 px-10 flex items-start justify-center custom-scrollbar bg-zinc-950">
                         <div className="bg-white shadow-[0_40px_100px_rgba(0,0,0,0.8)] w-[760px] min-h-[1050px] p-12 flex flex-col relative text-gray-900 text-sm rounded-sm mb-10">
 
                             <div className="flex justify-between mb-10">
@@ -555,7 +555,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         type="text"
                                         value={customAgencyName}
                                         onChange={e => setCustomAgencyName(e.target.value)}
-                                        className="font-bold border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent transition-colors"
+                                        className="font-bold border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-violet-400 bg-transparent transition-colors"
                                         style={{ width: `${Math.max(10, customAgencyName.length)}ch` }}
                                     />
                                 </div>
@@ -564,7 +564,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         type="text"
                                         value={customTitle}
                                         onChange={e => setCustomTitle(e.target.value.toUpperCase())}
-                                        className="text-4xl font-black text-gray-900 uppercase text-right border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent tracking-tight transition-colors leading-none"
+                                        className="text-4xl font-black text-gray-900 uppercase text-right border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-violet-400 bg-transparent tracking-tight transition-colors leading-none"
                                         style={{ width: `${Math.max(6, customTitle.length)}ch` }}
                                     />
                                     <div className="text-gray-400 text-sm mt-2 font-mono tracking-wide"># {invoiceNumber}</div>
@@ -580,7 +580,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         onChange={e => setCustomClientAddress(e.target.value)}
                                         placeholder="Thêm địa chỉ khách hàng..."
                                         rows={3}
-                                        className="w-full bg-transparent border border-transparent hover:border-gray-100 focus:border-indigo-200 focus:outline-none resize-none text-gray-500 text-sm rounded transition-colors"
+                                        className="w-full bg-transparent border border-transparent hover:border-gray-100 focus:border-violet-200 focus:outline-none resize-none text-gray-500 text-sm rounded transition-colors"
                                     />
                                 </div>
                                 <div className="text-right space-y-4">
@@ -590,7 +590,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                             type="date"
                                             value={issueDate}
                                             onChange={e => setIssueDate(e.target.value)}
-                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent"
+                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-200 focus:outline-none focus:border-violet-400 bg-transparent"
                                         />
                                     </div>
                                     <div className="flex flex-col items-end">
@@ -598,7 +598,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                             type="text"
                                             value={dueDateLabel}
                                             onChange={e => setDueDateLabel(e.target.value)}
-                                            className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-right bg-transparent border-b border-transparent hover:border-gray-100 focus:outline-none focus:border-indigo-300 transition-colors"
+                                            className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-right bg-transparent border-b border-transparent hover:border-gray-100 focus:outline-none focus:border-violet-300 transition-colors"
                                             style={{ width: `${Math.max(8, dueDateLabel.length + 2)}ch` }}
                                         />
                                         <input
@@ -606,7 +606,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                             value={dueDate}
                                             onChange={e => setDueDate(e.target.value)}
                                             placeholder="e.g. On Request"
-                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-200 focus:outline-none focus:border-indigo-400 bg-transparent placeholder-gray-300"
+                                            className="text-right font-bold text-gray-800 border-b border-dashed border-gray-200 focus:outline-none focus:border-violet-400 bg-transparent placeholder-gray-300"
                                             style={{ width: '10rem' }}
                                         />
                                     </div>
@@ -656,7 +656,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                         <td className="py-4 text-right font-bold text-gray-900 font-mono">{currency}{item.amount.toFixed(2)}</td>
                                                         <td className="py-4 text-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <div className="flex items-center justify-center gap-1">
-                                                                <button onClick={() => handleEditItem(item)} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit2 size={13} /></button>
+                                                                <button onClick={() => handleEditItem(item)} className="text-violet-500 hover:text-violet-700 p-1"><Edit2 size={13} /></button>
                                                                 {item.isManual && (
                                                                     <button onClick={() => setManualItems(prev => prev.filter(m => m.id !== item.id))} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={13} /></button>
                                                                 )}
@@ -690,7 +690,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                         <div className="flex flex-col gap-1">
                                                             <span className="text-[10px] font-bold text-gray-400 uppercase">Beneficiary Name</span>
                                                             <input 
-                                                                className="font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 w-full px-1 py-0.5 transition-all"
+                                                                className="font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-violet-400 w-full px-1 py-0.5 transition-all"
                                                                 defaultValue={p?.beneficiaryName || ''}
                                                             />
                                                         </div>
@@ -698,14 +698,14 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                             <div className="flex flex-col gap-1">
                                                                 <span className="text-[10px] font-bold text-gray-400 uppercase">Bank Name</span>
                                                                 <input 
-                                                                    className="font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-indigo-400 w-full px-1 py-0.5 transition-all"
+                                                                    className="font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-violet-400 w-full px-1 py-0.5 transition-all"
                                                                     defaultValue={p?.bankName || ''}
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col gap-1">
                                                                 <span className="text-[10px] font-bold text-gray-400 uppercase">Account Number</span>
                                                                 <input 
-                                                                    className="font-mono font-bold text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-indigo-400 w-full transition-all"
+                                                                    className="font-mono font-bold text-violet-600 bg-violet-50/50 px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-violet-400 w-full transition-all"
                                                                     defaultValue={p?.accountNumber || ''}
                                                                 />
                                                             </div>
@@ -752,7 +752,22 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                         </div>
                     </div>
                 </div>
+        </>
+    )
 
+    // Cấp-3 in-place: render inline lấp đầy ô (orchestrator lo breadcrumb + back)
+    if (embedded) {
+        return (
+            <div className="flex flex-col lg:flex-row w-full h-full overflow-hidden" style={{ background: '#0A0A0A' }}>
+                {body}
+            </div>
+        )
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 gap-0 overflow-hidden flex flex-row bg-zinc-900 border border-zinc-700">
+                {body}
             </DialogContent>
         </Dialog>
     )

@@ -193,8 +193,10 @@ export async function searchInviteCandidates(
             where: {
                 OR: [
                     { profileId: ws.profileId },
-                    { profileAccesses: { some: { profileId: ws.profileId } } },
+                    { profileAccesses: { some: { profileId: ws.profileId, role: { not: 'CLIENT' } } } },
                 ],
+                // [Client membership] Don't surface clients (legacy or per-profile) in the staff-invite search.
+                role: { notIn: ['LOCKED', 'CLIENT'] },
                 AND: [
                     {
                         OR: [

@@ -41,3 +41,16 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# nested node_modules (electron/, mcp-server/) — root /node_modules above is anchored to root only
+**/node_modules/
+
+# desktop (Electron) + MCP server build artifacts (keep source, drop builds)
+/electron/dist/
+/electron/release/
+/mcp-server/dist/
+/mcp-server/build/
+
+# stray junk / transient locks
+/null
+.claude/scheduled_tasks.lock

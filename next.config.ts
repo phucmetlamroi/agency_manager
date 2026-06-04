@@ -40,7 +40,9 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com images.unsplash.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com; frame-src 'self' *.frame.io; upgrade-insecure-requests;"
+            value: process.env.ELECTRON_DESKTOP
+              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com images.unsplash.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud; media-src 'self' blob:; frame-src 'self' *.frame.io;"
+              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com images.unsplash.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud; media-src 'self' blob:; frame-src 'self' *.frame.io; upgrade-insecure-requests;"
           },
           {
             key: 'X-Frame-Options',
@@ -56,7 +58,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()'
+            value: 'camera=(self), microphone=(self), display-capture=(self), geolocation=()'
           }
         ]
       }
@@ -67,4 +69,8 @@ const nextConfig: NextConfig = {
 // withBotId là outermost wrapper per Vercel docs — inject rewrites + bundler
 // aliases tại Next config level, cần thấy fully-resolved config (bao gồm
 // next-intl webpack alias).
-export default withBotId(withNextIntl(nextConfig) as NextConfig);
+// [Electron] BotId relies on Vercel Edge — disable in desktop builds.
+const resolvedConfig = withNextIntl(nextConfig) as NextConfig;
+export default process.env.ELECTRON_DESKTOP
+  ? resolvedConfig
+  : withBotId(resolvedConfig);

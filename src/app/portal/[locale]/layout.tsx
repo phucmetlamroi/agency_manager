@@ -3,6 +3,7 @@ import { getMessages, setRequestLocale } from 'next-intl/server'
 import { notFound, redirect } from 'next/navigation'
 import { routing } from '@/i18n/routing'
 import { getSession } from '@/lib/auth'
+import { getPortalUserId } from '@/actions/client-portal-actions'
 import { ReactNode } from 'react'
 import PresenceTracker from '@/components/tracking/PresenceTracker'
 
@@ -24,9 +25,11 @@ export default async function LocaleLayout({
     setRequestLocale(locale);
 
     const session = await getSession()
-    if (!session || session.user.role !== 'CLIENT') {
+    if (!session?.user?.id) {
         redirect('/login')
     }
+    // [Client membership] Allow legacy global CLIENT OR any per-profile CLIENT membership.
+    await getPortalUserId()
 
     // Explicitly load the right messages file for this locale
     const messages = await getMessages({ locale });

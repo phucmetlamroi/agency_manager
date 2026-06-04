@@ -16,6 +16,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         where: { id },
         include: {
             subsidiaries: {
+                where: { status: { not: 'SOFT_DELETED' } },
                 include: {
                     tasks: {
                         orderBy: { createdAt: 'desc' },
@@ -36,7 +37,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         }
     })
 
-    if (!client) return notFound()
+    // [Soft-delete] a trashed client isn't reachable from the active CRM
+    if (!client || client.status === 'SOFT_DELETED') return notFound()
 
     // Fetch client's User account to get ratings they submitted
     const clientUser = await globalPrisma.user.findFirst({

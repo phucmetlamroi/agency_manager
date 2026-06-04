@@ -14,10 +14,11 @@ import AutoRefresh from '@/components/AutoRefresh'
 import TaskWorkflowTabs from '@/components/TaskWorkflowTabs'
 import Leaderboard from '@/components/dashboard/Leaderboard'
 import { AdminKPIWidgets } from '@/components/dashboard/AdminKPIWidgets'
-import { AdminRevenueChart } from '@/components/dashboard/AdminRevenueChart'
+import DashboardClientsRow from '@/components/dashboard/DashboardClientsRow'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar'
 import DashboardActionWrapper from '@/components/dashboard/DashboardActionWrapper'
 import { getAvailableProfiles } from '@/actions/profile-actions'
+import { getClients } from '@/actions/crm-actions'
 import { isProfileOwner } from '@/lib/profile-permissions'
 
 export default async function AdminDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
@@ -91,14 +92,20 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     })
 
     // 4. Client count + client list for AddTaskModal
-    const totalClientsTarget = await (workspacePrisma as any).client.count({ where: { parentId: null } })
+    const totalClientsTarget = await (workspacePrisma as any).client.count({ where: { parentId: null, status: { not: 'SOFT_DELETED' } } })
     const activeClientIds = new Set(tasks.map((t: any) => t.clientId).filter(Boolean))
     const totalClients = activeClientIds.size
 
     const allClients = await workspacePrisma.client.findMany({
+        // [Soft-delete] don't offer archived clients in the new-task picker
+        where: { status: { not: 'SOFT_DELETED' } },
         select: { id: true, name: true, parentId: true, parent: { select: { name: true } } },
         orderBy: { name: 'asc' },
     })
+
+    // [CM merge] Full client tree (root + subsidiaries + tasks/projects) cho Clients Manager panel
+    const cmClientsRes = await getClients(workspaceId)
+    const cmClients = cmClientsRes.data || []
 
     // [Quick Create] Fetch pricing rules for AddTaskModal's 🚀 Quick Create
     const pricingRulesRaw = await prisma.pricingRule.findMany({
@@ -170,23 +177,6 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             )
         return { v: dayTotal }
     })
-
-    // ── Revenue by weekday (cumulative all-time, VND) ──────────────────────
-    const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    const revenueByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-    tasks.forEach((t: any) => {
-        const raw = new Date(t.updatedAt || t.createdAt).getDay()
-        const mapped = (raw + 6) % 7
-        const vnd = Number(t.jobPriceUSD || 0) * Number(t.exchangeRate || exchangeRate)
-        revenueByDay[mapped] = (revenueByDay[mapped] || 0) + vnd
-    })
-    const tasksByDay: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-    tasks.forEach((t: any) => {
-        const raw = new Date(t.updatedAt || t.createdAt).getDay()
-        const mapped = (raw + 6) % 7
-        tasksByDay[mapped] = (tasksByDay[mapped] || 0) + 1
-    })
-    const revenueChartData = DAYS.map((day, i) => ({ day, revenue: revenueByDay[i] || 0, tasks: tasksByDay[i] || 0 }))
 
     const unassignedTasks = tasks.filter((t: any) => !t.assigneeId)
     const assignedTasks = tasks.filter((t: any) => t.assigneeId)
@@ -261,18 +251,11 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 sparklineData,
             }} />
 
-            {/* ── Revenue Chart + Rankings (flex 2 : 1) ──────── */}
-            <div className="flex flex-col xl:flex-row gap-4">
-                <div className="xl:flex-[2] min-w-0">
-                    {/* [Sprint O] All-time workspace revenue (VND base).
-                        Client renders VND/USD toggle pill. */}
-                    <AdminRevenueChart
-                        data={revenueChartData}
-                        totalRevenueVND={grossRevenueVND}
-                        exchangeRate={exchangeRate}
-                    />
-                </div>
-                <div className="xl:flex-1 min-w-0">
+            {/* ── Clients Manager (gộp vào chỗ "Revenue Overview") + Rankings ── */}
+            <DashboardClientsRow
+                clients={serializeDecimal(cmClients) as any}
+                workspaceId={workspaceId}
+                rankingsSlot={
                     <Suspense fallback={
                         <div className="h-full rounded-[26px] bg-[#0A0A0A] border border-[rgba(139,92,246,0.15)] animate-pulse flex items-center justify-center text-[#A1A1AA] text-sm">
                             Loading Rankings...
@@ -280,8 +263,8 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                     }>
                         <Leaderboard workspaceId={workspaceId} />
                     </Suspense>
-                </div>
-            </div>
+                }
+            />
 
             {/* [Sprint S] BottleneckAlert removed — user request: bỏ hoàn toàn
                 cảnh báo "Báo động đỏ" về Revision count khỏi admin dashboard. */}

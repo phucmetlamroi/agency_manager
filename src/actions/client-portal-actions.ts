@@ -5,6 +5,12 @@ import { prisma as globalPrisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
+import { serializeDecimal } from '@/lib/serialization'
+import { revalidatePath } from 'next/cache'
+import { createNotificationInternal } from './notification-actions'
+import { broadcastNotificationToUser, broadcastToChannel } from '@/lib/notification-broadcast'
+import { CHAT_EVENTS } from '@/lib/chat-channels'
+import { audit } from '@/lib/audit-log'
 
 /**
  * Ensures the caller is authenticated and has the CLIENT role.
@@ -12,10 +18,42 @@ import { formatClientHierarchy } from '@/lib/client-hierarchy'
  */
 async function getClientSession() {
     const session = await getSession()
-    if (!session || session.user.role !== 'CLIENT') {
+    if (!session?.user?.id) {
         redirect('/login')
     }
-    return session.user.id
+    const userId = session.user.id
+    // [Client membership] Allow either the legacy global CLIENT role OR any
+    // per-profile CLIENT membership (the new model). Data is still isolated by
+    // getRelatedClientIds (only the Client records this user is a portal-user of).
+    if (session.user.role === 'CLIENT') return userId
+    const clientAccess = await globalPrisma.profileAccess.findFirst({
+        where: { userId, role: 'CLIENT' },
+        select: { id: true },
+    })
+    if (clientAccess) return userId
+    redirect('/login')
+}
+
+/**
+ * [Client membership] Portal access gate for server components (layout/page).
+ * Redirects to /login unless the caller is a client here — the legacy global
+ * CLIENT role, or a per-profile CLIENT membership (scoped to the given
+ * workspace's profile when provided). Returns the user id.
+ */
+export async function getPortalUserId(workspaceId?: string): Promise<string> {
+    const session = await getSession()
+    if (!session?.user?.id) redirect('/login')
+    const userId = session.user.id
+    if (session.user.role === 'CLIENT') return userId // legacy global
+
+    const where: { userId: string; role: 'CLIENT'; profileId?: string } = { userId, role: 'CLIENT' }
+    if (workspaceId) {
+        const ws = await globalPrisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+        if (ws?.profileId) where.profileId = ws.profileId
+    }
+    const access = await globalPrisma.profileAccess.findFirst({ where, select: { id: true } })
+    if (access) return userId
+    redirect('/login')
 }
 
 /**
@@ -33,59 +71,43 @@ async function getClientSession() {
  * Sau khi backfill xong toàn bộ user → có thể remove fallback.
  */
 async function getRelatedClientIds(clientUserId: string) {
+    const rootIds = new Set<number>()
+
+    // [Client membership] Per-profile CLIENT memberships → the Client they represent.
+    const clientAccesses = await globalPrisma.profileAccess.findMany({
+        where: { userId: clientUserId, role: 'CLIENT', clientId: { not: null } },
+        select: { clientId: true },
+    })
+    clientAccesses.forEach(a => { if (a.clientId != null) rootIds.add(a.clientId) })
+
     const user = await globalPrisma.user.findUnique({ where: { id: clientUserId } })
-    if (!user) return []
 
-    let rootIds: number[] = []
-
-    // PRIORITY 1: FK explicit link (post-audit fix #3.6)
-    const userClientId = (user as any).clientId as number | null | undefined
+    // Legacy: User.clientId FK (pre-membership model).
+    const userClientId = (user as any)?.clientId as number | null | undefined
     if (userClientId) {
-        const fkClient = await globalPrisma.client.findUnique({
-            where: { id: userClientId },
-            select: { id: true },
-        })
-        if (fkClient) {
-            rootIds = [fkClient.id]
-        }
+        const fkClient = await globalPrisma.client.findUnique({ where: { id: userClientId }, select: { id: true } })
+        if (fkClient) rootIds.add(fkClient.id)
     }
 
-    // PRIORITY 2 (fallback): name matching — legacy users chưa backfill xong
-    // [Sprint K P1] Scope name match by user's profileId để tránh cross-profile
-    // collision. Trước đây 2 user "John" ở 2 profile khác nhau cùng map với
-    // client "John, Inc." của profile bất kỳ → user A thấy data client B.
-    // Giờ chỉ match clients trong cùng profile với user.
-    if (rootIds.length === 0) {
-        console.warn(
-            `[client-portal] User ${user.username} (id=${user.id}) chưa có clientId FK. ` +
-            `Falling back to name matching (profile-scoped) — admin nên SET "clientId" cho user này.`
-        )
-        const username: string = user.username ?? ''
-        const nickname: string = user.nickname ?? ''
+    // Legacy fallback: profile-scoped name match — only if nothing else resolved.
+    if (rootIds.size === 0 && user) {
+        const username = user.username ?? ''
+        const nickname = user.nickname ?? ''
         const userProfileId = user.profileId
-        const nameWhere: any = {
-            OR: [
-                { name: username },
-                { name: nickname },
-            ],
-        }
-        // If user has profileId, scope matches; otherwise no match (safer than collision)
         if (userProfileId) {
-            nameWhere.profileId = userProfileId
-        } else {
-            // User without profileId can't match anything via legacy fallback —
-            // force backfill by admin setting clientId FK.
-            return []
+            const rootClients = await globalPrisma.client.findMany({
+                where: { OR: [{ name: username }, { name: nickname }], profileId: userProfileId, status: { not: 'SOFT_DELETED' } },
+                select: { id: true },
+            })
+            rootClients.forEach(c => rootIds.add(c.id))
         }
-        const rootClients = await globalPrisma.client.findMany({ where: nameWhere })
-        rootIds = rootClients.map(c => c.id)
     }
 
     const allIds = new Set(rootIds)
-
-    if (rootIds.length > 0) {
+    if (rootIds.size > 0) {
         const subs = await globalPrisma.client.findMany({
-            where: { parentId: { in: rootIds } }
+            where: { parentId: { in: Array.from(rootIds) }, status: { not: 'SOFT_DELETED' } },
+            select: { id: true },
         })
         subs.forEach(s => allIds.add(s.id))
     }
@@ -116,6 +138,30 @@ function mapClientTaskStatus(internalStatus: string): string {
     }
 
     return 'Pending'
+}
+
+/**
+ * Client-facing status, refined by the new `clientReview` field (decoupled from
+ * the internal status FSM). AWAITING = a cut is ready for the client to review.
+ */
+function deriveClientStatus(status: string, clientReview?: string | null): string {
+    if (clientReview === 'AWAITING') return 'Action Required'
+    if (clientReview === 'APPROVED') return 'Completed'
+    if (clientReview === 'CHANGES') return 'Revising'
+    return mapClientTaskStatus(status)
+}
+
+/**
+ * Whether this deliverable is waiting on the CLIENT (drives "Needs your attention").
+ * Explicit AWAITING, or heuristic: there's a cut (productLink) and it isn't done,
+ * and the client hasn't already approved or asked for changes.
+ */
+function deriveNeedsYou(t: { status: string; productLink?: string | null; clientReview?: string | null }): boolean {
+    if (t.clientReview === 'AWAITING') return true
+    if (t.clientReview === 'APPROVED' || t.clientReview === 'CHANGES') return false
+    const s = (t.status || '').toLowerCase()
+    const done = s.includes('hoàn tất') || s.includes('lưu trữ') || s.includes('hủy')
+    return !!t.productLink && !done
 }
 
 // [Sprint J P0] `calculateEstimatedCost` removed — exposed agency revenue
@@ -160,6 +206,10 @@ export async function getClientTasks(workspaceId: string) {
             frameUsername: true,
             framePassword: true,
             frameNote: true,
+            duration: true,
+            clientReview: true,
+            clientFeedback: true,
+            clientReviewedAt: true,
             client: {
                 select: {
                     id: true,
@@ -180,12 +230,13 @@ export async function getClientTasks(workspaceId: string) {
         orderBy: { createdAt: 'desc' }
     })
 
-    return tasks.map(task => ({
+    const mapped = tasks.map(task => ({
         ...task,
-        clientStatus: mapClientTaskStatus(task.status),
-        // estimatedCost: REMOVED — derived from jobPriceUSD which is now stripped
+        clientStatus: deriveClientStatus(task.status, task.clientReview),
+        needsYou: deriveNeedsYou(task),
         clientPath: formatClientHierarchy(task.client)
     }))
+    return serializeDecimal(mapped) as typeof mapped
 }
 
 /**
@@ -223,7 +274,7 @@ export async function getClientInvoices(workspaceId: string) {
     const prisma = getWorkspacePrisma(workspaceId)
     const relatedClientIds = await getRelatedClientIds(clientUserId)
 
-    return await prisma.invoice.findMany({
+    const invoices = await prisma.invoice.findMany({
         where: {
             OR: [
                 { clientUserId: clientUserId },
@@ -239,11 +290,13 @@ export async function getClientInvoices(workspaceId: string) {
             totalDue: true,
             status: true,
             filePath: true,
+            clientId: true,
             items: {
                 select: { description: true, amount: true, quantity: true }
             }
         }
     })
+    return serializeDecimal(invoices) as typeof invoices
 }
 
 /**
@@ -338,15 +391,16 @@ export async function getTaskDetailForPortal(taskId: string) {
 
     if (!task) return null
 
-    // [Sprint J P0] Strip jobPriceUSD before returning to client UI.
-    // estimatedCost field also removed.
-    const { jobPriceUSD: _stripped, ...safeTask } = task as any
-    void _stripped
-    return {
+    // [Sprint J P0 + Portal redesign] Strip ALL agency financials before returning
+    // to client UI (jobPriceUSD already; now also profit/wage/value/exchangeRate).
+    const { jobPriceUSD, profitVND, wageVND, value, exchangeRate, ...safeTask } = task as any
+    void jobPriceUSD; void profitVND; void wageVND; void value; void exchangeRate
+    return serializeDecimal({
         ...safeTask,
-        clientStatus: mapClientTaskStatus(task.status),
+        clientStatus: deriveClientStatus(task.status, (task as any).clientReview),
+        needsYou: deriveNeedsYou(task as any),
         clientPath: formatClientHierarchy(task.client)
-    }
+    })
 }
 
 /**
@@ -398,9 +452,381 @@ export async function getClientWorkspaces() {
         if (dw.workspaceId) workspaceIds.add(dw.workspaceId)
     })
 
+    // [Client membership] Workspaces of profiles where I'm a CLIENT member — so a
+    // freshly-invited client sees the workspace even before any task exists.
+    const clientProfiles = await globalPrisma.profileAccess.findMany({
+        where: { userId, role: 'CLIENT' },
+        select: { profileId: true },
+    })
+    if (clientProfiles.length > 0) {
+        const wsOfProfiles = await globalPrisma.workspace.findMany({
+            where: { profileId: { in: clientProfiles.map(p => p.profileId) }, status: { not: 'SOFT_DELETED' } },
+            select: { id: true },
+        })
+        wsOfProfiles.forEach(w => workspaceIds.add(w.id))
+    }
+
     return await globalPrisma.workspace.findMany({
         where: { id: { in: Array.from(workspaceIds) } }
     })
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   [Client Portal redesign] Client-driven review actions.
+   These run as the CLIENT (getClientSession) — they do NOT go through the staff
+   `updateTaskStatus` (which requires the assignee/admin session + FSM guard).
+   Minimal, scoped mutations + reuse of the notification + audit infrastructure.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/** Resolve a logged-in CLIENT to a task they own (or null). */
+async function findOwnedTask(taskId: string, workspaceId: string, clientUserId: string, select: any): Promise<any> {
+    const relatedClientIds = await getRelatedClientIds(clientUserId)
+    const prisma = getWorkspacePrisma(workspaceId)
+    return prisma.task.findFirst({
+        where: {
+            id: taskId,
+            OR: [{ clientUserId }, { clientId: { in: relatedClientIds } }],
+        },
+        select,
+    })
+}
+
+/**
+ * Client approves a deliverable → task moves to 'Hoàn tất' (counted in payroll
+ * like any completed task) + clientReview=APPROVED. Notifies the assignee.
+ */
+export async function approveDeliverable(taskId: string, workspaceId: string) {
+    const clientUserId = await getClientSession()
+    const task = await findOwnedTask(taskId, workspaceId, clientUserId, {
+        id: true, title: true, status: true, assigneeId: true, assignedById: true, clientReview: true,
+    })
+    if (!task) return { success: false, error: 'Không tìm thấy sản phẩm hoặc bạn không có quyền.' }
+    if (task.status === 'Hoàn tất' || task.clientReview === 'APPROVED') {
+        return { success: false, error: 'Sản phẩm này đã được duyệt.' }
+    }
+
+    const prisma = getWorkspacePrisma(workspaceId)
+    await prisma.task.update({
+        where: { id: taskId },
+        data: {
+            status: 'Hoàn tất',
+            deadline: null,
+            clientReview: 'APPROVED',
+            clientReviewedAt: new Date(),
+            version: { increment: 1 },
+        },
+    })
+
+    // Notify the assignee AND the admin who manages the task (mirror requestDeliverableChanges).
+    const recipients = new Set<string>()
+    if (task.assigneeId) recipients.add(task.assigneeId)
+    if (task.assignedById) recipients.add(task.assignedById)
+    recipients.delete(clientUserId)
+    for (const uid of recipients) {
+        try {
+            const notif = await createNotificationInternal({
+                userId: uid,
+                type: 'TASK_STATUS_CHANGED',
+                title: 'Khách đã duyệt sản phẩm 🎉',
+                body: `Khách hàng đã duyệt "${task.title}". Task được đánh dấu Hoàn tất.`,
+                taskId,
+                actorId: clientUserId,
+            })
+            void broadcastNotificationToUser(uid, {
+                id: notif.id, type: notif.type, title: notif.title, body: notif.body,
+                taskId, actorId: clientUserId, createdAt: notif.createdAt, isRead: false,
+            })
+        } catch (e) { console.error('[approveDeliverable] notify failed', e) }
+    }
+
+    void audit({
+        workspaceId, actorUserId: clientUserId, action: 'task.client_approved',
+        targetType: 'Task', targetId: taskId,
+        before: { status: task.status }, after: { status: 'Hoàn tất', clientReview: 'APPROVED' },
+    })
+
+    revalidatePath(`/${workspaceId}/admin`)
+    revalidatePath(`/${workspaceId}/dashboard`)
+    return { success: true }
+}
+
+/**
+ * Client requests changes → task moves to 'Revision' + stores clientFeedback
+ * (separate from internal notes) + clientReview=CHANGES. Notifies assignee + the
+ * admin who manages the task. The team then drives the internal rework flow.
+ */
+export async function requestDeliverableChanges(taskId: string, workspaceId: string, feedback: string) {
+    const clientUserId = await getClientSession()
+    const clean = (feedback || '').trim()
+    if (!clean) return { success: false, error: 'Vui lòng nhập nội dung cần chỉnh sửa.' }
+
+    const task = await findOwnedTask(taskId, workspaceId, clientUserId, {
+        id: true, title: true, status: true, assigneeId: true, assignedById: true,
+    })
+    if (!task) return { success: false, error: 'Không tìm thấy sản phẩm hoặc bạn không có quyền.' }
+    if (task.status === 'Hoàn tất') {
+        return { success: false, error: 'Sản phẩm đã hoàn tất — không thể yêu cầu chỉnh sửa.' }
+    }
+
+    const prisma = getWorkspacePrisma(workspaceId)
+    await prisma.task.update({
+        where: { id: taskId },
+        data: {
+            status: 'Revision',
+            deadline: null,
+            clientReview: 'CHANGES',
+            clientFeedback: clean,
+            clientReviewedAt: new Date(),
+            version: { increment: 1 },
+        },
+    })
+
+    const recipients = new Set<string>()
+    if (task.assigneeId) recipients.add(task.assigneeId)
+    if (task.assignedById) recipients.add(task.assignedById)
+    recipients.delete(clientUserId)
+    for (const uid of recipients) {
+        try {
+            const notif = await createNotificationInternal({
+                userId: uid,
+                type: 'TASK_STATUS_CHANGED',
+                title: 'Khách yêu cầu chỉnh sửa',
+                body: `Khách hàng yêu cầu chỉnh sửa "${task.title}": ${clean.slice(0, 160)}`,
+                taskId,
+                actorId: clientUserId,
+            })
+            void broadcastNotificationToUser(uid, {
+                id: notif.id, type: notif.type, title: notif.title, body: notif.body,
+                taskId, actorId: clientUserId, createdAt: notif.createdAt, isRead: false,
+            })
+        } catch (e) { console.error('[requestDeliverableChanges] notify failed', e) }
+    }
+
+    void audit({
+        workspaceId, actorUserId: clientUserId, action: 'task.client_changes_requested',
+        targetType: 'Task', targetId: taskId,
+        before: { status: task.status }, after: { status: 'Revision', clientReview: 'CHANGES', feedback: clean },
+    })
+
+    revalidatePath(`/${workspaceId}/admin`)
+    revalidatePath(`/${workspaceId}/dashboard`)
+    return { success: true }
+}
+
+/** Human labels for the deliverable Activity timeline (from AuditLog). */
+const ACTIVITY_LABELS: Record<string, string> = {
+    'task.assigned': 'Project opened',
+    'task.started': 'Editing started',
+    'task.delivered': 'Submitted for your review',
+    'task.completed': 'Approved & delivered',
+    'task.client_approved': 'You approved & delivered',
+    'task.client_changes_requested': 'You requested changes',
+}
+
+/**
+ * Reads the AuditLog for one task → a client-safe Activity timeline (newest first).
+ */
+export async function getDeliverableActivity(taskId: string) {
+    const clientUserId = await getClientSession()
+    const relatedClientIds = await getRelatedClientIds(clientUserId)
+    const owned = await globalPrisma.task.findFirst({
+        where: { id: taskId, OR: [{ clientUserId }, { clientId: { in: relatedClientIds } }] },
+        select: { id: true },
+    })
+    if (!owned) return []
+
+    const rows = await globalPrisma.auditLog.findMany({
+        where: { targetType: 'Task', targetId: taskId, action: { in: Object.keys(ACTIVITY_LABELS) } },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+    })
+
+    const actorIds = Array.from(new Set(rows.map(r => r.actorUserId).filter(Boolean))) as string[]
+    const users = actorIds.length
+        ? await globalPrisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, username: true, nickname: true } })
+        : []
+    const nameById = new Map(users.map(u => [u.id, u.nickname || u.username]))
+
+    return rows.map(r => ({
+        label: ACTIVITY_LABELS[r.action] || r.action,
+        who: r.actorUserId ? (nameById.get(r.actorUserId) || 'Team') : 'Team',
+        date: r.createdAt.toISOString(),
+    }))
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   [Client Portal redesign] "Message your team" — reuses the Knowledge Hub
+   Channel / Message + Supabase realtime, via a per-client PRIVATE channel.
+   CLIENT users aren't WorkspaceMembers, so this is a separate CLIENT-authorized
+   path (can't use authorizeChannel / verifyWorkspaceAccess).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const PORTAL_AUTHOR_SELECT = { id: true, username: true, displayName: true, avatarUrl: true } as const
+
+export interface PortalMessageDTO {
+    id: string
+    channelId: string
+    content: string
+    authorId: string
+    author: { id: string; username: string; displayName: string | null; avatarUrl: string | null } | null
+    parentId: string | null
+    replyCount: number
+    reactions: { emoji: string; userIds: string[] }[]
+    editedAt: string | null
+    deletedAt: string | null
+    createdAt: string
+}
+
+function serializePortalMessage(m: any): PortalMessageDTO {
+    return {
+        id: m.id,
+        channelId: m.channelId,
+        content: m.deletedAt ? '' : m.content,
+        authorId: m.authorId,
+        author: m.author ?? null,
+        parentId: m.parentId ?? null,
+        replyCount: m.replyCount ?? 0,
+        reactions: [],
+        editedAt: m.editedAt ? new Date(m.editedAt).toISOString() : null,
+        deletedAt: m.deletedAt ? new Date(m.deletedAt).toISOString() : null,
+        createdAt: new Date(m.createdAt).toISOString(),
+    }
+}
+
+/** Resolve the CLIENT's primary (root) Client record. */
+async function getClientRoot(clientUserId: string): Promise<{ id: number; name: string } | null> {
+    const user = await globalPrisma.user.findUnique({ where: { id: clientUserId }, select: { clientId: true } })
+    const fkId = user?.clientId
+    if (fkId) {
+        const c = await globalPrisma.client.findUnique({ where: { id: fkId }, select: { id: true, name: true } })
+        if (c) return c
+    }
+    const related = await getRelatedClientIds(clientUserId)
+    if (related.length === 0) return null
+    const roots = await globalPrisma.client.findMany({
+        where: { id: { in: related } },
+        select: { id: true, name: true, parentId: true },
+    })
+    const root = roots.find(r => r.parentId == null) || roots[0]
+    return root ? { id: root.id, name: root.name } : null
+}
+
+/** Verify a CLIENT may access a channel = it's their per-client channel. */
+async function authorizeClientChannel(workspaceId: string, channelId: string, clientUserId: string) {
+    const root = await getClientRoot(clientUserId)
+    if (!root) throw new Error('CLIENT_NO_ROOT')
+    const channel = await globalPrisma.channel.findFirst({
+        where: { id: channelId, workspaceId, clientId: root.id },
+        select: { id: true, profileId: true },
+    })
+    if (!channel) throw new Error('CLIENT_CHANNEL_FORBIDDEN')
+    return { clientUserId, root, channel }
+}
+
+/** Get-or-create the per-client message channel + ensure admins are members. */
+export async function getOrCreateClientChannelAsClient(workspaceId: string): Promise<{ channel: { id: string; name: string } } | { error: string }> {
+    const clientUserId = await getClientSession()
+    const root = await getClientRoot(clientUserId)
+    if (!root) return { error: 'Chưa liên kết tài khoản khách với hồ sơ khách hàng.' }
+
+    const ws = await globalPrisma.workspace.findUnique({ where: { id: workspaceId }, select: { id: true, profileId: true } })
+    if (!ws?.profileId) return { error: 'Workspace không hợp lệ.' }
+    const profileId = ws.profileId
+
+    let channel = await globalPrisma.channel.findFirst({
+        where: { workspaceId, clientId: root.id, type: 'TEXT' },
+        select: { id: true, name: true },
+    })
+
+    if (!channel) {
+        channel = await globalPrisma.channel.create({
+            data: {
+                workspaceId, profileId, clientId: root.id,
+                name: `Khách: ${root.name}`.slice(0, 80),
+                type: 'TEXT', visibility: 'PRIVATE', postPolicy: 'EVERYONE', position: 999,
+            },
+            select: { id: true, name: true },
+        })
+    }
+
+    // Ensure the client + workspace admins are channel members (idempotent).
+    const admins = await globalPrisma.workspaceMember.findMany({
+        where: { workspaceId, role: { in: ['OWNER', 'ADMIN'] } },
+        select: { userId: true },
+    })
+    const memberUserIds = Array.from(new Set([clientUserId, ...admins.map(a => a.userId)]))
+    await globalPrisma.channelMember.createMany({
+        data: memberUserIds.map(userId => ({ workspaceId, profileId, channelId: channel!.id, userId, role: 'MEMBER' as const })),
+        skipDuplicates: true,
+    })
+
+    return { channel: { id: channel.id, name: channel.name } }
+}
+
+/** Fetch messages of the per-client channel (CLIENT-auth, oldest→newest). */
+export async function getClientMessages(workspaceId: string, channelId: string) {
+    const clientUserId = await getClientSession()
+    try {
+        await authorizeClientChannel(workspaceId, channelId, clientUserId)
+    } catch {
+        return { messages: [] as PortalMessageDTO[] }
+    }
+    const rows = await globalPrisma.message.findMany({
+        where: { workspaceId, channelId, parentId: null },
+        orderBy: { createdAt: 'asc' },
+        take: 100,
+        include: { author: { select: PORTAL_AUTHOR_SELECT } },
+    })
+    return { messages: rows.map(serializePortalMessage) }
+}
+
+/** Client posts into their per-client channel → realtime broadcast + notify admins. */
+export async function sendClientMessage(workspaceId: string, channelId: string, content: string): Promise<{ success: true; message: PortalMessageDTO } | { error: string }> {
+    const clientUserId = await getClientSession()
+    const clean = (content || '').trim()
+    if (!clean) return { error: 'Tin nhắn trống' }
+    if (clean.length > 4000) return { error: 'Tin nhắn quá dài (tối đa 4000 ký tự)' }
+
+    let auth: Awaited<ReturnType<typeof authorizeClientChannel>>
+    try {
+        auth = await authorizeClientChannel(workspaceId, channelId, clientUserId)
+    } catch {
+        return { error: 'Bạn không có quyền gửi tin trong kênh này' }
+    }
+    const profileId = auth.channel.profileId
+
+    const created = await globalPrisma.message.create({
+        data: { workspaceId, profileId, channelId, authorId: clientUserId, content: clean },
+        include: { author: { select: PORTAL_AUTHOR_SELECT } },
+    })
+    const dto = serializePortalMessage(created)
+    await broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_NEW, dto)
+
+    // Notify workspace admins (the recipients of client messages).
+    try {
+        const admins = await globalPrisma.workspaceMember.findMany({
+            where: { workspaceId, role: { in: ['OWNER', 'ADMIN'] } },
+            select: { userId: true },
+        })
+        await Promise.allSettled(admins
+            .filter(a => a.userId !== clientUserId)
+            .map(async (a) => {
+                const notif = await createNotificationInternal({
+                    userId: a.userId,
+                    type: 'CHANNEL_MESSAGE',
+                    title: `Tin nhắn từ khách ${auth.root.name}`,
+                    body: clean.slice(0, 140),
+                    actorId: clientUserId,
+                    metadata: { channelId, clientName: auth.root.name },
+                })
+                void broadcastNotificationToUser(a.userId, {
+                    id: notif.id, type: notif.type, title: notif.title, body: notif.body,
+                    channelId, actorId: clientUserId, createdAt: notif.createdAt, isRead: false,
+                })
+            }))
+    } catch (e) { console.error('[sendClientMessage] notify admins failed', e) }
+
+    return { success: true, message: dto }
 }
 
 

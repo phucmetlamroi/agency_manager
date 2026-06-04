@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=Be+Vietnam+Pro:wght@500&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1920px; height: 1080px;
+    background: radial-gradient(circle at 50% 20%, #2d1b5e 0%, #0A0A0A 60%);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #E4E4E7; padding: 50px 80px;
+  }
+  .head { text-align: center; margin-bottom: 36px; }
+  .pre { display: inline-block; background: rgba(139,92,246,0.15); color: #A78BFA;
+         padding: 6px 16px; border-radius: 999px; font-size: 12px; font-weight: 800;
+         letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 14px; }
+  h1 { font-size: 40px; font-weight: 800; letter-spacing: -1px; }
+  .sub { color: #A1A1AA; font-family: 'Be Vietnam Pro'; font-size: 15px; margin-top: 6px; }
+
+  /* Stepper */
+  .stepper {
+    display: flex; justify-content: center; gap: 12px;
+    margin: 32px 0 24px;
+  }
+  .step {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(10,10,10,0.6); padding: 10px 16px;
+    border-radius: 999px; font-size: 13px; font-weight: 700;
+    border: 1px solid rgba(139,92,246,0.18);
+  }
+  .step-num {
+    width: 26px; height: 26px; border-radius: 999px;
+    background: rgba(139,92,246,0.15); color: #A78BFA;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 12px;
+  }
+  .step.active {
+    background: linear-gradient(135deg, rgba(139,92,246,0.30), rgba(217,70,239,0.20));
+    border-color: rgba(139,92,246,0.45); color: #E4E4E7;
+  }
+  .step.active .step-num {
+    background: linear-gradient(135deg,#8B5CF6,#A78BFA); color: white;
+  }
+  .step.done .step-num { background: rgba(52,211,153,0.20); color: #34D399; }
+
+  /* Form card */
+  .form-card {
+    max-width: 1500px; margin: 0 auto;
+    background: rgba(10,10,10,0.65); backdrop-filter: blur(24px);
+    border: 1px solid rgba(139,92,246,0.18); border-radius: 28px;
+    padding: 36px 44px; box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+  }
+  .form-card h2 {
+    font-size: 22px; font-weight: 800; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .form-card h2 .badge {
+    background: rgba(139,92,246,0.20); color: #A78BFA;
+    padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;
+  }
+  .form-card .desc { color: #A1A1AA; font-family: 'Be Vietnam Pro'; font-size: 13px; margin-bottom: 26px; }
+
+  .form-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px 28px;
+  }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .field-full { grid-column: 1 / -1; }
+  .field label {
+    font-size: 11px; font-weight: 700; color: #A1A1AA;
+    text-transform: uppercase; letter-spacing: 1.5px;
+  }
+  .field label .req { color: #f87171; margin-left: 3px; }
+  .field input, .field select, .field textarea {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(139,92,246,0.18);
+    border-radius: 12px; padding: 14px 16px;
+    color: #E4E4E7; font-size: 14px; font-family: 'Plus Jakarta Sans';
+    width: 100%;
+  }
+  .field-velox {
+    position: relative;
+  }
+  .field-velox input {
+    background: rgba(139,92,246,0.10);
+    border-color: rgba(139,92,246,0.40);
+    padding-left: 36px;
+  }
+  .field-velox::before {
+    content: '🚀'; position: absolute;
+    left: 12px; bottom: 12px; font-size: 16px;
+  }
+  .velox-badge {
+    position: absolute; top: 0; right: 0;
+    background: rgba(139,92,246,0.15); color: #A78BFA;
+    padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800;
+  }
+  .placeholder { color: #71717A; }
+
+  .chips-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(139,92,246,0.15);
+    padding: 8px 14px; border-radius: 999px; font-size: 12px;
+    color: #A1A1AA;
+  }
+  .chip.selected {
+    background: rgba(139,92,246,0.20); color: #E4E4E7;
+    border-color: rgba(139,92,246,0.40);
+  }
+
+  /* footer */
+  .form-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 32px; padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .nav-btn {
+    padding: 12px 24px; border-radius: 12px;
+    font-weight: 700; font-size: 14px; cursor: pointer; border: 0;
+  }
+  .nav-back {
+    background: rgba(255,255,255,0.04); color: #A1A1AA;
+  }
+  .nav-next {
+    background: linear-gradient(135deg,#8B5CF6,#A78BFA);
+    color: white;
+    box-shadow: 0 8px 20px rgba(139,92,246,0.4);
+  }
+</style>
+</head>
+<body>
+  <div class="head">
+    <span class="pre">📝 Hướng dẫn tạo task</span>
+    <h1>Tạo task mới · 5-step wizard</h1>
+    <p class="sub">Form thường (Hoặc bấm 🚀 Velox để tạo hàng loạt trong 30 giây)</p>
+  </div>
+
+  <div class="stepper">
+    <div class="step done"><span class="step-num">✓</span>1. General Info</div>
+    <div class="step active"><span class="step-num">2</span>2. Video</div>
+    <div class="step"><span class="step-num">3</span>3. Finance</div>
+    <div class="step"><span class="step-num">4</span>4. Assets</div>
+    <div class="step"><span class="step-num">5</span>5. Preview</div>
+  </div>
+
+  <div class="form-card">
+    <h2>Video Details <span class="badge">Step 2 / 5</span></h2>
+    <p class="desc">Nhập thông tin video — title, type, client, deadline. Field nào có icon 🚀 nghĩa là được Velox điền tự động.</p>
+
+    <div class="form-grid">
+      <div class="field field-velox field-full">
+        <span class="velox-badge">🚀 VELOX</span>
+        <label>Tiêu đề task<span class="req">*</span></label>
+        <input value="Barmoor Video 2 · Body + Hooks" />
+      </div>
+
+      <div class="field">
+        <label>Client<span class="req">*</span></label>
+        <select>
+          <option>Barmoor → Q2/2026 Campaign</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Loại video<span class="req">*</span></label>
+        <div class="chips-row">
+          <span class="chip selected">📹 Long form</span>
+          <span class="chip">⚡ Short form</span>
+          <span class="chip">🎬 Trial</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Deadline</label>
+        <input type="text" value="29/05/2026 · 15:00" />
+      </div>
+
+      <div class="field">
+        <label>Assignee</label>
+        <input value="Văn Ngữ (auto-pick · workload thấp nhất)" />
+      </div>
+
+      <div class="field field-velox field-full">
+        <span class="velox-badge">🚀 VELOX</span>
+        <label>Raw Footage URL</label>
+        <input value="https://www.dropbox.com/scl/fo/.../Body/Video_2_Body.mp4" />
+      </div>
+    </div>
+
+    <div class="form-footer">
+      <button class="nav-btn nav-back">← Quay lại</button>
+      <div style="color:#71717A;font-size:13px;">Tự lưu draft mỗi 30s · Saved 2s ago</div>
+      <button class="nav-btn nav-next">Tiếp theo: Finance →</button>
+    </div>
+  </div>
+</body>
+</html>

@@ -85,6 +85,24 @@ export default async function WorkspaceLayout({
         }
     }
 
+    // [Client membership] If the user's membership in the active profile is CLIENT
+    // (view-only portal), they must NEVER render an internal admin/dashboard page.
+    // Authoritative per-profile check (the JWT only carries sessionProfileId).
+    // NOTE: redirect() throws NEXT_REDIRECT — keep it OUT of the try/catch.
+    let isClientMembership = false
+    try {
+        const clientAccess = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId: session.user.id, profileId } },
+            select: { role: true },
+        })
+        isClientMembership = clientAccess?.role === 'CLIENT'
+    } catch (e) {
+        console.warn('[WorkspaceLayout] client-role guard check failed:', e)
+    }
+    if (isClientMembership) {
+        redirect(`/portal/en/${workspaceId}`)
+    }
+
     // Prefetch marketplace task count for badge UX (non-blocking if fails)
     let marketplaceCount = 0
     try {

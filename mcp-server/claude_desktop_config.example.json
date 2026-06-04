@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "hustly-tasker": {
+      "command": "node",
+      "args": ["C:/path/to/mcp-server/dist/index.js"],
+      "env": {
+        "MCP_DATABASE_URL": "postgresql://user:pass@host/db?sslmode=require",
+        "MCP_PROFILE_ID": "your-profile-uuid-here",
+        "MCP_WORKSPACE_IDS": ""
+      }
+    }
+  }
+}

@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { Hash, Lock, Plus, Loader2, MessagesSquare } from 'lucide-react'
 import { toast } from 'sonner'
-import { createChannel, createCategory, type HubCategoryDTO, type HubChannelDTO } from '@/actions/channel-actions'
+import { createChannel, createCategory, getUnreadCounts, markChannelRead, type HubCategoryDTO, type HubChannelDTO } from '@/actions/channel-actions'
 import ChannelView from './ChannelView'
 
 interface Props {
@@ -24,6 +24,38 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
     const [busy, setBusy] = useState(false)
 
     const selected = channels.find((c) => c.id === selectedId) ?? null
+
+    // [Phase 2 · unread] per-channel unread counts (sidebar badges).
+    const [unread, setUnread] = useState<Record<string, number>>({})
+
+    const refreshUnread = useCallback(() => {
+        getUnreadCounts(workspaceId).then(setUnread).catch(() => {})
+    }, [workspaceId])
+
+    useEffect(() => {
+        refreshUnread()
+        const id = setInterval(() => {
+            if (typeof document !== 'undefined' && document.hidden) return
+            refreshUnread()
+        }, 15000)
+        const onFocus = () => refreshUnread()
+        window.addEventListener('focus', onFocus)
+        return () => {
+            clearInterval(id)
+            window.removeEventListener('focus', onFocus)
+        }
+    }, [refreshUnread])
+
+    function selectChannel(id: string) {
+        setSelectedId(id)
+        setUnread((prev) => {
+            if (!prev[id]) return prev
+            const n = { ...prev }
+            delete n[id]
+            return n
+        })
+        void markChannelRead(workspaceId, id)
+    }
 
     // Group channels under their category (uncategorized first).
     const groups = useMemo(() => {
@@ -138,10 +170,11 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                             <div className="space-y-0.5">
                                 {g.channels.map((ch) => {
                                     const active = ch.id === selectedId
+                                    const unreadCount = !active ? unread[ch.id] ?? 0 : 0
                                     return (
                                         <button
                                             key={ch.id}
-                                            onClick={() => setSelectedId(ch.id)}
+                                            onClick={() => selectChannel(ch.id)}
                                             className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors ${
                                                 active
                                                     ? 'bg-violet-500/15 text-zinc-100'
@@ -153,7 +186,12 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                                             ) : (
                                                 <Hash className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
                                             )}
-                                            <span className="truncate">{ch.name}</span>
+                                            <span className={`truncate ${unreadCount > 0 ? 'text-zinc-100 font-semibold' : ''}`}>{ch.name}</span>
+                                            {unreadCount > 0 && (
+                                                <span className="ml-auto shrink-0 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-violet-600 text-white text-[10px] font-bold tabular-nums">
+                                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                                </span>
+                                            )}
                                         </button>
                                     )
                                 })}

@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth'
 import type { NotificationType } from '@prisma/client'
 import type { CreateNotificationParams } from '@/types/notification'
 import { maybeSendNotificationEmail } from '@/lib/notification-email'
+import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
 async function getAuthUserId(): Promise<string | null> {
     const session = await getSession()
@@ -66,6 +67,35 @@ export async function createBulkNotificationsInternal(
         ids.map(uid => createNotificationInternal({ ...params, userId: uid }))
     )
     return results
+}
+
+/**
+ * [nối dây] Fan-out helper: create N notifications AND realtime-broadcast each
+ * one with its real `id` (the bell drops payloads without an id). Reuses
+ * createBulkNotificationsInternal. For chat/group types (CHANNEL_MESSAGE,
+ * THREAD_REPLY, GROUP_MEMBER_*) this is in-app + realtime ONLY — they render no
+ * email template, so maybeSendNotificationEmail no-ops for them.
+ */
+export async function createAndBroadcastNotifications(
+    userIds: string[],
+    params: Omit<CreateNotificationParams, 'userId'>,
+) {
+    const rows = await createBulkNotificationsInternal(userIds, params)
+    for (const n of rows) {
+        void broadcastNotificationToUser(n.userId, {
+            id: n.id,
+            type: n.type,
+            title: n.title,
+            body: n.body,
+            avatarUrl: n.avatarUrl,
+            taskId: n.taskId,
+            actorId: n.actorId,
+            metadata: n.metadata,
+            createdAt: n.createdAt.toISOString(),
+            isRead: false,
+        })
+    }
+    return rows
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

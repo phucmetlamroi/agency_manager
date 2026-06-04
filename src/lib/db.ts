@@ -24,9 +24,12 @@ export const prisma = globalForPrisma.prisma ?? (() => {
         log: env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
     })
 
-    if (env.NODE_ENV !== 'production') {
-        globalForPrisma.prisma = client
-    }
+    // Always cache the singleton — prevents creating multiple PrismaClient
+    // instances (and therefore multiple DB connection pools) in production.
+    // The original guard (`!== 'production'`) was a Next.js hot-reload
+    // pattern, but in Electron's standalone server the module system is
+    // stable, so caching is both safe and necessary.
+    globalForPrisma.prisma = client
 
     return client
 })()

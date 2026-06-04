@@ -52,6 +52,7 @@ const ROLE_BADGE: Record<ProfileRole, { label: string; color: string; icon: any 
     OWNER: { label: 'Owner', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: Crown },
     ADMIN: { label: 'Admin', color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', icon: Shield },
     USER: { label: 'User', color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/20', icon: Users },
+    CLIENT: { label: 'Client', color: 'text-violet-400 bg-violet-500/10 border-violet-500/20', icon: Users },
 }
 
 export default function ProfileMembersPanel({

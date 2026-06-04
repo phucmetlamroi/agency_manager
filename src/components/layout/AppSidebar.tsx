@@ -11,7 +11,6 @@ import {
     Building2,
     Wallet,
     ListTodo,
-    Smile,
     LogOut,
     ChevronLeft,
     ChevronRight,
@@ -83,7 +82,7 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
         { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'] },
         { label: "Knowledge Hub", href: `/${workspaceId}/admin/hub`, icon: MessagesSquare, roles: ['ADMIN', 'USER'] },
         { label: "Wiki", href: `/${workspaceId}/admin/wiki`, icon: BookOpen, roles: ['ADMIN', 'USER'] },
-        { label: "Clients Manager", href: `/${workspaceId}/admin/crm`, icon: Smile, roles: ['ADMIN', 'USER'] },
+        // [CM merge] "Clients Manager" đã gộp vào Dashboard → bỏ khỏi sidebar.
         { label: "Schedule", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
         { label: "My Errors", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },
         { label: "Profile", href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, roles: ['USER'] },

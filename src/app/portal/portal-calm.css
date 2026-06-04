@@ -1,0 +1,150 @@
+/* ──────────────────────────────────────────────────────────────────
+   HustlyTasker — Client Portal · "Calm Dark"
+   Restrained dark mode. Neon, glow, mesh-gradients and glass stripped.
+   Hierarchy from type + whitespace. One quiet violet accent.
+   Scoped under `.portal-calm` so the rest of the app's theme is untouched.
+   ────────────────────────────────────────────────────────────────── */
+
+.portal-calm {
+  /* Surfaces — flat, near-black, calm */
+  --void:       #0A0A0C;
+  --sidebar:    #0C0C0F;
+  --surface:    #141417;
+  --surface-2:  #19191D;
+  --surface-3:  #212127;
+
+  /* Hairlines — soft single-layer */
+  --line:       rgba(255, 255, 255, 0.06);
+  --line-2:     rgba(255, 255, 255, 0.10);
+  --line-hover: rgba(255, 255, 255, 0.16);
+
+  /* Text ladder */
+  --fg:   #FAFAFA;
+  --fg-1: #E4E4E7;
+  --fg-2: #A1A1AA;
+  --fg-3: #71717A;
+  --fg-4: #52525B;
+
+  /* Quiet violet accent (HustlyTasker continuity) */
+  --accent:      #8B5CF6;
+  --accent-fg:   #C4B5FD;
+  --accent-soft: rgba(139, 92, 246, 0.12);
+  --accent-line: rgba(139, 92, 246, 0.32);
+
+  /* Functional status (muted; color + icon + label, never color alone) */
+  --ok:      #34D399; --ok-soft:      rgba(52, 211, 153, 0.11);  --ok-line:      rgba(52, 211, 153, 0.26);
+  --attn:    #FBBF24; --attn-soft:    rgba(251, 191, 36, 0.11);  --attn-line:    rgba(251, 191, 36, 0.26);
+  --revise:  #FB923C; --revise-soft:  rgba(251, 146, 60, 0.11);  --revise-line:  rgba(251, 146, 60, 0.24);
+  --danger:  #F87171; --danger-soft:  rgba(248, 113, 113, 0.11); --danger-line:  rgba(248, 113, 113, 0.28);
+  --neutral: #A1A1AA; --neutral-soft: rgba(161, 161, 170, 0.10); --neutral-line: rgba(161, 161, 170, 0.20);
+
+  --r-card: 16px;
+  --r-md: 12px;
+  --r-sm: 10px;
+  --r-pill: 999px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-panel: -24px 0 60px rgba(0, 0, 0, 0.45);
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  background: var(--void);
+  color: var(--fg-1);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Typography helpers ── */
+.portal-calm .eyebrow {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.14em; color: var(--fg-3); margin: 0;
+}
+.portal-calm .num { font-variant-numeric: tabular-nums; }
+
+/* ── Card ── */
+.portal-calm .pc-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+/* ── Buttons ── */
+.portal-calm .pc-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: inherit; font-size: 13.5px; font-weight: 600;
+  padding: 9px 15px; border-radius: var(--r-sm);
+  border: 1px solid transparent; cursor: pointer;
+  transition: background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease);
+  white-space: nowrap;
+}
+.portal-calm .pc-btn:disabled { cursor: not-allowed; opacity: .5; }
+.portal-calm .pc-btn-primary { background: var(--accent); color: #fff; }
+.portal-calm .pc-btn-primary:hover:not(:disabled) { background: #9D7BF8; }
+.portal-calm .pc-btn-ghost { background: var(--surface-2); color: var(--fg-1); border-color: var(--line-2); }
+.portal-calm .pc-btn-ghost:hover:not(:disabled) { background: var(--surface-3); border-color: var(--line-hover); }
+.portal-calm .pc-btn-quiet { background: transparent; color: var(--fg-2); border-color: var(--line-2); }
+.portal-calm .pc-btn-quiet:hover:not(:disabled) { background: var(--surface-2); color: var(--fg-1); }
+
+/* ── Inputs ── */
+.portal-calm .pc-input {
+  width: 100%; height: 40px; border-radius: var(--r-sm);
+  border: 1px solid var(--line-2); background: var(--surface-2);
+  color: var(--fg-1); padding: 0 12px; font-size: 14px; outline: none;
+  font-family: inherit; transition: border-color .15s;
+}
+.portal-calm .pc-input::placeholder { color: var(--fg-3); }
+.portal-calm .pc-input:focus { border-color: var(--accent-line); }
+
+/* ── Status pill ── */
+.portal-calm .pc-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 600; line-height: 1;
+  padding: 5px 10px 5px 8px; border-radius: var(--r-pill);
+  border: 1px solid; white-space: nowrap;
+}
+
+/* ── Scrollbars ── */
+.portal-calm ::-webkit-scrollbar { width: 9px; height: 9px; }
+.portal-calm ::-webkit-scrollbar-track { background: transparent; }
+.portal-calm ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+.portal-calm ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); background-clip: padding-box; }
+
+/* ── Quiet motion ── */
+@keyframes pc-fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pc-fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pc-panelIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes pc-scrimIn { from { opacity: 0; } to { opacity: 1; } }
+
+.portal-calm .pc-stagger > * { animation: pc-fadeUp .4s var(--ease) both; }
+.portal-calm .pc-stagger > *:nth-child(1) { animation-delay: .02s; }
+.portal-calm .pc-stagger > *:nth-child(2) { animation-delay: .07s; }
+.portal-calm .pc-stagger > *:nth-child(3) { animation-delay: .12s; }
+.portal-calm .pc-stagger > *:nth-child(4) { animation-delay: .17s; }
+.portal-calm .pc-stagger > *:nth-child(5) { animation-delay: .22s; }
+.portal-calm .pc-stagger > *:nth-child(6) { animation-delay: .27s; }
+
+.portal-calm .pc-view-in { animation: pc-fadeIn .28s var(--ease) both; }
+.portal-calm .pc-panel-in { animation: pc-panelIn .32s var(--ease) both; }
+.portal-calm .pc-scrim-in { animation: pc-scrimIn .2s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-calm * { animation: none !important; transition: none !important; }
+}
+
+.portal-calm a { color: inherit; text-decoration: none; }
+.portal-calm button { font-family: inherit; }
+
+/* Color scheme + responsive */
+.portal-calm { color-scheme: dark; }
+@media (max-width: 900px) {
+  .portal-calm .pc-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .portal-calm .pc-overview-cols { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 560px) {
+  .portal-calm .pc-stat-grid { grid-template-columns: 1fr !important; }
+  .portal-calm .pc-updated { display: none !important; }
+  .portal-calm .pc-msg-label { display: none !important; }
+}

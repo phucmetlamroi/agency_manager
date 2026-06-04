@@ -2,7 +2,8 @@ import { getClients } from '@/actions/crm-actions'
 import { serializeDecimal } from '@/lib/serialization'
 import ClientList from '@/components/crm/ClientList'
 import CreateClientButton from '@/components/crm/CreateClientButton'
-import { Building2, Users } from 'lucide-react'
+import Link from 'next/link'
+import { Building2, Users, Trash2 } from 'lucide-react'
 
 export default async function CRMDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -33,14 +34,22 @@ export default async function CRMDashboard({ params }: { params: Promise<{ works
                     </div>
                 </div>
 
-                {/* Right side - Count badge */}
-                <div className="self-start sm:self-auto inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/12 border border-indigo-500/25">
-                    <span className="text-lg font-bold text-indigo-300">
-                        {clientCount}
-                    </span>
-                    <span className="text-[11px] text-indigo-500 font-medium">
-                        Clients
-                    </span>
+                {/* Right side - Trash link + Count badge */}
+                <div className="self-start sm:self-auto flex items-center gap-2">
+                    <Link
+                        href={`/${workspaceId}/admin/client-trash`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-800/60 hover:bg-zinc-700/60 border border-white/8 text-[12px] text-zinc-400 hover:text-zinc-200 transition-colors"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" /> Thùng rác
+                    </Link>
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/12 border border-indigo-500/25">
+                        <span className="text-lg font-bold text-indigo-300">
+                            {clientCount}
+                        </span>
+                        <span className="text-[11px] text-indigo-500 font-medium">
+                            Clients
+                        </span>
+                    </div>
                 </div>
             </header>
 

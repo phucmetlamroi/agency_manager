@@ -3,8 +3,9 @@
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { hasAtLeastRole } from '@/lib/workspace-roles'
-import { visibleChannelWhere } from '@/lib/channel-permissions'
+import { visibleChannelWhere, authorizeChannel } from '@/lib/channel-permissions'
 import { revalidatePath } from 'next/cache'
+import { createAndBroadcastNotifications } from '@/actions/notification-actions'
 import type { ChannelType, ChannelVisibility, PostPolicy } from '@prisma/client'
 
 /**
@@ -271,7 +272,7 @@ export async function setChannelMembers(workspaceId: string, channelId: string, 
     const { user, workspaceRole } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
     if (!hasAtLeastRole(workspaceRole, 'ADMIN')) return { error: 'Không có quyền' }
 
-    const channel = await prisma.channel.findFirst({ where: { id: channelId, workspaceId }, select: { id: true } })
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, workspaceId }, select: { id: true, name: true } })
     if (!channel) return { error: 'Không tìm thấy kênh' }
     const profileId = await resolveProfileId(workspaceId, user)
     if (!profileId) return { error: 'Workspace chưa gắn profile' }
@@ -292,5 +293,144 @@ export async function setChannelMembers(workspaceId: string, channelId: string, 
         ...toAdd.map((userId) => prisma.channelMember.create({ data: { workspaceId, profileId, channelId, userId, role: 'MEMBER' } })),
     ])
     revalidatePath(`/${workspaceId}/admin/hub`)
+
+    // [nối dây] notify members added / removed (in-app only — these types render no email).
+    try {
+        if (toAdd.length) {
+            await createAndBroadcastNotifications(toAdd, {
+                type: 'GROUP_MEMBER_ADDED',
+                title: `Bạn được thêm vào #${channel.name}`,
+                body: `Bạn vừa được thêm vào kênh "${channel.name}".`,
+                actorId: user.id,
+                metadata: { channelId, channelName: channel.name },
+            })
+        }
+        if (toRemove.length) {
+            await createAndBroadcastNotifications(toRemove, {
+                type: 'GROUP_MEMBER_REMOVED',
+                title: `Bạn bị gỡ khỏi #${channel.name}`,
+                body: `Bạn đã được gỡ khỏi kênh "${channel.name}".`,
+                actorId: user.id,
+                metadata: { channelId, channelName: channel.name },
+            })
+        }
+    } catch (e) {
+        console.error('[setChannelMembers] notify failed', e)
+    }
+
     return { success: true }
+}
+
+/**
+ * [nối dây] Per-user channel mute. A linked member can silence CHANNEL_MESSAGE
+ * fan-out for a noisy channel; their @mentions + thread replies still come through.
+ */
+export async function getMyChannelMute(
+    workspaceId: string,
+    channelId: string,
+): Promise<{ isMember: boolean; muted: boolean }> {
+    const { userId } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    const row = await prisma.channelMember.findFirst({
+        where: { channelId, userId, workspaceId },
+        select: { muted: true },
+    })
+    return { isMember: !!row, muted: row?.muted ?? false }
+}
+
+export async function setChannelMuted(
+    workspaceId: string,
+    channelId: string,
+    muted: boolean,
+): Promise<{ success: true; muted: boolean } | { error: string }> {
+    const { userId } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    const res = await prisma.channelMember.updateMany({
+        where: { channelId, userId, workspaceId },
+        data: { muted },
+    })
+    if (res.count === 0) return { error: 'Bạn không phải thành viên của kênh này.' }
+    return { success: true, muted }
+}
+
+/**
+ * [Phase 2 · @-autocomplete] Members eligible to be @-mentioned in a channel =
+ * channel members ∪ workspace OWNER/ADMINs (mirrors notifyMentions so the
+ * dropdown matches exactly who a mention will reach; PRIVATE non-members excluded).
+ */
+export async function getChannelMembers(
+    workspaceId: string,
+    channelId: string,
+): Promise<Array<{ id: string; username: string; displayName: string | null; avatarUrl: string | null }>> {
+    try {
+        await authorizeChannel(workspaceId, channelId, 'VIEW')
+        const USER_SELECT = { id: true, username: true, displayName: true, avatarUrl: true } as const
+        const [chMembers, wsAdmins] = await Promise.all([
+            prisma.channelMember.findMany({ where: { channelId, workspaceId }, select: { user: { select: USER_SELECT } } }),
+            prisma.workspaceMember.findMany({ where: { workspaceId, role: { in: ['OWNER', 'ADMIN'] } }, select: { user: { select: USER_SELECT } } }),
+        ])
+        const byId = new Map<string, { id: string; username: string; displayName: string | null; avatarUrl: string | null }>()
+        for (const m of chMembers) if (m.user) byId.set(m.user.id, m.user)
+        for (const a of wsAdmins) if (a.user) byId.set(a.user.id, a.user)
+        return Array.from(byId.values()).sort((a, b) =>
+            (a.displayName || a.username).localeCompare(b.displayName || b.username),
+        )
+    } catch {
+        return []
+    }
+}
+
+/**
+ * [Phase 2 · read receipts] Mark a channel read for the caller (advances
+ * lastReadAt). Upserts a MEMBER row so an admin viewing a channel they're not a
+ * member of still gets unread tracking.
+ */
+export async function markChannelRead(
+    workspaceId: string,
+    channelId: string,
+): Promise<{ success: true } | { error: string }> {
+    try {
+        const ctx = await authorizeChannel(workspaceId, channelId, 'VIEW')
+        const ch = await prisma.channel.findFirst({ where: { id: channelId, workspaceId }, select: { profileId: true } })
+        if (!ch) return { error: 'Không tìm thấy kênh' }
+        await prisma.channelMember.upsert({
+            where: { channelId_userId: { channelId, userId: ctx.userId } },
+            update: { lastReadAt: new Date() },
+            create: { workspaceId, profileId: ch.profileId, channelId, userId: ctx.userId, role: 'MEMBER', lastReadAt: new Date() },
+        })
+        return { success: true }
+    } catch {
+        return { error: 'Lỗi đánh dấu đã đọc.' }
+    }
+}
+
+/**
+ * [Phase 2 · unread badges] Per-channel unread count for the caller — counts
+ * top-level, non-deleted messages from OTHERS newer than the caller's lastReadAt,
+ * across channels the caller is a member of. Returns only channels with count>0.
+ */
+export async function getUnreadCounts(workspaceId: string): Promise<Record<string, number>> {
+    try {
+        const { userId } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const memberships = await prisma.channelMember.findMany({
+            where: { workspaceId, userId },
+            select: { channelId: true, lastReadAt: true },
+        })
+        const result: Record<string, number> = {}
+        await Promise.all(
+            memberships.map(async (mem) => {
+                const count = await prisma.message.count({
+                    where: {
+                        channelId: mem.channelId,
+                        parentId: null,
+                        deletedAt: null,
+                        authorId: { not: userId },
+                        ...(mem.lastReadAt ? { createdAt: { gt: mem.lastReadAt } } : {}),
+                    },
+                })
+                if (count > 0) result[mem.channelId] = count
+            }),
+        )
+        return result
+    } catch {
+        return {}
+    }
 }

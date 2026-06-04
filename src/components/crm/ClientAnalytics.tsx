@@ -29,17 +29,17 @@ type ClientData = {
     invoices: any[]
 }
 
-const COLORS = ['#818cf8', '#c084fc', '#f472b6', '#34d399', '#fbbf24', '#38bdf8']
+const COLORS = ['#8B5CF6', '#A855F7', '#C084FC', '#7C3AED', '#6366F1', '#D8B4FE']
 
 const GlassCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => (
-    <div className={`relative overflow-hidden bg-zinc-900/40 backdrop-blur-xl border border-white/10 rounded-2xl group ${className}`}>
+    <div className={`relative overflow-hidden rounded-2xl group ${className}`} style={{ background: '#0A0A0A', border: '1px solid rgba(139,92,246,0.15)' }}>
         {/* Ambient Hover Glow */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
         <div className="relative z-10 h-full">{children}</div>
     </div>
 )
 
-export default function ClientAnalytics({ client, distribution, workspaceId, ratings = [] }: { client: ClientData, distribution: any[], workspaceId: string, ratings?: RatingData[] }) {
+export default function ClientAnalytics({ client, distribution, workspaceId, ratings = [], onCreateInvoice }: { client: ClientData, distribution: any[], workspaceId: string, ratings?: RatingData[], onCreateInvoice?: () => void }) {
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
 
     // Tier Badge Logic
@@ -49,7 +49,7 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
             case 'GOLD': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.5)]'
             case 'SILVER': return 'bg-gray-400/10 text-gray-300 border-gray-400/50'
             case 'WARNING': return 'bg-red-500/20 text-red-500 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse'
-            default: return 'bg-blue-500/10 text-blue-400 border-blue-500/50'
+            default: return 'bg-violet-500/10 text-violet-400 border-violet-500/50'
         }
     }
 
@@ -76,8 +76,8 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
             />
 
             {/* BENTO HERO BANNER */}
-            <div className="relative overflow-hidden rounded-[2rem] bg-zinc-950/60 backdrop-blur-3xl border border-white/10 p-8 group">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent pointer-events-none" />
+            <div className="relative overflow-hidden rounded-[2rem] p-8 group" style={{ background: '#0A0A0A', border: '1px solid rgba(139,92,246,0.15)' }}>
+                <div className="absolute inset-0 bg-gradient-to-r from-violet-500/10 via-purple-500/5 to-transparent pointer-events-none" />
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
                         <div className="flex items-center gap-3 mb-3">
@@ -98,8 +98,8 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
 
                     <div className="text-right flex flex-col items-end gap-2">
                         <Button
-                            onClick={() => setIsInvoiceModalOpen(true)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-900/20 gap-2 h-11 px-6 transition-all"
+                            onClick={() => (onCreateInvoice ? onCreateInvoice() : setIsInvoiceModalOpen(true))}
+                            className="bg-violet-600 hover:bg-violet-500 text-white rounded-xl shadow-lg shadow-violet-900/30 gap-2 h-11 px-6 transition-all"
                         >
                             <FileText size={18} /> Tạo Hóa đơn (Invoice)
                         </Button>
@@ -115,8 +115,8 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                     {/* KPI Quick Stats */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         <GlassCard className="p-6 flex flex-col justify-center items-center text-center">
-                            <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-3">
-                                <CheckCircle className="text-blue-400" size={24} />
+                            <div className="w-12 h-12 rounded-full bg-violet-500/10 flex items-center justify-center mb-3">
+                                <CheckCircle className="text-violet-400" size={24} />
                             </div>
                             <p className="text-sm font-medium text-gray-400 mb-1">Tổng Số Task</p>
                             <p className="text-3xl font-bold text-white tracking-tight">{totalTasksCount}</p>
@@ -133,8 +133,8 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                         </GlassCard>
 
                         <GlassCard className="p-6 flex flex-col justify-center items-center text-center">
-                            <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-3">
-                                <TrendingUp className="text-indigo-400" size={24} />
+                            <div className="w-12 h-12 rounded-full bg-violet-500/10 flex items-center justify-center mb-3">
+                                <TrendingUp className="text-violet-400" size={24} />
                             </div>
                             <p className="text-sm font-medium text-gray-400 mb-1">Dự án con</p>
                             <p className="text-3xl font-bold text-white tracking-tight">{client.subsidiaries?.length || 0}</p>
@@ -154,9 +154,9 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                                         <div key={r.id} className="bg-white/5 hover:bg-white/10 transition-colors rounded-xl p-4 flex flex-col sm:flex-row gap-4 border border-white/5">
                                             <div className="flex-1">
                                                 <p className="text-white font-medium text-sm mb-1 line-clamp-1">{r.task.title}</p>
-                                                <p className="text-gray-400 text-xs mb-2">Editor: <span className="text-indigo-300">{r.staff.nickname || r.staff.username}</span></p>
+                                                <p className="text-gray-400 text-xs mb-2">Editor: <span className="text-violet-300">{r.staff.nickname || r.staff.username}</span></p>
                                                 {r.qualitativeFeedback && (
-                                                    <div className="bg-black/20 p-3 rounded-lg border-l-2 border-indigo-500/50">
+                                                    <div className="bg-black/20 p-3 rounded-lg border-l-2 border-violet-500/50">
                                                         <p className="text-gray-300 text-sm italic">&ldquo;{r.qualitativeFeedback}&rdquo;</p>
                                                     </div>
                                                 )}
@@ -179,7 +179,7 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                 {/* Right Col: Distribution Chart */}
                 <GlassCard className="lg:col-span-4 p-6 flex flex-col min-h-[400px]">
                     <h3 className="text-lg font-bold mb-2 text-white flex items-center gap-2">
-                        <Activity size={20} className="text-indigo-400" /> Phân bổ Công việc
+                        <Activity size={20} className="text-violet-400" /> Phân bổ Công việc
                     </h3>
                     <p className="text-xs text-gray-400 mb-6">Tỷ trọng tasks theo dự án con</p>
                     
@@ -231,7 +231,7 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                 {/* Recent Tasks */}
                 <GlassCard className="p-6 flex flex-col">
                     <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
-                        <Video size={22} className="text-blue-400" /> Video & Task Gần đây
+                        <Video size={22} className="text-violet-400" /> Video & Task Gần đây
                     </h3>
                     <div className="overflow-x-auto custom-scrollbar">
                         <table className="w-full text-left border-collapse">

@@ -16,7 +16,7 @@ export async function broadcastNotificationToUser(userId: string, payload: any) 
     const url = `${SUPABASE_URL}/realtime/v1/api/broadcast`
 
     try {
-        await fetch(url, {
+        const res = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -31,8 +31,14 @@ export async function broadcastNotificationToUser(userId: string, payload: any) 
                 }],
             }),
         })
-    } catch {
+        // fetch KHÔNG throw khi 4xx/5xx → phải tự kiểm. Thiếu SERVICE_ROLE_KEY
+        // (broadcast bằng anon) thường trả 401/403 → log để ops thấy (trước đây ẩn).
+        if (!res.ok) {
+            console.warn('[broadcast] notification failed', res.status, await res.text().catch(() => ''))
+        }
+    } catch (e) {
         // Best-effort — notification persists in DB regardless
+        console.warn('[broadcast] notification network error', e)
     }
 }
 
@@ -47,7 +53,7 @@ export async function broadcastToChannel(channelId: string, event: string, paylo
 
     const url = `${SUPABASE_URL}/realtime/v1/api/broadcast`
     try {
-        await fetch(url, {
+        const res = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -58,7 +64,13 @@ export async function broadcastToChannel(channelId: string, event: string, paylo
                 messages: [{ topic: getChannelBroadcastTopic(channelId), event, payload }],
             }),
         })
-    } catch {
+        // Chat vẫn realtime nhờ client broadcast (ChannelView). Server broadcast
+        // này là bổ trợ; nếu 401/403 (thiếu SERVICE_ROLE_KEY) thì log thay vì ẩn.
+        if (!res.ok) {
+            console.warn('[broadcast] channel failed', res.status, await res.text().catch(() => ''))
+        }
+    } catch (e) {
         // Best-effort — DB is source of truth.
+        console.warn('[broadcast] channel network error', e)
     }
 }

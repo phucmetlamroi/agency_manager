@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, type ChangeEvent } from 'react'
-import { Hash, Lock, Loader2, Send, Trash2, SmilePlus, Settings, Bell, BellOff, Video, PhoneCall, Paperclip, FileText, X } from 'lucide-react'
+import { Hash, Lock, Loader2, Send, Trash2, SmilePlus, Smile, Settings, Bell, BellOff, Video, PhoneCall, Paperclip, FileText, X, Pin, Reply } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ChannelVisibility, PostPolicy } from '@prisma/client'
 import type { HubChannelDTO } from '@/actions/channel-actions'
-import { getMyChannelMute, setChannelMuted, getChannelMembers, markChannelRead } from '@/actions/channel-actions'
+import { getMyChannelMute, getMyChannelManage, setChannelMuted, getChannelMembers, markChannelRead } from '@/actions/channel-actions'
 import ChannelSettingsModal from './ChannelSettingsModal'
-import { getMessages, sendMessage, deleteMessage, type MessageDTO, type ReactionDTO } from '@/actions/message-actions'
+import ThreadPanel from './ThreadPanel'
+import EmojiPicker from './EmojiPicker'
+import { getMessages, sendMessage, deleteMessage, togglePinMessage, getPinnedMessages, type MessageDTO, type ReactionDTO } from '@/actions/message-actions'
 import { uploadChatAttachment, type ChatAttachmentMeta } from '@/actions/upload-actions'
 import { toggleReaction } from '@/actions/reaction-actions'
 import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
@@ -24,9 +25,8 @@ interface Props {
     workspaceId: string
     channel: HubChannelDTO
     currentUserId: string
-    isAdmin: boolean
     /** Called after channel settings change so the parent can update its state. */
-    onChannelUpdated?: (patch: { visibility: ChannelVisibility; postPolicy: PostPolicy }) => void
+    onChannelUpdated?: (patch: Partial<HubChannelDTO>) => void
 }
 
 function initials(name: string) {
@@ -44,13 +44,14 @@ function formatBytes(n: number) {
     return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
-export default function ChannelView({ workspaceId, channel, currentUserId, isAdmin, onChannelUpdated }: Props) {
+export default function ChannelView({ workspaceId, channel, currentUserId, onChannelUpdated }: Props) {
     const [messages, setMessages] = useState<MessageDTO[]>([])
     const [loading, setLoading] = useState(true)
     const [content, setContent] = useState('')
     const [sending, setSending] = useState(false)
     const [pickerFor, setPickerFor] = useState<string | null>(null)
     const [showSettings, setShowSettings] = useState(false)
+    const [canManage, setCanManage] = useState(false)
     const [muted, setMuted] = useState(false)
     const [isMember, setIsMember] = useState(false)
     const [muteBusy, setMuteBusy] = useState(false)
@@ -60,16 +61,23 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
     const [uploadingFile, setUploadingFile] = useState(false)
     const [members, setMembers] = useState<Array<{ id: string; username: string; displayName: string | null; avatarUrl: string | null }>>([])
     const [typingUsers, setTypingUsers] = useState<Record<string, { name: string; at: number }>>({})
+    // [Chat] threads + pinned messages + full emoji picker
+    const [threadParent, setThreadParent] = useState<MessageDTO | null>(null)
+    const [pinned, setPinned] = useState<MessageDTO[]>([])
+    const [pinnedOpen, setPinnedOpen] = useState(false)
+    const [emojiPickerFor, setEmojiPickerFor] = useState<string | null>(null) // a message id, or '__composer__'
+    const isTask = channel.type === 'TASK'
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
     const lastTypingSent = useRef(0)
     const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
     const onlineIds = usePresence(`presence:${workspaceId}`, currentUserId)
 
-    // UX-only: hide composer when the channel is admins-only and the user isn't an admin.
-    // (Server-side authorizeChannel is the real guard; channel MODERATORs are allowed there.)
-    const readOnly = channel.postPolicy === 'ADMINS_ONLY' && !isAdmin
+    // UX-only: hide composer when the channel is owner/mod-only and the user isn't one.
+    // (Server-side authorizeChannel is the real guard.)
+    const readOnly = channel.postPolicy === 'ADMINS_ONLY' && !canManage
 
     const scrollToBottom = useCallback(() => {
         requestAnimationFrame(() => {
@@ -99,20 +107,31 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
         }
     }, [workspaceId, channel.id, scrollToBottom])
 
-    // [nối dây] load this user's mute state for the channel (drives the bell toggle).
+    // [nối dây] load this user's mute + manage state for the channel (bell toggle + gear/delete).
     useEffect(() => {
         let cancelled = false
-        getMyChannelMute(workspaceId, channel.id)
-            .then((res) => {
+        Promise.all([getMyChannelMute(workspaceId, channel.id), getMyChannelManage(workspaceId, channel.id)])
+            .then(([mute, manage]) => {
                 if (cancelled) return
-                setIsMember(res.isMember)
-                setMuted(res.muted)
+                setIsMember(mute.isMember)
+                setMuted(mute.muted)
+                setCanManage(manage.canManage)
             })
             .catch(() => {})
         return () => {
             cancelled = true
         }
     }, [workspaceId, channel.id])
+
+    // [Chat pins] load + refresh the channel's pinned messages (reset popover on switch).
+    const refreshPinned = useCallback(() => {
+        getPinnedMessages(workspaceId, channel.id).then(setPinned).catch(() => {})
+    }, [workspaceId, channel.id])
+    useEffect(() => {
+        setPinnedOpen(false)
+        setThreadParent(null)
+        refreshPinned()
+    }, [refreshPinned])
 
     // [Phase 2 · @-autocomplete + read receipts] load mention-eligible members and
     // mark the channel read on open; reset transient typing state on channel switch.
@@ -190,10 +209,17 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
         (event, payload) => {
             if (event === CHAT_EVENTS.MESSAGE_NEW) {
                 const msg = payload as MessageDTO
+                // Replies belong to the thread panel, not the main stream (the parent's
+                // replyCount updates live via a separate MESSAGE_EDIT re-broadcast).
+                if (msg.parentId) return
                 setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
                 scrollToBottom()
                 // advance read marker while actively viewing the channel
                 if (typeof document !== 'undefined' && !document.hidden) void markChannelRead(workspaceId, channel.id)
+            } else if (event === CHAT_EVENTS.PIN) {
+                const { messageId, pinned: isPinned } = payload as { messageId: string; pinned: boolean }
+                setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, pinnedAt: isPinned ? new Date().toISOString() : null } : m)))
+                refreshPinned()
             } else if (event === CHAT_EVENTS.MESSAGE_EDIT) {
                 const msg = payload as MessageDTO
                 setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)))
@@ -239,6 +265,34 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
         }
         setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions: res.reactions } : m)))
         broadcast(CHAT_EVENTS.REACTION, { messageId, reactions: res.reactions })
+    }
+
+    async function handleTogglePin(messageId: string) {
+        const res = await togglePinMessage(workspaceId, messageId)
+        if ('error' in res) {
+            toast.error(res.error)
+            return
+        }
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, pinnedAt: res.pinned ? new Date().toISOString() : null } : m)))
+        broadcast(CHAT_EVENTS.PIN, { messageId, pinned: res.pinned })
+        refreshPinned()
+        toast.success(res.pinned ? 'Đã ghim tin nhắn' : 'Đã bỏ ghim tin nhắn')
+    }
+
+    function insertEmoji(native: string) {
+        const el = textareaRef.current
+        if (!el) {
+            setContent((p) => p + native)
+            return
+        }
+        const start = el.selectionStart ?? content.length
+        const end = el.selectionEnd ?? content.length
+        setContent((p) => p.slice(0, start) + native + p.slice(end))
+        requestAnimationFrame(() => {
+            el.focus()
+            const pos = start + native.length
+            el.setSelectionRange(pos, pos)
+        })
     }
 
     async function handleSend() {
@@ -363,7 +417,7 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                 <span className="font-bold text-zinc-100">{channel.name}</span>
                 {channel.postPolicy === 'ADMINS_ONLY' && (
                     <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-amber-400/80 border border-amber-400/20 rounded-full px-2 py-0.5">
-                        Chỉ admin đăng
+                        Chỉ chủ kênh đăng
                     </span>
                 )}
                 <div className="ml-auto flex items-center gap-1">
@@ -377,6 +431,48 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                             {muted ? <BellOff className="w-4 h-4 text-amber-400/80" /> : <Bell className="w-4 h-4" />}
                         </button>
                     )}
+                    {!isTask && (
+                        <div className="relative">
+                            <button
+                                onClick={() => setPinnedOpen((v) => !v)}
+                                className={`relative p-1.5 rounded-lg transition-colors hover:bg-white/5 ${pinnedOpen ? 'text-violet-300' : 'text-zinc-500 hover:text-zinc-200'}`}
+                                title="Tin đã ghim"
+                            >
+                                <Pin className="w-4 h-4" />
+                                {pinned.length > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 grid place-items-center rounded-full bg-violet-600 text-white text-[9px] font-bold tabular-nums">
+                                        {pinned.length}
+                                    </span>
+                                )}
+                            </button>
+                            {pinnedOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setPinnedOpen(false)} />
+                                    <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto rounded-xl border border-white/10 bg-zinc-950 shadow-2xl z-50 p-2">
+                                        <p className="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-500">Tin đã ghim</p>
+                                        {pinned.length === 0 ? (
+                                            <p className="px-2 py-4 text-center text-xs text-zinc-500">Chưa có tin nào được ghim.</p>
+                                        ) : (
+                                            pinned.map((pm) => (
+                                                <div key={pm.id} className="group/pin flex items-start gap-2 px-2 py-2 rounded-lg hover:bg-white/5">
+                                                    <Pin className="w-3 h-3 mt-1 shrink-0 text-violet-400" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-[11px] text-zinc-500">{pm.author?.displayName || pm.author?.username || 'Người dùng'}</div>
+                                                        <div className="text-sm text-zinc-200 line-clamp-3 whitespace-pre-wrap break-words">{pm.content || '(tệp đính kèm)'}</div>
+                                                    </div>
+                                                    {canManage && (
+                                                        <button onClick={() => handleTogglePin(pm.id)} title="Bỏ ghim" className="opacity-0 group-hover/pin:opacity-100 p-1 text-zinc-500 hover:text-red-400 shrink-0">
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                     {channel.type !== 'TASK' && (
                         <button
                             onClick={handleStartCall}
@@ -386,7 +482,7 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                             <Video className="w-4 h-4" />
                         </button>
                     )}
-                    {isAdmin && channel.type !== 'TASK' && (
+                    {canManage && (
                         <button
                             onClick={() => setShowSettings(true)}
                             className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
@@ -423,7 +519,7 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                     messages.map((m) => {
                         const name = m.author?.displayName || m.author?.username || 'Người dùng'
                         const mine = m.authorId === currentUserId
-                        const canDelete = mine || isAdmin
+                        const canDelete = mine || canManage
                         return (
                             <div key={m.id} className="group flex gap-3">
                                 <div className="relative shrink-0">
@@ -444,14 +540,33 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                                         <span className="text-sm font-semibold text-zinc-100">{name}</span>
                                         <span className="text-[11px] text-zinc-500">{fmtTime(m.createdAt)}</span>
                                         {m.editedAt && !m.deletedAt && <span className="text-[10px] text-zinc-600">(đã sửa)</span>}
-                                        {canDelete && !m.deletedAt && (
-                                            <button
-                                                onClick={() => handleDelete(m.id)}
-                                                className="ml-auto opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-opacity"
-                                                title="Xoá"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
+                                        {m.pinnedAt && !m.deletedAt && (
+                                            <span className="inline-flex items-center text-violet-400" title="Đã ghim">
+                                                <Pin className="w-3 h-3" />
+                                            </span>
+                                        )}
+                                        {!m.deletedAt && (
+                                            <div className="ml-auto flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {!isTask && (
+                                                    <button onClick={() => setThreadParent(m)} className="text-zinc-600 hover:text-violet-300" title="Trả lời / mở thread">
+                                                        <Reply className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                                {canManage && (
+                                                    <button
+                                                        onClick={() => handleTogglePin(m.id)}
+                                                        className={`hover:text-violet-300 ${m.pinnedAt ? 'text-violet-400' : 'text-zinc-600'}`}
+                                                        title={m.pinnedAt ? 'Bỏ ghim' : 'Ghim tin'}
+                                                    >
+                                                        <Pin className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button onClick={() => handleDelete(m.id)} className="text-zinc-600 hover:text-red-400" title="Xoá">
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                     {m.deletedAt ? (
@@ -514,7 +629,7 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                                                         <SmilePlus className="w-3.5 h-3.5" />
                                                     </button>
                                                     {pickerFor === m.id && (
-                                                        <div className="absolute z-20 mt-1 flex gap-0.5 rounded-xl border border-white/10 bg-zinc-900 p-1 shadow-xl">
+                                                        <div className="absolute z-20 mt-1 flex items-center gap-0.5 rounded-xl border border-white/10 bg-zinc-900 p-1 shadow-xl">
                                                             {QUICK_EMOJIS.map((e) => (
                                                                 <button
                                                                     key={e}
@@ -525,10 +640,37 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                                                                     {e}
                                                                 </button>
                                                             ))}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setPickerFor(null)
+                                                                    setEmojiPickerFor(m.id)
+                                                                }}
+                                                                className="ml-0.5 rounded-lg px-1.5 py-1 text-zinc-400 hover:text-zinc-100 hover:bg-white/10"
+                                                                title="Emoji khác…"
+                                                            >
+                                                                <Smile className="w-4 h-4" />
+                                                            </button>
                                                         </div>
+                                                    )}
+                                                    {emojiPickerFor === m.id && (
+                                                        <EmojiPicker
+                                                            align="left"
+                                                            onClose={() => setEmojiPickerFor(null)}
+                                                            onPick={(native) => handleToggleReaction(m.id, native)}
+                                                        />
                                                     )}
                                                 </div>
                                             </div>
+                                            {!isTask && m.replyCount > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setThreadParent(m)}
+                                                    className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-300 hover:text-violet-200"
+                                                >
+                                                    <Reply className="w-3.5 h-3.5" /> {m.replyCount} trả lời
+                                                </button>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -541,7 +683,7 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
             {/* Composer */}
             <div className="border-t border-white/10 p-3 shrink-0">
                 {readOnly ? (
-                    <p className="text-center text-xs text-zinc-500 py-2">Kênh này chỉ admin được đăng bài.</p>
+                    <p className="text-center text-xs text-zinc-500 py-2">Kênh này chỉ chủ kênh / điều hành được đăng bài.</p>
                 ) : (
                     <div className="space-y-2 relative">
                         {mentionQuery !== null && mentionResults.length > 0 && (
@@ -610,7 +752,21 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                             >
                                 {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
                             </button>
+                            <div className="relative shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setEmojiPickerFor(emojiPickerFor === '__composer__' ? null : '__composer__')}
+                                    className="h-11 w-11 grid place-items-center rounded-xl border border-white/10 text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-colors"
+                                    title="Emoji"
+                                >
+                                    <Smile className="w-4 h-4" />
+                                </button>
+                                {emojiPickerFor === '__composer__' && (
+                                    <EmojiPicker align="left" onClose={() => setEmojiPickerFor(null)} onPick={insertEmoji} />
+                                )}
+                            </div>
                             <textarea
+                                ref={textareaRef}
                                 value={content}
                                 onChange={handleContentChange}
                                 onKeyDown={(e) => {
@@ -648,6 +804,15 @@ export default function ChannelView({ workspaceId, channel, currentUserId, isAdm
                     channel={channel}
                     onClose={() => setShowSettings(false)}
                     onSaved={(patch) => onChannelUpdated?.(patch)}
+                />
+            )}
+
+            {threadParent && !isTask && (
+                <ThreadPanel
+                    workspaceId={workspaceId}
+                    channel={channel}
+                    parent={threadParent}
+                    onClose={() => setThreadParent(null)}
                 />
             )}
 

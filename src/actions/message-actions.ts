@@ -53,6 +53,8 @@ export interface MessageDTO {
     attachments: AttachmentDTO[]
     editedAt: string | null
     deletedAt: string | null
+    pinnedAt: string | null
+    pinnedById: string | null
     createdAt: string
 }
 
@@ -88,6 +90,8 @@ function serialize(m: any): MessageDTO {
               })),
         editedAt: m.editedAt ? new Date(m.editedAt).toISOString() : null,
         deletedAt: m.deletedAt ? new Date(m.deletedAt).toISOString() : null,
+        pinnedAt: m.pinnedAt ? new Date(m.pinnedAt).toISOString() : null,
+        pinnedById: m.pinnedById ?? null,
         createdAt: new Date(m.createdAt).toISOString(),
     }
 }
@@ -110,9 +114,9 @@ function parseMentions(content: string): string[] {
 
 /**
  * Create Mention rows + MENTION notifications for @username tokens, SCOPED to the
- * channel's members + workspace OWNER/ADMINs (previously matched ALL workspace
- * members, which leaked private-channel content to non-members). Returns the set
- * of notified userIds so the caller can dedup the broader thread/channel fan-out.
+ * channel's members ONLY (member-based model — never notify someone about a channel
+ * they can't open). Returns the set of notified userIds so the caller can dedup the
+ * broader thread/channel fan-out.
  */
 async function notifyMentions(opts: {
     workspaceId: string
@@ -126,20 +130,13 @@ async function notifyMentions(opts: {
     const tokens = parseMentions(opts.content)
     if (tokens.length === 0) return new Set()
 
-    // Candidates = channel members + workspace admins (admins can view any channel).
-    const [channelMembers, wsAdmins] = await Promise.all([
-        prisma.channelMember.findMany({
-            where: { channelId: opts.channelId },
-            select: { user: { select: { id: true, username: true } } },
-        }),
-        prisma.workspaceMember.findMany({
-            where: { workspaceId: opts.workspaceId, role: { in: ['OWNER', 'ADMIN'] } },
-            select: { user: { select: { id: true, username: true } } },
-        }),
-    ])
+    // Candidates = channel members ONLY (you can't @-mention into a channel you're not in).
+    const channelMembers = await prisma.channelMember.findMany({
+        where: { channelId: opts.channelId },
+        select: { user: { select: { id: true, username: true } } },
+    })
     const byUsername = new Map<string, string>()
     for (const m of channelMembers) if (m.user) byUsername.set(m.user.username.toLowerCase(), m.user.id)
-    for (const a of wsAdmins) if (a.user) byUsername.set(a.user.username.toLowerCase(), a.user.id)
 
     const matched = new Set<string>()
     for (const tok of tokens) {
@@ -213,6 +210,26 @@ export async function sendMessage(
     if (!clean && okAttachments.length === 0) return { error: 'Tin nhắn trống' }
     if (clean.length > 4000) return { error: 'Tin nhắn quá dài (tối đa 4000 ký tự)' }
 
+    // [Phase 3] slow mode — rate-limit per user, TOP-LEVEL posts only (owner/mod bypass;
+    // thread replies neither count toward nor are throttled by slow mode).
+    const slowCh = !parentId ? await prisma.channel.findUnique({ where: { id: channelId }, select: { slowModeSeconds: true, createdById: true } }) : null
+    if (slowCh && slowCh.slowModeSeconds > 0) {
+        const isOwnerOrMod = ctx.channelMemberRole === 'MODERATOR' || (slowCh.createdById != null && ctx.userId === slowCh.createdById)
+        if (!isOwnerOrMod) {
+            const last = await prisma.message.findFirst({
+                where: { channelId, authorId: ctx.userId, deletedAt: null, parentId: null },
+                orderBy: { createdAt: 'desc' },
+                select: { createdAt: true },
+            })
+            if (last) {
+                const elapsed = (Date.now() - new Date(last.createdAt).getTime()) / 1000
+                if (elapsed < slowCh.slowModeSeconds) {
+                    return { error: `Chế độ chậm: đợi ${Math.ceil(slowCh.slowModeSeconds - elapsed)}s rồi gửi tiếp.` }
+                }
+            }
+        }
+    }
+
     const profileId = await resolveProfileId(ctx, workspaceId)
 
     const created = await prisma.message.create({
@@ -249,6 +266,14 @@ export async function sendMessage(
 
     const dto = serialize(created)
     await broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_NEW, dto)
+
+    // [Chat threads] when this is a reply, re-broadcast the parent with its now-updated
+    // replyCount so the "N replies" badge increments live for everyone viewing the channel
+    // (DB replyCount is the source of truth — clients never count locally).
+    if (parentId) {
+        const parentRow = await prisma.message.findFirst({ where: { id: parentId, workspaceId }, include: MESSAGE_INCLUDE })
+        if (parentRow) await broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_EDIT, serialize(parentRow))
+    }
 
     // [nối dây] Fan-out notifications (best-effort — never blocks/fails the send).
     // Dedup precedence: mention > thread-reply > channel (one notif per user, most
@@ -325,7 +350,8 @@ export async function editMessage(
     } catch {
         return { error: 'Không có quyền' }
     }
-    const canEdit = existing.authorId === ctx.userId || ctx.isWorkspaceAdmin || ctx.channelMemberRole === 'MODERATOR'
+    // [Hub member-based] no workspace-admin god-mode: author, the channel's owner, or a MODERATOR.
+    const canEdit = existing.authorId === ctx.userId || ctx.channelMemberRole === 'MODERATOR' || ctx.userId === ctx.channel.createdById
     if (!canEdit) return { error: 'Không có quyền sửa tin nhắn này' }
 
     const updated = await prisma.message.update({
@@ -355,11 +381,79 @@ export async function deleteMessage(
     } catch {
         return { error: 'Không có quyền' }
     }
-    const canDelete = existing.authorId === ctx.userId || ctx.isWorkspaceAdmin || ctx.channelMemberRole === 'MODERATOR'
+    // [Hub member-based] no workspace-admin god-mode: author, the channel's owner, or a MODERATOR.
+    const canDelete = existing.authorId === ctx.userId || ctx.channelMemberRole === 'MODERATOR' || ctx.userId === ctx.channel.createdById
     if (!canDelete) return { error: 'Không có quyền xoá tin nhắn này' }
 
     await prisma.message.update({ where: { id: messageId }, data: { deletedAt: new Date() } })
     await broadcastToChannel(existing.channelId, CHAT_EVENTS.MESSAGE_DELETE, { id: messageId })
-    revalidatePath(`/${workspaceId}/admin/hub`)
+    revalidatePath(`/${workspaceId}/hub`)
     return { success: true }
+}
+
+/**
+ * [Chat] Pin / unpin a message. Pinning is a moderation act → owner/MODERATOR only
+ * (authorizeChannel MANAGE). Toggles pinnedAt; broadcasts so headers update live.
+ */
+export async function togglePinMessage(
+    workspaceId: string,
+    messageId: string,
+): Promise<{ success: true; pinned: boolean } | { error: string }> {
+    const existing = await prisma.message.findFirst({
+        where: { id: messageId, workspaceId },
+        select: { id: true, channelId: true, pinnedAt: true, deletedAt: true },
+    })
+    if (!existing || existing.deletedAt) return { error: 'Không tìm thấy tin nhắn' }
+
+    let ctx: ChannelAuthzContext
+    try {
+        ctx = await authorizeChannel(workspaceId, existing.channelId, 'MANAGE')
+    } catch {
+        return { error: 'Bạn không có quyền ghim tin trong kênh này' }
+    }
+
+    const willPin = existing.pinnedAt == null
+    await prisma.message.update({
+        where: { id: messageId },
+        data: willPin ? { pinnedAt: new Date(), pinnedById: ctx.userId } : { pinnedAt: null, pinnedById: null },
+    })
+    await broadcastToChannel(existing.channelId, CHAT_EVENTS.PIN, { messageId, pinned: willPin })
+    return { success: true, pinned: willPin }
+}
+
+/** [Chat] All currently-pinned messages in a channel (newest pin first). VIEW-gated. */
+export async function getPinnedMessages(workspaceId: string, channelId: string): Promise<MessageDTO[]> {
+    try {
+        await authorizeChannel(workspaceId, channelId, 'VIEW')
+    } catch {
+        return []
+    }
+    const rows = await prisma.message.findMany({
+        where: { workspaceId, channelId, pinnedAt: { not: null }, deletedAt: null },
+        orderBy: { pinnedAt: 'desc' },
+        take: 50,
+        include: MESSAGE_INCLUDE,
+    })
+    return rows.map(serialize)
+}
+
+/** [Chat] A thread's parent + its replies (oldest→newest), for the thread panel. VIEW-gated. */
+export async function getThreadReplies(
+    workspaceId: string,
+    parentId: string,
+): Promise<{ parent: MessageDTO; replies: MessageDTO[] } | { error: string }> {
+    // Authorize on the channel BEFORE loading any message content (auth gates DB access).
+    const head = await prisma.message.findFirst({ where: { id: parentId, workspaceId }, select: { channelId: true } })
+    if (!head) return { error: 'Không tìm thấy tin nhắn gốc' }
+    try {
+        await authorizeChannel(workspaceId, head.channelId, 'VIEW')
+    } catch {
+        return { error: 'Bạn không có quyền xem kênh này' }
+    }
+    const [parent, replies] = await Promise.all([
+        prisma.message.findFirst({ where: { id: parentId, workspaceId }, include: MESSAGE_INCLUDE }),
+        prisma.message.findMany({ where: { workspaceId, parentId }, orderBy: { createdAt: 'asc' }, include: MESSAGE_INCLUDE }),
+    ])
+    if (!parent) return { error: 'Không tìm thấy tin nhắn gốc' }
+    return { parent: serialize(parent), replies: replies.map(serialize) }
 }

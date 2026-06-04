@@ -1201,7 +1201,6 @@ export function TaskDetailModal({
                                     workspaceId={workspaceId}
                                     taskId={localTask.id}
                                     currentUserId={currentUserId}
-                                    isAdmin={isAdmin}
                                 />
                             )}
                         </div>

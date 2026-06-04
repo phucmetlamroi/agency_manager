@@ -1,10 +1,14 @@
 'use client'
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
-import { Hash, Lock, Plus, Loader2, MessagesSquare } from 'lucide-react'
+import { Hash, Lock, Plus, Loader2, MessagesSquare, BookOpen, Search, Shield, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { createChannel, createCategory, getUnreadCounts, markChannelRead, type HubCategoryDTO, type HubChannelDTO } from '@/actions/channel-actions'
 import ChannelView from './ChannelView'
+import WikiClient from './WikiClient'
+import SearchModal from './SearchModal'
+import RolesManagerModal from './RolesManagerModal'
+import ForumView from './ForumView'
 
 interface Props {
     workspaceId: string
@@ -21,7 +25,10 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
 
     const [showNewChannel, setShowNewChannel] = useState(false)
     const [newName, setNewName] = useState('')
+    const [newType, setNewType] = useState<'TEXT' | 'WIKI' | 'FORUM'>('TEXT')
     const [busy, setBusy] = useState(false)
+    const [showSearch, setShowSearch] = useState(false)
+    const [showRoles, setShowRoles] = useState(false)
 
     const selected = channels.find((c) => c.id === selectedId) ?? null
 
@@ -79,7 +86,7 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
         if (!name) return
         setBusy(true)
         try {
-            const res = await createChannel(workspaceId, { name })
+            const res = await createChannel(workspaceId, { name, type: newType })
             if ('error' in res) {
                 toast.error(res.error)
                 return
@@ -111,26 +118,42 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                 <div className="flex items-center justify-between px-2 py-2">
                     <div className="flex items-center gap-2 text-zinc-100 font-bold">
                         <MessagesSquare className="w-4 h-4 text-violet-400" />
-                        Kênh
+                        Chat
                     </div>
-                    {isAdmin && (
-                        <div className="flex items-center gap-1">
-                            <button
-                                onClick={handleCreateCategory}
-                                title="Tạo nhóm kênh"
-                                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-colors text-[10px] font-bold uppercase tracking-wide"
-                            >
-                                Nhóm
-                            </button>
-                            <button
-                                onClick={() => setShowNewChannel((v) => !v)}
-                                title="Tạo kênh"
-                                className="p-1.5 rounded-lg text-zinc-400 hover:text-violet-300 hover:bg-white/5 transition-colors"
-                            >
-                                <Plus className="w-4 h-4" />
-                            </button>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setShowSearch(true)}
+                            title="Tìm tin nhắn"
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-colors"
+                        >
+                            <Search className="w-4 h-4" />
+                        </button>
+                        {isAdmin && (
+                            <>
+                                <button
+                                    onClick={() => setShowRoles(true)}
+                                    title="Quản lý vai trò"
+                                    className="p-1.5 rounded-lg text-zinc-400 hover:text-violet-300 hover:bg-white/5 transition-colors"
+                                >
+                                    <Shield className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={handleCreateCategory}
+                                    title="Tạo nhóm kênh"
+                                    className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-colors text-[10px] font-bold uppercase tracking-wide"
+                                >
+                                    Nhóm
+                                </button>
+                                <button
+                                    onClick={() => setShowNewChannel((v) => !v)}
+                                    title="Tạo kênh"
+                                    className="p-1.5 rounded-lg text-zinc-400 hover:text-violet-300 hover:bg-white/5 transition-colors"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 {isAdmin && showNewChannel && (
@@ -147,13 +170,33 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                             maxLength={80}
                             className="w-full bg-zinc-900/70 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50"
                         />
+                        <div className="mt-2 flex gap-1 rounded-lg bg-zinc-900/70 border border-white/10 p-1">
+                            <button
+                                onClick={() => setNewType('TEXT')}
+                                className={`flex-1 flex items-center justify-center gap-1 rounded-md py-1.5 text-xs font-semibold transition-colors ${newType === 'TEXT' ? 'bg-violet-600 text-white' : 'text-zinc-400 hover:text-zinc-100'}`}
+                            >
+                                <Hash className="w-3.5 h-3.5" /> Chat
+                            </button>
+                            <button
+                                onClick={() => setNewType('FORUM')}
+                                className={`flex-1 flex items-center justify-center gap-1 rounded-md py-1.5 text-xs font-semibold transition-colors ${newType === 'FORUM' ? 'bg-violet-600 text-white' : 'text-zinc-400 hover:text-zinc-100'}`}
+                            >
+                                <MessageSquare className="w-3.5 h-3.5" /> Forum
+                            </button>
+                            <button
+                                onClick={() => setNewType('WIKI')}
+                                className={`flex-1 flex items-center justify-center gap-1 rounded-md py-1.5 text-xs font-semibold transition-colors ${newType === 'WIKI' ? 'bg-violet-600 text-white' : 'text-zinc-400 hover:text-zinc-100'}`}
+                            >
+                                <BookOpen className="w-3.5 h-3.5" /> Tài liệu
+                            </button>
+                        </div>
                         <button
                             onClick={handleCreateChannel}
                             disabled={busy || !newName.trim()}
                             className="mt-2 w-full flex items-center justify-center gap-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold py-2 disabled:opacity-40"
                         >
                             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                            Tạo kênh
+                            Tạo {newType === 'WIKI' ? 'kênh tài liệu' : newType === 'FORUM' ? 'diễn đàn' : 'kênh'}
                         </button>
                     </div>
                 )}
@@ -181,7 +224,11 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                                                     : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5'
                                             }`}
                                         >
-                                            {ch.visibility === 'PRIVATE' ? (
+                                            {ch.type === 'WIKI' ? (
+                                                <BookOpen className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
+                                            ) : ch.type === 'FORUM' ? (
+                                                <MessageSquare className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
+                                            ) : ch.visibility === 'PRIVATE' ? (
                                                 <Lock className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
                                             ) : (
                                                 <Hash className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
@@ -204,16 +251,21 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
             {/* Main */}
             <main className="flex-1 min-w-0 rounded-2xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl overflow-hidden">
                 {selected ? (
-                    <ChannelView
-                        key={selected.id}
-                        workspaceId={workspaceId}
-                        channel={selected}
-                        currentUserId={currentUserId}
-                        isAdmin={isAdmin}
-                        onChannelUpdated={(patch) =>
-                            setChannels((prev) => prev.map((c) => (c.id === selected.id ? { ...c, ...patch } : c)))
-                        }
-                    />
+                    selected.type === 'WIKI' ? (
+                        <WikiClient key={selected.id} workspaceId={workspaceId} channelId={selected.id} />
+                    ) : selected.type === 'FORUM' ? (
+                        <ForumView key={selected.id} workspaceId={workspaceId} channel={selected} />
+                    ) : (
+                        <ChannelView
+                            key={selected.id}
+                            workspaceId={workspaceId}
+                            channel={selected}
+                            currentUserId={currentUserId}
+                            onChannelUpdated={(patch) =>
+                                setChannels((prev) => prev.map((c) => (c.id === selected.id ? { ...c, ...patch } : c)))
+                            }
+                        />
+                    )
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center px-6">
                         <MessagesSquare className="w-10 h-10 text-zinc-700 mb-3" />
@@ -223,6 +275,16 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                     </div>
                 )}
             </main>
+
+            {showSearch && (
+                <SearchModal
+                    workspaceId={workspaceId}
+                    onClose={() => setShowSearch(false)}
+                    onJump={(channelId) => selectChannel(channelId)}
+                />
+            )}
+
+            {showRoles && <RolesManagerModal workspaceId={workspaceId} onClose={() => setShowRoles(false)} />}
         </div>
     )
 }

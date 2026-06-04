@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { FileText, Plus, Trash2, Loader2, ChevronRight, ChevronDown, BookOpen, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import {
+    getWikiTree,
     getWikiPage,
     createWikiPage,
     updateWikiPage,
@@ -20,10 +21,13 @@ const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), {
 
 interface Props {
     workspaceId: string
-    initialPages: WikiTreeNode[]
+    initialPages?: WikiTreeNode[]
+    /** When set, this is a WIKI-type Chat channel's page tree (self-fetched + channel-scoped). */
+    channelId?: string | null
 }
 
-export default function WikiClient({ workspaceId, initialPages }: Props) {
+export default function WikiClient({ workspaceId, initialPages = [], channelId = null }: Props) {
+    const embedded = !!channelId
     const [pages, setPages] = useState<WikiTreeNode[]>(initialPages)
     const [selectedId, setSelectedId] = useState<string | null>(initialPages[0]?.id ?? null)
     const [page, setPage] = useState<WikiPageDTO | null>(null)
@@ -41,6 +45,22 @@ export default function WikiClient({ workspaceId, initialPages }: Props) {
     useEffect(() => {
         selectedIdRef.current = selectedId
     }, [selectedId])
+
+    // [Chat] channel-scoped wiki: fetch this channel's page tree on mount.
+    useEffect(() => {
+        if (!channelId) return
+        let cancelled = false
+        getWikiTree(workspaceId, channelId)
+            .then((res) => {
+                if (cancelled) return
+                setPages(res.pages)
+                setSelectedId((cur) => cur ?? res.pages[0]?.id ?? null)
+            })
+            .catch(() => {})
+        return () => {
+            cancelled = true
+        }
+    }, [workspaceId, channelId])
 
     const childrenOf = useMemo(() => {
         const ids = new Set(pages.map((p) => p.id))
@@ -132,7 +152,7 @@ export default function WikiClient({ workspaceId, initialPages }: Props) {
     }
 
     async function handleCreate(parentId: string | null) {
-        const res = await createWikiPage(workspaceId, parentId ? { parentId } : {})
+        const res = await createWikiPage(workspaceId, { ...(parentId ? { parentId } : {}), ...(channelId ? { channelId } : {}) })
         if ('error' in res) {
             toast.error(res.error)
             return
@@ -221,9 +241,13 @@ export default function WikiClient({ workspaceId, initialPages }: Props) {
     }
 
     return (
-        <div className="flex h-[calc(100vh-160px)] min-h-[520px] gap-4">
+        <div className={embedded ? 'flex h-full' : 'flex h-[calc(100vh-160px)] min-h-[520px] gap-4'}>
             {/* Tree sidebar */}
-            <aside className="w-64 shrink-0 rounded-2xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl p-3 flex flex-col">
+            <aside
+                className={`shrink-0 p-3 flex flex-col ${
+                    embedded ? 'w-60 border-r border-white/10' : 'w-64 rounded-2xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl'
+                }`}
+            >
                 <div className="flex items-center justify-between px-2 py-2">
                     <div className="flex items-center gap-2 text-zinc-100 font-bold">
                         <BookOpen className="w-4 h-4 text-violet-400" /> Wiki
@@ -246,7 +270,11 @@ export default function WikiClient({ workspaceId, initialPages }: Props) {
             </aside>
 
             {/* Editor */}
-            <main className="flex-1 min-w-0 rounded-2xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl overflow-hidden flex flex-col">
+            <main
+                className={`flex-1 min-w-0 overflow-hidden flex flex-col ${
+                    embedded ? '' : 'rounded-2xl border border-white/10 bg-zinc-950/60 backdrop-blur-xl'
+                }`}
+            >
                 {!selectedId ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-6">
                         <BookOpen className="w-10 h-10 text-zinc-700 mb-3" />

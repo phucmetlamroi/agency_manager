@@ -1,0 +1,28 @@
+{
+  "name": "hustly-tasker-desktop",
+  "version": "1.0.0",
+  "description": "HustlyTasker Desktop — Electron wrapper",
+  "private": true,
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc && electron .",
+    "package": "electron-builder --config builder.config.js",
+    "dist": "electron-builder --config builder.config.js --win"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.3.0",
+    "get-port": "^7.1.0",
+    "node-cron": "^3.0.3",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.11.0",
+    "electron": "^36.0.0",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.7.0"
+  }
+}

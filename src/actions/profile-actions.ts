@@ -143,6 +143,13 @@ export async function getMyProfilesAndWorkspaces() {
                 select: { id: true, name: true, description: true },
                 orderBy: { createdAt: 'asc' }
             })
+        } else if (access?.role === 'CLIENT') {
+            // [Client membership] CLIENT sees the profile's workspaces (view-only portal).
+            workspaces = await prisma.workspace.findMany({
+                where: { profileId: currentProfileId, status: { not: 'SOFT_DELETED' } },
+                select: { id: true, name: true, description: true },
+                orderBy: { createdAt: 'asc' }
+            })
         }
         // else: no access → workspaces = []
     }

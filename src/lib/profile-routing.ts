@@ -3,8 +3,8 @@ import { prisma } from '@/lib/db'
 export interface LandingResult {
     /** Target workspace id to redirect to (null nếu profile không có workspace) */
     workspaceId: string | null
-    /** Target view: 'admin' nếu user là OWNER/ADMIN, 'dashboard' otherwise */
-    view: 'admin' | 'dashboard'
+    /** Target view: 'admin' (OWNER/ADMIN) · 'dashboard' (staff member) · 'portal' (CLIENT membership) */
+    view: 'admin' | 'dashboard' | 'portal'
 }
 
 const ROLE_PRIORITY: Record<string, number> = {
@@ -31,6 +31,20 @@ export async function determineLandingForProfile(
     profileId: string,
     isGlobalAdmin: boolean,
 ): Promise<LandingResult> {
+    // [Client membership] CLIENT membership in this profile → view-only portal.
+    const clientAccess = await prisma.profileAccess.findUnique({
+        where: { userId_profileId: { userId, profileId } },
+        select: { role: true },
+    })
+    if (clientAccess?.role === 'CLIENT') {
+        const ws = await prisma.workspace.findFirst({
+            where: { profileId },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true },
+        })
+        return { workspaceId: ws?.id ?? null, view: 'portal' }
+    }
+
     if (isGlobalAdmin) {
         const ws = await prisma.workspace.findFirst({
             where: { profileId },

@@ -197,9 +197,9 @@ export async function deleteBillingProfile(id: string) {
 export async function getUnbilledTasks(clientId: number, workspaceId: string) {
     try {
         const workspacePrisma = getWorkspacePrisma(workspaceId)
-        // 1. Get all related Client IDs (Parent + Children)
+        // 1. Get all related Client IDs (Parent + Children) — skip archived subs
         const subsidiaries = await workspacePrisma.client.findMany({
-            where: { parentId: clientId },
+            where: { parentId: clientId, status: { not: 'SOFT_DELETED' } },
             select: { id: true }
         })
         const allClientIds = [clientId, ...subsidiaries.map(s => s.id)]

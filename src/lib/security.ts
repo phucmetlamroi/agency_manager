@@ -2,6 +2,21 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import type { ProfileRole } from '@prisma/client'
 import { hasAtLeastRole, isWorkspaceRole, type WorkspaceRole } from '@/lib/workspace-roles'
+import { cache } from 'react'
+
+/**
+ * [Perf] Request-scoped cache for workspace membership lookups.
+ * Both layout.tsx and page-level verifyWorkspaceAccess() query the same
+ * WorkspaceMember row during a single navigation — this deduplicates it.
+ */
+export const getWorkspaceMembership = cache(
+    async (userId: string, workspaceId: string) => {
+        return prisma.workspaceMember.findUnique({
+            where: { userId_workspaceId: { userId, workspaceId } },
+            select: { role: true },
+        })
+    }
+)
 
 /**
  * [Sprint Z] BOLA/IDOR protection — verify caller có quyền access workspaceId.
@@ -82,9 +97,8 @@ export async function verifyWorkspaceAccess(
     } else {
         // Fall through: explicit WorkspaceMember row (for old workspaces granted
         // by Owner to specific Admin/User)
-        const membership = await prisma.workspaceMember.findUnique({
-            where: { userId_workspaceId: { userId, workspaceId } }
-        })
+        // [Perf] Uses cached helper — same row may already be fetched by layout.
+        const membership = await getWorkspaceMembership(userId, workspaceId)
 
         if (membership) {
             if (!isWorkspaceRole(membership.role)) {
@@ -92,7 +106,9 @@ export async function verifyWorkspaceAccess(
                 throw new Error('SECURITY_VIOLATION: Vai trò không hợp lệ trong Workspace này.')
             }
             workspaceRole = membership.role
-        } else if (profileAccess) {
+        } else if (profileAccess && profileAccess.role !== 'CLIENT') {
+            // [Client membership] CLIENT profile members are EXCLUDED here — they are
+            // view-only portal users and must never receive internal MEMBER access.
             // [Sprint Z+1 hotfix] Profile member (USER, hoặc ADMIN với workspace cũ hơn grantedAt)
             // → fall back tới MEMBER access. Cần thiết cho USER assigned to task —
             // họ cần permission update productLink/notes khi nộp delivery.
@@ -134,7 +150,7 @@ export async function verifyWorkspaceAccess(
  * (do user reset password / "logout tất cả thiết bị") → reject session.
  * Đây là defense-in-depth chống CVE-2025-29927 (middleware bypass).
  */
-export async function verifyActiveSession() {
+export const verifyActiveSession = cache(async function verifyActiveSession() {
     const session = await getSession()
     if (!session || !session.user || !session.user.id) {
         return { status: 'unauthorized', session: null, dbUser: null, isAdmin: false }
@@ -197,4 +213,4 @@ export async function verifyActiveSession() {
         // Callers cần dùng profile-permissions helpers để check workspace/profile access.
         isAdmin: !!dbUser.isTreasurer
     }
-}
+})

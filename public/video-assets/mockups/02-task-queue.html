@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=Be+Vietnam+Pro:wght@500&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1920px; height: 1080px;
+    background: radial-gradient(circle at 80% 0%, #2d1b5e 0%, #0A0A0A 60%);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #E4E4E7; padding: 40px 60px;
+  }
+  h1 { font-size: 32px; font-weight: 800; margin-bottom: 4px; }
+  .sub { color: #A1A1AA; font-family: 'Be Vietnam Pro'; font-size: 15px; margin-bottom: 28px; }
+  /* TABS */
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .tab {
+    padding: 12px 22px; border-radius: 999px;
+    background: rgba(255,255,255,0.04); color: #A1A1AA;
+    font-weight: 600; font-size: 14px;
+    border: 1px solid transparent;
+  }
+  .tab.active {
+    background: rgba(139,92,246,0.18); color: #E4E4E7;
+    border-color: rgba(139,92,246,0.30);
+  }
+  .tab .count {
+    margin-left: 8px; background: rgba(0,0,0,0.3); padding: 2px 8px;
+    border-radius: 999px; font-size: 11px; color: #A78BFA;
+  }
+  /* TABLE */
+  .table {
+    background: rgba(10,10,10,0.60);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(139,92,246,0.15);
+    border-radius: 24px; overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 60px 3fr 1.2fr 1.6fr 1fr 1.4fr 0.8fr;
+    gap: 16px; padding: 18px 24px;
+    align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .row.header { color: #71717A; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .row.header { padding-top: 16px; padding-bottom: 16px; }
+  .row.data { font-size: 14px; }
+  .row.data:hover { background: rgba(139,92,246,0.04); }
+  .chk { width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid rgba(139,92,246,0.35); }
+  .task-title { font-weight: 600; }
+  .task-sub { font-size: 11px; color: #71717A; font-family: 'Be Vietnam Pro'; margin-top: 2px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  }
+  .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .b-progress { background: rgba(99,102,241,0.15); color: #818cf8; }
+  .b-revise { background: rgba(239,68,68,0.15); color: #f87171; }
+  .b-complete { background: rgba(52,211,153,0.15); color: #34D399; }
+  .b-pending { background: rgba(139,92,246,0.15); color: #A78BFA; }
+  .b-overdue { background: rgba(239,68,68,0.20); color: #ef4444; }
+  .b-short { background: rgba(168,85,247,0.12); color: #c084fc; }
+  .b-long { background: rgba(34,211,238,0.12); color: #67e8f9; }
+  .avatar-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 12px 4px 4px; border-radius: 999px;
+    background: rgba(255,255,255,0.04);
+  }
+  .ava-circle {
+    width: 26px; height: 26px; border-radius: 999px;
+    background: linear-gradient(135deg,#8B5CF6,#d946ef);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 11px;
+  }
+  .deadline { font-weight: 600; }
+  .deadline.danger { color: #f87171; }
+  .deadline.muted { color: #71717A; }
+  .amount { font-weight: 700; color: #A78BFA; text-align: right; }
+  .menu { color: #71717A; text-align: right; }
+</style>
+</head>
+<body>
+  <h1>Task Queue · Tháng 5/2026</h1>
+  <div class="sub">Quản lý 92 task đang hoạt động — drag & drop để đổi status</div>
+
+  <div class="tabs">
+    <div class="tab">All <span class="count">92</span></div>
+    <div class="tab">Assignee <span class="count">14</span></div>
+    <div class="tab active">Progress <span class="count">28</span></div>
+    <div class="tab">Revise <span class="count">12</span></div>
+    <div class="tab">Quá hạn <span class="count">2</span></div>
+    <div class="tab">Complete <span class="count">36</span></div>
+  </div>
+
+  <div class="table">
+    <div class="row header">
+      <div></div>
+      <div>Task Name</div>
+      <div>Status</div>
+      <div>Assignee</div>
+      <div>Type</div>
+      <div>Deadline</div>
+      <div style="text-align:right">Amount</div>
+    </div>
+    <div class="row data">
+      <div class="chk"></div>
+      <div>
+        <div class="task-title">Jacob / Kash · Timeline 6 (Resolve)</div>
+        <div class="task-sub">Jacob → Kash</div>
+      </div>
+      <div><span class="badge b-revise">Revision</span></div>
+      <div><span class="avatar-chip"><span class="ava-circle">KJ</span>Kjt</span></div>
+      <div><span class="badge b-short">Short form</span></div>
+      <div class="deadline muted">—</div>
+      <div class="amount">290.000 đ</div>
+    </div>
+    <div class="row data">
+      <div class="chk"></div>
+      <div>
+        <div class="task-title">Barmoor Video 4 (Body + Hooks)</div>
+        <div class="task-sub">Barmoor → Q2/2026 Sales</div>
+      </div>
+      <div><span class="badge b-progress">Đang thực hiện</span></div>
+      <div><span class="avatar-chip"><span class="ava-circle">VN</span>Văn Ngữ</span></div>
+      <div><span class="badge b-long">Long form</span></div>
+      <div class="deadline">29-05</div>
+      <div class="amount">650.000 đ</div>
+    </div>
+    <div class="row data">
+      <div class="chk"></div>
+      <div>
+        <div class="task-title">LGR Video 3 — Talking Head A-Roll</div>
+        <div class="task-sub">LGR Roofing</div>
+      </div>
+      <div><span class="badge b-complete">Hoàn tất</span></div>
+      <div><span class="avatar-chip"><span class="ava-circle">PP</span>Phúc Phạm</span></div>
+      <div><span class="badge b-long">Long form</span></div>
+      <div class="deadline muted">—</div>
+      <div class="amount">820.000 đ</div>
+    </div>
+    <div class="row data">
+      <div class="chk"></div>
+      <div>
+        <div class="task-title">Align West Homes Reno · Video 2</div>
+        <div class="task-sub">Align West Real Estate</div>
+      </div>
+      <div><span class="badge b-pending">Đang đợi giao</span></div>
+      <div style="color:#71717A;font-size:12px">— Chưa giao —</div>
+      <div><span class="badge b-short">Short form</span></div>
+      <div class="deadline">30-05</div>
+      <div class="amount">320.000 đ</div>
+    </div>
+    <div class="row data">
+      <div class="chk"></div>
+      <div>
+        <div class="task-title">A1 Decking · Promo Video 1</div>
+        <div class="task-sub">A1 Decking AUS</div>
+      </div>
+      <div><span class="badge b-overdue">Quá hạn</span></div>
+      <div><span class="avatar-chip"><span class="ava-circle">PK</span>Phúc Kòi</span></div>
+      <div><span class="badge b-long">Long form</span></div>
+      <div class="deadline danger">26-05 · trễ 2d</div>
+      <div class="amount">750.000 đ</div>
+    </div>
+    <div class="row data">
+      <div class="chk"></div>
+      <div>
+        <div class="task-title">Dr Marwan · Testimonial Cut</div>
+        <div class="task-sub">Marwan Medical</div>
+      </div>
+      <div><span class="badge b-progress">Đang thực hiện</span></div>
+      <div><span class="avatar-chip"><span class="ava-circle">QT</span>Quốc Trung</span></div>
+      <div><span class="badge b-short">Short form</span></div>
+      <div class="deadline">28-05</div>
+      <div class="amount">280.000 đ</div>
+    </div>
+  </div>
+</body>
+</html>

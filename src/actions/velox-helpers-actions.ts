@@ -106,7 +106,7 @@ export async function getLastClientNote(
         // Load every client in the profile (workspace-scoped OR profile-scoped) so
         // we can compute name-paths in memory (no N+1). ~hundreds of rows — cheap.
         const clients = await prisma.client.findMany({
-            where: { OR: [{ profileId }, { workspaceId: { in: workspaceIds } }] },
+            where: { OR: [{ profileId }, { workspaceId: { in: workspaceIds } }], status: { not: 'SOFT_DELETED' } },
             select: { id: true, name: true, parentId: true },
         })
         const byId = new Map<number, { name: string; parentId: number | null }>(

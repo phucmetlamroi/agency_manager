@@ -89,6 +89,8 @@ export async function canAccessWorkspace(userId: string, workspaceId: string): P
     if (!ws?.profileId) return false
 
     const access = await getProfileAccess(userId, ws.profileId)
+    // [Client membership] CLIENT = view-only portal, never internal workspace access.
+    if (access?.role === 'CLIENT') return false
     if (access?.role === 'OWNER') return true
     if (access?.role === 'ADMIN' && ws.createdAt >= access.grantedAt) return true
 

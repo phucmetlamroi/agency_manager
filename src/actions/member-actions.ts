@@ -135,7 +135,10 @@ export async function getWorkspaceMembers(workspaceId: string) {
             where: {
                 profileId: workspace.profileId,
                 id: { notIn: Array.from(explicitUserIds) },
-                role: { not: 'LOCKED' },  // Skip deactivated users
+                // [Client membership] Exclude deactivated + legacy CLIENT-role accounts
+                // + per-profile client-members (view-only portal, not staff members).
+                role: { notIn: ['LOCKED', 'CLIENT'] },
+                NOT: { profileAccesses: { some: { profileId: workspace.profileId, role: 'CLIENT' } } },
             },
             select: {
                 id: true,
@@ -183,7 +186,9 @@ export async function getWorkspaceMembers(workspaceId: string) {
                 : ('workspace' as const),
         })),
         ...profileMembers,
-    ]
+    // [Client membership] Drop any CLIENT-role account that slipped in via a stray
+    // WorkspaceMember row (legacy auto-created clients are not staff members).
+    ].filter((m) => m.user?.role !== 'CLIENT')
 
     // Sort by role weight (OWNER > ADMIN > MEMBER > GUEST)
     const ROLE_ORDER: Record<string, number> = { OWNER: 4, ADMIN: 3, MEMBER: 2, GUEST: 1 }
@@ -513,6 +518,103 @@ export async function inviteToWorkspace(
     }
 }
 
+// ─── Invite a user as a CLIENT (per-profile, view-only portal) ───────
+/**
+ * [Client membership] Invite `targetUsername` into this workspace's PROFILE as a
+ * CLIENT representing `clientId` — a view-only portal membership, NOT a
+ * WorkspaceMember. Accept creates `ProfileAccess(role=CLIENT, clientId)`.
+ * Refuses to demote an existing internal (OWNER/ADMIN/USER) profile member.
+ */
+export async function inviteClientToProfile(workspaceId: string, targetUsername: string, clientId: number) {
+    const { userId: inviterId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
+    const trimmed = (targetUsername || '').trim()
+    if (!trimmed) return { error: 'Tên người dùng không được để trống.' }
+
+    const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+    if (!workspace?.profileId) return { error: 'Workspace không thuộc profile nào.' }
+    const profileId = workspace.profileId
+
+    // The Client must belong to this profile.
+    const client = await prisma.client.findFirst({ where: { id: clientId, profileId, status: { not: 'SOFT_DELETED' } }, select: { id: true, name: true } })
+    if (!client) return { error: 'Khách hàng không hợp lệ trong profile này.' }
+
+    const targetUser = await prisma.user.findFirst({
+        where: { OR: [{ username: { equals: trimmed, mode: 'insensitive' } }, { email: { equals: trimmed, mode: 'insensitive' } }] },
+        select: { id: true, username: true, nickname: true, profileId: true, allowExternalInvites: true },
+    })
+    if (!targetUser) return { error: 'Tài khoản không tồn tại.' }
+    if (targetUser.id === inviterId) return { error: 'Bạn không thể tự mời chính mình.' }
+
+    const existingAccess = await prisma.profileAccess.findUnique({
+        where: { userId_profileId: { userId: targetUser.id, profileId } },
+        select: { role: true },
+    })
+    if (existingAccess && existingAccess.role !== 'CLIENT') {
+        return { error: `${targetUser.nickname || targetUser.username} đã là thành viên nội bộ (${existingAccess.role}) của profile này — không thể mời làm client.` }
+    }
+
+    // External-invite consent (same rule as staff invites).
+    if (targetUser.profileId && targetUser.profileId !== profileId && targetUser.allowExternalInvites === false) {
+        return { error: `User ${targetUser.username} đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites".` }
+    }
+
+    const rateLimit = await checkInviteRate(workspaceId, targetUser.id)
+    if (!rateLimit.success) {
+        return { error: `Đã đạt giới hạn lời mời / ngày cho user này. Thử lại sau ${rateLimit.retryAfter ?? 86400} giây.` }
+    }
+
+    // Already a client of this profile → just (re)point the Client record.
+    if (existingAccess && existingAccess.role === 'CLIENT') {
+        await prisma.profileAccess.update({
+            where: { userId_profileId: { userId: targetUser.id, profileId } },
+            data: { clientId },
+        })
+        revalidatePath(`/${workspaceId}/admin`)
+        return { success: true, directAdd: true, username: targetUser.nickname || targetUser.username }
+    }
+
+    // Create / refresh a client invitation — accept grants ProfileAccess(CLIENT, clientId).
+    const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 3600 * 1000)
+    let existingInvite: { id: string } | null = null
+    try {
+        existingInvite = await prisma.workspaceInvitation.findFirst({
+            where: { workspaceId, invitedUserId: targetUser.id, status: 'PENDING' },
+            select: { id: true },
+        })
+    } catch (err: any) {
+        if (err?.code !== 'P2021') throw err
+    }
+
+    let invitation: { id: string }
+    if (existingInvite) {
+        invitation = await prisma.workspaceInvitation.update({
+            where: { id: existingInvite.id },
+            data: { role: 'GUEST', isClientInvite: true, clientId, invitedById: inviterId, expiresAt },
+            select: { id: true },
+        })
+    } else {
+        invitation = await prisma.workspaceInvitation.create({
+            data: { workspaceId, invitedUserId: targetUser.id, role: 'GUEST', isClientInvite: true, clientId, invitedById: inviterId, expiresAt },
+            select: { id: true },
+        })
+    }
+
+    await audit({
+        workspaceId, actorUserId: inviterId, action: 'member.invited',
+        targetType: 'WorkspaceInvitation', targetId: invitation.id,
+        after: { targetUsername: targetUser.username, role: 'CLIENT', clientId, clientName: client.name },
+    })
+
+    await notifyInvitee({
+        invitationId: invitation.id, inviteeUserId: targetUser.id, inviterUserId: inviterId,
+        workspaceId, role: `Client · ${client.name}`,
+    }).catch((err) => console.warn('[inviteClientToProfile] notify failed:', err))
+
+    revalidatePath(`/${workspaceId}/admin`)
+    return { success: true, directAdd: false, username: targetUser.nickname || targetUser.username }
+}
+
 // ─── Accept workspace invitation ─────────────────────────────────
 export async function acceptWorkspaceInvitation(invitationId: string) {
     const { getSession } = await import('@/lib/auth')
@@ -554,6 +656,31 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
 
             if (!invitation) return { error: 'Lời mời không tồn tại.' }
             if (invitation.workspace.status !== 'ACTIVE') return { error: 'Workspace không còn hoạt động.' }
+
+            // [Client membership] A client invite grants a per-profile CLIENT
+            // ProfileAccess (view-only portal) and NO WorkspaceMember.
+            if (invitation.isClientInvite && invitation.workspace.profileId) {
+                const existingPA = await tx.profileAccess.findUnique({
+                    where: { userId_profileId: { userId: session.user.id, profileId: invitation.workspace.profileId } },
+                    select: { role: true },
+                })
+                // Never demote an existing internal member to client.
+                if (!existingPA || existingPA.role === 'CLIENT') {
+                    await tx.profileAccess.upsert({
+                        where: { userId_profileId: { userId: session.user.id, profileId: invitation.workspace.profileId } },
+                        create: { userId: session.user.id, profileId: invitation.workspace.profileId, role: 'CLIENT', clientId: invitation.clientId },
+                        update: { role: 'CLIENT', clientId: invitation.clientId },
+                    })
+                }
+                return {
+                    success: true,
+                    workspaceId: invitation.workspaceId,
+                    workspaceName: invitation.workspace.name,
+                    role: 'CLIENT',
+                    inviterId: invitation.invitedBy?.id ?? null,
+                    inviteeName: session.user.nickname || session.user.username || 'Một thành viên',
+                }
+            }
 
             // [Z+1.fix5] Create membership — upsert pattern to prevent P2002 race.
             // Edge case: user was direct-added while invite was pending, OR

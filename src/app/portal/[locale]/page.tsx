@@ -36,7 +36,7 @@ export default async function PortalWorkspaceSelectPage({
                         workspaces.map(ws => (
                             <Link
                                 key={ws.id}
-                                href={`/portal/${locale}/${ws.id}/tasks`}
+                                href={`/portal/${locale}/${ws.id}`}
                                 className="group bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-800 hover:border-indigo-500/50 p-6 rounded-2xl transition-all duration-300 flex items-center justify-between"
                             >
                                 <div>

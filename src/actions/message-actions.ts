@@ -2,8 +2,9 @@
 
 import { prisma } from '@/lib/db'
 import { authorizeChannel, type ChannelAuthzContext } from '@/lib/channel-permissions'
-import { broadcastToChannel, broadcastNotificationToUser } from '@/lib/notification-broadcast'
+import { broadcastToChannel } from '@/lib/notification-broadcast'
 import { CHAT_EVENTS } from '@/lib/chat-channels'
+import { createAndBroadcastNotifications } from '@/actions/notification-actions'
 import { revalidatePath } from 'next/cache'
 
 /**
@@ -15,6 +16,10 @@ const AUTHOR_SELECT = { id: true, username: true, displayName: true, avatarUrl: 
 const MESSAGE_INCLUDE = {
     author: { select: AUTHOR_SELECT },
     reactions: { select: { emoji: true, userId: true } },
+    attachments: {
+        select: { id: true, url: true, fileName: true, mimeType: true, sizeBytes: true, width: true, height: true },
+        orderBy: { createdAt: 'asc' },
+    },
 } as const
 
 export interface MessageAuthorDTO {
@@ -27,6 +32,15 @@ export interface ReactionDTO {
     emoji: string
     userIds: string[]
 }
+export interface AttachmentDTO {
+    id: string
+    url: string
+    fileName: string
+    mimeType: string
+    sizeBytes: number
+    width: number | null
+    height: number | null
+}
 export interface MessageDTO {
     id: string
     channelId: string
@@ -36,6 +50,7 @@ export interface MessageDTO {
     parentId: string | null
     replyCount: number
     reactions: ReactionDTO[]
+    attachments: AttachmentDTO[]
     editedAt: string | null
     deletedAt: string | null
     createdAt: string
@@ -60,6 +75,17 @@ function serialize(m: any): MessageDTO {
         parentId: m.parentId ?? null,
         replyCount: m.replyCount ?? 0,
         reactions: groupReactions(m.reactions ?? []),
+        attachments: m.deletedAt
+            ? []
+            : (m.attachments ?? []).map((a: any) => ({
+                  id: a.id,
+                  url: a.url,
+                  fileName: a.fileName,
+                  mimeType: a.mimeType,
+                  sizeBytes: a.sizeBytes,
+                  width: a.width ?? null,
+                  height: a.height ?? null,
+              })),
         editedAt: m.editedAt ? new Date(m.editedAt).toISOString() : null,
         deletedAt: m.deletedAt ? new Date(m.deletedAt).toISOString() : null,
         createdAt: new Date(m.createdAt).toISOString(),
@@ -82,7 +108,12 @@ function parseMentions(content: string): string[] {
     return Array.from(out)
 }
 
-/** Create Mention + Notification rows and realtime-notify each mentioned member. */
+/**
+ * Create Mention rows + MENTION notifications for @username tokens, SCOPED to the
+ * channel's members + workspace OWNER/ADMINs (previously matched ALL workspace
+ * members, which leaked private-channel content to non-members). Returns the set
+ * of notified userIds so the caller can dedup the broader thread/channel fan-out.
+ */
 async function notifyMentions(opts: {
     workspaceId: string
     profileId: string
@@ -91,43 +122,49 @@ async function notifyMentions(opts: {
     authorId: string
     authorName: string
     content: string
-}) {
+}): Promise<Set<string>> {
     const tokens = parseMentions(opts.content)
-    if (tokens.length === 0) return
+    if (tokens.length === 0) return new Set()
 
-    const members = await prisma.workspaceMember.findMany({
-        where: { workspaceId: opts.workspaceId },
-        select: { user: { select: { id: true, username: true } } },
-    })
-    const matched = new Set<string>()
-    for (const m of members) {
-        if (m.user.id !== opts.authorId && tokens.includes(m.user.username.toLowerCase())) matched.add(m.user.id)
-    }
-    if (matched.size === 0) return
-
-    const title = `${opts.authorName} đã nhắc đến bạn`
-    const body = opts.content.replace(/\s+/g, ' ').trim().slice(0, 140)
-
-    await Promise.allSettled(
-        Array.from(matched).map(async (userId) => {
-            await prisma.mention
-                .create({ data: { workspaceId: opts.workspaceId, profileId: opts.profileId, messageId: opts.messageId, userId } })
-                .catch(() => {})
-            await prisma.notification
-                .create({
-                    data: {
-                        userId,
-                        type: 'MENTION',
-                        title,
-                        body,
-                        actorId: opts.authorId,
-                        metadata: { channelId: opts.channelId, messageId: opts.messageId },
-                    },
-                })
-                .catch(() => {})
-            broadcastNotificationToUser(userId, { type: 'MENTION', title, body, channelId: opts.channelId, messageId: opts.messageId })
+    // Candidates = channel members + workspace admins (admins can view any channel).
+    const [channelMembers, wsAdmins] = await Promise.all([
+        prisma.channelMember.findMany({
+            where: { channelId: opts.channelId },
+            select: { user: { select: { id: true, username: true } } },
         }),
-    )
+        prisma.workspaceMember.findMany({
+            where: { workspaceId: opts.workspaceId, role: { in: ['OWNER', 'ADMIN'] } },
+            select: { user: { select: { id: true, username: true } } },
+        }),
+    ])
+    const byUsername = new Map<string, string>()
+    for (const m of channelMembers) if (m.user) byUsername.set(m.user.username.toLowerCase(), m.user.id)
+    for (const a of wsAdmins) if (a.user) byUsername.set(a.user.username.toLowerCase(), a.user.id)
+
+    const matched = new Set<string>()
+    for (const tok of tokens) {
+        const uid = byUsername.get(tok)
+        if (uid && uid !== opts.authorId) matched.add(uid)
+    }
+    if (matched.size === 0) return new Set()
+
+    const ids = Array.from(matched)
+    await prisma.mention
+        .createMany({
+            data: ids.map((userId) => ({ workspaceId: opts.workspaceId, profileId: opts.profileId, messageId: opts.messageId, userId })),
+            skipDuplicates: true,
+        })
+        .catch(() => {})
+
+    await createAndBroadcastNotifications(ids, {
+        type: 'MENTION',
+        title: `${opts.authorName} đã nhắc đến bạn`,
+        body: opts.content.replace(/\s+/g, ' ').trim().slice(0, 140),
+        actorId: opts.authorId,
+        metadata: { channelId: opts.channelId, messageId: opts.messageId },
+    })
+
+    return matched
 }
 
 /** Paginated channel history (top-level messages), oldest→newest for display. */
@@ -158,6 +195,7 @@ export async function sendMessage(
     channelId: string,
     content: string,
     parentId?: string | null,
+    attachments?: Array<{ url: string; fileName: string; mimeType: string; sizeBytes: number; width?: number | null; height?: number | null }>,
 ): Promise<{ success: true; message: MessageDTO } | { error: string }> {
     let ctx: ChannelAuthzContext
     try {
@@ -167,13 +205,41 @@ export async function sendMessage(
     }
 
     const clean = content.trim()
-    if (!clean) return { error: 'Tin nhắn trống' }
+    // [Phase 2] only trust attachments uploaded to THIS workspace's chat blob path
+    // (blocks forged Attachment rows pointing at arbitrary URLs).
+    const okAttachments = (attachments ?? [])
+        .filter((a) => typeof a?.url === 'string' && a.url.includes(`/chat/${workspaceId}/`))
+        .slice(0, 10)
+    if (!clean && okAttachments.length === 0) return { error: 'Tin nhắn trống' }
     if (clean.length > 4000) return { error: 'Tin nhắn quá dài (tối đa 4000 ký tự)' }
 
     const profileId = await resolveProfileId(ctx, workspaceId)
 
     const created = await prisma.message.create({
-        data: { workspaceId, profileId, channelId, authorId: ctx.userId, content: clean, parentId: parentId ?? null },
+        data: {
+            workspaceId,
+            profileId,
+            channelId,
+            authorId: ctx.userId,
+            content: clean,
+            parentId: parentId ?? null,
+            ...(okAttachments.length
+                ? {
+                      attachments: {
+                          create: okAttachments.map((a) => ({
+                              workspaceId,
+                              profileId,
+                              url: a.url,
+                              fileName: a.fileName.slice(0, 200),
+                              mimeType: a.mimeType,
+                              sizeBytes: a.sizeBytes,
+                              width: a.width ?? null,
+                              height: a.height ?? null,
+                          })),
+                      },
+                  }
+                : {}),
+        },
         include: MESSAGE_INCLUDE,
     })
 
@@ -184,12 +250,56 @@ export async function sendMessage(
     const dto = serialize(created)
     await broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_NEW, dto)
 
-    // Mentions → notifications (best-effort, never blocks the send).
+    // [nối dây] Fan-out notifications (best-effort — never blocks/fails the send).
+    // Dedup precedence: mention > thread-reply > channel (one notif per user, most
+    // specific type wins).
     try {
         const authorName = created.author?.displayName || created.author?.username || 'Ai đó'
-        await notifyMentions({ workspaceId, profileId, channelId, messageId: created.id, authorId: ctx.userId, authorName, content: clean })
+        const preview = clean.replace(/\s+/g, ' ').trim().slice(0, 140)
+
+        // 1. @mentions (most specific) — returns who was notified.
+        const mentioned = await notifyMentions({ workspaceId, profileId, channelId, messageId: created.id, authorId: ctx.userId, authorName, content: clean })
+        const exclude = new Set<string>([ctx.userId, ...mentioned])
+
+        // 2. Thread reply → parent author + prior repliers.
+        if (parentId) {
+            const [parent, siblings] = await Promise.all([
+                prisma.message.findUnique({ where: { id: parentId }, select: { authorId: true } }),
+                prisma.message.findMany({ where: { parentId, workspaceId }, distinct: ['authorId'], select: { authorId: true } }),
+            ])
+            const threadIds = new Set<string>()
+            if (parent?.authorId) threadIds.add(parent.authorId)
+            for (const s of siblings) threadIds.add(s.authorId)
+            const threadTargets = Array.from(threadIds).filter((id) => !exclude.has(id))
+            if (threadTargets.length) {
+                await createAndBroadcastNotifications(threadTargets, {
+                    type: 'THREAD_REPLY',
+                    title: `${authorName} đã trả lời trong thread`,
+                    body: preview,
+                    actorId: ctx.userId,
+                    metadata: { channelId, messageId: created.id, parentId },
+                })
+                threadTargets.forEach((id) => exclude.add(id))
+            }
+        }
+
+        // 3. Channel members (broadest) — skip muted + already-notified + author.
+        const [members, ch] = await Promise.all([
+            prisma.channelMember.findMany({ where: { channelId }, select: { userId: true, muted: true } }),
+            prisma.channel.findUnique({ where: { id: channelId }, select: { name: true } }),
+        ])
+        const channelTargets = members.filter((m) => !m.muted && !exclude.has(m.userId)).map((m) => m.userId)
+        if (channelTargets.length) {
+            await createAndBroadcastNotifications(channelTargets, {
+                type: 'CHANNEL_MESSAGE',
+                title: ch?.name ? `Tin mới trong #${ch.name}` : 'Tin nhắn mới',
+                body: `${authorName}: ${preview}`,
+                actorId: ctx.userId,
+                metadata: { channelId, messageId: created.id },
+            })
+        }
     } catch {
-        /* ignore */
+        /* ignore — notifications must never break the send */
     }
 
     return { success: true, message: dto }

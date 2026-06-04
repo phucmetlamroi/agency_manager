@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<title>Mockup — Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Be+Vietnam+Pro:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1920px; height: 1080px;
+    background: radial-gradient(circle at 80% 0%, #2d1b5e 0%, #0A0A0A 60%);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #E4E4E7;
+    overflow: hidden;
+  }
+  .shell { display: grid; grid-template-columns: 280px 1fr; height: 100%; }
+  /* SIDEBAR */
+  .sidebar {
+    background: rgba(10,10,10,0.70);
+    backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(139,92,246,0.18);
+    padding: 24px 16px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .logo-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px 20px; }
+  .logo-box {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg,#8B5CF6,#d946ef);
+    box-shadow: 0 0 18px rgba(139,92,246,0.5);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 18px;
+  }
+  .logo-text { font-weight: 800; font-size: 18px; letter-spacing: -0.3px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; border-radius: 12px;
+    color: #A1A1AA; font-weight: 500; font-size: 14px;
+    cursor: pointer;
+  }
+  .nav-item.active {
+    background: rgba(139,92,246,0.18);
+    color: #E4E4E7;
+    box-shadow: inset 3px 0 0 #8B5CF6;
+  }
+  .nav-item .ico {
+    width: 18px; height: 18px;
+    background: currentColor;
+    -webkit-mask-size: contain;
+    opacity: 0.8;
+  }
+  .pill {
+    margin-left: auto;
+    background: rgba(139,92,246,0.15);
+    color: #A78BFA; font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px;
+  }
+  /* CONTENT */
+  .content { padding: 32px 40px; overflow: hidden; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .welcome h1 {
+    font-size: 28px; font-weight: 800; letter-spacing: -0.5px;
+  }
+  .welcome p { color: #A1A1AA; font-size: 14px; margin-top: 4px; font-family: 'Be Vietnam Pro'; }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .search {
+    background: rgba(10,10,10,0.6); border: 1px solid rgba(139,92,246,0.18);
+    padding: 10px 16px; border-radius: 12px; min-width: 260px;
+    color: #71717A; font-size: 14px;
+  }
+  .bell, .avatar {
+    width: 40px; height: 40px; border-radius: 999px;
+    background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.18);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .avatar { background: linear-gradient(135deg,#8B5CF6,#d946ef); font-weight: 800; }
+
+  /* KPI ROW */
+  .kpi-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+  .kpi {
+    background: rgba(10,10,10,0.60);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(139,92,246,0.15);
+    border-radius: 20px; padding: 20px 22px;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+  }
+  .kpi .label { font-size: 11px; font-weight: 700; color: #A1A1AA; text-transform: uppercase; letter-spacing: 1.2px; }
+  .kpi .value { font-size: 36px; font-weight: 900; letter-spacing: -0.5px; margin-top: 8px; }
+  .kpi .delta { font-size: 12px; color: #34D399; font-weight: 600; margin-top: 6px; }
+  .kpi.violet .value { color: #A78BFA; }
+  .kpi.emerald .value { color: #34D399; }
+  .kpi.amber .value { color: #F59E0B; }
+  .kpi.rose .value { color: #f43f5e; }
+
+  /* CHART + LEADERBOARD */
+  .second-row { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; }
+  .card {
+    background: rgba(10,10,10,0.60);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(139,92,246,0.15);
+    border-radius: 20px; padding: 24px;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+  }
+  .card h3 { font-size: 16px; font-weight: 700; }
+  .card .sub { font-size: 12px; color: #71717A; margin-top: 4px; }
+  .chart {
+    height: 250px; margin-top: 18px;
+    background: linear-gradient(180deg, rgba(139,92,246,0.18) 0%, transparent 100%);
+    border-radius: 12px; position: relative;
+    border-bottom: 1px solid rgba(139,92,246,0.15);
+  }
+  .chart::after {
+    content: ''; position: absolute; inset: 0;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 250' preserveAspectRatio='none'><path d='M0,200 C100,180 150,120 250,140 C350,160 450,80 550,100 C650,120 750,60 800,80 L800,250 L0,250 Z' fill='url(%23g)' opacity='0.8'/><path d='M0,200 C100,180 150,120 250,140 C350,160 450,80 550,100 C650,120 750,60 800,80' stroke='%238B5CF6' stroke-width='3' fill='none'/><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%238B5CF6' stop-opacity='0.4'/><stop offset='100%25' stop-color='%238B5CF6' stop-opacity='0'/></linearGradient></defs></svg>") no-repeat center/contain;
+  }
+  /* Leaderboard */
+  .leader { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .leader-row { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 10px; }
+  .leader-row.first { background: rgba(245,158,11,0.10); }
+  .leader-row.second { background: rgba(168,162,158,0.10); }
+  .leader-row.third { background: rgba(202,138,4,0.08); }
+  .rank-badge {
+    width: 32px; height: 32px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 14px;
+  }
+  .first .rank-badge { background: linear-gradient(135deg,#fde047,#ca8a04); color: #1a0e02; }
+  .second .rank-badge { background: linear-gradient(135deg,#e5e7eb,#9ca3af); color: #1a0e02; }
+  .third .rank-badge { background: linear-gradient(135deg,#d97706,#92400e); color: #fff; }
+  .leader-name { flex: 1; font-weight: 600; font-size: 14px; }
+  .leader-points { font-weight: 800; color: #A78BFA; font-size: 14px; }
+
+  .accent-glow {
+    position: absolute; top: -200px; right: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(139,92,246,0.25) 0%, transparent 60%);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="accent-glow"></div>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="logo-row">
+      <div class="logo-box">H</div>
+      <div class="logo-text">HustlyTasker</div>
+    </div>
+    <div class="nav-item active">📊 Dashboard <span class="pill">15</span></div>
+    <div class="nav-item">📋 Task Queue</div>
+    <div class="nav-item">🛒 Marketplace</div>
+    <div class="nav-item">😊 Clients</div>
+    <div class="nav-item">💬 Chat</div>
+    <div class="nav-item">📅 Schedule</div>
+    <div class="nav-item">💰 Finance</div>
+    <div class="nav-item">💵 Payroll</div>
+    <div class="nav-item">📈 Analytics</div>
+    <div class="nav-item">👥 Members</div>
+    <div class="nav-item">📝 Audit Log</div>
+    <div class="nav-item">⚙️ Settings</div>
+  </aside>
+
+  <main class="content">
+    <div class="topbar">
+      <div class="welcome">
+        <h1>Hustly Team — Tháng 5/2026</h1>
+        <p>Welcome back, Bảo Phúc 👋 Hôm nay là ngày 28/05/2026</p>
+      </div>
+      <div class="topbar-right">
+        <div class="search">🔍 Tìm task, client, hoặc editor…</div>
+        <div class="bell">🔔</div>
+        <div class="avatar">BP</div>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi violet">
+        <div class="label">Gross Revenue</div>
+        <div class="value">34.230.640 đ</div>
+        <div class="delta">▲ 18% so với tháng trước</div>
+      </div>
+      <div class="kpi emerald">
+        <div class="label">Tasks Hoàn tất</div>
+        <div class="value">64 / 92</div>
+        <div class="delta">▲ 70% rate</div>
+      </div>
+      <div class="kpi amber">
+        <div class="label">Active Clients</div>
+        <div class="value">15</div>
+        <div class="delta">▲ +3 mới</div>
+      </div>
+      <div class="kpi rose">
+        <div class="label">Quá hạn</div>
+        <div class="value">2</div>
+        <div class="delta" style="color:#f87171">▼ cần xử lý</div>
+      </div>
+    </div>
+
+    <div class="second-row">
+      <div class="card">
+        <h3>Revenue Overview · Tháng 5/2026</h3>
+        <div class="sub">Doanh thu workspace (VND) · all-time</div>
+        <div class="chart"></div>
+      </div>
+      <div class="card">
+        <h3>🏆 Leaderboard</h3>
+        <div class="sub">Top editors theo task hoàn tất</div>
+        <div class="leader">
+          <div class="leader-row first">
+            <div class="rank-badge">1</div>
+            <div class="leader-name">Kjt</div>
+            <div class="leader-points">2.450 pts</div>
+          </div>
+          <div class="leader-row second">
+            <div class="rank-badge">2</div>
+            <div class="leader-name">Văn Ngữ</div>
+            <div class="leader-points">2.110 pts</div>
+          </div>
+          <div class="leader-row third">
+            <div class="rank-badge">3</div>
+            <div class="leader-name">Phúc Phạm</div>
+            <div class="leader-points">1.830 pts</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

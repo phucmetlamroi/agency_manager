@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HustlyTasker Desktop — Setup</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        @font-face {
+            font-family: 'Inter';
+            src: local('Inter'), local('Inter-Regular');
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #09090b;
+            color: #e4e4e7;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+            -webkit-app-region: drag;
+        }
+
+        .wizard {
+            width: 100%;
+            max-width: 560px;
+            margin: 32px auto;
+            padding: 40px;
+            background: rgba(24, 24, 27, 0.8);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            border-radius: 24px;
+            box-shadow:
+                0 0 80px rgba(139, 92, 246, 0.06),
+                0 25px 50px rgba(0, 0, 0, 0.5);
+            -webkit-app-region: no-drag;
+        }
+
+        .logo-area {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            box-shadow: 0 0 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .logo-icon svg {
+            width: 28px;
+            height: 28px;
+            fill: white;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #fafafa;
+            margin-bottom: 6px;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: #71717a;
+            line-height: 1.5;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #8B5CF6;
+            margin-bottom: 12px;
+            margin-top: 28px;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        .field label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #a1a1aa;
+            margin-bottom: 6px;
+        }
+
+        .field label .required {
+            color: #ef4444;
+            font-size: 10px;
+        }
+
+        .field input, .field textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(9, 9, 11, 0.7);
+            border: 1px solid rgba(63, 63, 70, 0.5);
+            border-radius: 12px;
+            color: #e4e4e7;
+            font-size: 13px;
+            font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            outline: none;
+        }
+
+        .field input:focus, .field textarea:focus {
+            border-color: rgba(139, 92, 246, 0.5);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+
+        .field input::placeholder, .field textarea::placeholder {
+            color: #3f3f46;
+        }
+
+        .field .hint {
+            font-size: 11px;
+            color: #52525b;
+            margin-top: 4px;
+        }
+
+        .optional-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(63, 63, 70, 0.3);
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #71717a;
+            transition: background 0.15s, color 0.15s;
+            margin-top: 24px;
+            margin-bottom: 4px;
+        }
+
+        .optional-toggle:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #a1a1aa;
+        }
+
+        .optional-toggle svg {
+            transition: transform 0.2s;
+        }
+
+        .optional-toggle.expanded svg {
+            transform: rotate(90deg);
+        }
+
+        .optional-fields {
+            display: none;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        .optional-fields.visible {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 32px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            color: white;
+            box-shadow: 0 4px 14px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #9D75F8, #8B5CF6);
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: #a1a1aa;
+            border: 1px solid rgba(63, 63, 70, 0.5);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e4e4e7;
+        }
+
+        .status-bar {
+            margin-top: 16px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-bar.visible {
+            display: flex;
+        }
+
+        .status-bar.success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .status-bar.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .status-bar.loading {
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            color: #a78bfa;
+        }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(63, 63, 70, 0.3);
+            margin: 24px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="wizard">
+        <div class="logo-area">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+            </div>
+            <h1>HustlyTasker Desktop</h1>
+            <p class="subtitle">
+                Configure your database connection to get started.<br>
+                These credentials are stored encrypted on your machine.
+            </p>
+        </div>
+
+        <div class="section-label">Required</div>
+
+        <div class="field">
+            <label>DATABASE_URL <span class="required">*</span></label>
+            <input
+                type="text"
+                id="DATABASE_URL"
+                placeholder="postgresql://user:pass@host/dbname?sslmode=require"
+                spellcheck="false"
+                autocomplete="off"
+            />
+            <div class="hint">Neon / Supabase / any PostgreSQL connection string</div>
+        </div>
+
+        <div class="field">
+            <label>JWT_SECRET <span class="required">*</span></label>
+            <input
+                type="password"
+                id="JWT_SECRET"
+                placeholder="your-jwt-secret-key"
+                spellcheck="false"
+                autocomplete="off"
+            />
+            <div class="hint">Secret key for signing authentication tokens</div>
+        </div>
+
+        <div class="optional-toggle" id="optionalToggle" onclick="toggleOptional()">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                <path d="M4.5 2L9 6L4.5 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            </svg>
+            Optional settings (email, cron, Redis, MCP)
+        </div>
+
+        <div class="optional-fields" id="optionalFields">
+            <div class="divider"></div>
+            <div class="section-label">Email</div>
+
+            <div class="field">
+                <label>RESEND_API_KEY</label>
+                <input
+                    type="password"
+                    id="RESEND_API_KEY"
+                    placeholder="re_xxxxx"
+                    spellcheck="false"
+                    autocomplete="off"
+                />
+                <div class="hint">Resend API key for sending notification emails</div>
+            </div>
+
+            <div class="section-label">Cron</div>
+
+            <div class="field">
+                <label>CRON_SECRET</label>
+                <input
+                    type="text"
+                    id="CRON_SECRET"
+                    placeholder="local-cron"
+                    spellcheck="false"
+                    autocomplete="off"
+                    value="local-cron"
+                />
+                <div class="hint">Secret for authenticating cron job requests</div>
+            </div>
+
+            <div class="section-label">Redis (Rate Limiting)</div>
+
+            <div class="field">
+                <label>UPSTASH_REDIS_REST_URL</label>
+                <input
+                    type="text"
+                    id="UPSTASH_REDIS_REST_URL"
+                    placeholder="https://xxx.upstash.io"
+                    spellcheck="false"
+                    autocomplete="off"
+                />
+            </div>
+
+            <div class="field">
+                <label>UPSTASH_REDIS_REST_TOKEN</label>
+                <input
+                    type="password"
+                    id="UPSTASH_REDIS_REST_TOKEN"
+                    placeholder="AXxxxx..."
+                    spellcheck="false"
+                    autocomplete="off"
+                />
+            </div>
+
+            <div class="section-label">MCP Server</div>
+
+            <div class="field">
+                <label>MCP_PROFILE_ID</label>
+                <input
+                    type="text"
+                    id="MCP_PROFILE_ID"
+                    placeholder="your-profile-uuid"
+                    spellcheck="false"
+                    autocomplete="off"
+                />
+                <div class="hint">Profile UUID for MCP server service account</div>
+            </div>
+
+            <div class="field">
+                <label>MCP_WORKSPACE_IDS</label>
+                <input
+                    type="text"
+                    id="MCP_WORKSPACE_IDS"
+                    placeholder="ws-id-1,ws-id-2 (empty = all)"
+                    spellcheck="false"
+                    autocomplete="off"
+                />
+                <div class="hint">Comma-separated workspace IDs (empty = all in profile)</div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-secondary" id="btnTest" onclick="testConnection()">
+                Test Connection
+            </button>
+            <button class="btn btn-primary" id="btnSave" onclick="saveAndStart()">
+                Save &amp; Start App
+            </button>
+        </div>
+
+        <div class="status-bar" id="statusBar">
+            <span id="statusIcon"></span>
+            <span id="statusText"></span>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM refs ---
+        const statusBar = document.getElementById('statusBar');
+        const statusIcon = document.getElementById('statusIcon');
+        const statusText = document.getElementById('statusText');
+        const btnTest = document.getElementById('btnTest');
+        const btnSave = document.getElementById('btnSave');
+
+        const ENV_KEYS = [
+            'DATABASE_URL', 'JWT_SECRET', 'CRON_SECRET',
+            'RESEND_API_KEY', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN',
+            'MCP_PROFILE_ID', 'MCP_WORKSPACE_IDS'
+        ];
+
+        // --- Load existing values on startup ---
+        (async function loadExisting() {
+            try {
+                const vars = await window.hustly.getEnvVars();
+                for (const key of ENV_KEYS) {
+                    const el = document.getElementById(key);
+                    if (el && vars[key]) {
+                        el.value = vars[key];
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to load existing env vars:', e);
+            }
+        })();
+
+        // --- Toggle optional fields ---
+        function toggleOptional() {
+            const toggle = document.getElementById('optionalToggle');
+            const fields = document.getElementById('optionalFields');
+            const expanded = fields.classList.toggle('visible');
+            toggle.classList.toggle('expanded', expanded);
+        }
+
+        // --- Show status ---
+        function showStatus(type, message) {
+            statusBar.className = 'status-bar visible ' + type;
+            if (type === 'loading') {
+                statusIcon.innerHTML = '<div class="spinner"></div>';
+            } else if (type === 'success') {
+                statusIcon.textContent = '✓';
+            } else {
+                statusIcon.textContent = '✗';
+            }
+            statusText.textContent = message;
+        }
+
+        function hideStatus() {
+            statusBar.className = 'status-bar';
+        }
+
+        // --- Validate required fields ---
+        function validate() {
+            const dbUrl = document.getElementById('DATABASE_URL').value.trim();
+            const jwtSecret = document.getElementById('JWT_SECRET').value.trim();
+
+            if (!dbUrl) {
+                showStatus('error', 'DATABASE_URL is required');
+                document.getElementById('DATABASE_URL').focus();
+                return false;
+            }
+            if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+                showStatus('error', 'DATABASE_URL must start with postgresql:// or postgres://');
+                document.getElementById('DATABASE_URL').focus();
+                return false;
+            }
+            if (!jwtSecret) {
+                showStatus('error', 'JWT_SECRET is required');
+                document.getElementById('JWT_SECRET').focus();
+                return false;
+            }
+            if (jwtSecret.length < 8) {
+                showStatus('error', 'JWT_SECRET should be at least 8 characters');
+                document.getElementById('JWT_SECRET').focus();
+                return false;
+            }
+            return true;
+        }
+
+        // --- Test database connection ---
+        async function testConnection() {
+            if (!validate()) return;
+
+            const dbUrl = document.getElementById('DATABASE_URL').value.trim();
+            btnTest.disabled = true;
+            showStatus('loading', 'Testing database connection...');
+
+            try {
+                const result = await window.hustly.invoke('wizard:test-db', dbUrl);
+                if (result && result.success) {
+                    showStatus('success', 'Connection successful! Database is reachable.');
+                } else {
+                    showStatus('error', 'Connection failed: ' + (result?.error || 'Unknown error'));
+                }
+            } catch (e) {
+                showStatus('error', 'Connection test failed: ' + (e.message || e));
+            } finally {
+                btnTest.disabled = false;
+            }
+        }
+
+        // --- Save and start ---
+        async function saveAndStart() {
+            if (!validate()) return;
+
+            btnSave.disabled = true;
+            btnTest.disabled = true;
+            showStatus('loading', 'Saving configuration...');
+
+            try {
+                // Save each env var via IPC
+                for (const key of ENV_KEYS) {
+                    const el = document.getElementById(key);
+                    const value = el ? el.value.trim() : '';
+                    if (value) {
+                        await window.hustly.setEnvVar(key, value);
+                    }
+                }
+
+                showStatus('success', 'Configuration saved! Starting HustlyTasker...');
+
+                // Signal wizard is complete after a brief delay for user to see the message
+                setTimeout(async () => {
+                    try {
+                        await window.hustly.invoke('wizard:complete');
+                    } catch (e) {
+                        console.warn('wizard:complete signal failed:', e);
+                    }
+                }, 800);
+            } catch (e) {
+                showStatus('error', 'Failed to save: ' + (e.message || e));
+                btnSave.disabled = false;
+                btnTest.disabled = false;
+            }
+        }
+
+        // --- Enter key shortcut ---
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !btnSave.disabled) {
+                saveAndStart();
+            }
+        });
+    </script>
+</body>
+</html>

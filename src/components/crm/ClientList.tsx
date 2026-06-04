@@ -51,10 +51,10 @@ function getInitials(name: string): string {
 /* ── Helper: deterministic gradient for avatar ── */
 function getAvatarGradient(id: number): string {
     const gradients = [
-        'linear-gradient(135deg, #6366f1, #8b5cf6)',
-        'linear-gradient(135deg, #3b82f6, #6366f1)',
+        'linear-gradient(135deg, #8B5CF6, #8b5cf6)',
+        'linear-gradient(135deg, #8B5CF6, #8B5CF6)',
         'linear-gradient(135deg, #8b5cf6, #ec4899)',
-        'linear-gradient(135deg, #06b6d4, #3b82f6)',
+        'linear-gradient(135deg, #06b6d4, #8B5CF6)',
         'linear-gradient(135deg, #10b981, #06b6d4)',
         'linear-gradient(135deg, #f59e0b, #ef4444)',
         'linear-gradient(135deg, #ec4899, #f43f5e)',
@@ -85,7 +85,7 @@ function getClientStatus(tasks: Task[]): 'ACTIVE' | 'PENDING' | 'INACTIVE' {
 /* ── Grid template for columns ── */
 const GRID_TEMPLATE = '2.2fr 0.8fr 0.6fr 0.7fr 0.8fr 60px'
 
-export default function ClientList({ clients, workspaceId }: { clients: Client[], workspaceId: string }) {
+export default function ClientList({ clients, workspaceId, onOpenClient }: { clients: Client[], workspaceId: string, onOpenClient?: (id: number) => void }) {
     const [editingClient, setEditingClient] = useState<Client | null>(null)
     const [newName, setNewName] = useState('')
     const [draggingId, setDraggingId] = useState<number | null>(null)
@@ -171,7 +171,7 @@ export default function ClientList({ clients, workspaceId }: { clients: Client[]
                             outline: 'none',
                             transition: 'border-color 0.15s',
                         }}
-                        onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.40)' }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.40)' }}
                         onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' }}
                     />
                 </div>
@@ -184,10 +184,10 @@ export default function ClientList({ clients, workspaceId }: { clients: Client[]
                         margin: '0 20px 8px',
                         padding: '8px 16px',
                         borderRadius: 10,
-                        background: 'rgba(99,102,241,0.10)',
-                        border: '1px solid rgba(99,102,241,0.25)',
+                        background: 'rgba(139,92,246,0.10)',
+                        border: '1px solid rgba(139,92,246,0.25)',
                         fontSize: 11,
-                        color: '#a5b4fc',
+                        color: '#c4b5fd',
                         textAlign: 'center',
                     }}
                     className="animate-pulse"
@@ -242,6 +242,7 @@ export default function ClientList({ clients, workspaceId }: { clients: Client[]
                     client={client}
                     onEdit={handleEditClick}
                     workspaceId={workspaceId}
+                    onOpenClient={onOpenClient}
                     draggingId={draggingId}
                     dragOverId={dragOverId}
                     onDragStart={(id) => setDraggingId(id)}
@@ -282,6 +283,7 @@ type ClientItemProps = {
     client: Client
     onEdit: (c: Client) => void
     workspaceId: string
+    onOpenClient?: (id: number) => void
     draggingId: number | null
     dragOverId: number | null
     onDragStart: (id: number) => void
@@ -349,7 +351,7 @@ function FrictionCell({ value }: { value: number }) {
 
 /* ── Client row item ── */
 function ClientItem({
-    client, onEdit, workspaceId,
+    client, onEdit, workspaceId, onOpenClient,
     draggingId, dragOverId,
     onDragStart, onDragEnd, onDragOver, onDrop,
     isSubsidiary = false
@@ -360,16 +362,16 @@ function ClientItem({
     const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation()
         if (!(await confirm({
-            title: 'Xóa Khách hàng?',
-            message: `Bạn có chắc muốn xóa khách hàng "${client.name}"?\nHành động này không thể hoàn tác!`,
-            type: 'danger',
-            confirmText: 'Xóa luôn',
+            title: 'Chuyển vào Thùng rác?',
+            message: `Chuyển khách hàng "${client.name}" vào Thùng rác? Khách (và brand con) sẽ bị ẩn khỏi danh sách, nhưng Task/Hoá đơn vẫn giữ nguyên — có thể khôi phục bất cứ lúc nào.`,
+            type: 'warning',
+            confirmText: 'Chuyển vào Thùng rác',
             cancelText: 'Hủy'
         }))) return
 
         const res = await deleteClient(client.id, workspaceId)
         if (!res.success) toast.error(res.error)
-        else toast.success('Đã xóa khách hàng')
+        else toast.success('Đã chuyển vào Thùng rác')
     }
 
     const handleUnmerge = async (e: React.MouseEvent) => {
@@ -447,13 +449,13 @@ function ClientItem({
                     userSelect: 'none',
                     transition: 'background 0.15s, opacity 0.2s, box-shadow 0.2s',
                     background: isDragTarget
-                        ? 'rgba(99,102,241,0.12)'
+                        ? 'rgba(139,92,246,0.12)'
                         : isSubsidiary
-                            ? 'rgba(99,102,241,0.03)'
+                            ? 'rgba(139,92,246,0.03)'
                             : 'transparent',
                     opacity: isDragging ? 0.4 : 1,
                     boxShadow: isDragTarget
-                        ? 'inset 0 0 0 1px rgba(99,102,241,0.40)'
+                        ? 'inset 0 0 0 1px rgba(139,92,246,0.40)'
                         : isDragging
                             ? 'inset 0 0 0 2px rgba(139,92,246,0.50)'
                             : 'none',
@@ -461,14 +463,14 @@ function ClientItem({
                 onMouseEnter={(e) => {
                     if (!isDragTarget && !isDragging) {
                         e.currentTarget.style.background = isSubsidiary
-                            ? 'rgba(99,102,241,0.06)'
+                            ? 'rgba(139,92,246,0.06)'
                             : 'rgba(255,255,255,0.02)'
                     }
                 }}
                 onMouseLeave={(e) => {
                     if (!isDragTarget && !isDragging) {
                         e.currentTarget.style.background = isSubsidiary
-                            ? 'rgba(99,102,241,0.03)'
+                            ? 'rgba(139,92,246,0.03)'
                             : 'transparent'
                     }
                 }}
@@ -525,7 +527,7 @@ function ClientItem({
                             style={{
                                 width: 16,
                                 height: 1,
-                                background: 'rgba(99,102,241,0.20)',
+                                background: 'rgba(139,92,246,0.20)',
                                 flexShrink: 0,
                             }}
                         />
@@ -565,7 +567,7 @@ function ClientItem({
                                     cursor: 'pointer',
                                     transition: 'color 0.15s',
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.color = '#a5b4fc' }}
+                                onMouseEnter={(e) => { e.currentTarget.style.color = '#c4b5fd' }}
                                 onMouseLeave={(e) => { e.currentTarget.style.color = '#ffffff' }}
                                 onClick={(e) => { e.stopPropagation(); onEdit(client) }}
                                 title="Click to edit name"
@@ -585,7 +587,7 @@ function ClientItem({
                                     transition: 'color 0.15s',
                                     flexShrink: 0,
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.color = '#a5b4fc' }}
+                                onMouseEnter={(e) => { e.currentTarget.style.color = '#c4b5fd' }}
                                 onMouseLeave={(e) => { e.currentTarget.style.color = '#52525b' }}
                                 title="Sửa tên"
                             >
@@ -633,36 +635,41 @@ function ClientItem({
 
                 {/* ── Actions cell ── */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {/* Detail link */}
-                    <Link
-                        href={`/${workspaceId}/admin/crm/${client.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 6,
-                            background: 'rgba(99,102,241,0.10)',
-                            border: '1px solid rgba(99,102,241,0.20)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#a5b4fc',
-                            textDecoration: 'none',
-                            transition: 'background 0.15s, border-color 0.15s',
-                            flexShrink: 0,
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(99,102,241,0.20)'
-                            e.currentTarget.style.borderColor = 'rgba(99,102,241,0.40)'
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(99,102,241,0.10)'
-                            e.currentTarget.style.borderColor = 'rgba(99,102,241,0.20)'
-                        }}
-                        title="Chi tiết"
-                    >
-                        <ExternalLink style={{ width: 14, height: 14 }} />
-                    </Link>
+                    {/* Detail — in-place (onOpenClient) hoặc Link sang route /crm/[id] */}
+                    {onOpenClient ? (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onOpenClient(client.id) }}
+                            style={{
+                                width: 28, height: 28, borderRadius: 6,
+                                background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.20)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#c4b5fd', cursor: 'pointer', padding: 0,
+                                transition: 'background 0.15s, border-color 0.15s', flexShrink: 0,
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.20)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.40)' }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.10)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.20)' }}
+                            title="Chi tiết"
+                        >
+                            <ExternalLink style={{ width: 14, height: 14 }} />
+                        </button>
+                    ) : (
+                        <Link
+                            href={`/${workspaceId}/admin/crm/${client.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                                width: 28, height: 28, borderRadius: 6,
+                                background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.20)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#c4b5fd', textDecoration: 'none',
+                                transition: 'background 0.15s, border-color 0.15s', flexShrink: 0,
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.20)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.40)' }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.10)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.20)' }}
+                            title="Chi tiết"
+                        >
+                            <ExternalLink style={{ width: 14, height: 14 }} />
+                        </Link>
+                    )}
 
                     {/* Unmerge button (only for subsidiaries) */}
                     {isSubsidiary && (
@@ -732,7 +739,7 @@ function ClientItem({
                                 style={{
                                     fontSize: 10,
                                     fontWeight: 700,
-                                    color: '#6366f1',
+                                    color: '#8B5CF6',
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
                                     marginBottom: 6,
@@ -810,7 +817,7 @@ function ClientItem({
                                     padding: '8px 20px 4px 80px',
                                     fontSize: 10,
                                     fontWeight: 700,
-                                    color: '#3b82f6',
+                                    color: '#8B5CF6',
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
                                 }}
@@ -823,6 +830,7 @@ function ClientItem({
                                     client={sub}
                                     onEdit={onEdit}
                                     workspaceId={workspaceId}
+                                    onOpenClient={onOpenClient}
                                     draggingId={draggingId}
                                     dragOverId={dragOverId}
                                     onDragStart={onDragStart}

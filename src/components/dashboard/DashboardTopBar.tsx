@@ -68,9 +68,14 @@ export default function DashboardTopBar({
       // OWNER/ADMIN → /admin, otherwise → /dashboard.
       const res = await fetch(`/api/workspace/first?profileId=${newProfileId}`)
       const { workspaceId: newWsId, view } = await res.json()
-      const targetView = view === "admin" ? "admin" : "dashboard"
-      // [Sprint L] Empty profile → /welcome instead of /login (no kick-out).
-      window.location.href = newWsId ? `/${newWsId}/${targetView}` : "/welcome"
+      // [Client membership] CLIENT membership in target profile → portal view.
+      if (view === "portal") {
+        window.location.href = newWsId ? `/portal/en/${newWsId}` : "/welcome"
+      } else {
+        const targetView = view === "admin" ? "admin" : "dashboard"
+        // [Sprint L] Empty profile → /welcome instead of /login (no kick-out).
+        window.location.href = newWsId ? `/${newWsId}/${targetView}` : "/welcome"
+      }
     } catch {
       setSwitching(false)
     }

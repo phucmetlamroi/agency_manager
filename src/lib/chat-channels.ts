@@ -10,6 +10,11 @@ export const CHAT_EVENTS = {
     MESSAGE_EDIT: 'message_edit',
     MESSAGE_DELETE: 'message_delete',
     REACTION: 'reaction',
+    // [Phase 2] ephemeral call signals + typing indicator (no DB; LiveKit /active
+    // is the source of truth for the call banner — these just make it feel instant).
+    CALL_STARTED: 'call_started',
+    CALL_ENDED: 'call_ended',
+    TYPING: 'typing',
 } as const
 
 export type ChatEvent = (typeof CHAT_EVENTS)[keyof typeof CHAT_EVENTS]

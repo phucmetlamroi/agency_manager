@@ -72,7 +72,10 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
                                         {
                                             OR: [
                                                 { profileId: currentProfileId },
-                                                { profileAccesses: { some: { profileId: currentProfileId } } }
+                                                // [Client membership] CLIENT members are view-only portal users —
+                                                // exclude them from workspace-scoped User queries (assignee pickers,
+                                                // admin user list, etc.). Staff keep ADMIN/USER access → still matched.
+                                                { profileAccesses: { some: { profileId: currentProfileId, role: { not: 'CLIENT' } } } }
                                             ]
                                         }
                                     ]

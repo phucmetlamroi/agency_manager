@@ -251,9 +251,12 @@ model ProfileAccess {
   // ADMIN sees workspaces with createdAt >= grantedAt automatically. Older
   // workspaces need explicit WorkspaceMember row granted by Owner.
   grantedAt DateTime    @default(now())
+  // [Client membership] When role=CLIENT, the Client record this membership represents.
+  clientId  Int?
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  client  Client? @relation("ProfileAccessClient", fields: [clientId], references: [id], onDelete: SetNull)
 
   @@unique([userId, profileId])
   // [Sprint Z] Indices to speed up role+cutoff queries
@@ -348,6 +351,11 @@ model Task {
   profileId        String?
   profile          Profile?          @relation(fields: [profileId], references: [id])
   duration         String?
+  // [Client Portal] Client-facing review state, decoupled from internal `status`.
+  // null = not in client review · AWAITING = cut ready for client · APPROVED · CHANGES (client requested changes)
+  clientReview     String?
+  clientFeedback   String?           // client's "request changes" note (separate from notes_vi)
+  clientReviewedAt DateTime?         // when the client last approved / requested changes
   claimSource      ClaimSource       @default(ADMIN)
   claimedAt        DateTime?
   taskTags         TaskTag[]
@@ -430,9 +438,22 @@ model Client {
   // Một Client record có thể có 0..N portal users (vd 1 client = nhiều người
   // truy cập portal cùng).
   portalUsers    User[]     @relation("ClientPortalUser")
+  // [Client membership] CLIENT-role ProfileAccess rows that represent this client.
+  profileAccesses ProfileAccess[] @relation("ProfileAccessClient")
 
   // [Quick Create] Per-client pricing rules (null clientId = workspace default)
   pricingRules   PricingRule[]
+
+  // [Soft-delete] Notion-style archive — mirror Profile/Workspace pattern.
+  // status: "ACTIVE" | "SOFT_DELETED". Soft-delete hides the client (+ its
+  // subsidiary subtree) from CRM lists/pickers but keeps tasks/invoices intact
+  // and restorable from the Client Trash. hardDeleteAfter is reserved for a
+  // future auto-purge cron (currently permanent-delete is manual-only).
+  status          String    @default("ACTIVE")
+  deletedAt       DateTime?
+  hardDeleteAfter DateTime?
+
+  @@index([status, deletedAt])
 }
 
 model Project {
@@ -562,6 +583,10 @@ model WorkspaceInvitation {
   invitedUserId String?  // Target user ID (set for in-app invites)
   invitedEmail  String?  // Email for future email-based invites
   role          String   @default("MEMBER") // WorkspaceRole to assign on accept
+  // [Client membership] cross-profile client invite: when true, accept creates a
+  // ProfileAccess(role=CLIENT, clientId) instead of a WorkspaceMember.
+  isClientInvite Boolean @default(false)
+  clientId       Int?
   token         String   @unique @default(uuid()) // For email/link-based invites
   status        String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED | REVOKED
   invitedById   String   // Who sent the invite
@@ -637,6 +662,7 @@ enum ProfileRole {
   OWNER
   ADMIN
   USER
+  CLIENT
 }
 
 enum InvoiceStatus {
@@ -1195,6 +1221,8 @@ model Channel {
   position    Int               @default(0)
   // Task linkage: when set, this channel is the discussion thread for one task
   taskId      String?           @unique
+  // [Client Portal] when set, this is the private client↔team message channel for one Client
+  clientId    Int?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -1207,6 +1235,7 @@ model Channel {
 
   @@index([workspaceId, type])
   @@index([categoryId])
+  @@index([clientId])
 }
 
 model Message {

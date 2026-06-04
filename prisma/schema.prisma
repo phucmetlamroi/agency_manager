@@ -97,6 +97,7 @@ model Workspace {
   channels   Channel[]
   categories Category[]
   wikiPages  WikiPage[]
+  customRoles CustomRole[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 
@@ -225,10 +226,13 @@ model User {
   notifications        Notification[]
 
   // [Knowledge Hub] authored messages + reactions + mentions + memberships + wiki
-  channelMessages    Message[]
+  channelMessages    Message[]          @relation("MessageAuthor")
   channelReactions   Reaction[]
   channelMentions    Mention[]
   channelMemberships ChannelMember[]
+  createdChannels    Channel[]          @relation("ChannelCreator")
+  pinnedMessages     Message[]          @relation("MessagePinnedBy")
+  customRoleMemberships CustomRoleMember[]
   wikiPages          WikiPage[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
@@ -1223,14 +1227,20 @@ model Channel {
   taskId      String?           @unique
   // [Client Portal] when set, this is the private client↔team message channel for one Client
   clientId    Int?
+  // [Hub member-based] channel creator/owner — full MANAGE rights; SetNull if the account is removed
+  createdById String?
+  // [Chat Phase 3] per-channel rate limit (seconds between posts); owner/mod bypass
+  slowModeSeconds Int           @default(0)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
   workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   category  Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   task      Task?           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator   User?           @relation("ChannelCreator", fields: [createdById], references: [id], onDelete: SetNull)
   messages  Message[]
   members   ChannelMember[]
+  overwrites ChannelOverwrite[]
   wikiPages WikiPage[]
 
   @@index([workspaceId, type])
@@ -1250,17 +1260,23 @@ model Message {
   replyCount  Int       @default(0)
   editedAt    DateTime?
   deletedAt   DateTime? // soft delete
+  // [Chat] Pinned messages: pinnedAt set = pinned; pinnedById = who pinned it (moderation act)
+  pinnedAt    DateTime?
+  pinnedById  String?
   createdAt   DateTime  @default(now())
 
   channel     Channel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  author      User         @relation(fields: [authorId], references: [id])
+  author      User         @relation("MessageAuthor", fields: [authorId], references: [id])
+  pinnedBy    User?        @relation("MessagePinnedBy", fields: [pinnedById], references: [id], onDelete: SetNull)
   parent      Message?     @relation("MessageThread", fields: [parentId], references: [id], onDelete: SetNull)
   replies     Message[]    @relation("MessageThread")
   reactions   Reaction[]
   mentions    Mention[]
   attachments Attachment[]
+  linkPreviews LinkPreview[]
 
   @@index([channelId, createdAt])
+  @@index([channelId, pinnedAt])
   @@index([parentId])
 }
 
@@ -1311,6 +1327,73 @@ model ChannelMember {
 
   @@unique([channelId, userId])
   @@index([userId])
+}
+
+// [Chat Phase 2] Custom workspace roles (org tiers: Manager, Editor, Client…) — a
+// lighter alternative to Discord's bitfield. Channel access is refined per-channel via
+// ChannelOverwrite. Distinct from the WorkspaceRole enum (OWNER/ADMIN/MEMBER/GUEST).
+model CustomRole {
+  id          String   @id @default(cuid())
+  workspaceId String
+  profileId   String
+  name        String
+  color       String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members   CustomRoleMember[]
+
+  @@index([workspaceId, position])
+}
+
+model CustomRoleMember {
+  id          String @id @default(cuid())
+  workspaceId String
+  roleId      String
+  userId      String
+
+  role CustomRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, userId])
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+// [Chat Phase 2] Per-channel ALLOW/DENY overwrite for a role OR a user. allow/deny are
+// CSV action sets (e.g. "VIEW,POST"). No row = pure membership behaviour (identical to
+// pre-Phase-2). Precedence in the resolver: base(membership) → role → user; deny→allow.
+model ChannelOverwrite {
+  id          String @id @default(cuid())
+  workspaceId String
+  channelId   String
+  subjectType String // 'ROLE' | 'USER'
+  subjectId   String // CustomRole.id or User.id
+  allow       String @default("")
+  deny        String @default("")
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, subjectType, subjectId])
+  @@index([channelId])
+}
+
+// [Chat Phase 3] OpenGraph link preview cached per message (filled async after send).
+model LinkPreview {
+  id          String   @id @default(cuid())
+  workspaceId String
+  messageId   String
+  url         String
+  title       String?
+  description String?  @db.Text
+  imageUrl    String?
+  siteName    String?
+  createdAt   DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
 }
 
 model WikiPage {

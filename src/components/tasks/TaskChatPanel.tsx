@@ -13,12 +13,10 @@ export default function TaskChatPanel({
     workspaceId,
     taskId,
     currentUserId,
-    isAdmin,
 }: {
     workspaceId: string
     taskId: string
     currentUserId?: string
-    isAdmin: boolean
 }) {
     const [channel, setChannel] = useState<HubChannelDTO | null>(null)
     const [error, setError] = useState<string | null>(null)
@@ -64,7 +62,6 @@ export default function TaskChatPanel({
                 workspaceId={workspaceId}
                 channel={channel}
                 currentUserId={currentUserId ?? ''}
-                isAdmin={isAdmin}
             />
         </div>
     )

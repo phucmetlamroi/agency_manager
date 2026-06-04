@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { hasAtLeastRole } from '@/lib/workspace-roles'
-import type { ChannelVisibility, PostPolicy, ChannelRole, ProfileRole } from '@prisma/client'
+import type { ChannelVisibility, PostPolicy, ChannelRole, ProfileRole, ChannelType } from '@prisma/client'
 
 /**
  * Knowledge Hub — channel authorization (simplified Discord model).
@@ -22,42 +22,99 @@ import type { ChannelVisibility, PostPolicy, ChannelRole, ProfileRole } from '@p
 export type ChannelAction = 'VIEW' | 'POST' | 'MANAGE'
 
 interface ChannelGate {
-    visibility: ChannelVisibility
+    type: string
     postPolicy: PostPolicy
+    createdById: string | null
 }
 
 /**
- * Pure decision function (unit-testable, no I/O).
- * @param channelMemberRole the caller's ChannelMember.role, or null if not a member.
+ * [Hub member-based] Pure decision function (unit-testable, no I/O).
+ * Membership-based for EVERYONE — there is no workspace-admin bypass. A standalone
+ * channel is visible only to its members (creator/owner + people added). The
+ * creator (`createdById`) and MODERATORs have MANAGE rights.
+ * @param userId the caller; @param channelMemberRole their ChannelMember.role, or null.
  */
 export function canPerformChannelAction(args: {
     action: ChannelAction
     channel: ChannelGate
-    isWorkspaceAdmin: boolean
+    userId: string
     channelMemberRole: ChannelRole | string | null
 }): boolean {
-    const { action, channel, isWorkspaceAdmin, channelMemberRole } = args
+    const { action, channel, userId, channelMemberRole } = args
 
-    // Workspace OWNER/ADMIN bypass all channel rules.
-    if (isWorkspaceAdmin) return true
+    // TASK channels = per-task chat, NOT Hub channels. Any workspace MEMBER (already
+    // MEMBER-verified by authorizeChannel) may view/post; they never appear in the Hub
+    // sidebar (getHubData filters type in TEXT/FORUM/WIKI). No settings to MANAGE.
+    if (channel.type === 'TASK') {
+        return action === 'VIEW' || action === 'POST'
+    }
 
-    const isModerator = channelMemberRole === 'MODERATOR'
+    const isOwner = channel.createdById != null && userId === channel.createdById
+    const isOwnerOrMod = isOwner || channelMemberRole === 'MODERATOR'
     const isMember = channelMemberRole != null
-    const canView = channel.visibility === 'PUBLIC' || isMember
 
     switch (action) {
         case 'VIEW':
-            return canView
+            return isMember
         case 'MANAGE':
-            // Non-admins can only manage if they're a channel MODERATOR.
-            return isModerator
+            return isOwnerOrMod
         case 'POST':
-            if (!canView) return false
-            if (channel.postPolicy === 'ADMINS_ONLY') return isModerator
+            if (!isMember) return false
+            if (channel.postPolicy === 'ADMINS_ONLY') return isOwnerOrMod
             return true
         default:
             return false
     }
+}
+
+/** A channel overwrite row (allow/deny are CSV action sets, e.g. "VIEW,POST"). */
+export interface ChannelOverwriteRow {
+    subjectType: string // 'ROLE' | 'USER'
+    subjectId: string
+    allow: string
+    deny: string
+}
+
+function csvHas(csv: string, action: ChannelAction): boolean {
+    return csv.length > 0 && csv.split(',').includes(action)
+}
+
+/**
+ * [Phase 2] Apply per-channel ALLOW/DENY overwrites on top of the membership base.
+ * Precedence (low→high): base(membership) → role overwrites → user overwrite; within
+ * each level deny is applied then allow. No overwrites → base unchanged (== pre-Phase-2).
+ */
+export function applyChannelOverwrites(
+    base: boolean,
+    action: ChannelAction,
+    overwrites: ChannelOverwriteRow[],
+    userId: string,
+    userRoleIds: Set<string>,
+): boolean {
+    let allowed = base
+    let roleDeny = false
+    let roleAllow = false
+    for (const ow of overwrites) {
+        if (ow.subjectType === 'ROLE' && userRoleIds.has(ow.subjectId)) {
+            if (csvHas(ow.deny, action)) roleDeny = true
+            if (csvHas(ow.allow, action)) roleAllow = true
+        }
+    }
+    if (roleDeny) allowed = false
+    if (roleAllow) allowed = true
+    for (const ow of overwrites) {
+        if (ow.subjectType === 'USER' && ow.subjectId === userId) {
+            if (csvHas(ow.deny, action)) allowed = false
+            if (csvHas(ow.allow, action)) allowed = true
+        }
+    }
+    return allowed
+}
+
+/** All CustomRole ids the user holds in a workspace (overwrite resolution + visibility). */
+export async function getUserRoleIds(workspaceId: string, userId: string): Promise<string[]> {
+    const rows = await prisma.customRoleMember.findMany({ where: { workspaceId, userId }, select: { roleId: true } })
+    return rows.map((r) => r.roleId)
 }
 
 export interface ChannelAuthzContext {
@@ -67,7 +124,7 @@ export interface ChannelAuthzContext {
     workspaceRole: string
     profileRole: ProfileRole | null
     isWorkspaceAdmin: boolean
-    channel: { id: string; visibility: ChannelVisibility; postPolicy: PostPolicy; type: string; taskId: string | null }
+    channel: { id: string; visibility: ChannelVisibility; postPolicy: PostPolicy; type: string; taskId: string | null; createdById: string | null }
     channelMemberRole: ChannelRole | null
 }
 
@@ -89,18 +146,30 @@ export async function authorizeChannel(
     // 2. Load the channel scoped to this workspace (explicit filter — no magic).
     const channel = await prisma.channel.findFirst({
         where: { id: channelId, workspaceId },
-        select: { id: true, visibility: true, postPolicy: true, type: true, taskId: true },
+        select: { id: true, visibility: true, postPolicy: true, type: true, taskId: true, createdById: true },
     })
     if (!channel) throw new Error('SECURITY_VIOLATION: channel not found in workspace')
 
-    // 3. Channel membership (per-channel role / private access).
+    // 3. Channel membership (per-channel role).
     const membership = await prisma.channelMember.findUnique({
         where: { channelId_userId: { channelId, userId } },
         select: { role: true },
     })
     const channelMemberRole = membership?.role ?? null
 
-    if (!canPerformChannelAction({ action, channel, isWorkspaceAdmin, channelMemberRole })) {
+    // Base = membership model; then refine with per-channel role/user overwrites
+    // (no overwrite rows → base unchanged, identical to pre-Phase-2 behaviour).
+    const base = canPerformChannelAction({ action, channel, userId, channelMemberRole })
+    let allowed = base
+    const overwrites = await prisma.channelOverwrite.findMany({
+        where: { channelId },
+        select: { subjectType: true, subjectId: true, allow: true, deny: true },
+    })
+    if (overwrites.length > 0) {
+        const userRoleIds = new Set(await getUserRoleIds(workspaceId, userId))
+        allowed = applyChannelOverwrites(base, action, overwrites, userId, userRoleIds)
+    }
+    if (!allowed) {
         throw new Error('SECURITY_VIOLATION: channel action not permitted')
     }
 
@@ -108,13 +177,32 @@ export async function authorizeChannel(
 }
 
 /**
- * Prisma `where` fragment for listing channels the caller may VIEW.
- * Admins see all; others see PUBLIC channels + PRIVATE channels they belong to.
- * Merge into a findMany where (the workspaceId scope is applied separately).
+ * [Hub member-based] Prisma `where` fragment for listing channels the caller may
+ * VIEW: ONLY channels they're a member of (no admin-sees-all, no PUBLIC-everyone).
+ * The TASK branch is inert inside getHubData (which filters type in TEXT/FORUM/WIKI)
+ * but keeps the helper self-safe for any future caller. Merge into a findMany where.
  */
-export function visibleChannelWhere(userId: string, isWorkspaceAdmin: boolean) {
-    if (isWorkspaceAdmin) return {}
+export function visibleChannelWhere(userId: string, userRoleIds: string[] = []) {
+    // NOTE: overwrite actions are exactly VIEW|POST|MANAGE (validated in setChannelOverwrite);
+    // none contains "VIEW" as a substring, so `contains:'VIEW'` is a token-exact match. If a new
+    // action containing that substring is ever added, switch to an explicit token match here.
     return {
-        OR: [{ visibility: 'PUBLIC' as ChannelVisibility }, { members: { some: { userId } } }],
+        AND: [
+            {
+                OR: [
+                    { type: 'TASK' as ChannelType },
+                    { members: { some: { userId } } },
+                    // [Phase 2] a per-user ALLOW VIEW overwrite grants visibility to a non-member.
+                    { overwrites: { some: { subjectType: 'USER', subjectId: userId, allow: { contains: 'VIEW' } } } },
+                    // a role ALLOW VIEW overwrite grants visibility to everyone holding that role.
+                    ...(userRoleIds.length > 0
+                        ? [{ overwrites: { some: { subjectType: 'ROLE', subjectId: { in: userRoleIds }, allow: { contains: 'VIEW' } } } }]
+                        : []),
+                ],
+            },
+            // A per-user DENY VIEW hides the channel even from a member (the gate also enforces
+            // this; excluding it here stops the channel name leaking into the sidebar/search).
+            { NOT: { overwrites: { some: { subjectType: 'USER', subjectId: userId, deny: { contains: 'VIEW' } } } } },
+        ],
     }
 }

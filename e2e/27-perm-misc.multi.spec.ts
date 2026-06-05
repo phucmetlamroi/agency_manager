@@ -55,8 +55,11 @@ test('4-M2-USER-MANAGE: member2 sees settings gear on #e2e-overwrites (USER ALLO
         // Gear must be present (user grant beyond role).
         await m2.locator('text=e2e-overwrites').first().click()
         await m2.locator('textarea').first().waitFor()
+        // [Timing] getMyChannelManage runs in useEffect parallel with channel data fetch.
+        // 5s was too tight when Neon cold pool RTT is 4-15s + the action chain. 15s
+        // covers cold pool + the resolver's overwrite SQL roundtrip.
         const gear = m2.locator('button:has(svg.lucide-settings)').first()
-        await expect(gear, 'member2 should see settings gear (USER ALLOW MANAGE)').toBeVisible({ timeout: 5_000 })
+        await expect(gear, 'member2 should see settings gear (USER ALLOW MANAGE)').toBeVisible({ timeout: 15_000 })
     } finally {
         await browser.close().catch(() => {})
     }
@@ -90,13 +93,15 @@ test('4-CLIENT-NOSTAFF: e2e_client cannot reach the /hub staff surface', async (
     try {
         const ctx = await browser.newContext()
         const client = await login(ctx, USERS.client.username)
-        // After login, CLIENT lands on /portal, NOT /[workspaceId]/hub.
-        await client.waitForTimeout(2000)
-        const url = client.url()
-        expect(url, 'CLIENT must land on /portal not /hub').toContain('/portal')
-        // Direct nav to a hub URL → must redirect away.
+        // After login the WorkspaceLayout SSR check fires (line 102-104):
+        //   if (clientCheck === 'CLIENT') redirect(`/portal/en/${workspaceId}`)
+        // Browser follows the 307 to /portal. Wait up to 15s for the redirect chain
+        // (login → /workspace → /portal) — Neon cold-pool RTT can push this.
+        await client.waitForURL((u) => u.pathname.includes('/portal'), { timeout: 15_000 })
+        expect(client.url(), 'CLIENT must land on /portal not /hub').toContain('/portal')
+        // Direct nav to a hub URL → must redirect to /portal again.
         await client.goto('/9dca8fad-5957-4050-9c2e-c15b24c5f1db/hub', { waitUntil: 'domcontentloaded', timeout: 20_000 }).catch(() => {})
-        await client.waitForTimeout(2000)
+        await client.waitForURL((u) => u.pathname.includes('/portal'), { timeout: 15_000 }).catch(() => {})
         const finalUrl = client.url()
         expect(finalUrl.includes('/hub') && !finalUrl.includes('/portal'), 'CRITICAL: CLIENT reached /hub surface').toBe(false)
     } finally {

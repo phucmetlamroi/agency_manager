@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, type ChangeEvent } from 'react'
-import { Hash, Lock, Loader2, Send, Trash2, SmilePlus, Smile, Settings, Bell, BellOff, Video, PhoneCall, Paperclip, FileText, X, Pin, Reply } from 'lucide-react'
+import { Hash, Lock, Loader2, Send, Trash2, SmilePlus, Smile, Settings, Bell, BellOff, Video, PhoneCall, Paperclip, FileText, X, Pin, Reply, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import type { HubChannelDTO } from '@/actions/channel-actions'
 import { getMyChannelMute, getMyChannelManage, setChannelMuted, getChannelMembers, markChannelRead } from '@/actions/channel-actions'
 import ChannelSettingsModal from './ChannelSettingsModal'
 import ThreadPanel from './ThreadPanel'
 import EmojiPicker from './EmojiPicker'
-import { getMessages, sendMessage, deleteMessage, togglePinMessage, getPinnedMessages, type MessageDTO, type ReactionDTO } from '@/actions/message-actions'
+import { getMessages, sendMessage, editMessage, deleteMessage, togglePinMessage, getPinnedMessages, type MessageDTO, type ReactionDTO } from '@/actions/message-actions'
 import { uploadChatAttachment, type ChatAttachmentMeta } from '@/actions/upload-actions'
 import { toggleReaction } from '@/actions/reaction-actions'
 import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
@@ -66,6 +66,12 @@ export default function ChannelView({ workspaceId, channel, currentUserId, onCha
     const [pinned, setPinned] = useState<MessageDTO[]>([])
     const [pinnedOpen, setPinnedOpen] = useState(false)
     const [emojiPickerFor, setEmojiPickerFor] = useState<string | null>(null) // a message id, or '__composer__'
+    // [Discord parity P1] Edit-message inline state — opens a textarea in place
+    // of the message <p>. Saves via editMessage server action; realtime echo
+    // patches the row by id so we only update local state on success.
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editText, setEditText] = useState('')
+    const [editSaving, setEditSaving] = useState(false)
     const isTask = channel.type === 'TASK'
     const fileInputRef = useRef<HTMLInputElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -351,6 +357,43 @@ export default function ChannelView({ workspaceId, channel, currentUserId, onCha
         broadcast(CHAT_EVENTS.MESSAGE_DELETE, { id })
     }
 
+    /** [Discord parity P1] Open the inline editor for a message. */
+    function handleEditStart(m: MessageDTO) {
+        setEditingId(m.id)
+        setEditText(m.content)
+    }
+
+    /** Cancel the inline edit without persisting. */
+    function handleEditCancel() {
+        setEditingId(null)
+        setEditText('')
+    }
+
+    /** Persist edit via server action; realtime echo + optimistic local patch. */
+    async function handleEditSave(messageId: string) {
+        const clean = editText.trim()
+        if (!clean || editSaving) return
+        const original = messages.find((m) => m.id === messageId)
+        if (original && clean === original.content.trim()) {
+            handleEditCancel()
+            return
+        }
+        setEditSaving(true)
+        try {
+            const res = await editMessage(workspaceId, messageId, clean)
+            if ('error' in res) {
+                toast.error(res.error)
+                return
+            }
+            // Patch local state from server DTO (handles link-preview clear + editedAt stamp).
+            setMessages((prev) => prev.map((m) => (m.id === messageId ? res.message : m)))
+            broadcast(CHAT_EVENTS.MESSAGE_EDIT, res.message)
+            handleEditCancel()
+        } finally {
+            setEditSaving(false)
+        }
+    }
+
     async function handleToggleMute() {
         const next = !muted
         setMuted(next) // optimistic
@@ -561,6 +604,18 @@ export default function ChannelView({ workspaceId, channel, currentUserId, onCha
                                                         <Pin className="w-3.5 h-3.5" />
                                                     </button>
                                                 )}
+                                                {/* [Discord parity P1] Edit pencil — mirrors the server's canEdit gate
+                                                    (author OR channel MOD OR channel owner). canDelete already
+                                                    captures author + canManage which is the same set; reuse it. */}
+                                                {canDelete && editingId !== m.id && (
+                                                    <button
+                                                        onClick={() => handleEditStart(m)}
+                                                        className="text-zinc-600 hover:text-violet-300"
+                                                        title="Sửa"
+                                                    >
+                                                        <Pencil className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                                 {canDelete && (
                                                     <button onClick={() => handleDelete(m.id)} className="text-zinc-600 hover:text-red-400" title="Xoá">
                                                         <Trash2 className="w-3.5 h-3.5" />
@@ -571,6 +626,46 @@ export default function ChannelView({ workspaceId, channel, currentUserId, onCha
                                     </div>
                                     {m.deletedAt ? (
                                         <p className="text-sm italic text-zinc-600">(tin nhắn đã xoá)</p>
+                                    ) : editingId === m.id ? (
+                                        /* [Discord parity P1] Inline edit mode — Enter saves, Esc cancels,
+                                           Shift+Enter inserts newline (mirrors composer behavior). */
+                                        <div className="mt-1">
+                                            <textarea
+                                                autoFocus
+                                                value={editText}
+                                                onChange={(e) => setEditText(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Escape') {
+                                                        e.preventDefault()
+                                                        handleEditCancel()
+                                                    } else if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault()
+                                                        void handleEditSave(m.id)
+                                                    }
+                                                }}
+                                                rows={Math.min(6, Math.max(1, editText.split('\n').length))}
+                                                maxLength={4000}
+                                                className="w-full resize-none bg-zinc-900/70 border border-violet-500/40 rounded-xl px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500"
+                                            />
+                                            <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
+                                                <span>Enter để lưu · Esc để huỷ</span>
+                                                <span className="ml-auto flex gap-1">
+                                                    <button
+                                                        onClick={handleEditCancel}
+                                                        className="px-2 py-0.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                                                    >
+                                                        Huỷ
+                                                    </button>
+                                                    <button
+                                                        onClick={() => void handleEditSave(m.id)}
+                                                        disabled={editSaving || !editText.trim()}
+                                                        className="px-2 py-0.5 rounded-md bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40"
+                                                    >
+                                                        {editSaving ? '…' : 'Lưu'}
+                                                    </button>
+                                                </span>
+                                            </div>
+                                        </div>
                                     ) : (
                                         <>
                                             {m.content && (

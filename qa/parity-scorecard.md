@@ -16,7 +16,7 @@
 
 | # | Feature | Status | File evidence | Recommendation |
 |---|---|---|---|---|
-| 1 | Edit-message UI | ❌ | `src/actions/message-actions.ts:374` action exists; no UI affordance in `ChannelView.tsx` | P1 — add row-hover pencil icon + inline editor |
+| 1 | Edit-message UI | ✅ | `ChannelView.tsx` row-hover pencil opens inline textarea, Enter saves via `editMessage`, Esc cancels. `(đã sửa)` indicator already present at line 542 | shipped — see commit `<this commit>` |
 | 2 | Delete-message UI | ✅ | `ChannelView.tsx:565` (Trash2 icon, `title="Xoá"`) | — |
 | 3 | Channel-rename UI | 🟡 | server action `renameChannel` at `channel-actions.ts:161`; UI present in settings modal | — verify rename works in settings modal |
 | 4 | Channel-delete UI | 🟡 | server action `deleteChannel` at `:176`; UI via settings modal | — |
@@ -54,18 +54,18 @@
 
 ## Parity summary
 
-- **Present (✅)**: 17 / 35 — core Discord-equivalent features
+- **Present (✅)**: 18 / 35 — core Discord-equivalent features (incl. edit-message UI shipped)
 - **Partial (🟡)**: 5 / 35 — exist but trimmed
-- **Missing (❌)**: 8 / 35 — not implemented yet
+- **Missing (❌)**: 7 / 35 — not implemented yet
 - **N/A (➖)**: 5 / 35 — explicit product decisions
 
-**Parity score: 17 ✅ + 5 🟡 = 22 / 30 in-scope features ≈ 73% Discord-parity**
+**Parity score: 18 ✅ + 5 🟡 = 23 / 30 in-scope features ≈ 77% Discord-parity**
 (excluding the 5 N/A items)
 
 ## Recommended fix priority
 
 | P0 — blockers (none) | — |
-| P1 — high leverage | Edit-message UI (#1) |
+| ~~P1 — high leverage~~ | ~~Edit-message UI (#1)~~ — **shipped** |
 | P2 — medium leverage | Promote-to-MOD UI (#5), VOICE channel type (#9), Audit log UI (#15) |
 | P3 — nice-to-have | Custom emoji upload (#7), Stickers/GIFs (#8), Jump-to-message (#16), Quote/forward (#17), @everyone (#20), Thread follow (#19) |
 

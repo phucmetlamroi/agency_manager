@@ -71,12 +71,44 @@ export default defineConfig({
             dependencies: ['setup'],
         },
 
-        // Phase 5 realtime tests open MULTIPLE contexts inside one test, so they
-        // don't bind to a single storageState — run with the unauth chrome base.
+        // Phase 5 realtime + Phase 3-10 multi-context tests open MULTIPLE contexts
+        // inside one test, so they don't bind to a single storageState — run with
+        // the unauth chrome base. Matches `10-realtime.spec.ts` (legacy) plus any
+        // file named `*.multi.spec.ts` (Playbook P3-P10 multi-tab tests).
         {
             name: 'realtime',
             use: { ...devices['Desktop Chrome'] },
-            testMatch: /10-realtime\.spec\.ts/,
+            testMatch: /(10-realtime|.*\.multi)\.spec\.ts/,
+            dependencies: ['setup'],
+        },
+        // [Playbook P6] Security suite — auth-bypass + IDOR + CSRF probes need
+        // their own project so they can run without storageState (unauth probes)
+        // OR with a specific role's storage. Specs choose via test.use({...}).
+        {
+            name: 'security',
+            use: { ...devices['Desktop Chrome'] },
+            testMatch: /.*\.security\.spec\.ts/,
+            dependencies: ['setup'],
+        },
+        // [Playbook P8] i18n suite — runs as owner; needs locale fixtures.
+        {
+            name: 'i18n',
+            use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/owner.json' },
+            testMatch: /.*\.i18n\.spec\.ts/,
+            dependencies: ['setup'],
+        },
+        // [Playbook P9] a11y suite — runs as owner; injects axe-core.
+        {
+            name: 'a11y',
+            use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/owner.json' },
+            testMatch: /.*\.a11y\.spec\.ts/,
+            dependencies: ['setup'],
+        },
+        // [Playbook P10] Edge/regression suite.
+        {
+            name: 'edge',
+            use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/owner.json' },
+            testMatch: /.*\.edge\.spec\.ts/,
             dependencies: ['setup'],
         },
     ],

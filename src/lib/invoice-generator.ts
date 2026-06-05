@@ -260,7 +260,10 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         }
 
         const page = await browser.newPage()
-        await page.setContent(html, { waitUntil: 'networkidle0' }) // networkidle0 ensures all resources are loaded
+        // [Pa11y bump] puppeteer-core v24 only allows 'load' | 'domcontentloaded';
+        // 'networkidle0' was dropped. 'load' is the closest equivalent (waits for
+        // all resources including images/fonts) for invoice PDF rendering.
+        await page.setContent(html, { waitUntil: 'load' })
 
         const pdfBuffer = await page.pdf({
             format: 'A4',

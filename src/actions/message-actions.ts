@@ -5,6 +5,7 @@ import { authorizeChannel, type ChannelAuthzContext } from '@/lib/channel-permis
 import { broadcastToChannel } from '@/lib/notification-broadcast'
 import { CHAT_EVENTS } from '@/lib/chat-channels'
 import { createAndBroadcastNotifications } from '@/actions/notification-actions'
+import { checkChatWriteLimit } from '@/lib/chat-rate-limit'
 import { revalidatePath } from 'next/cache'
 
 /**
@@ -201,6 +202,10 @@ export async function sendMessage(
         return { error: 'Bạn không có quyền gửi tin trong kênh này' }
     }
 
+    // [Security · Phase 6] Per-user write rate cap (backstop above per-channel slow mode).
+    const rl = await checkChatWriteLimit('sendMessage', ctx.userId)
+    if (rl) return { error: rl }
+
     const clean = content.trim()
     // [Phase 2] only trust attachments uploaded to THIS workspace's chat blob path
     // (blocks forged Attachment rows pointing at arbitrary URLs).
@@ -353,6 +358,10 @@ export async function editMessage(
     // [Hub member-based] no workspace-admin god-mode: author, the channel's owner, or a MODERATOR.
     const canEdit = existing.authorId === ctx.userId || ctx.channelMemberRole === 'MODERATOR' || ctx.userId === ctx.channel.createdById
     if (!canEdit) return { error: 'Không có quyền sửa tin nhắn này' }
+
+    // [Security · Phase 6] Cap edit storms (the playbook's edit-as-rate-bypass scenario).
+    const rl = await checkChatWriteLimit('editMessage', ctx.userId)
+    if (rl) return { error: rl }
 
     const updated = await prisma.message.update({
         where: { id: messageId },

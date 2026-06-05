@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { authorizeChannel, type ChannelAuthzContext } from '@/lib/channel-permissions'
 import { broadcastToChannel } from '@/lib/notification-broadcast'
 import { CHAT_EVENTS } from '@/lib/chat-channels'
+import { checkChatWriteLimit } from '@/lib/chat-rate-limit'
 import type { ReactionDTO } from './message-actions'
 
 function groupReactions(rows: { emoji: string; userId: string }[]): ReactionDTO[] {
@@ -37,6 +38,10 @@ export async function toggleReaction(
     } catch {
         return { error: 'Không có quyền' }
     }
+
+    // [Security · Phase 6] Cap reaction storms (the playbook's reaction-storm scenario).
+    const rl = await checkChatWriteLimit('reaction', ctx.userId)
+    if (rl) return { error: rl }
 
     const e = emoji.slice(0, 8)
     const existing = await prisma.reaction.findUnique({

@@ -93,6 +93,11 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                 autolink: true,
                 linkOnPaste: true,
                 defaultProtocol: 'https',
+                // [Security · CVE-2025-14284] Block javascript:/data:/vbscript: hrefs from
+                // ever being attached to a link mark — both via the toolbar AND autolink/paste
+                // paths. Without this guard, a saved wiki/chat link can carry an executable URI
+                // scheme that fires on click. Only http(s) and mailto: are permitted.
+                isAllowedUri: (url: string) => /^(https?:|mailto:)/i.test(url),
                 HTMLAttributes: {
                     class: 'text-blue-500 underline cursor-pointer hover:text-blue-700',
                     // Ensure links saved by editor always open in a new tab when
@@ -157,6 +162,13 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
     }
 
     const saveLink = () => {
+        // [Security] Belt-and-suspenders — the Link extension's isAllowedUri already filters
+        // these, but the `insertContent` raw-HTML path below bypasses extension validation,
+        // so reject non-http(s) URLs explicitly before we render any <a href=...>.
+        if (linkUrl && !/^(https?:|mailto:)/i.test(linkUrl.trim())) {
+            setLinkUrl('')
+            return
+        }
         if (linkUrl) {
             if (linkText && editor.state.selection.empty) {
                 editor.chain().focus().insertContent(`<a href="${linkUrl}">${linkText}</a>`).run()

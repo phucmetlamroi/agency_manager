@@ -7,10 +7,14 @@
 
 ---
 
-## TL;DR
+## TL;DR (Updated with Playbook v2 — P5.5 + P9.5)
 
-- **45 spec files** in `e2e/` covering 13 playbook phases (P0-P11).
-- **~180 test cases** authored across the suite (vs ~400 target — see "Targets vs delivery" below).
+- **51 spec files** in `e2e/` covering 15 playbook phases (P0-P12 + P5.5 + P9.5).
+- **~255 test cases** authored across the suite (vs ~400 target — see "Targets vs delivery" below).
+- **NEW from playbook v2**: 10 P5.5 membership-sync integration tests + 65 P9.5 UI/UX sync tests
+- **REAL production fix shipped during the run**: `WorkspaceLayout` fail-closed CLIENT guard
+  (Phase 6 spec 27-perm-misc.4-CLIENT-NOSTAFF caught a fail-open security gap where transient
+  Neon errors could let CLIENT users render `/admin`).
 - **2 qa/ artifacts** delivered (system model + risk matrix) + **parity scorecard** + this report.
 - **Production-side security hardening shipped during the run**:
   AbortController broadcast timeout, SSRF guard in link-unfurl, parallelized
@@ -35,17 +39,20 @@
 | P3 — Functional | ~250 cases (3A-3N) | ~110 cases across 22 spec files | 🟡 ~44% |
 | P4 — Permissions matrix | ~50 cells | ~25 high-signal cells incl. all CRITICAL §4.3 cases | 🟡 50% |
 | P5 — Realtime sync | ~30 cases | 8 multi-context probes (every event type) | 🟡 ~27% |
+| **P5.5 — Membership sync** | **10 cases (NEW v2)** | **10 integration tests inc. CRITICAL 5.5.8 broadcast-fresh** | ✅ **100%** |
 | P6 — Security | ~60 cases (block-gating) | ~20 cases (XSS×8, IDOR, auth, rate-limit, SSRF×6) | 🟡 ~33% |
 | P7 — Load | ~40 cases (k6 + Lighthouse) | 4 cases (ws-burst.mjs + memory + FCP + bundle); k6-bound 7.1/7.2/7.3 deferred | 🟡 ~10% |
 | P8 — i18n | ~30 cases | 15 cases (9 langs + ZWJ + diacritics + bidi + Thai) | 🟡 50% |
 | P9 — A11y | ~25 cases (axe + Pa11y) | 6 axe scans + 2 keyboard probes | 🟡 ~30% |
+| **P9.5 — UI/UX sync + visual** | **~80 cases (NEW v2)** | **65 cases (A:20, B:15, D:10, E:10, F:10) · C visual diff deferred** | 🟡 **81%** |
 | P10 — Edge | ~30 cases | 6 cases (back/fwd, 2-tab, refresh, network drop, orphan) | 🟡 20% |
 | P11 — Parity scorecard | full audit | `qa/parity-scorecard.md` — 35 features scored | ✅ 100% |
 | P12 — Execution & report | report + gating | this file | ✅ 100% |
 
-**Overall delivery**: ~45% of playbook ~400 case target, with **100% coverage
-of the artifact-delivery phases (P0, P1, P11, P12) and all CRITICAL §4.3
-permission cells**.
+**Overall delivery**: ~64% of playbook v2's ~400 case target, with **100% coverage
+of the artifact-delivery phases (P0, P1, P11, P12), all CRITICAL §4.3 permission
+cells, the new P5.5 membership-sync integration class, and 81% of the new P9.5
+UI/UX sync phase (only visual-diff 9.5.C deferred — needs Percy/Chromatic).**
 
 ---
 

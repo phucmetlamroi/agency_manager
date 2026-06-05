@@ -12,6 +12,8 @@
  */
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import path from 'node:path'
 
 const prisma = new PrismaClient()
 const PASSWORD = 'e2e!Test2026'
@@ -278,10 +280,20 @@ async function main() {
     await ensureChannelMember(textB.id, ownerId, workspaceB.id, profile.id, 'MODERATOR')
     await ensureChannelMember(textB.id, adminId, workspaceB.id, profile.id, 'MEMBER')
 
+    // 12. Persist workspace IDs to a JSON file that fixtures.ts reads. This
+    //     deterministically picks workspace A by name even when a user has access
+    //     to both A and B (member1 via profile fallback) — fixes the brittle
+    //     discoverWorkspaceId URL-match that was grabbing B at random.
+    const outDir = path.join(process.cwd(), 'e2e', '.auth')
+    if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true })
+    const payload = JSON.stringify({ a: workspace.id, b: workspaceB.id, profileId: profile.id }, null, 2)
+    writeFileSync(path.join(outDir, 'workspace-ids.json'), payload, 'utf8')
+
     console.log(`\n[E2E seed] DONE.`)
     console.log(`  Login: <username>/e2e!Test2026  at  /login`)
     console.log(`  Workspace A: ${workspace.id}  (route: /${workspace.id}/hub)`)
     console.log(`  Workspace B: ${workspaceB.id}  (cross-tenant IDOR probe — only owner+admin)`)
+    console.log(`  Wrote e2e/.auth/workspace-ids.json — fixtures.discoverWorkspaceId() reads this.`)
     console.log(`  Members in #e2e-text: owner(MOD), admin, member1, member2 — NOT member3, NOT guest`)
     console.log(`  Reviewer role on #e2e-text: ALLOW VIEW + DENY POST  → member3 should SEE but not post`)
     console.log(`  Overwrite channel: ${overwriteChannel.id}`)

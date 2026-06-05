@@ -176,6 +176,33 @@ Phase IDs use playbook nomenclature: `P3A`–`P3N` (functional), `P4` (perms), `
 - **Probe** (`P3G-PIN-RACE`): 2 contexts both click "Pin" on same msg within 50ms; assert final state = pinned (idempotent) + exactly 1 pinned event broadcast OR a deterministic last-write-wins log.
 - **Expected**: convergent state.
 
+## R19 — Membership sync: add member but they don't receive messages (INTEGRATION bug class)
+
+- **File:line**: `src/actions/channel-actions.ts:369` (`setChannelMembers`) + `src/lib/notification-broadcast.ts` + client subscription in `src/hooks/useSupabaseChannel.ts`
+- **Likelihood**: **H** — common bug pattern in chat platforms (stale cache, missed subscribe-on-add).
+- **Impact**: **H/C** — H normally, **CRITICAL** if server broadcast recipient list excludes a just-added member (silent message loss).
+- **Probe** (`P5.5-1..10`):
+  - 5.5.1: A adds B → channel in B's sidebar in <3s; message sent in <2s arrives at B
+  - 5.5.5: A adds 10 members at once; ALL 10 receive next message
+  - 5.5.8: hook broadcast recipient list — MUST equal current ChannelMember list at send time (no stale cache) — CRITICAL if mismatch
+  - 5.5.9: concurrent `addMember + sendMessage` 20 times; state consistent (no half-state)
+- **Expected**: realtime membership change propagates to the new member's client (subscribes to channel topic), next broadcast includes them, notification fan-out reaches them.
+
+## R20 — UI-Logic desync: DB updated but UI requires F5
+
+- **File:line**: every Server Action call in `src/components/hub/*.tsx` that mutates state — the client must update local state OR re-fetch on success.
+- **Likelihood**: **M/H** — very common in React apps without proper state invalidation.
+- **Impact**: **H** — broken UX; user thinks the action failed.
+- **Probe** (`P9.5.A-1..20`):
+  - Create channel → appears in sidebar <1s no F5
+  - Edit channel name → header + sidebar update simultaneously
+  - Pin/unpin message → badge updates inline
+  - Mute channel → bell icon toggles immediately
+  - Permission DENY → user loses access without refresh
+- **Expected**: Server Action revalidatePath() OR client useOptimistic/re-fetch OR Supabase broadcast propagates the change. UI matches DB within 1s of mutation success.
+
+---
+
 ## R18 — Presence false positive (online after disconnect)
 
 - **File:line**: `src/hooks/usePresence.ts` + Supabase presence

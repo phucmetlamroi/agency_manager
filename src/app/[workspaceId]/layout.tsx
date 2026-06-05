@@ -89,17 +89,28 @@ export default async function WorkspaceLayout({
     // (view-only portal), they must NEVER render an internal admin/dashboard page.
     // Authoritative per-profile check (the JWT only carries sessionProfileId).
     // NOTE: redirect() throws NEXT_REDIRECT — keep it OUT of the try/catch.
-    let isClientMembership = false
+    //
+    // [Security · fail-closed] Discovered via Phase 6 spec 27-perm-misc.4-CLIENT-NOSTAFF
+    // (CRITICAL CANDIDATE: e2e_client reached /admin URL): the prior implementation
+    // defaulted isClientMembership=false and SWALLOWED query errors, which means a
+    // transient Neon RTT timeout would let a CLIENT user render /admin. The fix:
+    //   1. Default `unknown` — we MUST determine the role before deciding.
+    //   2. On query error: redirect to /portal (fail-closed for the safer side; the
+    //      CLIENT-portal redirect costs nothing for non-CLIENTs since their layout
+    //      doesn't render until we've re-checked; legitimate non-CLIENTs simply
+    //      retry from /portal if the lookup fails repeatedly).
+    let clientCheck: 'CLIENT' | 'NOT_CLIENT' | 'UNKNOWN' = 'UNKNOWN'
     try {
         const clientAccess = await prisma.profileAccess.findUnique({
             where: { userId_profileId: { userId: session.user.id, profileId } },
             select: { role: true },
         })
-        isClientMembership = clientAccess?.role === 'CLIENT'
+        clientCheck = clientAccess?.role === 'CLIENT' ? 'CLIENT' : 'NOT_CLIENT'
     } catch (e) {
-        console.warn('[WorkspaceLayout] client-role guard check failed:', e)
+        console.error('[WorkspaceLayout] client-role guard check failed — failing closed to /portal:', e)
+        clientCheck = 'CLIENT' // [fail-closed] treat the unknown as CLIENT so they go to /portal
     }
-    if (isClientMembership) {
+    if (clientCheck === 'CLIENT') {
         redirect(`/portal/en/${workspaceId}`)
     }
 

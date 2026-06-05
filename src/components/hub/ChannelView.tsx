@@ -600,6 +600,52 @@ export default function ChannelView({ workspaceId, channel, currentUserId, onCha
                                                     )}
                                                 </div>
                                             )}
+                                            {/* [ChatP3-3] OG link unfurl cards. Filled async by after() in sendMessage — */}
+                                            {/* may arrive a moment after the message via MESSAGE_EDIT broadcast. */}
+                                            {m.linkPreviews && m.linkPreviews.length > 0 && (
+                                                <div className="mt-2 flex flex-col gap-2 max-w-[480px]">
+                                                    {m.linkPreviews.map((p) => (
+                                                        <a
+                                                            key={p.id}
+                                                            href={p.url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/5 p-3 transition-colors group/preview"
+                                                        >
+                                                            {p.imageUrl ? (
+                                                                /* eslint-disable-next-line @next/next/no-img-element */
+                                                                <img
+                                                                    src={p.imageUrl}
+                                                                    alt=""
+                                                                    className="h-16 w-16 shrink-0 rounded-lg object-cover border border-white/10"
+                                                                    loading="lazy"
+                                                                    onError={(e) => {
+                                                                        // Hide broken images (don't leave a dead box).
+                                                                        ;(e.target as HTMLImageElement).style.display = 'none'
+                                                                    }}
+                                                                />
+                                                            ) : null}
+                                                            <div className="min-w-0 flex-1">
+                                                                {p.siteName && (
+                                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-300/80 truncate">
+                                                                        {p.siteName}
+                                                                    </p>
+                                                                )}
+                                                                {p.title && (
+                                                                    <p className="text-sm font-semibold text-zinc-100 leading-snug line-clamp-2 group-hover/preview:text-violet-200">
+                                                                        {p.title}
+                                                                    </p>
+                                                                )}
+                                                                {p.description && (
+                                                                    <p className="mt-0.5 text-xs text-zinc-400 leading-snug line-clamp-2">
+                                                                        {p.description}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            )}
                                             <div className="mt-1.5 flex flex-wrap items-center gap-1">
                                                 {m.reactions.map((r) => {
                                                     const mine = currentUserId ? r.userIds.includes(currentUserId) : false

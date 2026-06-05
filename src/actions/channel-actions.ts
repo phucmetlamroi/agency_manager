@@ -237,11 +237,52 @@ export interface ChannelMemberDTO {
     username: string
     displayName: string | null
     role: string
+    /** [ChatP2-5] true if this member is a portal CLIENT user (not internal staff). */
+    isClient: boolean
 }
 export interface WorkspaceMemberOption {
     id: string
     username: string
     displayName: string | null
+}
+/** [ChatP2-5] Portal CLIENT users belonging to this workspace's profile, addable to TEXT channels. */
+export interface WorkspaceClientOption {
+    id: string
+    username: string
+    displayName: string | null
+    /** Display label of the linked Client record (or null when not linked). */
+    clientName: string | null
+}
+
+/**
+ * [ChatP2-5] All CLIENT-role portal users for this workspace's profile — the
+ * universe of clients a staff manager may invite into a TEXT channel.
+ * Scope: ProfileAccess(role=CLIENT) for workspace.profileId. Includes the Client
+ * record's name (best display label) when available.
+ */
+async function getWorkspaceClientOptions(workspaceId: string): Promise<WorkspaceClientOption[]> {
+    const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+    if (!ws?.profileId) return []
+    const rows = await prisma.profileAccess.findMany({
+        where: { profileId: ws.profileId, role: 'CLIENT' },
+        select: {
+            userId: true,
+            clientId: true,
+            user: { select: { username: true, displayName: true } },
+            client: { select: { name: true, status: true } },
+        },
+    })
+    // Exclude SOFT_DELETED Client records (portal user remains but the client is hidden from staff surfaces).
+    return rows
+        .filter((r) => !r.client || r.client.status !== 'SOFT_DELETED')
+        .map((r) => ({
+            id: r.userId,
+            username: r.user.username,
+            displayName: r.user.displayName,
+            clientName: r.client?.name ?? null,
+        }))
+        // Stable order: client name first, then username, so the list doesn't churn between renders.
+        .sort((a, b) => (a.clientName ?? a.username).localeCompare(b.clientName ?? b.username))
 }
 
 export async function updateChannelSettings(
@@ -273,30 +314,58 @@ export async function updateChannelSettings(
 export async function getChannelAccess(
     workspaceId: string,
     channelId: string,
-): Promise<{ members: ChannelMemberDTO[]; workspaceMembers: WorkspaceMemberOption[] } | { error: string }> {
+): Promise<{
+    members: ChannelMemberDTO[]
+    workspaceMembers: WorkspaceMemberOption[]
+    /** [ChatP2-5] Portal CLIENT users — empty array for non-TEXT channels (clients are TEXT-only). */
+    workspaceClients: WorkspaceClientOption[]
+    /** Channel type, so the UI knows whether to render the Khách hàng section (TEXT only). */
+    channelType: ChannelType
+} | { error: string }> {
     try {
         await authorizeChannel(workspaceId, channelId, 'MANAGE')
     } catch {
         return { error: 'Không có quyền' }
     }
 
-    const channel = await prisma.channel.findFirst({ where: { id: channelId, workspaceId }, select: { id: true } })
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, workspaceId }, select: { id: true, type: true } })
     if (!channel) return { error: 'Không tìm thấy kênh' }
 
-    const [members, workspaceMembers] = await Promise.all([
+    // Clients are TEXT-only for now — WIKI exposes a doc tree and FORUM a post list,
+    // both broader surfaces than the client portal MessageModal can handle safely.
+    const allowClients = channel.type === 'TEXT'
+
+    const [members, workspaceMembers, workspaceClients] = await Promise.all([
         prisma.channelMember.findMany({
             where: { channelId },
             select: { userId: true, role: true, user: { select: { username: true, displayName: true } } },
         }),
         getWorkspaceStaffOptions(workspaceId),
+        allowClients ? getWorkspaceClientOptions(workspaceId) : Promise.resolve([] as WorkspaceClientOption[]),
     ])
 
+    // Tag each member as staff vs CLIENT — UI shows them in separate groups.
+    const clientUserIds = new Set(workspaceClients.map((c) => c.id))
     return {
-        members: members.map((m) => ({ userId: m.userId, role: m.role, username: m.user.username, displayName: m.user.displayName })),
+        members: members.map((m) => ({
+            userId: m.userId,
+            role: m.role,
+            username: m.user.username,
+            displayName: m.user.displayName,
+            isClient: clientUserIds.has(m.userId),
+        })),
         workspaceMembers,
+        workspaceClients,
+        channelType: channel.type,
     }
 }
 
+/**
+ * [ChatP2-5] Accepts staff + portal CLIENT user IDs in a single list. The action
+ * validates each id against the workspace's staff universe OR its CLIENT-portal
+ * universe (ProfileAccess role=CLIENT), then writes a single ChannelMember set.
+ * Clients are only accepted on TEXT channels — WIKI/FORUM remain staff-only here.
+ */
 export async function setChannelMembers(workspaceId: string, channelId: string, userIds: string[]) {
     let ctx: Awaited<ReturnType<typeof authorizeChannel>>
     try {
@@ -305,14 +374,24 @@ export async function setChannelMembers(workspaceId: string, channelId: string, 
         return { error: 'Không có quyền' }
     }
 
-    const channel = await prisma.channel.findFirst({ where: { id: channelId, workspaceId }, select: { id: true, name: true, createdById: true } })
+    const channel = await prisma.channel.findFirst({
+        where: { id: channelId, workspaceId },
+        select: { id: true, name: true, createdById: true, type: true, clientId: true },
+    })
     if (!channel) return { error: 'Không tìm thấy kênh' }
     const profileId = ctx.profileId ?? (await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } }))?.profileId ?? null
     if (!profileId) return { error: 'Workspace chưa gắn profile' }
 
-    // Only real workspace staff may be added (profile-level staff incl., not just WorkspaceMember rows).
-    const staffIds = new Set((await getWorkspaceStaffOptions(workspaceId)).map((s) => s.id))
-    const target = new Set(userIds.filter((id) => staffIds.has(id)))
+    // Two universes — staff (any channel) + CLIENTs (TEXT-only, this profile only).
+    const [staff, clients] = await Promise.all([
+        getWorkspaceStaffOptions(workspaceId),
+        channel.type === 'TEXT' ? getWorkspaceClientOptions(workspaceId) : Promise.resolve([] as WorkspaceClientOption[]),
+    ])
+    const staffIds = new Set(staff.map((s) => s.id))
+    const clientIds = new Set(clients.map((c) => c.id))
+
+    // Accept ids that are either staff OR CLIENT for this workspace. Unknown ids are dropped silently.
+    const target = new Set(userIds.filter((id) => staffIds.has(id) || clientIds.has(id)))
     // The owner can never be removed from their own channel.
     if (channel.createdById) target.add(channel.createdById)
     const existing = await prisma.channelMember.findMany({ where: { channelId }, select: { userId: true } })

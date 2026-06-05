@@ -334,6 +334,24 @@ export async function uploadChatAttachment(
 
         const mime = file.type || 'application/octet-stream'
         const rawName = (file.name || 'file').trim()
+        const lowerName = rawName.toLowerCase()
+        // [Security] Block SVG and any HTML-like file outright. SVG can carry inline <script>
+        // (Sharp cannot decode it → would fall through to the "store raw" branch and be served
+        // inline by Vercel Blob → stored XSS). The blob path is `chat/{workspaceId}/...` and the
+        // host serves it on a non-app domain, but inline SVG + content-sniffing still poses an
+        // XSS risk against any future inline embed and is cheap to block.
+        if (
+            mime === 'image/svg+xml' ||
+            mime === 'text/html' ||
+            mime === 'application/xhtml+xml' ||
+            lowerName.endsWith('.svg') ||
+            lowerName.endsWith('.svgz') ||
+            lowerName.endsWith('.html') ||
+            lowerName.endsWith('.htm') ||
+            lowerName.endsWith('.xhtml')
+        ) {
+            return { error: 'Định dạng SVG/HTML không được hỗ trợ vì lý do bảo mật.' }
+        }
         const safeName = (rawName.replace(/[^\w.\-]+/g, '_').slice(0, 120)) || 'file'
         const buffer = Buffer.from(await file.arrayBuffer())
 

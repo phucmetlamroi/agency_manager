@@ -5,7 +5,10 @@ import { authorizeChannel, type ChannelAuthzContext } from '@/lib/channel-permis
 import { broadcastToChannel } from '@/lib/notification-broadcast'
 import { CHAT_EVENTS } from '@/lib/chat-channels'
 import { createAndBroadcastNotifications } from '@/actions/notification-actions'
+import { checkChatWriteLimit } from '@/lib/chat-rate-limit'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
+import { unfurlMessage } from '@/lib/link-unfurl'
 
 /**
  * Knowledge Hub — message read/write (server actions). Every call goes through
@@ -18,6 +21,11 @@ const MESSAGE_INCLUDE = {
     reactions: { select: { emoji: true, userId: true } },
     attachments: {
         select: { id: true, url: true, fileName: true, mimeType: true, sizeBytes: true, width: true, height: true },
+        orderBy: { createdAt: 'asc' },
+    },
+    // [ChatP3-3] OG link unfurl cards — populated asynchronously by after() in sendMessage.
+    linkPreviews: {
+        select: { id: true, url: true, title: true, description: true, imageUrl: true, siteName: true },
         orderBy: { createdAt: 'asc' },
     },
 } as const
@@ -41,6 +49,15 @@ export interface AttachmentDTO {
     width: number | null
     height: number | null
 }
+/** [ChatP3-3] OpenGraph card surfaced under a message that contains a URL. */
+export interface LinkPreviewDTO {
+    id: string
+    url: string
+    title: string | null
+    description: string | null
+    imageUrl: string | null
+    siteName: string | null
+}
 export interface MessageDTO {
     id: string
     channelId: string
@@ -51,6 +68,7 @@ export interface MessageDTO {
     replyCount: number
     reactions: ReactionDTO[]
     attachments: AttachmentDTO[]
+    linkPreviews: LinkPreviewDTO[]
     editedAt: string | null
     deletedAt: string | null
     pinnedAt: string | null
@@ -87,6 +105,17 @@ function serialize(m: any): MessageDTO {
                   sizeBytes: a.sizeBytes,
                   width: a.width ?? null,
                   height: a.height ?? null,
+              })),
+        // [ChatP3-3] Drop preview cards on a deleted message (same policy as attachments).
+        linkPreviews: m.deletedAt
+            ? []
+            : (m.linkPreviews ?? []).map((p: any) => ({
+                  id: p.id,
+                  url: p.url,
+                  title: p.title ?? null,
+                  description: p.description ?? null,
+                  imageUrl: p.imageUrl ?? null,
+                  siteName: p.siteName ?? null,
               })),
         editedAt: m.editedAt ? new Date(m.editedAt).toISOString() : null,
         deletedAt: m.deletedAt ? new Date(m.deletedAt).toISOString() : null,
@@ -201,6 +230,10 @@ export async function sendMessage(
         return { error: 'Bạn không có quyền gửi tin trong kênh này' }
     }
 
+    // [Security · Phase 6] Per-user write rate cap (backstop above per-channel slow mode).
+    const rl = await checkChatWriteLimit('sendMessage', ctx.userId)
+    if (rl) return { error: rl }
+
     const clean = content.trim()
     // [Phase 2] only trust attachments uploaded to THIS workspace's chat blob path
     // (blocks forged Attachment rows pointing at arbitrary URLs).
@@ -265,14 +298,22 @@ export async function sendMessage(
     }
 
     const dto = serialize(created)
-    await broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_NEW, dto)
-
+    // [Perf] Fire broadcasts in parallel (each has a 3s timeout) so a slow Supabase
+    // edge node doesn't serially add 6s+ to the user's send latency.
+    const broadcasts: Promise<unknown>[] = [broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_NEW, dto)]
     // [Chat threads] when this is a reply, re-broadcast the parent with its now-updated
     // replyCount so the "N replies" badge increments live for everyone viewing the channel
     // (DB replyCount is the source of truth — clients never count locally).
     if (parentId) {
         const parentRow = await prisma.message.findFirst({ where: { id: parentId, workspaceId }, include: MESSAGE_INCLUDE })
-        if (parentRow) await broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_EDIT, serialize(parentRow))
+        if (parentRow) broadcasts.push(broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_EDIT, serialize(parentRow)))
+    }
+    await Promise.all(broadcasts)
+
+    // [ChatP3-3] Link unfurl runs AFTER the response is sent — never blocks the user.
+    // The unfurler re-broadcasts MESSAGE_EDIT with the populated preview cards once done.
+    if (clean.includes('http')) {
+        after(() => unfurlMessage(workspaceId, created.id, clean, channelId, serialize, MESSAGE_INCLUDE))
     }
 
     // [nối dây] Fan-out notifications (best-effort — never blocks/fails the send).
@@ -354,6 +395,13 @@ export async function editMessage(
     const canEdit = existing.authorId === ctx.userId || ctx.channelMemberRole === 'MODERATOR' || ctx.userId === ctx.channel.createdById
     if (!canEdit) return { error: 'Không có quyền sửa tin nhắn này' }
 
+    // [Security · Phase 6] Cap edit storms (the playbook's edit-as-rate-bypass scenario).
+    const rl = await checkChatWriteLimit('editMessage', ctx.userId)
+    if (rl) return { error: rl }
+
+    // [ChatP3-3] If the edited content removes URLs we already unfurled, clear those rows.
+    // We don't try to be surgical — drop everything for this message, re-unfurl below.
+    await prisma.linkPreview.deleteMany({ where: { messageId } })
     const updated = await prisma.message.update({
         where: { id: messageId },
         data: { content: clean.slice(0, 4000), editedAt: new Date() },
@@ -361,6 +409,12 @@ export async function editMessage(
     })
     const dto = serialize(updated)
     await broadcastToChannel(existing.channelId, CHAT_EVENTS.MESSAGE_EDIT, dto)
+
+    // [ChatP3-3] Re-unfurl after the response — same path as send.
+    if (clean.includes('http')) {
+        after(() => unfurlMessage(workspaceId, messageId, clean, existing.channelId, serialize, MESSAGE_INCLUDE))
+    }
+
     return { success: true, message: dto }
 }
 

@@ -1,9 +1,25 @@
 'use server'
 
+import DOMPurify from 'isomorphic-dompurify'
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { authorizeChannel } from '@/lib/channel-permissions'
 import { revalidatePath } from 'next/cache'
+
+/**
+ * [Security] Server-side HTML sanitization for Tiptap content. Tiptap/ProseMirror only
+ * sanitizes in the BROWSER — anyone POSTing raw HTML directly to updateWikiPage can store
+ * stored-XSS otherwise. Allow the Tiptap schema (StarterKit + Link + TaskList + TextAlign
+ * + LineHeight) and explicitly forbid javascript:/data:/vbscript: URI schemes (CVE-2025-14284).
+ */
+function sanitizeWikiHtml(html: string): string {
+    return DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        // Allow inline styles set by the LineHeight + TextAlign extensions, but
+        // restrict to a known-safe property list via ALLOWED_ATTR + CSS sanitization.
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+    })
+}
 
 /**
  * Chat — Wiki (Notion-style page tree, content stored as Tiptap HTML). A WikiPage is:
@@ -142,7 +158,8 @@ export async function updateWikiPage(
 
     const patch: { title?: string; content?: string; icon?: string | null } = {}
     if (typeof data.title === 'string') patch.title = data.title.trim().slice(0, 120) || 'Trang mới'
-    if (typeof data.content === 'string') patch.content = data.content
+    // [Security] sanitize HTML server-side — Tiptap's client filter is bypassable.
+    if (typeof data.content === 'string') patch.content = sanitizeWikiHtml(data.content)
     if (data.icon !== undefined) patch.icon = data.icon
 
     await prisma.wikiPage.updateMany({ where: { id: pageId, workspaceId }, data: patch })

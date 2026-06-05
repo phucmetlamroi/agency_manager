@@ -54,3 +54,10 @@ next-env.d.ts
 # stray junk / transient locks
 /null
 .claude/scheduled_tasks.lock
+
+# [E2E] Playwright artifacts — session cookies (.auth) and reports must NEVER be committed.
+e2e/.auth/
+e2e/.report/
+playwright-report/
+test-results/
+

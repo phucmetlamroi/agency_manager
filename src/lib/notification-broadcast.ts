@@ -15,9 +15,13 @@ export async function broadcastNotificationToUser(userId: string, payload: any) 
     const channelName = getUserNotificationChannel(userId)
     const url = `${SUPABASE_URL}/realtime/v1/api/broadcast`
 
+    // [Reliability] Hard 3s timeout — same rationale as broadcastToChannel.
+    const controller = new AbortController()
+    const t = setTimeout(() => controller.abort(), 3_000)
     try {
         const res = await fetch(url, {
             method: 'POST',
+            signal: controller.signal,
             headers: {
                 'Content-Type': 'application/json',
                 apikey: SUPABASE_KEY,
@@ -39,6 +43,8 @@ export async function broadcastNotificationToUser(userId: string, payload: any) 
     } catch (e) {
         // Best-effort — notification persists in DB regardless
         console.warn('[broadcast] notification network error', e)
+    } finally {
+        clearTimeout(t)
     }
 }
 
@@ -52,9 +58,15 @@ export async function broadcastToChannel(channelId: string, event: string, paylo
     if (!SUPABASE_URL || !SUPABASE_KEY) return
 
     const url = `${SUPABASE_URL}/realtime/v1/api/broadcast`
+    // [Reliability] Hard 3s timeout — Supabase realtime is best-effort here (client
+    // broadcast + 15s polling fallback both fire too), and a stuck fetch otherwise
+    // freezes sendMessage / editMessage / pin / etc for the full request lifetime.
+    const controller = new AbortController()
+    const t = setTimeout(() => controller.abort(), 3_000)
     try {
         const res = await fetch(url, {
             method: 'POST',
+            signal: controller.signal,
             headers: {
                 'Content-Type': 'application/json',
                 apikey: SUPABASE_KEY,
@@ -72,5 +84,7 @@ export async function broadcastToChannel(channelId: string, event: string, paylo
     } catch (e) {
         // Best-effort — DB is source of truth.
         console.warn('[broadcast] channel network error', e)
+    } finally {
+        clearTimeout(t)
     }
 }

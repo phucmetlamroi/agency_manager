@@ -218,22 +218,77 @@ async function main() {
     await ensureRoleMember(reviewer.id, m3, workspace.id)
     console.log(`  roles: editor=${editor.id} (m1,m2) reviewer=${reviewer.id} (m3)`)
 
-    // 9. Channel overwrite — Reviewer role on `e2e-text`: ALLOW VIEW + DENY POST
-    //    Probes permission resolver: role ALLOW VIEW grants visibility to a non-member;
-    //    DENY POST blocks them from sending. Tests Phase 4 cell from playbook matrix.
+    // 9. Channel overwrite matrix — covers the ALLOW/DENY × VIEW/POST/MANAGE combos
+    //    needed for Phase 4 cells from playbook. We seed on a dedicated overwrite-test
+    //    channel so the regular happy-path tests on `e2e-text` aren't disturbed.
+
+    // Reviewer role on `e2e-text`: ALLOW VIEW + DENY POST (regression — kept).
     await ensureOverwrite(text.id, workspace.id, 'ROLE', reviewer.id, 'VIEW', 'POST')
 
-    // Also a user overwrite probe: member1 has role Editor, but we add a USER DENY VIEW
-    // to test "DENY > ALLOW, user > role" precedence. Member1 should LOSE access to text.
-    // We do NOT seed this by default (it would break the regular "member1 can post" tests);
-    // it's documented here as a manual probe to flip on/off if you want to test that cell.
-    // await ensureOverwrite(text.id, workspace.id, 'USER', m1, '', 'VIEW')
+    // Dedicated overwrite test channel (e2e-overwrites) — owner only by default;
+    // we add per-row overwrites that the Phase 4 spec asserts directly.
+    const overwriteChannel = await ensureChannel({
+        workspaceId: workspace.id, profileId: profile.id,
+        name: 'e2e-overwrites', type: 'TEXT', createdById: ownerId, categoryId: category.id,
+    })
+    await ensureChannelMember(overwriteChannel.id, ownerId, workspace.id, profile.id, 'MODERATOR')
+    await ensureChannelMember(overwriteChannel.id, adminId, workspace.id, profile.id, 'MEMBER')
+    await ensureChannelMember(overwriteChannel.id, m1, workspace.id, profile.id, 'MEMBER')
+    await ensureChannelMember(overwriteChannel.id, m2, workspace.id, profile.id, 'MEMBER')
+    await ensureChannelMember(overwriteChannel.id, m3, workspace.id, profile.id, 'MEMBER')
+
+    // Editor role: ALLOW VIEW+POST (positive grant). m1 + m2 hold this role.
+    await ensureOverwrite(overwriteChannel.id, workspace.id, 'ROLE', editor.id, 'VIEW,POST', '')
+    // Reviewer role: DENY POST (negative — m3 holds this role and is also a member; should not be able to post).
+    await ensureOverwrite(overwriteChannel.id, workspace.id, 'ROLE', reviewer.id, '', 'POST')
+    // Member-specific DENY VIEW on m1: tests "user DENY beats role ALLOW" (m1 is in Editor with ALLOW VIEW).
+    // This is the most important Phase 4 case — m1 must NOT see the channel.
+    await ensureOverwrite(overwriteChannel.id, workspace.id, 'USER', m1, '', 'VIEW')
+    // Member-specific ALLOW MANAGE on m2: lets m2 manage the channel even though only role-level perms are set elsewhere.
+    await ensureOverwrite(overwriteChannel.id, workspace.id, 'USER', m2, 'MANAGE', '')
+
+    // 10. CLIENT portal wiring — Client record, User.clientId FK, ProfileAccess.CLIENT.clientId.
+    //     Without this the CLIENT user can sign in but `getRelatedClientIds` returns [] and
+    //     the portal looks empty. Required for Phase 4 client-in-channel tests + Phase 6 IDOR.
+    const clientUser = users['e2e_client']
+    let e2eClientRecord = await prisma.client.findFirst({ where: { name: 'James Studio (E2E)', profileId: profile.id } })
+    if (!e2eClientRecord) {
+        e2eClientRecord = await prisma.client.create({
+            data: { name: 'James Studio (E2E)', profileId: profile.id, workspaceId: workspace.id },
+        })
+    }
+    await prisma.user.update({ where: { id: clientUser.id }, data: { clientId: e2eClientRecord.id } })
+    await prisma.profileAccess.updateMany({
+        where: { userId: clientUser.id, profileId: profile.id, role: 'CLIENT' },
+        data: { clientId: e2eClientRecord.id },
+    })
+
+    // 11. Second workspace — required by playbook for cross-tenant IDOR probes (Phase 6C).
+    //     Same profile (so admin-level access carries) but DIFFERENT channel set;
+    //     a member from workspace A who tries to read a channel by id in B must be denied.
+    const workspaceB = await findOrCreateWorkspace('E2E Workspace B', profile.id)
+    await ensureWorkspaceMember(ownerId, workspaceB.id, 'OWNER')
+    await ensureWorkspaceMember(adminId, workspaceB.id, 'ADMIN')
+    // Intentionally DO NOT add member1/2/3 to workspace B — that's the IDOR probe target.
+    const categoryB = await ensureCategory(workspaceB.id, profile.id, 'E2E B Suite', 0)
+    const textB = await ensureChannel({
+        workspaceId: workspaceB.id, profileId: profile.id,
+        name: 'e2e-text-b', type: 'TEXT', createdById: ownerId, categoryId: categoryB.id,
+    })
+    await ensureChannelMember(textB.id, ownerId, workspaceB.id, profile.id, 'MODERATOR')
+    await ensureChannelMember(textB.id, adminId, workspaceB.id, profile.id, 'MEMBER')
 
     console.log(`\n[E2E seed] DONE.`)
     console.log(`  Login: <username>/e2e!Test2026  at  /login`)
-    console.log(`  Workspace: ${workspace.id}  (route: /${workspace.id}/hub)`)
+    console.log(`  Workspace A: ${workspace.id}  (route: /${workspace.id}/hub)`)
+    console.log(`  Workspace B: ${workspaceB.id}  (cross-tenant IDOR probe — only owner+admin)`)
     console.log(`  Members in #e2e-text: owner(MOD), admin, member1, member2 — NOT member3, NOT guest`)
     console.log(`  Reviewer role on #e2e-text: ALLOW VIEW + DENY POST  → member3 should SEE but not post`)
+    console.log(`  Overwrite channel: ${overwriteChannel.id}`)
+    console.log(`    - Editor role ALLOW VIEW,POST · Reviewer role DENY POST`)
+    console.log(`    - USER DENY VIEW on member1 (Editor) → DENY-beats-role ALLOW probe`)
+    console.log(`    - USER ALLOW MANAGE on member2 → user-level grant probe`)
+    console.log(`  CLIENT wiring: e2e_client → Client id=${e2eClientRecord.id} "James Studio (E2E)"`)
 }
 
 main()

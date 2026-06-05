@@ -7,6 +7,8 @@ import { CHAT_EVENTS } from '@/lib/chat-channels'
 import { createAndBroadcastNotifications } from '@/actions/notification-actions'
 import { checkChatWriteLimit } from '@/lib/chat-rate-limit'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
+import { unfurlMessage } from '@/lib/link-unfurl'
 
 /**
  * Knowledge Hub — message read/write (server actions). Every call goes through
@@ -19,6 +21,11 @@ const MESSAGE_INCLUDE = {
     reactions: { select: { emoji: true, userId: true } },
     attachments: {
         select: { id: true, url: true, fileName: true, mimeType: true, sizeBytes: true, width: true, height: true },
+        orderBy: { createdAt: 'asc' },
+    },
+    // [ChatP3-3] OG link unfurl cards — populated asynchronously by after() in sendMessage.
+    linkPreviews: {
+        select: { id: true, url: true, title: true, description: true, imageUrl: true, siteName: true },
         orderBy: { createdAt: 'asc' },
     },
 } as const
@@ -42,6 +49,15 @@ export interface AttachmentDTO {
     width: number | null
     height: number | null
 }
+/** [ChatP3-3] OpenGraph card surfaced under a message that contains a URL. */
+export interface LinkPreviewDTO {
+    id: string
+    url: string
+    title: string | null
+    description: string | null
+    imageUrl: string | null
+    siteName: string | null
+}
 export interface MessageDTO {
     id: string
     channelId: string
@@ -52,6 +68,7 @@ export interface MessageDTO {
     replyCount: number
     reactions: ReactionDTO[]
     attachments: AttachmentDTO[]
+    linkPreviews: LinkPreviewDTO[]
     editedAt: string | null
     deletedAt: string | null
     pinnedAt: string | null
@@ -88,6 +105,17 @@ function serialize(m: any): MessageDTO {
                   sizeBytes: a.sizeBytes,
                   width: a.width ?? null,
                   height: a.height ?? null,
+              })),
+        // [ChatP3-3] Drop preview cards on a deleted message (same policy as attachments).
+        linkPreviews: m.deletedAt
+            ? []
+            : (m.linkPreviews ?? []).map((p: any) => ({
+                  id: p.id,
+                  url: p.url,
+                  title: p.title ?? null,
+                  description: p.description ?? null,
+                  imageUrl: p.imageUrl ?? null,
+                  siteName: p.siteName ?? null,
               })),
         editedAt: m.editedAt ? new Date(m.editedAt).toISOString() : null,
         deletedAt: m.deletedAt ? new Date(m.deletedAt).toISOString() : null,
@@ -282,6 +310,12 @@ export async function sendMessage(
     }
     await Promise.all(broadcasts)
 
+    // [ChatP3-3] Link unfurl runs AFTER the response is sent — never blocks the user.
+    // The unfurler re-broadcasts MESSAGE_EDIT with the populated preview cards once done.
+    if (clean.includes('http')) {
+        after(() => unfurlMessage(workspaceId, created.id, clean, channelId, serialize, MESSAGE_INCLUDE))
+    }
+
     // [nối dây] Fan-out notifications (best-effort — never blocks/fails the send).
     // Dedup precedence: mention > thread-reply > channel (one notif per user, most
     // specific type wins).
@@ -365,6 +399,9 @@ export async function editMessage(
     const rl = await checkChatWriteLimit('editMessage', ctx.userId)
     if (rl) return { error: rl }
 
+    // [ChatP3-3] If the edited content removes URLs we already unfurled, clear those rows.
+    // We don't try to be surgical — drop everything for this message, re-unfurl below.
+    await prisma.linkPreview.deleteMany({ where: { messageId } })
     const updated = await prisma.message.update({
         where: { id: messageId },
         data: { content: clean.slice(0, 4000), editedAt: new Date() },
@@ -372,6 +409,12 @@ export async function editMessage(
     })
     const dto = serialize(updated)
     await broadcastToChannel(existing.channelId, CHAT_EVENTS.MESSAGE_EDIT, dto)
+
+    // [ChatP3-3] Re-unfurl after the response — same path as send.
+    if (clean.includes('http')) {
+        after(() => unfurlMessage(workspaceId, messageId, clean, existing.channelId, serialize, MESSAGE_INCLUDE))
+    }
+
     return { success: true, message: dto }
 }
 

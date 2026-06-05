@@ -97,7 +97,9 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@eslint/eslintrc": "^3.3.4",
+    "@playwright/test": "^1.60.0",
     "@types/canvas-confetti": "^1.9.0",
     "@types/handlebars": "^4.0.40",
     "@types/node": "^20",

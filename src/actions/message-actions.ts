@@ -270,15 +270,17 @@ export async function sendMessage(
     }
 
     const dto = serialize(created)
-    await broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_NEW, dto)
-
+    // [Perf] Fire broadcasts in parallel (each has a 3s timeout) so a slow Supabase
+    // edge node doesn't serially add 6s+ to the user's send latency.
+    const broadcasts: Promise<unknown>[] = [broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_NEW, dto)]
     // [Chat threads] when this is a reply, re-broadcast the parent with its now-updated
     // replyCount so the "N replies" badge increments live for everyone viewing the channel
     // (DB replyCount is the source of truth — clients never count locally).
     if (parentId) {
         const parentRow = await prisma.message.findFirst({ where: { id: parentId, workspaceId }, include: MESSAGE_INCLUDE })
-        if (parentRow) await broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_EDIT, serialize(parentRow))
+        if (parentRow) broadcasts.push(broadcastToChannel(channelId, CHAT_EVENTS.MESSAGE_EDIT, serialize(parentRow)))
     }
+    await Promise.all(broadcasts)
 
     // [nối dây] Fan-out notifications (best-effort — never blocks/fails the send).
     // Dedup precedence: mention > thread-reply > channel (one notif per user, most

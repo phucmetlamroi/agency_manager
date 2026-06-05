@@ -18,9 +18,9 @@ async function sendOne(page: import('@playwright/test').Page, msg: string) {
     const composer = page.locator('textarea').first()
     await composer.fill(msg)
     await composer.press('Enter')
-    // Use getByText (matches Phase 2 pattern that's known-good). Generous 20s
-    // covers Neon test-branch RTT + Supabase broadcast (now 3s capped).
-    await expect(page.getByText(msg).first()).toBeVisible({ timeout: 20_000 })
+    // Use getByText (matches Phase 2 pattern). 45s covers Neon RTT + Supabase
+    // broadcast 3s cap + notification fan-out for 3-recipient channel.
+    await expect(page.getByText(msg).first()).toBeVisible({ timeout: 45_000 })
 }
 
 test('react with thumbs-up via quick-emoji popup', async ({ page }) => {

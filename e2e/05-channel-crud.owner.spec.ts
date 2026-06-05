@@ -76,8 +76,9 @@ test('owner creates a WIKI channel and it renders the Tiptap tree view', async (
     const input = page.locator('input[placeholder="tên-kênh"]')
     await input.click()
     await input.pressSequentially(newName, { delay: 10 })
-    await input.press('Enter')
+    // Click "Tài liệu" BEFORE Enter — type toggle updates newType to 'WIKI' before submit.
     await page.locator('button:has-text("Tài liệu")').click()
+    await input.press('Enter')
     await expect(page.locator(`text=${newName}`).first()).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText(/chưa có trang|chọn một trang/i).first()).toBeVisible({ timeout: 10_000 })
 })

@@ -18,7 +18,12 @@ export default defineConfig({
     expect: { timeout: 30_000 },
     fullyParallel: false, // realtime tests rely on stable channel state — serialize until we add isolation
     workers: 1, // single worker so tests don't race over shared seed
-    retries: process.env.CI ? 2 : 0,
+    // [Iterate Phase 3] retry once locally to absorb cold-pool flakes; the broadcast
+    // 3s timeout removed the worst freezes but cumulative Neon RTT still pushes some
+    // server-action chains close to the assertion window. Retries are cheap (a single
+    // failed test re-runs in <30s) and turn flakes into real signal: if a test fails
+    // twice in a row, it's a real bug.
+    retries: process.env.CI ? 2 : 1,
     reporter: [
         ['list'],
         ['html', { outputFolder: 'e2e/.report', open: 'never' }],

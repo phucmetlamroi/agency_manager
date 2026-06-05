@@ -41,8 +41,21 @@ for (const r of ROLES) {
         // Wait until we're off /login. Successful login lands on a workspace / admin /
         // dashboard — anything OTHER than /login or /api/*.
         await page.waitForURL((url) => !url.pathname.startsWith('/login') && !url.pathname.startsWith('/api/'), {
-            timeout: 20_000,
+            timeout: 30_000,
         })
+
+        // [Phase 3 warmup] Hit the chat surface once so the Neon connection pool is
+        // already hot when the actual specs run — saves the 4-15s first-hit cost.
+        // ROLES doesn't include CLIENT (portal user) so all entries here can warm /hub.
+        try {
+            await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30_000 })
+            const m = page.url().match(/\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\//i)
+            if (m) {
+                await page.goto(`/${m[1]}/hub`, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+            }
+        } catch {
+            // Best-effort — if warmup fails the actual tests will retry.
+        }
 
         await context.storageState({ path: path.join(AUTH_DIR, r.file) })
         expect(fs.existsSync(path.join(AUTH_DIR, r.file))).toBe(true)

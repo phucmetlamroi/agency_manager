@@ -10,8 +10,12 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
     testDir: './e2e',
-    timeout: 30_000,
-    expect: { timeout: 5_000 },
+    // [Neon test branch latency] Local dev → Neon us-east-1 first-hit RTT is 4-15s
+    // on cold connections (login alone takes 15.6s on the first request). Bump test
+    // timeout to 90s so server-action chains can complete; per-assertion 30s default
+    // covers the worst hub-data refetch (4.1s) + a couple of follow-ups.
+    timeout: 90_000,
+    expect: { timeout: 30_000 },
     fullyParallel: false, // realtime tests rely on stable channel state — serialize until we add isolation
     workers: 1, // single worker so tests don't race over shared seed
     retries: process.env.CI ? 2 : 0,
@@ -59,6 +63,15 @@ export default defineConfig({
             name: 'member3',
             use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/member3.json' },
             testMatch: /.*\.member3\.spec\.ts/,
+            dependencies: ['setup'],
+        },
+
+        // Phase 5 realtime tests open MULTIPLE contexts inside one test, so they
+        // don't bind to a single storageState — run with the unauth chrome base.
+        {
+            name: 'realtime',
+            use: { ...devices['Desktop Chrome'] },
+            testMatch: /10-realtime\.spec\.ts/,
             dependencies: ['setup'],
         },
     ],

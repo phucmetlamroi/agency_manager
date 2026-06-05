@@ -24,7 +24,7 @@
 | 6 | Reactions on thread-starter message | 🟡 | reactions wired everywhere; thread starter just uses `MessageRow` semantics | — verify with manual test |
 | 7 | Custom emoji upload | ❌ | only emoji-mart standard set | P3 — workspace-scoped uploads |
 | 8 | Stickers/GIFs | ❌ | not implemented | P3 — Tenor/Giphy via server action |
-| 9 | Voice channel without text channel | ❌ | LiveKit calls launch from a TEXT channel header | P2 — separate VOICE channel type |
+| 9 | Voice channel without text channel | ✅ | `Channel.type=VOICE` shipped — sidebar renders Volume2 icon, main pane uses new `VoiceChannelView` (LiveKit room join surface, no message stream). Create-channel UI exposes the type. | shipped — see commit `<this commit>` |
 | 10 | Direct Messages (DMs) | ➖ | product decision — internal team tool, not 1:1 social | — |
 | 11 | Friend system | ➖ | same as DMs | — |
 | 12 | Stage channels | ➖ | Discord-specific community feature | — |
@@ -54,19 +54,19 @@
 
 ## Parity summary
 
-- **Present (✅)**: 18 / 35 — core Discord-equivalent features (incl. edit-message UI shipped)
+- **Present (✅)**: 19 / 35 — core Discord-equivalent features (incl. edit-UI + VOICE channel)
 - **Partial (🟡)**: 5 / 35 — exist but trimmed
-- **Missing (❌)**: 7 / 35 — not implemented yet
+- **Missing (❌)**: 6 / 35 — not implemented yet
 - **N/A (➖)**: 5 / 35 — explicit product decisions
 
-**Parity score: 18 ✅ + 5 🟡 = 23 / 30 in-scope features ≈ 77% Discord-parity**
+**Parity score: 19 ✅ + 5 🟡 = 24 / 30 in-scope features ≈ 80% Discord-parity**
 (excluding the 5 N/A items)
 
 ## Recommended fix priority
 
 | P0 — blockers (none) | — |
 | ~~P1 — high leverage~~ | ~~Edit-message UI (#1)~~ — **shipped** |
-| P2 — medium leverage | Promote-to-MOD UI (#5), VOICE channel type (#9), Audit log UI (#15) |
+| P2 — medium leverage | Promote-to-MOD UI (#5), ~~VOICE channel type (#9)~~ **shipped**, Audit log UI (#15) |
 | P3 — nice-to-have | Custom emoji upload (#7), Stickers/GIFs (#8), Jump-to-message (#16), Quote/forward (#17), @everyone (#20), Thread follow (#19) |
 
 ## Notes on items deliberately diverging from Discord

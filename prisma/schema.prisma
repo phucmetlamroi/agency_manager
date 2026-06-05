@@ -1181,6 +1181,7 @@ enum ChannelType {
   FORUM // post-based (UI deferred)
   WIKI // container for wiki pages
   TASK // auto-created, attached to one task
+  VOICE // pure LiveKit voice/video room — no message stream, no composer (Discord parity #9)
 }
 
 enum ChannelVisibility {

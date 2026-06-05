@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
-import { Hash, Lock, Plus, Loader2, MessagesSquare, BookOpen, Search, Shield, MessageSquare } from 'lucide-react'
+import { Hash, Lock, Plus, Loader2, MessagesSquare, BookOpen, Search, Shield, MessageSquare, Volume2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createChannel, createCategory, getUnreadCounts, markChannelRead, type HubCategoryDTO, type HubChannelDTO } from '@/actions/channel-actions'
 import ChannelView from './ChannelView'
@@ -9,6 +9,7 @@ import WikiClient from './WikiClient'
 import SearchModal from './SearchModal'
 import RolesManagerModal from './RolesManagerModal'
 import ForumView from './ForumView'
+import VoiceChannelView from './VoiceChannelView'
 
 interface Props {
     workspaceId: string
@@ -25,7 +26,7 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
 
     const [showNewChannel, setShowNewChannel] = useState(false)
     const [newName, setNewName] = useState('')
-    const [newType, setNewType] = useState<'TEXT' | 'WIKI' | 'FORUM'>('TEXT')
+    const [newType, setNewType] = useState<'TEXT' | 'WIKI' | 'FORUM' | 'VOICE'>('TEXT')
     const [busy, setBusy] = useState(false)
     const [showSearch, setShowSearch] = useState(false)
     const [showRoles, setShowRoles] = useState(false)
@@ -189,6 +190,12 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                             >
                                 <BookOpen className="w-3.5 h-3.5" /> Tài liệu
                             </button>
+                            <button
+                                onClick={() => setNewType('VOICE')}
+                                className={`flex-1 flex items-center justify-center gap-1 rounded-md py-1.5 text-xs font-semibold transition-colors ${newType === 'VOICE' ? 'bg-violet-600 text-white' : 'text-zinc-400 hover:text-zinc-100'}`}
+                            >
+                                <Volume2 className="w-3.5 h-3.5" /> Voice
+                            </button>
                         </div>
                         <button
                             onClick={handleCreateChannel}
@@ -196,7 +203,7 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                             className="mt-2 w-full flex items-center justify-center gap-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold py-2 disabled:opacity-40"
                         >
                             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                            Tạo {newType === 'WIKI' ? 'kênh tài liệu' : newType === 'FORUM' ? 'diễn đàn' : 'kênh'}
+                            Tạo {newType === 'WIKI' ? 'kênh tài liệu' : newType === 'FORUM' ? 'diễn đàn' : newType === 'VOICE' ? 'kênh thoại' : 'kênh'}
                         </button>
                     </div>
                 )}
@@ -228,6 +235,8 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                                                 <BookOpen className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
                                             ) : ch.type === 'FORUM' ? (
                                                 <MessageSquare className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
+                                            ) : ch.type === 'VOICE' ? (
+                                                <Volume2 className="w-3.5 h-3.5 shrink-0 text-violet-400" />
                                             ) : ch.visibility === 'PRIVATE' ? (
                                                 <Lock className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
                                             ) : (
@@ -255,6 +264,15 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
                         <WikiClient key={selected.id} workspaceId={workspaceId} channelId={selected.id} />
                     ) : selected.type === 'FORUM' ? (
                         <ForumView key={selected.id} workspaceId={workspaceId} channel={selected} />
+                    ) : selected.type === 'VOICE' ? (
+                        <VoiceChannelView
+                            key={selected.id}
+                            workspaceId={workspaceId}
+                            channel={selected}
+                            onChannelUpdated={(patch) =>
+                                setChannels((prev) => prev.map((c) => (c.id === selected.id ? { ...c, ...patch } : c)))
+                            }
+                        />
                     ) : (
                         <ChannelView
                             key={selected.id}

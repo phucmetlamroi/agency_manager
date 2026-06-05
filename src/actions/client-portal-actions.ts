@@ -711,56 +711,118 @@ async function getClientRoot(clientUserId: string): Promise<{ id: number; name: 
     return root ? { id: root.id, name: root.name } : null
 }
 
-/** Verify a CLIENT may access a channel = it's their per-client channel. */
+/**
+ * Verify a CLIENT may access a channel. Two paths (unified by [ChatP2-5]):
+ *   1. Legacy per-client channel: `Channel.clientId === root.id` (auto-created
+ *      for every client by getOrCreateClientChannelAsClient).
+ *   2. [ChatP2-5] Explicit ChannelMember row created by staff via
+ *      setChannelMembers — lets staff bring a client into any TEXT channel.
+ *
+ * Restricted to TEXT type — WIKI/FORUM are staff-only surfaces (the portal
+ * MessageModal only renders a single chat stream).
+ */
 async function authorizeClientChannel(workspaceId: string, channelId: string, clientUserId: string) {
     const root = await getClientRoot(clientUserId)
-    if (!root) throw new Error('CLIENT_NO_ROOT')
+    // root is optional for path 2 — a freshly-invited CLIENT may have no Client record
+    // wired up yet but still legitimately appear in ChannelMember.
     const channel = await globalPrisma.channel.findFirst({
-        where: { id: channelId, workspaceId, clientId: root.id },
+        where: {
+            id: channelId,
+            workspaceId,
+            type: 'TEXT',
+            OR: [
+                ...(root ? [{ clientId: root.id }] : []),
+                { members: { some: { userId: clientUserId } } },
+            ],
+        },
         select: { id: true, profileId: true },
     })
     if (!channel) throw new Error('CLIENT_CHANNEL_FORBIDDEN')
-    return { clientUserId, root, channel }
+    // root may be null in path 2; downstream callers (sendClientMessage admin notify)
+    // tolerate it via a sane fallback label.
+    return { clientUserId, root: root ?? { id: 0, name: 'Khách' }, channel }
 }
 
-/** Get-or-create the per-client message channel + ensure admins are members. */
-export async function getOrCreateClientChannelAsClient(workspaceId: string): Promise<{ channel: { id: string; name: string } } | { error: string }> {
+/**
+ * Get-or-create the per-client default channel + list every TEXT channel this
+ * CLIENT user can access (their per-client channel + any channel a staff manager
+ * added them to via setChannelMembers — [ChatP2-5]).
+ *
+ * Backward-compat: legacy callers using `res.channel` still work via the same
+ * shape; new callers can read `res.availableChannels` to render a switcher.
+ */
+export async function getOrCreateClientChannelAsClient(workspaceId: string): Promise<{
+    channel: { id: string; name: string }
+    availableChannels: { id: string; name: string }[]
+} | { error: string }> {
     const clientUserId = await getClientSession()
     const root = await getClientRoot(clientUserId)
-    if (!root) return { error: 'Chưa liên kết tài khoản khách với hồ sơ khách hàng.' }
 
     const ws = await globalPrisma.workspace.findUnique({ where: { id: workspaceId }, select: { id: true, profileId: true } })
     if (!ws?.profileId) return { error: 'Workspace không hợp lệ.' }
     const profileId = ws.profileId
 
-    let channel = await globalPrisma.channel.findFirst({
-        where: { workspaceId, clientId: root.id, type: 'TEXT' },
-        select: { id: true, name: true },
-    })
+    let defaultChannel: { id: string; name: string } | null = null
 
-    if (!channel) {
-        channel = await globalPrisma.channel.create({
-            data: {
-                workspaceId, profileId, clientId: root.id,
-                name: `Khách: ${root.name}`.slice(0, 80),
-                type: 'TEXT', visibility: 'PRIVATE', postPolicy: 'EVERYONE', position: 999,
-            },
+    // Per-client default channel — only attempt when the client root is resolvable.
+    if (root) {
+        defaultChannel = await globalPrisma.channel.findFirst({
+            where: { workspaceId, clientId: root.id, type: 'TEXT' },
             select: { id: true, name: true },
+        })
+
+        if (!defaultChannel) {
+            defaultChannel = await globalPrisma.channel.create({
+                data: {
+                    workspaceId, profileId, clientId: root.id,
+                    name: `Khách: ${root.name}`.slice(0, 80),
+                    type: 'TEXT', visibility: 'PRIVATE', postPolicy: 'EVERYONE', position: 999,
+                },
+                select: { id: true, name: true },
+            })
+        }
+
+        // Ensure the client + workspace admins are members of the default channel (idempotent).
+        const admins = await globalPrisma.workspaceMember.findMany({
+            where: { workspaceId, role: { in: ['OWNER', 'ADMIN'] } },
+            select: { userId: true },
+        })
+        const memberUserIds = Array.from(new Set([clientUserId, ...admins.map(a => a.userId)]))
+        await globalPrisma.channelMember.createMany({
+            data: memberUserIds.map(userId => ({ workspaceId, profileId, channelId: defaultChannel!.id, userId, role: 'MEMBER' as const })),
+            skipDuplicates: true,
         })
     }
 
-    // Ensure the client + workspace admins are channel members (idempotent).
-    const admins = await globalPrisma.workspaceMember.findMany({
-        where: { workspaceId, role: { in: ['OWNER', 'ADMIN'] } },
-        select: { userId: true },
-    })
-    const memberUserIds = Array.from(new Set([clientUserId, ...admins.map(a => a.userId)]))
-    await globalPrisma.channelMember.createMany({
-        data: memberUserIds.map(userId => ({ workspaceId, profileId, channelId: channel!.id, userId, role: 'MEMBER' as const })),
-        skipDuplicates: true,
+    // [ChatP2-5] Any additional TEXT channels staff invited this user into.
+    const inviteRows = await globalPrisma.channel.findMany({
+        where: {
+            workspaceId,
+            type: 'TEXT',
+            members: { some: { userId: clientUserId } },
+        },
+        select: { id: true, name: true },
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
     })
 
-    return { channel: { id: channel.id, name: channel.name } }
+    // Merge: default first (if any), then invites — dedupe by id.
+    const seen = new Set<string>()
+    const availableChannels: { id: string; name: string }[] = []
+    if (defaultChannel) {
+        availableChannels.push(defaultChannel)
+        seen.add(defaultChannel.id)
+    }
+    for (const c of inviteRows) {
+        if (seen.has(c.id)) continue
+        seen.add(c.id)
+        availableChannels.push(c)
+    }
+
+    if (availableChannels.length === 0) {
+        return { error: 'Chưa liên kết tài khoản khách với hồ sơ khách hàng.' }
+    }
+
+    return { channel: availableChannels[0], availableChannels }
 }
 
 /** Fetch messages of the per-client channel (CLIENT-auth, oldest→newest). */

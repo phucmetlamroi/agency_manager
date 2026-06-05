@@ -16,6 +16,8 @@ export default function MessageModal({ workspaceId, currentUserId, onClose }: {
     onClose: () => void
 }) {
     const [channelId, setChannelId] = useState<string | null>(null)
+    // [ChatP2-5] Channels the CLIENT has access to (default per-client + invited-into).
+    const [channels, setChannels] = useState<{ id: string; name: string }[]>([])
     const [messages, setMessages] = useState<PortalMessageDTO[]>([])
     const [text, setText] = useState('')
     const [loading, setLoading] = useState(true)
@@ -31,7 +33,7 @@ export default function MessageModal({ workspaceId, currentUserId, onClose }: {
         })
     }, [])
 
-    // Open / create the per-client channel + load history.
+    // Open / create the per-client channel + list any extra channels the client was invited into.
     useEffect(() => {
         let alive = true
         getOrCreateClientChannelAsClient(workspaceId).then(res => {
@@ -39,6 +41,7 @@ export default function MessageModal({ workspaceId, currentUserId, onClose }: {
             if (!('channel' in res)) { setErr(res.error); setLoading(false); return }
             const ch = res.channel
             setChannelId(ch.id)
+            setChannels(res.availableChannels ?? [ch])
             getClientMessages(workspaceId, ch.id).then(r => {
                 if (!alive) return
                 setMessages(r.messages)
@@ -47,6 +50,18 @@ export default function MessageModal({ workspaceId, currentUserId, onClose }: {
         })
         return () => { alive = false }
     }, [workspaceId])
+
+    // Switch to a different channel (load its history; realtime hook re-subscribes via channelId dep).
+    const switchChannel = useCallback((nextId: string) => {
+        if (!nextId || nextId === channelId) return
+        setChannelId(nextId)
+        setMessages([])
+        setLoading(true)
+        getClientMessages(workspaceId, nextId).then(r => {
+            setMessages(r.messages)
+            setLoading(false)
+        }).catch(() => setLoading(false))
+    }, [channelId, workspaceId])
 
     // Realtime — receive staff replies (and dedupe our own).
     const { broadcast } = useSupabaseChannel(
@@ -96,6 +111,35 @@ export default function MessageModal({ workspaceId, currentUserId, onClose }: {
                     </div>
                     <button onClick={onClose} className="pc-btn pc-btn-quiet" style={{ padding: 8, borderRadius: 9 }}><X size={16} /></button>
                 </div>
+
+                {/* [ChatP2-5] Channel switcher — only render when the client has access to >1 channel. */}
+                {channels.length > 1 && (
+                    <div style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: '1px solid var(--line)', overflowX: 'auto' }}>
+                        {channels.map(c => {
+                            const active = c.id === channelId
+                            return (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => switchChannel(c.id)}
+                                    style={{
+                                        whiteSpace: 'nowrap',
+                                        padding: '5px 10px',
+                                        borderRadius: 999,
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        background: active ? 'var(--accent-soft)' : 'transparent',
+                                        border: '1px solid ' + (active ? 'var(--accent-line)' : 'var(--line-2)'),
+                                        color: active ? 'var(--accent-fg)' : 'var(--fg-2)',
+                                    }}
+                                >
+                                    #{c.name}
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
 
                 {/* Thread */}
                 <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>

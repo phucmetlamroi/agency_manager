@@ -25,23 +25,56 @@ export const CHANNELS = {
     adminsOnly: 'e2e-admins-only',
 } as const
 
+import { readFileSync, existsSync } from 'node:fs'
+import path from 'node:path'
+
 /**
- * Discover the E2E workspace ID from the sidebar after login. Tests then
- * navigate to `/${workspaceId}/hub` without depending on a hard-coded UUID.
- * Falls back to scraping the current URL if the sidebar isn't present.
+ * Cached read of e2e/.auth/workspace-ids.json (written by seed-e2e-fixtures.ts).
+ * Without this file (or in legacy mode), the helper falls back to URL scraping
+ * which is brittle when a profile-member user has access to multiple workspaces.
  */
-export async function discoverWorkspaceId(page: import('@playwright/test').Page): Promise<string> {
-    // The workspace ID is in the URL right after login — go to root and observe.
+let _wsIds: { a: string; b: string; profileId?: string } | null | undefined
+
+function loadWorkspaceIds(): { a: string; b: string; profileId?: string } | null {
+    if (_wsIds !== undefined) return _wsIds ?? null
+    try {
+        const p = path.join(process.cwd(), 'e2e', '.auth', 'workspace-ids.json')
+        if (!existsSync(p)) { _wsIds = null; return null }
+        const parsed = JSON.parse(readFileSync(p, 'utf8')) as { a: string; b: string; profileId?: string }
+        _wsIds = parsed
+        return parsed
+    } catch {
+        _wsIds = null
+        return null
+    }
+}
+
+/**
+ * Discover the E2E workspace ID. Prefers the deterministic file written by the
+ * seed (`e2e/.auth/workspace-ids.json`) — picks workspace A by default. Falls
+ * back to URL-scraping for legacy tests that ran before the seed wrote the file.
+ *
+ * Pass key='b' to target the cross-tenant workspace (IDOR probes).
+ */
+export async function discoverWorkspaceId(
+    page: import('@playwright/test').Page,
+    key: 'a' | 'b' = 'a',
+): Promise<string> {
+    const ids = loadWorkspaceIds()
+    if (ids) return ids[key]
+
+    // [Legacy fallback] file is missing — re-seed to populate. Tries URL match.
     await page.goto('/')
     await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {})
     const m = page.url().match(/\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\//i)
     if (m) return m[1]
-    // Fallback: try /admin link in sidebar
     const link = page.locator('a[href*="/admin"]').first()
     if ((await link.count()) > 0) {
         const href = await link.getAttribute('href')
         const m2 = href?.match(/\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\//i)
         if (m2) return m2[1]
     }
-    throw new Error('Could not discover workspace ID from URL or sidebar')
+    throw new Error(
+        'Could not discover workspace ID. Run `npx tsx scripts/seed-e2e-fixtures.ts` to write e2e/.auth/workspace-ids.json.',
+    )
 }

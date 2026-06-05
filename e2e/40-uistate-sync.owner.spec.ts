@@ -165,17 +165,23 @@ test('9.5.A-9-WS-SWITCH-RESET: switching workspace clears prior channel state', 
     expect(stillHasA, 'workspace A channels must NOT leak into B view').toBeLessThanOrEqual(1)
 })
 
-/* ───────── 9.5.A-10: Edit msg parity — UI missing acknowledged ──── */
-test('9.5.A-10-EDIT-UI-PARITY: edit-message UI not present (parity gap P-EDIT-UI)', async ({ page }) => {
+/* ───────── 9.5.A-10: Edit msg UI shipped — replaces text in place ─── */
+test('9.5.A-10-EDIT-UI: pencil opens inline editor, save updates row WITHOUT F5', async ({ page }) => {
     await openText(page)
-    const tag = `edit-parity-${Date.now()}`
-    await page.locator('textarea').first().fill(tag)
+    const original = `edit-uirow-${Date.now()}`
+    await page.locator('textarea').first().fill(original)
     await page.locator('textarea').first().press('Enter')
-    await expect(page.getByText(tag).first()).toBeVisible({ timeout: 45_000 })
-    const row = page.getByText(tag).first().locator('xpath=ancestor::div[contains(@class,"group")][1]')
+    await expect(page.getByText(original).first()).toBeVisible({ timeout: 45_000 })
+    const row = page.getByText(original).first().locator('xpath=ancestor::div[contains(@class,"group")][1]')
     await row.hover()
-    // No edit button — confirm absence as parity gap.
-    expect(await row.locator('button[title="Sửa"]').count()).toBe(0)
+    await row.locator('button[title="Sửa"]').click()
+    const editor = row.locator('textarea').first()
+    await expect(editor).toBeVisible({ timeout: 5_000 })
+    const updated = original + '-LIVE'
+    await editor.fill(updated)
+    await editor.press('Enter')
+    // [NON-NEGOTIABLE per playbook] UI must reflect within 1-3s, no F5
+    await expect(page.getByText(updated).first(), 'row must update inline within budget').toBeVisible({ timeout: 8_000 })
 })
 
 /* ───────── 9.5.A-11: Unread badge clears when channel becomes active ─── */

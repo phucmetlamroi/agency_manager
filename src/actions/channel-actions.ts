@@ -84,7 +84,9 @@ export async function getHubData(workspaceId: string): Promise<{
         }),
         prisma.channel.findMany({
             // Standalone hub channels only — TASK channels live inside task detail.
-            where: { workspaceId, type: { in: ['TEXT', 'FORUM', 'WIKI'] }, ...visibleChannelWhere(userId, userRoleIds) },
+            // VOICE channels are sidebar-visible like TEXT/FORUM/WIKI; they render a
+            // LiveKit room surface instead of a message stream.
+            where: { workspaceId, type: { in: ['TEXT', 'FORUM', 'WIKI', 'VOICE'] }, ...visibleChannelWhere(userId, userRoleIds) },
             orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
             select: CHANNEL_SELECT,
         }),
@@ -181,7 +183,7 @@ export async function deleteChannel(workspaceId: string, channelId: string) {
     }
 
     // Only standalone hub channels deletable here (never a TASK channel).
-    await prisma.channel.deleteMany({ where: { id: channelId, workspaceId, type: { in: ['TEXT', 'FORUM', 'WIKI'] } } })
+    await prisma.channel.deleteMany({ where: { id: channelId, workspaceId, type: { in: ['TEXT', 'FORUM', 'WIKI', 'VOICE'] } } })
     revalidatePath(`/${workspaceId}/hub`)
     return { success: true }
 }
@@ -304,7 +306,7 @@ export async function updateChannelSettings(
 
     // Never alter a TASK channel's nature.
     await prisma.channel.updateMany({
-        where: { id: channelId, workspaceId, type: { in: ['TEXT', 'FORUM', 'WIKI'] } },
+        where: { id: channelId, workspaceId, type: { in: ['TEXT', 'FORUM', 'WIKI', 'VOICE'] } },
         data,
     })
     revalidatePath(`/${workspaceId}/hub`)

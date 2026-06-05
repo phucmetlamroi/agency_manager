@@ -29,15 +29,24 @@ async function send(page: import('@playwright/test').Page, body: string) {
     await expect(page.getByText(body).first()).toBeVisible({ timeout: 45_000 })
 }
 
-test('3C-EDIT-PARITY: edit UI is missing — documented as P-EDIT-UI parity gap', async ({ page }) => {
+test('3C-EDIT-UI: row-hover pencil icon opens inline editor + saves via editMessage', async ({ page }) => {
     await openText(page)
-    const msg = `edit-parity-${Date.now()}`
-    await send(page, msg)
-    const row = page.getByText(msg).first().locator('xpath=ancestor::div[contains(@class,"group")][1]')
+    const original = `edit-orig-${Date.now()}`
+    await send(page, original)
+    const row = page.getByText(original).first().locator('xpath=ancestor::div[contains(@class,"group")][1]')
     await row.hover()
-    // No edit button title in current UI — confirm absence (parity gap, not failure).
     const editBtn = row.locator('button[title="Sửa"]')
-    await expect(editBtn).toHaveCount(0)
+    await expect(editBtn, 'edit pencil must appear for own message on hover').toBeVisible({ timeout: 5_000 })
+    // Open editor + change content + save
+    await editBtn.click()
+    const inlineEditor = row.locator('textarea').first()
+    await expect(inlineEditor).toBeVisible({ timeout: 5_000 })
+    const updated = original + '-EDITED'
+    await inlineEditor.fill(updated)
+    await inlineEditor.press('Enter')
+    // After save: row shows the updated text + the "(đã sửa)" indicator
+    await expect(page.getByText(updated).first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/\(đã sửa\)/i).first()).toBeVisible({ timeout: 5_000 })
 })
 
 test('3C-DELETE-OWN: owner deletes own message → row disappears or shows "(đã xoá)"', async ({ page }) => {

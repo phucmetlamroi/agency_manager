@@ -242,10 +242,46 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
         })
     }
 
+    /**
+     * Live-sync editForm changes back to the source-of-truth (overrides for tasks, manualItems
+     * for manual rows) on every keystroke, so `activeSubtotal`/`finalTotalDue` update in real
+     * time WITHOUT needing the explicit save click. Previously totals only refreshed after the
+     * user clicked the pencil-save button, which felt broken: the line total reacted (it was
+     * reading editForm directly) but the grand total stayed stuck on the auto-extracted tasks.
+     */
+    const applyEditField = (patch: Partial<{ description: string; unitPrice: number; quantity: number }>) => {
+        if (!editingItemId) return
+        const next = { ...editForm, ...patch }
+        setEditForm(next)
+        const unitPrice = Number(next.unitPrice) || 0
+        const quantity = Number(next.quantity) || 1
+        const amount = unitPrice * quantity
+        const isTask = tasks.find(t => t.id === editingItemId)
+        if (isTask) {
+            setOverrides(prev => ({
+                ...prev,
+                [editingItemId]: {
+                    description: next.description,
+                    unitPrice,
+                    quantity,
+                    amount,
+                }
+            }))
+        } else {
+            setManualItems(prev => prev.map(m => m.id === editingItemId ? {
+                ...m,
+                description: next.description,
+                unitPrice,
+                quantity,
+                amount,
+            } : m))
+        }
+    }
+
     const saveEditItem = () => {
         if (!editingItemId) return
 
-        const newAmount = editForm.unitPrice * editForm.quantity
+        const newAmount = (Number(editForm.unitPrice) || 0) * (Number(editForm.quantity) || 1)
 
         // Check if it's a task or manual
         const isTask = tasks.find(t => t.id === editingItemId)
@@ -255,8 +291,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 ...prev,
                 [editingItemId]: {
                     description: editForm.description,
-                    unitPrice: editForm.unitPrice,
-                    quantity: editForm.quantity,
+                    unitPrice: Number(editForm.unitPrice) || 0,
+                    quantity: Number(editForm.quantity) || 1,
                     amount: newAmount
                 }
             }))
@@ -265,8 +301,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
             setManualItems(prev => prev.map(m => m.id === editingItemId ? {
                 ...m,
                 description: editForm.description,
-                unitPrice: editForm.unitPrice,
-                quantity: editForm.quantity,
+                unitPrice: Number(editForm.unitPrice) || 0,
+                quantity: Number(editForm.quantity) || 1,
                 amount: newAmount
             } : m))
         }
@@ -630,13 +666,30 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                 {editingItemId === item.id ? (
                                                     <>
                                                         <td className="py-3 pr-2">
-                                                            <Input value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} className="h-8 text-sm bg-white" />
+                                                            <Input
+                                                                value={editForm.description}
+                                                                onChange={e => applyEditField({ description: e.target.value })}
+                                                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveEditItem() } }}
+                                                                className="h-8 text-sm bg-white"
+                                                            />
                                                         </td>
                                                         <td className="py-3 text-center">
-                                                            <Input type="number" value={editForm.quantity} onChange={e => setEditForm({ ...editForm, quantity: Number(e.target.value) })} className="h-8 w-14 mx-auto text-center bg-white" />
+                                                            <Input
+                                                                type="number"
+                                                                value={editForm.quantity}
+                                                                onChange={e => applyEditField({ quantity: Number(e.target.value) })}
+                                                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveEditItem() } }}
+                                                                className="h-8 w-14 mx-auto text-center bg-white"
+                                                            />
                                                         </td>
                                                         <td className="py-3 text-right">
-                                                            <Input type="number" value={editForm.unitPrice} onChange={e => setEditForm({ ...editForm, unitPrice: Number(e.target.value) })} className="h-8 w-24 ml-auto text-right bg-white" />
+                                                            <Input
+                                                                type="number"
+                                                                value={editForm.unitPrice}
+                                                                onChange={e => applyEditField({ unitPrice: Number(e.target.value) })}
+                                                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveEditItem() } }}
+                                                                className="h-8 w-24 ml-auto text-right bg-white"
+                                                            />
                                                         </td>
                                                         <td className="py-3 text-right font-bold font-mono text-gray-900">
                                                             {currency}{(editForm.unitPrice * editForm.quantity).toFixed(2)}

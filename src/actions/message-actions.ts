@@ -223,6 +223,25 @@ export async function sendMessage(
     parentId?: string | null,
     attachments?: Array<{ url: string; fileName: string; mimeType: string; sizeBytes: number; width?: number | null; height?: number | null }>,
 ): Promise<{ success: true; message: MessageDTO } | { error: string }> {
+    try {
+        return await sendMessageImpl(workspaceId, channelId, content, parentId, attachments)
+    } catch (e) {
+        // [Defensive backstop] Surface the actual exception text to the client so
+        // silent UI fails (composer stuck, no toast) become diagnosable. Log full
+        // stack server-side for triage.
+        console.error('[sendMessage] uncaught exception', e)
+        const msg = (e as { message?: string })?.message ?? String(e)
+        return { error: `Lỗi server: ${msg.slice(0, 200)}` }
+    }
+}
+
+async function sendMessageImpl(
+    workspaceId: string,
+    channelId: string,
+    content: string,
+    parentId?: string | null,
+    attachments?: Array<{ url: string; fileName: string; mimeType: string; sizeBytes: number; width?: number | null; height?: number | null }>,
+): Promise<{ success: true; message: MessageDTO } | { error: string }> {
     let ctx: ChannelAuthzContext
     try {
         ctx = await authorizeChannel(workspaceId, channelId, 'POST')

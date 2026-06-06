@@ -123,6 +123,27 @@ export async function createChannel(
         postPolicy?: PostPolicy
     },
 ) {
+    try {
+        return await createChannelImpl(workspaceId, input)
+    } catch (e) {
+        // [Defensive backstop] Same pattern as sendMessage — surface uncaught
+        // exception text so silent UI fails become diagnosable.
+        console.error('[createChannel] uncaught exception', e)
+        const msg = (e as { message?: string })?.message ?? String(e)
+        return { error: `Lỗi server: ${msg.slice(0, 200)}` }
+    }
+}
+
+async function createChannelImpl(
+    workspaceId: string,
+    input: {
+        name: string
+        categoryId?: string | null
+        type?: ChannelType
+        visibility?: ChannelVisibility
+        postPolicy?: PostPolicy
+    },
+) {
     const { user, userId, workspaceRole } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
     if (!hasAtLeastRole(workspaceRole, 'ADMIN')) return { error: 'Chỉ admin mới tạo kênh' }
     const clean = input.name.trim()

@@ -317,6 +317,14 @@ export default function ChannelView({ workspaceId, channel, currentUserId, onCha
             setContent('')
             setPendingFiles([])
             scrollToBottom()
+        } catch (e) {
+            // [Hardening] Server action threw (unhandled). Without this catch the
+            // user previously saw a silent failure: send icon button spun, then
+            // returned to ready state but the typed text stayed in the composer —
+            // no toast, no feedback. Common cause: dev/Prisma client mismatch
+            // after a schema migration that hasn't been picked up by the server.
+            console.error('[sendMessage] failed', e)
+            toast.error('Lỗi gửi tin — thử lại sau ít giây hoặc refresh trang')
         } finally {
             setSending(false)
         }
@@ -389,6 +397,11 @@ export default function ChannelView({ workspaceId, channel, currentUserId, onCha
             setMessages((prev) => prev.map((m) => (m.id === messageId ? res.message : m)))
             broadcast(CHAT_EVENTS.MESSAGE_EDIT, res.message)
             handleEditCancel()
+        } catch (e) {
+            // [Hardening] Unhandled server-action throw — show feedback instead of
+            // silently leaving the editor open.
+            console.error('[editMessage] failed', e)
+            toast.error('Lỗi sửa tin — thử lại')
         } finally {
             setEditSaving(false)
         }

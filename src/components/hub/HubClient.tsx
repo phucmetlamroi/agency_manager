@@ -96,6 +96,12 @@ export default function HubClient({ workspaceId, initialCategories, initialChann
             setSelectedId(res.channel.id)
             setNewName('')
             setShowNewChannel(false)
+        } catch (e) {
+            // [Hardening] Server action threw (unhandled). Without this catch the
+            // user previously saw a silent failure: spinner ran, then form stayed
+            // open with the typed name still in the input — no toast, no feedback.
+            console.error('[createChannel] failed', e)
+            toast.error('Lỗi tạo kênh — thử lại sau ít giây hoặc refresh trang')
         } finally {
             setBusy(false)
         }

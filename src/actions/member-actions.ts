@@ -565,10 +565,22 @@ export async function inviteClientToProfile(workspaceId: string, targetUsername:
     }
 
     // Already a client of this profile → just (re)point the Client record.
+    // [Portal Audit M11] Audit both old + new clientId so the trail shows which
+    // brand a portal user was switched between (e.g. rep moved from Client A → B).
     if (existingAccess && existingAccess.role === 'CLIENT') {
+        const oldAccess = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId: targetUser.id, profileId } },
+            select: { clientId: true },
+        })
         await prisma.profileAccess.update({
             where: { userId_profileId: { userId: targetUser.id, profileId } },
             data: { clientId },
+        })
+        await audit({
+            workspaceId, actorUserId: inviterId, action: 'member.role_changed',
+            targetType: 'ProfileAccess', targetId: targetUser.id,
+            before: { role: 'CLIENT', clientId: oldAccess?.clientId ?? null },
+            after: { role: 'CLIENT', clientId, clientName: client.name },
         })
         revalidatePath(`/${workspaceId}/admin`)
         return { success: true, directAdd: true, username: targetUser.nickname || targetUser.username }
@@ -679,6 +691,23 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
                     role: 'CLIENT',
                     inviterId: invitation.invitedBy?.id ?? null,
                     inviteeName: session.user.nickname || session.user.username || 'Một thành viên',
+                }
+            }
+
+            // [Portal Audit M8 · Anti-mixed-state] If this is a STAFF invite but
+            // the user is already a CLIENT of the workspace's profile, refuse.
+            // Accepting would leave a WorkspaceMember row AND a PA(role=CLIENT)
+            // row — an internally-inconsistent state that the fail-closed
+            // CLIENT-layout guard would (correctly) keep redirecting to /portal,
+            // while staff queries would still surface the user as a ghost member.
+            // The admin must first revoke the CLIENT role explicitly.
+            if (invitation.workspace.profileId) {
+                const existingPA = await tx.profileAccess.findUnique({
+                    where: { userId_profileId: { userId: session.user.id, profileId: invitation.workspace.profileId } },
+                    select: { role: true },
+                })
+                if (existingPA?.role === 'CLIENT') {
+                    return { error: 'Tài khoản này đang là CLIENT của profile — hãy gỡ vai trò CLIENT trước khi mời làm thành viên nội bộ.' }
                 }
             }
 

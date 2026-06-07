@@ -16,9 +16,6 @@ const GROUPING_WINDOW_MS = 5 * 60 * 1000  // 5 minutes
 
 /**
  * Create a single notification.
- * Implements grouping: if the same recipient already has an unread NEW_MESSAGE
- * for the same conversation within the last 5 minutes, mutate that record
- * instead of inserting a new one (avoids spamming the panel).
  *
  * Always returns a notification record. Does NOT throw if the recipient is the
  * actor (callers must filter that out themselves).
@@ -72,9 +69,7 @@ export async function createBulkNotificationsInternal(
 /**
  * [nối dây] Fan-out helper: create N notifications AND realtime-broadcast each
  * one with its real `id` (the bell drops payloads without an id). Reuses
- * createBulkNotificationsInternal. For chat/group types (CHANNEL_MESSAGE,
- * THREAD_REPLY, GROUP_MEMBER_*) this is in-app + realtime ONLY — they render no
- * email template, so maybeSendNotificationEmail no-ops for them.
+ * createBulkNotificationsInternal.
  */
 export async function createAndBroadcastNotifications(
     userIds: string[],

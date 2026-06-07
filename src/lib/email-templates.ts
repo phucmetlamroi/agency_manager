@@ -247,18 +247,11 @@ export const emailTemplates = {
             type: string
             title: string
             body: string
-            conversationId: string | null
             taskId: string | null
         },
         appUrl: string,
     ) => {
         const typeEmoji: Record<string, string> = {
-            NEW_MESSAGE: '💬',
-            MENTION: '📢',
-            GROUP_MEMBER_ADDED: '👥',
-            GROUP_MEMBER_REMOVED: '👤',
-            GROUP_MEMBER_LEFT: '🚪',
-            GROUP_DELETED: '🗑️',
             TASK_DEADLINE_APPROACHING: '⏰',
             TASK_OVERDUE: '🚨',
         }
@@ -267,10 +260,7 @@ export const emailTemplates = {
         // Build CTA link
         let ctaLink = `${appUrl}/dashboard`
         let ctaLabel = 'MỞ AGENCYMANAGER'
-        if (notification.conversationId) {
-            ctaLink = `${appUrl}/dashboard` // chat opens via sidebar
-            ctaLabel = 'MỞ TIN NHẮN'
-        } else if (notification.taskId) {
+        if (notification.taskId) {
             ctaLink = `${appUrl}/dashboard`
             ctaLabel = 'XEM TASK'
         }
@@ -308,12 +298,6 @@ export const emailTemplates = {
         appUrl: string,
     ) => {
         const typeEmoji: Record<string, string> = {
-            NEW_MESSAGE: '💬',
-            MENTION: '📢',
-            GROUP_MEMBER_ADDED: '👥',
-            GROUP_MEMBER_REMOVED: '👤',
-            GROUP_MEMBER_LEFT: '🚪',
-            GROUP_DELETED: '🗑️',
             TASK_DEADLINE_APPROACHING: '⏰',
             TASK_OVERDUE: '🚨',
         }

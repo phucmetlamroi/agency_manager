@@ -90,14 +90,11 @@ model Workspace {
   tagCategories       TagCategory[]
 
   // [Quick Create] OAuth tokens + pricing rules per-workspace
-  integrationTokens   IntegrationToken[]
-  pricingRules        PricingRule[]
+  integrationTokens IntegrationToken[]
+  pricingRules      PricingRule[]
 
-  // [Knowledge Hub] chat channels + categories + wiki pages
-  channels   Channel[]
-  categories Category[]
-  wikiPages  WikiPage[]
-  customRoles CustomRole[]
+  // Wiki — standalone Notion-style doc tree
+  wikiPages WikiPage[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 
@@ -121,23 +118,23 @@ model WorkspaceMember {
 }
 
 model User {
-  id                String              @id @default(uuid())
-  username          String              @unique
+  id                String    @id @default(uuid())
+  username          String    @unique
   // [Username Handle] true = user đã chủ ý đặt username theo pattern mới
   // (signup mới hoặc đã complete migration modal). false = username cũ
   // (auto-derived từ email hoặc có dấu) → trigger migration modal khi user vào app.
-  usernameSetByUser Boolean             @default(false)
+  usernameSetByUser Boolean   @default(false)
   // [Google OAuth] password nullable — Google sign-in users have no password
   // (có thể đặt sau qua luồng "Quên mật khẩu"). googleId = Google account id
   // (canonical OAuth identity, dùng để nhận diện user quay lại). authProvider
   // = nguồn tạo tài khoản ("email" | "google") cho tracking/UI.
   password          String?
-  googleId          String?             @unique
-  authProvider      String?             @default("email")
+  googleId          String?   @unique
+  authProvider      String?   @default("email")
   avatarUrl         String?
-  createdAt         DateTime            @default(now())
-  isTreasurer       Boolean             @default(false)
-  hasAcceptedTerms  Boolean             @default(false)
+  createdAt         DateTime  @default(now())
+  isTreasurer       Boolean   @default(false)
+  hasAcceptedTerms  Boolean   @default(false)
   termsAcceptedAt   DateTime?
   email             String?
   nickname          String?
@@ -147,7 +144,7 @@ model User {
   paymentQrUrl      String?
   agencyId          String?
   profileId         String?
-  role              UserRole            @default(USER)
+  role              UserRole  @default(USER)
 
   // ─── Auth Phase 1: signup / login email-only / forgot password ───
   // Display name (giữ Unicode tiếng Việt có dấu — KHÔNG sanitize)
@@ -176,41 +173,41 @@ model User {
   clientId                   Int?
   client                     Client?   @relation("ClientPortalUser", fields: [clientId], references: [id], onDelete: SetNull)
 
-  ownedAgency       Agency[]            @relation("AgencyOwner")
-  bonuses           MonthlyBonus[]
-  payrolls          Payroll[]
-  metrics           PerformanceMetric[]
-  tasks             Task[]              @relation("AssigneeTasks")
+  ownedAgency     Agency[]            @relation("AgencyOwner")
+  bonuses         MonthlyBonus[]
+  payrolls        Payroll[]
+  metrics         PerformanceMetric[]
+  tasks           Task[]              @relation("AssigneeTasks")
   // [Sprint P] Reverse relation for Task.assignedBy — track tasks user has
   // assigned to others (admin role). Used by email + notif routing.
-  tasksAssignedBy   Task[]              @relation("TaskAssigner")
+  tasksAssignedBy Task[]              @relation("TaskAssigner")
 
-  agency                 Agency?                 @relation("AgencyMembers", fields: [agencyId], references: [id])
-  workspaces             WorkspaceMember[]
-  clientTasks            Task[]                  @relation("UserClientTasks")
-  clientProjects         Project[]               @relation("UserClientProjects")
-  clientInvoices         Invoice[]               @relation("UserClientInvoices")
-  clientRatings          Rating[]                @relation("ClientRatings")
-  staffRatings           Rating[]                @relation("StaffRatings")
-  errorLogs              ErrorLog[]              @relation("UserErrorLogs")
-  detectedErrors         ErrorLog[]              @relation("UserDetectedErrors")
-  monthlyRanks           MonthlyRank[]           @relation("UserMonthlyRanks")
-  sessions               Session[]
-  events                 Event[]
-  presence               UserPresence?
-  notificationPreference NotificationPreference?
-  scheduleRules          ScheduleRule[]
-  scheduleExceptions     ScheduleException[]
-  dailyAvailabilities    DailyAvailability[]
-  profileAccesses        ProfileAccess[]
-  accessRequests         ProfileAccessRequest[]
-  approvedRequests       ProfileAccessRequest[]  @relation("ApprovedBy")
-  requestedRequests      ProfileAccessRequest[]  @relation("RequestedBy")
-  tagCategories          TagCategory[]
-  auditLogsAsActor       AuditLog[]              @relation("AuditLogActor")
-  auditLogsAsTarget      AuditLog[]              @relation("AuditLogUser")
-  workspaceInvitesReceived WorkspaceInvitation[] @relation("WorkspaceInvitedUser")
-  workspaceInvitesSent     WorkspaceInvitation[] @relation("WorkspaceInviter")
+  agency                   Agency?                 @relation("AgencyMembers", fields: [agencyId], references: [id])
+  workspaces               WorkspaceMember[]
+  clientTasks              Task[]                  @relation("UserClientTasks")
+  clientProjects           Project[]               @relation("UserClientProjects")
+  clientInvoices           Invoice[]               @relation("UserClientInvoices")
+  clientRatings            Rating[]                @relation("ClientRatings")
+  staffRatings             Rating[]                @relation("StaffRatings")
+  errorLogs                ErrorLog[]              @relation("UserErrorLogs")
+  detectedErrors           ErrorLog[]              @relation("UserDetectedErrors")
+  monthlyRanks             MonthlyRank[]           @relation("UserMonthlyRanks")
+  sessions                 Session[]
+  events                   Event[]
+  presence                 UserPresence?
+  notificationPreference   NotificationPreference?
+  scheduleRules            ScheduleRule[]
+  scheduleExceptions       ScheduleException[]
+  dailyAvailabilities      DailyAvailability[]
+  profileAccesses          ProfileAccess[]
+  accessRequests           ProfileAccessRequest[]
+  approvedRequests         ProfileAccessRequest[]  @relation("ApprovedBy")
+  requestedRequests        ProfileAccessRequest[]  @relation("RequestedBy")
+  tagCategories            TagCategory[]
+  auditLogsAsActor         AuditLog[]              @relation("AuditLogActor")
+  auditLogsAsTarget        AuditLog[]              @relation("AuditLogUser")
+  workspaceInvitesReceived WorkspaceInvitation[]   @relation("WorkspaceInvitedUser")
+  workspaceInvitesSent     WorkspaceInvitation[]   @relation("WorkspaceInviter")
 
   // Auth Phase 1 relations
   emailVerificationTokens EmailVerificationToken[]
@@ -218,22 +215,15 @@ model User {
   loginAttempts           LoginAttempt[]
 
   // [Quick Create] OAuth tokens for Dropbox / Google Drive per-user
-  integrationTokens       IntegrationToken[]
+  integrationTokens IntegrationToken[]
 
   // Contact relations
-  contactsSent         Contact[]                 @relation("ContactRequester")
-  contactsReceived     Contact[]                 @relation("ContactReceiver")
-  notifications        Notification[]
+  contactsSent     Contact[]      @relation("ContactRequester")
+  contactsReceived Contact[]      @relation("ContactReceiver")
+  notifications    Notification[]
 
-  // [Knowledge Hub] authored messages + reactions + mentions + memberships + wiki
-  channelMessages    Message[]          @relation("MessageAuthor")
-  channelReactions   Reaction[]
-  channelMentions    Mention[]
-  channelMemberships ChannelMember[]
-  createdChannels    Channel[]          @relation("ChannelCreator")
-  pinnedMessages     Message[]          @relation("MessagePinnedBy")
-  customRoleMemberships CustomRoleMember[]
-  wikiPages          WikiPage[]
+  // Wiki — authored standalone doc pages
+  wikiPages WikiPage[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 
@@ -358,22 +348,20 @@ model Task {
   // [Client Portal] Client-facing review state, decoupled from internal `status`.
   // null = not in client review · AWAITING = cut ready for client · APPROVED · CHANGES (client requested changes)
   clientReview     String?
-  clientFeedback   String?           // client's "request changes" note (separate from notes_vi)
-  clientReviewedAt DateTime?         // when the client last approved / requested changes
+  clientFeedback   String? // client's "request changes" note (separate from notes_vi)
+  clientReviewedAt DateTime? // when the client last approved / requested changes
   claimSource      ClaimSource       @default(ADMIN)
   claimedAt        DateTime?
   taskTags         TaskTag[]
   rating           Rating?
-  // [Knowledge Hub] auto-created TASK-type discussion channel (1-1, lazy)
-  channel          Channel?
 
   // [Sprint P] Track admin who assigned/created the task. Used for email +
   // in-app notification routing — when user starts/delivers a task, the
   // ASSIGNER (assignedBy) gets notified, not the user themselves.
   // Backward compat: nullable + onDelete: SetNull. Tasks created before
   // migration get backfilled to workspace OWNER.
-  assignedById     String?
-  assignedBy       User?             @relation("TaskAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedById String?
+  assignedBy   User?   @relation("TaskAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, status])
   @@index([workspaceId, isArchived])
@@ -418,35 +406,35 @@ model PayrollLock {
 }
 
 model Client {
-  id             Int        @id @default(autoincrement())
-  name           String
-  parentId       Int?
-  aiScore        Decimal    @default(0)
-  frictionIndex  Decimal    @default(0)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  inputQuality   Int        @default(3)
-  paymentRating  Int        @default(3)
-  tier           ClientTier @default(standard)
-  depositBalance Decimal    @default(0)
-  parent         Client?    @relation("ClientHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  subsidiaries   Client[]   @relation("ClientHierarchy")
-  invoices       Invoice[]
-  projects       Project[]
-  tasks          Task[]
-  workspaceId    String?
-  workspace      Workspace? @relation(fields: [workspaceId], references: [id])
-  profileId      String?
-  profile        Profile?   @relation(fields: [profileId], references: [id])
+  id              Int             @id @default(autoincrement())
+  name            String
+  parentId        Int?
+  aiScore         Decimal         @default(0)
+  frictionIndex   Decimal         @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  inputQuality    Int             @default(3)
+  paymentRating   Int             @default(3)
+  tier            ClientTier      @default(standard)
+  depositBalance  Decimal         @default(0)
+  parent          Client?         @relation("ClientHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subsidiaries    Client[]        @relation("ClientHierarchy")
+  invoices        Invoice[]
+  projects        Project[]
+  tasks           Task[]
+  workspaceId     String?
+  workspace       Workspace?      @relation(fields: [workspaceId], references: [id])
+  profileId       String?
+  profile         Profile?        @relation(fields: [profileId], references: [id])
   // Audit fix #3.6: Reverse relation cho User.clientId
   // Một Client record có thể có 0..N portal users (vd 1 client = nhiều người
   // truy cập portal cùng).
-  portalUsers    User[]     @relation("ClientPortalUser")
+  portalUsers     User[]          @relation("ClientPortalUser")
   // [Client membership] CLIENT-role ProfileAccess rows that represent this client.
   profileAccesses ProfileAccess[] @relation("ProfileAccessClient")
 
   // [Quick Create] Per-client pricing rules (null clientId = workspace default)
-  pricingRules   PricingRule[]
+  pricingRules PricingRule[]
 
   // [Soft-delete] Notion-style archive — mirror Profile/Workspace pattern.
   // status: "ACTIVE" | "SOFT_DELETED". Soft-delete hides the client (+ its
@@ -582,23 +570,23 @@ model InvoiceItem {
 /// Supports both in-profile direct adds and cross-profile invitations with
 /// accept/decline flow. Token field enables future email-based invite links.
 model WorkspaceInvitation {
-  id            String   @id @default(uuid())
-  workspaceId   String
-  invitedUserId String?  // Target user ID (set for in-app invites)
-  invitedEmail  String?  // Email for future email-based invites
-  role          String   @default("MEMBER") // WorkspaceRole to assign on accept
+  id             String    @id @default(uuid())
+  workspaceId    String
+  invitedUserId  String? // Target user ID (set for in-app invites)
+  invitedEmail   String? // Email for future email-based invites
+  role           String    @default("MEMBER") // WorkspaceRole to assign on accept
   // [Client membership] cross-profile client invite: when true, accept creates a
   // ProfileAccess(role=CLIENT, clientId) instead of a WorkspaceMember.
-  isClientInvite Boolean @default(false)
+  isClientInvite Boolean   @default(false)
   clientId       Int?
-  token         String   @unique @default(uuid()) // For email/link-based invites
-  status        String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED | REVOKED
-  invitedById   String   // Who sent the invite
-  message       String?  // Optional personal message from inviter
-  expiresAt     DateTime // When the invitation expires
-  respondedAt   DateTime? // When the invitee accepted/declined
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  token          String    @unique @default(uuid()) // For email/link-based invites
+  status         String    @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED | REVOKED
+  invitedById    String // Who sent the invite
+  message        String? // Optional personal message from inviter
+  expiresAt      DateTime // When the invitation expires
+  respondedAt    DateTime? // When the invitee accepted/declined
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   invitedUser User?     @relation("WorkspaceInvitedUser", fields: [invitedUserId], references: [id], onDelete: Cascade)
@@ -924,8 +912,8 @@ model TagCategory {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  profile   Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   taskTags  TaskTag[]
 
@@ -959,13 +947,6 @@ enum ContactStatus {
 }
 
 enum NotificationType {
-  // Chat
-  NEW_MESSAGE
-  MENTION
-  GROUP_MEMBER_ADDED
-  GROUP_MEMBER_REMOVED
-  GROUP_MEMBER_LEFT
-  GROUP_DELETED
   // Task
   TASK_ASSIGNED
   TASK_UNASSIGNED
@@ -974,12 +955,8 @@ enum NotificationType {
   TASK_OVERDUE
   TASK_COMMENT
   // [Sprint P] Lifecycle email + in-app routing tới admin (assignedBy)
-  TASK_STARTED   // User bấm "Bắt đầu" → notify admin who created task
+  TASK_STARTED // User bấm "Bắt đầu" → notify admin who created task
   TASK_DELIVERED // User submit productLink → notify admin who created task
-  // [Knowledge Hub] chat / wiki notifications
-  CHANNEL_MESSAGE // new message in a channel the user belongs to
-  THREAD_REPLY    // reply to a message the user authored / participated in
-  TASK_CHAT       // new message in a task's discussion channel
   // Workspace invitations
   WORKSPACE_INVITATION_ACCEPTED
   WORKSPACE_INVITATION_DECLINED
@@ -987,23 +964,23 @@ enum NotificationType {
 }
 
 model Notification {
-  id             String           @id @default(uuid())
-  userId         String
-  type           NotificationType
-  title          String
-  body           String           @db.Text
-  avatarUrl      String?
-  isRead         Boolean          @default(false)
-  isArchived     Boolean          @default(false)
+  id          String           @id @default(uuid())
+  userId      String
+  type        NotificationType
+  title       String
+  body        String           @db.Text
+  avatarUrl   String?
+  isRead      Boolean          @default(false)
+  isArchived  Boolean          @default(false)
   // Source links (nullable, depends on type)
-  taskId         String?
-  actorId        String?
+  taskId      String?
+  actorId     String?
   // Flexible metadata (group name, task title, oldStatus, newStatus, messageCount, ...)
-  metadata       Json?
+  metadata    Json?
   // Delivery tracking — kept for future Push/Email phases
-  pushSentAt     DateTime?
-  emailSentAt    DateTime?
-  createdAt      DateTime         @default(now())
+  pushSentAt  DateTime?
+  emailSentAt DateTime?
+  createdAt   DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1040,7 +1017,6 @@ model Contact {
   @@index([requesterId, status])
 }
 
-
 // ─────────────────────────────────────────────────────────────────────
 //  Auth Phase 1: signup / login email-only / forgot password / migration
 // ─────────────────────────────────────────────────────────────────────
@@ -1058,8 +1034,8 @@ model EmailVerificationToken {
   tokenHash String    @unique // SHA-256 hex của raw token
   // Values: "EMAIL_VERIFICATION" | "PASSWORD_RESET" | "EMAIL_MIGRATION"
   purpose   String    @default("EMAIL_VERIFICATION")
-  email     String    // Email liên quan (có thể khác User.email khi đổi)
-  expiresAt DateTime  // = createdAt + 24h (verification) hoặc 5 phút (password reset)
+  email     String // Email liên quan (có thể khác User.email khi đổi)
+  expiresAt DateTime // = createdAt + 24h (verification) hoặc 5 phút (password reset)
   usedAt    DateTime? // null nếu chưa verify
   createdAt DateTime  @default(now())
 
@@ -1077,11 +1053,11 @@ model PasswordResetOTP {
   id            String    @id @default(uuid())
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  otpHash       String    // SHA-256 hex của 6-digit OTP
+  otpHash       String // SHA-256 hex của 6-digit OTP
   // Values: "PASSWORD_RESET" | "EMAIL_MIGRATION"
   purpose       String    @default("PASSWORD_RESET")
-  email         String    // Snapshot email tại thời điểm tạo (chống email-change attack)
-  expiresAt     DateTime  // = createdAt + 10 phút
+  email         String // Snapshot email tại thời điểm tạo (chống email-change attack)
+  expiresAt     DateTime // = createdAt + 10 phút
   attemptCount  Int       @default(0) // Tăng mỗi lần verify sai; >= 5 → invalidate
   consumedAt    DateTime? // Đặt khi user nhập đúng OTP và bắt đầu reset password
   invalidatedAt DateTime? // Đặt khi vượt quá 5 lần thử / superseded
@@ -1098,15 +1074,15 @@ model PasswordResetOTP {
 ///   - Security audit ("ai đã login từ IP nào?")
 ///   - Anti-fraud (Phase 5+ correlate với device fingerprint)
 model LoginAttempt {
-  id         String    @id @default(uuid())
-  userId     String?   // null nếu user_not_found (chống enumeration: vẫn log)
-  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  emailTried String    // Lowercase. Có thể là email hoặc username (transition mode).
+  id         String   @id @default(uuid())
+  userId     String? // null nếu user_not_found (chống enumeration: vẫn log)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  emailTried String // Lowercase. Có thể là email hoặc username (transition mode).
   success    Boolean
-  failReason String?   // 'invalid_password' | 'user_not_found' | 'account_locked' | 'email_not_verified' | 'rate_limited'
+  failReason String? // 'invalid_password' | 'user_not_found' | 'account_locked' | 'email_not_verified' | 'rate_limited'
   ipAddress  String
   userAgent  String?
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([emailTried, createdAt])
   @@index([ipAddress, createdAt])
@@ -1124,11 +1100,11 @@ model IntegrationToken {
   id           String    @id @default(uuid())
   userId       String
   workspaceId  String
-  provider     String    // "dropbox" | "google_drive"
-  accessToken  String    // AES-256-GCM encrypted
-  refreshToken String?   // AES-256-GCM encrypted (nullable — Dropbox offline access)
+  provider     String // "dropbox" | "google_drive"
+  accessToken  String // AES-256-GCM encrypted
+  refreshToken String? // AES-256-GCM encrypted (nullable — Dropbox offline access)
   expiresAt    DateTime? // Token expiry; null = never expires (Dropbox legacy)
-  accountEmail String?   // Display: "Connected as user@gmail.com"
+  accountEmail String? // Display: "Connected as user@gmail.com"
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -1152,12 +1128,12 @@ model IntegrationToken {
 /// clientId=null means workspace-wide default rule.
 model PricingRule {
   id          String   @id @default(uuid())
-  name        String   // "Dr. Marwan Standard", "Default Short/Long"
-  clientId    Int?     // null = workspace default rule
+  name        String // "Dr. Marwan Standard", "Default Short/Long"
+  clientId    Int? // null = workspace default rule
   workspaceId String
   profileId   String
-  ruleType    String   // "flat" | "per_minute" | "tiered_duration" | "custom"
-  config      Json     // Flexible rule config — schema depends on ruleType
+  ruleType    String // "flat" | "per_minute" | "tiered_duration" | "custom"
+  config      Json // Flexible rule config — schema depends on ruleType
   isDefault   Boolean  @default(false)
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
@@ -1170,238 +1146,10 @@ model PricingRule {
   @@index([workspaceId, isDefault])
 }
 
-// ============================================================
-// KNOWLEDGE HUB — unified Channel model (chat + forum + wiki + task-chat)
-// Every row carries workspaceId + profileId → getWorkspacePrisma auto-scopes
-// them. DO NOT add these models to bypassModels / noProfileModels.
-// ============================================================
-
-enum ChannelType {
-  TEXT // realtime team chat stream
-  FORUM // post-based (UI deferred)
-  WIKI // container for wiki pages
-  TASK // auto-created, attached to one task
-  VOICE // pure LiveKit voice/video room — no message stream, no composer (Discord parity #9)
-}
-
-enum ChannelVisibility {
-  PUBLIC // all workspace members can view
-  PRIVATE // only explicit ChannelMember rows
-}
-
-enum PostPolicy {
-  EVERYONE // any viewer can post
-  ADMINS_ONLY // only workspace OWNER/ADMIN (or channel MODERATOR) can post
-}
-
-enum ChannelRole {
-  MEMBER
-  MODERATOR
-}
-
-model Category {
-  id          String   @id @default(cuid())
-  workspaceId String
-  profileId   String
-  name        String
-  position    Int      @default(0)
-  createdAt   DateTime @default(now())
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  channels  Channel[]
-
-  @@index([workspaceId])
-}
-
-model Channel {
-  id          String            @id @default(cuid())
-  workspaceId String
-  profileId   String
-  categoryId  String?
-  name        String
-  description String?
-  type        ChannelType       @default(TEXT)
-  visibility  ChannelVisibility @default(PUBLIC)
-  postPolicy  PostPolicy        @default(EVERYONE)
-  position    Int               @default(0)
-  // Task linkage: when set, this channel is the discussion thread for one task
-  taskId      String?           @unique
-  // [Client Portal] when set, this is the private client↔team message channel for one Client
-  clientId    Int?
-  // [Hub member-based] channel creator/owner — full MANAGE rights; SetNull if the account is removed
-  createdById String?
-  // [Chat Phase 3] per-channel rate limit (seconds between posts); owner/mod bypass
-  slowModeSeconds Int           @default(0)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-
-  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  category  Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  task      Task?           @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  creator   User?           @relation("ChannelCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  messages  Message[]
-  members   ChannelMember[]
-  overwrites ChannelOverwrite[]
-  wikiPages WikiPage[]
-
-  @@index([workspaceId, type])
-  @@index([categoryId])
-  @@index([clientId])
-}
-
-model Message {
-  id          String    @id @default(cuid())
-  workspaceId String
-  profileId   String
-  channelId   String
-  authorId    String
-  content     String    @db.Text
-  // Threading (Slack-style): null = top-level; else points to parent (root) message
-  parentId    String?
-  replyCount  Int       @default(0)
-  editedAt    DateTime?
-  deletedAt   DateTime? // soft delete
-  // [Chat] Pinned messages: pinnedAt set = pinned; pinnedById = who pinned it (moderation act)
-  pinnedAt    DateTime?
-  pinnedById  String?
-  createdAt   DateTime  @default(now())
-
-  channel     Channel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  author      User         @relation("MessageAuthor", fields: [authorId], references: [id])
-  pinnedBy    User?        @relation("MessagePinnedBy", fields: [pinnedById], references: [id], onDelete: SetNull)
-  parent      Message?     @relation("MessageThread", fields: [parentId], references: [id], onDelete: SetNull)
-  replies     Message[]    @relation("MessageThread")
-  reactions   Reaction[]
-  mentions    Mention[]
-  attachments Attachment[]
-  linkPreviews LinkPreview[]
-
-  @@index([channelId, createdAt])
-  @@index([channelId, pinnedAt])
-  @@index([parentId])
-}
-
-model Reaction {
-  id          String   @id @default(cuid())
-  workspaceId String
-  profileId   String
-  messageId   String
-  userId      String
-  emoji       String
-  createdAt   DateTime @default(now())
-
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([messageId, userId, emoji])
-  @@index([messageId])
-}
-
-model Mention {
-  id          String   @id @default(cuid())
-  workspaceId String
-  profileId   String
-  messageId   String
-  userId      String
-  createdAt   DateTime @default(now())
-
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([messageId])
-}
-
-model ChannelMember {
-  id          String      @id @default(cuid())
-  workspaceId String
-  profileId   String
-  channelId   String
-  userId      String
-  role        ChannelRole @default(MEMBER)
-  lastReadAt  DateTime?
-  muted       Boolean     @default(false)
-  joinedAt    DateTime    @default(now())
-
-  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([channelId, userId])
-  @@index([userId])
-}
-
-// [Chat Phase 2] Custom workspace roles (org tiers: Manager, Editor, Client…) — a
-// lighter alternative to Discord's bitfield. Channel access is refined per-channel via
-// ChannelOverwrite. Distinct from the WorkspaceRole enum (OWNER/ADMIN/MEMBER/GUEST).
-model CustomRole {
-  id          String   @id @default(cuid())
-  workspaceId String
-  profileId   String
-  name        String
-  color       String?
-  position    Int      @default(0)
-  createdAt   DateTime @default(now())
-
-  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  members   CustomRoleMember[]
-
-  @@index([workspaceId, position])
-}
-
-model CustomRoleMember {
-  id          String @id @default(cuid())
-  workspaceId String
-  roleId      String
-  userId      String
-
-  role CustomRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([roleId, userId])
-  @@index([userId])
-  @@index([workspaceId])
-}
-
-// [Chat Phase 2] Per-channel ALLOW/DENY overwrite for a role OR a user. allow/deny are
-// CSV action sets (e.g. "VIEW,POST"). No row = pure membership behaviour (identical to
-// pre-Phase-2). Precedence in the resolver: base(membership) → role → user; deny→allow.
-model ChannelOverwrite {
-  id          String @id @default(cuid())
-  workspaceId String
-  channelId   String
-  subjectType String // 'ROLE' | 'USER'
-  subjectId   String // CustomRole.id or User.id
-  allow       String @default("")
-  deny        String @default("")
-
-  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-
-  @@unique([channelId, subjectType, subjectId])
-  @@index([channelId])
-}
-
-// [Chat Phase 3] OpenGraph link preview cached per message (filled async after send).
-model LinkPreview {
-  id          String   @id @default(cuid())
-  workspaceId String
-  messageId   String
-  url         String
-  title       String?
-  description String?  @db.Text
-  imageUrl    String?
-  siteName    String?
-  createdAt   DateTime @default(now())
-
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-
-  @@index([messageId])
-}
-
 model WikiPage {
   id          String   @id @default(cuid())
   workspaceId String
   profileId   String
-  channelId   String?
   parentId    String?
   title       String
   icon        String?
@@ -1412,7 +1160,6 @@ model WikiPage {
   updatedAt   DateTime @updatedAt
 
   workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  channel     Channel?     @relation(fields: [channelId], references: [id], onDelete: SetNull)
   parent      WikiPage?    @relation("WikiTree", fields: [parentId], references: [id], onDelete: SetNull)
   children    WikiPage[]   @relation("WikiTree")
   author      User         @relation(fields: [authorId], references: [id])
@@ -1426,7 +1173,6 @@ model Attachment {
   id          String   @id @default(cuid())
   workspaceId String
   profileId   String
-  messageId   String?
   wikiPageId  String?
   url         String
   fileName    String
@@ -1436,10 +1182,8 @@ model Attachment {
   height      Int?
   createdAt   DateTime @default(now())
 
-  message  Message?  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   wikiPage WikiPage? @relation(fields: [wikiPageId], references: [id], onDelete: Cascade)
 
-  @@index([messageId])
   @@index([wikiPageId])
 }
 

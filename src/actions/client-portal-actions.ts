@@ -1,5 +1,6 @@
 'use server'
 
+import DOMPurify from 'isomorphic-dompurify'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { prisma as globalPrisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
@@ -12,25 +13,60 @@ import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { audit } from '@/lib/audit-log'
 
 /**
- * Ensures the caller is authenticated and has the CLIENT role.
- * Returns the session user ID.
+ * [Security · Portal Audit M3] CLIENT session gate — now scopes to a workspace's
+ * profile when workspaceId is provided. Without scope (legacy callers / cross-
+ * workspace lookups like getClientWorkspaces), falls back to "user has CLIENT
+ * access to ANY profile" — safe because downstream queries are workspace-scoped
+ * via getWorkspacePrisma, and getRelatedClientIds resolves only Client records
+ * the user is portal-user-of.
+ *
+ * Pass workspaceId for action calls that mutate or read scoped data (defense in
+ * depth against RPC-style invocation that bypasses the page-layer
+ * getPortalUserId guard).
  */
-async function getClientSession() {
+async function getClientSession(workspaceId?: string) {
     const session = await getSession()
     if (!session?.user?.id) {
         redirect('/login')
     }
     const userId = session.user.id
-    // [Client membership] Allow either the legacy global CLIENT role OR any
-    // per-profile CLIENT membership (the new model). Data is still isolated by
-    // getRelatedClientIds (only the Client records this user is a portal-user of).
+    // Legacy global CLIENT role — fully isolated by getRelatedClientIds downstream.
     if (session.user.role === 'CLIENT') return userId
-    const clientAccess = await globalPrisma.profileAccess.findFirst({
-        where: { userId, role: 'CLIENT' },
-        select: { id: true },
-    })
-    if (clientAccess) return userId
+
+    // Per-profile CLIENT check.
+    const where: { userId: string; role: 'CLIENT'; profileId?: string } = { userId, role: 'CLIENT' }
+    if (workspaceId) {
+        const ws = await globalPrisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        if (ws?.profileId) where.profileId = ws.profileId
+    }
+    const access = await globalPrisma.profileAccess.findFirst({ where, select: { id: true } })
+    if (access) return userId
     redirect('/login')
+}
+
+/**
+ * [Security · Portal Audit M3] Resolve CLIENT session for a single-task action
+ * (submitTaskRating, getDeliverableActivity). Looks up the task's workspaceId
+ * and then verifies CLIENT-of-that-workspace's-profile. Prevents a CLIENT of
+ * profile A from calling a task action on profile B's task via RPC.
+ */
+async function getClientSessionForTask(taskId: string) {
+    const session = await getSession()
+    if (!session?.user?.id) {
+        redirect('/login')
+    }
+    const task = await globalPrisma.task.findUnique({
+        where: { id: taskId },
+        select: { workspaceId: true },
+    })
+    if (!task?.workspaceId) {
+        // Task không tồn tại hoặc không gắn workspace — coi như unauthorized.
+        redirect('/login')
+    }
+    return getClientSession(task.workspaceId)
 }
 
 /**
@@ -62,12 +98,10 @@ export async function getPortalUserId(workspaceId?: string): Promise<string> {
  * collision-prone (vd 7 user "Jacob" map với 7 client "Jacob" cùng tên).
  *
  * Sau:
- * 1. PRIORITY 1: User.clientId FK (explicit link, set bởi admin/backfill)
- *    → safe, không collision
- * 2. PRIORITY 2 (fallback legacy): name match — chỉ dùng khi FK chưa set.
- *    Log warning để observability biết user nào còn dùng fallback.
- *
- * Sau khi backfill xong toàn bộ user → có thể remove fallback.
+ * 1. PRIORITY 1: ProfileAccess(role=CLIENT, clientId) — per-profile membership.
+ * 2. PRIORITY 2: User.clientId FK (explicit link, legacy backfill).
+ * 3. PRIORITY 3 (fallback legacy): name match — chỉ dùng khi không có FK + cả
+ *    username VÀ nickname đều non-empty (M9: tránh match Client tên rỗng).
  */
 async function getRelatedClientIds(clientUserId: string) {
     const rootIds = new Set<number>()
@@ -88,14 +122,17 @@ async function getRelatedClientIds(clientUserId: string) {
         if (fkClient) rootIds.add(fkClient.id)
     }
 
-    // Legacy fallback: profile-scoped name match — only if nothing else resolved.
+    // [M9] Legacy fallback: profile-scoped name match — only if nothing else resolved
+    // AND at least one of username/nickname is non-empty (so we don't OR on '' and
+    // accidentally pick up Client records with empty names).
     if (rootIds.size === 0 && user) {
-        const username = user.username ?? ''
-        const nickname = user.nickname ?? ''
+        const username = (user.username ?? '').trim()
+        const nickname = (user.nickname ?? '').trim()
         const userProfileId = user.profileId
-        if (userProfileId) {
+        const names = [username, nickname].filter(n => n.length > 0)
+        if (userProfileId && names.length > 0) {
             const rootClients = await globalPrisma.client.findMany({
-                where: { OR: [{ name: username }, { name: nickname }], profileId: userProfileId, status: { not: 'SOFT_DELETED' } },
+                where: { OR: names.map(n => ({ name: n })), profileId: userProfileId, status: { not: 'SOFT_DELETED' } },
                 select: { id: true },
             })
             rootClients.forEach(c => rootIds.add(c.id))
@@ -163,6 +200,21 @@ function deriveNeedsYou(t: { status: string; productLink?: string | null; client
     return !!t.productLink && !done
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+   [Security · M4] Server-side input sanitization for free-text client fields.
+   Currently UI renders these as React text (auto-escapes), but we cap length +
+   strip HTML defensively for: (a) DoS / DB bloat, (b) future surfaces (email
+   digest, audit log viewer) that might render as HTML.
+   ─────────────────────────────────────────────────────────────────────────── */
+const FEEDBACK_MAX_LEN = 4000   // requestDeliverableChanges.feedback
+const RATING_FEEDBACK_MAX_LEN = 2000  // submitTaskRating.qualitativeFeedback
+
+function sanitizeClientText(raw: string, maxLen: number): string {
+    // DOMPurify w/ ALLOWED_TAGS:[] → strip all tags, keep plain text.
+    const stripped = DOMPurify.sanitize(raw, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+    return stripped.trim().slice(0, maxLen)
+}
+
 // [Sprint J P0] `calculateEstimatedCost` removed — exposed agency revenue
 // (jobPriceUSD) to client role. Clients should not learn how much they paid
 // per task at the line-item level.
@@ -175,7 +227,7 @@ function deriveNeedsYou(t: { status: string; productLink?: string | null; client
  * vì client cần submit feedback / xem creds để duyệt.
  */
 export async function getClientTasks(workspaceId: string) {
-    const clientUserId = await getClientSession()
+    const clientUserId = await getClientSession(workspaceId)
     const prisma = getWorkspacePrisma(workspaceId)
     const relatedClientIds = await getRelatedClientIds(clientUserId)
 
@@ -242,7 +294,7 @@ export async function getClientTasks(workspaceId: string) {
  * Fetches Projects for the authenticated Client.
  */
 export async function getClientProjects(workspaceId: string) {
-    const clientUserId = await getClientSession()
+    const clientUserId = await getClientSession(workspaceId)
     const prisma = getWorkspacePrisma(workspaceId)
     const relatedClientIds = await getRelatedClientIds(clientUserId)
 
@@ -269,7 +321,7 @@ export async function getClientProjects(workspaceId: string) {
  * Fetches Invoices for the authenticated Client.
  */
 export async function getClientInvoices(workspaceId: string) {
-    const clientUserId = await getClientSession()
+    const clientUserId = await getClientSession(workspaceId)
     const prisma = getWorkspacePrisma(workspaceId)
     const relatedClientIds = await getRelatedClientIds(clientUserId)
 
@@ -300,6 +352,13 @@ export async function getClientInvoices(workspaceId: string) {
 
 /**
  * Submits a client's star rating for a completed task.
+ *
+ * [Security · M5+M6] Validates:
+ *  - All three star scores are integers in [1,5].
+ *  - The task is actually completed (status='Hoàn tất' OR clientReview='APPROVED')
+ *    so clients can't rate a Pending / Cancelled / in-progress task.
+ *  - Free-text feedback is HTML-stripped + length-capped.
+ *  - Session is scoped to the task's workspace's profile (M3).
  */
 export async function submitTaskRating(
     taskId: string,
@@ -308,9 +367,15 @@ export async function submitTaskRating(
     communication: number,
     qualitativeFeedback?: string
 ) {
-    const clientUserId = await getClientSession()
+    const clientUserId = await getClientSessionForTask(taskId)
 
-    // Verify the task belongs to this client
+    // [M5] Validate star ranges — must be integers in [1,5].
+    const isValidStar = (n: number) => Number.isInteger(n) && n >= 1 && n <= 5
+    if (!isValidStar(creativeQuality) || !isValidStar(responsiveness) || !isValidStar(communication)) {
+        return { success: false, error: 'Điểm đánh giá phải là số nguyên từ 1 đến 5.' }
+    }
+
+    // Verify the task belongs to this client.
     const relatedClientIds = await getRelatedClientIds(clientUserId)
     const task = await globalPrisma.task.findFirst({
         where: {
@@ -319,23 +384,36 @@ export async function submitTaskRating(
                 { clientUserId },
                 { clientId: { in: relatedClientIds } }
             ]
-        }
+        },
+        select: { id: true, assigneeId: true, workspaceId: true, status: true, clientReview: true },
     })
 
     if (!task) {
         return { success: false, error: 'Task không tồn tại hoặc bạn không có quyền đánh giá.' }
     }
 
-    // Check if already rated
+    // [M6] Only allow rating once the task is actually completed.
+    const statusOk = task.status === 'Hoàn tất' || task.clientReview === 'APPROVED'
+    if (!statusOk) {
+        return { success: false, error: 'Chỉ có thể đánh giá khi task đã hoàn tất.' }
+    }
+
+    // Check if already rated.
     const existing = await globalPrisma.rating.findUnique({ where: { taskId } })
     if (existing) {
         return { success: false, error: 'Task này đã được đánh giá rồi.' }
     }
 
-    // Find the staff (assignee)
+    // Find the staff (assignee).
     if (!task.assigneeId) {
         return { success: false, error: 'Task chưa được giao cho ai.' }
     }
+
+    // [M4] Sanitize + cap qualitativeFeedback (defensive: strip any HTML,
+    // length-cap to prevent DB bloat).
+    const safeFeedback = qualitativeFeedback
+        ? sanitizeClientText(qualitativeFeedback, RATING_FEEDBACK_MAX_LEN)
+        : null
 
     try {
         await globalPrisma.rating.create({
@@ -346,7 +424,7 @@ export async function submitTaskRating(
                 creativeQuality,
                 responsiveness,
                 communication,
-                qualitativeFeedback: qualitativeFeedback || null,
+                qualitativeFeedback: safeFeedback,
                 workspaceId: task.workspaceId || undefined
             }
         })
@@ -358,67 +436,17 @@ export async function submitTaskRating(
     }
 }
 
-/**
- * Fetches the real task detail for the client portal task-detail page.
- */
-export async function getTaskDetailForPortal(taskId: string) {
-    const clientUserId = await getClientSession()
-    const relatedClientIds = await getRelatedClientIds(clientUserId)
-
-    const task = await globalPrisma.task.findFirst({
-        where: {
-            id: taskId,
-            OR: [
-                { clientUserId },
-                { clientId: { in: relatedClientIds } }
-            ]
-        },
-        include: {
-            rating: true,
-            assignee: { select: { username: true, nickname: true } },
-            client: {
-                select: {
-                    name: true,
-                    parent: {
-                        select: { name: true }
-                    }
-                }
-            },
-            project: { select: { name: true } }
-        }
-    })
-
-    if (!task) return null
-
-    // [Sprint J P0 + Portal redesign] Strip ALL agency financials before returning
-    // to client UI (jobPriceUSD already; now also profit/wage/value/exchangeRate).
-    const { jobPriceUSD, profitVND, wageVND, value, exchangeRate, ...safeTask } = task as any
-    void jobPriceUSD; void profitVND; void wageVND; void value; void exchangeRate
-    return serializeDecimal({
-        ...safeTask,
-        clientStatus: deriveClientStatus(task.status, (task as any).clientReview),
-        needsYou: deriveNeedsYou(task as any),
-        clientPath: formatClientHierarchy(task.client)
-    })
-}
-
-/**
- * Fetches all ratings for a client's tasks — used by admin CRM to see client feedback.
- */
-export async function getClientTaskRatings(
-    clientUserId: string,
-    workspaceId: string
-) {
-    const workspacePrisma = getWorkspacePrisma(workspaceId)
-    return await workspacePrisma.rating.findMany({
-        where: { clientId: clientUserId },
-        include: {
-            task: { select: { title: true } },
-            staff: { select: { username: true, nickname: true } }
-        },
-        orderBy: { createdAt: 'desc' }
-    })
-}
+// [Portal Audit M1+M2] Removed two dead `'use server'` exports that bypassed
+// authentication:
+//   - getClientTaskRatings(clientUserId, workspaceId) had NO session check →
+//     any authenticated caller could supply an arbitrary clientUserId and read
+//     ratings + staff metadata for someone else's tasks.
+//   - getTaskDetailForPortal(taskId) used a destructuring blocklist that leaked
+//     internal Task fields (fileLink, isPenalized, submissionFolder,
+//     assignedAgencyId, claimSource, claimedAt, assignedById, invoiceId,
+//     invoiceStatus, version, profileId, isArchived) to clients.
+// Neither was called from the UI. Re-add later with explicit auth + whitelist
+// SELECT if a real use-case appears.
 
 /**
  * Discovers workspaces where the client has data or memberships.
@@ -495,7 +523,7 @@ async function findOwnedTask(taskId: string, workspaceId: string, clientUserId: 
  * like any completed task) + clientReview=APPROVED. Notifies the assignee.
  */
 export async function approveDeliverable(taskId: string, workspaceId: string) {
-    const clientUserId = await getClientSession()
+    const clientUserId = await getClientSession(workspaceId)
     const task = await findOwnedTask(taskId, workspaceId, clientUserId, {
         id: true, title: true, status: true, assigneeId: true, assignedById: true, clientReview: true,
     })
@@ -553,10 +581,13 @@ export async function approveDeliverable(taskId: string, workspaceId: string) {
  * Client requests changes → task moves to 'Revision' + stores clientFeedback
  * (separate from internal notes) + clientReview=CHANGES. Notifies assignee + the
  * admin who manages the task. The team then drives the internal rework flow.
+ *
+ * [Security · M4] feedback is HTML-stripped + length-capped before storage.
  */
 export async function requestDeliverableChanges(taskId: string, workspaceId: string, feedback: string) {
-    const clientUserId = await getClientSession()
-    const clean = (feedback || '').trim()
+    const clientUserId = await getClientSession(workspaceId)
+    // [M4] Strip HTML + cap length.
+    const clean = sanitizeClientText(feedback || '', FEEDBACK_MAX_LEN)
     if (!clean) return { success: false, error: 'Vui lòng nhập nội dung cần chỉnh sửa.' }
 
     const task = await findOwnedTask(taskId, workspaceId, clientUserId, {
@@ -626,7 +657,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
  * Reads the AuditLog for one task → a client-safe Activity timeline (newest first).
  */
 export async function getDeliverableActivity(taskId: string) {
-    const clientUserId = await getClientSession()
+    const clientUserId = await getClientSessionForTask(taskId)
     const relatedClientIds = await getRelatedClientIds(clientUserId)
     const owned = await globalPrisma.task.findFirst({
         where: { id: taskId, OR: [{ clientUserId }, { clientId: { in: relatedClientIds } }] },

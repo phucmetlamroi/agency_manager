@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import PresenceTracker from '@/components/tracking/PresenceTracker'
@@ -8,6 +9,18 @@ import { MarketplaceProvider } from '@/components/marketplace/MarketplaceProvide
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { needsUsernameMigration } from '@/lib/username-validation'
 import { UsernameMigrationModal } from '@/components/auth/UsernameMigrationModal'
+
+/** [M10] Resolve the user's preferred locale for portal redirects. Reads the
+ * next-intl cookie if present; falls back to 'en'. Hardcoding 'en' loses the
+ * user's language preference on the CLIENT-guard bounce. */
+async function resolvePortalLocale(): Promise<string> {
+    try {
+        const c = await cookies()
+        const v = c.get('NEXT_LOCALE')?.value
+        if (v && /^[a-zA-Z-]{2,10}$/.test(v)) return v
+    } catch { /* ignore */ }
+    return 'en'
+}
 
 export default async function WorkspaceLayout({
     children,
@@ -64,9 +77,18 @@ export default async function WorkspaceLayout({
 
     // [Z+1.fix3] If workspace's profile khác sessionProfileId, verify user có ProfileAccess.
     // Use workspace's profile cho data context (correct cho cross-profile navigation).
+    //
+    // [Portal Audit M7 · Security · fail-closed] If the cross-profile lookup throws
+    // (Neon RTT timeout / transient pool error), the previous implementation kept
+    // the stale sessionProfileId. That could let an ADMIN-of-profile-A user who is
+    // also CLIENT-of-profile-B render the admin chrome of workspace B when the
+    // lookup blipped, because the downstream CLIENT-check would then run against
+    // profile A (where they're ADMIN). Failing closed to /portal is consistent
+    // with the clientCheck block below and costs nothing for legitimate non-CLIENTs.
     if (workspaceCheck.profileId && workspaceCheck.profileId !== profileId) {
+        let xAccess: { profileId: string } | null = null
         try {
-            const xAccess = await prisma.profileAccess.findUnique({
+            xAccess = await prisma.profileAccess.findUnique({
                 where: {
                     userId_profileId: {
                         userId: session.user.id,
@@ -75,14 +97,16 @@ export default async function WorkspaceLayout({
                 },
                 select: { profileId: true },
             })
-            if (xAccess) {
-                // User có access tới workspace's profile → switch context
-                profileId = xAccess.profileId
-            }
-            // Nếu không có access → để verifyWorkspaceAccess trong downstream catch + report properly
         } catch (e) {
-            console.warn('[WorkspaceLayout] cross-profile access check failed:', e)
+            console.error('[WorkspaceLayout] cross-profile access check failed — failing closed to /portal:', e)
+            const loc = await resolvePortalLocale()
+            redirect(`/portal/${loc}/${workspaceId}`)
         }
+        if (xAccess) {
+            // User có access tới workspace's profile → switch context
+            profileId = xAccess.profileId
+        }
+        // Nếu không có access → để downstream verifyWorkspaceAccess catch + report.
     }
 
     // [Client membership] If the user's membership in the active profile is CLIENT
@@ -111,7 +135,8 @@ export default async function WorkspaceLayout({
         clientCheck = 'CLIENT' // [fail-closed] treat the unknown as CLIENT so they go to /portal
     }
     if (clientCheck === 'CLIENT') {
-        redirect(`/portal/en/${workspaceId}`)
+        const loc = await resolvePortalLocale()
+        redirect(`/portal/${loc}/${workspaceId}`)
     }
 
     // Prefetch marketplace task count for badge UX (non-blocking if fails)

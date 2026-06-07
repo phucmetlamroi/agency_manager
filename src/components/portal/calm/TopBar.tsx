@@ -1,16 +1,15 @@
 'use client'
 
-import { MessageSquare, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import ScopeSelector from './ScopeSelector'
 import { fmtDate } from './format'
 import type { Brand } from './types'
 
-export default function TopBar({ scope, setScope, brands, lastUpdated, onMessage }: {
+export default function TopBar({ scope, setScope, brands, lastUpdated }: {
     scope: number | 'all'
     setScope: (s: number | 'all') => void
     brands: Brand[]
     lastUpdated: string | null
-    onMessage: () => void
 }) {
     return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '16px 24px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
@@ -27,10 +26,6 @@ export default function TopBar({ scope, setScope, brands, lastUpdated, onMessage
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ok)' }} />
                     {lastUpdated ? `Updated ${fmtDate(lastUpdated, false)}` : 'Up to date'}
                 </span>
-                <button className="pc-btn pc-btn-ghost" onClick={onMessage}>
-                    <MessageSquare size={15} />
-                    <span className="pc-msg-label">Message your team</span>
-                </button>
             </div>
         </div>
     )

@@ -9,7 +9,6 @@ import DeliverablesSurface from './DeliverablesSurface'
 import InvoicesSurface from './InvoicesSurface'
 import DeliverableDetailPanel from './DeliverableDetailPanel'
 import InvoiceDetailPanel from './InvoiceDetailPanel'
-import MessageModal from './MessageModal'
 import { deriveBrands, deriveLastUpdated, scopeFilterDeliverables, scopeFilterInvoices } from './types'
 import type { Deliverable, Invoice, SurfaceId } from './types'
 
@@ -38,7 +37,6 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
     const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables)
     const [openDel, setOpenDel] = useState<string | null>(null)
     const [openInv, setOpenInv] = useState<string | null>(null)
-    const [showMsg, setShowMsg] = useState(false)
 
     const invoices = initialInvoices
     const brands = useMemo(() => deriveBrands(deliverables), [deliverables])
@@ -62,7 +60,7 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
             </div>
 
             <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%' }}>
-                <TopBar scope={scope} setScope={setScope} brands={brands} lastUpdated={lastUpdated} onMessage={() => setShowMsg(true)} />
+                <TopBar scope={scope} setScope={setScope} brands={brands} lastUpdated={lastUpdated} />
 
                 <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
                     {active === 'overview' && <OverviewSurface key={'ov' + scope} deliverables={scopedDels} invoices={scopedInvs} scope={scope} brands={brands} contactName={contactName} onNav={onNav} openDeliverable={openDeliverable} openInvoice={openInvoice} />}
@@ -87,7 +85,6 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
 
             {delObj && <DeliverableDetailPanel d={delObj} workspaceId={workspaceId} onClose={() => setOpenDel(null)} onUpdated={updateDeliverable} />}
             {invObj && <InvoiceDetailPanel inv={invObj} brands={brands} onClose={() => setOpenInv(null)} />}
-            {showMsg && <MessageModal workspaceId={workspaceId} currentUserId={currentUserId} onClose={() => setShowMsg(false)} />}
         </div>
     )
 }

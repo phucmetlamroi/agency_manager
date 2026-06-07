@@ -4,8 +4,6 @@ import { put } from '@vercel/blob'
 import { prisma } from '@/lib/db'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import sharp from 'sharp'
-import { randomUUID } from 'crypto'
-import { authorizeChannel } from '@/lib/channel-permissions'
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  [Z+1.fix3] Image upload helpers                                      */
@@ -297,110 +295,5 @@ export async function uploadProfileLogo(profileId: string, formData: FormData) {
     } catch (error: any) {
         console.error('Profile logo upload error:', error)
         return { error: error?.message?.slice(0, 200) || 'Lỗi khi tải logo. Vui lòng thử lại.' }
-    }
-}
-
-/* ──────────────────────────────────────────────────────────────────── */
-/*  [Phase 2] Chat attachment upload (images optimized, files as-is)     */
-/* ──────────────────────────────────────────────────────────────────── */
-
-export interface ChatAttachmentMeta {
-    url: string
-    fileName: string
-    mimeType: string
-    sizeBytes: number
-    width: number | null
-    height: number | null
-}
-
-/**
- * Upload a chat attachment to Vercel Blob under a workspace-scoped path
- * `chat/{workspaceId}/{channelId}/...`. Images are Sharp-optimized to webp
- * (≤1920px) with width/height computed; other files are stored as-is. Returns
- * metadata only — the Attachment row is created in sendMessage (which has the
- * profileId). Caller must be able to POST in the channel.
- */
-export async function uploadChatAttachment(
-    workspaceId: string,
-    channelId: string,
-    formData: FormData,
-): Promise<{ attachment: ChatAttachmentMeta } | { error: string }> {
-    try {
-        await authorizeChannel(workspaceId, channelId, 'POST')
-
-        const file = formData.get('file') as File | null
-        if (!file) return { error: 'Không tìm thấy tệp.' }
-        if (file.size > 10 * 1024 * 1024) return { error: 'Tệp tối đa 10MB.' }
-
-        const mime = file.type || 'application/octet-stream'
-        const rawName = (file.name || 'file').trim()
-        const lowerName = rawName.toLowerCase()
-        // [Security] Block SVG and any HTML-like file outright. SVG can carry inline <script>
-        // (Sharp cannot decode it → would fall through to the "store raw" branch and be served
-        // inline by Vercel Blob → stored XSS). The blob path is `chat/{workspaceId}/...` and the
-        // host serves it on a non-app domain, but inline SVG + content-sniffing still poses an
-        // XSS risk against any future inline embed and is cheap to block.
-        if (
-            mime === 'image/svg+xml' ||
-            mime === 'text/html' ||
-            mime === 'application/xhtml+xml' ||
-            lowerName.endsWith('.svg') ||
-            lowerName.endsWith('.svgz') ||
-            lowerName.endsWith('.html') ||
-            lowerName.endsWith('.htm') ||
-            lowerName.endsWith('.xhtml')
-        ) {
-            return { error: 'Định dạng SVG/HTML không được hỗ trợ vì lý do bảo mật.' }
-        }
-        const safeName = (rawName.replace(/[^\w.\-]+/g, '_').slice(0, 120)) || 'file'
-        const buffer = Buffer.from(await file.arrayBuffer())
-
-        let outBuffer: Buffer = buffer
-        let contentType = mime
-        let ext = ''
-        let width: number | null = null
-        let height: number | null = null
-        let sizeBytes = file.size
-
-        if (mime.startsWith('image/')) {
-            try {
-                const optimized = await sharp(buffer, { failOn: 'none' })
-                    .rotate()
-                    .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
-                    .webp({ quality: 82 })
-                    .toBuffer({ resolveWithObject: true })
-                outBuffer = optimized.data
-                contentType = 'image/webp'
-                ext = '.webp'
-                width = optimized.info.width ?? null
-                height = optimized.info.height ?? null
-                sizeBytes = optimized.data.length
-            } catch {
-                // Non-decodable image → store raw.
-                outBuffer = buffer
-                contentType = mime
-                sizeBytes = buffer.length
-            }
-        }
-
-        const key = `chat/${workspaceId}/${channelId}/${randomUUID()}-${safeName}${ext}`
-        const blob = await put(key, outBuffer, { access: 'public', contentType })
-
-        return {
-            attachment: {
-                url: blob.url,
-                fileName: rawName.slice(0, 200) || safeName,
-                mimeType: contentType,
-                sizeBytes,
-                width,
-                height,
-            },
-        }
-    } catch (error: any) {
-        if (typeof error?.message === 'string' && error.message.startsWith('SECURITY_VIOLATION')) {
-            return { error: 'Bạn không có quyền gửi tệp trong kênh này.' }
-        }
-        console.error('[uploadChatAttachment]', error)
-        return { error: error?.message?.slice(0, 160) || 'Lỗi tải tệp lên.' }
     }
 }

@@ -22,8 +22,7 @@ import {
     ArrowRightLeft,
     Settings,
     ScrollText,
-    LifeBuoy,
-    MessagesSquare
+    LifeBuoy
 } from "lucide-react"
 
 import {
@@ -79,7 +78,6 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
     const allItems: NavItem[] = [
         { label: "Dashboard", href: viewRole === 'USER' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`, icon: LayoutDashboard, roles: ['ADMIN', 'USER'] },
         { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'] },
-        { label: "Chat", href: `/${workspaceId}/hub`, icon: MessagesSquare, roles: ['ADMIN', 'USER'] },
         // [CM merge] "Clients Manager" đã gộp vào Dashboard → bỏ khỏi sidebar.
         { label: "Schedule", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
         { label: "My Errors", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },

@@ -31,9 +31,8 @@ if (typeof window !== 'undefined' && !globalThis.__taskDetailDompurifyLinkHookRe
 import { motion } from "framer-motion"
 import {
     X, Pencil, LayoutGrid, FolderOpen, StickyNote, ExternalLink, Check, Plus,
-    Lock, Play, Loader2, MessagesSquare,
+    Lock, Play, Loader2,
 } from "lucide-react"
-import TaskChatPanel from "@/components/tasks/TaskChatPanel"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
@@ -168,14 +167,13 @@ function TabNav({
     activeTab,
     onChange,
 }: {
-    activeTab: 'main' | 'assets' | 'notes' | 'chat'
-    onChange: (tab: 'main' | 'assets' | 'notes' | 'chat') => void
+    activeTab: 'main' | 'assets' | 'notes'
+    onChange: (tab: 'main' | 'assets' | 'notes') => void
 }) {
     const tabs = [
         { id: 'main' as const, label: 'Main', icon: LayoutGrid },
         { id: 'assets' as const, label: 'Assets', icon: FolderOpen },
         { id: 'notes' as const, label: 'Notes', icon: StickyNote },
-        { id: 'chat' as const, label: 'Thảo luận', icon: MessagesSquare },
     ]
     return (
         <div className="mx-6 my-4 flex items-center bg-white/[0.04] border border-white/5 rounded-full p-1">
@@ -423,7 +421,7 @@ export function TaskDetailModal({
         bulkSelectedIds.includes(task.id)
     )
     const bulkCount = bulkSelectedIds?.length ?? 0
-    const [activeTab, setActiveTab] = useState<'main' | 'assets' | 'notes' | 'chat'>('main')
+    const [activeTab, setActiveTab] = useState<'main' | 'assets' | 'notes'>('main')
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
 
     // Per-card edit states (only one open at a time, but state per card)
@@ -1195,14 +1193,6 @@ export function TaskDetailModal({
                                 </Card>
                             )}
 
-                            {/* TAB CHAT — [Phase 6] per-task discussion (reuses Hub ChannelView) */}
-                            {activeTab === 'chat' && localTask && (
-                                <TaskChatPanel
-                                    workspaceId={workspaceId}
-                                    taskId={localTask.id}
-                                    currentUserId={currentUserId}
-                                />
-                            )}
                         </div>
 
                           </>

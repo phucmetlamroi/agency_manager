@@ -326,6 +326,97 @@ export function applyStatusChain(preNodes: PreNode[]): {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+//  §3.7e — Shared asset detection
+//  CTA/BODY nodes that landed in the "main" default concept while other
+//  named concepts exist promote to SHARED scope. The LGR spec example:
+//  Video 1/2/3 + a root-level "Main CTA.mp4" → the CTA links to all three.
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns `{ byConcept, shared }`. The input map is partitioned in-place —
+ * shared nodes are pulled OUT of the "main" bucket and returned in the
+ * `shared` array. If the "main" bucket has zero remaining nodes, it's
+ * dropped from the map entirely.
+ *
+ * Roles eligible for shared promotion: CTA, BODY, SCRIPT, CAPTION. Hooks
+ * stay scoped — a hook used by all three videos is logically an asset
+ * that needs per-video splitting, not a single shared node.
+ */
+export function extractSharedAssets(
+    byConcept: Map<string, PreNode[]>,
+): { byConcept: Map<string, PreNode[]>; shared: PreNode[] } {
+    const mainNodes = byConcept.get('main') ?? []
+    const otherKeys = [...byConcept.keys()].filter(k => k !== 'main')
+    if (otherKeys.length === 0 || mainNodes.length === 0) {
+        return { byConcept, shared: [] }
+    }
+
+    const SHAREABLE: Array<PreNode['role']> = ['CTA', 'BODY', 'SCRIPT', 'CAPTION']
+    const shared: PreNode[] = []
+    const remaining: PreNode[] = []
+    for (const n of mainNodes) {
+        if (SHAREABLE.includes(n.role) && n.status === 'ACTIVE') {
+            shared.push(n)
+        } else {
+            remaining.push(n)
+        }
+    }
+
+    if (remaining.length === 0) byConcept.delete('main')
+    else byConcept.set('main', remaining)
+
+    return { byConcept, shared }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  §3.7d — Fan-out edges
+//  Inside each concept, wire active hook → body → cta. When there's no
+//  body, hooks fan to the concept's first FINAL ("Video 1.mov" full-cut).
+//  Shared CTAs replace per-concept CTAs when none exist locally.
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface BuildEdgesOptions {
+    sharedCtas: PreNode[]
+    finals: PreNode[]
+}
+
+export function buildFanOutEdges(
+    nodes: PreNode[],
+    opts: BuildEdgesOptions,
+): Array<{ from: string; to: string }> {
+    const active = nodes.filter(n => n.status === 'ACTIVE' || n.status === 'PENDING')
+    const hooks = active.filter(n => n.role === 'HOOK')
+    const callouts = active.filter(n => n.role === 'CALLOUT')
+    const body = active.find(n => n.role === 'BODY')
+    const cta =
+        active.find(n => n.role === 'CTA') ??
+        opts.sharedCtas.find(n => n.role === 'CTA')
+
+    const edges: Array<{ from: string; to: string }> = []
+
+    if (body) {
+        // hook → body
+        for (const h of hooks) edges.push({ from: h.id, to: body.id })
+        // callout → body (callouts ride into the body lane same as hooks)
+        for (const c of callouts) edges.push({ from: c.id, to: body.id })
+        if (cta) edges.push({ from: body.id, to: cta.id })
+        return edges
+    }
+
+    // No body in this concept — hooks/callouts fan to the first FINAL/CTA.
+    // Spec §3.7d: "concept không có body riêng (chỉ hooks + full video)
+    // → edge hook[i] → finalVideo".
+    const sink = opts.finals[0] ?? cta
+    if (!sink) return edges
+    for (const h of hooks) edges.push({ from: h.id, to: sink.id })
+    for (const c of callouts) edges.push({ from: c.id, to: sink.id })
+    if (cta && opts.finals[0]) {
+        edges.push({ from: opts.finals[0].id, to: cta.id })
+    }
+    return edges
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 //  Helpers
 // ────────────────────────────────────────────────────────────────────────────
 

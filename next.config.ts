@@ -17,7 +17,14 @@ const nextConfig: NextConfig = {
       }
     ],
   },
-  output: 'standalone',
+  // [F6 standalone trace fix] `output: 'standalone'` is required for the
+  // Electron desktop wrapper (it packages the .next/standalone tree into the
+  // app bundle), but it does NOT belong on Vercel — Vercel handles output file
+  // tracing for serverless functions itself, and combining standalone +
+  // Turbopack 16 + the next-intl wrapper produced a runtime
+  // `Error: Failed to load external "..."` on every route. Only enable
+  // standalone in the Electron build.
+  ...(process.env.ELECTRON_DESKTOP ? { output: 'standalone' as const } : {}),
   serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "youtube-dl-exec", "@sparticuz/chromium"],
   async redirects() {
     return [

@@ -177,15 +177,28 @@ export function mergeParts(items: PartMergeInput[]): PreNode[] {
         return { ...it, part }
     })
 
-    // For compilation files inside the SAME concept, ensure distinct ids so
-    // none collapse into each other (spec §3.7f: each compilation is its
-    // own node). Synthesise an index from the file name's stable hash.
+    // Bucket key — drives which files merge.
+    //
+    // Status / replacement suffix prevents collisions on the spec's OBJ
+    // case: "H2 NO Use" (status EXCLUDED) and "H2 Replacement" share
+    // (concept=Video 1, role=HOOK, index=2) and would collapse into one
+    // bucket without a status discriminator. P2.3 then re-pairs them and
+    // sets `SUPERSEDED` on the excluded base.
+    //
+    // Compilation files (spec §3.7f) get a per-file bucket so each
+    // "Video N Hooks" stays a distinct node.
     const buckets = new Map<string, typeof enriched>()
     for (const it of enriched) {
-        const idxKey = it.node.verdict.isCompilation
+        const v = it.node.verdict
+        const isReplacement = /\brepla?cement\b|\breplaced\b/i.test(v.tokenized.normalized)
+        const statusSuffix =
+            v.status === 'EXCLUDED' ? ':excluded' :
+            v.status === 'PENDING' ? ':pending' :
+            isReplacement ? ':replacement' : ''
+        const idxKey = v.isCompilation
             ? `comp:${it.node.file.name}`
-            : `${it.node.verdict.index ?? 'noidx'}`
-        const key = `${it.conceptKey}::${it.node.verdict.role}::${idxKey}`
+            : `${v.index ?? 'noidx'}${statusSuffix}`
+        const key = `${it.conceptKey}::${v.role}::${idxKey}`
         if (!buckets.has(key)) buckets.set(key, [])
         buckets.get(key)!.push(it)
     }
@@ -239,6 +252,77 @@ export function mergeParts(items: PartMergeInput[]): PreNode[] {
     }
 
     return out
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  §3.7c — Status chain (Replacement supersedes Base; Final lift)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Walks the PreNodes and applies the spec §3.7c relations:
+ *
+ *   - When a "*Replacement" node exists at (concept, role, index), the
+ *     BASE node at the same coordinates flips `status` to SUPERSEDED.
+ *     The replacement keeps `status = ACTIVE`. Spec OBJ example:
+ *     `H2 NO Use` (EXCLUDED→SUPERSEDED) + `H2 Replacement` (ACTIVE).
+ *   - Files tagged FINAL/master OR sitting in an `Exports` folder are
+ *     promoted to `role = FINAL`. They're returned in a separate
+ *     `finals` array so the engine layers them outside the modular
+ *     hook → body → cta fan-out.
+ *
+ * The function MUTATES `preNodes` in-place (status updates) and returns
+ * a `{ active, finals }` split so the caller can map them straight onto
+ * `VeloxConcept.nodes` and `VeloxConcept.finals`.
+ */
+export function applyStatusChain(preNodes: PreNode[]): {
+    active: PreNode[]
+    finals: PreNode[]
+} {
+    // 1. Pair Replacement → Base. Index by (concept::role::index) — when a
+    //    bucket has both a `:replacement` and a non-replacement variant
+    //    (with EXCLUDED or any other status), the non-replacement variant
+    //    becomes SUPERSEDED.
+    const byCoord = new Map<string, PreNode[]>()
+    for (const n of preNodes) {
+        if (n.isCompilation) continue            // compilations never chain
+        if (n.index === undefined) continue       // shared / named-angle skip
+        const k = `${n.conceptKey}::${n.role}::${n.index}`
+        if (!byCoord.has(k)) byCoord.set(k, [])
+        byCoord.get(k)!.push(n)
+    }
+    for (const group of byCoord.values()) {
+        if (group.length < 2) continue
+        const replacements = group.filter(
+            n => /\brepla?cement\b|\breplaced\b/i.test(n.files[0]?.name ?? ''),
+        )
+        if (replacements.length === 0) continue
+        for (const n of group) {
+            if (replacements.includes(n)) {
+                n.status = 'ACTIVE'
+                n.note = (n.note ?? '') + (n.note ? ' · ' : '') + 'replaces base variant'
+                continue
+            }
+            n.status = 'SUPERSEDED'
+        }
+    }
+
+    // 2. Promote FINAL / Exports.
+    const finals: PreNode[] = []
+    const active: PreNode[] = []
+    for (const n of preNodes) {
+        const isExports = /\b(exports?|final|master|delivered)\b/i
+        const hint =
+            isExports.test(n.files[0]?.name ?? '') ||
+            n.role === 'FINAL'
+        if (hint) {
+            n.role = 'FINAL'
+            finals.push(n)
+        } else {
+            active.push(n)
+        }
+    }
+
+    return { active, finals }
 }
 
 // ────────────────────────────────────────────────────────────────────────────

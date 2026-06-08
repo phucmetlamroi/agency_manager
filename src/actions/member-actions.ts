@@ -7,6 +7,7 @@ import { ensureNotLastOwner, LastOwnerProtectionError } from '@/lib/workspace-gu
 import { isWorkspaceRole, hasAtLeastRole, type WorkspaceRole } from '@/lib/workspace-roles'
 import { audit } from '@/lib/audit-log'
 import { checkInviteRate } from '@/lib/rate-limit-upstash'
+import { findUserByEmailOrUsername } from '@/lib/user-lookup'
 
 const INVITATION_EXPIRY_DAYS = 14
 
@@ -320,17 +321,18 @@ export async function inviteToWorkspace(
     const trimmedUsername = targetUsername.trim()
     if (!trimmedUsername) return { error: 'Tên người dùng không được để trống.' }
 
-    // Find target user
-    const targetUser = await prisma.user.findFirst({
-        where: {
-            OR: [
-                { username: { equals: trimmedUsername, mode: 'insensitive' } },
-                { email: { equals: trimmedUsername, mode: 'insensitive' } },
-            ]
-        },
-        select: { id: true, username: true, nickname: true, role: true, profileId: true, allowExternalInvites: true }
+    // Find target user — deterministic lookup that survives duplicate-email rows.
+    const lookup = await findUserByEmailOrUsername<{
+        id: string; username: string; nickname: string | null; role: string;
+        profileId: string | null; allowExternalInvites: boolean
+    }>(trimmedUsername, {
+        id: true, username: true, nickname: true, role: true,
+        profileId: true, allowExternalInvites: true,
     })
-
+    if (lookup.matchCount > 1) {
+        return { error: `Có ${lookup.matchCount} tài khoản dùng email/username "${trimmedUsername}". Yêu cầu admin chạy scripts/audit-duplicate-emails.mjs để gộp trước khi mời.` }
+    }
+    const targetUser = lookup.user
     if (!targetUser) {
         return { error: 'Tài khoản không tồn tại.' }
     }
@@ -564,10 +566,17 @@ export async function inviteClientToProfile(workspaceId: string, targetUsername:
     const client = await prisma.client.findFirst({ where: { id: clientId, profileId, status: { not: 'SOFT_DELETED' } }, select: { id: true, name: true } })
     if (!client) return { error: 'Khách hàng không hợp lệ trong profile này.' }
 
-    const targetUser = await prisma.user.findFirst({
-        where: { OR: [{ username: { equals: trimmed, mode: 'insensitive' } }, { email: { equals: trimmed, mode: 'insensitive' } }] },
-        select: { id: true, username: true, nickname: true, profileId: true, allowExternalInvites: true },
+    const lookup = await findUserByEmailOrUsername<{
+        id: string; username: string; nickname: string | null;
+        profileId: string | null; allowExternalInvites: boolean
+    }>(trimmed, {
+        id: true, username: true, nickname: true,
+        profileId: true, allowExternalInvites: true,
     })
+    if (lookup.matchCount > 1) {
+        return { error: `Có ${lookup.matchCount} tài khoản dùng email/username "${trimmed}". Yêu cầu admin chạy scripts/audit-duplicate-emails.mjs để gộp trước khi mời.` }
+    }
+    const targetUser = lookup.user
     if (!targetUser) return { error: 'Tài khoản không tồn tại.' }
     if (targetUser.id === inviterId) return { error: 'Bạn không thể tự mời chính mình.' }
 

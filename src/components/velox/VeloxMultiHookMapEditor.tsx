@@ -554,8 +554,36 @@ function applyMove(
         }
     }
 
+    // [Review BLOCKER 2] Prune any node that just lost its last file.
+    // Zod's `veloxNodeSchema.files.min(1)` would otherwise reject the map at
+    // save time and the operator would silently lose their edits.
+    pruneEmptyNodes(next)
+
     recomputeStats(next)
     return next
+}
+
+function pruneEmptyNodes(map: VeloxScanResult): void {
+    // 1. Drop empty concept + shared nodes first.
+    for (const c of map.concepts) {
+        c.nodes = c.nodes.filter(n => n.files.length > 0)
+        c.finals = c.finals.filter(n => n.files.length > 0)
+    }
+    map.sharedAssets = map.sharedAssets.filter(n => n.files.length > 0)
+
+    // 2. Build the global live-id set AFTER pruning so edges to shared
+    //    nodes that survived stay valid, and orphan edges (to dropped
+    //    shared or concept nodes) get filtered out.
+    const liveIds = new Set<string>()
+    for (const c of map.concepts) {
+        for (const n of c.nodes) liveIds.add(n.id)
+        for (const n of c.finals) liveIds.add(n.id)
+    }
+    for (const n of map.sharedAssets) liveIds.add(n.id)
+
+    for (const c of map.concepts) {
+        c.edges = c.edges.filter(e => liveIds.has(e.from) && liveIds.has(e.to))
+    }
 }
 
 function removeFileFromNode(map: VeloxScanResult, nodeId: string, path: string) {

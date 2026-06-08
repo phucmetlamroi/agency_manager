@@ -79,12 +79,17 @@ const veloxConceptSchema = z.object({
     edges: z.array(z.object({ from: z.string(), to: z.string() })),
 })
 
+// [Review BLOCKER 1] Strict ID format — fail fast before the DB roundtrip.
+const taskIdSchema = z.string().uuid({ message: 'taskId không phải UUID hợp lệ.' })
+
 const veloxScanResultSchema = z.object({
     schemaVersion: z.literal('velox-4.0'),
     rootFolder: z.object({
         provider: z.enum(['dropbox', 'gdrive']),
         name: z.string(),
-        url: z.string(),
+        // [Review HIGH 2] Validate as a real URL so DB can't accept
+        // `javascript:` or relative-path payloads via `sourceFolderUrl`.
+        url: z.string().url({ message: 'rootFolder.url phải là URL hợp lệ.' }),
     }),
     scannedAt: z.string(),
     stats: z.object({
@@ -109,10 +114,15 @@ const veloxScanResultSchema = z.object({
 // ────────────────────────────────────────────────────────────────────────────
 
 async function loadTaskOrFail(taskId: string) {
+    // [Review BLOCKER 1] Session BEFORE Prisma + UUID format validation
+    // BEFORE any DB roundtrip. Earlier ordering let a deleted-user session
+    // hit the DB and then failed silently at workspace-access.
     const session = await getSession()
     if (!session?.user?.id) return { error: 'Unauthorized' as const }
+    const idCheck = taskIdSchema.safeParse(taskId)
+    if (!idCheck.success) return { error: 'taskId không hợp lệ.' as const }
     const task = await prisma.task.findUnique({
-        where: { id: taskId },
+        where: { id: idCheck.data },
         select: { id: true, workspaceId: true, profileId: true, title: true },
     })
     if (!task) return { error: 'Task không tồn tại.' as const }

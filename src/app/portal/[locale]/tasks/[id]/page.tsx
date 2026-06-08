@@ -1,4 +1,6 @@
-import { getTranslations } from 'next-intl/server';
+// [F5] Removed unused `getTranslations` import — never called in this file and
+// next-intl server APIs trigger the Turbopack standalone trace miss we hit on
+// /portal/* routes (see 5df77e7).
 import { Link } from '@/i18n/routing';
 import { ArrowLeft, Clock, FileVideo, MessageSquareQuote } from 'lucide-react';
 import RatingMicroSurvey from '@/components/portal/RatingMicroSurvey';

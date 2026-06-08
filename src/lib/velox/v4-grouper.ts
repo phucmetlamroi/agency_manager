@@ -16,6 +16,8 @@
  */
 
 import type { MappedNode } from './v4-engine'
+import type { VeloxFile, VeloxRole, VeloxStatus, VeloxModifiers } from './v4-types'
+import { tokenizeFilename, getPart } from './v4-tokenizer'
 
 // ────────────────────────────────────────────────────────────────────────────
 //  §3.7a — Concept key derivation
@@ -118,6 +120,128 @@ export function buildBrandPrefixIndex(nodes: MappedNode[]): Set<string> {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+//  §3.7b — Part merge
+//  Files sharing (concept, role, index) but carrying different part
+//  numbers become ONE node with files[] sorted by part. Single-file nodes
+//  stay as-is. Compilation nodes never merge (spec §3.7f).
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Intermediate "pre-node" used while the grouper assembles the final
+ * VeloxConcept tree. Carries enough state for status chain (§3.7c) and
+ * shared/fan-out (§3.7d-e) to operate without re-tokenising.
+ */
+export interface PreNode {
+    /** Stable id derived from concept-key + role + index. */
+    id: string
+    conceptKey: string
+    conceptLabel: string
+    conceptSource: 'subfolder' | 'filename' | 'brand_prefix' | 'default'
+    role: VeloxRole
+    index?: number
+    label: string
+    status: VeloxStatus
+    confidence: number
+    band: 'HIGH' | 'REVIEW'
+    isCompilation: boolean
+    note?: string
+    files: VeloxFile[]
+    modifiers?: VeloxModifiers
+}
+
+/**
+ * Group MappedNodes into PreNodes. Inputs must already have the concept
+ * key on them (call `resolveConceptKey` beforehand). The merger:
+ *
+ *   - Buckets by (conceptKey, role, index).
+ *   - When a bucket has multiple files with DIFFERENT part numbers, they
+ *     merge into one PreNode. Files are stamped with `.part` and sorted
+ *     ascending.
+ *   - Compilation nodes never merge (each LGR-style "Video N Hooks"
+ *     file is its own bucket because conceptKey is "video-N" but each
+ *     gets a unique synthetic index).
+ *   - Same-bucket duplicates with NO part info take the highest-confidence
+ *     verdict and surface a warning on the engine (TODO P2.5 — wire warn).
+ */
+export interface PartMergeInput {
+    node: MappedNode
+    conceptKey: string
+    conceptLabel: string
+    conceptSource: 'subfolder' | 'filename' | 'brand_prefix' | 'default'
+}
+
+export function mergeParts(items: PartMergeInput[]): PreNode[] {
+    // ─ Pre-process: derive part for each item, and bucket key.
+    const enriched = items.map(it => {
+        const part = getPart(it.node.file.name)
+        return { ...it, part }
+    })
+
+    // For compilation files inside the SAME concept, ensure distinct ids so
+    // none collapse into each other (spec §3.7f: each compilation is its
+    // own node). Synthesise an index from the file name's stable hash.
+    const buckets = new Map<string, typeof enriched>()
+    for (const it of enriched) {
+        const idxKey = it.node.verdict.isCompilation
+            ? `comp:${it.node.file.name}`
+            : `${it.node.verdict.index ?? 'noidx'}`
+        const key = `${it.conceptKey}::${it.node.verdict.role}::${idxKey}`
+        if (!buckets.has(key)) buckets.set(key, [])
+        buckets.get(key)!.push(it)
+    }
+
+    const out: PreNode[] = []
+    for (const [key, group] of buckets) {
+        const head = group[0]
+
+        // Files with distinct parts merge; otherwise the highest-confidence
+        // verdict wins (its tokens/label/status carry through).
+        const distinctParts = new Set(group.map(g => g.part).filter(p => p !== undefined))
+        const shouldMerge =
+            !head.node.verdict.isCompilation &&
+            distinctParts.size >= 2 &&
+            distinctParts.size === group.filter(g => g.part !== undefined).length &&
+            group.length === distinctParts.size
+
+        let winnerIdx = 0
+        for (let i = 1; i < group.length; i++) {
+            if (group[i].node.verdict.confidence > group[winnerIdx].node.verdict.confidence) {
+                winnerIdx = i
+            }
+        }
+        const winner = group[winnerIdx]
+        const winnerVerdict = winner.node.verdict
+
+        const files: VeloxFile[] = shouldMerge
+            ? [...group]
+                .sort((a, b) => (a.part ?? 0) - (b.part ?? 0))
+                .map(g => ({ ...g.node.file, part: g.part }))
+            : [winner.node.file]
+
+        out.push({
+            id: stableNodeId(key),
+            conceptKey: head.conceptKey,
+            conceptLabel: head.conceptLabel,
+            conceptSource: head.conceptSource,
+            role: winnerVerdict.role === 'UNKNOWN' ? 'FINAL' : winnerVerdict.role,
+            index: winnerVerdict.index,
+            label: winnerVerdict.label,
+            status: winnerVerdict.status,
+            confidence: winnerVerdict.confidence,
+            band: winnerVerdict.band,
+            isCompilation: winnerVerdict.isCompilation,
+            note: winnerVerdict.isCompilation
+                ? 'File này chứa nhiều hook khác nhau — cần tách khi dựng.'
+                : undefined,
+            files,
+            modifiers: winnerVerdict.tokenized.modifiers,
+        })
+    }
+
+    return out
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 //  Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -125,3 +249,17 @@ function capitalise(s: string): string {
     if (!s) return s
     return s.charAt(0).toUpperCase() + s.slice(1)
 }
+
+function stableNodeId(seed: string): string {
+    // Tiny deterministic hash → 8-char hex. Good enough for React keys and
+    // edge endpoints; not a security primitive.
+    let h = 0
+    for (let i = 0; i < seed.length; i++) {
+        h = (h * 31 + seed.charCodeAt(i)) | 0
+    }
+    return 'n_' + (h >>> 0).toString(16).padStart(8, '0')
+}
+
+// Silence unused import lint — tokenizeFilename is re-exported here for
+// downstream P2.3-P2.4 sub-phases that need the same module.
+void tokenizeFilename

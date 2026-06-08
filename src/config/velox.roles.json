@@ -1,0 +1,152 @@
+{
+  "_comment": "Velox v4 deep-scan role dictionary. Spec §3.4 + Appendix A. Add aliases here, NOT in code. Per-client overrides live in velox.roles.<clientId>.json (merged on top of this base).",
+  "schemaVersion": "velox-4.0",
+  "separators": ["_", "|", "(", ")", "[", "]", "-", " "],
+  "roles": [
+    {
+      "role": "HOOK",
+      "priority": 100,
+      "isSource": false,
+      "isFinal": false,
+      "aliases": [
+        "hook",
+        "hooks",
+        "hk",
+        "opener",
+        "intro",
+        "pattern interrupt",
+        "pi"
+      ],
+      "letterForms": ["h"]
+    },
+    {
+      "role": "BODY",
+      "priority": 80,
+      "isSource": false,
+      "isFinal": false,
+      "aliases": ["body", "main", "content", "demo", "mechanism"]
+    },
+    {
+      "role": "CTA",
+      "priority": 90,
+      "isSource": false,
+      "isFinal": false,
+      "aliases": [
+        "cta",
+        "ctas",
+        "cta's",
+        "call to action",
+        "main cta",
+        "end card",
+        "endcard",
+        "outro",
+        "offer"
+      ]
+    },
+    {
+      "role": "CALLOUT",
+      "priority": 70,
+      "isSource": false,
+      "isFinal": false,
+      "aliases": [
+        "audience callout",
+        "callout",
+        "call out",
+        "call-out"
+      ]
+    },
+    {
+      "role": "SCRIPT",
+      "priority": 60,
+      "isSource": false,
+      "isFinal": false,
+      "aliases": ["script", "vo script", "voiceover script"],
+      "docExt": ["txt", "doc", "docx", "pdf"]
+    },
+    {
+      "role": "CAPTION",
+      "priority": 50,
+      "isSource": false,
+      "isFinal": false,
+      "aliases": [
+        "caption",
+        "captions",
+        "subs",
+        "sub",
+        "subtitle",
+        "subtitles",
+        "cc"
+      ],
+      "docExt": ["srt", "vtt"]
+    },
+    {
+      "role": "FINAL",
+      "priority": 40,
+      "isSource": false,
+      "isFinal": true,
+      "aliases": [
+        "final",
+        "master",
+        "ad",
+        "video",
+        "export",
+        "approved",
+        "delivered"
+      ]
+    }
+  ],
+  "sourceBuckets": [
+    "a-roll",
+    "a roll",
+    "aroll",
+    "b-roll",
+    "b roll",
+    "broll",
+    "b-roll footage",
+    "footage",
+    "raw",
+    "raw footage",
+    "images",
+    "image",
+    "photos",
+    "headshots",
+    "stills",
+    "assets",
+    "audio",
+    "music",
+    "sfx",
+    "project files",
+    "project"
+  ],
+  "_sourceBucketsNote": "Exports/Final are NOT source-buckets — they hold deliverables (FINAL role). See spec §3.2.",
+  "status": {
+    "EXCLUDED": [
+      "no use",
+      "non use",
+      "not use",
+      "dont use",
+      "don't use",
+      "do not use",
+      "unused"
+    ],
+    "REPLACEMENT": ["replacement", "replaced"],
+    "PENDING": [
+      "future edits",
+      "future edit",
+      "wip",
+      "tbc",
+      "draft",
+      "placeholder"
+    ],
+    "FINAL": ["final", "approved", "master", "delivered"]
+  },
+  "rawDumpPatterns": [
+    "^(nested\\s*sequence|sequence|comp|render|export|clip|untitled)\\s*\\d+",
+    "^(dsc|img|mvi|gopr|dji|c)\\d{3,5}\\b",
+    "^\\d+$"
+  ],
+  "_rawDumpNote": "Default names from cameras (DSC0001, C0017) and NLE (Nested Sequence 247, Comp 12, Untitled 03). Files matching these go to the Raw tray, not on the map.",
+  "videoExt": ["mp4", "mov", "m4v", "avi", "mkv", "mxf", "webm"],
+  "audioExt": ["mp3", "wav", "aif", "aiff", "m4a", "flac"],
+  "imageExt": ["jpg", "jpeg", "png", "gif", "tif", "tiff", "webp", "heic"]
+}

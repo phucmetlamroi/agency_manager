@@ -7,6 +7,7 @@ import { ensureNotLastOwner, LastOwnerProtectionError } from '@/lib/workspace-gu
 import { isWorkspaceRole, hasAtLeastRole, type WorkspaceRole } from '@/lib/workspace-roles'
 import { audit } from '@/lib/audit-log'
 import { checkInviteRate } from '@/lib/rate-limit-upstash'
+import { findUserByEmailOrUsername } from '@/lib/user-lookup'
 
 const INVITATION_EXPIRY_DAYS = 14
 
@@ -19,6 +20,31 @@ async function notifyInvitee(params: {
     role: string
 }): Promise<void> {
     const { invitationId, inviteeUserId, inviterUserId, workspaceId, role } = params
+
+    // [F2 stale-notification cleanup] Before delivering a fresh invitation
+    // notification, archive any previous unarchived invitation notifications for
+    // this user + workspace. Without this, the user can end up clicking an old
+    // notification whose embedded invitationId points to a DECLINED / EXPIRED /
+    // superseded invitation, causing the "Lời mời đã hết hạn" error even though
+    // a fresh PENDING invitation exists.
+    try {
+        await prisma.notification.updateMany({
+            where: {
+                userId: inviteeUserId,
+                type: 'WORKSPACE_INVITATION_RECEIVED',
+                isArchived: false,
+                metadata: {
+                    path: ['workspaceId'],
+                    equals: workspaceId,
+                },
+            },
+            data: { isArchived: true },
+        })
+    } catch (e) {
+        // Best-effort — the smart-fallback in acceptWorkspaceInvitation will
+        // also rescue the user if a stale notification survives.
+        console.warn('[notifyInvitee] archive stale notifications failed:', e)
+    }
 
     // Lookup data needed for email + notification
     const [invitee, inviter, ws] = await Promise.all([
@@ -295,17 +321,18 @@ export async function inviteToWorkspace(
     const trimmedUsername = targetUsername.trim()
     if (!trimmedUsername) return { error: 'Tên người dùng không được để trống.' }
 
-    // Find target user
-    const targetUser = await prisma.user.findFirst({
-        where: {
-            OR: [
-                { username: { equals: trimmedUsername, mode: 'insensitive' } },
-                { email: { equals: trimmedUsername, mode: 'insensitive' } },
-            ]
-        },
-        select: { id: true, username: true, nickname: true, role: true, profileId: true, allowExternalInvites: true }
+    // Find target user — deterministic lookup that survives duplicate-email rows.
+    const lookup = await findUserByEmailOrUsername<{
+        id: string; username: string; nickname: string | null; role: string;
+        profileId: string | null; allowExternalInvites: boolean
+    }>(trimmedUsername, {
+        id: true, username: true, nickname: true, role: true,
+        profileId: true, allowExternalInvites: true,
     })
-
+    if (lookup.matchCount > 1) {
+        return { error: `Có ${lookup.matchCount} tài khoản dùng email/username "${trimmedUsername}". Yêu cầu admin chạy scripts/audit-duplicate-emails.mjs để gộp trước khi mời.` }
+    }
+    const targetUser = lookup.user
     if (!targetUser) {
         return { error: 'Tài khoản không tồn tại.' }
     }
@@ -539,10 +566,17 @@ export async function inviteClientToProfile(workspaceId: string, targetUsername:
     const client = await prisma.client.findFirst({ where: { id: clientId, profileId, status: { not: 'SOFT_DELETED' } }, select: { id: true, name: true } })
     if (!client) return { error: 'Khách hàng không hợp lệ trong profile này.' }
 
-    const targetUser = await prisma.user.findFirst({
-        where: { OR: [{ username: { equals: trimmed, mode: 'insensitive' } }, { email: { equals: trimmed, mode: 'insensitive' } }] },
-        select: { id: true, username: true, nickname: true, profileId: true, allowExternalInvites: true },
+    const lookup = await findUserByEmailOrUsername<{
+        id: string; username: string; nickname: string | null;
+        profileId: string | null; allowExternalInvites: boolean
+    }>(trimmed, {
+        id: true, username: true, nickname: true,
+        profileId: true, allowExternalInvites: true,
     })
+    if (lookup.matchCount > 1) {
+        return { error: `Có ${lookup.matchCount} tài khoản dùng email/username "${trimmed}". Yêu cầu admin chạy scripts/audit-duplicate-emails.mjs để gộp trước khi mời.` }
+    }
+    const targetUser = lookup.user
     if (!targetUser) return { error: 'Tài khoản không tồn tại.' }
     if (targetUser.id === inviterId) return { error: 'Bạn không thể tự mời chính mình.' }
 
@@ -634,6 +668,57 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
     if (!session?.user?.id) return { error: 'Unauthorized' }
 
     try {
+        // [F1 diagnostic + F3 smart-fallback] Before the CAS update, inspect the
+        // invitation pointed to by the (possibly stale) notification. Common
+        // failure modes — give precise messages, and when the user is clicking a
+        // stale notification we silently substitute the FRESHEST PENDING
+        // invitation for the same workspace so the click "just works".
+        const probe = await prisma.workspaceInvitation.findUnique({
+            where: { id: invitationId },
+            select: { id: true, workspaceId: true, invitedUserId: true, status: true, expiresAt: true },
+        })
+
+        let effectiveId = invitationId
+        if (!probe) {
+            return { error: 'Lời mời không tồn tại trong hệ thống. Vui lòng yêu cầu admin gửi lại.' }
+        }
+        if (probe.invitedUserId !== session.user.id) {
+            // Wrong user — this can happen if there are duplicate accounts with
+            // the same email (User.email is not @unique). Surface clearly.
+            return { error: 'Lời mời này không dành cho tài khoản hiện tại. Hãy đăng nhập đúng email khách hàng đã dùng để nhận thư mời.' }
+        }
+        if (probe.status !== 'PENDING' || probe.expiresAt <= new Date()) {
+            // Stale — try to find a fresher PENDING invitation for this user +
+            // workspace (admin probably re-invited after the old one expired /
+            // was declined; the new one's notification just hasn't surfaced
+            // visually yet).
+            const fresher = await prisma.workspaceInvitation.findFirst({
+                where: {
+                    workspaceId: probe.workspaceId,
+                    invitedUserId: session.user.id,
+                    status: 'PENDING',
+                    expiresAt: { gt: new Date() },
+                },
+                orderBy: { createdAt: 'desc' },
+                select: { id: true },
+            })
+            if (fresher) {
+                console.warn(`[acceptWorkspaceInvitation] stale id=${invitationId} substituted with fresher id=${fresher.id}`)
+                effectiveId = fresher.id
+            } else {
+                if (probe.expiresAt <= new Date()) {
+                    return { error: 'Lời mời này đã hết hạn. Vui lòng yêu cầu admin gửi lại.' }
+                }
+                if (probe.status === 'DECLINED') {
+                    return { error: 'Lời mời này đã bị từ chối trước đó. Yêu cầu admin gửi lại nếu cần.' }
+                }
+                if (probe.status === 'ACCEPTED') {
+                    return { error: 'Lời mời này đã được chấp nhận trước đó.' }
+                }
+                return { error: `Lời mời ở trạng thái "${probe.status}" — không thể chấp nhận.` }
+            }
+        }
+
         // Atomic accept: use interactive transaction to prevent TOCTOU race.
         // The updateMany with status='PENDING' acts as a compare-and-swap lock:
         // if another concurrent request already accepted, updateMany returns count=0.
@@ -641,7 +726,7 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             // Atomically claim the invitation (CAS: only if still PENDING)
             const updated = await tx.workspaceInvitation.updateMany({
                 where: {
-                    id: invitationId,
+                    id: effectiveId,
                     invitedUserId: session.user.id,
                     status: 'PENDING',
                     expiresAt: { gt: new Date() },
@@ -653,13 +738,15 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             })
 
             if (updated.count === 0) {
-                // Either doesn't exist, wrong user, already handled, or expired
-                return { error: 'Lời mời không tồn tại, đã được xử lý, hoặc đã hết hạn.' }
+                // Concurrent accept between probe + CAS — surface plainly.
+                return { error: 'Có một thao tác khác vừa xử lý lời mời này. Hãy refresh và thử lại.' }
             }
 
             // Now read the invitation for workspace info (safe — we own the lock)
+            // Use effectiveId (may differ from invitationId when we substituted a
+            // fresher invitation in the stale-notification fallback above).
             const invitation = await tx.workspaceInvitation.findUnique({
-                where: { id: invitationId },
+                where: { id: effectiveId },
                 include: {
                     workspace: { select: { id: true, name: true, status: true, profileId: true } },
                     invitedBy: { select: { id: true, username: true, nickname: true } },

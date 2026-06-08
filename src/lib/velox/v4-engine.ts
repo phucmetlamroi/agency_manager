@@ -28,11 +28,24 @@ import {
     type RoleVerdict,
 } from './v4-role-classifier'
 import { loadRolesConfig, type VeloxRolesConfig } from './v4-roles-loader'
+import {
+    buildBrandPrefixIndex,
+    resolveConceptKey,
+    mergeParts,
+    applyStatusChain,
+    extractSharedAssets,
+    buildFanOutEdges,
+    type PreNode,
+    type PartMergeInput,
+} from './v4-grouper'
 import type {
     ScanInputFile,
     ScanInputFolder,
     ScanInputNode,
+    VeloxConcept,
+    VeloxEdge,
     VeloxFile,
+    VeloxNode,
     VeloxScanInput,
     VeloxScanResult,
 } from './v4-types'
@@ -206,8 +219,63 @@ export function runEngineV4(input: VeloxScanInput): {
         })
     }
 
+    // ─ Pass 3 — Grouper (P2: concept key → part merge → status chain →
+    //   shared extraction → fan-out edges). Produces the final
+    //   `VeloxConcept[]` + `sharedAssets[]` for the result.
+    const brandPrefixes = buildBrandPrefixIndex(mappedNodes)
+    const partInputs: PartMergeInput[] = mappedNodes.map(node => {
+        const r = resolveConceptKey(node, brandPrefixes)
+        return {
+            node,
+            conceptKey: r.key,
+            conceptLabel: r.label,
+            conceptSource: r.source,
+        }
+    })
+    const preNodes = mergeParts(partInputs)
+    const { active: activePre, finals: finalsPre } = applyStatusChain(preNodes)
+
+    const byConceptActive = bucketByConceptKey(activePre)
+    const byConceptFinals = bucketByConceptKey(finalsPre)
+    const { byConcept: prunedActive, shared } = extractSharedAssets(byConceptActive)
+
+    const concepts: VeloxConcept[] = []
+    const conceptKeys = new Set<string>([
+        ...prunedActive.keys(),
+        ...byConceptFinals.keys(),
+    ])
+    for (const key of conceptKeys) {
+        const activeNodes = prunedActive.get(key) ?? []
+        const finalNodes = byConceptFinals.get(key) ?? []
+        // Skip a concept that ended up entirely empty (e.g. all its nodes
+        // were shared-promoted) — there'd be nothing to render.
+        if (activeNodes.length === 0 && finalNodes.length === 0) continue
+
+        const headSource = activeNodes[0]?.conceptSource ?? finalNodes[0]?.conceptSource ?? 'default'
+        const headLabel = activeNodes[0]?.conceptLabel ?? finalNodes[0]?.conceptLabel ?? key
+
+        const edges = buildFanOutEdges(activeNodes, { sharedCtas: shared, finals: finalNodes })
+        const sharedEdgesIntoMe = shared.length > 0 && activeNodes.length > 0
+            ? buildSharedToConceptEdges(activeNodes, shared)
+            : []
+
+        concepts.push({
+            id: `c_${key}`,
+            label: headLabel,
+            source: headSource,
+            nodes: activeNodes.map(preToNode),
+            finals: finalNodes.map(preToNode),
+            edges: [...edges, ...sharedEdgesIntoMe],
+        })
+    }
+
+    const sharedAssets: VeloxNode[] = shared.map(p => ({ ...preToNode(p), scope: 'SHARED' }))
+
     // ─ Stats + result envelope ─────────────────────────────────────────────
     const totalFiles = countFiles(input.tree)
+    const hooksDetected =
+        concepts.reduce((n, c) => n + c.nodes.filter(node => node.role === 'HOOK').length, 0) +
+        sharedAssets.filter(n => n.role === 'HOOK').length
     const result: VeloxScanResult = {
         schemaVersion: 'velox-4.0',
         rootFolder: input.rootFolder,
@@ -217,13 +285,11 @@ export function runEngineV4(input: VeloxScanInput): {
             mappedFiles: mappedNodes.length,
             rawFiles: raw.length,
             unsortedFiles: unsorted.length,
-            // Concepts + hooksDetected filled in by P2's grouper. For now
-            // surface 0 — UI consumers should refresh after grouping.
-            conceptsDetected: 0,
-            hooksDetected: mappedNodes.filter(m => m.verdict.role === 'HOOK').length,
+            conceptsDetected: concepts.length,
+            hooksDetected,
         },
-        concepts: [],
-        sharedAssets: [],
+        concepts,
+        sharedAssets,
         trays: { raw, unsorted },
         warnings,
     }
@@ -238,6 +304,51 @@ export function runEngineV4(input: VeloxScanInput): {
             warnings,
         },
     }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+//  P2.5 wiring — small helpers used by the grouper hand-off
+// ────────────────────────────────────────────────────────────────────────────
+
+function bucketByConceptKey(items: PreNode[]): Map<string, PreNode[]> {
+    const out = new Map<string, PreNode[]>()
+    for (const it of items) {
+        if (!out.has(it.conceptKey)) out.set(it.conceptKey, [])
+        out.get(it.conceptKey)!.push(it)
+    }
+    return out
+}
+
+function preToNode(p: PreNode): VeloxNode {
+    return {
+        id: p.id,
+        role: p.role,
+        index: p.index,
+        label: p.label,
+        scope: 'CONCEPT',
+        status: p.status,
+        confidence: p.confidence,
+        band: p.band,
+        isCompilation: p.isCompilation || undefined,
+        note: p.note,
+        files: p.files,
+        modifiers: p.modifiers,
+    }
+}
+
+/** When a shared CTA exists and a concept has a Body but no local CTA, add
+ *  an explicit `body → sharedCTA` edge so the diagram renders the link. */
+function buildSharedToConceptEdges(
+    conceptNodes: PreNode[],
+    shared: PreNode[],
+): VeloxEdge[] {
+    const localCta = conceptNodes.find(n => n.role === 'CTA')
+    if (localCta) return []
+    const sharedCta = shared.find(n => n.role === 'CTA')
+    if (!sharedCta) return []
+    const body = conceptNodes.find(n => n.role === 'BODY')
+    if (!body) return []
+    return [{ from: body.id, to: sharedCta.id }]
 }
 
 // ────────────────────────────────────────────────────────────────────────────

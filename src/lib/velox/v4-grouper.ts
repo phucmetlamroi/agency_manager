@@ -92,29 +92,35 @@ export function resolveConceptKey(
 }
 
 /**
- * Find tokens that appear as the FIRST token of two or more files. Those
- * become brand-prefix candidates (Glenesk/Lochlands case from spec §1
- * folder #3).
+ * Find tokens that appear as the FIRST token of two or more files AND
+ * prefix files of MULTIPLE roles. Glenesk/Lochlands prefix hooks, CTAs,
+ * AND final videos — multi-role → brand. "Audience" only prefixes CALLOUT
+ * files (e.g. April18 fixture's "Audience callout 1/2/3") — single-role
+ * → modifier, NOT a brand.
  *
- * Excluded by design:
- *   - Tokens that match the rule-2 video/ad pattern (those are concept
+ * Excluded by design (filtered before tallying):
+ *   - Tokens matching the rule-2 video/ad pattern (those are concept
  *     numbers, not brands).
- *   - Tokens carrying a role keyword (hook/body/cta/callout) so role-
- *     word files don't accidentally seed a "brand" called "hook".
- *   - Single-character tokens (would over-trigger for "H1"-style names).
+ *   - Tokens carrying a role keyword themselves (hook/body/cta/callout/…)
+ *     so role-word files don't seed a "brand" called "hook".
+ *   - Single-character tokens (would over-trigger on "H1"-style names).
  */
 export function buildBrandPrefixIndex(nodes: MappedNode[]): Set<string> {
-    const counts = new Map<string, number>()
+    const tokenRoles = new Map<string, Set<string>>()
     for (const n of nodes) {
         const first = n.verdict.tokenized.tokens[0]
         if (!first || first.length < 2) continue
-        if (/^(video|ad|hook|hooks|body|cta|callout|script|caption|final)$/i.test(first)) continue
+        if (/^(video|ad|hook|hooks|body|cta|callout|script|caption|final|main|call|audience)$/i.test(first)) continue
         if (/^\d+$/.test(first)) continue
-        counts.set(first, (counts.get(first) ?? 0) + 1)
+        if (!tokenRoles.has(first)) tokenRoles.set(first, new Set())
+        tokenRoles.get(first)!.add(n.verdict.role)
     }
     const brands = new Set<string>()
-    for (const [token, n] of counts) {
-        if (n >= 2) brands.add(token)
+    for (const [token, roles] of tokenRoles) {
+        // Brand must prefix files of ≥2 distinct roles (which also implies
+        // ≥2 occurrences). Single-role prefixes are role modifiers, not
+        // brands.
+        if (roles.size >= 2) brands.add(token)
     }
     return brands
 }

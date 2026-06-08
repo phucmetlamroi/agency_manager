@@ -34,19 +34,19 @@ export function classifyFolder(
     const cfg = loadRolesConfig(clientId)
     const reasons: string[] = []
 
-    // 1. Folder-name level: source-bucket short-circuit.
-    if (matchesSourceBucket(folder.name, cfg)) {
-        reasons.push(`folder name "${folder.name}" matches a source bucket`)
-        return { class: 'SOURCE_BUCKET', organizedScore: 0, reasons }
-    }
-
-    // 2. Direct video children. Subfolders are NOT counted — we only judge
+    // 1. Direct video children. Subfolders are NOT counted — we only judge
     //    this folder's own files. The recursion happens in the engine.
     const directVideos = folder.children
         .filter(isFile)
         .filter(f => isVideo(f.name, cfg))
 
     if (directVideos.length === 0) {
+        // Empty folders still respect a source-bucket name (so empty "B-Roll"
+        // surfaces as SOURCE_BUCKET, not EMPTY, for clearer warnings).
+        if (matchesSourceBucket(folder.name, cfg)) {
+            reasons.push(`folder name "${folder.name}" matches a source bucket (and is empty)`)
+            return { class: 'SOURCE_BUCKET', organizedScore: 0, reasons }
+        }
         reasons.push('no video files directly in this folder')
         return { class: 'EMPTY', organizedScore: 0, reasons }
     }
@@ -55,6 +55,28 @@ export function classifyFolder(
     const clear = directVideos.filter(f => hasRoleToken(f.name, cfg)).length
     const organizedScore = clear / directVideos.length
     const rawScore = rawish / directVideos.length
+
+    // 2. Source-bucket short-circuit — content-aware. The spec's §3.2 lists
+    //    "footage" / "b-roll" / "headshots" as bucket names, but real
+    //    fixtures (April18 #4) put their HOOK/BODY/CTA files inside a
+    //    `Footage/` folder. The strict name-only check would dump those
+    //    deliverables to the Raw tray. So we require BOTH the bucket name
+    //    AND a low organisation score (<0.3) before classing the folder
+    //    as SOURCE_BUCKET. The 0.3 threshold is generous — even a single
+    //    Hook among 4 raw files keeps the folder out of the bucket lane.
+    if (matchesSourceBucket(folder.name, cfg)) {
+        if (organizedScore < 0.3) {
+            reasons.push(
+                `folder name "${folder.name}" matches a source bucket and ` +
+                `organizedScore=${organizedScore.toFixed(2)} < 0.3 → SOURCE_BUCKET`,
+            )
+            return { class: 'SOURCE_BUCKET', organizedScore: 0, reasons }
+        }
+        reasons.push(
+            `folder name "${folder.name}" matches a source bucket BUT ` +
+            `organizedScore=${organizedScore.toFixed(2)} ≥ 0.3 → continue normal triage`,
+        )
+    }
 
     reasons.push(
         `${clear}/${directVideos.length} videos carry a role token (organizedScore=${organizedScore.toFixed(2)})`,

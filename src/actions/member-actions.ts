@@ -675,7 +675,7 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
         // invitation for the same workspace so the click "just works".
         const probe = await prisma.workspaceInvitation.findUnique({
             where: { id: invitationId },
-            select: { id: true, workspaceId: true, invitedUserId: true, status: true, expiresAt: true },
+            select: { id: true, workspaceId: true, invitedUserId: true, status: true, expiresAt: true, isClientInvite: true, clientId: true },
         })
 
         let effectiveId = invitationId
@@ -687,6 +687,68 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             // the same email (User.email is not @unique). Surface clearly.
             return { error: 'Lời mời này không dành cho tài khoản hiện tại. Hãy đăng nhập đúng email khách hàng đã dùng để nhận thư mời.' }
         }
+
+        // [F4 idempotent-accept] If a previously-accepted invitation already
+        // exists for this (workspaceId, invitedUserId), accepting THIS one would
+        // INSERT/UPDATE a row that violates the @@unique([workspaceId,
+        // invitedUserId, status]) constraint → Prisma P2002 → user sees the
+        // misleading "Bạn đã là thành viên workspace này" error even though the
+        // notification "just" appeared. Detect that case here, ensure their
+        // existing membership / profile-access is intact (re-create if a prior
+        // accept partially failed), then mark this PENDING invitation as
+        // SUPERSEDED so it doesn't keep tripping the constraint, and return
+        // success so the notification clears cleanly.
+        const priorAccepted = await prisma.workspaceInvitation.findFirst({
+            where: {
+                workspaceId: probe.workspaceId,
+                invitedUserId: session.user.id,
+                status: 'ACCEPTED',
+                id: { not: probe.id },
+            },
+            select: { id: true, isClientInvite: true, clientId: true, workspace: { select: { profileId: true, name: true } } },
+        })
+        if (priorAccepted) {
+            // The user already accepted a previous invitation for this same
+            // workspace + user pair. Repair any drift, retire the current
+            // PENDING row, and signal success without throwing.
+            try {
+                await prisma.$transaction(async (tx) => {
+                    if (priorAccepted.isClientInvite && priorAccepted.workspace.profileId) {
+                        const pa = await tx.profileAccess.findUnique({
+                            where: { userId_profileId: { userId: session.user.id, profileId: priorAccepted.workspace.profileId } },
+                            select: { role: true, clientId: true },
+                        })
+                        if (!pa) {
+                            await tx.profileAccess.create({
+                                data: {
+                                    userId: session.user.id,
+                                    profileId: priorAccepted.workspace.profileId,
+                                    role: 'CLIENT',
+                                    clientId: priorAccepted.clientId ?? probe.clientId ?? null,
+                                },
+                            })
+                        }
+                    }
+                    // Retire the duplicate PENDING — use updateMany so we don't crash
+                    // if a race already updated it.
+                    if (probe.status === 'PENDING') {
+                        await tx.workspaceInvitation.updateMany({
+                            where: { id: probe.id, status: 'PENDING' },
+                            data: { status: 'EXPIRED', respondedAt: new Date() },
+                        })
+                    }
+                })
+            } catch (e) {
+                console.warn('[acceptWorkspaceInvitation] idempotent-accept repair failed (non-fatal):', e)
+            }
+            return {
+                success: true,
+                workspaceId: probe.workspaceId,
+                workspaceName: priorAccepted.workspace.name,
+                alreadyMember: true,
+            }
+        }
+
         if (probe.status !== 'PENDING' || probe.expiresAt <= new Date()) {
             // Stale — try to find a fresher PENDING invitation for this user +
             // workspace (admin probably re-invited after the old one expired /

@@ -63,7 +63,11 @@ export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, o
                 toast.error((res as any).error)
                 return
             }
-            toast.success(`Đã tham gia workspace ${(res as any)?.workspaceName || ''}`)
+            if ((res as any)?.alreadyMember) {
+                toast.success(`Bạn đã là thành viên của ${(res as any)?.workspaceName || 'workspace này'} — đang điều hướng…`)
+            } else {
+                toast.success(`Đã tham gia workspace ${(res as any)?.workspaceName || ''}`)
+            }
             onLocalRemove(notification.id)
             void archiveNotification(notification.id)
             onRequestClose?.()

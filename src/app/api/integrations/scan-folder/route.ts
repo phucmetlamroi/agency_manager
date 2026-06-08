@@ -35,6 +35,10 @@ import {
 } from '@/lib/cloud-scanner'
 import { classifyScan } from '@/lib/scan-classifier'
 import { refreshTokenIfNeeded } from '@/actions/integration-actions'
+// [Velox v4] Multi-Hook Map deep-scan engine — runs side-by-side with v3,
+// opt-in via `?v=4`. See FEATURE_REQUIREMENTS_VELOX_MULTIHOOK_MAP_v4.md.
+import { runEngineV4 } from '@/lib/velox/v4-engine'
+import { rawTreeToScanInput } from '@/lib/velox/v4-adapter'
 
 // [Velox Deep Scan v3.1] Bumped 60→90s for recursive depth-4 scans on large
 // folders (some clients have 30+ DJI files at root + nested broll subfolders).
@@ -160,16 +164,65 @@ export async function POST(req: Request) {
     // [Velox Deep Scan v3.1 — PR4 flip] API versioning:
     //   - default (no ?v param)  → V3 Deep Scan (recursiveScanFolder + classifyScan)
     //   - ?v=3 explicit          → same as default
+    //   - ?v=4 explicit          → V4 Multi-Hook Map engine
+    //                              (rawTreeToScanInput → runEngineV4)
     //   - ?v=1 explicit          → V1 flat scan (escape hatch)
     //
     // V3 response also includes a flat `videos[]` field (= mainItems flattened
     // back to ScannedVideo shape) so any V1 caller keeps working transparently.
+    // V4 returns a different envelope (`VeloxScanResult`) — callers opt in by
+    // setting `?v=4` and switching their parser.
     // ---------------------------------------------------------------------------
     const url0 = new URL(req.url)
     const apiVersion = url0.searchParams.get('v')
-    const useV3 = apiVersion !== '1' // default V3, explicit ?v=1 → V1
+    const useV4 = apiVersion === '4'
+    const useV3 = !useV4 && apiVersion !== '1'
 
     try {
+        if (useV4) {
+            // ─── V4 Multi-Hook Map path ─────────────────────────────────────
+            const rootName =
+                parsed.provider === 'dropbox'
+                    ? (parsed.folderPath?.split('/').filter(Boolean).pop() ??
+                        parsed.sharedFolderId ?? 'root')
+                    : 'root'
+
+            const tree =
+                parsed.provider === 'dropbox'
+                    ? await recursiveScanFolder({
+                        provider: 'dropbox',
+                        accessToken,
+                        folderIdentifier: parsed.folderPath,
+                        sharedLinkUrl: parsed.sharedLinkUrl,
+                        sharedFolderId: parsed.sharedFolderId,
+                        rootName,
+                    })
+                    : await recursiveScanFolder({
+                        provider: 'google_drive',
+                        accessToken,
+                        folderIdentifier: parsed.folderId,
+                        rootName,
+                    })
+
+            const scanInput = rawTreeToScanInput(
+                tree,
+                parsed.provider === 'dropbox' ? 'dropbox' : 'gdrive',
+                rootName,
+                // clientId can be threaded through later via body — leaving
+                // undefined now so the base config is used.
+            )
+            const { result } = runEngineV4(scanInput)
+            // Stamp the timestamp here (engine itself stays deterministic for
+            // snapshot tests).
+            result.scannedAt = new Date().toISOString()
+
+            return NextResponse.json({
+                ...result,
+                provider: parsed.provider,
+                apiVersion: 'v4',
+            })
+        }
+
         if (useV3) {
             // ─── V3 Deep Scan path ──────────────────────────────────────────
             const rootName =

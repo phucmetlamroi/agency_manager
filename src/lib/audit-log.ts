@@ -74,6 +74,9 @@ export type AuditAction =
     | 'task.bulk_updated'         // Bulk update fields (productLink/notes/deadline/...) of N tasks
     | 'task.bulk_status_updated'  // Bulk status change of N tasks (with digest email)
     | 'task.invariant_auto_synced' // [Z+1.fix8] Auto-sync assigneeId ↔ status khi invariant bị vi phạm
+    // [Velox v4] Multi-Hook Map lifecycle on TaskRawFootage
+    | 'task.raw_footage_mode_changed' // Editor flips between PER_LINK / BATCH / MULTI_HOOK_MAP
+    | 'task.raw_footage_map_saved'    // VeloxScanResult persisted after user review
     // [Quick Create] Pricing rules + integrations
     | 'pricing_rule.created'
     | 'pricing_rule.updated'

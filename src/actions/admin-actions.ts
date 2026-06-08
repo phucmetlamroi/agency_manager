@@ -219,7 +219,10 @@ export async function createTask(formData: FormData, workspaceId: string) {
         revalidatePath(`/${workspaceId}/admin/queue`)
         revalidatePath(`/${workspaceId}/admin/crm`)
         revalidatePath(`/${workspaceId}/dashboard`)
-        return { success: true }
+        // [Velox v4] Return the new task id so the wrapper can persist the
+        // Multi-Hook Map (TaskRawFootage) right after creation. Callers that
+        // only check `success: true` keep working unchanged.
+        return { success: true, taskId: task.id }
     } catch (e: any) {
         if (e?.message?.startsWith('SECURITY_VIOLATION')) {
             return { error: e.message }

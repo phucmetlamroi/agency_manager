@@ -4,7 +4,9 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import DashboardActionBar from "./DashboardActionBar"
 import AddTaskModal from "./AddTaskModal"
+import { toast } from "sonner"
 import { createTask } from "@/actions/admin-actions"
+import { saveRawFootageMap } from "@/actions/raw-footage-actions"
 import { createBatchTasks } from "@/actions/bulk-task-actions"
 import { createTasksFromBatch, type BatchTaskRow } from "@/actions/velox-batch-actions"
 import {
@@ -76,7 +78,15 @@ export default function DashboardActionWrapper({
       /** Single rich-text Notes HTML (replaces notesVi/notesEn split per Figma redesign) */
       notes: string
     },
-    options?: { veloxBatchRaw?: string[]; veloxV3Payload?: VeloxApplyPayloadV3 },
+    options?: {
+      veloxBatchRaw?: string[]
+      veloxV3Payload?: VeloxApplyPayloadV3
+      /** [Velox v4 — Multi-Hook Map] When the editor was used in Step 4,
+       *  the confirmed map is forwarded here so we can persist it via
+       *  saveRawFootageMap AFTER the task is created (we need the new
+       *  task id, so it's a two-step flow). */
+      veloxMapV4?: import('@/lib/velox/v4-types').VeloxScanResult
+    },
   ) => {
     const client = clients.find((c) => c.id === data.clientId)
     const clientLabel = client?.parent
@@ -247,6 +257,25 @@ export default function DashboardActionWrapper({
 
       const result = await createTask(fd, workspaceId)
       if (result?.error) throw new Error(result.error)
+      // [Velox v4] Single-task create succeeded → persist the Multi-Hook
+      // Map if the editor was used. Best-effort: log + toast on failure so
+      // the task itself isn't lost.
+      if (options?.veloxMapV4 && result?.taskId) {
+        try {
+          const saveResult = await saveRawFootageMap(result.taskId, {
+            veloxMap: options.veloxMapV4,
+            sourceFolderUrl: options.veloxMapV4.rootFolder.url,
+            scannedAt: options.veloxMapV4.scannedAt,
+          })
+          if ('error' in saveResult) {
+            console.warn('[velox-v4] saveRawFootageMap failed:', saveResult.error)
+            toast.error(`Đã tạo task nhưng không lưu được Multi-Hook Map: ${saveResult.error}`)
+          }
+        } catch (err: any) {
+          console.error('[velox-v4] saveRawFootageMap threw:', err)
+          toast.error('Đã tạo task nhưng lưu Multi-Hook Map thất bại — thử lại từ Task detail.')
+        }
+      }
     } else {
       // Multiple videos (non-Velox batch) → shared-resources batch create
       const result = await createBatchTasks(

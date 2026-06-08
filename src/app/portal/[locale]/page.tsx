@@ -1,8 +1,24 @@
 import { getClientWorkspaces } from '@/actions/client-portal-actions'
-import { getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { LayoutGrid, ArrowRight } from 'lucide-react'
 import { localizeWorkspaceName } from '@/lib/workspace-name'
+
+// [F5] Inline locale dictionaries — same reason as src/app/portal/[locale]/layout.tsx
+// (Turbopack + standalone trace miss on getTranslations / next-intl server APIs).
+import enMessages from '../../../../messages/en.json'
+import viMessages from '../../../../messages/vi.json'
+import zhMessages from '../../../../messages/zh.json'
+import itMessages from '../../../../messages/it.json'
+import ruMessages from '../../../../messages/ru.json'
+
+type PortalKey = keyof typeof enMessages.Portal
+const portalDict: Record<string, Record<string, string>> = {
+    en: enMessages.Portal as any,
+    vi: viMessages.Portal as any,
+    zh: zhMessages.Portal as any,
+    it: itMessages.Portal as any,
+    ru: ruMessages.Portal as any,
+}
 
 export default async function PortalWorkspaceSelectPage({
     params
@@ -11,7 +27,8 @@ export default async function PortalWorkspaceSelectPage({
 }) {
     const { locale } = await params
     const workspaces = await getClientWorkspaces()
-    const t = await getTranslations('Portal')
+    const dict = portalDict[locale] ?? portalDict.en
+    const t = (k: PortalKey) => dict[k] ?? (enMessages.Portal as any)[k] ?? k
 
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">

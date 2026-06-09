@@ -20,6 +20,7 @@ import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft"
 import QuickCreateMode from "./QuickCreateMode"
 import VeloxConflictDialog, { type ConflictStrategy } from "./VeloxConflictDialog"
 import VeloxRawFootagesModal from "./VeloxRawFootagesModal"
+import VeloxMultiHookMapEditor from "@/components/velox/VeloxMultiHookMapEditor"
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput"
 import {
     mapVeloxPayloadToFormData,
@@ -81,7 +82,13 @@ interface AddTaskModalProps {
      */
     onSubmit?: (
         data: TaskFormData,
-        options?: { veloxBatchRaw?: string[]; veloxV3Payload?: VeloxApplyPayloadV3 },
+        options?: {
+            veloxBatchRaw?: string[]
+            veloxV3Payload?: VeloxApplyPayloadV3
+            /** [Velox v4] Confirmed Multi-Hook Map — wrapper persists it via
+             *  saveRawFootageMap after the task row is created. */
+            veloxMapV4?: import('@/lib/velox/v4-types').VeloxScanResult
+        },
     ) => void | Promise<void>
     /** [Quick Create] Pricing rules available for this workspace */
     pricingRules?: Array<{
@@ -443,6 +450,14 @@ export default function AddTaskModal({
      */
     const [veloxV3Payload, setVeloxV3Payload] = useState<VeloxApplyPayloadV3 | null>(null)
 
+    // [Velox v4 — Multi-Hook Map] Step 4 raw-footage display mode toggle.
+    // PER_LINK keeps the legacy 6-field grid (default — no behavioural change
+    // for existing flows). MULTI_HOOK_MAP mounts the v4 editor in place of
+    // the grid and stashes the user-confirmed VeloxScanResult so handleSubmit
+    // can pass it to DashboardActionWrapper for saveRawFootageMap.
+    const [rawFootageMode, setRawFootageMode] = useState<'PER_LINK' | 'MULTI_HOOK_MAP'>('PER_LINK')
+    const [veloxMapV4, setVeloxMapV4] = useState<import('@/lib/velox/v4-types').VeloxScanResult | null>(null)
+
     // [Bug fix] Pad veloxBatchRaw with '' khi user thêm dòng vào videoList.
     // KHÔNG truncate khi user xóa dòng — vì truncate có thể MẤT URLs nếu
     // form.videoList tạm thời chưa match (vd: sau conflict dialog 'keep'
@@ -777,7 +792,15 @@ export default function AddTaskModal({
                     : veloxBatchRaw.length > 0
                       ? { veloxBatchRaw }
                       : undefined
-            await onSubmit?.(form, options)
+            // [Velox v4] Attach the Multi-Hook Map payload so
+            // DashboardActionWrapper can persist it to TaskRawFootage after
+            // the task row is created. Falls back to legacy submit when the
+            // editor wasn't used.
+            const optionsWithMap =
+                rawFootageMode === 'MULTI_HOOK_MAP' && veloxMapV4
+                    ? { ...(options ?? {}), veloxMapV4 }
+                    : options
+            await onSubmit?.(form, optionsWithMap)
             setSubmitted(true)
             // [Auto-save] Clear draft khi submit success — không còn cần restore
             clearDraft()
@@ -997,7 +1020,52 @@ export default function AddTaskModal({
             case 3:
                 return (
                     <div className="flex flex-col gap-5">
-                        {/* URL fields — 6 in 3×2 grid matching Figma layout exactly */}
+                        {/* [Velox v4] Display mode toggle — keeps the legacy 6-field grid
+                            on the left tab (PER_LINK) and surfaces the new Multi-Hook
+                            Map editor on the right tab. Mode persists to TaskRawFootage
+                            via DashboardActionWrapper after task creation. */}
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="inline-flex items-center gap-0 rounded-full p-1 border border-white/10 bg-zinc-900/40">
+                                <button
+                                    type="button"
+                                    onClick={() => setRawFootageMode('PER_LINK')}
+                                    className={[
+                                        'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold transition-colors',
+                                        rawFootageMode === 'PER_LINK'
+                                            ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-md shadow-violet-500/30'
+                                            : 'text-zinc-400 hover:text-white',
+                                    ].join(' ')}
+                                >
+                                    Link lẻ
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setRawFootageMode('MULTI_HOOK_MAP')}
+                                    className={[
+                                        'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold transition-colors',
+                                        rawFootageMode === 'MULTI_HOOK_MAP'
+                                            ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-md shadow-violet-500/30'
+                                            : 'text-zinc-400 hover:text-white',
+                                    ].join(' ')}
+                                >
+                                    🗺 Multi-Hook Map
+                                </button>
+                            </div>
+                            {rawFootageMode === 'MULTI_HOOK_MAP' && veloxMapV4 && (
+                                <span className="text-[11px] font-mono text-emerald-400">
+                                    ✓ {veloxMapV4.stats.conceptsDetected} concept · {veloxMapV4.stats.mappedFiles} file
+                                </span>
+                            )}
+                        </div>
+
+                        {rawFootageMode === 'MULTI_HOOK_MAP' ? (
+                            <VeloxMultiHookMapEditor
+                                workspaceId={workspaceId}
+                                initialMap={veloxMapV4 ?? undefined}
+                                onChange={setVeloxMapV4}
+                            />
+                        ) : (
+                        /* URL fields — 6 in 3×2 grid matching Figma layout exactly */
                         <div className="grid grid-cols-2 gap-x-4 gap-y-4">
                             {(
                                 [
@@ -1072,6 +1140,7 @@ export default function AddTaskModal({
                                 )
                             })}
                         </div>
+                        )}
 
                         {/* Notes — single TipTap rich-text editor (Figma's centerpiece in Step 4) */}
                         <div className="flex flex-col gap-2">

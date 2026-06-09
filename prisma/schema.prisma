@@ -363,9 +363,41 @@ model Task {
   assignedById String?
   assignedBy   User?   @relation("TaskAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
 
+  // [Velox v4] Optional Multi-Hook Map persistence — see TaskRawFootage.
+  // PER_LINK / BATCH legacy storage stays on `resources` / `references`.
+  rawFootage TaskRawFootage?
+
   @@index([workspaceId, status])
   @@index([workspaceId, isArchived])
   @@index([assignedById])
+}
+
+// [Velox v4 — Multi-Hook Map] Per-task display mode + persisted scan map.
+// Existing tasks default to PER_LINK and don't get a TaskRawFootage row
+// until the editor opts into BATCH or MULTI_HOOK_MAP on Add Task.
+enum RawFootageDisplayType {
+  PER_LINK
+  BATCH
+  MULTI_HOOK_MAP
+}
+
+model TaskRawFootage {
+  id              String                @id @default(uuid())
+  taskId          String                @unique
+  task            Task                  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  displayType     RawFootageDisplayType @default(PER_LINK)
+  // [MULTI_HOOK_MAP] Stores the user-edited VeloxScanResult as JSON. Schema
+  // version + structure documented in src/lib/velox/v4-types.ts. Validated
+  // server-side against Zod in src/actions/raw-footage-actions.ts.
+  veloxMap        Json?
+  // Original Dropbox/Drive folder URL the user pasted. Used by the cache
+  // layer (P5) to skip a re-scan when nothing on the folder changed.
+  sourceFolderUrl String?
+  scannedAt       DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([taskId])
 }
 
 model MonthlyBonus {

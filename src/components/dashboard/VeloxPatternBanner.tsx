@@ -8,7 +8,7 @@
  * inline above this banner when isWrapper=true).
  */
 
-import { FolderTree, Film, Layers, Sparkles, AlertTriangle } from 'lucide-react'
+import { FolderTree, Film, Layers, Sparkles, AlertTriangle, FolderX } from 'lucide-react'
 import type { PrimaryPattern, ScanResultV3 } from '@/lib/velox-helpers'
 
 interface Props {
@@ -17,8 +17,11 @@ interface Props {
 
 const PATTERN_META: Record<
     PrimaryPattern,
-    { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; tone: 'violet' | 'emerald' | 'amber' | 'indigo' }
+    { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; tone: 'violet' | 'emerald' | 'amber' | 'indigo' | 'red' }
 > = {
+    // P0_EMPTY = container-folder diagnosis (no videos in tree, many subfolders).
+    // Surfaced in red so the user doesn't mistake "0 task" for "scan worked".
+    P0_EMPTY: { icon: FolderX, label: 'Folder rỗng video', tone: 'red' },
     P1: { icon: Film, label: 'P1 — Flat', tone: 'indigo' },
     P2: { icon: Film, label: 'P2 — Body + Hooks', tone: 'violet' },
     P3: { icon: FolderTree, label: 'P3 — Folder Bundles', tone: 'violet' },
@@ -64,6 +67,18 @@ const TONE_STYLES = {
         iconBorder: 'border-indigo-500/30',
         iconText: 'text-indigo-300',
     },
+    // Red tone is used by P0_EMPTY only — it tells the user the scan
+    // succeeded but the folder they pasted isn't usable as-is, so they need
+    // to take action (drill down) rather than tweak settings.
+    red: {
+        bg: 'rgba(239,68,68,0.08)',
+        border: 'rgba(239,68,68,0.30)',
+        text: 'text-red-100',
+        sub: 'text-red-200/80',
+        iconBg: 'bg-red-500/15',
+        iconBorder: 'border-red-500/30',
+        iconText: 'text-red-300',
+    },
 } as const
 
 function buildPatternMessage(result: ScanResultV3): string {
@@ -73,6 +88,12 @@ function buildPatternMessage(result: ScanResultV3): string {
     const bundles = mainItems.filter((m) => m.kind === 'folder-bundle').length
 
     switch (primaryPattern) {
+        case 'P0_EMPTY':
+            // P0_EMPTY is the "container folder" diagnosis — see classifier
+            // decidePattern §P0_EMPTY. The detailed warning is also in
+            // result.warnings (rendered just below this message), so we keep
+            // this top line short and actionable.
+            return `Đã quét toàn bộ folder nhưng KHÔNG tìm thấy file video. Nhiều khả năng đây là folder cha (Khách / Tháng) — hãy dán link 1 project cụ thể bên trong.`
         case 'P1':
             return `${itemCount} video file ở root, mỗi file = 1 task.`
         case 'P2':

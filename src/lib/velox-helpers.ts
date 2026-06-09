@@ -465,8 +465,13 @@ export interface ScriptDoc {
 /**
  * Primary pattern detected by Phase 5. P6 is composed with inner pattern
  * (recorded separately via `isWrapper` flag — primaryPattern reflects inner).
+ *
+ * P0_EMPTY = special "container folder" diagnosis: user pasted a parent/index
+ * folder (e.g. Client manager root) that holds many subfolders but no videos
+ * within depth-4. UI should surface a clear "drill down" hint instead of the
+ * P1 "0 task" useless fallback.
  */
-export type PrimaryPattern = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P7'
+export type PrimaryPattern = 'P0_EMPTY' | 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P7'
 
 export interface ScanDiagnosticsV3 {
     isWrapper: boolean

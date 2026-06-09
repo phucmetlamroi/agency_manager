@@ -40,10 +40,19 @@ import { refreshTokenIfNeeded } from '@/actions/integration-actions'
 import { runEngineV4 } from '@/lib/velox/v4-engine'
 import { rawTreeToScanInput } from '@/lib/velox/v4-adapter'
 
-// [Velox Deep Scan v3.1] Bumped 60→90s for recursive depth-4 scans on large
-// folders (some clients have 30+ DJI files at root + nested broll subfolders).
-// Sequential traversal + 500-file cap should keep us under the limit.
-export const maxDuration = 90
+// [Velox scan timeout]
+// History:
+//   - v3.1 bumped 60→90s for recursive depth-4 scans (Quy ước LGR-style).
+//   - 2026-06-09: user pasted a multi-hundred-file LGR root → 90s wasn't
+//     enough → Vercel returned 504 plain text → client crashed parsing
+//     JSON. Bumped to 300s (Vercel Fluid Compute ceiling on this plan).
+//     Client now also surfaces a Vietnamese "folder too large" toast for
+//     504/408 so the user knows to drill into a subfolder instead.
+//
+// 300s is the HARD ceiling. If you find yourself wanting more, the right
+// move is to add a background job (Vercel Cron → Supabase queue) and stream
+// progress to the client, not to bump this number.
+export const maxDuration = 300
 
 export async function POST(req: Request) {
     // ---------------------------------------------------------------------------

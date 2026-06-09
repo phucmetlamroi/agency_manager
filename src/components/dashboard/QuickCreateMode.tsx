@@ -242,15 +242,48 @@ export default function QuickCreateMode({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url: url.trim(), workspaceId }),
             })
-            const data = await res.json()
-            if (!res.ok) {
-                if (data.requiresConnection) {
+
+            // [Defensive] Vercel timeout (504) and other infra errors return
+            // PLAIN TEXT ("An error occurred with this application…"), not
+            // JSON. Reading the body once + content-type sniff lets us
+            // surface a useful Vietnamese error instead of crashing on
+            // "Unexpected token 'A'…".
+            const contentType = res.headers.get('content-type') ?? ''
+            const rawBody = await res.text()
+            let data: any = null
+            if (contentType.includes('application/json') && rawBody) {
+                try {
+                    data = JSON.parse(rawBody)
+                } catch {
+                    // fall through to !res.ok handling below
+                }
+            }
+
+            if (!res.ok || !data) {
+                // 504: Vercel function timeout — folder too big to finish in
+                // the configured maxDuration window.
+                if (res.status === 504 || res.status === 408) {
+                    toast.error(
+                        'Folder quá lớn — Velox không scan kịp trong 90s. ' +
+                        'Hãy dán link subfolder cụ thể (vd. "Project A/Video 1") để scan nhanh hơn.',
+                    )
+                    return
+                }
+                // 502 / 503: gateway issue — usually transient.
+                if (res.status === 502 || res.status === 503) {
+                    toast.error('Server tạm thời không phản hồi. Thử lại sau 30s.')
+                    return
+                }
+                // Auth integration not connected.
+                if (data?.requiresConnection) {
                     toast.error(
                         `${data.error} Vào Settings → Connectors để kết nối.`,
                     )
-                } else {
-                    toast.error(data.error ?? 'Scan thất bại.')
+                    return
                 }
+                // Generic — surface the server message if it gave one.
+                const serverMsg = data?.error || rawBody?.slice(0, 200) || `HTTP ${res.status}`
+                toast.error(`Scan thất bại: ${serverMsg}`)
                 return
             }
 

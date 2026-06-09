@@ -298,9 +298,22 @@ export default function QuickCreateMode({
                 setTaskNameMode(firstMode)
                 // Init D2 policy from server detection
                 setBrollPolicy(v3.brollMatchPolicy)
-                toast.success(
-                    `Đã scan ${v3.mainItems.length} task (${v3.primaryPattern}, confidence ${Math.round(v3.confidence * 100)}%).`,
-                )
+                // [Bug 2026-06-09] Special-case P0_EMPTY so we surface an
+                // ACTIONABLE warning toast instead of a fake "0 task confidence
+                // 50%" success. The banner explains what to do; the toast is
+                // just the first thing the user sees after scan returns.
+                if (v3.primaryPattern === 'P0_EMPTY') {
+                    toast.warning(
+                        `Velox quét xong nhưng không tìm thấy file video nào. ` +
+                        `Folder có ${v3.diagnostics.totalSubfolderCount} subfolders — ` +
+                        `có thể bạn dán nhầm link folder cha. Xem chi tiết ở banner đỏ.`,
+                        { duration: 8000 },
+                    )
+                } else {
+                    toast.success(
+                        `Đã scan ${v3.mainItems.length} task (${v3.primaryPattern}, confidence ${Math.round(v3.confidence * 100)}%).`,
+                    )
+                }
                 return
             }
 

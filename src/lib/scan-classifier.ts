@@ -539,6 +539,19 @@ interface PatternDecisionInput {
     perVideoBrollFolders: SubfolderProfile[]
     imageFolders: SubfolderProfile[]
     hasPairing: boolean
+    /**
+     * Total subfolders seen across the recursive tree (depth 0..MAX_DEPTH).
+     * Used by the P0_EMPTY guard: if the root has 0 videos and the tree has
+     * many subfolders, the user almost certainly pasted a *container* folder
+     * (Client manager, year/month index, etc.) instead of a project folder.
+     */
+    totalSubfolderCount: number
+    /**
+     * Total video files seen anywhere in the recursive tree. If this is 0 too,
+     * we know videos genuinely don't live within depth-4 — the right answer is
+     * "drill down into a specific project subfolder", not "1 task per file = 0".
+     */
+    totalVideoCountRecursive: number
 }
 
 interface PatternDecisionResult {
@@ -557,10 +570,40 @@ function decidePattern(input: PatternDecisionInput): PatternDecisionResult {
         arollSharedFolders,
         arollPerVideoFolders,
         hasPairing,
+        totalSubfolderCount,
+        totalVideoCountRecursive,
     } = input
 
     const R = rootVideoFiles.length
     const hasRootMainFiles = mainFiles.length > 0
+
+    // P0_EMPTY — "container folder" guard.
+    // [Bug 2026-06-09] User pasted Dropbox client-manager root → scanner
+    // traversed 1554 subfolders down to depth-4 but found 0 videos. The old
+    // code fell through to P1 "0 task, confidence 50%" which read as
+    // "Velox is broken". Detect this UP FRONT and surface an actionable hint
+    // instead of pretending we have a pattern.
+    //
+    // Triggers when:
+    //   - 0 videos at root      (R === 0)
+    //   - 0 videos anywhere in the recursive tree
+    //   - many subfolders detected — ≥10 is the floor (a Project folder is
+    //     usually <10 subfolders; only Client managers / yearly indices have
+    //     dozens-to-thousands).
+    if (
+        R === 0 &&
+        totalVideoCountRecursive === 0 &&
+        totalSubfolderCount >= 10
+    ) {
+        return {
+            primaryPattern: 'P0_EMPTY',
+            rationale:
+                `P0_EMPTY: 0 video file trong toàn bộ folder, nhưng phát hiện ` +
+                `${totalSubfolderCount} subfolders. Có khả năng bạn dán link ` +
+                `folder cha (vd: Client Manager, Index Tháng) thay vì link ` +
+                `Project cụ thể. Hãy mở 1 project bên trong và copy link folder đó.`,
+        }
+    }
 
     // P4 — output container + A-Roll shared
     if (outputContainerFolders.length > 0 && arollSharedFolders.length > 0) {
@@ -801,6 +844,11 @@ function computeConfidence(args: {
     }
 
     if (args.primaryPattern === 'P7') confidence -= 0.2
+    // P0_EMPTY is a DIAGNOSIS, not a successful classification. Force
+    // confidence to 0 so the UI never shows "50%" next to it (which would
+    // imply "Velox half-detected something" — wrong; Velox detected nothing
+    // because there's nothing TO detect within depth-4).
+    if (args.primaryPattern === 'P0_EMPTY') return 0
 
     // Clamp [0, 1]
     return Math.max(0, Math.min(1, confidence))
@@ -953,6 +1001,14 @@ export function classifyScan(tree: RawScanTree): ScanResultV3 {
     const rootPairing = buildPairedMainItems(fileClass.mainFiles)
 
     // ─── Phase 5 — Pattern decision ──────────────────────────────
+    // Compute totals here so P0_EMPTY guard can detect "container folder" case
+    // (many subfolders, 0 videos anywhere) UP FRONT — see decidePattern §P0_EMPTY.
+    const totalSubfolderCount = countSubfolders(phase02.rootSubfolderProfiles)
+    const totalVideoCountRecursive = countRecursiveVideos(
+        phase02.effectiveTree.rootFiles,
+        phase02.rootSubfolderProfiles,
+    )
+
     const decision = decidePattern({
         rootVideoFiles,
         mainFiles: fileClass.mainFiles,
@@ -964,7 +1020,21 @@ export function classifyScan(tree: RawScanTree): ScanResultV3 {
         perVideoBrollFolders,
         imageFolders,
         hasPairing: rootPairing.hasPairing,
+        totalSubfolderCount,
+        totalVideoCountRecursive,
     })
+
+    // [P0_EMPTY] When the classifier diagnoses a container folder, also push
+    // a human-readable warning so QuickCreateMode banner picks it up without
+    // having to special-case the pattern code.
+    if (decision.primaryPattern === 'P0_EMPTY') {
+        warnings.push(
+            `⚠️ Folder rỗng video (P0_EMPTY) — đã quét ${totalSubfolderCount} ` +
+            `subfolders nhưng KHÔNG tìm thấy file video nào trong phạm vi 4 cấp. ` +
+            `Bạn có thể đang dán nhầm link folder cha. Vui lòng vào 1 project ` +
+            `cụ thể bên trong (vd: Khách A → LGR Tháng 6) rồi copy link folder đó.`,
+        )
+    }
 
     // Build mainItems based on detected pattern
     let mainItems: MainItem[]
@@ -1037,11 +1107,8 @@ export function classifyScan(tree: RawScanTree): ScanResultV3 {
         wrapperConfidenceBreakdown: phase02.wrapperBreakdown,
         effectiveRootUrl: phase02.effectiveTree.rootUrl,
         patternDetectionRationale: decision.rationale,
-        totalVideoCountRecursive: countRecursiveVideos(
-            phase02.effectiveTree.rootFiles,
-            phase02.rootSubfolderProfiles,
-        ),
-        totalSubfolderCount: countSubfolders(phase02.rootSubfolderProfiles),
+        totalVideoCountRecursive,
+        totalSubfolderCount,
         ignoredDeepFiles: phase02.effectiveTree.ignoredDeepFiles,
         subfolderScores: summarizeSubfolderScores(phase02.rootSubfolderProfiles),
         fileScores: fileClass.fileScores,

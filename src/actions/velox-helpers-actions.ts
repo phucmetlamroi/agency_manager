@@ -187,7 +187,13 @@ export async function suggestRoundRobinAssignee(
     try {
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
-        // Get all workspace members with role MEMBER (editors)
+        // Get all workspace members with role MEMBER (editors).
+        // [Bug 2026-06-10] FK violation on Task.assigneeId — root cause: this
+        // path returned `m.userId` straight from WorkspaceMember, but the
+        // joined `m.user` could be NULL when a User row had been removed by
+        // a non-Prisma path (raw SQL, manual SUPABASE delete) without
+        // Cascade firing the WorkspaceMember cleanup. The orphan userId then
+        // reached createTask → Prisma FK rejected. Defensive filter below.
         const members = await prisma.workspaceMember.findMany({
             where: { workspaceId, role: 'MEMBER' },
             select: {
@@ -196,11 +202,13 @@ export async function suggestRoundRobinAssignee(
             },
         })
 
-        if (members.length === 0) return null
+        // [Orphan guard] Drop rows where the joined User no longer exists.
+        const validMembers = members.filter((m) => m.user != null)
+        if (validMembers.length === 0) return null
 
         // Count each member's active (non-completed) task load
         const counts = await Promise.all(
-            members.map(async (m) => {
+            validMembers.map(async (m) => {
                 const count = await prisma.task.count({
                     where: {
                         workspaceId,
@@ -210,8 +218,8 @@ export async function suggestRoundRobinAssignee(
                 })
                 return {
                     userId: m.userId,
-                    username: m.user?.username ?? '',
-                    nickname: m.user?.nickname ?? null,
+                    username: m.user!.username,
+                    nickname: m.user!.nickname,
                     activeCount: count,
                 }
             }),

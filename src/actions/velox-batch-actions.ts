@@ -146,6 +146,32 @@ export async function createTasksFromBatch(
         const uniqueAssignees = Array.from(
             new Set(validRows.map((r) => r.row.assigneeId).filter((a): a is string => !!a)),
         )
+
+        // [Bug 2026-06-10] Pre-validate every unique assigneeId exists in the
+        // User table before opening the transaction. Without this, an orphan
+        // userId (stale Velox draft, deleted user) would silently fail
+        // ensureWorkspaceMembership, then explode inside the transaction with
+        // "Foreign key constraint violated: Task_assigneeId_fkey" and roll
+        // back ALL valid rows. Better to refuse the whole batch up front
+        // with a clear Vietnamese message than to crash the user mid-flow.
+        if (uniqueAssignees.length > 0) {
+            const existingUsers = await prisma.user.findMany({
+                where: { id: { in: uniqueAssignees } },
+                select: { id: true },
+            })
+            const existingIds = new Set(existingUsers.map((u) => u.id))
+            const missing = uniqueAssignees.filter((id) => !existingIds.has(id))
+            if (missing.length > 0) {
+                console.error('[createTasksFromBatch] BLOCK: orphan assigneeId(s)', { missing, workspaceId })
+                return {
+                    error:
+                        `Có ${missing.length} editor được gán không còn tồn tại trong hệ thống ` +
+                        `(có thể đã bị xoá hoặc workspace đã được clone). ` +
+                        `Vui lòng bỏ chọn assignee các row đó (Leave Blank) hoặc chọn editor khác rồi thử lại.`,
+                }
+            }
+        }
+
         for (const assigneeId of uniqueAssignees) {
             await ensureWorkspaceMembership(assigneeId, workspaceId, 'MEMBER')
         }

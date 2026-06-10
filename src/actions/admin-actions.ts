@@ -103,6 +103,31 @@ export async function createTask(formData: FormData, workspaceId: string) {
 
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
+        // [Bug 2026-06-10 — Task_assigneeId_fkey FK violation]
+        // Velox auto-assign and the manual editor picker can both surface a
+        // stale userId — e.g. the autoSave draft was authored when the user
+        // existed but the row was later removed via raw SQL (no Prisma
+        // cascade), or the picker showed a global user who's no longer a
+        // workspace member. Reaching Prisma with such an id throws the
+        // ugly "Foreign key constraint violated" error toast the user sees.
+        // Validate the User exists FIRST so we can return a friendly
+        // Vietnamese message and let the rest of the form survive.
+        if (assigneeId) {
+            const userExists = await prisma.user.findUnique({
+                where: { id: assigneeId },
+                select: { id: true },
+            })
+            if (!userExists) {
+                console.error('[createTask] BLOCK: assigneeId references non-existent User', { assigneeId, workspaceId })
+                return {
+                    error:
+                        'Editor được chọn không còn tồn tại trong hệ thống — ' +
+                        'có thể đã bị xoá hoặc bạn vừa chuyển workspace. ' +
+                        'Vui lòng bỏ chọn assignee (Leave Blank → Task Pool) hoặc chọn lại editor khác rồi thử lại.',
+                }
+            }
+        }
+
         const task = await workspacePrisma.task.create({
             data: {
                 title,

@@ -91,6 +91,11 @@ export type AuditAction =
     | 'client.soft_deleted'
     | 'client.restored'
     | 'client.hard_deleted'
+    // [Canonical Clients 2026-06] migration + public share links
+    | 'client.auto_merged'      // migrate-clients-to-profile-scope merged a duplicate (machine-readable rollback log)
+    | 'share_link.created'      // profile OWNER/ADMIN generated a public client link
+    | 'share_link.revoked'      // link revoked — effective immediately
+    | 'share_link.accessed'     // public page opened with a valid token (page-level, not per action)
 
 /**
  * `workspaceId` value semantics (audit fix #2.9):

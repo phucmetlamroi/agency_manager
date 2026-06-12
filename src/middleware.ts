@@ -24,6 +24,19 @@ export async function middleware(request: NextRequest) {
         return NextResponse.rewrite(new URL('/404', request.url))
     }
 
+    // 1.6. [Canonical Clients] /share/[token] is INTENTIONALLY PUBLIC —
+    // the 256-bit token in the URL is the credential (verified server-side
+    // by resolveShareToken with hash-at-rest + rate limit + uniform 404).
+    // Early-return so neither the session guard nor a logged-in user's
+    // role-isolation redirects can interfere with a client opening a link.
+    // X-Robots-Tag backstops the page-level noindex metadata.
+    if (pathname.startsWith('/share')) {
+        const res = NextResponse.next()
+        res.headers.set('X-Robots-Tag', 'noindex, nofollow')
+        res.headers.set('Referrer-Policy', 'no-referrer')
+        return res
+    }
+
     // 2. Auth Guard ONLY
     if (!sessionCookie) {
         const protectedPaths = ['/portal', '/admin', '/dashboard']

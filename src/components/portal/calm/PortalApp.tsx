@@ -9,8 +9,11 @@ import DeliverablesSurface from './DeliverablesSurface'
 import InvoicesSurface from './InvoicesSurface'
 import DeliverableDetailPanel from './DeliverableDetailPanel'
 import InvoiceDetailPanel from './InvoiceDetailPanel'
+import {
+    approveDeliverable, requestDeliverableChanges, getDeliverableActivity, submitTaskRating,
+} from '@/actions/client-portal-actions'
 import { deriveBrands, deriveLastUpdated, scopeFilterDeliverables, scopeFilterInvoices } from './types'
-import type { Deliverable, Invoice, SurfaceId } from './types'
+import type { Deliverable, Invoice, SurfaceId, DeliverableActions } from './types'
 
 const NAV: { id: SurfaceId; label: string; Icon: any }[] = [
     { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
@@ -18,7 +21,7 @@ const NAV: { id: SurfaceId; label: string; Icon: any }[] = [
     { id: 'invoices', label: 'Invoices', Icon: ReceiptText },
 ]
 
-export default function PortalApp({ workspaceId, locale, currentUserId, accountName, contactName, agencyName, initialDeliverables, initialInvoices, initialSurface = 'overview', profiles = [], switcherWorkspaces = [], currentProfileId = null }: {
+export default function PortalApp({ workspaceId, locale, currentUserId, accountName, contactName, agencyName, initialDeliverables, initialInvoices, initialSurface = 'overview', profiles = [], switcherWorkspaces = [], currentProfileId = null, mode = 'account', actions }: {
     workspaceId: string
     locale: string
     currentUserId: string
@@ -31,12 +34,29 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
     profiles?: { id: string; name: string }[]
     switcherWorkspaces?: { id: string; name: string }[]
     currentProfileId?: string | null
+    /**
+     * [Canonical Clients] 'share' = public tokenized link: hides the
+     * profile/workspace switcher + logout (no session exists) and routes all
+     * deliverable actions through the injected token adapter.
+     */
+    mode?: 'account' | 'share'
+    /** Required in share mode; account mode falls back to the session actions. */
+    actions?: DeliverableActions
 }) {
     const [active, setActive] = useState<SurfaceId>(initialSurface)
     const [scope, setScope] = useState<number | 'all'>('all')
     const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables)
     const [openDel, setOpenDel] = useState<string | null>(null)
     const [openInv, setOpenInv] = useState<string | null>(null)
+
+    // [Canonical Clients] Account-mode default adapter (session actions).
+    // Share mode MUST inject its own token adapter — guarded below.
+    const effectiveActions: DeliverableActions = actions ?? {
+        approve: (taskId) => approveDeliverable(taskId, workspaceId),
+        requestChanges: (taskId, notes) => requestDeliverableChanges(taskId, workspaceId, notes),
+        rate: (taskId, cq, rs, cm, fb) => submitTaskRating(taskId, cq, rs, cm, fb),
+        activity: (taskId) => getDeliverableActivity(taskId),
+    }
 
     const invoices = initialInvoices
     const brands = useMemo(() => deriveBrands(deliverables), [deliverables])
@@ -56,7 +76,7 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
     return (
         <div style={{ display: 'flex', height: '100%', width: '100%' }}>
             <div className="hidden md:flex" style={{ height: '100%' }}>
-                <Sidebar active={active} onNav={onNav} deliverables={scopedDels} invoices={scopedInvs} accountName={accountName} contactName={contactName} agencyName={agencyName} locale={locale} profiles={profiles} switcherWorkspaces={switcherWorkspaces} currentProfileId={currentProfileId} workspaceId={workspaceId} />
+                <Sidebar active={active} onNav={onNav} deliverables={scopedDels} invoices={scopedInvs} accountName={accountName} contactName={contactName} agencyName={agencyName} locale={locale} profiles={profiles} switcherWorkspaces={switcherWorkspaces} currentProfileId={currentProfileId} workspaceId={workspaceId} shareMode={mode === 'share'} />
             </div>
 
             <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%' }}>
@@ -83,7 +103,7 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
                 </div>
             </main>
 
-            {delObj && <DeliverableDetailPanel d={delObj} workspaceId={workspaceId} onClose={() => setOpenDel(null)} onUpdated={updateDeliverable} />}
+            {delObj && <DeliverableDetailPanel d={delObj} actions={effectiveActions} onClose={() => setOpenDel(null)} onUpdated={updateDeliverable} />}
             {invObj && <InvoiceDetailPanel inv={invObj} brands={brands} onClose={() => setOpenInv(null)} />}
         </div>
     )

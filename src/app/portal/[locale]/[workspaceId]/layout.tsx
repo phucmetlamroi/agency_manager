@@ -1,6 +1,8 @@
 import { ReactNode } from 'react'
 import { getPortalUserId } from '@/actions/client-portal-actions'
-import '../../portal-calm.css'
+// [Canonical Clients] CSS moved to src/styles so the share-link portal
+// (/share/[token]) can reuse it after this account portal is removed.
+import '@/styles/portal-calm.css'
 
 /* Auth gate (legacy global CLIENT or per-profile CLIENT membership for this
    workspace's profile) + "Calm Dark" scope wrapper. The shell lives in PortalApp. */

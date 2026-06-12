@@ -39,6 +39,25 @@ async function main() {
     } else {
         console.log(`\n(dry-run — pass --apply to lock these accounts)`)
     }
+
+    // [Canonical Clients 2026-06] Also revoke PENDING client invitations —
+    // the invite flow was removed (clients use public share links now), so a
+    // pending isClientInvite row would just dead-end at accept time.
+    const pendingInvites = await prisma.workspaceInvitation.findMany({
+        where: { isClientInvite: true, status: 'PENDING' },
+        select: { id: true, invitedUserId: true, invitedEmail: true, clientId: true },
+    })
+    console.log(`\nFound ${pendingInvites.length} PENDING client invitation(s).`)
+    for (const inv of pendingInvites) {
+        console.log(`  ${APPLY ? 'REVOKE' : 'would revoke'}: ${inv.id}${inv.invitedEmail ? ' · ' + inv.invitedEmail : ''}${inv.clientId ? ' · clientId=' + inv.clientId : ''}`)
+    }
+    if (APPLY && pendingInvites.length > 0) {
+        const r = await prisma.workspaceInvitation.updateMany({
+            where: { isClientInvite: true, status: 'PENDING' },
+            data: { status: 'REVOKED', respondedAt: new Date() },
+        })
+        console.log(`Revoked ${r.count} pending client invitation(s).`)
+    }
 }
 
 main()

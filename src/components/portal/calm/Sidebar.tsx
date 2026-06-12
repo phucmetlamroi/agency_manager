@@ -1,11 +1,10 @@
 'use client'
 
-import { LayoutDashboard, Clapperboard, ReceiptText, Settings, ShieldCheck, LogOut } from 'lucide-react'
+import { LayoutDashboard, Clapperboard, ReceiptText, ShieldCheck, LogOut } from 'lucide-react'
 import { logoutAction } from '@/actions/auth-actions'
 import LanguageSwitcher from '@/components/portal/LanguageSwitcher'
 import { mapInvoiceStatus, initials } from './format'
 import type { Deliverable, Invoice, SurfaceId } from './types'
-import PortalSwitcher from './PortalSwitcher'
 
 const NAV: { id: SurfaceId; label: string; Icon: any }[] = [
     { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
@@ -46,7 +45,8 @@ export default function Sidebar({ active, onNav, deliverables, invoices, account
                 </div>
             </div>
 
-            {!shareMode && <PortalSwitcher profiles={profiles} workspaces={switcherWorkspaces} currentProfileId={currentProfileId} currentWorkspaceId={workspaceId} locale={locale} />}
+            {/* [Canonical Clients] PortalSwitcher removed with the account portal —
+                a share link has no session/profile to switch between. */}
 
             {/* Nav */}
             <nav style={{ padding: '6px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>

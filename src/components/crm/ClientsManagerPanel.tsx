@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Building2, ChevronRight, ArrowLeft, Loader2, UserPlus, X } from 'lucide-react'
+import { Building2, ChevronRight, ArrowLeft, Loader2, Link2 } from 'lucide-react'
 import ClientList from './ClientList'
 import ClientAnalytics from './ClientAnalytics'
 import CreateClientButton from './CreateClientButton'
+import ShareLinkSection from './ShareLinkSection'
 import { InvoiceModal } from '@/components/invoice/InvoiceModal'
 import { getClientDetail } from '@/actions/crm-actions'
-import { inviteClientToProfile } from '@/actions/member-actions'
 
 type View = 'list' | 'detail' | 'invoice'
 
@@ -43,21 +43,11 @@ export default function ClientsManagerPanel({
     const [selectedId, setSelectedId] = useState<number | null>(null)
     const [detail, setDetail] = useState<{ client: any; distribution: any[]; ratings: any[] } | null>(null)
     const [loading, setLoading] = useState(false)
-    const [inviteOpen, setInviteOpen] = useState(false)
-    const [inviteName, setInviteName] = useState('')
-    const [inviteBusy, setInviteBusy] = useState(false)
+    // [Canonical Clients] "Mời vào Portal" (account invite) replaced by the
+    // public share-link manager — see ShareLinkSection.
+    const [shareOpen, setShareOpen] = useState(false)
 
     useEffect(() => { onViewChange?.(view) }, [view, onViewChange])
-
-    const doInvite = async () => {
-        if (!inviteName.trim() || selectedId == null || inviteBusy) return
-        setInviteBusy(true)
-        const res = await inviteClientToProfile(workspaceId, inviteName.trim(), selectedId)
-        setInviteBusy(false)
-        if (!('username' in res)) { toast.error(res.error || 'Không mời được.'); return }
-        toast.success(res.directAdd ? `Đã cấp quyền portal cho ${res.username}.` : `Đã gửi lời mời portal tới ${res.username}.`)
-        setInviteOpen(false); setInviteName('')
-    }
 
     const selectedClient = selectedId != null ? (detail?.client ?? findClient(clients, selectedId)) : null
     const selectedName = selectedClient?.name ?? ''
@@ -177,11 +167,11 @@ export default function ClientsManagerPanel({
                     )}
                     {view === 'detail' && (
                         <button
-                            onClick={() => setInviteOpen(true)}
+                            onClick={() => setShareOpen(true)}
                             className="inline-flex items-center gap-1.5"
                             style={{ padding: '6px 12px', borderRadius: 9, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#c4b5fd', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}
                         >
-                            <UserPlus className="w-[14px] h-[14px]" /> Mời vào Portal
+                            <Link2 className="w-[14px] h-[14px]" /> Link chia sẻ
                         </button>
                     )}
                     {view === 'invoice' && (
@@ -236,28 +226,13 @@ export default function ClientsManagerPanel({
                 </motion.div>
             </div>
 
-            {inviteOpen && (
-                <div onClick={() => setInviteOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                    <div onClick={(e) => e.stopPropagation()} style={{ width: 420, maxWidth: '94vw', background: '#0A0A0A', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 18, padding: 20, boxShadow: '0 24px 70px rgba(0,0,0,0.6)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff' }}>Mời khách vào Portal</h3>
-                            <button onClick={() => setInviteOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717a' }}><X className="w-4 h-4" /></button>
-                        </div>
-                        <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#a1a1aa', lineHeight: 1.5 }}>
-                            Nhập <b>tên đăng nhập</b> của tài khoản sẽ làm portal user cho <b style={{ color: '#c4b5fd' }}>{selectedName}</b>. Họ sẽ thấy profile này ở chế độ Client (chỉ xem) khi switch sang.
-                        </p>
-                        <input
-                            autoFocus value={inviteName} onChange={(e) => setInviteName(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') void doInvite() }}
-                            placeholder="username hoặc email"
-                            style={{ width: '100%', height: 42, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', padding: '0 12px', fontSize: 14, outline: 'none', fontFamily: 'inherit' }}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-                            <button onClick={() => setInviteOpen(false)} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#a1a1aa', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600 }}>Huỷ</button>
-                            <button onClick={doInvite} disabled={!inviteName.trim() || inviteBusy} style={{ padding: '8px 16px', borderRadius: 9, background: '#8B5CF6', border: 'none', color: '#fff', cursor: (!inviteName.trim() || inviteBusy) ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, opacity: (!inviteName.trim() || inviteBusy) ? 0.5 : 1 }}>{inviteBusy ? 'Đang gửi…' : 'Gửi lời mời'}</button>
-                        </div>
-                    </div>
-                </div>
+            {shareOpen && selectedId != null && (
+                <ShareLinkSection
+                    clientId={selectedId}
+                    clientName={selectedName}
+                    workspaceId={workspaceId}
+                    onClose={() => setShareOpen(false)}
+                />
             )}
         </div>
     )

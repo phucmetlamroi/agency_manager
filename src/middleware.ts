@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { routing } from '@/i18n/routing'
 import { decrypt } from '@/lib/jwt'
 
 export async function middleware(request: NextRequest) {
@@ -39,7 +38,7 @@ export async function middleware(request: NextRequest) {
 
     // 2. Auth Guard ONLY
     if (!sessionCookie) {
-        const protectedPaths = ['/portal', '/admin', '/dashboard']
+        const protectedPaths = ['/admin', '/dashboard']
         if (protectedPaths.some(p => pathname.startsWith(p))) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
@@ -47,20 +46,15 @@ export async function middleware(request: NextRequest) {
         try {
             const session = await decrypt(sessionCookie.value)
             if (!session?.user) throw new Error('Invalid session')
-            
+
             const role = session.user.role;
 
-            // 1. Auth Redirects for /login and /
-            if (pathname === '/login' || pathname === '/') {
-                if (role === 'CLIENT') {
-                    return NextResponse.redirect(new URL('/portal/en', request.url));
-                }
-            }
-
-            // 2. Basic role isolation for CLIENT
-            // Clients are ONLY allowed in /portal or /api.
-            if (role === 'CLIENT' && !pathname.startsWith('/portal') && !pathname.startsWith('/api')) {
-                return NextResponse.redirect(new URL('/portal/en', request.url));
+            // [Canonical Clients] The account-based client portal was removed —
+            // clients access via public /share/[token] links now. Leftover
+            // CLIENT sessions (accounts get LOCKED by the deactivate script)
+            // have nowhere to go: keep them out of staff surfaces.
+            if (role === 'CLIENT' && !pathname.startsWith('/api') && pathname !== '/login') {
+                return NextResponse.redirect(new URL('/login', request.url));
             }
 
             // VERCEL FIX 4: CHECK EMBEDDED PROFILE ID
@@ -85,17 +79,9 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    // 3. I18n and Response Assembly
-    let finalResponse: NextResponse;
-    if (pathname === '/portal' || pathname === '/portal/') {
-        finalResponse = NextResponse.redirect(new URL(`/portal/${routing.defaultLocale}`, request.url))
-    } else {
-        const localeMatch = pathname.match(/^\/portal\/([a-z]{2})(\/|$)/)
-        if (localeMatch && routing.locales.includes(localeMatch[1] as any)) {
-            requestHeaders.set('x-portal-locale', localeMatch[1])
-        }
-        finalResponse = NextResponse.next({ request: { headers: requestHeaders } })
-    }
+    // 3. Response Assembly
+    // [Canonical Clients] portal i18n rewrite removed with the account portal.
+    const finalResponse: NextResponse = NextResponse.next({ request: { headers: requestHeaders } })
 
     const trackingId = request.cookies.get('tracking_session_id')?.value || crypto.randomUUID()
     finalResponse.cookies.set('tracking_session_id', trackingId, {

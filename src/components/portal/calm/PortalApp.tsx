@@ -9,9 +9,6 @@ import DeliverablesSurface from './DeliverablesSurface'
 import InvoicesSurface from './InvoicesSurface'
 import DeliverableDetailPanel from './DeliverableDetailPanel'
 import InvoiceDetailPanel from './InvoiceDetailPanel'
-import {
-    approveDeliverable, requestDeliverableChanges, getDeliverableActivity, submitTaskRating,
-} from '@/actions/client-portal-actions'
 import { deriveBrands, deriveLastUpdated, scopeFilterDeliverables, scopeFilterInvoices } from './types'
 import type { Deliverable, Invoice, SurfaceId, DeliverableActions } from './types'
 
@@ -38,10 +35,11 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
      * [Canonical Clients] 'share' = public tokenized link: hides the
      * profile/workspace switcher + logout (no session exists) and routes all
      * deliverable actions through the injected token adapter.
+     * (The account portal was removed in P5 — share is the only consumer.)
      */
     mode?: 'account' | 'share'
-    /** Required in share mode; account mode falls back to the session actions. */
-    actions?: DeliverableActions
+    /** Credential-bound action adapter — see DeliverableActions in types.ts. */
+    actions: DeliverableActions
 }) {
     const [active, setActive] = useState<SurfaceId>(initialSurface)
     const [scope, setScope] = useState<number | 'all'>('all')
@@ -49,14 +47,7 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
     const [openDel, setOpenDel] = useState<string | null>(null)
     const [openInv, setOpenInv] = useState<string | null>(null)
 
-    // [Canonical Clients] Account-mode default adapter (session actions).
-    // Share mode MUST inject its own token adapter — guarded below.
-    const effectiveActions: DeliverableActions = actions ?? {
-        approve: (taskId) => approveDeliverable(taskId, workspaceId),
-        requestChanges: (taskId, notes) => requestDeliverableChanges(taskId, workspaceId, notes),
-        rate: (taskId, cq, rs, cm, fb) => submitTaskRating(taskId, cq, rs, cm, fb),
-        activity: (taskId) => getDeliverableActivity(taskId),
-    }
+    const effectiveActions: DeliverableActions = actions
 
     const invoices = initialInvoices
     const brands = useMemo(() => deriveBrands(deliverables), [deliverables])

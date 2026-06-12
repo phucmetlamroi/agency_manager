@@ -1,12 +1,10 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Plus, Loader2, Layers } from 'lucide-react'
 import { createWorkspaceAction } from '@/actions/workspace-actions'
-import { copyClientsToWorkspace } from '@/actions/workspace-clone-actions'
-import { CopyClientsSection, type CopyClientsState } from '@/components/workspace/CopyClientsSection'
 import { toast } from 'sonner'
 
 interface WorkspaceItem {
@@ -18,16 +16,19 @@ interface WorkspaceItem {
 interface Props {
     open: boolean
     onClose: () => void
-    /** Profile's existing workspaces — enables the "copy clients" option. */
+    /** Kept for call-site compat — no longer used since clients are profile-scoped. */
     workspaces?: WorkspaceItem[]
 }
 
-export default function CreateWorkspaceModal({ open, onClose, workspaces = [] }: Props) {
+// [Canonical Clients 2026-06] The "Sao chép khách hàng" clone section was
+// REMOVED: clients are profile-scoped now, so every new workspace sees the
+// profile's clients automatically — cloning would only mint the duplicate
+// rows the canonical migration just merged.
+export default function CreateWorkspaceModal({ open, onClose }: Props) {
     const router = useRouter()
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [creating, setCreating] = useState(false)
-    const copyStateRef = useRef<CopyClientsState>({ enabled: false, sourceId: null, selectedIds: [], copyPricing: true })
 
     async function handleCreate() {
         if (!name.trim()) {
@@ -50,18 +51,7 @@ export default function CreateWorkspaceModal({ open, onClose, workspaces = [] }:
                 toast.error(result.error)
             } else if (result.success && result.workspaceId) {
                 const newWsId = result.workspaceId
-                // [Copy clients] If opted in, clone the selected clients into the new workspace.
-                const cs = copyStateRef.current
-                if (cs.enabled && cs.sourceId && cs.selectedIds.length > 0) {
-                    const copyRes = await copyClientsToWorkspace(cs.sourceId, newWsId, cs.selectedIds, cs.copyPricing)
-                    if ('success' in copyRes) {
-                        toast.success(`Workspace tạo xong · đã sao chép ${copyRes.count} khách hàng`)
-                    } else {
-                        toast.warning(`Workspace đã tạo, nhưng sao chép khách lỗi: ${copyRes.error}`)
-                    }
-                } else {
-                    toast.success('Workspace mới đã được tạo!')
-                }
+                toast.success('Workspace mới đã được tạo! Khách hàng của profile sẽ tự hiển thị sẵn.')
                 onClose()
                 setName('')
                 setDescription('')
@@ -144,14 +134,11 @@ export default function CreateWorkspaceModal({ open, onClose, workspaces = [] }:
                                 />
                             </div>
 
-                            {/* Copy clients from a previous workspace */}
-                            <CopyClientsSection workspaces={workspaces} onChange={(c) => { copyStateRef.current = c }} />
-
                             {/* Info note */}
                             <div className="bg-violet-500/5 border border-violet-500/10 rounded-xl p-3">
                                 <p className="text-xs text-zinc-400 leading-relaxed">
                                     Bạn sẽ tự động trở thành <span className="text-violet-400 font-bold">OWNER</span> của workspace mới.
-                                    Sau đó có thể mời thành viên từ trang Members.
+                                    Khách hàng của profile sẽ <span className="text-violet-400 font-bold">tự hiển thị sẵn</span> — không cần sao chép.
                                 </p>
                             </div>
 

@@ -15,19 +15,25 @@ export async function getClients(workspaceId: string) {
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+        // [Canonical Clients] The client LIST is profile-wide now (every
+        // workspace sees the same canonical clients), but the task/project
+        // counts shown on each card stay scoped to THIS workspace — data
+        // isolation per workspace is unchanged. Relation includes don't go
+        // through the middleware, so the workspaceId filter is explicit.
         const clients = await workspacePrisma.client.findMany({
-            // [Soft-delete] only top-level ACTIVE clients (archived ones live in the Trash)
-            where: { parentId: null, status: { not: 'SOFT_DELETED' } },
+            // status: 'ACTIVE' excludes both SOFT_DELETED (Trash) and MERGED
+            // (absorbed duplicates from the canonical migration).
+            where: { parentId: null, status: 'ACTIVE' },
             include: {
                 subsidiaries: {
-                    where: { status: { not: 'SOFT_DELETED' } },
+                    where: { status: 'ACTIVE' },
                     include: {
-                        projects: true,
-                        tasks: true
+                        projects: { where: { workspaceId } },
+                        tasks: { where: { workspaceId } }
                     }
                 },
-                projects: true,
-                tasks: true
+                projects: { where: { workspaceId } },
+                tasks: { where: { workspaceId } }
             },
             orderBy: { createdAt: 'desc' }
         })
@@ -38,16 +44,40 @@ export async function getClients(workspaceId: string) {
     }
 }
 
+/**
+ * [Canonical Clients] App-level duplicate guard — one ACTIVE client per
+ * (profile, parent, normalized name). Backstops the partial unique index
+ * (client_profile_path_unique) during the window before it's applied, and
+ * turns the DB error into a friendly Vietnamese message after.
+ */
+async function findDuplicateName(
+    wp: any,
+    name: string,
+    parentId: number | null,
+    excludeId?: number,
+): Promise<boolean> {
+    const siblings: { id: number; name: string }[] = await wp.client.findMany({
+        where: { parentId, status: 'ACTIVE' },
+        select: { id: true, name: true },
+    })
+    const normalized = name.trim().toLowerCase()
+    return siblings.some((s) => s.id !== excludeId && s.name.trim().toLowerCase() === normalized)
+}
+
 
 export async function createClient(data: { name: string, parentId?: number }, workspaceId: string) {
     try {
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+        const parentId = data.parentId || null
+        if (await findDuplicateName(workspacePrisma, data.name, parentId)) {
+            return { success: false, error: `Khách hàng "${data.name.trim()}" đã tồn tại trong profile — clients giờ dùng chung cho mọi workspace, không cần tạo lại.` }
+        }
         await workspacePrisma.client.create({
             data: {
                 name: data.name,
-                parentId: data.parentId || null
+                parentId
             }
         })
         revalidatePath(`/${workspaceId}/admin/crm`)
@@ -62,6 +92,11 @@ export async function updateClient(id: number, data: { name: string }, workspace
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+        // Dup-guard on rename: same normalized name under the same parent.
+        const current = await workspacePrisma.client.findUnique({ where: { id }, select: { parentId: true } })
+        if (current && await findDuplicateName(workspacePrisma, data.name, current.parentId, id)) {
+            return { success: false, error: `Khách hàng "${data.name.trim()}" đã tồn tại trong profile.` }
+        }
         await workspacePrisma.client.update({
             where: { id },
             data: { name: data.name }
@@ -235,11 +270,15 @@ export async function permanentlyDeleteClient(id: number, workspaceId: string) {
         const profileId = (session?.user as any)?.sessionProfileId
         const wp = getWorkspacePrisma(workspaceId, profileId)
         const ids = await collectClientSubtreeIds(wp, id)
-        const invoiceCount = await wp.invoice.count({ where: { clientId: { in: ids } } })
+        // [Canonical Clients] Invoice guard must be GLOBAL: the canonical
+        // client can have invoices in OTHER workspaces of the profile — the
+        // workspace-scoped count would miss them and the hard-delete would
+        // explode with a vague P2003 mid-flight.
+        const invoiceCount = await prisma.invoice.count({ where: { clientId: { in: ids } } })
         if (invoiceCount > 0) {
             return {
                 success: false,
-                error: `Không thể xoá vĩnh viễn: còn ${invoiceCount} hoá đơn liên kết. Hãy xử lý hoá đơn trước — khách vẫn nằm trong Thùng rác.`,
+                error: `Không thể xoá vĩnh viễn: còn ${invoiceCount} hoá đơn liên kết (tính trên TẤT CẢ workspace). Hãy xử lý hoá đơn trước — khách vẫn nằm trong Thùng rác.`,
             }
         }
         // Delete the top node; child clients + projects cascade, tasks detach.
@@ -283,9 +322,10 @@ export async function mergeClientIntoParent(childId: number, parentId: number, w
         ])
 
         if (!child || !parent) return { success: false, error: 'Không tìm thấy khách hàng.' }
-        // [Soft-delete] don't merge into/from an archived (trashed) client
-        if (child.status === 'SOFT_DELETED' || parent.status === 'SOFT_DELETED') {
-            return { success: false, error: 'Không thể gộp khách hàng đang ở trong Thùng rác.' }
+        // [Soft-delete + Canonical Clients] only ACTIVE clients can be merged
+        // (blocks both Trash rows and MERGED migration leftovers)
+        if (child.status !== 'ACTIVE' || parent.status !== 'ACTIVE') {
+            return { success: false, error: 'Chỉ có thể gộp khách hàng đang hoạt động (không nằm trong Thùng rác).' }
         }
         if (child.parentId !== null) return { success: false, error: 'Khách hàng được kéo đã là khách hàng trực thuộc, không thể gộp.' }
         if (parent.parentId !== null) return { success: false, error: 'Khách hàng đích đến đã là khách hàng trực thuộc, không thể dùng làm khách hàng chính.' }
@@ -336,11 +376,14 @@ export async function getClientDetail(clientId: number, workspaceId: string) {
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
+        // [Canonical Clients] Detail/analytics view intentionally shows the
+        // client's FULL history across all workspaces of the profile — that's
+        // the point of one canonical id ("dữ liệu từ trước tới giờ").
         const client = await workspacePrisma.client.findUnique({
             where: { id: clientId },
             include: {
                 subsidiaries: {
-                    where: { status: { not: 'SOFT_DELETED' } },
+                    where: { status: 'ACTIVE' },
                     include: { tasks: { orderBy: { createdAt: 'desc' }, take: 5 } }
                 },
                 tasks: {
@@ -353,8 +396,8 @@ export async function getClientDetail(clientId: number, workspaceId: string) {
             }
         })
 
-        // [Soft-delete] a trashed client must not be reachable from the active CRM
-        if (!client || client.status === 'SOFT_DELETED') {
+        // [Soft-delete + Canonical] trashed/merged clients aren't reachable from the active CRM
+        if (!client || client.status !== 'ACTIVE') {
             return { success: false as const, error: 'Không tìm thấy khách hàng.' }
         }
 

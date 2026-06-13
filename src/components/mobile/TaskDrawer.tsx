@@ -9,7 +9,8 @@ import { Separator } from "@/components/ui/separator"
 import {
     Calendar, Link as LinkIcon, User, Play, Pause, Send, CheckCircle2, AlertTriangle, Trash2, UserPlus, Users,
 } from "lucide-react"
-import DOMPurify from "isomorphic-dompurify"
+// [Hotfix 2026-06-13] browser-only dompurify — see TaskDetailModal.tsx note.
+import DOMPurify from "dompurify"
 import { ensureExternalLinks } from "@/lib/utils"
 import { formatClientHierarchy } from "@/lib/client-hierarchy"
 import { getValidNextStatuses, type ActorRole } from "@/lib/task-state-machine"

@@ -23,6 +23,7 @@
 
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { clientPathKey } from '@/lib/client-dedupe'
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Return shape — used by Velox preview UI                            */
@@ -58,19 +59,13 @@ export interface InheritedNotePreview {
 function buildClientPath(
     clientId: number,
     byId: Map<number, { name: string; parentId: number | null }>,
-    maxDepth = 6,
 ): string {
-    const names: string[] = []
-    let current: number | null = clientId
-    let depth = 0
-    while (current != null && depth < maxDepth) {
-        const c = byId.get(current)
-        if (!c) break
-        names.push((c.name ?? '').trim().toLowerCase())
-        current = c.parentId
-        depth++
-    }
-    return names.reverse().join('/')
+    // [Hardened 2026-06] Delegates to the shared canonical key so note-inheritance,
+    // the new-task picker de-dup, the merge migration and the share-link scope all
+    // agree on "same client": NFC-normalized + U+0000-separated (a "/"-join would
+    // false-merge a client literally named "Jacob/Unit" with a Jacob→Unit tree),
+    // cycle-guarded.
+    return clientPathKey(clientId, byId)
 }
 
 /* ──────────────────────────────────────────────────────────────────── */

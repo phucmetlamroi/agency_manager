@@ -17,6 +17,7 @@ import { AdminKPIWidgets } from '@/components/dashboard/AdminKPIWidgets'
 import DashboardClientsRow from '@/components/dashboard/DashboardClientsRow'
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar'
 import DashboardActionWrapper from '@/components/dashboard/DashboardActionWrapper'
+import { dedupeClientsByPath } from '@/lib/client-dedupe'
 import { getAvailableProfiles } from '@/actions/profile-actions'
 import { getClients } from '@/actions/crm-actions'
 import { isProfileOwner } from '@/lib/profile-permissions'
@@ -92,16 +93,27 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     })
 
     // 4. Client count + client list for AddTaskModal
-    const totalClientsTarget = await (workspacePrisma as any).client.count({ where: { parentId: null, status: { not: 'SOFT_DELETED' } } })
     const activeClientIds = new Set(tasks.map((t: any) => t.clientId).filter(Boolean))
     const totalClients = activeClientIds.size
 
-    const allClients = await workspacePrisma.client.findMany({
-        // [Soft-delete] don't offer archived clients in the new-task picker
-        where: { status: { not: 'SOFT_DELETED' } },
+    // [Canonical Clients] status: 'ACTIVE' excludes BOTH trashed (SOFT_DELETED)
+    // AND merged-duplicate (MERGED) rows — so the picker never offers an absorbed
+    // dupe after the merge migration runs.
+    const allClientsRaw = await workspacePrisma.client.findMany({
+        where: { status: 'ACTIVE' },
         select: { id: true, name: true, parentId: true, parent: { select: { name: true } } },
         orderBy: { name: 'asc' },
     })
+    // [Canonical Clients] Until the merge migration consolidates them, the same
+    // logical client still exists as several per-workspace rows with different
+    // ids — so the picker showed "Jacob" three times. Collapse by canonical
+    // name-path, keeping the lowest id (= the migration's survivor), so each
+    // client appears ONCE and new tasks attach to the row the migration will
+    // consolidate everything into.
+    const allClients = dedupeClientsByPath(allClientsRaw)
+    // Target = distinct canonical root clients in the profile (no longer inflated
+    // by per-workspace duplicates).
+    const totalClientsTarget = allClients.filter((c) => c.parentId === null).length
 
     // [CM merge] Full client tree (root + subsidiaries + tasks/projects) cho Clients Manager panel
     const cmClientsRes = await getClients(workspaceId)

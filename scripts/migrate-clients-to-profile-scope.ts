@@ -35,6 +35,27 @@
  *   npx tsx scripts/migrate-clients-to-profile-scope.ts --profile <id>  # limit to 1 profile
  */
 import { PrismaClient } from '@prisma/client'
+import { clientPathKey, clientPathDepth } from '../src/lib/client-dedupe'
+import { existsSync, readFileSync } from 'fs'
+import { resolve } from 'path'
+
+// Dependency-free .env loader (the repo doesn't ship `dotenv`) so the script runs
+// with just `npx tsx scripts/migrate-clients-to-profile-scope.ts`. No-op if the
+// env is already set (e.g. CI / Vercel) — it never overrides an existing value.
+if (!process.env.DATABASE_URL) {
+    try {
+        const envPath = resolve(process.cwd(), '.env')
+        if (existsSync(envPath)) {
+            for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+                const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+                if (!m) continue
+                let v = m[2].trim()
+                if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1)
+                if (process.env[m[1]] === undefined) process.env[m[1]] = v
+            }
+        }
+    } catch { /* best-effort — fall through to Prisma's own env resolution */ }
+}
 
 const prisma = new PrismaClient()
 const APPLY = process.argv.includes('--apply')
@@ -51,23 +72,19 @@ interface ClientRow {
     createdAt: Date
 }
 
-/** Copy of velox-helpers buildClientPath — trim+lowercase per segment, root-first join. */
+/**
+ * [Hardened 2026-06] Delegates to the shared canonical key (src/lib/client-dedupe)
+ * so the migration's grouping EXACTLY matches the new-task picker's de-dup and the
+ * share-link scope: NFC-normalized, U+0000-separated (NOT "/"-joined — "/" is a
+ * legal character in a name, and a slash-join false-merges a single client named
+ * "Jacob/Unit" with a real Jacob→Unit hierarchy, corrupting data on merge),
+ * cycle-guarded, depth 12. Survivor = lowest id, identical on both sides.
+ */
 function buildClientPath(
     clientId: number,
     byId: Map<number, { name: string; parentId: number | null }>,
-    maxDepth = 6,
 ): string {
-    const names: string[] = []
-    let current: number | null = clientId
-    let depth = 0
-    while (current != null && depth < maxDepth) {
-        const c = byId.get(current)
-        if (!c) break
-        names.push((c.name ?? '').trim().toLowerCase())
-        current = c.parentId
-        depth++
-    }
-    return names.reverse().join('/')
+    return clientPathKey(clientId, byId)
 }
 
 /** Per-(profile,path) task+invoice tallies for the V5 conservation check. */
@@ -164,7 +181,7 @@ async function main() {
         // merge before children (children of a merged root re-point cleanly).
         const dupGroups = [...groups.entries()]
             .filter(([, members]) => members.length > 1)
-            .sort(([a], [b]) => a.split('/').length - b.split('/').length)
+            .sort(([a], [b]) => clientPathDepth(a) - clientPathDepth(b))
 
         if (dupGroups.length === 0) continue
         totalGroups += dupGroups.length

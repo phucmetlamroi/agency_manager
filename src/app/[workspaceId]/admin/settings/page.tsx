@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import WorkspaceSettingsPanel from '@/components/workspace/WorkspaceSettingsPanel'
+import { dedupeClientsByPath } from '@/lib/client-dedupe'
 
 export default async function AdminSettingsPage({
     params,
@@ -82,13 +83,17 @@ export default async function AdminSettingsPage({
     }))
 
     // [Quick Create] Fetch clients in this profile (for pricing rule scope dropdown)
-    // [Canonical Clients] only ACTIVE — hide SOFT_DELETED + MERGED duplicates.
+    // [Canonical Clients] only ACTIVE — hide SOFT_DELETED + MERGED duplicates —
+    // then collapse the per-workspace duplicates by canonical name-path (parentId
+    // is needed to compute that path) so the scope dropdown shows each client ONCE.
     const clients = workspace.profileId
-        ? await prisma.client.findMany({
-              where: { profileId: workspace.profileId, status: 'ACTIVE' },
-              select: { id: true, name: true },
-              orderBy: { name: 'asc' },
-          })
+        ? dedupeClientsByPath(
+              await prisma.client.findMany({
+                  where: { profileId: workspace.profileId, status: 'ACTIVE' },
+                  select: { id: true, name: true, parentId: true },
+                  orderBy: { name: 'asc' },
+              }),
+          )
         : []
 
     const serializedWorkspace = {

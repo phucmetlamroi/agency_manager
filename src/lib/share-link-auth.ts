@@ -89,26 +89,69 @@ export async function resolveShareToken(
     if (!link.client || link.client.status !== 'ACTIVE') return null
     if (!link.profile || link.profile.status !== 'ACTIVE') return null
 
-    // Scope: canonical client + ACTIVE subsidiary subtree (bounded depth,
-    // same pattern as crm-actions collectClientSubtreeIds).
-    const clientIds = new Set<number>([link.clientId])
-    let frontier = [link.clientId]
-    let guard = 0
-    while (frontier.length > 0 && guard < 8) {
-        const children = await prisma.client.findMany({
-            where: { parentId: { in: frontier }, status: 'ACTIVE', profileId: link.profileId },
-            select: { id: true },
-        })
-        const next: number[] = []
-        for (const c of children) {
-            if (!clientIds.has(c.id)) { clientIds.add(c.id); next.push(c.id) }
+    // ── Scope: the client's FULL history across the whole profile ──────────
+    // [Canonical Clients 2026-06] The merge migration may not have run yet, so
+    // the SAME logical client ("Jacob") still exists as many per-workspace
+    // duplicate rows with different ids — and the link points at just one of
+    // them (often an empty one). Resolving scope by a single id would show a
+    // blank page. Instead we identify the client by its hierarchical NAME-PATH
+    // within the profile (the exact mechanism Velox note-inheritance uses) and
+    // gather EVERY profile client that shares that path, plus all of its
+    // sub-brands. This:
+    //   - works whether or not the merge migration has run (post-merge only
+    //     the survivor is ACTIVE → it holds all the remapped tasks);
+    //   - is strictly profile-confined (never crosses profiles);
+    //   - keeps a different logical client out: link path "jacob" matches the
+    //     root "Jacob" rows + "jacob/<sub>" sub-brands, but NOT "josh/jacob"
+    //     (Josh's sub-brand) nor "acme".
+    const profileClients = await prisma.client.findMany({
+        where: { profileId: link.profileId, status: 'ACTIVE' },
+        select: { id: true, name: true, parentId: true },
+    })
+    const byId = new Map(profileClients.map((c) => [c.id, c]))
+    // The name-path is an ARRAY of normalized ancestor names, NOT a "/"-joined
+    // string. "/" is a legal character inside a free-text client name, so a
+    // joined string would conflate a single client literally named "Jacob/Unit"
+    // with a real Jacob→Unit hierarchy and leak one client's data into the
+    // other's share scope (verified High finding). Comparing segment arrays
+    // element-by-element makes ["jacob/unit"] (one name) distinct from
+    // ["jacob","unit"] (two names). NFC-normalize so accented duplicates merge.
+    // A visited-set (not a depth cap) guards against a corrupt parent cycle
+    // without truncating deep chains into aliasable prefixes.
+    const segPath = (id: number): string[] => {
+        const names: string[] = []
+        const seen = new Set<number>()
+        let cur: number | null = id
+        while (cur != null && !seen.has(cur)) {
+            seen.add(cur)
+            const c = byId.get(cur)
+            if (!c) break
+            names.push((c.name ?? '').normalize('NFC').trim().toLowerCase())
+            cur = c.parentId
         }
-        frontier = next
-        guard++
+        return names.reverse()
+    }
+    // candidate is the same logical client (its per-workspace duplicates) OR one
+    // of its sub-brands iff its segment array starts with the link's, element-wise.
+    const startsWithSegs = (full: string[], prefix: string[]): boolean => {
+        if (full.length < prefix.length) return false
+        for (let i = 0; i < prefix.length; i++) if (full[i] !== prefix[i]) return false
+        return true
+    }
+    const linkSegs = segPath(link.clientId)
+    const clientIds = new Set<number>([link.clientId])
+    if (linkSegs.length > 0 && linkSegs.every((s) => s.length > 0)) {
+        for (const c of profileClients) {
+            if (startsWithSegs(segPath(c.id), linkSegs)) clientIds.add(c.id)
+        }
     }
 
+    // Include EVERY workspace of the profile — incl. SOFT_DELETED/archived
+    // monthly workspaces — so the client sees their full history ("sổ workspace
+    // đã làm trước đó"). clientId-scoping already confines tasks to this
+    // profile, so this filter is a defensive belt, not the security boundary.
     const workspaces = await prisma.workspace.findMany({
-        where: { profileId: link.profileId, status: 'ACTIVE' },
+        where: { profileId: link.profileId },
         select: { id: true },
     })
 

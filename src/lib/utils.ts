@@ -26,14 +26,25 @@ export function formatCurrency(amount: number | string | any) {
     }).format(value)
 }
 
-import DOMPurify from 'isomorphic-dompurify';
+// [Hotfix 2026-06-13] plain browser `dompurify` (zero deps) replaces
+// isomorphic-dompurify. utils.ts is imported by virtually EVERY route (cn()
+// lives here), so the old import dragged jsdom into every server bundle —
+// jsdom's html-encoding-sniffer require()s an ESM-only package and Vercel's
+// Node runtime lacks require(esm) → ERR_REQUIRE_ESM 500s in production.
+import DOMPurify from 'dompurify';
 
 /**
  * Ensures all <a> tags in an HTML string have target="_blank" and rel="noopener noreferrer"
  * and sanitizes the HTML to prevent XSS.
+ *
+ * CLIENT-ONLY: browser dompurify has no DOM during SSR. The single caller
+ * (TaskDrawer, 'use client', renders on user interaction post-hydration)
+ * never runs this on the server; the guard below fails CLOSED (empty
+ * string, never unsanitized HTML) if a future server caller appears.
  */
 export function ensureExternalLinks(html: string | null | undefined): string {
     if (!html) return '';
+    if (typeof window === 'undefined') return '';
 
     // First, sanitize the HTML
     const sanitized = DOMPurify.sanitize(html);

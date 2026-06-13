@@ -8,7 +8,13 @@ import { updateTaskStatus } from "@/actions/task-actions"
 import { toast } from "sonner"
 import { Dialog } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
-import DOMPurify from 'isomorphic-dompurify'
+// [Hotfix 2026-06-13] plain 'dompurify' (browser-only, zero deps) replaces
+// isomorphic-dompurify: the latter eagerly required jsdom on the SERVER
+// during SSR of this client component → jsdom's html-encoding-sniffer
+// require()s an ESM-only package → ERR_REQUIRE_ESM 500 on Vercel for every
+// route importing this modal. All .sanitize() calls here run client-side
+// only (the modal renders on user interaction, post-hydration).
+import DOMPurify from 'dompurify'
 import { cn } from "@/lib/utils"
 
 // ── DOMPurify global hook: force every anchor in sanitized HTML to open in

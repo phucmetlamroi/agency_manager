@@ -227,7 +227,7 @@ function CalmRating({ taskId, actions, existing, onRated }: { taskId: string; ac
         return (
             <div className="pc-card" style={{ padding: 14, background: 'var(--surface-2)', borderColor: 'var(--ok-line)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Star size={15} style={{ color: '#FBBF24', fill: '#FBBF24' }} />
+                    <Star size={15} style={{ color: 'var(--attn)', fill: 'var(--attn)' }} />
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>Thanks for your rating — {avg.toFixed(1)}/5</span>
                 </div>
             </div>
@@ -263,7 +263,7 @@ function Stars({ label, value, onChange }: { label: string; value: number; onCha
             <div style={{ display: 'flex', gap: 4 }}>
                 {[1, 2, 3, 4, 5].map(n => (
                     <button key={n} onClick={() => onChange(n)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, lineHeight: 0 }}>
-                        <Star size={17} style={{ color: n <= value ? '#FBBF24' : 'var(--fg-4)', fill: n <= value ? '#FBBF24' : 'transparent' }} />
+                        <Star size={17} style={{ color: n <= value ? 'var(--attn)' : 'var(--fg-4)', fill: n <= value ? 'var(--attn)' : 'transparent' }} />
                     </button>
                 ))}
             </div>

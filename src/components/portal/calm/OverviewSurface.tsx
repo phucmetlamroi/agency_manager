@@ -13,26 +13,31 @@ function greetingWord() {
 }
 
 function StatTile({ label, value, sub, accent, Icon }: { label: string; value: string | number; sub?: string | null; accent?: string | null; Icon: any }) {
+    const on = !!accent
     return (
-        <div className="pc-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="pc-card" style={{ padding: '16px 18px 18px', display: 'flex', flexDirection: 'column', gap: 14, position: 'relative', overflow: 'hidden' }}>
+            {on && <span style={{ position: 'absolute', top: 0, left: 18, right: 18, height: 2, borderRadius: 2, background: accent!, opacity: 0.55 }} />}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span className="eyebrow" style={{ fontSize: 10 }}>{label}</span>
-                <Icon size={15} style={{ color: 'var(--fg-3)' }} />
+                <span style={{ width: 26, height: 26, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: on ? 'color-mix(in srgb, ' + accent + ' 13%, transparent)' : 'var(--surface-2)', border: '1px solid ' + (on ? 'color-mix(in srgb, ' + accent + ' 30%, transparent)' : 'var(--line-2)'), color: on ? accent! : 'var(--fg-3)' }}>
+                    <Icon size={14} />
+                </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span className="num" style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em', color: accent || 'var(--fg)', lineHeight: 1 }}>{value}</span>
+                <span className="num" style={{ fontSize: 34, fontWeight: 600, letterSpacing: '-0.01em', color: accent || 'var(--fg)', lineHeight: 1 }}>{value}</span>
                 {sub && <span style={{ fontSize: 12.5, color: 'var(--fg-3)' }}>{sub}</span>}
             </div>
         </div>
     )
 }
 
-export default function OverviewSurface({ deliverables, invoices, scope, brands, contactName, onNav, openDeliverable, openInvoice }: {
+export default function OverviewSurface({ deliverables, invoices, scope, brands, contactName, periodLabel, onNav, openDeliverable, openInvoice }: {
     deliverables: Deliverable[]
     invoices: Invoice[]
     scope: number | 'all'
     brands: Brand[]
     contactName: string
+    periodLabel?: string | null
     onNav: (id: SurfaceId) => void
     openDeliverable: (id: string) => void
     openInvoice: (id: string) => void
@@ -58,16 +63,20 @@ export default function OverviewSurface({ deliverables, invoices, scope, brands,
     const scopeLabel = scope === 'all' ? 'all your channels' : (brands.find(b => b.id === scope)?.name || 'this channel')
 
     return (
-        <div className="pc-view-in" style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 48px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <div className="pc-view-in" style={{ maxWidth: 1180, margin: '0 auto', padding: '30px 24px 48px', display: 'flex', flexDirection: 'column', gap: 22 }}>
             {/* Greeting */}
             <div>
-                <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--fg)' }}>{greetingWord()}, {firstName}</h1>
-                <p style={{ margin: '6px 0 0', fontSize: 14.5, color: 'var(--fg-2)' }}>Here&apos;s where things stand across <span style={{ color: 'var(--fg-1)', fontWeight: 600 }}>{scopeLabel}</span>.</p>
+                <p className="eyebrow" style={{ marginBottom: 9, color: 'var(--accent-fg)' }}>Your studio room</p>
+                <h1 style={{ margin: 0, fontSize: 33, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--fg)', lineHeight: 1.04 }}>{greetingWord()}, {firstName}</h1>
+                <p style={{ margin: '8px 0 0', fontSize: 14.5, color: 'var(--fg-2)' }}>
+                    Here&apos;s where things stand across <span style={{ color: 'var(--fg-1)', fontWeight: 600 }}>{scopeLabel}</span>
+                    {periodLabel && <> in <span style={{ color: 'var(--accent-fg)', fontWeight: 600 }}>{periodLabel}</span></>}.
+                </p>
             </div>
 
             {/* Needs your attention */}
             {attention.length > 0 && (
-                <div className="pc-card" style={{ borderColor: 'var(--accent-line)', background: 'linear-gradient(180deg, rgba(139,92,246,0.05), var(--surface))', padding: 18 }}>
+                <div className="pc-card" style={{ borderColor: 'var(--accent-line)', background: 'linear-gradient(180deg, var(--accent-soft), var(--surface) 60%)', padding: 18 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 14 }}>
                         <span style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', color: 'var(--accent-fg)' }}><Hand size={16} /></span>
                         <div>
@@ -106,9 +115,9 @@ export default function OverviewSurface({ deliverables, invoices, scope, brands,
             {/* At-a-glance */}
             <div className="pc-stagger pc-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
                 <StatTile label="In production" value={inProduction} sub="deliverables" Icon={Clapperboard} />
-                <StatTile label="Awaiting you" value={awaiting.length} sub={awaiting.length === 1 ? 'review' : 'reviews'} Icon={Eye} accent={awaiting.length ? '#FBBF24' : null} />
-                <StatTile label="Delivered" value={delivered} sub="this month" Icon={CheckCheck} accent={delivered ? '#34D399' : null} />
-                <StatTile label="Outstanding" value={fmtMoney(outstanding)} sub={overdueInvs.length ? `${overdueInvs.length} overdue` : null} Icon={Wallet} accent={overdueInvs.length ? '#F87171' : null} />
+                <StatTile label="Awaiting you" value={awaiting.length} sub={awaiting.length === 1 ? 'review' : 'reviews'} Icon={Eye} accent={awaiting.length ? 'var(--attn)' : null} />
+                <StatTile label="Delivered" value={delivered} sub="this month" Icon={CheckCheck} accent={delivered ? 'var(--ok)' : null} />
+                <StatTile label="Outstanding" value={fmtMoney(outstanding)} sub={overdueInvs.length ? `${overdueInvs.length} overdue` : null} Icon={Wallet} accent={overdueInvs.length ? 'var(--danger)' : null} />
             </div>
 
             {/* Recent + Upcoming */}

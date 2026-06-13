@@ -1,8 +1,30 @@
 import { ReactNode } from 'react'
 import type { Metadata } from 'next'
+import { Fraunces, Hanken_Grotesk } from 'next/font/google'
 // Calm-Dark theme shared with the (former) account portal — lives in
 // src/styles so it survives the portal removal.
 import '@/styles/portal-calm.css'
+
+/**
+ * [Atelier redesign 2026-06] The share portal gets its OWN typographic
+ * identity — distinct from the staff app's Plus Jakarta Sans — so the client
+ * room reads like a studio, not the admin tool: Fraunces (an editorial serif
+ * with optical sizing) carries headlines + figures, Hanken Grotesk does the
+ * working text. Both are scoped via CSS variables consumed in portal-calm.css.
+ */
+const fraunces = Fraunces({
+    variable: '--font-fraunces',
+    subsets: ['latin'],
+    weight: ['400', '500', '600', '700'],
+    style: ['normal'],
+    display: 'swap',
+})
+const hanken = Hanken_Grotesk({
+    variable: '--font-hanken',
+    subsets: ['latin'],
+    weight: ['400', '500', '600', '700', '800'],
+    display: 'swap',
+})
 
 /**
  * [Canonical Clients] PUBLIC layout for tokenized share links.
@@ -20,7 +42,10 @@ export default function ShareLayout({ children }: { children: ReactNode }) {
     return (
         <>
             <meta name="referrer" content="no-referrer" />
-            <div className="portal-calm" style={{ height: '100vh', width: '100%', overflow: 'hidden' }}>
+            <div
+                className={`portal-calm ${fraunces.variable} ${hanken.variable}`}
+                style={{ height: '100vh', width: '100%', overflow: 'hidden' }}
+            >
                 {children}
             </div>
         </>

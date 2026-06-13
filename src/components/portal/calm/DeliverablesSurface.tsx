@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Clapperboard } from 'lucide-react'
+import { ChevronRight, ChevronDown, Clapperboard, CalendarRange } from 'lucide-react'
 import { StatusBadge, BrandAvatar, FilterChip, Empty, DeliverableTypeIcon } from './ui'
 import { relDeadline } from './format'
 import type { Deliverable, Brand } from './types'
@@ -9,7 +9,15 @@ import type { Deliverable, Brand } from './types'
 const FILTERS = ['All', 'Needs you', 'In Progress', 'Revising', 'Completed'] as const
 type Filter = typeof FILTERS[number]
 
-function DeliverableRow({ d, onOpen }: { d: Deliverable; onOpen: (id: string) => void }) {
+function PeriodTag({ name }: { name: string }) {
+    return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 21, padding: '0 8px', borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--line-2)', color: 'var(--fg-2)', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <CalendarRange size={11} style={{ color: 'var(--fg-3)' }} /> {name}
+        </span>
+    )
+}
+
+function DeliverableRow({ d, onOpen, showPeriod }: { d: Deliverable; onOpen: (id: string) => void; showPeriod?: boolean }) {
     const rel = d.clientStatus === 'Completed' ? null : relDeadline(d.deadline)
     return (
         <button onClick={() => onOpen(d.id)}
@@ -26,16 +34,18 @@ function DeliverableRow({ d, onOpen }: { d: Deliverable; onOpen: (id: string) =>
                     {rel && rel.text && (<><span style={{ opacity: 0.4 }}>·</span><span style={{ color: rel.urgent ? 'var(--attn)' : 'var(--fg-3)', fontWeight: rel.urgent ? 600 : 400 }}>{rel.text}</span></>)}
                 </div>
             </div>
+            {showPeriod && d.workspaceName && <span className="hidden md:inline-flex"><PeriodTag name={d.workspaceName} /></span>}
             <StatusBadge status={d.clientStatus} />
             <ChevronRight size={17} style={{ color: 'var(--fg-4)', flexShrink: 0 }} />
         </button>
     )
 }
 
-export default function DeliverablesSurface({ deliverables, brands, openDeliverable }: {
+export default function DeliverablesSurface({ deliverables, brands, openDeliverable, showPeriod }: {
     deliverables: Deliverable[]
     brands: Brand[]
     openDeliverable: (id: string) => void
+    showPeriod?: boolean
 }) {
     const [filter, setFilter] = useState<Filter>('All')
     const [openGroups, setOpenGroups] = useState<Set<number>>(new Set())
@@ -81,7 +91,7 @@ export default function DeliverablesSurface({ deliverables, brands, openDelivera
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
                 {FILTERS.map(f => (
                     <FilterChip key={f} label={f} count={counts[f]} active={filter === f} onClick={() => setFilter(f)}
-                        dotColor={f === 'Needs you' ? '#FBBF24' : f === 'Revising' ? '#FB923C' : f === 'Completed' ? '#34D399' : null} />
+                        dotColor={f === 'Needs you' ? 'var(--attn)' : f === 'Revising' ? 'var(--revise)' : f === 'Completed' ? 'var(--ok)' : null} />
                 ))}
             </div>
 
@@ -105,7 +115,7 @@ export default function DeliverablesSurface({ deliverables, brands, openDelivera
                                 </button>
                                 {open && (
                                     <div className="pc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '6px 6px 8px' }}>
-                                        {g.items.map(d => <DeliverableRow key={d.id} d={d} onOpen={openDeliverable} />)}
+                                        {g.items.map(d => <DeliverableRow key={d.id} d={d} onOpen={openDeliverable} showPeriod={showPeriod} />)}
                                     </div>
                                 )}
                             </div>

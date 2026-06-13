@@ -46,6 +46,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
             profileName={snapshot.profileName}
             deliverables={snapshot.tasks as any}
             invoices={snapshot.invoices as any}
+            workspaces={snapshot.workspaces}
         />
     )
 }

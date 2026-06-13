@@ -103,18 +103,37 @@ export async function getShareSnapshot(token: string) {
         }),
     ])
 
+    // [Hotfix 2026-06-13] serializeDecimal keeps Date objects AS-IS (it only
+    // unwraps Prisma Decimal), but the calm `Deliverable`/`Invoice` DTOs declare
+    // their date fields as `string` and the surfaces treat them as such
+    // (OverviewSurface sorts via `updatedAt.localeCompare(...)`). A raw Date
+    // survives the RSC boundary as a Date in the browser → `.localeCompare is
+    // not a function` crash on the share page. Stringify every date field here,
+    // mirroring how the old getClientInvoices did `.toISOString()`.
+    const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
+
     const mappedTasks = tasks.map((task) => ({
         ...task,
+        deadline: iso(task.deadline),
+        createdAt: iso(task.createdAt)!,
+        updatedAt: iso(task.updatedAt)!,
+        clientReviewedAt: iso(task.clientReviewedAt),
         clientStatus: deriveClientStatus(task.status, task.clientReview),
         needsYou: deriveNeedsYou(task),
         clientPath: formatClientHierarchy(task.client),
+    }))
+
+    const mappedInvoices = invoices.map((inv) => ({
+        ...inv,
+        issueDate: iso(inv.issueDate)!,
+        dueDate: iso(inv.dueDate),
     }))
 
     return {
         clientName: scope.clientName,
         profileName: scope.profileName,
         tasks: serializeDecimal(mappedTasks) as typeof mappedTasks,
-        invoices: serializeDecimal(invoices) as typeof invoices,
+        invoices: serializeDecimal(mappedInvoices) as typeof mappedInvoices,
     }
 }
 

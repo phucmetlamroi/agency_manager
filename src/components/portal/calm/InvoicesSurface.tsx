@@ -9,11 +9,12 @@ import type { Invoice, Brand } from './types'
 const FILTERS = ['All', 'Overdue', 'Due', 'Paid'] as const
 type Filter = typeof FILTERS[number]
 
-export default function InvoicesSurface({ invoices, brands, openInvoice, activeId }: {
+export default function InvoicesSurface({ invoices, brands, openInvoice, activeId, showPeriod }: {
     invoices: Invoice[]
     brands: Brand[]
     openInvoice: (id: string) => void
     activeId: string | null
+    showPeriod?: boolean
 }) {
     const [filter, setFilter] = useState<Filter>('All')
     const brandName = (id: number | null) => brands.find(b => b.id === id)?.name
@@ -66,7 +67,7 @@ export default function InvoicesSurface({ invoices, brands, openInvoice, activeI
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
                 {FILTERS.map(f => (
                     <FilterChip key={f} label={f} count={counts[f]} active={filter === f} onClick={() => setFilter(f)}
-                        dotColor={f === 'Overdue' ? '#F87171' : f === 'Paid' ? '#34D399' : null} />
+                        dotColor={f === 'Overdue' ? 'var(--danger)' : f === 'Paid' ? 'var(--ok)' : null} />
                 ))}
             </div>
 
@@ -91,7 +92,7 @@ export default function InvoicesSurface({ invoices, brands, openInvoice, activeI
                                         <BrandAvatar name={brandName(inv.clientId) || inv.invoiceNumber} id={inv.clientId ?? inv.invoiceNumber} size={34} radius={9} />
                                         <span style={{ minWidth: 0 }}>
                                             <span className="num" style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--fg)' }}>{inv.invoiceNumber}</span>
-                                            <span style={{ display: 'block', fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brandName(inv.clientId) || '—'}</span>
+                                            <span style={{ display: 'block', fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brandName(inv.clientId) || '—'}{showPeriod && inv.workspaceName ? ` · ${inv.workspaceName}` : ''}</span>
                                         </span>
                                     </span>
                                     <span style={{ fontSize: 13, color: 'var(--fg-2)' }}>{fmtDate(inv.issueDate, false)}</span>

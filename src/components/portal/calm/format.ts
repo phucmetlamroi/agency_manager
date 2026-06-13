@@ -31,8 +31,8 @@ export function relDeadline(iso: string | Date | null | undefined): { text: stri
     return { text: 'Due ' + fmtDate(iso, false), urgent: false }
 }
 
-/* Deterministic muted, violet-leaning tint for a sub-brand avatar tile. */
-const TINTS = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#60A5FA', '#34D399', '#FBBF24', '#FB923C', '#F472B6', '#22D3EE']
+/* Deterministic earthy/warm tint for a sub-brand avatar tile (Atelier palette). */
+const TINTS = ['#E0A458', '#E0875B', '#84B98C', '#D2735B', '#D8B45E', '#D98AA0', '#B0A857', '#C8855A', '#6FAE9E']
 export function brandTint(key: string | number): string {
     const s = String(key)
     let h = 0

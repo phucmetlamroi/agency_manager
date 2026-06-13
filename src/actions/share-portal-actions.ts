@@ -98,10 +98,36 @@ export async function getShareSnapshot(token: string) {
                 status: true,
                 filePath: true,
                 clientId: true,
+                workspaceId: true,
                 items: { select: { description: true, amount: true, quantity: true } },
             },
         }),
     ])
+
+    // ── Workspace identity for the client-facing period filter ────────────
+    // [Atelier 2026-06] The client asked for the admin's "Tháng X/2026"
+    // workspace switcher. We only surface workspaces that ACTUALLY hold this
+    // client's data ("sổ workspace mình đã làm") — not every empty month of the
+    // profile — and order them newest-first like the admin dropdown does. The
+    // name lookup is a single batched query over the ids already present in the
+    // result set (no extra scope widening, no security surface).
+    const presentWsIds = Array.from(
+        new Set([
+            ...tasks.map((t) => t.workspaceId),
+            ...invoices.map((i) => i.workspaceId),
+        ].filter((id): id is string => !!id)),
+    )
+    const wsRows = presentWsIds.length
+        ? await prisma.workspace.findMany({
+            where: { id: { in: presentWsIds } },
+            select: { id: true, name: true, createdAt: true },
+        })
+        : []
+    const wsNameById = new Map(wsRows.map((w) => [w.id, w.name]))
+    const workspaces = wsRows
+        .slice()
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .map((w) => ({ id: w.id, name: w.name }))
 
     // [Hotfix 2026-06-13] serializeDecimal keeps Date objects AS-IS (it only
     // unwraps Prisma Decimal), but the calm `Deliverable`/`Invoice` DTOs declare
@@ -121,17 +147,20 @@ export async function getShareSnapshot(token: string) {
         clientStatus: deriveClientStatus(task.status, task.clientReview),
         needsYou: deriveNeedsYou(task),
         clientPath: formatClientHierarchy(task.client),
+        workspaceName: task.workspaceId ? wsNameById.get(task.workspaceId) ?? null : null,
     }))
 
     const mappedInvoices = invoices.map((inv) => ({
         ...inv,
         issueDate: iso(inv.issueDate)!,
         dueDate: iso(inv.dueDate),
+        workspaceName: inv.workspaceId ? wsNameById.get(inv.workspaceId) ?? null : null,
     }))
 
     return {
         clientName: scope.clientName,
         profileName: scope.profileName,
+        workspaces,
         tasks: serializeDecimal(mappedTasks) as typeof mappedTasks,
         invoices: serializeDecimal(mappedInvoices) as typeof mappedInvoices,
     }

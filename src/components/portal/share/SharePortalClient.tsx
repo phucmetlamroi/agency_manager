@@ -18,14 +18,15 @@ import {
     submitRatingViaToken,
     getActivityViaToken,
 } from '@/actions/share-portal-actions'
-import type { Deliverable, Invoice, DeliverableActions } from '@/components/portal/calm/types'
+import type { Deliverable, Invoice, Workspace, DeliverableActions } from '@/components/portal/calm/types'
 
-export default function SharePortalClient({ token, clientName, profileName, deliverables, invoices }: {
+export default function SharePortalClient({ token, clientName, profileName, deliverables, invoices, workspaces }: {
     token: string
     clientName: string
     profileName: string
     deliverables: Deliverable[]
     invoices: Invoice[]
+    workspaces: Workspace[]
 }) {
     const actions: DeliverableActions = useMemo(() => ({
         approve: (taskId) => approveDeliverableViaToken(token, taskId),
@@ -46,6 +47,7 @@ export default function SharePortalClient({ token, clientName, profileName, deli
             agencyName={profileName}
             initialDeliverables={deliverables}
             initialInvoices={invoices}
+            workspaces={workspaces}
         />
     )
 }

@@ -38,7 +38,7 @@ export default function Sidebar({ active, onNav, deliverables, invoices, account
         <aside style={{ width: 244, flexShrink: 0, background: 'var(--sidebar)', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* Brand lockup */}
             <div style={{ padding: '22px 20px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ width: 38, height: 38, borderRadius: 11, background: 'linear-gradient(150deg,#1c1830,#141417)', border: '1px solid var(--accent-line)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-fg)', fontWeight: 800, fontSize: 16 }}>{accountName.slice(0, 1).toUpperCase()}</span>
+                <span className="pc-display" style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(150deg, var(--surface-3), var(--surface))', border: '1px solid var(--accent-line)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-fg)', fontWeight: 600, fontSize: 19, boxShadow: 'inset 0 1px 0 rgba(245,233,214,0.05)' }}>{accountName.slice(0, 1).toUpperCase()}</span>
                 <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{accountName}</div>
                     <div className="eyebrow" style={{ fontSize: 9.5, marginTop: 1 }}>Client Portal</div>
@@ -64,7 +64,7 @@ export default function Sidebar({ active, onNav, deliverables, invoices, account
                             <Icon size={18} style={{ color: on ? 'var(--accent-fg)' : 'var(--fg-2)' }} />
                             <span style={{ flex: 1, fontSize: 14, fontWeight: on ? 700 : 600, color: on ? 'var(--fg)' : 'var(--fg-2)' }}>{item.label}</span>
                             {b > 0 && (
-                                <span className="num" style={{ minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: danger ? '#F87171' : '#FBBF24', background: danger ? 'rgba(248,113,113,0.12)' : 'rgba(251,191,36,0.12)', border: '1px solid ' + (danger ? 'rgba(248,113,113,0.28)' : 'rgba(251,191,36,0.26)') }}>{b}</span>
+                                <span className="num" style={{ minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: danger ? 'var(--danger)' : 'var(--attn)', background: danger ? 'var(--danger-soft)' : 'var(--attn-soft)', border: '1px solid ' + (danger ? 'var(--danger-line)' : 'var(--attn-line)') }}>{b}</span>
                             )}
                         </button>
                     )
@@ -78,7 +78,7 @@ export default function Sidebar({ active, onNav, deliverables, invoices, account
             <div style={{ padding: 12, borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {!shareMode && <LanguageSwitcher currentLocale={locale} />}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface)' }}>
-                    <span style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(150deg,#2a2438,#19191d)', border: '1px solid var(--line-2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-1)', fontWeight: 700, fontSize: 12 }}>{initials(contactName)}</span>
+                    <span style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(150deg, var(--surface-3), var(--surface-2))', border: '1px solid var(--line-2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-1)', fontWeight: 700, fontSize: 12 }}>{initials(contactName)}</span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contactName}</div>
                         <div style={{ fontSize: 11.5, color: 'var(--fg-3)' }}>{shareMode ? 'Shared view' : 'Account owner'}</div>

@@ -39,6 +39,9 @@ export interface Deliverable {
     project: { id: number; name: string } | null
     rating: RatingDTO | null
     assignee: { username: string; nickname: string | null } | null
+    /** [Atelier] The period/workspace this deliverable lives in (admin "Tháng X/2026"). */
+    workspaceId: string | null
+    workspaceName: string | null
 }
 
 export interface Invoice {
@@ -51,12 +54,24 @@ export interface Invoice {
     filePath: string | null
     clientId: number | null
     items: { description: string; amount: number; quantity: number }[]
+    workspaceId: string | null
+    workspaceName: string | null
+}
+
+/** A period the work was booked under — mirrors the admin's workspace switcher. */
+export interface Workspace {
+    id: string
+    name: string
 }
 
 /** A sub-brand / channel = a distinct Client among the user's data. */
 export interface Brand {
     id: number
     name: string
+    /** Deliverable count in the current view (drives the channel switcher subtitle). */
+    count?: number
+    /** Most-recent activity ISO — used to sort channels by what's moving. */
+    lastActivity?: string | null
 }
 
 export interface ActivityItem {
@@ -86,15 +101,28 @@ export interface DeliverableActions {
     activity: (taskId: string) => Promise<ActivityItem[]>
 }
 
-/** Derive the distinct sub-brands (channels) from deliverables. */
+/**
+ * Derive the distinct sub-brands (channels) from deliverables, enriched with a
+ * count + last-activity timestamp and ordered the way a person scans a studio
+ * board: the channel with the freshest movement first, ties broken by volume,
+ * then alphabetically. ("lọc và sắp xếp thông minh hơn".)
+ */
 export function deriveBrands(deliverables: Deliverable[]): Brand[] {
-    const map = new Map<number, string>()
+    const map = new Map<number, { name: string; count: number; last: number }>()
     for (const d of deliverables) {
-        if (d.client?.id != null) map.set(d.client.id, d.client.name)
+        if (d.client?.id == null) continue
+        const t = new Date(d.updatedAt).getTime()
+        const cur = map.get(d.client.id)
+        if (cur) {
+            cur.count++
+            if (!isNaN(t) && t > cur.last) cur.last = t
+        } else {
+            map.set(d.client.id, { name: d.client.name, count: 1, last: isNaN(t) ? 0 : t })
+        }
     }
     return Array.from(map.entries())
-        .map(([id, name]) => ({ id, name }))
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(([id, v]) => ({ id, name: v.name, count: v.count, lastActivity: v.last ? new Date(v.last).toISOString() : null }))
+        .sort((a, b) => (b.lastActivity || '').localeCompare(a.lastActivity || '') || (b.count! - a.count!) || a.name.localeCompare(b.name))
 }
 
 /** The client account name (root client) — used in the sidebar brand lockup. */
@@ -125,4 +153,12 @@ export function scopeFilterDeliverables(list: Deliverable[], scope: number | 'al
 }
 export function scopeFilterInvoices(list: Invoice[], scope: number | 'all'): Invoice[] {
     return scope === 'all' ? list : list.filter(i => i.clientId === scope)
+}
+
+/** Period filter — 'all' or a specific workspace id (the admin-style switcher). */
+export function workspaceFilterDeliverables(list: Deliverable[], ws: string | 'all'): Deliverable[] {
+    return ws === 'all' ? list : list.filter(d => d.workspaceId === ws)
+}
+export function workspaceFilterInvoices(list: Invoice[], ws: string | 'all'): Invoice[] {
+    return ws === 'all' ? list : list.filter(i => i.workspaceId === ws)
 }

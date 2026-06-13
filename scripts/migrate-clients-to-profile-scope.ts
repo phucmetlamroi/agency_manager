@@ -36,6 +36,26 @@
  */
 import { PrismaClient } from '@prisma/client'
 import { clientPathKey, clientPathDepth } from '../src/lib/client-dedupe'
+import { existsSync, readFileSync } from 'fs'
+import { resolve } from 'path'
+
+// Dependency-free .env loader (the repo doesn't ship `dotenv`) so the script runs
+// with just `npx tsx scripts/migrate-clients-to-profile-scope.ts`. No-op if the
+// env is already set (e.g. CI / Vercel) — it never overrides an existing value.
+if (!process.env.DATABASE_URL) {
+    try {
+        const envPath = resolve(process.cwd(), '.env')
+        if (existsSync(envPath)) {
+            for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+                const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+                if (!m) continue
+                let v = m[2].trim()
+                if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1)
+                if (process.env[m[1]] === undefined) process.env[m[1]] = v
+            }
+        }
+    } catch { /* best-effort — fall through to Prisma's own env resolution */ }
+}
 
 const prisma = new PrismaClient()
 const APPLY = process.argv.includes('--apply')

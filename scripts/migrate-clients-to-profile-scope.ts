@@ -252,7 +252,10 @@ async function main() {
                             afterData: { survivorId: survivor.id, survivorName: survivor.name, profileId: profile.id },
                         },
                     })
-                })
+                    // [P2028 fix] Neon free-tier per-statement latency can blow the
+                    // default 5s interactive-transaction timeout mid-merge. Give each
+                    // group a generous budget (each is still ~10 quick statements).
+                }, { maxWait: 30_000, timeout: 120_000 })
 
                 // Survivor adopts profileId if it was workspace-only pre-backfill.
                 if (APPLY && !survivor.profileId) {

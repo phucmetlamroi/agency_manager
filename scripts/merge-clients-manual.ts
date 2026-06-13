@@ -217,7 +217,9 @@ async function main() {
                     afterData: { survivorId: survivor.id, survivorName: rename ?? survivor.name, profileId: survivor.profileId },
                 },
             })
-        })
+            // [P2028] Generous budget — Neon free-tier latency can exceed the
+            // default 5s interactive-transaction timeout on larger merges.
+        }, { maxWait: 30_000, timeout: 120_000 })
         console.log(`  ✔ merged #${dup.id} → #${survivor.id}`)
     }
 

@@ -89,26 +89,57 @@ export async function resolveShareToken(
     if (!link.client || link.client.status !== 'ACTIVE') return null
     if (!link.profile || link.profile.status !== 'ACTIVE') return null
 
-    // Scope: canonical client + ACTIVE subsidiary subtree (bounded depth,
-    // same pattern as crm-actions collectClientSubtreeIds).
-    const clientIds = new Set<number>([link.clientId])
-    let frontier = [link.clientId]
-    let guard = 0
-    while (frontier.length > 0 && guard < 8) {
-        const children = await prisma.client.findMany({
-            where: { parentId: { in: frontier }, status: 'ACTIVE', profileId: link.profileId },
-            select: { id: true },
-        })
-        const next: number[] = []
-        for (const c of children) {
-            if (!clientIds.has(c.id)) { clientIds.add(c.id); next.push(c.id) }
+    // ── Scope: the client's FULL history across the whole profile ──────────
+    // [Canonical Clients 2026-06] The merge migration may not have run yet, so
+    // the SAME logical client ("Jacob") still exists as many per-workspace
+    // duplicate rows with different ids — and the link points at just one of
+    // them (often an empty one). Resolving scope by a single id would show a
+    // blank page. Instead we identify the client by its hierarchical NAME-PATH
+    // within the profile (the exact mechanism Velox note-inheritance uses) and
+    // gather EVERY profile client that shares that path, plus all of its
+    // sub-brands. This:
+    //   - works whether or not the merge migration has run (post-merge only
+    //     the survivor is ACTIVE → it holds all the remapped tasks);
+    //   - is strictly profile-confined (never crosses profiles);
+    //   - keeps a different logical client out: link path "jacob" matches the
+    //     root "Jacob" rows + "jacob/<sub>" sub-brands, but NOT "josh/jacob"
+    //     (Josh's sub-brand) nor "acme".
+    const profileClients = await prisma.client.findMany({
+        where: { profileId: link.profileId, status: 'ACTIVE' },
+        select: { id: true, name: true, parentId: true },
+    })
+    const byId = new Map(profileClients.map((c) => [c.id, c]))
+    const pathOf = (id: number): string => {
+        const names: string[] = []
+        let cur: number | null = id
+        let depth = 0
+        while (cur != null && depth < 8) {
+            const c = byId.get(cur)
+            if (!c) break
+            names.push((c.name ?? '').trim().toLowerCase())
+            cur = c.parentId
+            depth++
         }
-        frontier = next
-        guard++
+        return names.reverse().join('/')
+    }
+    const linkPath = pathOf(link.clientId)
+    const clientIds = new Set<number>([link.clientId])
+    if (linkPath) {
+        const prefix = linkPath + '/'
+        for (const c of profileClients) {
+            const path = pathOf(c.id)
+            // exact same logical client (its duplicates across workspaces) OR
+            // one of its sub-brands ("jacob/unit").
+            if (path === linkPath || path.startsWith(prefix)) clientIds.add(c.id)
+        }
     }
 
+    // Include EVERY workspace of the profile — incl. SOFT_DELETED/archived
+    // monthly workspaces — so the client sees their full history ("sổ workspace
+    // đã làm trước đó"). clientId-scoping already confines tasks to this
+    // profile, so this filter is a defensive belt, not the security boundary.
     const workspaces = await prisma.workspace.findMany({
-        where: { profileId: link.profileId, status: 'ACTIVE' },
+        where: { profileId: link.profileId },
         select: { id: true },
     })
 

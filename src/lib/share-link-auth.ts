@@ -77,16 +77,19 @@ export async function resolveShareToken(
             expiresAt: true,
             profileId: true,
             clientId: true,
-            client: { select: { id: true, name: true, status: true } },
+            client: { select: { id: true, name: true, status: true, mergedIntoId: true } },
             profile: { select: { id: true, name: true, status: true } },
         },
     })
     if (!link) return null
     if (link.revokedAt) return null
     if (link.expiresAt && link.expiresAt.getTime() < Date.now()) return null
-    // Client must still be ACTIVE — a MERGED duplicate or trashed/deleted
-    // client kills its links (admin should mint a new link on the survivor).
-    if (!link.client || link.client.status !== 'ACTIVE') return null
+    // [Canonical Clients] A MERGED client is a duplicate the merge migration
+    // absorbed into a survivor (an ACTIVE row on the SAME name-path) — its tasks
+    // were remapped there. We still honor the link by re-seeding the scope from
+    // mergedIntoId below, so a link minted before the merge keeps working ("link
+    // cũ không cần tạo lại"). SOFT_DELETED / trashed / missing still 404.
+    if (!link.client || (link.client.status !== 'ACTIVE' && link.client.status !== 'MERGED')) return null
     if (!link.profile || link.profile.status !== 'ACTIVE') return null
 
     // ── Scope: the client's FULL history across the whole profile ──────────
@@ -138,8 +141,15 @@ export async function resolveShareToken(
         for (let i = 0; i < prefix.length; i++) if (full[i] !== prefix[i]) return false
         return true
     }
-    const linkSegs = segPath(link.clientId)
-    const clientIds = new Set<number>([link.clientId])
+    // If the link points at a MERGED duplicate, follow it to the survivor (an
+    // ACTIVE row in `byId`) so the name-path resolves against the row that now
+    // actually holds the tasks. Pre-merge (status ACTIVE) this is a no-op.
+    const seedClientId =
+        link.client.status === 'MERGED' && link.client.mergedIntoId
+            ? link.client.mergedIntoId
+            : link.clientId
+    const linkSegs = segPath(seedClientId)
+    const clientIds = new Set<number>([seedClientId])
     if (linkSegs.length > 0 && linkSegs.every((s) => s.length > 0)) {
         for (const c of profileClients) {
             if (startsWithSegs(segPath(c.id), linkSegs)) clientIds.add(c.id)

@@ -109,28 +109,40 @@ export async function resolveShareToken(
         select: { id: true, name: true, parentId: true },
     })
     const byId = new Map(profileClients.map((c) => [c.id, c]))
-    const pathOf = (id: number): string => {
+    // The name-path is an ARRAY of normalized ancestor names, NOT a "/"-joined
+    // string. "/" is a legal character inside a free-text client name, so a
+    // joined string would conflate a single client literally named "Jacob/Unit"
+    // with a real Jacob→Unit hierarchy and leak one client's data into the
+    // other's share scope (verified High finding). Comparing segment arrays
+    // element-by-element makes ["jacob/unit"] (one name) distinct from
+    // ["jacob","unit"] (two names). NFC-normalize so accented duplicates merge.
+    // A visited-set (not a depth cap) guards against a corrupt parent cycle
+    // without truncating deep chains into aliasable prefixes.
+    const segPath = (id: number): string[] => {
         const names: string[] = []
+        const seen = new Set<number>()
         let cur: number | null = id
-        let depth = 0
-        while (cur != null && depth < 8) {
+        while (cur != null && !seen.has(cur)) {
+            seen.add(cur)
             const c = byId.get(cur)
             if (!c) break
-            names.push((c.name ?? '').trim().toLowerCase())
+            names.push((c.name ?? '').normalize('NFC').trim().toLowerCase())
             cur = c.parentId
-            depth++
         }
-        return names.reverse().join('/')
+        return names.reverse()
     }
-    const linkPath = pathOf(link.clientId)
+    // candidate is the same logical client (its per-workspace duplicates) OR one
+    // of its sub-brands iff its segment array starts with the link's, element-wise.
+    const startsWithSegs = (full: string[], prefix: string[]): boolean => {
+        if (full.length < prefix.length) return false
+        for (let i = 0; i < prefix.length; i++) if (full[i] !== prefix[i]) return false
+        return true
+    }
+    const linkSegs = segPath(link.clientId)
     const clientIds = new Set<number>([link.clientId])
-    if (linkPath) {
-        const prefix = linkPath + '/'
+    if (linkSegs.length > 0 && linkSegs.every((s) => s.length > 0)) {
         for (const c of profileClients) {
-            const path = pathOf(c.id)
-            // exact same logical client (its duplicates across workspaces) OR
-            // one of its sub-brands ("jacob/unit").
-            if (path === linkPath || path.startsWith(prefix)) clientIds.add(c.id)
+            if (startsWithSegs(segPath(c.id), linkSegs)) clientIds.add(c.id)
         }
     }
 

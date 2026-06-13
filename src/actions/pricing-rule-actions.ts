@@ -188,7 +188,7 @@ export async function createPricingRule(
         // If client specified, verify it belongs to this profile
         if (data.clientId != null) {
             const client = await prisma.client.findFirst({
-                where: { id: data.clientId, profileId, status: { not: 'SOFT_DELETED' } },
+                where: { id: data.clientId, profileId, status: 'ACTIVE' },
                 select: { id: true },
             })
             if (!client) {
@@ -277,7 +277,7 @@ export async function updatePricingRule(
                 select: { profileId: true },
             })
             const client = await prisma.client.findFirst({
-                where: { id: data.clientId, profileId: ws?.profileId, status: { not: 'SOFT_DELETED' } },
+                where: { id: data.clientId, profileId: ws?.profileId, status: 'ACTIVE' },
                 select: { id: true },
             })
             if (!client) {

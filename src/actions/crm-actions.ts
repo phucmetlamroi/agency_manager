@@ -60,8 +60,13 @@ async function findDuplicateName(
         where: { parentId, status: 'ACTIVE' },
         select: { id: true, name: true },
     })
-    const normalized = name.trim().toLowerCase()
-    return siblings.some((s) => s.id !== excludeId && s.name.trim().toLowerCase() === normalized)
+    // NFC + trim + lowercase — IDENTICAL to clientPathKey (src/lib/client-dedupe)
+    // so the create/rename guard rejects exactly what the picker would collapse.
+    // Without NFC, two visually-identical Vietnamese names with different Unicode
+    // encodings slip the guard and re-create the very duplicate this prevents.
+    const norm = (s: string) => (s ?? '').normalize('NFC').trim().toLowerCase()
+    const normalized = norm(name)
+    return siblings.some((s) => s.id !== excludeId && norm(s.name) === normalized)
 }
 
 

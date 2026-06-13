@@ -3,6 +3,13 @@ import { prisma as globalPrisma } from './db'
 
 /**
  * List of models that are shared across all workspaces and should NOT be filtered by `workspaceId`.
+ *
+ * [Canonical Clients 2026-06] 'Client' added: clients are now PROFILE-scoped
+ * (one canonical record per profile, visible in every workspace). Reads and
+ * creates still get `profileId` injected below — Client is NOT in
+ * noProfileModels — so tenant isolation moves from workspace-level to
+ * profile-level. Task/Invoice data isolation per workspace is unchanged
+ * (those models stay out of this list).
  */
 const bypassModels = [
     'Profile',
@@ -11,7 +18,8 @@ const bypassModels = [
     'WorkspaceMember',
     'BillingProfile',
     'ErrorDictionary',
-    'Contact'
+    'Contact',
+    'Client'
 ]
 
 /**
@@ -54,6 +62,22 @@ export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?
 
                     const isBypassed = bypassModels.includes(model)
                     const hasNoProfile = noProfileModels.includes(model)
+
+                    // [Canonical Clients] FAIL-CLOSED guard: Client is bypassed
+                    // from workspaceId injection, so profileId is its ONLY
+                    // tenant filter. A call site that constructed this client
+                    // without currentProfileId would otherwise query Clients
+                    // UNFILTERED — a silent cross-profile leak. Throw loudly
+                    // (all envs, not just dev) so a missed sweep site surfaces
+                    // as an error instead of a data leak.
+                    if (model === 'Client' && !currentProfileId) {
+                        throw new Error(
+                            `[prisma-workspace] Client queries require profileId — ` +
+                            `getWorkspacePrisma(workspaceId, profileId) was called without ` +
+                            `profileId (workspace ${currentWorkspaceId}, op ${operation}). ` +
+                            `Pass sessionProfileId or resolve workspace.profileId first.`,
+                        )
+                    }
 
                     // 1. READ & DELETE Operations (Inject into `where`)
                     if (['findUnique', 'findUniqueOrThrow', 'findFirst', 'findFirstOrThrow', 'findMany', 'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'delete', 'deleteMany'].includes(operation)) {

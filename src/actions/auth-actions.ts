@@ -330,12 +330,12 @@ export async function loginAction(prevState: any, formData: FormData) {
             requiresEmailMigration: !user.hasCompletedEmailMigration,
         }
 
-        // CLIENT role → portal
+        // [Canonical Clients] CLIENT accounts can no longer log in — the
+        // account portal was replaced by public /share/[token] links and the
+        // accounts are LOCKED by scripts/deactivate-legacy-client-accounts.
+        // Defensive guard for any row the script hasn't reached yet.
         if (userRole === 'CLIENT') {
-            await login(sessionPayload, { rememberMe })
-            const cookieStore = await cookies()
-            cookieStore.set('NEXT_LOCALE', 'en', { path: '/' })
-            redirect('/portal/en')
+            return { error: 'Tài khoản khách hàng đã được thay bằng link chia sẻ. Vui lòng liên hệ agency để nhận link theo dõi dự án.' }
         }
 
         // Staff/Admin → auto-select profile + workspace

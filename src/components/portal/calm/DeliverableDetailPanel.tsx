@@ -7,14 +7,14 @@ import {
 } from 'lucide-react'
 import { PipelineTracker } from './ui'
 import { fmtDate, relDeadline } from './format'
-import {
-    approveDeliverable, requestDeliverableChanges, getDeliverableActivity, submitTaskRating,
-} from '@/actions/client-portal-actions'
-import type { Deliverable, ActivityItem } from './types'
+import type { Deliverable, ActivityItem, DeliverableActions } from './types'
 
-export default function DeliverableDetailPanel({ d, workspaceId, onClose, onUpdated }: {
+// [Canonical Clients] The panel is credential-agnostic: all server calls go
+// through the injected `actions` adapter (account-session OR share-token —
+// see DeliverableActions in types.ts). No direct server-action imports here.
+export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated }: {
     d: Deliverable
-    workspaceId: string
+    actions: DeliverableActions
     onClose: () => void
     onUpdated: (id: string, patch: Partial<Deliverable>) => void
 }) {
@@ -30,29 +30,30 @@ export default function DeliverableDetailPanel({ d, workspaceId, onClose, onUpda
 
     useEffect(() => {
         let alive = true
-        getDeliverableActivity(d.id).then(rows => { if (alive) setActivity(rows) }).catch(() => { })
+        actions.activity(d.id).then(rows => { if (alive) setActivity(rows) }).catch(() => { })
         return () => { alive = false }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [d.id])
 
     const approve = async () => {
         setBusy(true); setErr(null)
-        const res = await approveDeliverable(d.id, workspaceId)
+        const res = await actions.approve(d.id)
         setBusy(false)
         if ('success' in res && res.success) {
             onUpdated(d.id, { status: 'Hoàn tất', clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
-            getDeliverableActivity(d.id).then(setActivity).catch(() => { })
+            actions.activity(d.id).then(setActivity).catch(() => { })
         } else setErr(('error' in res && res.error) || 'Không thể duyệt.')
     }
 
     const requestChanges = async () => {
         if (!notes.trim()) return
         setBusy(true); setErr(null)
-        const res = await requestDeliverableChanges(d.id, workspaceId, notes.trim())
+        const res = await actions.requestChanges(d.id, notes.trim())
         setBusy(false)
         if ('success' in res && res.success) {
             onUpdated(d.id, { status: 'Revision', clientStatus: 'Revising', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
             setMode(null); setNotes('')
-            getDeliverableActivity(d.id).then(setActivity).catch(() => { })
+            actions.activity(d.id).then(setActivity).catch(() => { })
         } else setErr(('error' in res && res.error) || 'Không thể gửi yêu cầu.')
     }
 
@@ -164,7 +165,7 @@ export default function DeliverableDetailPanel({ d, workspaceId, onClose, onUpda
                     )}
 
                     {/* Rating (completed only) */}
-                    {done && <CalmRating taskId={d.id} existing={d.rating} onRated={(r) => onUpdated(d.id, { rating: r })} />}
+                    {done && <CalmRating taskId={d.id} actions={actions} existing={d.rating} onRated={(r) => onUpdated(d.id, { rating: r })} />}
 
                     {/* Details */}
                     <div>
@@ -212,8 +213,8 @@ function DetailItem({ label, value, valueColor }: { label: string; value: string
     )
 }
 
-/* Compact calm rating (3 dimensions) — reuses submitTaskRating. */
-function CalmRating({ taskId, existing, onRated }: { taskId: string; existing: Deliverable['rating']; onRated: (r: any) => void }) {
+/* Compact calm rating (3 dimensions) — submits through the injected adapter. */
+function CalmRating({ taskId, actions, existing, onRated }: { taskId: string; actions: DeliverableActions; existing: Deliverable['rating']; onRated: (r: any) => void }) {
     const [cq, setCq] = useState(0)
     const [rs, setRs] = useState(0)
     const [cm, setCm] = useState(0)
@@ -236,7 +237,7 @@ function CalmRating({ taskId, existing, onRated }: { taskId: string; existing: D
     const submit = async () => {
         if (!cq || !rs || !cm) return
         setBusy(true); setErr(null)
-        const res = await submitTaskRating(taskId, cq, rs, cm, fb.trim() || undefined)
+        const res = await actions.rate(taskId, cq, rs, cm, fb.trim() || undefined)
         setBusy(false)
         if (res.success) onRated({ creativeQuality: cq, responsiveness: rs, communication: cm, qualitativeFeedback: fb.trim() || null })
         else setErr(res.error || 'Không thể lưu đánh giá.')

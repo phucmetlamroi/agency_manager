@@ -82,9 +82,10 @@ export default async function AdminSettingsPage({
     }))
 
     // [Quick Create] Fetch clients in this profile (for pricing rule scope dropdown)
+    // [Canonical Clients] only ACTIVE — hide SOFT_DELETED + MERGED duplicates.
     const clients = workspace.profileId
         ? await prisma.client.findMany({
-              where: { profileId: workspace.profileId },
+              where: { profileId: workspace.profileId, status: 'ACTIVE' },
               select: { id: true, name: true },
               orderBy: { name: 'asc' },
           })

@@ -65,6 +65,27 @@ export interface ActivityItem {
     date: string
 }
 
+/**
+ * [Canonical Clients] Action adapter injected into DeliverableDetailPanel so
+ * the same calm UI serves both credential models:
+ *   - account portal (session-gated client-portal-actions) — removed in P5
+ *   - public share-link portal (token-gated share-portal-actions)
+ * The adapter closes over its credential (workspaceId or token) — the panel
+ * never needs to know which world it's in.
+ */
+export interface DeliverableActions {
+    approve: (taskId: string) => Promise<{ success?: boolean; error?: string }>
+    requestChanges: (taskId: string, notes: string) => Promise<{ success?: boolean; error?: string }>
+    rate: (
+        taskId: string,
+        creativeQuality: number,
+        responsiveness: number,
+        communication: number,
+        qualitativeFeedback?: string,
+    ) => Promise<{ success: boolean; error?: string }>
+    activity: (taskId: string) => Promise<ActivityItem[]>
+}
+
 /** Derive the distinct sub-brands (channels) from deliverables. */
 export function deriveBrands(deliverables: Deliverable[]): Brand[] {
     const map = new Map<number, string>()

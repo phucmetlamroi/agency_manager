@@ -545,121 +545,12 @@ export async function inviteToWorkspace(
     }
 }
 
-// ─── Invite a user as a CLIENT (per-profile, view-only portal) ───────
-/**
- * [Client membership] Invite `targetUsername` into this workspace's PROFILE as a
- * CLIENT representing `clientId` — a view-only portal membership, NOT a
- * WorkspaceMember. Accept creates `ProfileAccess(role=CLIENT, clientId)`.
- * Refuses to demote an existing internal (OWNER/ADMIN/USER) profile member.
- */
-export async function inviteClientToProfile(workspaceId: string, targetUsername: string, clientId: number) {
-    const { userId: inviterId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
-
-    const trimmed = (targetUsername || '').trim()
-    if (!trimmed) return { error: 'Tên người dùng không được để trống.' }
-
-    const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
-    if (!workspace?.profileId) return { error: 'Workspace không thuộc profile nào.' }
-    const profileId = workspace.profileId
-
-    // The Client must belong to this profile.
-    const client = await prisma.client.findFirst({ where: { id: clientId, profileId, status: { not: 'SOFT_DELETED' } }, select: { id: true, name: true } })
-    if (!client) return { error: 'Khách hàng không hợp lệ trong profile này.' }
-
-    const lookup = await findUserByEmailOrUsername<{
-        id: string; username: string; nickname: string | null;
-        profileId: string | null; allowExternalInvites: boolean
-    }>(trimmed, {
-        id: true, username: true, nickname: true,
-        profileId: true, allowExternalInvites: true,
-    })
-    if (lookup.matchCount > 1) {
-        return { error: `Có ${lookup.matchCount} tài khoản dùng email/username "${trimmed}". Yêu cầu admin chạy scripts/audit-duplicate-emails.mjs để gộp trước khi mời.` }
-    }
-    const targetUser = lookup.user
-    if (!targetUser) return { error: 'Tài khoản không tồn tại.' }
-    if (targetUser.id === inviterId) return { error: 'Bạn không thể tự mời chính mình.' }
-
-    const existingAccess = await prisma.profileAccess.findUnique({
-        where: { userId_profileId: { userId: targetUser.id, profileId } },
-        select: { role: true },
-    })
-    if (existingAccess && existingAccess.role !== 'CLIENT') {
-        return { error: `${targetUser.nickname || targetUser.username} đã là thành viên nội bộ (${existingAccess.role}) của profile này — không thể mời làm client.` }
-    }
-
-    // External-invite consent (same rule as staff invites).
-    if (targetUser.profileId && targetUser.profileId !== profileId && targetUser.allowExternalInvites === false) {
-        return { error: `User ${targetUser.username} đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites".` }
-    }
-
-    const rateLimit = await checkInviteRate(workspaceId, targetUser.id)
-    if (!rateLimit.success) {
-        return { error: `Đã đạt giới hạn lời mời / ngày cho user này. Thử lại sau ${rateLimit.retryAfter ?? 86400} giây.` }
-    }
-
-    // Already a client of this profile → just (re)point the Client record.
-    // [Portal Audit M11] Audit both old + new clientId so the trail shows which
-    // brand a portal user was switched between (e.g. rep moved from Client A → B).
-    if (existingAccess && existingAccess.role === 'CLIENT') {
-        const oldAccess = await prisma.profileAccess.findUnique({
-            where: { userId_profileId: { userId: targetUser.id, profileId } },
-            select: { clientId: true },
-        })
-        await prisma.profileAccess.update({
-            where: { userId_profileId: { userId: targetUser.id, profileId } },
-            data: { clientId },
-        })
-        await audit({
-            workspaceId, actorUserId: inviterId, action: 'member.role_changed',
-            targetType: 'ProfileAccess', targetId: targetUser.id,
-            before: { role: 'CLIENT', clientId: oldAccess?.clientId ?? null },
-            after: { role: 'CLIENT', clientId, clientName: client.name },
-        })
-        revalidatePath(`/${workspaceId}/admin`)
-        return { success: true, directAdd: true, username: targetUser.nickname || targetUser.username }
-    }
-
-    // Create / refresh a client invitation — accept grants ProfileAccess(CLIENT, clientId).
-    const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 3600 * 1000)
-    let existingInvite: { id: string } | null = null
-    try {
-        existingInvite = await prisma.workspaceInvitation.findFirst({
-            where: { workspaceId, invitedUserId: targetUser.id, status: 'PENDING' },
-            select: { id: true },
-        })
-    } catch (err: any) {
-        if (err?.code !== 'P2021') throw err
-    }
-
-    let invitation: { id: string }
-    if (existingInvite) {
-        invitation = await prisma.workspaceInvitation.update({
-            where: { id: existingInvite.id },
-            data: { role: 'GUEST', isClientInvite: true, clientId, invitedById: inviterId, expiresAt },
-            select: { id: true },
-        })
-    } else {
-        invitation = await prisma.workspaceInvitation.create({
-            data: { workspaceId, invitedUserId: targetUser.id, role: 'GUEST', isClientInvite: true, clientId, invitedById: inviterId, expiresAt },
-            select: { id: true },
-        })
-    }
-
-    await audit({
-        workspaceId, actorUserId: inviterId, action: 'member.invited',
-        targetType: 'WorkspaceInvitation', targetId: invitation.id,
-        after: { targetUsername: targetUser.username, role: 'CLIENT', clientId, clientName: client.name },
-    })
-
-    await notifyInvitee({
-        invitationId: invitation.id, inviteeUserId: targetUser.id, inviterUserId: inviterId,
-        workspaceId, role: `Client · ${client.name}`,
-    }).catch((err) => console.warn('[inviteClientToProfile] notify failed:', err))
-
-    revalidatePath(`/${workspaceId}/admin`)
-    return { success: true, directAdd: false, username: targetUser.nickname || targetUser.username }
-}
+// [Canonical Clients 2026-06] `inviteClientToProfile` REMOVED — client
+// accounts were replaced by public share links (ClientShareLink). Clients no
+// longer get invited or log in; profile OWNER/ADMIN generates a tokenized
+// /share/[token] URL from the Clients Manager instead (share-link-actions.ts).
+// Pending isClientInvite invitations are revoked by
+// scripts/deactivate-legacy-client-accounts.ts.
 
 // ─── Accept workspace invitation ─────────────────────────────────
 export async function acceptWorkspaceInvitation(invitationId: string) {
@@ -709,35 +600,18 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
         })
         if (priorAccepted) {
             // The user already accepted a previous invitation for this same
-            // workspace + user pair. Repair any drift, retire the current
-            // PENDING row, and signal success without throwing.
+            // workspace + user pair. Retire the current PENDING row and signal
+            // success without throwing.
+            // [Canonical Clients] The old isClientInvite repair (re-creating a
+            // CLIENT ProfileAccess) was removed with the account portal — no
+            // new CLIENT memberships are ever minted now.
             try {
-                await prisma.$transaction(async (tx) => {
-                    if (priorAccepted.isClientInvite && priorAccepted.workspace.profileId) {
-                        const pa = await tx.profileAccess.findUnique({
-                            where: { userId_profileId: { userId: session.user.id, profileId: priorAccepted.workspace.profileId } },
-                            select: { role: true, clientId: true },
-                        })
-                        if (!pa) {
-                            await tx.profileAccess.create({
-                                data: {
-                                    userId: session.user.id,
-                                    profileId: priorAccepted.workspace.profileId,
-                                    role: 'CLIENT',
-                                    clientId: priorAccepted.clientId ?? probe.clientId ?? null,
-                                },
-                            })
-                        }
-                    }
-                    // Retire the duplicate PENDING — use updateMany so we don't crash
-                    // if a race already updated it.
-                    if (probe.status === 'PENDING') {
-                        await tx.workspaceInvitation.updateMany({
-                            where: { id: probe.id, status: 'PENDING' },
-                            data: { status: 'EXPIRED', respondedAt: new Date() },
-                        })
-                    }
-                })
+                if (probe.status === 'PENDING') {
+                    await prisma.workspaceInvitation.updateMany({
+                        where: { id: probe.id, status: 'PENDING' },
+                        data: { status: 'EXPIRED', respondedAt: new Date() },
+                    })
+                }
             } catch (e) {
                 console.warn('[acceptWorkspaceInvitation] idempotent-accept repair failed (non-fatal):', e)
             }
@@ -818,29 +692,13 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             if (!invitation) return { error: 'Lời mời không tồn tại.' }
             if (invitation.workspace.status !== 'ACTIVE') return { error: 'Workspace không còn hoạt động.' }
 
-            // [Client membership] A client invite grants a per-profile CLIENT
-            // ProfileAccess (view-only portal) and NO WorkspaceMember.
-            if (invitation.isClientInvite && invitation.workspace.profileId) {
-                const existingPA = await tx.profileAccess.findUnique({
-                    where: { userId_profileId: { userId: session.user.id, profileId: invitation.workspace.profileId } },
-                    select: { role: true },
-                })
-                // Never demote an existing internal member to client.
-                if (!existingPA || existingPA.role === 'CLIENT') {
-                    await tx.profileAccess.upsert({
-                        where: { userId_profileId: { userId: session.user.id, profileId: invitation.workspace.profileId } },
-                        create: { userId: session.user.id, profileId: invitation.workspace.profileId, role: 'CLIENT', clientId: invitation.clientId },
-                        update: { role: 'CLIENT', clientId: invitation.clientId },
-                    })
-                }
-                return {
-                    success: true,
-                    workspaceId: invitation.workspaceId,
-                    workspaceName: invitation.workspace.name,
-                    role: 'CLIENT',
-                    inviterId: invitation.invitedBy?.id ?? null,
-                    inviteeName: session.user.nickname || session.user.username || 'Một thành viên',
-                }
+            // [Canonical Clients] Client invites are no longer accepted — the
+            // account portal was replaced by public share links. Any legacy
+            // PENDING isClientInvite row that slipped past the revoke script
+            // gets refused here (the CAS above already marked it ACCEPTED;
+            // refusing without granting access is the safe direction).
+            if (invitation.isClientInvite) {
+                return { error: 'Lời mời khách hàng đã ngừng hỗ trợ — agency sẽ gửi bạn link theo dõi dự án (không cần tài khoản).' }
             }
 
             // [Portal Audit M8 · Anti-mixed-state] If this is a STAFF invite but

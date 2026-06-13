@@ -48,6 +48,8 @@ model Profile {
   tagCategories       TagCategory[]
   // [Bonus Config] 1 cấu hình thưởng / team (profile), dùng lại mọi tháng.
   bonusConfig         BonusConfig?
+  // [Canonical Clients] Public client share links scoped to this profile.
+  clientShareLinks    ClientShareLink[]
 
   @@index([status, deletedAt])
 }
@@ -225,6 +227,9 @@ model User {
   // Wiki — authored standalone doc pages
   wikiPages WikiPage[]
 
+  // [Canonical Clients] Share links this user created (profile OWNER/ADMIN only)
+  shareLinksCreated ClientShareLink[] @relation("ShareLinkCreator")
+
   profile Profile? @relation(fields: [profileId], references: [id])
 
   // Auth Phase 1 indexes
@@ -335,7 +340,11 @@ model Task {
   invoiceItems     InvoiceItem[]
   assignedAgency   Agency?           @relation(fields: [assignedAgencyId], references: [id])
   assignee         User?             @relation("AssigneeTasks", fields: [assigneeId], references: [id])
-  client           Client?           @relation(fields: [clientId], references: [id])
+  // [Canonical Clients 2026-06] Explicit SetNull — hard-deleting a client
+  // must NEVER delete its tasks ("xóa client thì tasks vẫn còn"). Matches
+  // the DB's existing behaviour for this optional FK; documented to prevent
+  // drift.
+  client           Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
   clientUserId     String?
   clientUser       User?             @relation("UserClientTasks", fields: [clientUserId], references: [id])
   invoice          Invoice?          @relation(fields: [invoiceId], references: [id])
@@ -454,6 +463,11 @@ model Client {
   invoices        Invoice[]
   projects        Project[]
   tasks           Task[]
+  // [Canonical Clients 2026-06] LEGACY — pre profile-scope. Clients are now
+  // identified per-PROFILE (one canonical id, visible in every workspace of
+  // the profile). Do NOT write workspaceId on new clients; it is retained
+  // read-only on old + MERGED rows for forensics/rollback, and will be
+  // dropped in a future cleanup migration.
   workspaceId     String?
   workspace       Workspace?      @relation(fields: [workspaceId], references: [id])
   profileId       String?
@@ -468,16 +482,69 @@ model Client {
   // [Quick Create] Per-client pricing rules (null clientId = workspace default)
   pricingRules PricingRule[]
 
+  // [Canonical Clients] Public share links — admin-generated tokenized URLs
+  // that let the client view their full history without an account.
+  shareLinks ClientShareLink[]
+
   // [Soft-delete] Notion-style archive — mirror Profile/Workspace pattern.
-  // status: "ACTIVE" | "SOFT_DELETED". Soft-delete hides the client (+ its
-  // subsidiary subtree) from CRM lists/pickers but keeps tasks/invoices intact
-  // and restorable from the Client Trash. hardDeleteAfter is reserved for a
-  // future auto-purge cron (currently permanent-delete is manual-only).
+  // status: "ACTIVE" | "SOFT_DELETED" | "MERGED".
+  // - SOFT_DELETED: hidden from CRM lists/pickers, restorable from Client Trash.
+  // - MERGED [Canonical Clients]: this row was a per-workspace duplicate that
+  //   got absorbed into the canonical client (mergedIntoId). All FK rows
+  //   (tasks/invoices/projects/...) were remapped to the survivor; this row
+  //   keeps every original column (incl. legacy workspaceId) as the
+  //   zero-data-loss rollback record. Never shown in any UI list.
+  // hardDeleteAfter is reserved for a future auto-purge cron.
   status          String    @default("ACTIVE")
   deletedAt       DateTime?
   hardDeleteAfter DateTime?
 
+  // [Canonical Clients] Merge pointer — set when status='MERGED'. Points at
+  // the canonical survivor this duplicate was absorbed into.
+  mergedIntoId Int?
+  mergedInto   Client?  @relation("ClientMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom   Client[] @relation("ClientMerge")
+
   @@index([status, deletedAt])
+  // Profile-wide reads (getClients, pickers) are the hot path post-migration.
+  @@index([profileId, status])
+}
+
+/// [Canonical Clients 2026-06] Public share link — Google-Drive-style tokenized
+/// URL that grants UNAUTHENTICATED access to one client's full task/invoice
+/// history across every workspace of the profile.
+///
+/// Security model (mirrors EmailVerificationToken):
+///   - The raw token (32 random bytes, base64url) is shown to the admin
+///     EXACTLY ONCE at creation and never persisted. Only its SHA-256 hex
+///     lives here — a DB leak does not leak working links.
+///   - Lookup is by tokenHash; revoked/expired/merged-client all resolve to
+///     the same uniform 404 (no enumeration oracle).
+///   - Only profile OWNER/ADMIN can create/revoke (canManageShareLinks).
+model ClientShareLink {
+  id          String    @id @default(uuid())
+  tokenHash   String    @unique
+  clientId    Int
+  profileId   String
+  createdById String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  /// null = link sống vĩnh viễn (admin thu hồi thủ công).
+  expiresAt   DateTime?
+
+  // Access telemetry — surfaced in the admin ShareLink panel.
+  lastAccessedAt DateTime?
+  accessCount    Int       @default(0)
+
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("ShareLinkCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // Ratings submitted through this link (no user account involved).
+  ratings Rating[]
+
+  @@index([clientId])
+  @@index([profileId, revokedAt])
 }
 
 model Project {
@@ -607,8 +674,9 @@ model WorkspaceInvitation {
   invitedUserId  String? // Target user ID (set for in-app invites)
   invitedEmail   String? // Email for future email-based invites
   role           String    @default("MEMBER") // WorkspaceRole to assign on accept
-  // [Client membership] cross-profile client invite: when true, accept creates a
-  // ProfileAccess(role=CLIENT, clientId) instead of a WorkspaceMember.
+  // [Canonical Clients 2026-06] DEPRECATED — client invites removed; clients
+  // now access via public share links (ClientShareLink), no account needed.
+  // Columns retained for historical rows; dropped in a future cleanup.
   isClientInvite Boolean   @default(false)
   clientId       Int?
   token          String    @unique @default(uuid()) // For email/link-based invites
@@ -705,7 +773,10 @@ enum InvoiceTaskStatus {
 model Rating {
   id                  String   @id @default(cuid())
   taskId              String   @unique
-  clientId            String
+  // [Canonical Clients 2026-06] Nullable: ratings submitted via a public
+  // share link have NO logged-in user — clientId stays null and shareLinkId
+  // records provenance instead. Account-era rows keep their User FK.
+  clientId            String?
   staffId             String
   creativeQuality     Decimal
   responsiveness      Decimal
@@ -714,10 +785,16 @@ model Rating {
   createdAt           DateTime @default(now())
   workspaceId         String?
 
-  task      Task       @relation(fields: [taskId], references: [id])
-  client    User       @relation("ClientRatings", fields: [clientId], references: [id])
-  staff     User       @relation("StaffRatings", fields: [staffId], references: [id])
-  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  // [Canonical Clients] Provenance: "ACCOUNT" (legacy portal login) or
+  // "SHARE_LINK" (public tokenized link, no account).
+  ratedVia    String  @default("ACCOUNT")
+  shareLinkId String?
+
+  task      Task             @relation(fields: [taskId], references: [id])
+  client    User?            @relation("ClientRatings", fields: [clientId], references: [id])
+  staff     User             @relation("StaffRatings", fields: [staffId], references: [id])
+  workspace Workspace?       @relation(fields: [workspaceId], references: [id])
+  shareLink ClientShareLink? @relation(fields: [shareLinkId], references: [id], onDelete: SetNull)
 
   @@index([clientId])
   @@index([staffId])

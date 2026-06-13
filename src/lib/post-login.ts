@@ -14,8 +14,10 @@ import { prisma } from '@/lib/db'
 export async function resolveHomeDestination(user: any): Promise<string> {
     if (!user) return '/login'
 
-    // CLIENT role is locked to the portal.
-    if (user.role === 'CLIENT') return '/portal/en'
+    // [Canonical Clients] The account portal was removed — clients use public
+    // /share/[token] links now. Leftover CLIENT sessions go back to /login
+    // (their accounts are LOCKED by the deactivate script).
+    if (user.role === 'CLIENT') return '/login'
 
     // Without an active profile in the session we can't safely hit /admin
     // (middleware requires sessionProfileId) → send to the post-signup hub.

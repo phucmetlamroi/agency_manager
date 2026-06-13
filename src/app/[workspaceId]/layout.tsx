@@ -1,5 +1,4 @@
 import { notFound, redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import PresenceTracker from '@/components/tracking/PresenceTracker'
@@ -9,18 +8,6 @@ import { MarketplaceProvider } from '@/components/marketplace/MarketplaceProvide
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { needsUsernameMigration } from '@/lib/username-validation'
 import { UsernameMigrationModal } from '@/components/auth/UsernameMigrationModal'
-
-/** [M10] Resolve the user's preferred locale for portal redirects. Reads the
- * next-intl cookie if present; falls back to 'en'. Hardcoding 'en' loses the
- * user's language preference on the CLIENT-guard bounce. */
-async function resolvePortalLocale(): Promise<string> {
-    try {
-        const c = await cookies()
-        const v = c.get('NEXT_LOCALE')?.value
-        if (v && /^[a-zA-Z-]{2,10}$/.test(v)) return v
-    } catch { /* ignore */ }
-    return 'en'
-}
 
 export default async function WorkspaceLayout({
     children,
@@ -98,9 +85,9 @@ export default async function WorkspaceLayout({
                 select: { profileId: true },
             })
         } catch (e) {
-            console.error('[WorkspaceLayout] cross-profile access check failed — failing closed to /portal:', e)
-            const loc = await resolvePortalLocale()
-            redirect(`/portal/${loc}/${workspaceId}`)
+            // [Canonical Clients] portal removed — fail-closed now means /login.
+            console.error('[WorkspaceLayout] cross-profile access check failed — failing closed to /login:', e)
+            redirect('/login')
         }
         if (xAccess) {
             // User có access tới workspace's profile → switch context
@@ -131,12 +118,12 @@ export default async function WorkspaceLayout({
         })
         clientCheck = clientAccess?.role === 'CLIENT' ? 'CLIENT' : 'NOT_CLIENT'
     } catch (e) {
-        console.error('[WorkspaceLayout] client-role guard check failed — failing closed to /portal:', e)
-        clientCheck = 'CLIENT' // [fail-closed] treat the unknown as CLIENT so they go to /portal
+        console.error('[WorkspaceLayout] client-role guard check failed — failing closed to /login:', e)
+        clientCheck = 'CLIENT' // [fail-closed] treat the unknown as CLIENT so they bounce out
     }
     if (clientCheck === 'CLIENT') {
-        const loc = await resolvePortalLocale()
-        redirect(`/portal/${loc}/${workspaceId}`)
+        // [Canonical Clients] account portal removed — clients use /share links.
+        redirect('/login')
     }
 
     // Prefetch marketplace task count for badge UX (non-blocking if fails)

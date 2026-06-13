@@ -1,22 +1,39 @@
 import { serializeDecimal } from '@/lib/serialization'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { prisma as globalPrisma } from '@/lib/db'
+import { getSession } from '@/lib/auth'
 import ClientAnalytics from '@/components/crm/ClientAnalytics'
 import CreateSubClientButton from '@/components/crm/CreateSubClientButton'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string, workspaceId: string }> }) {
     const { id: paramId, workspaceId } = await params
     const id = parseInt(paramId)
     if (isNaN(id)) return notFound()
 
+    // [Canonical Clients] Client queries are profile-scoped now — resolve the
+    // session profileId (same fallback pattern as admin/page.tsx) so the
+    // middleware's fail-closed guard passes AND the lookup can't cross profiles.
+    const session = await getSession()
+    if (!session) redirect('/login')
+    let profileId = (session.user as any).sessionProfileId as string | null | undefined
+    if (!profileId) {
+        const firstAccess = await globalPrisma.profileAccess.findFirst({
+            where: { userId: session.user.id },
+            select: { profileId: true },
+            orderBy: { grantedAt: 'asc' },
+        })
+        profileId = firstAccess?.profileId ?? null
+        if (!profileId) redirect('/login')
+    }
+
     // Fetch Client with Subsidiaries, Tasks, and Invoices
-    const workspacePrisma = getWorkspacePrisma(workspaceId)
+    const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
     const client = await workspacePrisma.client.findUnique({
         where: { id },
         include: {
             subsidiaries: {
-                where: { status: { not: 'SOFT_DELETED' } },
+                where: { status: 'ACTIVE' },
                 include: {
                     tasks: {
                         orderBy: { createdAt: 'desc' },
@@ -37,8 +54,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         }
     })
 
-    // [Soft-delete] a trashed client isn't reachable from the active CRM
-    if (!client || client.status === 'SOFT_DELETED') return notFound()
+    // [Soft-delete] a trashed/merged client isn't reachable from the active CRM
+    if (!client || client.status !== 'ACTIVE') return notFound()
 
     // Fetch client's User account to get ratings they submitted
     const clientUser = await globalPrisma.user.findFirst({

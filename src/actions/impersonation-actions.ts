@@ -38,11 +38,9 @@ export async function startImpersonation(targetUserId: string, workspaceId: stri
         after: { targetUsername: targetUser.username, targetRole: targetUser.role },
     })
 
-    // Redirect based on target role
-    if (targetUser.role === 'CLIENT') {
-        redirect(`/portal/en/${workspaceId}/tasks`)
-    }
-
+    // [Canonical Clients] CLIENT impersonation target removed with the
+    // account portal — clients use public /share links now. Any remaining
+    // CLIENT rows land on the workspace root like staff (harmless).
     const dest = `/${workspaceId}`
     redirect(dest)
 }

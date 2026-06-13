@@ -103,9 +103,10 @@ export default function UserHomeTopBar({
             // OWNER/ADMIN → /admin, otherwise → /dashboard.
             const res = await fetch(`/api/workspace/first?profileId=${newProfileId}`)
             const { workspaceId: newWsId, view } = await res.json()
-            // [Client membership] CLIENT membership in target profile → portal view.
+            // [Canonical Clients] portal view removed — CLIENT memberships have
+            // no internal surface anymore (clients use /share links) → /welcome.
             if (view === "portal") {
-                window.location.href = newWsId ? `/portal/en/${newWsId}` : "/welcome"
+                window.location.href = "/welcome"
             } else {
                 const targetView = view === "admin" ? "admin" : "dashboard"
                 // [Sprint L] Empty profile (0 workspaces) → /welcome instead of /login.

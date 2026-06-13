@@ -53,6 +53,17 @@ export async function canInviteMember(userId: string, profileId: string): Promis
     return role === 'OWNER' || role === 'ADMIN'
 }
 
+/**
+ * [Canonical Clients] Who can create/revoke public client share links.
+ * User requirement: "chỉ có admin của profile mới có quyền share link, không
+ * đưa được lung tung" → profile OWNER + ADMIN only (same bar as inviting
+ * members). USER/CLIENT roles can never mint or kill a public link.
+ */
+export async function canManageShareLinks(userId: string, profileId: string): Promise<boolean> {
+    const role = await getProfileRole(userId, profileId)
+    return role === 'OWNER' || role === 'ADMIN'
+}
+
 export async function canRemoveMember(userId: string, profileId: string): Promise<boolean> {
     const role = await getProfileRole(userId, profileId)
     return role === 'OWNER'

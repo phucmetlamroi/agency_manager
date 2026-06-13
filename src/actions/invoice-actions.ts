@@ -196,10 +196,15 @@ export async function deleteBillingProfile(id: string) {
 // UPDATED: Now includes tasks from Sub-clients (Subsidiaries)
 export async function getUnbilledTasks(clientId: number, workspaceId: string) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        // [Canonical Clients] Client is now profile-scoped → the middleware
+        // REQUIRES profileId for client queries (fail-closed guard). Resolve
+        // it via the session (also gives us the missing membership check).
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // 1. Get all related Client IDs (Parent + Children) — skip archived subs
         const subsidiaries = await workspacePrisma.client.findMany({
-            where: { parentId: clientId, status: { not: 'SOFT_DELETED' } },
+            where: { parentId: clientId, status: 'ACTIVE' },
             select: { id: true }
         })
         const allClientIds = [clientId, ...subsidiaries.map(s => s.id)]
@@ -400,10 +405,14 @@ export async function createInvoiceRecord(data: {
 // Fetch Invoices for a specific client (including invoices generated for sub-clients if any)
 export async function getClientInvoices(clientId: number, workspaceId: string) {
     try {
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        // [Canonical Clients] profileId required for the client query —
+        // see getUnbilledTasks above for rationale.
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // 1. Get all related Client IDs (Parent + Children)
         const subsidiaries = await workspacePrisma.client.findMany({
-            where: { parentId: clientId },
+            where: { parentId: clientId, status: { not: 'MERGED' } },
             select: { id: true }
         })
         const allClientIds = [clientId, ...subsidiaries.map(s => s.id)]

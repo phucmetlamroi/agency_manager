@@ -381,22 +381,27 @@ export async function getClientDetail(clientId: number, workspaceId: string) {
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
-        // [Canonical Clients] Detail/analytics view intentionally shows the
-        // client's FULL history across all workspaces of the profile — that's
-        // the point of one canonical id ("dữ liệu từ trước tới giờ").
+        // [Bug fix 2026-06] Scope tasks/invoices to the SELECTED workspace so the
+        // detail matches the workspace switcher + the per-workspace revenue/task
+        // numbers in the Clients Manager list (getClients already filters tasks by
+        // workspaceId). Previously this showed the client's all-workspace history,
+        // which contradicted the per-workspace revenue and made the "Tổng số Task"
+        // card disagree with the (truncated) list. The middleware does NOT inject
+        // workspaceId into nested relation includes, so the filter is explicit.
+        // No `take` cap → the card count equals the rows the UI renders.
         const client = await workspacePrisma.client.findUnique({
             where: { id: clientId },
             include: {
                 subsidiaries: {
                     where: { status: 'ACTIVE' },
-                    include: { tasks: { orderBy: { createdAt: 'desc' }, take: 5 } }
+                    include: { tasks: { where: { workspaceId }, orderBy: { createdAt: 'desc' } } }
                 },
                 tasks: {
+                    where: { workspaceId },
                     orderBy: { createdAt: 'desc' },
-                    take: 20,
                     include: { rating: true }
                 },
-                invoices: { orderBy: { issueDate: 'desc' }, take: 20 },
+                invoices: { where: { workspaceId }, orderBy: { issueDate: 'desc' } },
                 projects: true
             }
         })

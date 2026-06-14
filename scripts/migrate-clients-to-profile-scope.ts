@@ -35,7 +35,7 @@
  *   npx tsx scripts/migrate-clients-to-profile-scope.ts --profile <id>  # limit to 1 profile
  */
 import { PrismaClient } from '@prisma/client'
-import { clientPathKey, clientPathDepth } from '../src/lib/client-dedupe'
+import { clientPathKey, clientPathDepth, SEP } from '../src/lib/client-dedupe'
 import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 
@@ -246,13 +246,19 @@ async function main() {
                                 duplicateStatus: dup.status,
                                 duplicateWorkspaceId: dup.workspaceId,
                                 duplicateParentId: dup.parentId,
-                                path,
+                                // clientPathKey joins segments with U+0000, which
+                                // Postgres can't store in text/JSON (22P05). Write a
+                                // human-readable form for the audit row.
+                                path: path.split(SEP).join(' / '),
                                 remapped: counts,
                             },
                             afterData: { survivorId: survivor.id, survivorName: survivor.name, profileId: profile.id },
                         },
                     })
-                })
+                    // [P2028 fix] Neon free-tier per-statement latency can blow the
+                    // default 5s interactive-transaction timeout mid-merge. Give each
+                    // group a generous budget (each is still ~10 quick statements).
+                }, { maxWait: 30_000, timeout: 120_000 })
 
                 // Survivor adopts profileId if it was workspace-only pre-backfill.
                 if (APPLY && !survivor.profileId) {

@@ -745,10 +745,11 @@ function ClientItem({
                                     marginBottom: 6,
                                 }}
                             >
-                                Recent Videos (Aggregated)
+                                Recent Videos (Aggregated) · {allTasks.length}
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                {allTasks.slice(0, 5).map((t, idx) => (
+                            {/* [Bug fix] scrollable list of ALL tasks (was sliced to 5 with a dead "+N more" line) */}
+                            <div className="custom-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
+                                {allTasks.map((t, idx) => (
                                     <div
                                         key={`${t.id}-${idx}`}
                                         style={{
@@ -800,12 +801,21 @@ function ClientItem({
                                         </span>
                                     </div>
                                 ))}
-                                {allTasks.length > 5 && (
-                                    <div style={{ fontSize: 10, color: '#52525b', textAlign: 'center', paddingTop: 4 }}>
-                                        ...con {allTasks.length - 5} video nua
-                                    </div>
-                                )}
                             </div>
+                            {onOpenClient && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onOpenClient(client.id) }}
+                                    style={{
+                                        marginTop: 8, background: 'none', border: 'none', padding: 0,
+                                        cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#c4b5fd',
+                                        transition: 'color 0.15s',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.color = '#ddd6fe' }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.color = '#c4b5fd' }}
+                                >
+                                    Xem chi tiết khách hàng →
+                                </button>
+                            )}
                         </div>
                     )}
 

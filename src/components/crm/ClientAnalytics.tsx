@@ -232,10 +232,14 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                 <GlassCard className="p-6 flex flex-col">
                     <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
                         <Video size={22} className="text-violet-400" /> Video & Task Gần đây
+                        {totalTasksCount > 0 && (
+                            <span className="text-sm font-semibold text-gray-500">({totalTasksCount})</span>
+                        )}
                     </h3>
-                    <div className="overflow-x-auto custom-scrollbar">
+                    {/* [Bug fix] scrollable + no slice cap → all tasks visible, count matches the card */}
+                    <div className="max-h-[420px] overflow-y-auto overflow-x-auto custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            <thead>
+                            <thead className="sticky top-0 z-10" style={{ background: '#0A0A0A' }}>
                                 <tr className="text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-white/10">
                                     <th className="pb-3 pl-2">Tên Task</th>
                                     <th className="pb-3">Trạng thái</th>
@@ -243,12 +247,12 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                                 </tr>
                             </thead>
                             <tbody className="text-sm">
-                                {allTasks.slice(0, 8).length === 0 ? (
+                                {allTasks.length === 0 ? (
                                     <tr>
                                         <td colSpan={3} className="py-8 text-center text-gray-500 italic border-b border-white/5">Chưa có task nào.</td>
                                     </tr>
                                 ) : (
-                                    allTasks.slice(0, 8).map((task: any) => (
+                                    allTasks.map((task: any) => (
                                         <tr key={task.id} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors group/row">
                                             <td className="py-3 pl-2 max-w-[150px]">
                                                 <div className="font-medium text-gray-200 truncate">{task.title}</div>

@@ -82,8 +82,8 @@ async function main() {
 
         // Pending workspace invitations already sent to this email.
         const invites = await prisma.workspaceInvitation.findMany({
-            where: { email: { equals: email, mode: 'insensitive' } },
-            select: { id: true, email: true, status: true, role: true, workspaceId: true, createdAt: true },
+            where: { invitedEmail: { equals: email, mode: 'insensitive' } },
+            select: { id: true, invitedEmail: true, status: true, role: true, workspaceId: true, createdAt: true },
             orderBy: { createdAt: 'desc' },
         })
         if (invites.length) {

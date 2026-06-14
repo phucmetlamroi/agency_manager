@@ -13,6 +13,7 @@
 
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { verifyWorkspaceAccess } from '@/lib/security'
 import { audit } from '@/lib/audit-log'
 import { validateUsername, USERNAME_REGEX } from '@/lib/username-validation'
 import { revalidatePath } from 'next/cache'
@@ -169,6 +170,12 @@ export async function searchInviteCandidates(
         const session = await getSession()
         if (!session?.user?.id || !workspaceId) return []
 
+        // [Authz 2026-06] Only workspace ADMINs may search invite candidates —
+        // matches inviteToWorkspace. Without this, any logged-in user could call
+        // this action with any workspaceId and probe the global exact-email
+        // lookup below to enumerate accounts across orgs. Throws → caught → [].
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
         const q = (query ?? '').trim()
         if (q.length < 1) return []
 
@@ -219,6 +226,50 @@ export async function searchInviteCandidates(
             take: 10,
             orderBy: [{ displayName: 'asc' }, { username: 'asc' }],
         })
+
+        // [Cross-profile email invite 2026-06] The list above is profile-scoped
+        // (only people already in this profile). But an admin who types the FULL
+        // email of an existing account — e.g. a Google sign-up who owns their own
+        // separate profile — should still find them and invite in-app, not be
+        // forced down the blind "invite by email" path. So if the query is a full
+        // email, resolve it to an existing eligible account ANYWHERE in the system
+        // and surface it. EXACT-email only → an admin can't enumerate the user base
+        // (they must already know the address); CLIENT/LOCKED, existing members and
+        // self are excluded; allowExternalInvites consent is still enforced later in
+        // inviteToWorkspace. Mirrors findUserByEmailOrUsername's global resolution.
+        const isFullEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q)
+        const alreadyListed = candidates.some((c) => c.email?.toLowerCase() === q.toLowerCase())
+        if (isFullEmail && !alreadyListed) {
+            // Deterministic pick: User.email is NOT @unique (duplicate-email rows
+            // exist on prod), so mirror findUserByEmailOrUsername's ordering with
+            // findMany+take(1) — surfaces the SAME account inviteToWorkspace will
+            // resolve, not a random duplicate. Honor allowExternalInvites consent
+            // (don't surface someone who refused external invites) and exclude a
+            // per-profile CLIENT of THIS profile (defense-in-depth, mirrors the
+            // main query's profileAccesses CLIENT guard).
+            const [byEmail] = await prisma.user.findMany({
+                where: {
+                    email: { equals: q, mode: 'insensitive' },
+                    role: { notIn: ['LOCKED', 'CLIENT'] },
+                    allowExternalInvites: true,
+                    NOT: {
+                        OR: [
+                            { id: { in: Array.from(excludeIds) } },
+                            { profileAccesses: { some: { profileId: ws.profileId, role: 'CLIENT' } } },
+                        ],
+                    },
+                },
+                select: { id: true, username: true, displayName: true, email: true, avatarUrl: true, role: true },
+                orderBy: [
+                    { emailVerified: 'desc' },
+                    { googleId: { sort: 'desc', nulls: 'last' } },
+                    { lastLoginAt: { sort: 'desc', nulls: 'last' } },
+                    { createdAt: 'desc' },
+                ],
+                take: 1,
+            })
+            if (byEmail) candidates.push(byEmail)
+        }
 
         return candidates
     } catch (err) {

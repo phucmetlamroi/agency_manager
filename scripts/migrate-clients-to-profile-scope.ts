@@ -35,7 +35,7 @@
  *   npx tsx scripts/migrate-clients-to-profile-scope.ts --profile <id>  # limit to 1 profile
  */
 import { PrismaClient } from '@prisma/client'
-import { clientPathKey, clientPathDepth } from '../src/lib/client-dedupe'
+import { clientPathKey, clientPathDepth, SEP } from '../src/lib/client-dedupe'
 import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 
@@ -246,7 +246,10 @@ async function main() {
                                 duplicateStatus: dup.status,
                                 duplicateWorkspaceId: dup.workspaceId,
                                 duplicateParentId: dup.parentId,
-                                path,
+                                // clientPathKey joins segments with U+0000, which
+                                // Postgres can't store in text/JSON (22P05). Write a
+                                // human-readable form for the audit row.
+                                path: path.split(SEP).join(' / '),
                                 remapped: counts,
                             },
                             afterData: { survivorId: survivor.id, survivorName: survivor.name, profileId: profile.id },

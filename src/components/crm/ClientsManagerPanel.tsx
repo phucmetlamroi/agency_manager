@@ -3,15 +3,19 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Building2, ChevronRight, ArrowLeft, Loader2, Link2 } from 'lucide-react'
+import { Building2, ChevronRight, ArrowLeft, Loader2, Link2, Wallet } from 'lucide-react'
 import ClientList from './ClientList'
 import ClientAnalytics from './ClientAnalytics'
 import CreateClientButton from './CreateClientButton'
 import ShareLinkSection from './ShareLinkSection'
+import PaymentLedger from './PaymentLedger'
+import RecordPaymentModal from './RecordPaymentModal'
 import { InvoiceModal } from '@/components/invoice/InvoiceModal'
 import { getClientDetail } from '@/actions/crm-actions'
+import { getPaymentLedger } from '@/actions/payment-actions'
 
-type View = 'list' | 'detail' | 'invoice'
+type View = 'list' | 'detail' | 'invoice' | 'payments'
+type LedgerEntry = { paid: number; lastPaidAt: string | null; count: number }
 
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
@@ -46,6 +50,11 @@ export default function ClientsManagerPanel({
     // [Canonical Clients] "Mời vào Portal" (account invite) replaced by the
     // public share-link manager — see ShareLinkSection.
     const [shareOpen, setShareOpen] = useState(false)
+    // [Payment ledger 2026-06] "Sổ thu tiền": per-client paid totals + a
+    // record-payment modal. Independent of invoices, supports partial payments.
+    const [ledger, setLedger] = useState<Record<number, LedgerEntry>>({})
+    const [ledgerLoading, setLedgerLoading] = useState(false)
+    const [recordTarget, setRecordTarget] = useState<{ clientId: number; clientName: string; owed: number; paid: number } | null>(null)
 
     useEffect(() => { onViewChange?.(view) }, [view, onViewChange])
 
@@ -53,6 +62,19 @@ export default function ClientsManagerPanel({
     const selectedName = selectedClient?.name ?? ''
 
     const goList = () => { setView('list'); setSelectedId(null); setDetail(null) }
+
+    const loadLedger = async () => {
+        setLedgerLoading(true)
+        const res = await getPaymentLedger(workspaceId)
+        setLedgerLoading(false)
+        if (res.success) setLedger(res.byClient)
+        else toast.error('Không tải được sổ thu tiền.')
+    }
+
+    const openPayments = async () => {
+        setView('payments')
+        await loadLedger()
+    }
 
     const openClient = async (id: number) => {
         setSelectedId(id)
@@ -148,6 +170,12 @@ export default function ClientsManagerPanel({
                                     <span className="text-[16px] font-extrabold text-white">Tạo hóa đơn</span>
                                 </>
                             )}
+                            {view === 'payments' && (
+                                <>
+                                    <ChevronRight className="w-[15px] h-[15px] flex-shrink-0" style={{ color: '#52525b' }} />
+                                    <span className="text-[16px] font-extrabold text-white">Sổ thu tiền</span>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -162,6 +190,16 @@ export default function ClientsManagerPanel({
                                 <span className="text-[15px] font-extrabold" style={{ color: '#c4b5fd' }}>{clients.length}</span>
                                 <span className="text-[11px] font-semibold" style={{ color: '#a78bfa' }}>Clients</span>
                             </span>
+                            <button
+                                onClick={openPayments}
+                                className="inline-flex items-center gap-1.5"
+                                style={{ padding: '7px 13px', borderRadius: 10, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.28)', color: '#6ee7b7', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700 }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(16,185,129,0.2)' }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)' }}
+                                title="Theo dõi khách đã thanh toán hay chưa"
+                            >
+                                <Wallet className="w-[14px] h-[14px]" /> Sổ thu tiền
+                            </button>
                             <CreateClientButton partners={clients} workspaceId={workspaceId} />
                         </>
                     )}
@@ -192,6 +230,23 @@ export default function ClientsManagerPanel({
                 >
                     {view === 'list' && (
                         <ClientList clients={clients} workspaceId={workspaceId} onOpenClient={openClient} />
+                    )}
+
+                    {view === 'payments' && (
+                        ledgerLoading ? (
+                            <div className="flex items-center justify-center gap-2 h-full text-sm" style={{ color: '#A1A1AA' }}>
+                                <Loader2 className="w-4 h-4 animate-spin" /> Đang tải sổ thu tiền…
+                            </div>
+                        ) : (
+                            <PaymentLedger
+                                clients={clients}
+                                byClient={ledger}
+                                onRecord={(clientId, owed, paid) => {
+                                    const c = findClient(clients, clientId)
+                                    setRecordTarget({ clientId, clientName: c?.name ?? 'Khách hàng', owed, paid })
+                                }}
+                            />
+                        )
                     )}
 
                     {view === 'detail' && (
@@ -232,6 +287,18 @@ export default function ClientsManagerPanel({
                     clientName={selectedName}
                     workspaceId={workspaceId}
                     onClose={() => setShareOpen(false)}
+                />
+            )}
+
+            {recordTarget && (
+                <RecordPaymentModal
+                    clientId={recordTarget.clientId}
+                    clientName={recordTarget.clientName}
+                    owed={recordTarget.owed}
+                    paid={recordTarget.paid}
+                    workspaceId={workspaceId}
+                    onClose={() => setRecordTarget(null)}
+                    onSaved={loadLedger}
                 />
             )}
         </div>

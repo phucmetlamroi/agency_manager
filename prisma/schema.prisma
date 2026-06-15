@@ -665,6 +665,30 @@ model InvoiceItem {
   task        Task?   @relation(fields: [taskId], references: [id])
 }
 
+// [Payment ledger 2026-06] "Sổ thu tiền" — record when a client actually paid,
+// per (client, workspace=month), independent of invoices (regular clients pay
+// directly without one). Multiple rows per client = partial / installment
+// payments; the ledger sums them. Scalar-only FK-ish fields by design — it's
+// self-contained and the action layer (payment-actions.ts) enforces ADMIN +
+// workspace scoping explicitly, mirroring share-portal-actions.
+model Payment {
+  id           String   @id @default(uuid())
+  clientId     Int
+  workspaceId  String
+  profileId    String?
+  invoiceId    String?  // optional link to an Invoice (recording marks it PAID)
+  amount       Decimal  @default(0)
+  paidAt       DateTime @default(now())
+  method       String?  // free text, e.g. "Chuyển khoản", "Tiền mặt", "MoMo"
+  note         String?
+  recordedById String?  // staff who logged it
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, paidAt])
+}
+
 /// Workspace invitation — allows OWNER/ADMIN to invite users to a workspace.
 /// Supports both in-profile direct adds and cross-profile invitations with
 /// accept/decline flow. Token field enables future email-based invite links.

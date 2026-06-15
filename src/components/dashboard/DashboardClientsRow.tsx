@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import ClientsManagerPanel from '@/components/crm/ClientsManagerPanel'
 
-type View = 'list' | 'detail' | 'invoice'
+type View = 'list' | 'detail' | 'invoice' | 'payments'
 
 /**
  * Layout wrapper cho hàng [Clients Manager | Rankings] trên Dashboard.
@@ -23,8 +23,8 @@ export default function DashboardClientsRow({
 }) {
     const [cmView, setCmView] = useState<View>('list')
     const expanded = cmView !== 'list'
-    // Chiều cao theo cấp: list gọn; detail cao vừa; invoice đủ chứa nguyên tờ A4 (1050px + chrome)
-    const cellHeight = cmView === 'invoice' ? 1180 : cmView === 'detail' ? 880 : 452
+    // Chiều cao theo cấp: list gọn; detail/payments cao vừa (cuộn nội bộ); invoice đủ chứa nguyên tờ A4 (1050px + chrome)
+    const cellHeight = cmView === 'invoice' ? 1180 : (cmView === 'detail' || cmView === 'payments') ? 880 : 452
 
     return (
         <>

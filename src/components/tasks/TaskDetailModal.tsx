@@ -84,7 +84,7 @@ function formatDate(d: Date | string | null): string {
     const dt = new Date(d)
     if (isNaN(dt.getTime())) return '—'
     const pad = (n: number) => (n < 10 ? '0' + n : String(n))
-    return `${dt.getFullYear()} - ${pad(dt.getMonth() + 1)} - ${pad(dt.getDate())}`
+    return `${dt.getFullYear()} - ${pad(dt.getMonth() + 1)} - ${pad(dt.getDate())}  ·  ${pad(dt.getHours())}:${pad(dt.getMinutes())}`
 }
 
 function parseContent(content: string | null): string {

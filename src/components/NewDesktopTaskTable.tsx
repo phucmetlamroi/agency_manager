@@ -225,7 +225,9 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
     const formatDeadline = (deadline: Date | null) => {
         if (!deadline) return 'No Limit'
         const d = new Date(deadline)
-        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+        const date = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+        const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        return `${date} · ${time}`
     }
 
     const formatAmount = (task: TaskWithUser) => {

@@ -105,7 +105,9 @@ export async function getMarketplaceTasks(workspaceId: string) {
         deadline: t.deadline?.toISOString() || null,
         value: Number(t.value || 0),
         wageVND: Number(t.wageVND || 0),
-        jobPriceUSD: Number(t.jobPriceUSD || 0),
+        // [Security P0] jobPriceUSD (agency revenue) MUST NOT leak to non-admin staff.
+        // The marketplace is editor-facing — they only need their wage (value/wageVND).
+        // Do NOT add jobPriceUSD/exchangeRate/profitVND to this payload.
         duration: t.duration,
         client: t.client ? {
             name: t.client.name,

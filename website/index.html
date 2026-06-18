@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#16120E" />
+
+    <title>HustlyTasker · Trỏ Velox vào folder, có ngay bảng task.</title>
+    <meta
+      name="description"
+      content="HustlyTasker là hệ điều hành vận hành cho team làm video ngắn. Velox đọc folder Drive hoặc Dropbox của bạn rồi bày sẵn bảng task đã phân công đủ: đầu việc, vai trò, deadline. Miễn phí để bắt đầu."
+    />
+
+    <!-- Decorative amber-dot favicon, inline so there is no extra request -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2316120E'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23E5A24A'/%3E%3C/svg%3E"
+    />
+
+    <!-- Open Graph / social -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="HustlyTasker · Trỏ Velox vào folder, có ngay bảng task." />
+    <meta
+      property="og:description"
+      content="Hệ điều hành vận hành cho team video ngắn. Velox đọc folder rồi bày sẵn công việc: bảng task, khâu duyệt, lương, phiên chợ, gọn trong một tab. Miễn phí để bắt đầu."
+    />
+
+    <!-- Fonts: Fraunces (display), Hanken Grotesk (body), Space Mono (specs) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Hanken+Grotesk:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Add a hook so CSS can hide reveal targets only when JS is active -->
+    <script>
+      document.documentElement.classList.add('js');
+    </script>
+  </head>
+
+  <body>
+    <!-- Keyboard users land here first; off-screen until focused -->
+    <a class="skip-link" href="#top">Tới nội dung</a>
+
+    <!-- Warm ambient backdrop — pure CSS, no raster media -->
+    <div class="ambient" aria-hidden="true"></div>
+
+    <!-- ============================== Header ============================== -->
+    <header class="site-header" id="siteHeader">
+      <a class="wordmark" href="#top" aria-label="HustlyTasker trang chủ">
+        <span class="wordmark__text">Hustly<span class="wordmark__dot">·</span>Tasker</span>
+      </a>
+      <nav class="site-nav" aria-label="Điều hướng chính">
+        <a href="#velox">Velox</a>
+        <a href="#pipeline">Quy trình</a>
+        <a href="#review">Duyệt bài</a>
+        <a href="#payroll">Lương</a>
+        <a href="#pricing">Bảng giá</a>
+      </nav>
+      <a class="btn btn--cta site-header__cta" href="#pricing">Dùng thử miễn phí</a>
+    </header>
+
+    <main id="top">
+      <!-- ===================== 1 · HERO ===================== -->
+      <section class="section section--hero" id="hero">
+        <div class="hero__bg" aria-hidden="true">
+          <video
+            class="parallax-img"
+            data-parallax="34"
+            data-bgvideo
+            poster="/media/htl-deskhero.webp"
+            muted
+            loop
+            playsinline
+            preload="auto"
+          >
+            <source src="/media/htl-deskhero.mp4" type="video/mp4" />
+          </video>
+          <div class="hero__scrim"></div>
+          <span class="hero__glow"></span>
+        </div>
+        <div class="container hero__grid">
+          <div class="hero__copy">
+            <p class="eyebrow" data-reveal>
+              <span class="eyebrow__dot" aria-hidden="true"></span>
+              Hệ điều hành vận hành cho team video ngắn
+            </p>
+            <h1 class="display display--xl" data-reveal>
+              Trỏ Velox vào một folder.<br />
+              <span class="display--accent">Có ngay bảng task.</span>
+            </h1>
+            <p class="lede" data-reveal>
+              HustlyTasker gom cả guồng dựng video ngắn, từ talking-head tới faceless, về chung một
+              tab. Velox đọc folder Drive hoặc Dropbox, hiểu phần việc bên trong rồi bày sẵn bảng task
+              đã phân công đủ: đầu việc, vai trò, deadline.
+            </p>
+            <div class="hero__actions" data-reveal>
+              <a class="btn btn--cta" href="#pricing">Dùng thử miễn phí</a>
+              <a class="btn btn--ghost" href="#velox">Xem Velox quét</a>
+            </div>
+            <p class="hero__micro" data-reveal>Miễn phí để bắt đầu, không cần thẻ.</p>
+          </div>
+
+          <!-- The product, not an abstraction: a live Velox scan window -->
+          <div class="hero__demo" data-reveal>
+            <div class="velox-app" data-velox aria-label="Velox đang quét folder và tạo task">
+              <div class="velox-app__bar">
+                <span class="velox-app__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="velox-app__title">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M7 18a4.6 4.6 0 0 1-.3-9.2 6 6 0 0 1 11.5 1.5A4 4 0 0 1 18 18Z" />
+                  </svg>
+                  <span class="velox-app__src">Google Drive</span> · /ClientProjects
+                </span>
+                <span class="velox-app__badge" data-velox-badge>
+                  <span class="velox-app__spin" aria-hidden="true"></span>
+                  <span data-velox-badge-text>Đang quét</span>
+                </span>
+              </div>
+
+              <div class="velox-app__body">
+                <!-- Left: source files -->
+                <div class="velox-col">
+                  <p class="velox-col__label">File nguồn · <b data-velox-filecount>0</b></p>
+                  <div class="velox-tree" data-velox-tree>
+                    <span class="velox-tree__scan" aria-hidden="true"></span>
+                    <div class="vfile vfile--folder">
+                      <svg class="vfile__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+                      <span class="vfile__name">Acme_Q3_Launch</span><span class="vfile__sz">6 file</span>
+                    </div>
+                    <div class="vfile" data-vfile>
+                      <svg class="vfile__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h7l5 5v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>
+                      <span class="vfile__name">Acme_Launch_v3.prproj</span><span class="vfile__sz">2.4 GB</span>
+                      <svg class="vfile__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <div class="vfile" data-vfile>
+                      <svg class="vfile__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h7l5 5v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>
+                      <span class="vfile__name">raw_footage_A001.mp4</span><span class="vfile__sz">8.1 GB</span>
+                      <svg class="vfile__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <div class="vfile" data-vfile>
+                      <svg class="vfile__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h7l5 5v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>
+                      <span class="vfile__name">VO_script_FINAL.docx</span><span class="vfile__sz">38 KB</span>
+                      <svg class="vfile__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <div class="vfile" data-vfile>
+                      <svg class="vfile__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h7l5 5v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>
+                      <span class="vfile__name">color_LUT_pack.cube</span><span class="vfile__sz">4 MB</span>
+                      <svg class="vfile__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <div class="vfile" data-vfile>
+                      <svg class="vfile__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 8a2 2 0 0 1 2-2h7l5 5v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>
+                      <span class="vfile__name">thumb_options.psd</span><span class="vfile__sz">142 MB</span>
+                      <svg class="vfile__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right: generated tasks -->
+                <div class="velox-col">
+                  <p class="velox-col__label">Task tự sinh · <b data-velox-taskcount>0</b></p>
+                  <div class="velox-tasks" data-velox-tasks>
+                    <article class="vtask" data-vtask>
+                      <div class="vtask__top">
+                        <span class="vtask__title">Dựng · Acme Launch v3</span>
+                        <span class="vtask__conf">96%<span class="vtask__bar"><i style="--w: 96%"></i></span></span>
+                      </div>
+                      <div class="vtask__meta">
+                        <span class="vtask__status"><i class="vtask__dot" style="--c: var(--amber)"></i>Đang thực hiện</span>
+                        <span class="vtask__pill">Editor</span>
+                        <span class="vtask__pill vtask__pill--code">P3</span>
+                      </div>
+                      <p class="vtask__reason">File .prproj có đánh version → đang dựng dở</p>
+                    </article>
+                    <article class="vtask" data-vtask>
+                      <div class="vtask__top">
+                        <span class="vtask__title">Grade màu · Acme reel</span>
+                        <span class="vtask__conf">91%<span class="vtask__bar"><i style="--w: 91%"></i></span></span>
+                      </div>
+                      <div class="vtask__meta">
+                        <span class="vtask__status"><i class="vtask__dot" style="--c: var(--sand)"></i>Nhận task</span>
+                        <span class="vtask__pill">Colorist</span>
+                        <span class="vtask__pill vtask__pill--code">P5</span>
+                      </div>
+                      <p class="vtask__reason">Gói LUT kèm footage thô → cần grade màu</p>
+                    </article>
+                    <article class="vtask" data-vtask>
+                      <div class="vtask__top">
+                        <span class="vtask__title">Thumbnail · Acme</span>
+                        <span class="vtask__conf">88%<span class="vtask__bar"><i style="--w: 88%"></i></span></span>
+                      </div>
+                      <div class="vtask__meta">
+                        <span class="vtask__status"><i class="vtask__dot" style="--c: var(--sand)"></i>Nhận task</span>
+                        <span class="vtask__pill">Designer</span>
+                        <span class="vtask__pill vtask__pill--code">P2</span>
+                      </div>
+                      <p class="vtask__reason">File .psd tên 'thumb' → thumbnail cần giao</p>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="scroll-hint" data-reveal aria-hidden="true">
+          <span>Cuộn</span>
+          <span class="scroll-hint__line"></span>
+        </div>
+      </section>
+
+      <!-- ===================== 2 · THE PROBLEM ===================== -->
+      <section class="section section--problem section--bg" id="problem">
+        <div class="section__bg" aria-hidden="true">
+          <img class="parallax-img" data-parallax="26" src="/media/htl-accent-desk.webp" alt="" loading="lazy" decoding="async" />
+        </div>
+        <div class="container narrow">
+          <p class="eyebrow" data-reveal>Vấn đề</p>
+          <h2 class="display display--lg" data-reveal>
+            Cả guồng vận hành đang nằm rải rác khắp chục cái tab.
+          </h2>
+          <p class="body body--lg" data-reveal>
+            Bảng việc một nơi. Công cụ duyệt một nẻo. Bảng lương nằm trong file Sheet chẳng mấy ai dám
+            tin. Góp ý thì lùi sâu ba tầng tin nhắn. Mỗi lần bàn giao là thêm một dịp để bản cắt kẹt
+            lại, còn bạn thì lặng lẽ thành nút thắt cổ chai.
+          </p>
+          <ul class="stack-list" data-reveal>
+            <li>Bảng việc</li>
+            <li>Công cụ duyệt</li>
+            <li>File lương</li>
+            <li>Tin nhắn rải rác</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ===================== 3 · VELOX — UNDERSTANDS THE WORK ===================== -->
+      <section class="section section--velox" id="velox">
+        <div class="container split">
+          <div class="split__copy">
+            <p class="eyebrow eyebrow--amber" data-reveal>Velox · Quét sâu</p>
+            <h2 class="display display--lg" data-reveal>
+              Velox không chỉ liệt kê file. Nó hiểu phần việc nằm bên trong từng file.
+            </h2>
+            <p class="body body--lg" data-reveal>
+              Kết nối cloud một lần. Velox nhận ra bảy kiểu cấu trúc dự án, tạo một task cho mỗi
+              video, và giải thích vì sao tạo từng task, kèm điểm tin cậy bạn có thể tin được.
+            </p>
+            <div class="velox-stats" data-reveal>
+              <div class="velox-stat"><b>7</b><span>kiểu cấu trúc khớp</span></div>
+              <div class="velox-stat"><b>9</b><span>cột điền sẵn</span></div>
+              <div class="velox-stat"><b>0</b><span>thao tác tay</span></div>
+            </div>
+            <p class="callout" data-reveal>
+              Velox lo phần sắp xếp, nó không bao giờ động vào phần sáng tạo. Nó bày sẵn bảng việc, còn
+              dựng video và viết kịch bản vẫn là của team bạn.
+            </p>
+          </div>
+
+          <!-- "Why these tasks?" — real pattern reasoning -->
+          <figure class="split__panel reason-card" data-reveal>
+            <figcaption class="reason-card__head">Vì sao lại là những task này?</figcaption>
+            <div class="reason-row">
+              <span class="reason-row__code">P3</span>
+              <div class="reason-row__body">
+                <p class="reason-row__title">File dự án → Task dựng</p>
+                <p class="reason-row__desc">File <b>.prproj</b> có đánh version tức là đang dựng dở. Giao cho Editor.</p>
+              </div>
+              <span class="reason-row__conf">96%</span>
+            </div>
+            <div class="reason-row">
+              <span class="reason-row__code">P5</span>
+              <div class="reason-row__body">
+                <p class="reason-row__title">Phát hiện asset màu</p>
+                <p class="reason-row__desc">Có <b>gói LUT</b> kèm footage thô thì cần một lượt grade màu. Đẩy cho Colorist.</p>
+              </div>
+              <span class="reason-row__conf">91%</span>
+            </div>
+            <div class="reason-row">
+              <span class="reason-row__code">P2</span>
+              <div class="reason-row__body">
+                <p class="reason-row__title">Bắt được file thiết kế</p>
+                <p class="reason-row__desc">File <b>.psd</b> nhiều layer tên ‘thumb’ ứng với một thumbnail cần giao, dành cho Designer.</p>
+              </div>
+              <span class="reason-row__conf">88%</span>
+            </div>
+            <div class="reason-row">
+              <span class="reason-row__code">P7</span>
+              <div class="reason-row__body">
+                <p class="reason-row__title">Suy ra deadline</p>
+                <p class="reason-row__desc">Tên ‘Q3_Launch’ cùng ngày sửa cuối gợi ra <b>hạn dự kiến</b>, bạn chỉnh lại được.</p>
+              </div>
+              <span class="reason-row__conf">84%</span>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <!-- ===================== 4 · THE PIPELINE / BOARD ===================== -->
+      <section class="section section--pipeline section--bg" id="pipeline">
+        <div class="section__bg" aria-hidden="true">
+          <video
+            class="parallax-img"
+            data-parallax="26"
+            data-bgvideo
+            poster="/media/htl-deskboard.webp"
+            muted
+            loop
+            playsinline
+            preload="none"
+          >
+            <source src="/media/htl-deskboard.mp4" type="video/mp4" />
+          </video>
+        </div>
+        <div class="container">
+          <div class="section__head" data-reveal>
+            <p class="eyebrow eyebrow--amber">Quy trình</p>
+            <h2 class="display display--lg">Luôn biết chính xác mỗi bản cắt đang ở đâu.</h2>
+            <p class="body body--lg center-block">
+              Mười một trạng thái đưa từng video đi từ footage thô tới lúc giao xong. Một bảng việc,
+              một trạng thái chung, hết cảnh nhắn nhau “cái này tới đâu rồi?”.
+            </p>
+          </div>
+
+          <!-- A real task board -->
+          <div class="board" data-reveal>
+            <div class="board__head">
+              <span>Đầu việc</span><span>Trạng thái</span><span>Người làm</span><span>Loại</span><span>Hạn</span><span class="board__amount">Lương editor</span>
+            </div>
+            <div class="board__row" style="--accent: var(--amber)">
+              <span class="board__task"><b class="board__client">LGR</b><span class="board__title">Video 1 · Body + Hooks</span></span>
+              <span class="board__status" style="--c: var(--amber)"><i></i>Đang thực hiện</span>
+              <span class="board__assignee"><span class="board__avatar">Q</span>Quân</span>
+              <span class="board__type board__type--short">SHORT</span>
+              <span class="board__deadline">18 Th6</span>
+              <span class="board__amount">₫450,000</span>
+            </div>
+            <div class="board__row" style="--accent: var(--sage)">
+              <span class="board__task"><b class="board__client">Acme</b><span class="board__title">Reel ra mắt · bản master</span></span>
+              <span class="board__status" style="--c: var(--sage)"><i></i>Hoàn tất</span>
+              <span class="board__assignee"><span class="board__avatar">P</span>Phúc</span>
+              <span class="board__type board__type--long">LONG</span>
+              <span class="board__deadline">Đã giao</span>
+              <span class="board__amount">₫1,200,000</span>
+            </div>
+            <div class="board__row" style="--accent: var(--clay)">
+              <span class="board__task"><b class="board__client">Jacob</b><span class="board__title">Tháng 5 · Tập 3</span></span>
+              <span class="board__status" style="--c: var(--clay)"><i></i>Revision</span>
+              <span class="board__assignee"><span class="board__avatar">L</span>Linh</span>
+              <span class="board__type board__type--short">SHORT</span>
+              <span class="board__deadline board__deadline--soon">19 Th6</span>
+              <span class="board__amount">₫450,000</span>
+            </div>
+            <div class="board__row" style="--accent: var(--sand)">
+              <span class="board__task"><b class="board__client">Mira</b><span class="board__title">Tháng 6 · Tập 1</span></span>
+              <span class="board__status" style="--c: var(--sand)"><i></i>Đang đợi giao</span>
+              <span class="board__assignee board__assignee--empty">Chưa giao</span>
+              <span class="board__type board__type--short">SHORT</span>
+              <span class="board__deadline">20 Th6</span>
+              <span class="board__amount">₫450,000</span>
+            </div>
+          </div>
+
+          <!-- The 11 real stages -->
+          <div class="stages" data-reveal>
+            <span class="stages__cap">11 trạng thái · một dòng chảy</span>
+            <ul class="stages__list" aria-label="Mười một trạng thái quy trình">
+              <li style="--c: var(--sand)">Đang đợi giao</li>
+              <li style="--c: var(--ivory)">Nhận task</li>
+              <li style="--c: var(--amber)">Đang thực hiện</li>
+              <li style="--c: var(--clay)">Gửi lại</li>
+              <li style="--c: var(--clay)">Revision</li>
+              <li style="--c: var(--clay)">Sửa frame</li>
+              <li style="--c: var(--sage)">Hoàn tất</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== 5 · CLIENT REVIEW ===================== -->
+      <section class="section section--review" id="review">
+        <div class="container split split--reverse">
+          <div class="split__copy">
+            <p class="eyebrow eyebrow--amber" data-reveal>Duyệt bài</p>
+            <h2 class="display display--lg" data-reveal>Góp ý ghim thẳng vào khung hình.</h2>
+            <p class="body body--lg" data-reveal>
+              Khách mở một đường link, không tài khoản, không đăng nhập, xem bản cắt rồi duyệt hoặc
+              yêu cầu sửa kèm ghi chú gắn timecode. Yêu cầu chạy thẳng về cho editor.
+            </p>
+            <p class="spec" data-reveal>Link chia sẻ công khai · không cần đăng nhập</p>
+          </div>
+
+          <figure class="split__panel review-panel" data-reveal>
+            <div class="review-panel__head">
+              <span class="review-panel__eyebrow">Acme Corp · khách duyệt</span>
+              <h3 class="review-panel__title">Reel ra mắt · bản 3</h3>
+            </div>
+            <button class="review-panel__link" type="button" tabindex="-1" aria-hidden="true">
+              <span class="review-panel__play">▶</span>
+              <span class="review-panel__linktext">Mở bản cắt</span>
+              <span class="review-panel__time">00:48</span>
+            </button>
+            <div class="review-panel__note">
+              <span class="review-panel__stamp">02:14</span>
+              <span class="review-panel__text">“Siết phần mở đầu nhanh hơn nửa nhịp.”</span>
+            </div>
+            <p class="review-panel__prompt">Bản cắt này đã sẵn sàng để bạn duyệt.</p>
+            <div class="review-panel__actions">
+              <span class="rbtn rbtn--approve" aria-hidden="true">Duyệt</span>
+              <span class="rbtn rbtn--changes" aria-hidden="true">Yêu cầu sửa</span>
+            </div>
+            <div class="review-panel__track">
+              <span class="rtrack rtrack--done">Chờ duyệt</span>
+              <span class="rtrack rtrack--active">Đang sửa</span>
+              <span class="rtrack">Hoàn tất</span>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <!-- ===================== 6 · TRANSPARENT PAYROLL ===================== -->
+      <section class="section section--payroll" id="payroll">
+        <div class="container split">
+          <div class="split__copy">
+            <p class="eyebrow eyebrow--amber" data-reveal>Lương</p>
+            <h2 class="display display--lg" data-reveal>Trả công sòng phẳng, tính ngay khi bài vừa giao.</h2>
+            <p class="body body--lg" data-reveal>
+              Khi một task chuyển sang <b>Hoàn tất</b>, lương editor được cộng tự động bằng VNĐ, kèm
+              thưởng Top minh bạch. Ai cũng thấy rõ mình nhận bao nhiêu, đều đặn mỗi kỳ, khỏi ngồi
+              tính tay.
+            </p>
+            <p class="spec" data-reveal>Lương editor bằng VNĐ · minh bạch, dễ đoán</p>
+          </div>
+
+          <figure class="split__panel payroll-card" data-reveal>
+            <div class="payroll-card__top">
+              <span class="payroll-card__avatar">P</span>
+              <div class="payroll-card__who">
+                <span class="payroll-card__name">Phúc</span>
+                <span class="payroll-card__role">Editor · 5 task kỳ này</span>
+              </div>
+              <span class="payroll-card__rank">🥇 Top 1</span>
+            </div>
+            <div class="payroll-card__progress" aria-hidden="true">
+              <span class="payroll-card__bar"><i style="width: 62%"></i></span>
+              <span class="payroll-card__legend">3 hoàn tất · 2 đang xử lý</span>
+            </div>
+            <div class="payroll-card__figures">
+              <div class="payroll-card__net">
+                <span class="payroll-card__label">Thực nhận</span>
+                <span class="payroll-card__figure">₫18,500,000</span>
+              </div>
+              <div class="payroll-card__pending">
+                <span class="payroll-card__label">Dự kiến</span>
+                <span class="payroll-card__sub">₫4,200,000</span>
+              </div>
+            </div>
+            <div class="payroll-card__bonus">🥇 Thưởng Top 1 · 10% × Thực nhận</div>
+            <span class="payroll-card__paid">Đã thanh toán</span>
+          </figure>
+        </div>
+      </section>
+
+      <!-- ===================== 7 · TASK MARKETPLACE ===================== -->
+      <section class="section section--market" id="marketplace">
+        <div class="container narrow">
+          <p class="eyebrow eyebrow--amber" data-reveal>Phiên Chợ</p>
+          <h2 class="display display--lg" data-reveal>Việc còn trống tự tìm được người làm.</h2>
+          <p class="body body--lg" data-reveal>
+            Task chưa giao sẽ rơi vào <b>Kho Task Đợi</b>. Mở Phiên Chợ là editor tự xem và nhận phần
+            hợp với mình, công việc chạy mà không cần ai ngồi điều phối.
+          </p>
+          <div class="market" data-reveal>
+            <div class="market__toggle">
+              <span class="market__dot"></span>
+              <span class="market__toggle-text"><b>Phiên Chợ</b> đang mở · nhân viên có thể nhận task</span>
+            </div>
+            <div class="market__row">
+              <span class="market__task"><b class="board__client">Jacob</b> Tháng 6 · Tập 1</span>
+              <span class="board__type board__type--short">SHORT</span>
+              <span class="market__deadline">20 Th6</span>
+              <span class="market__claim" aria-hidden="true">Nhận task</span>
+            </div>
+            <div class="market__row">
+              <span class="market__task"><b class="board__client">Acme</b> Cắt gọn B-roll</span>
+              <span class="board__type board__type--long">LONG</span>
+              <span class="market__deadline">21 Th6</span>
+              <span class="market__claim" aria-hidden="true">Nhận task</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== 8 · PROOF / TRACTION ===================== -->
+      <section class="section section--proof" id="proof">
+        <div class="container narrow center">
+          <p class="eyebrow eyebrow--amber" data-reveal>Thực tế</p>
+          <h2 class="display display--xl proof__headline" data-reveal>
+            3 team đang vận hành thật trên HustlyTasker.
+          </h2>
+          <p class="body body--lg" data-reveal>
+            Không phải danh sách chờ. Không phải slide gọi vốn. Ba team video ngắn đang chạy việc hằng
+            ngày trên HustlyTasker, ngay lúc này.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===================== 9 · PRICING + FINAL CTA ===================== -->
+      <section class="section section--pricing section--bg" id="pricing">
+        <div class="section__bg" aria-hidden="true">
+          <video
+            class="parallax-img"
+            data-parallax="26"
+            data-bgvideo
+            poster="/media/htl-deskcalm.webp"
+            muted
+            loop
+            playsinline
+            preload="none"
+          >
+            <source src="/media/htl-deskcalm.mp4" type="video/mp4" />
+          </video>
+        </div>
+        <div class="container narrow center">
+          <p class="eyebrow eyebrow--amber" data-reveal>Bảng giá</p>
+          <h2 class="display display--lg" data-reveal>Miễn phí để bắt đầu. Cả team, chung một tab.</h2>
+          <div class="price-card" data-reveal>
+            <div class="price-card__amount">
+              Miễn phí<span class="price-card__period">để bắt đầu</span>
+            </div>
+            <ul class="price-card__list">
+              <li>Velox: từ link folder ra cả bảng task</li>
+              <li>Quy trình sản xuất 11 trạng thái</li>
+              <li>Cổng khách duyệt, không cần đăng nhập</li>
+              <li>Tính lương VNĐ tự động, minh bạch</li>
+              <li>Phiên Chợ: chợ nhận task</li>
+              <li>Cả team gọn trong một tab</li>
+            </ul>
+            <a class="btn btn--cta btn--block" href="#top">Dùng thử miễn phí</a>
+            <p class="price-card__micro">Miễn phí để bắt đầu, không cần thẻ.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ============================== Footer ============================== -->
+    <footer class="site-footer">
+      <div class="container site-footer__inner">
+        <a class="wordmark wordmark--footer" href="#top" aria-label="HustlyTasker trang chủ">
+          <span class="wordmark__text">Hustly<span class="wordmark__dot">·</span>Tasker</span>
+        </a>
+        <p class="site-footer__tagline">Hệ điều hành vận hành cho team video ngắn.</p>
+        <nav class="site-footer__nav" aria-label="Chân trang">
+          <a href="#velox">Velox</a>
+          <a href="#pipeline">Quy trình</a>
+          <a href="#review">Duyệt bài</a>
+          <a href="#payroll">Lương</a>
+          <a href="#pricing">Bảng giá</a>
+        </nav>
+        <p class="site-footer__copy">© 2026 HustlyTasker</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

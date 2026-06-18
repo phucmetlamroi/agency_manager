@@ -5,15 +5,16 @@ import { resolveHomeDestination } from "@/lib/post-login";
 import LandingPage from "@/components/landing/LandingPage";
 
 export const metadata: Metadata = {
-  title: "HustlyTasker — Point Velox at a folder. Get a task board.",
+  title: "HustlyTasker · Trỏ Velox vào folder, có ngay bảng task.",
   description:
-    "The operating system for high-volume video agencies. Velox scans your Drive or Dropbox, reads the patterns in your files, and auto-generates a fully assigned task board — tasks, roles, deadlines, all pre-filled.",
+    "HustlyTasker là hệ điều hành vận hành cho team làm video ngắn. Velox đọc folder Drive hoặc Dropbox của bạn rồi bày sẵn bảng task đã phân công đủ: đầu việc, vai trò, deadline. Miễn phí để bắt đầu.",
   openGraph: {
-    title: "HustlyTasker — Point Velox at a folder. Get a task board.",
+    title: "HustlyTasker · Trỏ Velox vào folder, có ngay bảng task.",
     description:
-      "Velox auto-builds your next project board from a cloud folder. Operations, clients, dual-currency finance and KPIs — under one pane of glass.",
+      "Hệ điều hành vận hành cho team video ngắn. Velox đọc folder rồi bày sẵn công việc: bảng task, khâu duyệt, lương, phiên chợ, gọn trong một tab. Miễn phí để bắt đầu.",
     type: "website",
     siteName: "HustlyTasker",
+    locale: "vi_VN",
   },
 };
 

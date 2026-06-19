@@ -1383,7 +1383,14 @@ export default function AddTaskModal({
                     }}
                 >
                     <motion.div
-                        className="relative w-full max-w-[680px] max-h-[88vh] flex flex-col rounded-3xl border border-[rgba(139,92,246,0.15)] shadow-[0_32px_80px_rgba(0,0,0,0.60)] overflow-hidden"
+                        /* [Hook Graph] Widen the modal while the Multi-Hook Map editor
+                           is open (Assets step) so the canvas has room to work; it
+                           springs back to the normal width on any other tab/step. */
+                        className={`relative w-full max-h-[88vh] flex flex-col rounded-3xl border border-[rgba(139,92,246,0.15)] shadow-[0_32px_80px_rgba(0,0,0,0.60)] overflow-hidden transition-[max-width] duration-300 ease-out ${
+                            step === 3 && rawFootageMode === 'MULTI_HOOK_MAP'
+                                ? 'max-w-[1080px]'
+                                : 'max-w-[680px]'
+                        }`}
                         style={{ background: "rgba(10,10,10,0.95)", backdropFilter: "blur(24px)" }}
                         initial={{ opacity: 0, y: 32, scale: 0.97 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}

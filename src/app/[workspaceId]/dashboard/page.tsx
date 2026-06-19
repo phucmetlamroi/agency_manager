@@ -121,6 +121,7 @@ export default async function UserDashboard({ params, searchParams }: {
                 },
             },
             taskTags: { include: { tagCategory: { select: { id: true, name: true } } } },
+            rawFootage: { select: { displayType: true } },
         },
         orderBy: { createdAt: 'desc' },
     })

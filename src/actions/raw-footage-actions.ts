@@ -31,6 +31,7 @@ import { verifyWorkspaceAccess } from '@/lib/security'
 import { audit } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { normalizeGraph, type HookGraph } from '@/lib/velox/hook-graph-types'
 
 // ────────────────────────────────────────────────────────────────────────────
 //  Zod schema mirroring VeloxScanResult — see src/lib/velox/v4-types.ts
@@ -266,6 +267,127 @@ export async function saveRawFootageMap(
             sourceFolderUrl: args.sourceFolderUrl ?? null,
         },
     }).catch((e) => console.warn('[saveRawFootageMap] audit failed:', e))
+
+    try {
+        revalidatePath(`/${task.workspaceId}/dashboard`)
+    } catch { /* best-effort */ }
+
+    return { ok: true as const, row }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  [HOOK GRAPH] Manual whiteboard node-graph — stored in `manualGraph`
+//
+//  Distinct from `veloxMap` (the auto-scan / seed). Shape is HookGraph from
+//  src/lib/velox/hook-graph-types.ts. We reuse the same audit action
+//  (`task.raw_footage_map_saved`) since it's the same conceptual event.
+// ════════════════════════════════════════════════════════════════════════════
+
+const hookTimecodeSchema = z.object({
+    inSec: z.number().nonnegative(),
+    outSec: z.number().nonnegative(),
+    fileUrl: z.string().max(4000).optional(),
+    fileName: z.string().max(400).optional(),
+})
+
+const hookBlockSchema = z.object({
+    id: z.string().min(1).max(120),
+    name: z.string().max(200),
+    position: z.object({ x: z.number(), y: z.number() }),
+    url: z.string().max(4000).optional(),
+    timecode: hookTimecodeSchema.optional(),
+    // Back-compat: older graphs stored a `source` discriminated union — accepted
+    // here and normalised to url/timecode on read (see normalizeGraph).
+    source: z.any().optional(),
+    tag: z.string().max(40).optional(),
+    status: z.enum(['DRAFT', 'EDITING', 'REVIEW', 'APPROVED', 'REJECTED']).optional(),
+    note: z.string().max(2000).optional(),
+    assigneeId: z.string().nullable().optional(),
+    durationSec: z.number().nonnegative().optional(),
+    thumbnailUrl: z.string().max(4000).optional(),
+})
+
+const hookEdgeSchema = z.object({
+    id: z.string().min(1).max(120),
+    from: z.string().min(1).max(120),
+    to: z.string().min(1).max(120),
+})
+
+// Caps keep a malicious/runaway payload from bloating the row.
+const hookGraphSchema = z.object({
+    schemaVersion: z.literal('hookgraph-1'),
+    blocks: z.array(hookBlockSchema).max(500),
+    edges: z.array(hookEdgeSchema).max(2000),
+    viewport: z
+        .object({ x: z.number(), y: z.number(), zoom: z.number() })
+        .optional(),
+})
+
+export async function getHookGraph(taskId: string): Promise<
+    | { error: string }
+    | {
+          ok: true
+          graph: HookGraph | null
+          /** The last Velox auto-scan — offered as a "seed" in the editor. */
+          veloxMap: unknown | null
+          sourceFolderUrl: string | null
+      }
+> {
+    const r = await loadTaskOrFail(taskId)
+    if ('error' in r) return { error: r.error ?? 'Không thể tải dữ liệu.' }
+    const row = await prisma.taskRawFootage.findUnique({ where: { taskId } })
+    if (!row) {
+        return { ok: true as const, graph: null, veloxMap: null, sourceFolderUrl: null }
+    }
+    const parsed = row.manualGraph ? hookGraphSchema.safeParse(row.manualGraph) : null
+    return {
+        ok: true as const,
+        graph: parsed?.success ? normalizeGraph(parsed.data as unknown as HookGraph) : null,
+        veloxMap: row.veloxMap ?? null,
+        sourceFolderUrl: row.sourceFolderUrl ?? null,
+    }
+}
+
+export async function saveHookGraph(taskId: string, graph: unknown) {
+    const r = await loadTaskOrFail(taskId)
+    if ('error' in r) return r
+    const { session, task } = r
+
+    const parsed = hookGraphSchema.safeParse(graph)
+    if (!parsed.success) {
+        return {
+            error: 'manualGraph không hợp lệ — JSON sai schema.' as const,
+            details: parsed.error.flatten(),
+        }
+    }
+    const manualGraph = parsed.data
+
+    const row = await prisma.taskRawFootage.upsert({
+        where: { taskId },
+        create: {
+            taskId,
+            displayType: 'MULTI_HOOK_MAP',
+            manualGraph: manualGraph as object,
+        },
+        update: {
+            displayType: 'MULTI_HOOK_MAP',
+            manualGraph: manualGraph as object,
+        },
+    })
+
+    await audit({
+        workspaceId: task.workspaceId,
+        actorUserId: session.user.id,
+        action: 'task.raw_footage_map_saved',
+        targetType: 'Task',
+        targetId: task.id,
+        after: {
+            taskTitle: task.title,
+            mode: 'hook_graph',
+            blocks: manualGraph.blocks.length,
+            edges: manualGraph.edges.length,
+        },
+    }).catch((e) => console.warn('[saveHookGraph] audit failed:', e))
 
     try {
         revalidatePath(`/${task.workspaceId}/dashboard`)

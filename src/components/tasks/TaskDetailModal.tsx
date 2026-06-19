@@ -5,6 +5,8 @@ import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { bulkUpdateTaskDetails, bulkUpdateTaskResourceSubfields } from "@/actions/bulk-task-actions"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
+import type { HookGraph } from "@/lib/velox/hook-graph-types"
 import { toast } from "sonner"
 import { Dialog } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
@@ -42,6 +44,16 @@ import {
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
+// [Hook Graph] React Flow is client-only + heavy — lazy-load so it ships only
+// when a task with a Multi-Hook Map is opened.
+const HookGraphViewer = dynamic(
+    () => import('@/components/velox/hookgraph/HookGraphViewer').then((m) => m.HookGraphViewer),
+    { ssr: false },
+)
+const HookGraphEditor = dynamic(
+    () => import('@/components/velox/hookgraph/HookGraphEditor').then((m) => m.HookGraphEditor),
+    { ssr: false },
+)
 
 /* ────────────────────────────────────────────────────────────────────── */
 /*  Status / Type maps                                                     */
@@ -429,6 +441,71 @@ export function TaskDetailModal({
     const bulkCount = bulkSelectedIds?.length ?? 0
     const [activeTab, setActiveTab] = useState<'main' | 'assets' | 'notes'>('main')
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
+
+    // [Hook Graph] The saved Multi-Hook Map for this task (fetched on open).
+    const [hookGraph, setHookGraph] = useState<HookGraph | null>(null)
+    const [editingMap, setEditingMap] = useState(false)
+    const [editGraph, setEditGraph] = useState<HookGraph | null>(null)
+    const [savingMap, setSavingMap] = useState(false)
+    // [Hook Graph] The Assets tab defaults to the Resources grid; clicking the
+    // RAW Assets row (when a Multi-Hook Map exists) opens the map panel.
+    const [showMapPanel, setShowMapPanel] = useState(false)
+
+    useEffect(() => {
+        if (!isOpen || !task?.id) {
+            setHookGraph(null)
+            setEditingMap(false)
+            setEditGraph(null)
+            setShowMapPanel(false)
+            return
+        }
+        let cancelled = false
+        setEditingMap(false)
+        setEditGraph(null)
+        setShowMapPanel(false)
+        getHookGraph(task.id)
+            .then((res) => {
+                if (cancelled) return
+                if ('ok' in res && res.ok && res.graph && res.graph.blocks.length > 0) {
+                    setHookGraph(res.graph)
+                } else {
+                    setHookGraph(null)
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setHookGraph(null)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [isOpen, task?.id])
+
+    const handleEditMap = () => {
+        setEditGraph(hookGraph)
+        setEditingMap(true)
+    }
+    const handleCancelMap = () => {
+        setEditingMap(false)
+        setEditGraph(null)
+    }
+    const handleSaveMap = async () => {
+        if (!task?.id || !editGraph) return
+        setSavingMap(true)
+        try {
+            const res = await saveHookGraph(task.id, editGraph)
+            if ('error' in res) {
+                toast.error(res.error || 'Không lưu được Multi-Hook Map.')
+            } else {
+                setHookGraph(editGraph)
+                setEditingMap(false)
+                toast.success('Đã lưu Multi-Hook Map.')
+            }
+        } catch {
+            toast.error('Lưu Multi-Hook Map thất bại.')
+        } finally {
+            setSavingMap(false)
+        }
+    }
 
     // Per-card edit states (only one open at a time, but state per card)
     const [editingDelivery, setEditingDelivery] = useState(false)
@@ -1116,16 +1193,94 @@ export function TaskDetailModal({
                             )}
 
                             {/* TAB ASSETS */}
-                            {activeTab === 'assets' && (
+                            {activeTab === 'assets' &&
+                                (showMapPanel && hookGraph ? (
+                                    /* [Hook Graph] Map panel — opened from the RAW Assets row.
+                                       Has a "← Quay lại" button back to the Resources grid. */
+                                    <Card
+                                        title="🗺 Multi-Hook Map"
+                                        rightSlot={
+                                            <div className="flex items-center gap-2">
+                                                {isAdmin &&
+                                                    (editingMap ? (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleCancelMap}
+                                                                className="rounded-lg px-2.5 py-1 text-[12px] text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
+                                                            >
+                                                                Hủy
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleSaveMap}
+                                                                disabled={savingMap}
+                                                                className="rounded-lg bg-violet-600 px-3 py-1 text-[12px] font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+                                                            >
+                                                                {savingMap ? 'Đang lưu…' : 'Lưu map'}
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleEditMap}
+                                                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-medium text-violet-300 hover:bg-violet-500/15"
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" /> Sửa map
+                                                        </button>
+                                                    ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (editingMap) handleCancelMap()
+                                                        setShowMapPanel(false)
+                                                    }}
+                                                    className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[12px] font-medium text-zinc-300 hover:bg-white/10 hover:text-white"
+                                                >
+                                                    ← Quay lại
+                                                </button>
+                                            </div>
+                                        }
+                                    >
+                                        {editingMap ? (
+                                            <HookGraphEditor
+                                                initialGraph={editGraph ?? hookGraph}
+                                                onChange={setEditGraph}
+                                                height={460}
+                                            />
+                                        ) : (
+                                            <HookGraphViewer graph={hookGraph} height={440} />
+                                        )}
+                                    </Card>
+                                ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <Card title="Resources">
                                         <div className="flex flex-col">
-                                            <LinkRow
-                                                label="RAW Assets"
-                                                value={form.linkRaw}
-                                                canEdit={isAdmin}
-                                                onSave={(v) => saveResource('linkRaw', v)}
-                                            />
+                                            {hookGraph ? (
+                                                /* [Hook Graph] RAW Assets holds a Multi-Hook Map —
+                                                   show a "configured" pill that opens the map panel. */
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowMapPanel(true)}
+                                                    title="Mở sơ đồ Multi-hook Map"
+                                                    className="group flex w-full items-center justify-between gap-3 border-b border-white/5 py-2 text-left last:border-0"
+                                                >
+                                                    <span className="flex-shrink-0 text-[12px] font-medium text-zinc-300">
+                                                        RAW Assets
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-[12px] font-semibold text-violet-300 transition-colors group-hover:bg-violet-500/20">
+                                                        🗺 Multi-hook Map · {hookGraph.blocks.length} block
+                                                        <span className="text-violet-400">→</span>
+                                                    </span>
+                                                </button>
+                                            ) : (
+                                                <LinkRow
+                                                    label="RAW Assets"
+                                                    value={form.linkRaw}
+                                                    canEdit={isAdmin}
+                                                    onSave={(v) => saveResource('linkRaw', v)}
+                                                />
+                                            )}
                                             <LinkRow
                                                 label="B-Roll Assets"
                                                 value={form.linkBroll}
@@ -1164,7 +1319,7 @@ export function TaskDetailModal({
                                         </div>
                                     </Card>
                                 </div>
-                            )}
+                                ))}
 
                             {/* TAB NOTES */}
                             {activeTab === 'notes' && (

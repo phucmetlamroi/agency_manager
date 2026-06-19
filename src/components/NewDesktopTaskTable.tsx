@@ -624,6 +624,24 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 }}>
                                     {getTypeLabel(task.type)}
                                 </span>
+                                {task.rawFootage?.displayType === 'MULTI_HOOK_MAP' && (
+                                    <span
+                                        title="Task có Multi-Hook Map"
+                                        style={{
+                                            marginLeft: 4,
+                                            display: 'inline-flex',
+                                            padding: '3px 7px',
+                                            borderRadius: 999,
+                                            fontSize: 9,
+                                            fontWeight: 700,
+                                            background: 'rgba(139,92,246,0.14)',
+                                            color: '#c4b5fd',
+                                            border: '1px solid rgba(139,92,246,0.30)',
+                                        }}
+                                    >
+                                        🗺 Map
+                                    </span>
+                                )}
                             </div>
 
                             {/* Deadline cell */}

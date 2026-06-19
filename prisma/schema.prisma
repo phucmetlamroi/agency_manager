@@ -399,6 +399,12 @@ model TaskRawFootage {
   // version + structure documented in src/lib/velox/v4-types.ts. Validated
   // server-side against Zod in src/actions/raw-footage-actions.ts.
   veloxMap        Json?
+  // [HOOK_GRAPH] The user-built free-form node graph (the whiteboard). Distinct
+  // from `veloxMap`, which is now only the Velox auto-scan used as an optional
+  // SEED. Shape (HookGraph: blocks + edges + positions) documented in
+  // src/lib/velox/hook-graph-types.ts and validated by Zod in
+  // src/actions/raw-footage-actions.ts. Additive + nullable → zero data loss.
+  manualGraph     Json?
   // Original Dropbox/Drive folder URL the user pasted. Used by the cache
   // layer (P5) to skip a re-scan when nothing on the folder changed.
   sourceFolderUrl String?

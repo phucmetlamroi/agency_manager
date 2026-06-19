@@ -52,6 +52,11 @@ function imagePipeline(buffer: Buffer) {
 
 export async function uploadPaymentQr(userId: string, formData: FormData) {
     try {
+        // [AUDIT R1 — BLOCKER fix] Ignore the client-supplied userId; only the
+        // authenticated user may write their own payment QR (was an IDOR).
+        const session = await getSession()
+        if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+        userId = session.user.id
         const file = formData.get('file') as File
         const bankName = formData.get('bankName') as string
         const accountNum = formData.get('accountNum') as string
@@ -117,6 +122,11 @@ export async function uploadPaymentQr(userId: string, formData: FormData) {
 
 export async function uploadAvatar(userId: string, formData: FormData) {
     try {
+        // [AUDIT R1 — BLOCKER fix] Ignore the client-supplied userId; only the
+        // authenticated user may change their own avatar (was an IDOR).
+        const session = await getSession()
+        if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
+        userId = session.user.id
         const file = formData.get('file') as File
 
         // [Z+1.fix3] Validate file early

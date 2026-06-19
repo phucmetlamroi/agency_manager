@@ -1,0 +1,178 @@
+/* ============================================================
+   Hook Graph editor — React Flow theme overrides
+   Scoped under .hgx so nothing leaks into the rest of the app.
+   "Studio console": deep canvas, violet dot-grid, glowing ports,
+   soft bezier wires that flow when a path is highlighted.
+   ============================================================ */
+
+.hgx {
+  --hg-violet: #8b5cf6;
+  --hg-violet-2: #a78bfa;
+  --hg-edge: rgba(167, 139, 250, 0.55);
+  --hg-edge-dim: rgba(148, 130, 200, 0.18);
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 80% -10%, rgba(139, 92, 246, 0.12), transparent 60%),
+    radial-gradient(90% 70% at 8% 110%, rgba(56, 189, 248, 0.08), transparent 60%),
+    #0b0a12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hgx .react-flow {
+  background: transparent;
+}
+
+/* Dot grid — tinted, recedes into the dark */
+.hgx .react-flow__background {
+  color: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Ports / handles ───────────────────────────────────────── */
+.hgx .react-flow__handle {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(11, 10, 18, 0.9);
+  background: var(--hg-violet-2);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+.hgx .react-flow__handle:hover {
+  background: #c4b5fd;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.35), 0 0 12px rgba(167, 139, 250, 0.8);
+  transform: scale(1.12);
+}
+.hgx .react-flow__handle-connecting {
+  background: #ddd6fe;
+  box-shadow: 0 0 0 5px rgba(139, 92, 246, 0.4), 0 0 16px rgba(167, 139, 250, 0.9);
+}
+.hgx .react-flow__handle-valid {
+  background: #6ee7b7;
+  box-shadow: 0 0 0 5px rgba(52, 211, 153, 0.35), 0 0 16px rgba(52, 211, 153, 0.8);
+}
+/* Invisible halo that DOUBLES as the grab target — makes starting/dropping a
+   wire far easier (no pixel-perfect aim needed). Pointer events on ::after
+   count as the handle itself. */
+.hgx .react-flow__handle.hg-handle::after {
+  content: "";
+  position: absolute;
+  inset: -11px;
+  border-radius: 9999px;
+}
+/* Light up both ports the moment you hover the card, so it's obvious where to
+   grab to wire the next block. */
+.hgx .react-flow__node:hover .react-flow__handle.hg-handle {
+  background: #c4b5fd;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.3), 0 0 10px rgba(167, 139, 250, 0.65);
+}
+
+/* ── Edges ─────────────────────────────────────────────────── */
+.hgx .react-flow__edge-path {
+  stroke: var(--hg-edge);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.35));
+  transition: stroke 0.15s ease, stroke-width 0.15s ease, opacity 0.15s ease;
+}
+.hgx .react-flow__edge.hg-dim .react-flow__edge-path {
+  stroke: var(--hg-edge-dim);
+  filter: none;
+}
+.hgx .react-flow__edge.hg-hot .react-flow__edge-path {
+  stroke: #c4b5fd;
+  stroke-width: 2.6;
+  filter: drop-shadow(0 0 7px rgba(167, 139, 250, 0.85));
+}
+.hgx .react-flow__edge.selected .react-flow__edge-path,
+.hgx .react-flow__edge:focus .react-flow__edge-path {
+  stroke: #ddd6fe;
+  stroke-width: 3;
+}
+/* Flowing dash for highlighted paths */
+.hgx .react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 6 5;
+  animation: hgDash 0.6s linear infinite;
+}
+@keyframes hgDash {
+  to {
+    stroke-dashoffset: -11;
+  }
+}
+.hgx .react-flow__edge .react-flow__edge-interaction {
+  stroke-width: 18; /* easier to grab/delete */
+}
+
+/* Connection line while dragging a new edge */
+.hgx .react-flow__connectionline .react-flow__connection-path {
+  stroke: #c4b5fd;
+  stroke-width: 2.4;
+  stroke-dasharray: 6 5;
+  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.8));
+}
+
+/* ── Controls + MiniMap — frosted ──────────────────────────── */
+.hgx .react-flow__controls {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.7);
+  background: rgba(20, 18, 28, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.hgx .react-flow__controls-button {
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #c4b5fd;
+  fill: #c4b5fd;
+  width: 26px;
+  height: 26px;
+}
+.hgx .react-flow__controls-button:hover {
+  background: rgba(139, 92, 246, 0.18);
+}
+.hgx .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.hgx .react-flow__minimap {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(13, 12, 20, 0.7) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.hgx .react-flow__minimap-mask {
+  fill: rgba(11, 10, 18, 0.6);
+}
+
+/* Selection box */
+.hgx .react-flow__selection {
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(167, 139, 250, 0.6);
+}
+
+/* Keep the attribution but make it whisper-quiet against the dark canvas */
+.hgx .react-flow__attribution {
+  background: transparent;
+}
+.hgx .react-flow__attribution a {
+  color: rgba(255, 255, 255, 0.22);
+  font-size: 9px;
+}
+
+/* The selected node ring is drawn by the node itself; kill RF's default */
+.hgx .react-flow__node {
+  border: none;
+  background: transparent;
+}
+.hgx .react-flow__node.selected,
+.hgx .react-flow__node:focus,
+.hgx .react-flow__node:focus-visible {
+  outline: none;
+}

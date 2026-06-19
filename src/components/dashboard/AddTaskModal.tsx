@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import {
@@ -20,7 +20,10 @@ import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft"
 import QuickCreateMode from "./QuickCreateMode"
 import VeloxConflictDialog, { type ConflictStrategy } from "./VeloxConflictDialog"
 import VeloxRawFootagesModal from "./VeloxRawFootagesModal"
-import VeloxMultiHookMapEditor from "@/components/velox/VeloxMultiHookMapEditor"
+import { HookGraphEditor } from "@/components/velox/hookgraph/HookGraphEditor"
+import { veloxMapToHookGraph } from "@/lib/velox/hook-graph-convert"
+import type { HookGraph } from "@/lib/velox/hook-graph-types"
+import type { VeloxScanResult } from "@/lib/velox/v4-types"
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput"
 import {
     mapVeloxPayloadToFormData,
@@ -85,9 +88,9 @@ interface AddTaskModalProps {
         options?: {
             veloxBatchRaw?: string[]
             veloxV3Payload?: VeloxApplyPayloadV3
-            /** [Velox v4] Confirmed Multi-Hook Map — wrapper persists it via
-             *  saveRawFootageMap after the task row is created. */
-            veloxMapV4?: import('@/lib/velox/v4-types').VeloxScanResult
+            /** [Hook Graph] The user-built Multi-Hook Map — wrapper persists it
+             *  via saveHookGraph after the task row is created. */
+            hookGraphV1?: HookGraph
         },
     ) => void | Promise<void>
     /** [Quick Create] Pricing rules available for this workspace */
@@ -456,7 +459,35 @@ export default function AddTaskModal({
     // the grid and stashes the user-confirmed VeloxScanResult so handleSubmit
     // can pass it to DashboardActionWrapper for saveRawFootageMap.
     const [rawFootageMode, setRawFootageMode] = useState<'PER_LINK' | 'MULTI_HOOK_MAP'>('PER_LINK')
-    const [veloxMapV4, setVeloxMapV4] = useState<import('@/lib/velox/v4-types').VeloxScanResult | null>(null)
+    // [Hook Graph] The user-built whiteboard graph for MULTI_HOOK_MAP mode, plus
+    // an optional folder URL the "Đổ sẵn từ Velox" seed button scans.
+    const [hookGraph, setHookGraph] = useState<HookGraph | null>(null)
+    const [mhmFolderUrl, setMhmFolderUrl] = useState('')
+    const seedHookGraphFromVelox = useCallback(async (): Promise<HookGraph | null> => {
+        const url = mhmFolderUrl.trim()
+        if (!url) {
+            toast.error('Dán link folder Drive/Dropbox để Velox đổ sẵn.')
+            return null
+        }
+        try {
+            const res = await fetch('/api/integrations/scan-folder?v=4', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ url, workspaceId }),
+            })
+            const body = await res.json()
+            if (!res.ok) {
+                toast.error(body?.error || `Quét lỗi (HTTP ${res.status})`)
+                return null
+            }
+            // Strip route-added fields so the shape stays VeloxScanResult.
+            const { provider: _p, apiVersion: _v, ...result } = body
+            return veloxMapToHookGraph(result as VeloxScanResult)
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Quét folder thất bại.')
+            return null
+        }
+    }, [mhmFolderUrl, workspaceId])
 
     // [Bug fix] Pad veloxBatchRaw with '' khi user thêm dòng vào videoList.
     // KHÔNG truncate khi user xóa dòng — vì truncate có thể MẤT URLs nếu
@@ -796,9 +827,14 @@ export default function AddTaskModal({
             // DashboardActionWrapper can persist it to TaskRawFootage after
             // the task row is created. Falls back to legacy submit when the
             // editor wasn't used.
+            // [FIX 2026-06-19] Persist the map whenever it HAS blocks — NOT only
+            // when the active sub-tab is MULTI_HOOK_MAP. Previously switching to
+            // the "Link lẻ" tab to preview the indicator flipped rawFootageMode
+            // back to PER_LINK, so the map was silently dropped on submit (the
+            // data-loss bug the user reported). Building a map = intent to use it.
             const optionsWithMap =
-                rawFootageMode === 'MULTI_HOOK_MAP' && veloxMapV4
-                    ? { ...(options ?? {}), veloxMapV4 }
+                hookGraph && hookGraph.blocks.length > 0
+                    ? { ...(options ?? {}), hookGraphV1: hookGraph }
                     : options
             await onSubmit?.(form, optionsWithMap)
             setSubmitted(true)
@@ -1051,19 +1087,42 @@ export default function AddTaskModal({
                                     🗺 Multi-Hook Map
                                 </button>
                             </div>
-                            {rawFootageMode === 'MULTI_HOOK_MAP' && veloxMapV4 && (
+                            {rawFootageMode === 'MULTI_HOOK_MAP' && hookGraph && hookGraph.blocks.length > 0 && (
                                 <span className="text-[11px] font-mono text-emerald-400">
-                                    ✓ {veloxMapV4.stats.conceptsDetected} concept · {veloxMapV4.stats.mappedFiles} file
+                                    ✓ {hookGraph.blocks.length} block · {hookGraph.edges.length} dây
                                 </span>
                             )}
                         </div>
 
                         {rawFootageMode === 'MULTI_HOOK_MAP' ? (
-                            <VeloxMultiHookMapEditor
-                                workspaceId={workspaceId}
-                                initialMap={veloxMapV4 ?? undefined}
-                                onChange={setVeloxMapV4}
-                            />
+                            <div className="flex flex-col gap-3">
+                                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/40 px-3 py-2">
+                                    <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                                        Folder
+                                    </span>
+                                    <input
+                                        value={mhmFolderUrl}
+                                        onChange={(e) => setMhmFolderUrl(e.target.value)}
+                                        placeholder="Dán link Dropbox / Google Drive rồi bấm “Đổ sẵn từ Velox” (tuỳ chọn)"
+                                        className="min-w-0 flex-1 bg-transparent text-[12.5px] text-zinc-200 outline-none placeholder:text-zinc-600"
+                                    />
+                                </div>
+                                <HookGraphEditor
+                                    initialGraph={hookGraph}
+                                    onChange={setHookGraph}
+                                    onSeed={seedHookGraphFromVelox}
+                                    onSave={() => {
+                                        if (hookGraph && hookGraph.blocks.length > 0) {
+                                            toast.success(
+                                                `Đã ghi nhận sơ đồ (${hookGraph.blocks.length} block) — bấm "Tạo task" để lưu vào Raw Footage.`,
+                                            )
+                                        } else {
+                                            toast.message('Thêm ít nhất 1 block trước khi lưu.')
+                                        }
+                                    }}
+                                    height={520}
+                                />
+                            </div>
                         ) : (
                         /* URL fields — 6 in 3×2 grid matching Figma layout exactly */
                         <div className="grid grid-cols-2 gap-x-4 gap-y-4">
@@ -1082,6 +1141,33 @@ export default function AddTaskModal({
                                 const isVeloxFilled =
                                     (key === 'rawFootage' && veloxFilledFields.has('rawFootage')) ||
                                     (key === 'script' && veloxFilledFields.has('script'))
+
+                                // [Hook Graph] When a Multi-hook Map is configured, the Raw
+                                // footage field shows a "Multi-hook Map" indicator instead of the
+                                // plain input — clicking jumps back to the map tab.
+                                if (key === 'rawFootage' && hookGraph && hookGraph.blocks.length > 0) {
+                                    return (
+                                        <div key={key} className="col-span-2 flex flex-col gap-2">
+                                            <label className="text-[14px] text-white font-bold pl-1">{label}</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setRawFootageMode('MULTI_HOOK_MAP')}
+                                                className="group flex min-h-[44px] w-full items-center justify-between gap-3 rounded-xl border border-violet-500/30 bg-violet-500/[0.08] px-4 py-2.5 text-left text-[13px] text-violet-200 transition-colors hover:border-violet-500/50 hover:bg-violet-500/[0.14]"
+                                                title="Bấm để mở sơ đồ Multi-hook Map"
+                                            >
+                                                <span className="flex min-w-0 items-center gap-2 font-semibold">
+                                                    <span className="shrink-0">🗺</span>
+                                                    <span className="truncate">
+                                                        Multi-hook Map · {hookGraph.blocks.length} block · {hookGraph.edges.length} dây
+                                                    </span>
+                                                </span>
+                                                <span className="shrink-0 whitespace-nowrap text-[11px] text-violet-300/80">
+                                                    Mở sơ đồ →
+                                                </span>
+                                            </button>
+                                        </div>
+                                    )
+                                }
 
                                 // [Velox v1.0 Phase 2 redesign] When N≥2 raw links exist, show
                                 // a clickable summary instead of the single input. Click opens

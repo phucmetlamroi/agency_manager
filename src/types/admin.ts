@@ -28,6 +28,8 @@ export type TaskWithUser = { // Updated with Client Info
         id: number
         name: string
     } | null
+    /** [Hook Graph] Set when the task has a saved Multi-Hook Map — drives the board badge. */
+    rawFootage?: { displayType: string } | null
     // Financials
     jobPriceUSD?: number | null
     wageVND?: number | null

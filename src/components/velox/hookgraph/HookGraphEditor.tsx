@@ -19,7 +19,6 @@ import {
     Background,
     BackgroundVariant,
     Controls,
-    MiniMap,
     Panel,
     ConnectionMode,
     addEdge,
@@ -47,10 +46,10 @@ import {
     pathIndicesThroughBlock,
     wouldCreateCycle,
 } from '@/lib/velox/hook-graph-paths'
-import { HookBlockNode, type HookNode, type HookNodeData } from './HookBlockNode'
+import { HookBlockNode, type HookNode } from './HookBlockNode'
 import { HookVariantPanel } from './HookVariantPanel'
 import { HookInspector } from './HookInspector'
-import { TAG_PALETTE, rgba, tagHex } from './hook-graph-style'
+import { TAG_PALETTE, rgba } from './hook-graph-style'
 import './hookgraph.css'
 
 // React Flow needs a STABLE nodeTypes reference.
@@ -199,7 +198,7 @@ function Flow({
     onChange,
     onSeed,
     onSave,
-    saveLabel = 'Lưu Multi-hook Map',
+    saveLabel = 'Save',
     height = 520,
 }: HookGraphEditorProps) {
     const rf = useReactFlow<HookNode, Edge>()
@@ -635,14 +634,6 @@ function Flow({
                 >
                     <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} />
                     <Controls showInteractive={false} position="bottom-left" />
-                    <MiniMap
-                        pannable
-                        zoomable
-                        position="bottom-right"
-                        nodeColor={(n) => tagHex((n.data as HookNodeData).tag)}
-                        nodeStrokeWidth={0}
-                        maskColor="rgba(11,10,18,0.6)"
-                    />
 
                     <Panel position="top-left">
                         <div className="flex items-center gap-0.5 rounded-xl border border-white/10 bg-[#15131d]/80 p-1 shadow-xl shadow-black/50 backdrop-blur-xl">

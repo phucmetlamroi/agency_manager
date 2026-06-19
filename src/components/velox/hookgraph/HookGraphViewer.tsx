@@ -13,15 +13,13 @@ import {
     ReactFlowProvider,
     Background,
     BackgroundVariant,
-    MiniMap,
     Panel,
     type Edge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { HookGraph } from '@/lib/velox/hook-graph-types'
 import { enumeratePaths } from '@/lib/velox/hook-graph-paths'
-import { HookBlockNode, type HookNode, type HookNodeData } from './HookBlockNode'
-import { tagHex } from './hook-graph-style'
+import { HookBlockNode, type HookNode } from './HookBlockNode'
 import './hookgraph.css'
 
 const nodeTypes = { hookBlock: HookBlockNode }
@@ -85,13 +83,6 @@ function ViewerInner({ graph, height = 440 }: HookGraphViewerProps) {
                 onNodeClick={(_, n) => onOpen(n.id)}
             >
                 <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} />
-                <MiniMap
-                    pannable
-                    position="bottom-right"
-                    nodeColor={(n) => tagHex((n.data as HookNodeData).tag)}
-                    nodeStrokeWidth={0}
-                    maskColor="rgba(11,10,18,0.6)"
-                />
                 <Panel position="top-right">
                     <div className="rounded-xl border border-violet-400/20 bg-[#15131d]/80 px-3 py-1.5 shadow-xl shadow-black/50 backdrop-blur-xl">
                         <span className="text-base font-bold tabular-nums text-violet-200">

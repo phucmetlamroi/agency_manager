@@ -199,7 +199,7 @@ function Flow({
     onChange,
     onSeed,
     onSave,
-    saveLabel = 'Lưu Multi-hook Map',
+    saveLabel = 'Save',
     height = 520,
 }: HookGraphEditorProps) {
     const rf = useReactFlow<HookNode, Edge>()

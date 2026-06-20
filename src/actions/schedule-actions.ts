@@ -227,6 +227,10 @@ export async function getEffectiveAvailability(
   userId: string,
   targetDate: Date
 ) {
+  // [AUDIT R1 — HIGH fix #18] This read had NO auth → anyone could dump any
+  // user's availability cross-tenant by passing ids. Require the caller to be a
+  // member of this workspace (every mutation here already routes via validateAccess).
+  await verifyWorkspaceAccess(workspaceId, 'MEMBER')
   const prisma = getWorkspacePrisma(workspaceId, profileId)
   
   // Normalize date to UTC midnight

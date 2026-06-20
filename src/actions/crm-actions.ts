@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { verifyWorkspaceAccess } from '@/lib/security'
 import { serializeDecimal } from '@/lib/serialization'
 import { audit } from '@/lib/audit-log'
 
@@ -12,6 +13,9 @@ import { audit } from '@/lib/audit-log'
 
 export async function getClients(workspaceId: string) {
     try {
+        // [AUDIT R1 — HIGH fix #15] CRM actions had NO workspace authz — any
+        // authenticated user could read/mutate clients. Require membership to read.
+        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
@@ -72,6 +76,8 @@ async function findDuplicateName(
 
 export async function createClient(data: { name: string, parentId?: number }, workspaceId: string) {
     try {
+        // [AUDIT R1 — HIGH fix #15] Require workspace ADMIN to mutate CRM.
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
@@ -94,6 +100,7 @@ export async function createClient(data: { name: string, parentId?: number }, wo
 
 export async function updateClient(id: number, data: { name: string }, workspaceId: string) {
     try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
@@ -117,6 +124,7 @@ export async function updateClient(id: number, data: { name: string }, workspace
 
 export async function createProject(data: { name: string, clientId: number, code?: string }, workspaceId: string) {
     try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
@@ -176,6 +184,7 @@ async function collectClientSubtreeIds(wp: any, rootId: number): Promise<number[
  */
 export async function deleteClient(id: number, workspaceId: string) {
     try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const wp = getWorkspacePrisma(workspaceId, profileId)
@@ -206,6 +215,7 @@ export async function deleteClient(id: number, workspaceId: string) {
  */
 export async function restoreClient(id: number, workspaceId: string) {
     try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const wp = getWorkspacePrisma(workspaceId, profileId)
@@ -239,6 +249,7 @@ export async function restoreClient(id: number, workspaceId: string) {
  */
 export async function getTrashedClients(workspaceId: string) {
     try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const wp = getWorkspacePrisma(workspaceId, profileId)
@@ -271,6 +282,7 @@ export async function getTrashedClients(workspaceId: string) {
  */
 export async function permanentlyDeleteClient(id: number, workspaceId: string) {
     try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const wp = getWorkspacePrisma(workspaceId, profileId)
@@ -314,6 +326,7 @@ export async function permanentlyDeleteClient(id: number, workspaceId: string) {
  */
 export async function mergeClientIntoParent(childId: number, parentId: number, workspaceId: string) {
     try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         if (childId === parentId) return { success: false, error: 'Không thể gộp khách hàng vào chính nó.' }
 
         const session = await getSession()
@@ -353,6 +366,7 @@ export async function mergeClientIntoParent(childId: number, parentId: number, w
  */
 export async function unmergeClient(clientId: number, workspaceId: string) {
     try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
@@ -377,6 +391,7 @@ export async function unmergeClient(clientId: number, workspaceId: string) {
  */
 export async function getClientDetail(clientId: number, workspaceId: string) {
     try {
+        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)

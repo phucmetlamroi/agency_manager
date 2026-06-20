@@ -6,6 +6,7 @@ import { validateTransition, TaskState } from '@/lib/fsm-config'
 
 import { getCurrentUser } from '@/lib/auth-guard'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { verifyWorkspaceAccess } from '@/lib/security'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { audit } from '@/lib/audit-log'
@@ -61,7 +62,12 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         if (!task) return { error: 'Task not found' }
 
         // RBAC CHECK:
-        if (!user.isSuperAdmin) {
+        // [AUDIT R1 — HIGH fix #8] Scope the admin check to THIS workspace instead of
+        // the legacy global isSuperAdmin flag (which let a legacy global admin update
+        // tasks in any tenant and blocked new-model workspace admins).
+        const { workspaceRole } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const isWorkspaceAdmin = workspaceRole === 'OWNER' || workspaceRole === 'ADMIN'
+        if (!isWorkspaceAdmin) {
             // Can ONLY update tasks assigned to themselves
             if (task.assigneeId !== user.id) {
                 return { error: 'Forbidden: Bạn chỉ được cập nhật Task của chính mình.' }

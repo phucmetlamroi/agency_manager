@@ -4,22 +4,22 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth-guard'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { verifyWorkspaceAccess } from '@/lib/security'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
 // --- 1. DELETE TASK ---
 export async function deleteTask(id: string, workspaceId: string) {
     try {
-        const user = await getCurrentUser() // Guard Check
+        // [AUDIT R1 — HIGH fix #8] Was gated on the legacy GLOBAL isSuperAdmin
+        // (user.role==='ADMIN'): a legacy global admin could delete tasks in ANY
+        // tenant's workspace, while new-model workspace admins were blocked entirely.
+        // Scope to workspace ADMIN.
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const workspacePrisma = getWorkspacePrisma(workspaceId)
 
         const task = await workspacePrisma.task.findUnique({ where: { id } })
         if (!task) return { error: 'Not found' }
-
-        // Permission Check
-        if (!user.isSuperAdmin) {
-            return { error: 'Forbidden: Bạn không có quyền xóa Task này.' }
-        }
 
         await workspacePrisma.task.delete({ where: { id } })
 
@@ -35,13 +35,18 @@ export async function deleteTask(id: string, workspaceId: string) {
 export async function updateTask(id: string, data: any, workspaceId: string) {
     try {
         const user = await getCurrentUser() // Guard Check
+        // [AUDIT R1 — HIGH fix #8] Scope the admin check to THIS workspace instead of
+        // the legacy global isSuperAdmin flag. Members may still update their own
+        // assigned task (ownership branch below); workspace ADMIN/OWNER update any.
+        const { workspaceRole } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const isWorkspaceAdmin = workspaceRole === 'OWNER' || workspaceRole === 'ADMIN'
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const task = await workspacePrisma.task.findUnique({ where: { id } })
 
         if (!task) return { error: 'Not found' }
 
         // Security & Sanitization
-        if (!user.isSuperAdmin) {
+        if (!isWorkspaceAdmin) {
             // Check Ownership
             if (task.assigneeId !== user.id) return { error: 'Forbidden' }
 
@@ -82,14 +87,13 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
     try {
         // A. AUTH & SCOPE CHECK
         const user = await getCurrentUser()
+        // [AUDIT R1 — HIGH fix #8] Scope assign permission to workspace ADMIN instead
+        // of the legacy global isSuperAdmin flag.
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const task = await workspacePrisma.task.findUnique({ where: { id: taskId } })
 
         if (!task) return { error: 'Task not found' }
-
-        if (!user.isSuperAdmin) {
-            return { error: 'Permission denied: Chỉ Admin mới được giao việc.' }
-        }
 
         // B. PREPARE DATA
         let updateData: any = {}

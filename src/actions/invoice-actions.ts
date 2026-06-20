@@ -287,13 +287,22 @@ export async function createInvoiceRecord(data: {
     taskIds: string[]
 }, workspaceId: string) {
     try {
+        // [AUDIT R1 — BLOCKER fix] Authorization was a GLOBAL finance-flag check
+        // (isSuperAdmin/isTreasurer) with NO workspace scope → a treasurer of
+        // workspace A could create invoices against clients of workspace B simply
+        // by passing B's id. Require the caller to be a member of THIS workspace
+        // first (scope), then keep the finance-role gate. profileId is resolved so
+        // the client-deposit write below is correctly profile-scoped (Client is
+        // profile-scoped and fail-closes without it).
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
         const user = await getCurrentUser()
         // Determine if user has permission (Admin or Treasurer)
         if (!user || (!user.isSuperAdmin && !user.isTreasurer)) return { error: 'Unauthorized' }
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
-        // 0. Verify Tasks are Unbilled (Prevent Double Billing)
+        // 0. Verify Tasks are Unbilled (Prevent Double Billing) — fast-fail before tx.
         if (data.taskIds.length > 0) {
             const billedCount = await workspacePrisma.task.count({
                 where: {
@@ -336,24 +345,43 @@ export async function createInvoiceRecord(data: {
             })
 
             // 2. Update Tasks (Mark as INVOICED)
+            // [AUDIT R1 — HIGH fix #13] Double-billing race: the pre-tx count check
+            // (step 0) can be passed concurrently by two requests, both marking the
+            // same tasks INVOICED. Make the claim atomic by only flipping tasks that
+            // are STILL UNBILLED and asserting we claimed all of them — otherwise a
+            // concurrent invoice already grabbed some, so we roll back this one.
             if (data.taskIds.length > 0) {
-                await tx.task.updateMany({
-                    where: { id: { in: data.taskIds } },
+                const claimed = await tx.task.updateMany({
+                    where: { id: { in: data.taskIds }, invoiceStatus: 'UNBILLED' },
                     data: {
                         invoiceId: invoice.id,
                         invoiceStatus: 'INVOICED'
                     }
                 })
+                if (claimed.count !== data.taskIds.length) {
+                    throw new Error('CONCURRENT_INVOICE: some tasks were billed concurrently')
+                }
             }
 
             // 3. Deduct Deposit from Client (if any)
+            // [AUDIT R1 — HIGH fix #12] Clamp the deduction to the available balance
+            // so a stale/oversized client-deposit amount can't drive depositBalance
+            // negative. Read inside the tx for isolation.
             if (data.clientDepositDeducted && data.clientDepositDeducted > 0) {
-                await tx.client.update({
+                const client = await tx.client.findUnique({
                     where: { id: data.clientId },
-                    data: {
-                        depositBalance: { decrement: data.clientDepositDeducted }
-                    }
+                    select: { depositBalance: true }
                 })
+                const available = toSafeNumber(client?.depositBalance)
+                const deduct = Math.min(data.clientDepositDeducted, available)
+                if (deduct > 0) {
+                    await tx.client.update({
+                        where: { id: data.clientId },
+                        data: {
+                            depositBalance: { decrement: deduct }
+                        }
+                    })
+                }
             }
 
             return invoice
@@ -395,8 +423,14 @@ export async function createInvoiceRecord(data: {
 
         return { success: true, data: safeResult }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Create Invoice Error:', error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
+        if (error?.message?.startsWith('CONCURRENT_INVOICE')) {
+            return { error: 'Some tasks have already been invoiced. Please refresh.' }
+        }
         return { error: 'Failed to save invoice record' }
     }
 }

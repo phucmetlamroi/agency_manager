@@ -20,9 +20,11 @@ export async function updateTaskDetails(id: string, data: {
 }, workspaceId: string) {
     try {
         let isAdmin = false
+        let callerId = ''
         try {
             const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
             isAdmin = access.isGlobalAdmin || access.workspaceRole === 'ADMIN' || access.workspaceRole === 'OWNER'
+            callerId = access.userId
         } catch {
             return { error: 'Unauthorized: no workspace access' }
         }
@@ -52,6 +54,12 @@ export async function updateTaskDetails(id: string, data: {
             if (data.notes_en !== undefined) updateData.notes_en = data.notes_en
             if (data.duration !== undefined) updateData.duration = data.duration
         } else {
+            // [AUDIT R1 — HIGH fix #10] BOLA: a non-admin member could edit the
+            // productLink/notes_en of ANY task in the workspace. Restrict non-admins
+            // to tasks they are actually assigned to.
+            if (currentTask.assigneeId !== callerId) {
+                return { error: 'Forbidden: Bạn chỉ được cập nhật Task của chính mình.' }
+            }
             // Non-admins are ONLY allowed to update their delivery/translation fields
             if (data.productLink !== undefined) updateData.productLink = data.productLink
             if (data.notes_en !== undefined) updateData.notes_en = data.notes_en

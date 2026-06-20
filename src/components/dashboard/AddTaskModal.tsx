@@ -702,6 +702,20 @@ export default function AddTaskModal({
             setVeloxBatchRaw([])
         }
 
+        // [QA R4 fix] Mirror the V1 R3 fix for the V3 Deep Scan path. The V3 submit
+        // builds every row from v3.mainItems titles (taskNameByMode) and ignores
+        // data.videoList entirely (DashboardActionWrapper rows = v3.mainItems.map).
+        // Force-overwrite videoList to those exact titles and drop it from the conflict
+        // set — otherwise 'Giữ'/'Gộp' keeps the old/merged value and the locked Video
+        // list + Step 5 Preview would show titles that differ from the tasks actually
+        // created (the textarea is locked once veloxV3Payload != null).
+        if (prefill.videoList != null && payload.mainItems.length >= 1) {
+            const veloxVideoList = prefill.videoList
+            setForm((prev) => ({ ...prev, videoList: veloxVideoList }))
+            filledFields.add('videoList')
+            delete prefill.videoList
+        }
+
         // Stash V3 result on form via assetsContext (consumed at submit)
         setVeloxV3Payload(payload)
 

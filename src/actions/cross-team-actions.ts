@@ -172,6 +172,22 @@ export async function removeCrossTeamAccess(userId: string, profileId: string, w
             return { success: false, error: 'Bạn không có quyền gỡ quyền du học này.' }
         }
 
+        // [AUDIT R11 — HIGH fix] Never strip a profile OWNER's access via this path. The
+        // profile OWNER's authority is stored in this same ProfileAccess table, so without
+        // this guard a profile ADMIN (isProfileAdmin === true) could delete the OWNER's row
+        // — orphaning the tenant and bypassing the OWNER-only last-owner protection that
+        // the dedicated removeFromProfileAction enforces. Mirror that protection here.
+        const targetAccess = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId, profileId } },
+            select: { role: true },
+        })
+        if (!targetAccess) {
+            return { success: false, error: 'Người dùng không có quyền du học tại profile này.' }
+        }
+        if (targetAccess.role === 'OWNER') {
+            return { success: false, error: 'Không thể gỡ quyền của chủ sở hữu (OWNER) profile.' }
+        }
+
         // Xóa ProfileAccess và Reset luôn ProfileAccessRequest để có thể xin lại sau
         await prisma.$transaction([
             prisma.profileAccess.delete({

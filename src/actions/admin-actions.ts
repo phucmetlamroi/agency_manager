@@ -39,6 +39,33 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
         if (target.profileId && target.profileId !== profileId) {
             return { error: 'Bạn không thể đổi vai trò của user thuộc Profile khác.' }
         }
+        // [AUDIT R11 — fix] The guard above no-ops when target.profileId is null (same
+        // null-profileId class closed for deactivateUser in R10). Require a positive
+        // tenancy link to THIS workspace's profile before the global User.role write.
+        const wsForTenancy = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        const tenantProfileId = wsForTenancy?.profileId ?? null
+        const [tenancyMember, tenancyAccess] = await Promise.all([
+            prisma.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId, workspaceId } },
+                select: { role: true },
+            }),
+            tenantProfileId
+                ? prisma.profileAccess.findUnique({
+                      where: { userId_profileId: { userId, profileId: tenantProfileId } },
+                      select: { role: true },
+                  })
+                : Promise.resolve(null),
+        ])
+        const targetBelongsToTenant =
+            (!!tenantProfileId && target.profileId === tenantProfileId) ||
+            !!tenancyMember ||
+            !!tenancyAccess
+        if (!targetBelongsToTenant) {
+            return { error: 'Không thể đổi vai trò của user không thuộc Workspace/Profile này.' }
+        }
 
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.user.update({

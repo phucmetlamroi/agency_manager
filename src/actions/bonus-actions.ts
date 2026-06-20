@@ -6,32 +6,11 @@ import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { SALARY_COMPLETED_STATUS, SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
 import { verifyWorkspaceAccess } from '@/lib/security'
-
-/**
- * Extract payroll cycle (month/year) từ workspace.name format "MM / YYYY".
- * Vd: "04 / 2026" → { month: 4, year: 2026 }
- *
- * Trước đây code hardcode `month=0, year=0` cho mọi workspace → KHÔNG truy vết
- * được lương theo tháng (year-end report sai, audit khó). Pattern này thống nhất
- * với cách payroll/bonus actions đã extract trước đây.
- *
- * Fallback: nếu workspace.name không có format tháng/năm → dùng current date.
- */
-function extractPayrollCycle(workspaceName: string | null | undefined): { month: number; year: number } {
-    if (workspaceName) {
-        const match = workspaceName.match(/(\d{1,2})\s*\/\s*(\d{4})/)
-        if (match) {
-            const month = parseInt(match[1], 10)
-            const year = parseInt(match[2], 10)
-            if (month >= 1 && month <= 12 && year >= 2020 && year <= 2099) {
-                return { month, year }
-            }
-        }
-    }
-    // Fallback: workspace name không có format MM/YYYY → dùng tháng/năm hiện tại
-    const now = new Date()
-    return { month: now.getMonth() + 1, year: now.getFullYear() }
-}
+// [AUDIT R5] extractPayrollCycle moved to a shared helper so payroll-actions
+// (Payroll row + revert lock lookup) and this module (PayrollLock creation) always
+// derive the SAME cycle key from workspace.name. Previously each had its own notion
+// and the payroll page hardcoded (0,0), leaving the anti-fraud lock unmatchable.
+import { extractPayrollCycle } from '@/lib/payroll-cycle'
 
 const toSafeNumber = (value: unknown): number => {
     if (value == null) return 0

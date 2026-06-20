@@ -34,8 +34,9 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
         }
         const target = await prisma.user.findUnique({ where: { id: userId }, select: { profileId: true } })
         if (!target) return { error: 'Người dùng không tồn tại.' }
-        const callerIsGlobalAdmin = (session?.user as any)?.role === 'ADMIN'
-        if (!callerIsGlobalAdmin && target.profileId && target.profileId !== profileId) {
+        // [AUDIT R5 — fix] No JWT role==='ADMIN' escape hatch (Sprint Z removed the
+        // global super-admin); the cross-profile check is unconditional.
+        if (target.profileId && target.profileId !== profileId) {
             return { error: 'Bạn không thể đổi vai trò của user thuộc Profile khác.' }
         }
 

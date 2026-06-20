@@ -73,13 +73,11 @@ export async function createBillingProfile(data: {
 }) {
 
     try {
-        // SECURITY: if workspaceId provided, require workspace ADMIN; else require global ADMIN.
-        if (data.workspaceId) {
-            await verifyWorkspaceAccess(data.workspaceId, 'ADMIN')
-        } else {
-            const user = await getCurrentUser()
-            if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
-        }
+        // [AUDIT R5 — fix] Require a workspace context + workspace ADMIN. The legacy
+        // no-workspace global-ADMIN branch is dead under Sprint Z and would mint an
+        // orphaned profileId:null billing row — mirror update/delete/get billing.
+        if (!data.workspaceId) return { error: 'workspaceId required' }
+        await verifyWorkspaceAccess(data.workspaceId, 'ADMIN')
 
         let profileId: string | null = null;
         if (data.workspaceId) {

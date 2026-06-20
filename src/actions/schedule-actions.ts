@@ -129,7 +129,9 @@ export async function createScheduleException(
   creatorId?: string
 ) {
   if (!profileId) throw new Error("profileId is required")
-  await validateAccess(workspaceId, userId, profileId)
+  // [AUDIT R5 — fix] Bind the audit-attribution field to the authenticated caller —
+  // the untrusted creatorId param could otherwise stamp another user as the creator.
+  const caller = await validateAccess(workspaceId, userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
 
   // Parse "YYYY-MM-DD" directly as UTC midnight → no timezone drift
@@ -145,7 +147,7 @@ export async function createScheduleException(
       type,
       reason,
       timezone,
-      updatedById: creatorId,
+      updatedById: caller.id,
       workspaceId,
       profileId
     }
@@ -170,9 +172,10 @@ export async function createBatchScheduleExceptions(
 ) {
   if (!entries.length) return { count: 0 }
   if (!profileId) throw new Error("profileId is required")
-  await validateAccess(workspaceId, userId, profileId)
+  // [AUDIT R5 — fix] Bind audit-attribution to the authenticated caller.
+  const caller = await validateAccess(workspaceId, userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
-  
+
   const created = await prisma.$transaction(
     entries.map(e => prisma.scheduleException.create({
       data: {
@@ -183,7 +186,7 @@ export async function createBatchScheduleExceptions(
         type: e.type,
         reason: e.reason,
         timezone,
-        updatedById: creatorId,
+        updatedById: caller.id,
         workspaceId,
         profileId
       }

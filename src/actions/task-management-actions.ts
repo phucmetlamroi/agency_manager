@@ -61,6 +61,21 @@ export async function updateTask(id: string, data: any, workspaceId: string) {
             delete data.exchangeRate
             delete data.invoiceStatus
             delete data.invoiceId
+            // [AUDIT R5 — fix] Also strip tenancy + ownership + status + lifecycle
+            // fields. Omitting workspaceId/profileId let an assignee MOVE their own task
+            // into another tenant (cross-tenant BOLA); omitting status let them self-set
+            // 'Hoàn tất' to trigger their own salary. Status changes go through the
+            // dedicated FSM-gated updateTaskStatus action, not this generic update.
+            delete data.workspaceId
+            delete data.profileId
+            delete data.status
+            delete data.assignedById
+            delete data.clientId
+            delete data.projectId
+            delete data.isArchived
+            delete data.claimSource
+            delete data.claimedAt
+            delete data.version
             delete data.deadline
             delete data.assigneeId
             delete data.assignedAgencyId

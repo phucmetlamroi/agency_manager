@@ -14,6 +14,15 @@ import { verifyWorkspaceAccess } from '@/lib/security'
 
 // ─── Get marketplace open/close status ────────────────────────
 export async function getMarketplaceStatus(workspaceId: string) {
+    // [AUDIT R5 — fix] Exported server action — require workspace membership so it
+    // can't be used to probe another tenant's marketplace state. Internal callers
+    // (getMarketplaceTasks/claimTask) already hold access; safe default (closed) on
+    // violation.
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    } catch {
+        return false
+    }
     const workspace = await prisma.workspace.findUnique({
         where: { id: workspaceId },
         select: { marketplaceOpen: true }

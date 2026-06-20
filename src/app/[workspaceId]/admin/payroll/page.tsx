@@ -6,6 +6,7 @@ import PayrollCard from '@/components/admin/PayrollCard'
 import PayrollKpiStrip from '@/components/admin/PayrollKpiStrip'
 import { serializeDecimal } from '@/lib/serialization'
 import { SALARY_COMPLETED_STATUS, SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
+import { extractPayrollCycle } from '@/lib/payroll-cycle'
 import { Download } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,10 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
         where: { id: workspaceId },
         select: { name: true }
     })
+
+    // [AUDIT R5 — fix] Real payroll cycle from the workspace name (e.g. "Tháng 6/2026"),
+    // not the old hardcoded (0,0) that desynced confirm/revert from the PayrollLock.
+    const payrollCycle = extractPayrollCycle(workspace?.name)
 
     const users = await workspacePrisma.user.findMany({
         where: {
@@ -159,8 +164,8 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                     <PayrollCard
                         key={user.id}
                         user={user}
-                        currentMonth={0}
-                        currentYear={0}
+                        currentMonth={payrollCycle.month}
+                        currentYear={payrollCycle.year}
                         workspaceId={workspaceId}
                     />
                 ))}

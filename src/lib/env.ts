@@ -1,8 +1,10 @@
 import { z } from 'zod'
 
+const JWT_SECRET_DEFAULT = "temporary-build-secret-key-change-me"
+
 const envSchema = z.object({
     DATABASE_URL: z.string().min(1).default("placeholder_url_replace_me"),
-    JWT_SECRET: z.string().min(10).default("temporary-build-secret-key-change-me"),
+    JWT_SECRET: z.string().min(10).default(JWT_SECRET_DEFAULT),
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 })
 
@@ -26,8 +28,17 @@ if (!parsed.success) {
 
 export const env = parsed.success ? parsed.data : envSchema.parse({})
 
-if (env.JWT_SECRET === "temporary-build-secret-key-change-me" && env.NODE_ENV === 'production') {
-    console.warn("⚠️  WARNING: JWT_SECRET is using DEFAULT value in production!")
+// [AUDIT R1 — CRITICAL fix] Fail CLOSED at runtime in production if JWT_SECRET is
+// missing or the public, source-controlled placeholder. Booting on the placeholder
+// lets anyone forge session JWTs (full auth bypass / impersonation of any role).
+// We still allow the build phase (next build) to run on the placeholder so a deploy
+// doesn't break when the real secret is only injected at runtime.
+const IS_BUILD_PHASE = process.env.NEXT_PHASE === 'phase-production-build'
+if (env.NODE_ENV === 'production' && !IS_BUILD_PHASE && env.JWT_SECRET === JWT_SECRET_DEFAULT) {
+    throw new Error(
+        '[env] JWT_SECRET is unset or set to the default placeholder in production. ' +
+        'Set a strong, secret JWT_SECRET. Refusing to start (fail closed).'
+    )
 }
 
 if (env.DATABASE_URL === "placeholder_url_replace_me" && env.NODE_ENV === 'production') {

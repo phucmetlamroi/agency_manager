@@ -36,7 +36,11 @@ export async function POST(req: Request) {
         }
 
         let hasAccess = false;
-        if (user.role === 'ADMIN' || (user as any).profileId === profileId) {
+        // [AUDIT R1 — CRITICAL fix] Removed the legacy global `role === 'ADMIN'`
+        // super-admin bypass (Sprint Z removed the super-admin model). Access now
+        // requires the profile to be the user's own OR an explicit ProfileAccess row
+        // (the cross-team check below).
+        if ((user as any).profileId === profileId) {
             hasAccess = true;
         }
 

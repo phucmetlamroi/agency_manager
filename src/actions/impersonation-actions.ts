@@ -4,14 +4,22 @@ import { redirect } from 'next/navigation'
 import { getSession, createImpersonationSession, stopImpersonationSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { audit } from '@/lib/audit-log'
+import { verifyWorkspaceAccess } from '@/lib/security'
 
 export async function startImpersonation(targetUserId: string, workspaceId: string) {
+    // [AUDIT R1 — CRITICAL fix] Was gated only on the legacy global role==='ADMIN'
+    // with NO scope check on the target → cross-tenant account takeover. Now require
+    // the caller to be a workspace ADMIN, the target to be a member of THIS
+    // workspace, and forbid impersonating a (legacy) global-admin account.
+    await verifyWorkspaceAccess(workspaceId, 'ADMIN')
     const session = await getSession()
+    if (!session?.user) throw new Error('Unauthorized')
 
-    // Security check: Only global Admins can impersonate (legitimately global).
-    if (!session || session.user.role !== 'ADMIN') {
-        throw new Error('Unauthorized')
-    }
+    const targetMember = await prisma.workspaceMember.findFirst({
+        where: { userId: targetUserId, workspaceId },
+        select: { id: true },
+    })
+    if (!targetMember) throw new Error('Người này không thuộc workspace của bạn.')
 
     const targetUser = await prisma.user.findUnique({
         where: { id: targetUserId },
@@ -25,6 +33,7 @@ export async function startImpersonation(targetUserId: string, workspaceId: stri
     })
 
     if (!targetUser) throw new Error('User not found')
+    if (targetUser.role === 'ADMIN') throw new Error('Không thể đóng vai tài khoản quản trị.')
 
     await createImpersonationSession(session.user, targetUser)
 

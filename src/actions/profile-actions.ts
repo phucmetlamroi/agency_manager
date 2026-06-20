@@ -506,8 +506,12 @@ export async function changePassword(userId: string, currentPass: string, newPas
         // Hash new password
         const hashedPassword = await hash(newPass, 12)
 
+        // [AUDIT R4 — BLOCKER fix] The R3 patch rebound the READ+verify to targetId but
+        // left this WRITE pointed at the untrusted `userId` param → the current-password
+        // check ran against the CALLER's row while the new hash landed on the victim
+        // (account takeover). Bind the write to the authenticated caller.
         await prisma.user.update({
-            where: { id: userId },
+            where: { id: targetId },
             data: {
                 password: hashedPassword
             }

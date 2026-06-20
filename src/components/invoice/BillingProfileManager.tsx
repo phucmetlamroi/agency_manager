@@ -103,7 +103,7 @@ export default function BillingProfileManager({
 
         let res
         if (editingId) {
-            res = await updateBillingProfile(editingId, payload)
+            res = await updateBillingProfile(editingId, payload, workspaceId)
         } else {
             res = await createBillingProfile(payload)
         }
@@ -119,7 +119,7 @@ export default function BillingProfileManager({
 
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this profile?')) return
-        const res = await deleteBillingProfile(id)
+        const res = await deleteBillingProfile(id, workspaceId)
         if (res.success) {
             toast.success('Profile deleted')
             fetchProfiles()

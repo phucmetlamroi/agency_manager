@@ -22,6 +22,10 @@ const toSafeNumber = (val: any) => {
 
 export async function getBillingProfiles(workspaceId?: string) {
     try {
+        // [AUDIT R4 — fix] The no-workspaceId branch skipped the access check entirely
+        // and returned profileId:null billing rows (bank details) to ANY caller.
+        // Require a workspace context — every real caller passes it.
+        if (!workspaceId) return { error: 'workspaceId required' }
         let profileId: string | null = null;
         if (workspaceId) {
             // SECURITY: Verify caller is a member of the workspace before reading
@@ -130,21 +134,28 @@ export async function updateBillingProfile(id: string, data: {
     notes?: string
     isDefault?: boolean
     currency?: string
-}) {
+}, workspaceId?: string) {
 
     try {
-        const user = await getCurrentUser()
-        if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
+        // [AUDIT R4 — fix] Was gated only on the removed legacy global ADMIN with NO
+        // tenant scope → a stray ADMIN account could tamper with ANY tenant's bank
+        // details by id, while legit profile owners were locked out. Require workspace
+        // ADMIN and scope the mutation to THIS workspace's profile.
+        if (!workspaceId) return { error: 'workspaceId required' }
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+        const scopedProfileId = ws?.profileId ?? null
 
-        const currentProfile = await prisma.billingProfile.findUnique({
-            where: { id },
-            select: { profileId: true }
+        const currentProfile = await prisma.billingProfile.findFirst({
+            where: { id, profileId: scopedProfileId },
+            select: { id: true, profileId: true }
         });
+        if (!currentProfile) return { error: 'Billing profile not found' }
 
         if (data.isDefault) {
             // Unset other defaults for THIS profile
             await prisma.billingProfile.updateMany({
-                where: { isDefault: true, id: { not: id }, profileId: currentProfile?.profileId },
+                where: { isDefault: true, id: { not: id }, profileId: scopedProfileId },
                 data: { isDefault: false }
             })
         }
@@ -166,22 +177,29 @@ export async function updateBillingProfile(id: string, data: {
 
         revalidatePath('/admin/crm')
         return { success: true, data: profile }
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) return { error: error.message }
         return { error: 'Failed to update billing profile' }
     }
 }
 
-export async function deleteBillingProfile(id: string) {
+export async function deleteBillingProfile(id: string, workspaceId?: string) {
     try {
-        const user = await getCurrentUser()
-        if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
+        // [AUDIT R4 — fix] Same legacy-ADMIN + no-tenant-scope gap as updateBillingProfile.
+        if (!workspaceId) return { error: 'workspaceId required' }
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+        const scopedProfileId = ws?.profileId ?? null
 
-        await prisma.billingProfile.delete({
-            where: { id }
+        // deleteMany scoped to this workspace's profile → a foreign id simply no-ops.
+        const result = await prisma.billingProfile.deleteMany({
+            where: { id, profileId: scopedProfileId }
         })
+        if (result.count === 0) return { error: 'Billing profile not found' }
         revalidatePath('/admin/crm')
         return { success: true }
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) return { error: error.message }
         return { error: 'Failed to delete billing profile' }
     }
 }

@@ -6,39 +6,40 @@
  */
 
 /**
- * Maps the 8 internal task states into 5 abstract states suitable for the
- * client-facing portal.
+ * [Redesign] Maps each REAL admin task status to a faithful client-facing
+ * English label (mirroring the admin status vocabulary instead of the old
+ * lossy 5-state abstraction). Purely-internal staffing states are folded:
+ *   - 'Đang đợi giao' (not-yet-assigned)  → "In production"
+ *   - 'Sửa frame' (internal frame fix)    → "In progress"
+ *   - 'Quá hạn' (cron overdue flag)       → "In progress" (don't surface "Delayed")
+ *   - 'Đã hủy' (cancelled)                → "Closed" (excluded from lists upstream)
+ * Order matters — most-specific substrings first.
  */
 export function mapClientTaskStatus(internalStatus: string): string {
-    const statusLower = internalStatus.toLowerCase()
+    const s = (internalStatus || '').toLowerCase()
 
-    if (statusLower.includes('đợi') || statusLower.includes('đã nhận')) {
-        return 'Pending'
-    }
-    if (statusLower.includes('thực hiện')) {
-        return 'In Progress'
-    }
-    if (statusLower.includes('review')) {
-        return 'Action Required'
-    }
-    if (statusLower.includes('revision') || statusLower.includes('sửa')) {
-        return 'Revising'
-    }
-    if (statusLower.includes('hoàn tất') || statusLower.includes('lưu trữ')) {
-        return 'Completed'
-    }
-
-    return 'Pending'
+    if (s.includes('hoàn tất') || s.includes('lưu trữ')) return 'Completed'
+    if (s.includes('hủy')) return 'Closed'
+    if (s.includes('revision')) return 'In revision'
+    if (s.includes('gửi lại')) return 'Revisions delivered'
+    if (s.includes('sửa')) return 'In progress'        // 'Sửa frame' (internal) folded
+    if (s.includes('tạm ng')) return 'On hold'          // 'Tạm ngưng'
+    if (s.includes('quá hạn')) return 'In progress'     // soften — don't show "Delayed"
+    if (s.includes('thực hiện')) return 'In progress'
+    if (s.includes('nhận')) return 'Received'           // 'Nhận task' / 'Đã nhận task'
+    if (s.includes('đợi')) return 'In production'       // 'Đang đợi giao' (pre-assignment)
+    return 'Received'
 }
 
 /**
  * Client-facing status, refined by the `clientReview` field (decoupled from
- * the internal status FSM). AWAITING = a cut is ready for the client to review.
+ * the internal status FSM). AWAITING = a cut is ready for the client to review
+ * — the single loudest, client-action state.
  */
 export function deriveClientStatus(status: string, clientReview?: string | null): string {
-    if (clientReview === 'AWAITING') return 'Action Required'
+    if (clientReview === 'AWAITING') return 'Awaiting your review'
     if (clientReview === 'APPROVED') return 'Completed'
-    if (clientReview === 'CHANGES') return 'Revising'
+    if (clientReview === 'CHANGES') return 'In revision'
     return mapClientTaskStatus(status)
 }
 

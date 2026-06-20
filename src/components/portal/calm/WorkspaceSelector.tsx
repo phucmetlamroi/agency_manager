@@ -42,9 +42,9 @@ export default function WorkspaceSelector({ workspaces, value, counts, onChange 
                     {current ? <CalendarRange size={14} /> : <Library size={14} />}
                 </span>
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.25, flex: 1, minWidth: 0 }}>
-                    <span className="eyebrow" style={{ fontSize: 9 }}>Period</span>
+                    <span className="eyebrow" style={{ fontSize: 9 }}>Month</span>
                     <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 134 }}>
-                        {current ? current.name : 'All periods'}
+                        {current ? current.name : 'All months'}
                     </span>
                 </span>
                 <ChevronsUpDown size={15} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
@@ -55,13 +55,13 @@ export default function WorkspaceSelector({ workspaces, value, counts, onChange 
                     <div style={{ padding: 8, borderBottom: '1px solid var(--line)' }}>
                         <div style={{ position: 'relative' }}>
                             <Search size={14} style={{ color: 'var(--fg-3)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-                            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Find a period" className="pc-input" style={{ height: 36, paddingLeft: 32, fontSize: 13 }} />
+                            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Find a month" className="pc-input" style={{ height: 36, paddingLeft: 32, fontSize: 13 }} />
                         </div>
                     </div>
                     <div style={{ padding: 6, maxHeight: 300, overflowY: 'auto' }}>
                         <Row active={value === 'all'} onClick={() => { onChange('all'); setOpen(false) }}
                             icon={<Library size={15} />} accentIcon
-                            title="All periods" sub={`${workspaces.length} ${workspaces.length === 1 ? 'book' : 'books'} of work`} />
+                            title="All months" sub={`${workspaces.length} ${workspaces.length === 1 ? 'month' : 'months'}`} />
                         {filtered.map(w => {
                             const n = counts[w.id] || 0
                             return (
@@ -70,7 +70,7 @@ export default function WorkspaceSelector({ workspaces, value, counts, onChange 
                                     title={w.name} sub={`${n} ${n === 1 ? 'deliverable' : 'deliverables'}`} />
                             )
                         })}
-                        {filtered.length === 0 && <div style={{ padding: '14px 10px', fontSize: 13, color: 'var(--fg-3)' }}>No periods match.</div>}
+                        {filtered.length === 0 && <div style={{ padding: '14px 10px', fontSize: 13, color: 'var(--fg-3)' }}>No months match.</div>}
                     </div>
                 </div>
             )}

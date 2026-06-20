@@ -217,6 +217,12 @@
 
 /* Color scheme + responsive */
 .portal-calm { color-scheme: light; }
+/* Desktop has the sidebar for navigation, so hide the mobile bottom nav at md+.
+   It sets display:flex inline (which overrides Tailwind's md:hidden class), so
+   this rule needs !important to win. */
+@media (min-width: 768px) {
+  .portal-calm .pc-bottom-nav { display: none !important; }
+}
 @media (max-width: 900px) {
   .portal-calm .pc-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .portal-calm .pc-overview-cols { grid-template-columns: 1fr !important; }

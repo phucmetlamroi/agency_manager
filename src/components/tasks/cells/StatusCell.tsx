@@ -127,7 +127,8 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                     </SelectTrigger>
                     <SelectContent>
                         {/* [Sprint A] 'Review' đã bỏ — submit → Revision */}
-                        {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Revision", "Gửi lại", "Sửa frame", "Tạm ngừng", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
+                        {/* [QA R1 fix] 'Tạm ngừng' (ừ) sai chính tả → 'Tạm ngưng' (ư) để khớp VALID_TASK_STATUSES; trước đây chọn Pause bị server từ chối, status không lưu. */}
+                        {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Revision", "Gửi lại", "Sửa frame", "Tạm ngưng", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                         ))}
                     </SelectContent>

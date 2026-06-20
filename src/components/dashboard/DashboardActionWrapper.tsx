@@ -178,6 +178,8 @@ export default function DashboardActionWrapper({
           assigneeId: v3.common.assigneeId ?? data.assigneeId ?? null,
           deadline: v3.common.deadline ?? data.deadline ?? null,
           rawFootage: encodedResources,
+          // [QA R1 fix] Forward the "Collect file" link — was dropped on the V3 batch path.
+          collectFilesLink: data.collectFile || null,
           references: v3PackedReferences,
           notes: notesWithBrief || null,
         }
@@ -222,6 +224,8 @@ export default function DashboardActionWrapper({
           deadline: data.deadline || null,
           // rawFootage in createTasksFromBatch maps to `resources` field
           rawFootage: rowResources || null,
+          // [QA R1 fix] Forward the "Collect file" link — was dropped on the V1 Velox batch path.
+          collectFilesLink: data.collectFile || null,
           references: packedReferences || null,
           notes: data.notes || null,
         }

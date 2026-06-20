@@ -524,6 +524,10 @@ export default function AddTaskModal({
         step: number
         veloxBatchRaw: string[]
         veloxFilledFields: string[]
+        // [QA R1 fix] Persist the Multi-Hook Map whiteboard + its mode so a built
+        // graph survives reload / close+reopen within the 3-min draft window.
+        hookGraph: HookGraph | null
+        rawFootageMode: 'PER_LINK' | 'MULTI_HOOK_MAP'
     }>(
         DRAFT_KEY,
         {
@@ -531,6 +535,8 @@ export default function AddTaskModal({
             step,
             veloxBatchRaw,
             veloxFilledFields: Array.from(veloxFilledFields),
+            hookGraph,
+            rawFootageMode,
         },
         (draft) => {
             // Restore từ localStorage khi mở modal
@@ -546,17 +552,25 @@ export default function AddTaskModal({
                     new Set(draft.veloxFilledFields as (keyof VeloxFormPrefill)[]),
                 )
             }
+            // [QA R1 fix] Restore the Multi-Hook Map + flip to MULTI_HOOK_MAP so the
+            // canvas + "✓ N block" indicator reappear. Guard older draft shapes.
+            if (draft.hookGraph && Array.isArray((draft.hookGraph as HookGraph).blocks)) {
+                setHookGraph(draft.hookGraph)
+                setRawFootageMode('MULTI_HOOK_MAP')
+            } else if (draft.rawFootageMode === 'MULTI_HOOK_MAP') {
+                setRawFootageMode('MULTI_HOOK_MAP')
+            }
         },
         {
             ttlMs: 3 * 60 * 1000, // 3 phút sliding TTL
             debounceMs: 500,
             enabled: open && !submitted, // chỉ save khi modal đang mở + chưa submit
-            shouldSave: ({ form, veloxBatchRaw, veloxFilledFields }) => {
-                // Save nếu form có content HOẶC Velox đã apply (kể cả form chưa
-                // hoàn chỉnh, có Velox state là đáng save vì user đã đầu tư công
-                // scan folder).
+            shouldSave: ({ form, veloxBatchRaw, veloxFilledFields, hookGraph }) => {
+                // Save nếu form có content HOẶC Velox đã apply HOẶC đã dựng Multi-Hook
+                // Map (kể cả form chưa hoàn chỉnh — user đã đầu tư công).
                 return Boolean(
-                    veloxBatchRaw.length > 0 ||
+                    (hookGraph && hookGraph.blocks.length > 0) ||
+                        veloxBatchRaw.length > 0 ||
                         veloxFilledFields.length > 0 ||
                         form.clientId ||
                         form.assigneeId ||
@@ -844,6 +858,11 @@ export default function AddTaskModal({
             setVeloxFilledFields(new Set())
             setVeloxBatchRaw([])
             setVeloxV3Payload(null)
+            // [QA R1 fix] Reset the Multi-Hook Map too — without this, a map built for
+            // batch #1 bleeds into every later task created in the same session.
+            setHookGraph(null)
+            setRawFootageMode('PER_LINK')
+            setMhmFolderUrl('')
         } catch (err: any) {
             toast.error(err?.message || "Lỗi khi tạo task. Vui lòng thử lại.")
         } finally {
@@ -858,6 +877,10 @@ export default function AddTaskModal({
         setVeloxFilledFields(new Set())
         setVeloxBatchRaw([])
         setVeloxV3Payload(null)
+        // [QA R1 fix] Reset the Multi-Hook Map state for the next open.
+        setHookGraph(null)
+        setRawFootageMode('PER_LINK')
+        setMhmFolderUrl('')
         onClose()
     }
 

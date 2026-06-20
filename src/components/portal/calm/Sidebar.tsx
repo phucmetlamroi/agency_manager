@@ -1,8 +1,6 @@
 'use client'
 
-import { LayoutDashboard, Clapperboard, ReceiptText, ShieldCheck, LogOut } from 'lucide-react'
-import { logoutAction } from '@/actions/auth-actions'
-import LanguageSwitcher from '@/components/portal/LanguageSwitcher'
+import { LayoutDashboard, Clapperboard, ReceiptText, ShieldCheck } from 'lucide-react'
 import { mapInvoiceStatus, initials } from './format'
 import type { Deliverable, Invoice, SurfaceId } from './types'
 
@@ -38,7 +36,7 @@ export default function Sidebar({ active, onNav, deliverables, invoices, account
         <aside style={{ width: 244, flexShrink: 0, background: 'var(--sidebar)', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* Brand lockup */}
             <div style={{ padding: '22px 20px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span className="pc-display" style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(150deg, var(--surface-3), var(--surface))', border: '1px solid var(--accent-line)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-fg)', fontWeight: 600, fontSize: 19, boxShadow: 'inset 0 1px 0 rgba(245,233,214,0.05)' }}>{accountName.slice(0, 1).toUpperCase()}</span>
+                <span className="pc-display" style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(150deg, var(--surface-3), var(--surface))', border: '1px solid var(--accent-line)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-fg)', fontWeight: 600, fontSize: 19, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5)' }}>{accountName.slice(0, 1).toUpperCase()}</span>
                 <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{accountName}</div>
                     <div className="eyebrow" style={{ fontSize: 9.5, marginTop: 1 }}>Client Portal</div>
@@ -73,23 +71,15 @@ export default function Sidebar({ active, onNav, deliverables, invoices, account
 
             <div style={{ flex: 1 }} />
 
-            {/* Account card — share mode has no session, so no language
-                switcher (locale routes are portal paths) and no logout. */}
+            {/* Account card — a share link has no session, so no logout / locale
+                switcher (those assumed an account that no longer exists). */}
             <div style={{ padding: 12, borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {!shareMode && <LanguageSwitcher currentLocale={locale} />}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface)' }}>
                     <span style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(150deg, var(--surface-3), var(--surface-2))', border: '1px solid var(--line-2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-1)', fontWeight: 700, fontSize: 12 }}>{initials(contactName)}</span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contactName}</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--fg-3)' }}>{shareMode ? 'Shared view' : 'Account owner'}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--fg-3)' }}>Shared view</div>
                     </div>
-                    {!shareMode && (
-                        <form action={logoutAction}>
-                            <button type="submit" title="Sign out" style={{ display: 'inline-flex', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-3)', padding: 2 }}>
-                                <LogOut size={15} />
-                            </button>
-                        </form>
-                    )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '2px 10px', fontSize: 11, color: 'var(--fg-4)' }}>
                     <ShieldCheck size={12} />

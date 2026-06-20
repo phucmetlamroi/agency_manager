@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import {
     X, Play, FolderOpen, ExternalLink, Clock, Check, RotateCcw, Info, CheckCircle2,
-    Download, KeyRound, Star,
+    Download, KeyRound, Star, History, ChevronDown,
 } from 'lucide-react'
-import { PipelineTracker } from './ui'
+import { StatusBadge, statusSentence } from './ui'
 import { fmtDate, relDeadline } from './format'
 import type { Deliverable, ActivityItem, DeliverableActions } from './types'
 
@@ -24,6 +24,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
     const [err, setErr] = useState<string | null>(null)
     const [activity, setActivity] = useState<ActivityItem[]>([])
     const [showCreds, setShowCreds] = useState(false)
+    const [showActivity, setShowActivity] = useState(false)
 
     const brandName = d.client?.name || '—'
     const rel = d.clientStatus === 'Completed' ? null : relDeadline(d.deadline)
@@ -51,7 +52,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
         const res = await actions.requestChanges(d.id, notes.trim())
         setBusy(false)
         if ('success' in res && res.success) {
-            onUpdated(d.id, { status: 'Revision', clientStatus: 'Revising', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
+            onUpdated(d.id, { status: 'Revision', clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
             setMode(null); setNotes('')
             actions.activity(d.id).then(setActivity).catch(() => { })
         } else setErr(('error' in res && res.error) || 'Không thể gửi yêu cầu.')
@@ -61,7 +62,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
 
     return (
         <>
-            <div className="pc-scrim-in" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 80 }} />
+            <div className="pc-scrim-in" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(26,23,20,0.35)', zIndex: 80 }} />
             <div className="pc-panel-in" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 480, maxWidth: '94vw', zIndex: 81, background: 'var(--surface)', borderLeft: '1px solid var(--line-2)', boxShadow: 'var(--shadow-panel)', display: 'flex', flexDirection: 'column' }}>
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '18px 20px', borderBottom: '1px solid var(--line)' }}>
@@ -112,8 +113,11 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                         </div>
                     )}
 
-                    {/* Pipeline */}
-                    <div style={{ padding: '4px 4px 0' }}><PipelineTracker status={d.clientStatus} /></div>
+                    {/* Status — the real admin-mirrored state + a plain-English line */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '2px 2px 0' }}>
+                        <StatusBadge status={d.clientStatus} />
+                        <span style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.4 }}>{statusSentence(d.clientStatus)}</span>
+                    </div>
 
                     {/* Your previous change request */}
                     {d.clientReview === 'CHANGES' && d.clientFeedback && (
@@ -178,11 +182,15 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                         </div>
                     </div>
 
-                    {/* Activity */}
+                    {/* Activity — tucked behind a disclosure so the panel stays calm */}
                     {activity.length > 0 && (
                         <div>
-                            <p className="eyebrow" style={{ fontSize: 10, marginBottom: 12 }}>Activity</p>
-                            <div>
+                            <button onClick={() => setShowActivity(s => !s)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-3)', fontSize: 12.5, fontWeight: 600, padding: 0 }}>
+                                <History size={13} /> {showActivity ? 'Hide history' : 'Show history'}
+                                <ChevronDown size={13} style={{ transition: 'transform .2s var(--ease)', transform: showActivity ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+                            </button>
+                            {showActivity && (
+                            <div style={{ marginTop: 14 }}>
                                 {activity.map((h, i) => (
                                     <div key={i} style={{ display: 'flex', gap: 12 }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -196,6 +204,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                                     </div>
                                 ))}
                             </div>
+                            )}
                         </div>
                     )}
                 </div>

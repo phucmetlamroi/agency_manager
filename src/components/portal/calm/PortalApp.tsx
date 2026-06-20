@@ -116,8 +116,10 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
                     {active === 'invoices' && <InvoicesSurface key={'iv' + wsScope + scope} invoices={scopedInvs} brands={brands} showPeriod={wsScope === 'all'} openInvoice={openInvoice} activeId={openInv} />}
                 </div>
 
-                {/* Mobile bottom nav */}
-                <div className="md:hidden" style={{ height: 60, borderTop: '1px solid var(--line)', background: 'var(--sidebar)', display: 'flex', alignItems: 'center', justifyContent: 'space-around', flexShrink: 0, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                {/* Mobile bottom nav — desktop has the sidebar, so this is hidden
+                    at md+ via .pc-bottom-nav (the inline display:flex defeats the
+                    Tailwind md:hidden class, hence the CSS override). */}
+                <div className="md:hidden pc-bottom-nav" style={{ height: 60, borderTop: '1px solid var(--line)', background: 'var(--sidebar)', display: 'flex', alignItems: 'center', justifyContent: 'space-around', flexShrink: 0, paddingBottom: 'env(safe-area-inset-bottom)' }}>
                     {NAV.map(it => {
                         const on = active === it.id
                         const Icon = it.Icon

@@ -31,8 +31,10 @@ export function relDeadline(iso: string | Date | null | undefined): { text: stri
     return { text: 'Due ' + fmtDate(iso, false), urgent: false }
 }
 
-/* Deterministic earthy/warm tint for a sub-brand avatar tile (Atelier palette). */
-const TINTS = ['#E0A458', '#E0875B', '#84B98C', '#D2735B', '#D8B45E', '#D98AA0', '#B0A857', '#C8855A', '#6FAE9E']
+/* Deterministic earthy/warm tint for a sub-brand avatar tile (Daylight Atelier).
+   Deep, saturated earth/jewel tones so the initials read as TEXT on a faint
+   tint-of-themselves over near-white card paper. */
+const TINTS = ['#B5532C', '#A9761B', '#3E7D53', '#B0472E', '#8E7415', '#A85070', '#6E7A2E', '#A85C2E', '#2E7D74']
 export function brandTint(key: string | number): string {
     const s = String(key)
     let h = 0
@@ -57,9 +59,6 @@ export function mapInvoiceStatus(raw: string): InvoiceLedgerStatus {
         default: return 'Due' // DRAFT, SENT
     }
 }
-
-/* Client-facing deliverable pipeline (matches the clientStatus buckets). */
-export const PIPELINE = ['Pending', 'In Progress', 'Action Required', 'Revising', 'Completed'] as const
 
 /* Pick a deliverable's type icon name (resolved to a lucide component in ui.tsx). */
 export function deliverableIcon(type?: string | null): 'mic' | 'film' | 'smartphone' {

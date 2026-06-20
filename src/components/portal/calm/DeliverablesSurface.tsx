@@ -6,8 +6,12 @@ import { StatusBadge, BrandAvatar, FilterChip, Empty, DeliverableTypeIcon } from
 import { relDeadline } from './format'
 import type { Deliverable, Brand } from './types'
 
-const FILTERS = ['All', 'Needs you', 'In Progress', 'Revising', 'Completed'] as const
+const FILTERS = ['All', 'Needs you', 'In progress', 'In revision', 'Completed'] as const
 type Filter = typeof FILTERS[number]
+
+// Client statuses that count as "actively in progress" for the filter.
+const IN_PROGRESS_STATES = ['In progress', 'Received', 'In production']
+const IN_REVISION_STATES = ['In revision', 'Revisions delivered']
 
 function PeriodTag({ name }: { name: string }) {
     return (
@@ -60,8 +64,8 @@ export default function DeliverablesSurface({ deliverables, brands, openDelivera
     const match = (d: Deliverable) => {
         if (filter === 'All') return true
         if (filter === 'Needs you') return d.needsYou
-        if (filter === 'In Progress') return ['In Progress', 'Pending'].includes(d.clientStatus)
-        if (filter === 'Revising') return d.clientStatus === 'Revising'
+        if (filter === 'In progress') return IN_PROGRESS_STATES.includes(d.clientStatus)
+        if (filter === 'In revision') return IN_REVISION_STATES.includes(d.clientStatus)
         if (filter === 'Completed') return d.clientStatus === 'Completed'
         return true
     }
@@ -70,8 +74,8 @@ export default function DeliverablesSurface({ deliverables, brands, openDelivera
     const counts: Record<Filter, number> = {
         'All': deliverables.length,
         'Needs you': deliverables.filter(d => d.needsYou).length,
-        'In Progress': deliverables.filter(d => ['In Progress', 'Pending'].includes(d.clientStatus)).length,
-        'Revising': deliverables.filter(d => d.clientStatus === 'Revising').length,
+        'In progress': deliverables.filter(d => IN_PROGRESS_STATES.includes(d.clientStatus)).length,
+        'In revision': deliverables.filter(d => IN_REVISION_STATES.includes(d.clientStatus)).length,
         'Completed': deliverables.filter(d => d.clientStatus === 'Completed').length,
     }
 
@@ -91,7 +95,7 @@ export default function DeliverablesSurface({ deliverables, brands, openDelivera
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
                 {FILTERS.map(f => (
                     <FilterChip key={f} label={f} count={counts[f]} active={filter === f} onClick={() => setFilter(f)}
-                        dotColor={f === 'Needs you' ? 'var(--attn)' : f === 'Revising' ? 'var(--revise)' : f === 'Completed' ? 'var(--ok)' : null} />
+                        dotColor={f === 'Needs you' ? 'var(--accent)' : f === 'In revision' ? 'var(--st-revision)' : f === 'Completed' ? 'var(--st-done)' : null} />
                 ))}
             </div>
 

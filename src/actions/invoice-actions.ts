@@ -200,6 +200,13 @@ export async function getUnbilledTasks(clientId: number, workspaceId: string) {
         // REQUIRES profileId for client queries (fail-closed guard). Resolve
         // it via the session (also gives us the missing membership check).
         const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        // [AUDIT R3 — fix] This returns per-task jobPriceUSD (agency USD revenue) which
+        // must never reach non-finance staff. Require a finance role (the invoice
+        // builder that calls this is admin/treasurer-only anyway).
+        const caller = await getCurrentUser()
+        if (!caller || (!caller.isSuperAdmin && !caller.isTreasurer)) {
+            return { error: 'Forbidden' }
+        }
         const profileId = (session?.user as any)?.sessionProfileId as string | undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // 1. Get all related Client IDs (Parent + Children) — skip archived subs

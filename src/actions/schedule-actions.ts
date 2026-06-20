@@ -275,12 +275,17 @@ export async function deleteScheduleExceptionsByIds(
   if (!profileId) throw new Error("profileId is required")
   
   const prisma = getWorkspacePrisma(workspaceId, profileId)
-  const samples = await prisma.scheduleException.findMany({ 
+  // [AUDIT R3 — fix] Was validating access on only the FIRST row but deleting ALL
+  // ids → a member could mix their own exception id (to pass validateAccess) with a
+  // peer's ids and delete theirs. Validate every distinct owner before deleting;
+  // validateAccess throws for any the caller may not touch, aborting the whole op.
+  const rows = await prisma.scheduleException.findMany({
     where: { id: { in: exceptionIds } },
-    take: 1
+    select: { userId: true }
   })
-  if (samples.length) {
-    await validateAccess(workspaceId, samples[0].userId, profileId)
+  const distinctOwnerIds = [...new Set(rows.map(r => r.userId))]
+  for (const ownerId of distinctOwnerIds) {
+    await validateAccess(workspaceId, ownerId, profileId)
   }
 
   const result = await prisma.scheduleException.deleteMany({

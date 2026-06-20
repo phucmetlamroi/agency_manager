@@ -51,7 +51,16 @@ export async function updateTask(id: string, data: any, workspaceId: string) {
             if (task.assigneeId !== user.id) return { error: 'Forbidden' }
 
             // SANITIZE: Loại bỏ trường nhạy cảm để nhân viên không tự hack lương/deadline
+            // [AUDIT R3 — fix] `value` IS the VND wage (wageVND is synced FROM it in
+            // update-task-details), so omitting it let an assignee self-inflate their
+            // own earnings via updateTask on their own task. Strip ALL money fields.
             delete data.wageVND
+            delete data.value
+            delete data.jobPriceUSD
+            delete data.profitVND
+            delete data.exchangeRate
+            delete data.invoiceStatus
+            delete data.invoiceId
             delete data.deadline
             delete data.assigneeId
             delete data.assignedAgencyId

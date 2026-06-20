@@ -47,7 +47,12 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
     const handleRevert = () => {
         if (!confirm('Bạn có chắc chắn muốn hoàn tác (hủy) trạng thái thanh toán này?')) return
         startTransition(async () => {
-            const res = await revertPayment(user.id, 0, 0, workspaceId)
+            // [AUDIT R3 — fix] Pass the REAL cycle (same currentMonth/currentYear that
+            // PaymentModal uses for confirmPayment). The old hardcoded (0,0) meant
+            // revertPayment looked up the Payroll row AND the PayrollLock at cycle
+            // (0,0) — finding neither — so revert silently no-op'd "not found" AND the
+            // anti-fraud lock guard never fired. Aligning the cycle restores both.
+            const res = await revertPayment(user.id, currentMonth, currentYear, workspaceId)
             if (res.error) { toast.error(res.error) }
             else { toast.success('Đã hủy trạng thái thanh toán') }
         })

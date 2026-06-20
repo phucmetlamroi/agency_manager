@@ -528,6 +528,10 @@ export default function AddTaskModal({
         // graph survives reload / close+reopen within the 3-min draft window.
         hookGraph: HookGraph | null
         rawFootageMode: 'PER_LINK' | 'MULTI_HOOK_MAP'
+        // [QA R2 fix] Persist the V3 deep-scan payload too — without it, restore
+        // silently downgraded a V3 batch to V1 (losing shared assets / B-roll
+        // encoding / per-task brief notes).
+        veloxV3Payload: VeloxApplyPayloadV3 | null
     }>(
         DRAFT_KEY,
         {
@@ -537,6 +541,7 @@ export default function AddTaskModal({
             veloxFilledFields: Array.from(veloxFilledFields),
             hookGraph,
             rawFootageMode,
+            veloxV3Payload,
         },
         (draft) => {
             // Restore từ localStorage khi mở modal
@@ -552,9 +557,15 @@ export default function AddTaskModal({
                     new Set(draft.veloxFilledFields as (keyof VeloxFormPrefill)[]),
                 )
             }
-            // [QA R1 fix] Restore the Multi-Hook Map + flip to MULTI_HOOK_MAP so the
-            // canvas + "✓ N block" indicator reappear. Guard older draft shapes.
-            if (draft.hookGraph && Array.isArray((draft.hookGraph as HookGraph).blocks)) {
+            // [QA R2 fix] Restore the V3 payload so a V3 batch isn't downgraded to V1.
+            if (draft.veloxV3Payload) {
+                setVeloxV3Payload(draft.veloxV3Payload)
+            }
+            // [QA R1 fix] Restore the Multi-Hook Map. [QA R2 fix] Only force
+            // MULTI_HOOK_MAP when the restored graph actually HAS blocks — otherwise
+            // honour the mode the user last left (don't snap them back into the Map tab
+            // after they emptied it and switched to 'Link lẻ'). Guard older draft shapes.
+            if (draft.hookGraph && ((draft.hookGraph as HookGraph).blocks?.length ?? 0) > 0) {
                 setHookGraph(draft.hookGraph)
                 setRawFootageMode('MULTI_HOOK_MAP')
             } else if (draft.rawFootageMode === 'MULTI_HOOK_MAP') {
@@ -565,11 +576,12 @@ export default function AddTaskModal({
             ttlMs: 3 * 60 * 1000, // 3 phút sliding TTL
             debounceMs: 500,
             enabled: open && !submitted, // chỉ save khi modal đang mở + chưa submit
-            shouldSave: ({ form, veloxBatchRaw, veloxFilledFields, hookGraph }) => {
-                // Save nếu form có content HOẶC Velox đã apply HOẶC đã dựng Multi-Hook
-                // Map (kể cả form chưa hoàn chỉnh — user đã đầu tư công).
+            shouldSave: ({ form, veloxBatchRaw, veloxFilledFields, hookGraph, veloxV3Payload }) => {
+                // Save nếu form có content HOẶC Velox đã apply (V1/V3) HOẶC đã dựng
+                // Multi-Hook Map (kể cả form chưa hoàn chỉnh — user đã đầu tư công).
                 return Boolean(
-                    (hookGraph && hookGraph.blocks.length > 0) ||
+                    veloxV3Payload != null ||
+                        (hookGraph && hookGraph.blocks.length > 0) ||
                         veloxBatchRaw.length > 0 ||
                         veloxFilledFields.length > 0 ||
                         form.clientId ||
@@ -1007,9 +1019,23 @@ export default function AddTaskModal({
                             />
                             </VeloxField>
                             {videoListLocked && (
-                                <p className="text-[11px] text-amber-400/80 pl-1">
-                                    🔒 Danh sách video do Velox quản lý — sửa tên/link trong mục Velox (bước Assets) để không làm mất link đã trích xuất.
-                                </p>
+                                <div className="flex items-start justify-between gap-2 pl-1">
+                                    <p className="text-[11px] text-amber-400/80 flex-1">
+                                        🔒 Danh sách video do Velox quản lý — sửa tên/link trong mục Velox (bước Assets), hoặc <strong>Bỏ Velox</strong> để nhập tay lại.
+                                    </p>
+                                    {/* [QA R2 fix] Un-apply Velox so the user isn't trapped by the lock. */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setVeloxBatchRaw([])
+                                            setVeloxV3Payload(null)
+                                            setVeloxFilledFields(new Set())
+                                        }}
+                                        className="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors"
+                                    >
+                                        Bỏ Velox
+                                    </button>
+                                </div>
                             )}
                         </div>
                         <p className="text-[11px] text-zinc-600 pl-1">

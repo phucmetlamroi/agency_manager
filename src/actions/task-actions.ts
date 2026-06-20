@@ -104,6 +104,14 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             ? { deadline: null }
             : {}
 
+        // [QA R2 fix] Setting status to 'Đang đợi giao' (= back to the pool) MUST also
+        // clear the assignee — otherwise the task stays glued to the editor yet vanishes
+        // from the admin board (the assigneeId↔status invariant). Mirror assignTask's
+        // unassign reset. Applies to the StatusCell dropdown + any caller of this action.
+        const poolReset = newStatus === 'Đang đợi giao'
+            ? { assigneeId: null, isPenalized: false, deadline: null }
+            : {}
+
         // --- SMART STOPWATCH LOGIC ---
         // (Removed to save database usage)
 
@@ -121,6 +129,7 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
                 status: newStatus,
                 ...(newNotes ? { notes_vi: newNotes } : {}),
                 ...deadlineUpdate,
+                ...poolReset,
                 version: { increment: 1 }
             }
 

@@ -49,7 +49,12 @@ async function attachMapToFirstBatchTask(
   graph: import('@/lib/velox/hook-graph-types').HookGraph | undefined,
   taskIds: string[] | undefined,
 ) {
-  if (!graph || graph.blocks.length === 0 || !taskIds || taskIds.length === 0) return
+  if (!graph || graph.blocks.length === 0) return
+  if (!taskIds || taskIds.length === 0) {
+    // [QA R2 fix] Don't silently drop a built map when no task id came back.
+    toast.error('Đã dựng Multi-Hook Map nhưng không có task nào được tạo để gắn — kiểm tra lại danh sách video.')
+    return
+  }
   try {
     const saveResult = await saveHookGraph(taskIds[0], graph)
     if ('error' in saveResult) {
@@ -222,6 +227,21 @@ export default function DashboardActionWrapper({
     // toggle ON, options.veloxBatchRaw carries per-video URLs (1:1 with videoNames).
     // Route to createTasksFromBatch with per-row resources instead of the shared
     // createBatchTasks (which would force all tasks to use the same rawFootage).
+    // [QA R2 fix] Guard the Velox-batch desync (e.g. the conflict dialog kept an old /
+    // merged video list): if per-video links exist but their count no longer matches the
+    // video lines, abort LOUDLY instead of silently routing to the shared path that
+    // drops every per-video link.
+    if (
+      options?.veloxBatchRaw &&
+      options.veloxBatchRaw.length > 0 &&
+      options.veloxBatchRaw.length !== videoNames.length
+    ) {
+      throw new Error(
+        `Số dòng video (${videoNames.length}) không khớp số link Velox (${options.veloxBatchRaw.length}). ` +
+          `Mở lại Velox chọn "Ghi đè", hoặc bấm "Bỏ Velox" rồi nhập lại danh sách.`,
+      )
+    }
+
     const hasVeloxBatch =
       options?.veloxBatchRaw &&
       options.veloxBatchRaw.length === videoNames.length &&

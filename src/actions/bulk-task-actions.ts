@@ -78,6 +78,19 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile rồi thử lại.' }
         }
 
+        // [QA R2 fix] Pre-validate the (single, shared) assignee exists so a stale id
+        // fails with a clear message instead of an opaque FK error that rolls back the
+        // whole batch (mirrors the per-row pre-check in createTasksFromBatch).
+        if (data.assigneeId) {
+            const assigneeExists = await prisma.user.findUnique({
+                where: { id: data.assigneeId },
+                select: { id: true },
+            })
+            if (!assigneeExists) {
+                return { error: 'Người được giao không còn tồn tại — vui lòng chọn lại editor.' }
+            }
+        }
+
         // Use standard prisma instead of extension for this complex transaction
         const createdTasks: { id: string; title: string }[] = []
         await prisma.$transaction(async (tx) => {
@@ -498,6 +511,14 @@ export async function bulkUpdateTaskStatus(
         // status ∈ ['Revision', 'Hoàn tất'] → clear deadline.
         const updateData: any = { status: newStatus, version: { increment: 1 } }
         enforceStatusDeadlineInvariant(updateData)
+        // [QA R2 fix] Bulk-setting status to 'Đang đợi giao' (= back to pool) must also
+        // clear the assignee (assigneeId↔status invariant) — otherwise the tasks stay
+        // glued to their editors yet vanish from the admin board.
+        if (newStatus === 'Đang đợi giao') {
+            updateData.assigneeId = null
+            updateData.isPenalized = false
+            updateData.deadline = null
+        }
 
         await prisma.task.updateMany({
             where: { id: { in: validTasks.map((t) => t.id) }, workspaceId },

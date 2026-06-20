@@ -62,10 +62,22 @@ export async function verifyWorkspaceAccess(
     // REAL-TIME DB CHECK: account active?
     const dbUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true, avatarUrl: true }
+        select: { role: true, avatarUrl: true, sessionVersion: true }
     })
     if (!dbUser || dbUser.role === 'LOCKED') {
         throw new Error('SECURITY_VIOLATION: Tài khoản đã bị khóa hoặc không tồn tại.')
+    }
+
+    // [AUDIT R3 — fix] Enforce sessionVersion here too. verifyActiveSession (the DAL
+    // read path) already rejects a JWT whose sessionVersion is older than the DB, but
+    // verifyWorkspaceAccess gates the WRITE/mutation paths (server actions) — without
+    // this check a "logout all devices" / password-reset (which bumps the DB
+    // sessionVersion) would NOT revoke an old token on those paths. Coerce null→0 so
+    // legacy sessions (schema default 0) are unaffected.
+    const tokenSessionVersion = (session.user as any).sessionVersion ?? 0
+    const dbSessionVersion = (dbUser as any).sessionVersion ?? 0
+    if (tokenSessionVersion < dbSessionVersion) {
+        throw new Error('SECURITY_VIOLATION: Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.')
     }
 
     // Get workspace + its profile

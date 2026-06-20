@@ -34,7 +34,7 @@ import {
     recursiveScanFolder,
 } from '@/lib/cloud-scanner'
 import { classifyScan } from '@/lib/scan-classifier'
-import { refreshTokenIfNeeded } from '@/actions/integration-actions'
+import { refreshTokenIfNeeded } from '@/lib/integration-tokens'
 // [Velox v4] Multi-Hook Map deep-scan engine — runs side-by-side with v3,
 // opt-in via `?v=4`. See FEATURE_REQUIREMENTS_VELOX_MULTIHOOK_MAP_v4.md.
 import { runEngineV4 } from '@/lib/velox/v4-engine'

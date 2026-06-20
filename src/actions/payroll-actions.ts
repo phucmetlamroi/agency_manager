@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { audit } from '@/lib/audit-log'
+import { extractPayrollCycle } from '@/lib/payroll-cycle'
 
 /**
  * Confirm payment cho 1 user trong 1 cycle (month/year/workspace).
@@ -32,12 +33,19 @@ export async function confirmPayment(data: {
         const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         const workspacePrisma = getWorkspacePrisma(workspaceId)
+        // [AUDIT R5 — fix] Resolve the cycle server-side from workspace.name (the SAME
+        // key calculateMonthlyBonus locks) instead of trusting client-supplied
+        // month/year — the payroll page hardcodes (0,0), which desynced the Payroll row
+        // from the PayrollLock and killed the anti-fraud revert guard.
+        const ws = await workspacePrisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } })
+        const { month, year } = extractPayrollCycle(ws?.name)
+
         const payroll = await workspacePrisma.payroll.upsert({
             where: {
                 userId_month_year_workspaceId: {
                     userId: data.userId,
-                    month: data.month,
-                    year: data.year,
+                    month,
+                    year,
                     workspaceId
                 }
             } as any,
@@ -50,8 +58,8 @@ export async function confirmPayment(data: {
             },
             create: {
                 userId: data.userId,
-                month: data.month,
-                year: data.year,
+                month,
+                year,
                 workspaceId: workspaceId,
                 baseSalary: data.baseSalary,
                 bonus: data.bonus,
@@ -70,8 +78,8 @@ export async function confirmPayment(data: {
             targetId: payroll.id,
             after: {
                 userId: data.userId,
-                month: data.month,
-                year: data.year,
+                month,
+                year,
                 totalAmount: data.totalAmount,
                 status: 'PAID',
             },
@@ -133,11 +141,18 @@ export async function getPayrollData(month: number, year: number, workspaceId: s
  *
  * Treasurer "lén" revert payment để inflate bonus là attack vector cũ.
  */
-export async function revertPayment(userId: string, month: number, year: number, workspaceId: string) {
+export async function revertPayment(userId: string, _month: number, _year: number, workspaceId: string) {
     try {
         const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         const workspacePrisma = getWorkspacePrisma(workspaceId)
+
+        // [AUDIT R5 — fix] Ignore the client-supplied month/year (the payroll page sends
+        // (0,0)); resolve the REAL cycle from workspace.name so the lock lookup, the
+        // Payroll lookup and the delete all use the same key calculateMonthlyBonus
+        // locked. This revives the anti-fraud guard: a locked cycle blocks revert.
+        const ws = await workspacePrisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } })
+        const { month, year } = extractPayrollCycle(ws?.name)
 
         // Check lock của cycle (workspace + month + year)
         const lock = await workspacePrisma.payrollLock.findUnique({

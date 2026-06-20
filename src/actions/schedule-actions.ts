@@ -129,7 +129,9 @@ export async function createScheduleException(
   creatorId?: string
 ) {
   if (!profileId) throw new Error("profileId is required")
-  await validateAccess(workspaceId, userId, profileId)
+  // [AUDIT R5 — fix] Bind the audit-attribution field to the authenticated caller —
+  // the untrusted creatorId param could otherwise stamp another user as the creator.
+  const caller = await validateAccess(workspaceId, userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
 
   // Parse "YYYY-MM-DD" directly as UTC midnight → no timezone drift
@@ -145,7 +147,7 @@ export async function createScheduleException(
       type,
       reason,
       timezone,
-      updatedById: creatorId,
+      updatedById: caller.id,
       workspaceId,
       profileId
     }
@@ -170,9 +172,10 @@ export async function createBatchScheduleExceptions(
 ) {
   if (!entries.length) return { count: 0 }
   if (!profileId) throw new Error("profileId is required")
-  await validateAccess(workspaceId, userId, profileId)
+  // [AUDIT R5 — fix] Bind audit-attribution to the authenticated caller.
+  const caller = await validateAccess(workspaceId, userId, profileId)
   const prisma = getWorkspacePrisma(workspaceId, profileId)
-  
+
   const created = await prisma.$transaction(
     entries.map(e => prisma.scheduleException.create({
       data: {
@@ -183,7 +186,7 @@ export async function createBatchScheduleExceptions(
         type: e.type,
         reason: e.reason,
         timezone,
-        updatedById: creatorId,
+        updatedById: caller.id,
         workspaceId,
         profileId
       }
@@ -227,6 +230,10 @@ export async function getEffectiveAvailability(
   userId: string,
   targetDate: Date
 ) {
+  // [AUDIT R1 — HIGH fix #18] This read had NO auth → anyone could dump any
+  // user's availability cross-tenant by passing ids. Require the caller to be a
+  // member of this workspace (every mutation here already routes via validateAccess).
+  await verifyWorkspaceAccess(workspaceId, 'MEMBER')
   const prisma = getWorkspacePrisma(workspaceId, profileId)
   
   // Normalize date to UTC midnight
@@ -271,12 +278,17 @@ export async function deleteScheduleExceptionsByIds(
   if (!profileId) throw new Error("profileId is required")
   
   const prisma = getWorkspacePrisma(workspaceId, profileId)
-  const samples = await prisma.scheduleException.findMany({ 
+  // [AUDIT R3 — fix] Was validating access on only the FIRST row but deleting ALL
+  // ids → a member could mix their own exception id (to pass validateAccess) with a
+  // peer's ids and delete theirs. Validate every distinct owner before deleting;
+  // validateAccess throws for any the caller may not touch, aborting the whole op.
+  const rows = await prisma.scheduleException.findMany({
     where: { id: { in: exceptionIds } },
-    take: 1
+    select: { userId: true }
   })
-  if (samples.length) {
-    await validateAccess(workspaceId, samples[0].userId, profileId)
+  const distinctOwnerIds = [...new Set(rows.map(r => r.userId))]
+  for (const ownerId of distinctOwnerIds) {
+    await validateAccess(workspaceId, ownerId, profileId)
   }
 
   const result = await prisma.scheduleException.deleteMany({

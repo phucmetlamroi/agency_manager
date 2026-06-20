@@ -88,10 +88,15 @@ export async function trackEvent(payload: TrackingEventPayload) {
 /**
  * Pings the application with presence data (Heartbeat)
  */
-export async function pingHeartbeat(status: 'ONLINE' | 'AWAY' | 'BUSY' | 'OFFLINE' = 'ONLINE', currentUserId?: string) {
+export async function pingHeartbeat(status: 'ONLINE' | 'AWAY' | 'BUSY' | 'OFFLINE' = 'ONLINE', _currentUserId?: string) {
     try {
-        // Find the user context. If currentUserId is not provided, try to extract via headers or layout auth
-        if (!currentUserId) return { success: false, reason: 'No User ID provided for heartbeat' }
+        // [AUDIT R1 — HIGH fix #16] The user id was taken from the CLIENT-supplied
+        // `currentUserId` with no auth → anyone could forge presence/session rows for
+        // any user. Always derive the user id from the authenticated session and
+        // ignore the (now legacy) client-supplied argument.
+        const session = await getSession()
+        const currentUserId = session?.user?.id
+        if (!currentUserId) return { success: false, reason: 'Unauthenticated' }
 
         await prisma.userPresence.upsert({
             where: { userId: currentUserId },

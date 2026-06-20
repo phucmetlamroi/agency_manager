@@ -1,10 +1,18 @@
 'use server'
 
 import { prisma } from '@/lib/db'
+import { verifyActiveSession } from '@/lib/security'
 
 const GLOBAL_FRAME_TASK_ID = 'global-system-settings'
 
 export async function getFrameAccount() {
+    // [AUDIT R1 — BLOCKER fix] These were unauthenticated server actions exposing a
+    // shared credential to anyone. Require an authenticated, active (non-locked)
+    // session before reading/writing the global Frame account.
+    const sess = await verifyActiveSession()
+    if (sess.status !== 'active') {
+        return { account: '', password: '' }
+    }
     try {
         const frameTask = await prisma.task.findUnique({
             where: { id: GLOBAL_FRAME_TASK_ID }
@@ -31,6 +39,12 @@ export async function getFrameAccount() {
 }
 
 export async function updateFrameAccount(account: string, password: string) {
+    // [AUDIT R1 — BLOCKER fix] Require an authenticated, active session before
+    // overwriting the global shared credential.
+    const sess = await verifyActiveSession()
+    if (sess.status !== 'active') {
+        return { error: 'Bạn cần đăng nhập.' }
+    }
     try {
         const payload = JSON.stringify({ account, password })
 

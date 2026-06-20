@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
+import { getProfileRole } from '@/lib/profile-permissions'
 
 /**
  * Gửi yêu cầu "Du học": Admin team gốc xin cấp quyền cho user vào team khác.
@@ -27,7 +28,18 @@ export async function requestCrossTeamAccess(userId: string, targetProfileId: st
             where: { id: userId },
             select: { profileId: true }
         })
-        if (user?.profileId === targetProfileId) return { success: false, error: 'User đã thuộc team này (team gốc)' }
+        if (!user) return { success: false, error: 'Người dùng không tồn tại' }
+        if (user.profileId === targetProfileId) return { success: false, error: 'User đã thuộc team này (team gốc)' }
+
+        // [AUDIT R2 — fix] Authority check: the caller must be OWNER/ADMIN of the
+        // user's ORIGIN profile to request cross-team ("du học") access on their
+        // behalf. Previously ANY logged-in user could mint a request for an
+        // arbitrary userId → arbitrary targetProfileId (cross-tenant escalation seed).
+        if (!user.profileId) return { success: false, error: 'Người dùng không có team gốc.' }
+        const callerOriginRole = await getProfileRole(requestedById, user.profileId)
+        if (callerOriginRole !== 'OWNER' && callerOriginRole !== 'ADMIN') {
+            return { success: false, error: 'Bạn không có quyền gửi yêu cầu du học cho người dùng này.' }
+        }
 
         // Kiểm tra xem đã có access chưa
         const existingAccess = await prisma.profileAccess.findUnique({
@@ -84,6 +96,15 @@ export async function approveCrossTeamAccess(requestId: string, workspaceId: str
         const request = await prisma.profileAccessRequest.findUnique({ where: { id: requestId } })
         if (!request || request.status !== 'PENDING') return { success: false, error: 'Yêu cầu không hợp lệ hoặc đã xử lý' }
 
+        // [AUDIT R2 — BLOCKER fix] Authority check: only an OWNER/ADMIN of the TARGET
+        // profile may approve a request that grants access into it. Previously any
+        // logged-in user could approve any PENDING request → mint cross-tenant
+        // ProfileAccess into a profile they have no authority over.
+        const approverRole = await getProfileRole(approvedById, request.targetProfileId)
+        if (approverRole !== 'OWNER' && approverRole !== 'ADMIN') {
+            return { success: false, error: 'Bạn không có quyền duyệt yêu cầu vào team này.' }
+        }
+
         // Thêm quyền truy cập
         await prisma.$transaction([
             prisma.profileAccess.upsert({
@@ -113,6 +134,15 @@ export async function rejectCrossTeamAccess(requestId: string, workspaceId: stri
         const approvedById = session?.user?.id
         if (!approvedById) return { success: false, error: 'Chưa đăng nhập' }
 
+        // [AUDIT R2 — fix] Only an OWNER/ADMIN of the target profile may reject a
+        // request into it (mirrors approveCrossTeamAccess).
+        const request = await prisma.profileAccessRequest.findUnique({ where: { id: requestId } })
+        if (!request) return { success: false, error: 'Yêu cầu không tồn tại' }
+        const approverRole = await getProfileRole(approvedById, request.targetProfileId)
+        if (approverRole !== 'OWNER' && approverRole !== 'ADMIN') {
+            return { success: false, error: 'Bạn không có quyền từ chối yêu cầu vào team này.' }
+        }
+
         await prisma.profileAccessRequest.update({
             where: { id: requestId },
             data: { status: 'REJECTED', approvedById }
@@ -130,6 +160,18 @@ export async function rejectCrossTeamAccess(requestId: string, workspaceId: stri
  */
 export async function removeCrossTeamAccess(userId: string, profileId: string, workspaceId: string) {
     try {
+        // [AUDIT R2 — fix] Only an OWNER/ADMIN of the profile, or the user revoking
+        // their OWN cross-team access, may remove. Previously this had NO auth at all
+        // → any caller could delete ANY user's ProfileAccess in ANY profile.
+        const session = await getSession()
+        const callerId = session?.user?.id
+        if (!callerId) return { success: false, error: 'Chưa đăng nhập' }
+        const callerRole = await getProfileRole(callerId, profileId)
+        const isProfileAdmin = callerRole === 'OWNER' || callerRole === 'ADMIN'
+        if (!isProfileAdmin && callerId !== userId) {
+            return { success: false, error: 'Bạn không có quyền gỡ quyền du học này.' }
+        }
+
         // Xóa ProfileAccess và Reset luôn ProfileAccessRequest để có thể xin lại sau
         await prisma.$transaction([
             prisma.profileAccess.delete({

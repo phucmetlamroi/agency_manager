@@ -107,6 +107,17 @@ export async function inviteToProfileAction(
         return { error: 'Bạn không có quyền mời thành viên vào Profile này.' }
     }
 
+    // [AUDIT R5 — fix] Privilege-escalation: canInviteMember allows OWNER *or* ADMIN,
+    // but the requested `role` was applied verbatim → an ADMIN could mint another
+    // ADMIN. Only a profile OWNER may grant the ADMIN role (mirrors the OWNER-only
+    // promote/demote rule in the permission matrix).
+    if (role === 'ADMIN') {
+        const callerRole = await getProfileRole(session.user.id, profileId)
+        if (callerRole !== 'OWNER') {
+            return { error: 'Chỉ Owner mới có quyền cấp vai trò Admin.' }
+        }
+    }
+
     const trimmed = usernameOrEmail.trim()
     if (!trimmed) return { error: 'Tên đăng nhập / email không được để trống.' }
 

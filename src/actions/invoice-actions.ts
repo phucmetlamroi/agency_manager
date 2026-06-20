@@ -22,6 +22,10 @@ const toSafeNumber = (val: any) => {
 
 export async function getBillingProfiles(workspaceId?: string) {
     try {
+        // [AUDIT R4 — fix] The no-workspaceId branch skipped the access check entirely
+        // and returned profileId:null billing rows (bank details) to ANY caller.
+        // Require a workspace context — every real caller passes it.
+        if (!workspaceId) return { error: 'workspaceId required' }
         let profileId: string | null = null;
         if (workspaceId) {
             // SECURITY: Verify caller is a member of the workspace before reading
@@ -69,13 +73,11 @@ export async function createBillingProfile(data: {
 }) {
 
     try {
-        // SECURITY: if workspaceId provided, require workspace ADMIN; else require global ADMIN.
-        if (data.workspaceId) {
-            await verifyWorkspaceAccess(data.workspaceId, 'ADMIN')
-        } else {
-            const user = await getCurrentUser()
-            if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
-        }
+        // [AUDIT R5 — fix] Require a workspace context + workspace ADMIN. The legacy
+        // no-workspace global-ADMIN branch is dead under Sprint Z and would mint an
+        // orphaned profileId:null billing row — mirror update/delete/get billing.
+        if (!data.workspaceId) return { error: 'workspaceId required' }
+        await verifyWorkspaceAccess(data.workspaceId, 'ADMIN')
 
         let profileId: string | null = null;
         if (data.workspaceId) {
@@ -130,21 +132,28 @@ export async function updateBillingProfile(id: string, data: {
     notes?: string
     isDefault?: boolean
     currency?: string
-}) {
+}, workspaceId?: string) {
 
     try {
-        const user = await getCurrentUser()
-        if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
+        // [AUDIT R4 — fix] Was gated only on the removed legacy global ADMIN with NO
+        // tenant scope → a stray ADMIN account could tamper with ANY tenant's bank
+        // details by id, while legit profile owners were locked out. Require workspace
+        // ADMIN and scope the mutation to THIS workspace's profile.
+        if (!workspaceId) return { error: 'workspaceId required' }
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+        const scopedProfileId = ws?.profileId ?? null
 
-        const currentProfile = await prisma.billingProfile.findUnique({
-            where: { id },
-            select: { profileId: true }
+        const currentProfile = await prisma.billingProfile.findFirst({
+            where: { id, profileId: scopedProfileId },
+            select: { id: true, profileId: true }
         });
+        if (!currentProfile) return { error: 'Billing profile not found' }
 
         if (data.isDefault) {
             // Unset other defaults for THIS profile
             await prisma.billingProfile.updateMany({
-                where: { isDefault: true, id: { not: id }, profileId: currentProfile?.profileId },
+                where: { isDefault: true, id: { not: id }, profileId: scopedProfileId },
                 data: { isDefault: false }
             })
         }
@@ -166,22 +175,29 @@ export async function updateBillingProfile(id: string, data: {
 
         revalidatePath('/admin/crm')
         return { success: true, data: profile }
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) return { error: error.message }
         return { error: 'Failed to update billing profile' }
     }
 }
 
-export async function deleteBillingProfile(id: string) {
+export async function deleteBillingProfile(id: string, workspaceId?: string) {
     try {
-        const user = await getCurrentUser()
-        if (!user || user.role !== 'ADMIN') return { error: 'Unauthorized' }
+        // [AUDIT R4 — fix] Same legacy-ADMIN + no-tenant-scope gap as updateBillingProfile.
+        if (!workspaceId) return { error: 'workspaceId required' }
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+        const scopedProfileId = ws?.profileId ?? null
 
-        await prisma.billingProfile.delete({
-            where: { id }
+        // deleteMany scoped to this workspace's profile → a foreign id simply no-ops.
+        const result = await prisma.billingProfile.deleteMany({
+            where: { id, profileId: scopedProfileId }
         })
+        if (result.count === 0) return { error: 'Billing profile not found' }
         revalidatePath('/admin/crm')
         return { success: true }
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) return { error: error.message }
         return { error: 'Failed to delete billing profile' }
     }
 }
@@ -200,6 +216,13 @@ export async function getUnbilledTasks(clientId: number, workspaceId: string) {
         // REQUIRES profileId for client queries (fail-closed guard). Resolve
         // it via the session (also gives us the missing membership check).
         const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        // [AUDIT R3 — fix] This returns per-task jobPriceUSD (agency USD revenue) which
+        // must never reach non-finance staff. Require a finance role (the invoice
+        // builder that calls this is admin/treasurer-only anyway).
+        const caller = await getCurrentUser()
+        if (!caller || (!caller.isSuperAdmin && !caller.isTreasurer)) {
+            return { error: 'Forbidden' }
+        }
         const profileId = (session?.user as any)?.sessionProfileId as string | undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // 1. Get all related Client IDs (Parent + Children) — skip archived subs
@@ -247,24 +270,36 @@ export async function getUnbilledTasks(clientId: number, workspaceId: string) {
 
 // Preview Invoice Calculations (No DB connection needed for calc, but good for validation)
 export async function calculateInvoicePreview(taskIds: string[], taxRate: number = 0, depositCurrent: number = 0, workspaceId: string) {
-    // This is a utility action to help frontend validation if needed
-    const workspacePrisma = getWorkspacePrisma(workspaceId)
-    // Fetch fresh data to ensure security
-    const tasks = await workspacePrisma.task.findMany({
-        where: { id: { in: taskIds } },
-        select: { jobPriceUSD: true }
-    })
+    // [AUDIT R1/R2 — HIGH fix #14] This had NO auth and returned a subtotal of
+    // jobPriceUSD (agency USD revenue, which must never reach non-finance staff).
+    // Require workspace membership + finance role; return zeros otherwise.
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const user = await getCurrentUser()
+        if (!user || (!user.isSuperAdmin && !user.isTreasurer)) {
+            return { subtotal: 0, taxAmount: 0, totalDue: 0 }
+        }
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        // Fetch fresh data to ensure security
+        const tasks = await workspacePrisma.task.findMany({
+            where: { id: { in: taskIds } },
+            select: { jobPriceUSD: true }
+        })
 
-    const subtotal = tasks.reduce((sum, t) => sum + Number(t.jobPriceUSD || 0), 0)
-    const taxAmount = subtotal * (taxRate / 100)
+        const subtotal = tasks.reduce((sum, t) => sum + Number(t.jobPriceUSD || 0), 0)
+        const taxAmount = subtotal * (taxRate / 100)
 
-    let totalDue = subtotal + taxAmount - depositCurrent
-    if (totalDue < 0) totalDue = 0
+        let totalDue = subtotal + taxAmount - depositCurrent
+        if (totalDue < 0) totalDue = 0
 
-    return {
-        subtotal,
-        taxAmount,
-        totalDue
+        return {
+            subtotal,
+            taxAmount,
+            totalDue
+        }
+    } catch (error) {
+        console.error('calculateInvoicePreview error:', error)
+        return { subtotal: 0, taxAmount: 0, totalDue: 0 }
     }
 }
 
@@ -287,13 +322,22 @@ export async function createInvoiceRecord(data: {
     taskIds: string[]
 }, workspaceId: string) {
     try {
+        // [AUDIT R1 — BLOCKER fix] Authorization was a GLOBAL finance-flag check
+        // (isSuperAdmin/isTreasurer) with NO workspace scope → a treasurer of
+        // workspace A could create invoices against clients of workspace B simply
+        // by passing B's id. Require the caller to be a member of THIS workspace
+        // first (scope), then keep the finance-role gate. profileId is resolved so
+        // the client-deposit write below is correctly profile-scoped (Client is
+        // profile-scoped and fail-closes without it).
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
         const user = await getCurrentUser()
         // Determine if user has permission (Admin or Treasurer)
         if (!user || (!user.isSuperAdmin && !user.isTreasurer)) return { error: 'Unauthorized' }
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
-        // 0. Verify Tasks are Unbilled (Prevent Double Billing)
+        // 0. Verify Tasks are Unbilled (Prevent Double Billing) — fast-fail before tx.
         if (data.taskIds.length > 0) {
             const billedCount = await workspacePrisma.task.count({
                 where: {
@@ -336,24 +380,43 @@ export async function createInvoiceRecord(data: {
             })
 
             // 2. Update Tasks (Mark as INVOICED)
+            // [AUDIT R1 — HIGH fix #13] Double-billing race: the pre-tx count check
+            // (step 0) can be passed concurrently by two requests, both marking the
+            // same tasks INVOICED. Make the claim atomic by only flipping tasks that
+            // are STILL UNBILLED and asserting we claimed all of them — otherwise a
+            // concurrent invoice already grabbed some, so we roll back this one.
             if (data.taskIds.length > 0) {
-                await tx.task.updateMany({
-                    where: { id: { in: data.taskIds } },
+                const claimed = await tx.task.updateMany({
+                    where: { id: { in: data.taskIds }, invoiceStatus: 'UNBILLED' },
                     data: {
                         invoiceId: invoice.id,
                         invoiceStatus: 'INVOICED'
                     }
                 })
+                if (claimed.count !== data.taskIds.length) {
+                    throw new Error('CONCURRENT_INVOICE: some tasks were billed concurrently')
+                }
             }
 
             // 3. Deduct Deposit from Client (if any)
+            // [AUDIT R1 — HIGH fix #12] Clamp the deduction to the available balance
+            // so a stale/oversized client-deposit amount can't drive depositBalance
+            // negative. Read inside the tx for isolation.
             if (data.clientDepositDeducted && data.clientDepositDeducted > 0) {
-                await tx.client.update({
+                const client = await tx.client.findUnique({
                     where: { id: data.clientId },
-                    data: {
-                        depositBalance: { decrement: data.clientDepositDeducted }
-                    }
+                    select: { depositBalance: true }
                 })
+                const available = toSafeNumber(client?.depositBalance)
+                const deduct = Math.min(data.clientDepositDeducted, available)
+                if (deduct > 0) {
+                    await tx.client.update({
+                        where: { id: data.clientId },
+                        data: {
+                            depositBalance: { decrement: deduct }
+                        }
+                    })
+                }
             }
 
             return invoice
@@ -395,8 +458,14 @@ export async function createInvoiceRecord(data: {
 
         return { success: true, data: safeResult }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Create Invoice Error:', error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
+        if (error?.message?.startsWith('CONCURRENT_INVOICE')) {
+            return { error: 'Some tasks have already been invoiced. Please refresh.' }
+        }
         return { error: 'Failed to save invoice record' }
     }
 }
@@ -447,10 +516,17 @@ export async function getClientInvoices(clientId: number, workspaceId: string) {
 // Void Invoice (Revert actions)
 export async function voidInvoice(invoiceId: string, workspaceId: string) {
     try {
+        // [AUDIT R1/R2 — BLOCKER fix #3] Same cross-tenant gap as createInvoiceRecord:
+        // global finance flags with no workspace scope let a treasurer of one tenant
+        // void invoices of another (flipping their tasks to UNBILLED + refunding their
+        // client deposit). Require membership of THIS workspace first; resolve profileId
+        // so the client deposit-refund (Client is profile-scoped) actually runs.
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
         const user = await getCurrentUser()
         if (!user || (!user.isSuperAdmin && !user.isTreasurer)) return { error: 'Unauthorized' }
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
         const invoice = await workspacePrisma.invoice.findUnique({
             where: { id: invoiceId },
@@ -491,8 +567,11 @@ export async function voidInvoice(invoiceId: string, workspaceId: string) {
         revalidatePath(`/${workspaceId}/admin/crm/${invoice.clientId}`)
         return { success: true }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Void Invoice Error:', error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
         return { error: 'Failed to void invoice' }
     }
 }

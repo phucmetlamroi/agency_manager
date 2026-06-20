@@ -46,6 +46,10 @@ export interface BatchTaskRow {
     deadline: string | null
     /** Original footage link → stored in `resources` */
     rawFootage: string | null
+    /** [QA R1 fix] Collect-files link → stored in `collectFilesLink`. Was missing,
+     *  so the "Collect file" link entered in the UI was silently dropped on every
+     *  Velox batch create. */
+    collectFilesLink?: string | null
     /** Packed references string ("REF:url | SCRIPT:url") → stored in `references` */
     references?: string | null
     /** Per-row notes (notes_vi). null → empty */
@@ -192,6 +196,7 @@ export async function createTasksFromBatch(
                         type: row.type,
                         deadline: deadlineDate,
                         resources: row.rawFootage,
+                        collectFilesLink: row.collectFilesLink ?? null,
                         references: row.references ?? null,
                         notes_vi: row.notes,
                         notes_en: null,

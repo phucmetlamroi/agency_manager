@@ -43,6 +43,31 @@ interface DashboardActionWrapperProps {
   onTaskCreated?: () => void
 }
 
+// [QA R1 — user decision] A Multi-Hook Map can't fan out across a batch — attach it to
+// the FIRST created task + toast so the admin's work isn't silently discarded.
+async function attachMapToFirstBatchTask(
+  graph: import('@/lib/velox/hook-graph-types').HookGraph | undefined,
+  taskIds: string[] | undefined,
+) {
+  if (!graph || graph.blocks.length === 0) return
+  if (!taskIds || taskIds.length === 0) {
+    // [QA R2 fix] Don't silently drop a built map when no task id came back.
+    toast.error('Đã dựng Multi-Hook Map nhưng không có task nào được tạo để gắn — kiểm tra lại danh sách video.')
+    return
+  }
+  try {
+    const saveResult = await saveHookGraph(taskIds[0], graph)
+    if ('error' in saveResult) {
+      toast.error(`Đã tạo các task nhưng không lưu được Multi-Hook Map: ${saveResult.error}`)
+    } else {
+      toast.success(`Đã gắn Multi-Hook Map vào task đầu của lô (${taskIds.length} task).`)
+    }
+  } catch (err) {
+    console.error('[hook-graph] batch attach threw:', err)
+    toast.error('Đã tạo các task nhưng lưu Multi-Hook Map thất bại — thử lại từ Task detail.')
+  }
+}
+
 export default function DashboardActionWrapper({
   workspaceId,
   clients,
@@ -178,15 +203,19 @@ export default function DashboardActionWrapper({
           assigneeId: v3.common.assigneeId ?? data.assigneeId ?? null,
           deadline: v3.common.deadline ?? data.deadline ?? null,
           rawFootage: encodedResources,
+          // [QA R1 fix] Forward the "Collect file" link — was dropped on the V3 batch path.
+          collectFilesLink: data.collectFile || null,
           references: v3PackedReferences,
           notes: notesWithBrief || null,
         }
       })
       const result = await createTasksFromBatch(
-        { rows, exchangeRate: 25000 },
+        { rows, exchangeRate },
         workspaceId,
       )
       if ('error' in result) throw new Error(result.error)
+      // [QA R1 — user decision] Attach the Multi-Hook Map to the batch's first task.
+      await attachMapToFirstBatchTask(options?.hookGraphV1, result.taskIds)
 
       startTransition(() => {
         router.refresh()
@@ -198,6 +227,21 @@ export default function DashboardActionWrapper({
     // toggle ON, options.veloxBatchRaw carries per-video URLs (1:1 with videoNames).
     // Route to createTasksFromBatch with per-row resources instead of the shared
     // createBatchTasks (which would force all tasks to use the same rawFootage).
+    // [QA R2 fix] Guard the Velox-batch desync (e.g. the conflict dialog kept an old /
+    // merged video list): if per-video links exist but their count no longer matches the
+    // video lines, abort LOUDLY instead of silently routing to the shared path that
+    // drops every per-video link.
+    if (
+      options?.veloxBatchRaw &&
+      options.veloxBatchRaw.length > 0 &&
+      options.veloxBatchRaw.length !== videoNames.length
+    ) {
+      throw new Error(
+        `Số dòng video (${videoNames.length}) không khớp số link Velox (${options.veloxBatchRaw.length}). ` +
+          `Mở lại Velox chọn "Ghi đè", hoặc bấm "Bỏ Velox" rồi nhập lại danh sách.`,
+      )
+    }
+
     const hasVeloxBatch =
       options?.veloxBatchRaw &&
       options.veloxBatchRaw.length === videoNames.length &&
@@ -222,15 +266,19 @@ export default function DashboardActionWrapper({
           deadline: data.deadline || null,
           // rawFootage in createTasksFromBatch maps to `resources` field
           rawFootage: rowResources || null,
+          // [QA R1 fix] Forward the "Collect file" link — was dropped on the V1 Velox batch path.
+          collectFilesLink: data.collectFile || null,
           references: packedReferences || null,
           notes: data.notes || null,
         }
       })
       const result = await createTasksFromBatch(
-        { rows, exchangeRate: 25000 },
+        { rows, exchangeRate },
         workspaceId,
       )
       if ('error' in result) throw new Error(result.error)
+      // [QA R1 — user decision] Attach the Multi-Hook Map to the batch's first task.
+      await attachMapToFirstBatchTask(options?.hookGraphV1, result.taskIds)
     } else if (titles.length === 1) {
       // Single task — use the original createTask path
       const fd = new FormData()
@@ -240,7 +288,7 @@ export default function DashboardActionWrapper({
       fd.set("deadline", data.deadline || "")
       fd.set("jobPriceUSD", data.jobPriceUSD || "0")
       fd.set("value", data.editorFee || "0")
-      fd.set("exchangeRate", "25000")
+      fd.set("exchangeRate", String(exchangeRate))
       fd.set("references", packedReferences)
       fd.set("resources", packedResources)
       fd.set("fileLink", "")                     // [FIX] Empty — bRoll giờ packed trong resources
@@ -280,7 +328,7 @@ export default function DashboardActionWrapper({
           assigneeId: data.assigneeId || null,
           deadline: data.deadline || null,
           jobPriceUSD: parseFloat(data.jobPriceUSD) || 0,
-          exchangeRate: 25000,
+          exchangeRate,
           wageVND: parseFloat(data.editorFee) || 0,
           resources: packedResources || null,
           references: packedReferences || null,
@@ -298,6 +346,8 @@ export default function DashboardActionWrapper({
         workspaceId
       )
       if (result?.error) throw new Error(result.error)
+      // [QA R1 — user decision] Attach the Multi-Hook Map to the batch's first task.
+      await attachMapToFirstBatchTask(options?.hookGraphV1, (result as { taskIds?: string[] })?.taskIds)
     }
 
     startTransition(() => {

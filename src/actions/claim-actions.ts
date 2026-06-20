@@ -6,22 +6,23 @@ import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 
-// ─── Helper: Quick boolean membership check (legacy shim) ─────
-// Renamed from `verifyWorkspaceAccess` (which shadowed the global security
-// helper). Internal callers vẫn dùng để check nhanh; SECURITY-critical paths
-// (claim, etc.) phải dùng `verifyWorkspaceAccess` global thay vì hàm này.
-async function isWorkspaceMemberOrInScope(userId: string, workspaceId: string): Promise<boolean> {
-    const member = await prisma.workspaceMember.findUnique({
-        where: { userId_workspaceId: { userId, workspaceId } }
-    })
-    if (member) return true
-    const workspacePrisma = getWorkspacePrisma(workspaceId)
-    const user = await workspacePrisma.user.findUnique({ where: { id: userId } })
-    return !!user
-}
+// [AUDIT R2 — fix] Removed `isWorkspaceMemberOrInScope`: its fallback queried the
+// GLOBAL User model (workspacePrisma.user.findUnique), so it returned true for ANY
+// authenticated user — leaking marketplace tasks (wageVND + client names) across
+// tenants. All call sites now use the real `verifyWorkspaceAccess` gate, which
+// throws SECURITY_VIOLATION for non-members (same as claimTask already did).
 
 // ─── Get marketplace open/close status ────────────────────────
 export async function getMarketplaceStatus(workspaceId: string) {
+    // [AUDIT R5 — fix] Exported server action — require workspace membership so it
+    // can't be used to probe another tenant's marketplace state. Internal callers
+    // (getMarketplaceTasks/claimTask) already hold access; safe default (closed) on
+    // violation.
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    } catch {
+        return false
+    }
     const workspace = await prisma.workspace.findUnique({
         where: { id: workspaceId },
         select: { marketplaceOpen: true }
@@ -64,11 +65,14 @@ export async function toggleMarketplace(workspaceId: string) {
 
 // ─── Get unassigned tasks for marketplace ─────────────────────
 export async function getMarketplaceTasks(workspaceId: string) {
-    const session = await getSession()
-    if (!session) return { error: 'Unauthorized', tasks: [], marketplaceOpen: true }
-
-    if (!await isWorkspaceMemberOrInScope(session.user.id, workspaceId)) {
-        return { error: 'Forbidden: Not a member of this workspace', tasks: [], marketplaceOpen: true }
+    // [AUDIT R2 — fix] Real workspace-membership gate (was the broken shim).
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    } catch (e: any) {
+        if (e?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: 'Forbidden: Not a member of this workspace', tasks: [], marketplaceOpen: true }
+        }
+        throw e
     }
 
     // Check if marketplace is open
@@ -207,13 +211,16 @@ export async function claimTask(taskId: string, workspaceId: string) {
 
 // ─── Return a claimed task (within 10 minutes) ───────────────
 export async function returnTask(taskId: string, workspaceId: string) {
-    const session = await getSession()
-    if (!session) return { error: 'Unauthorized' }
-
-    const userId = session.user.id
-
-    if (!await isWorkspaceMemberOrInScope(userId, workspaceId)) {
-        return { error: 'Forbidden: Not a member of this workspace' }
+    // [AUDIT R2 — fix] Real workspace-membership gate (was the broken shim).
+    let userId: string
+    try {
+        const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        userId = access.userId
+    } catch (e: any) {
+        if (e?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: 'Forbidden: Not a member of this workspace' }
+        }
+        throw e
     }
 
     const workspacePrisma = getWorkspacePrisma(workspaceId)

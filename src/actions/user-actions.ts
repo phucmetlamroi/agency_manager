@@ -38,14 +38,35 @@ export async function changePassword(formData: FormData, workspaceId: string) {
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
         // SECURITY: workspace-scoped admin check (was global ADMIN only).
-        const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
+        // [AUDIT R2 — fix] Constrain assignable roles (never the legacy global ADMIN /
+        // super-admin — that would be a privilege-escalation), scope the target to the
+        // caller's profile (User is a GLOBAL model, not workspace-scoped, so without
+        // this a workspace admin could re-role a user in another tenant), and forbid
+        // self-target. Account-level admin-ness now lives in ProfileRole
+        // (changeProfileRoleAction), not User.role.
+        const ASSIGNABLE_ROLES: UserRole[] = [UserRole.USER, UserRole.AGENCY_ADMIN]
+        if (!ASSIGNABLE_ROLES.includes(newRole as UserRole)) {
+            return { success: false, error: 'Vai trò không hợp lệ cho thao tác này.' }
+        }
+        if (userId === actorId) {
+            return { success: false, error: 'Không thể tự đổi vai trò của chính mình.' }
+        }
 
         // [Sprint Z] Super admin protection removed — admin user deleted in Z.12.
         // Profile-level role changes use changeProfileRoleAction instead.
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { role: true },
+            select: { role: true, profileId: true },
         })
+        if (!targetUser) return { success: false, error: 'Người dùng không tồn tại.' }
+        // [AUDIT R5 — fix] No JWT role==='ADMIN' escape hatch (Sprint Z removed the
+        // global super-admin); the cross-profile check is unconditional.
+        const callerProfileId = (session?.user as any)?.sessionProfileId
+        if (targetUser.profileId && targetUser.profileId !== callerProfileId) {
+            return { success: false, error: 'Bạn không thể đổi vai trò của user thuộc Profile khác.' }
+        }
 
         await prisma.user.update({
             where: { id: userId },
@@ -105,9 +126,13 @@ export async function deactivateUser(userId: string, workspaceId: string) {
         // Audit fix #2.6: profile scoping check
         // Trước: workspace ADMIN có thể deactivate user thuộc profile khác (cross-tenant)
         // Sau: target user phải cùng profile với caller (hoặc caller là global ADMIN)
+        // [AUDIT R5 — fix] Removed the `callerIsGlobalAdmin = role==='ADMIN'` escape
+        // hatch from the cross-profile + owner guards below: Sprint Z removed the global
+        // super-admin, so a JWT-asserted role==='ADMIN' must NOT bypass tenant isolation
+        // (a stray seed/restore ADMIN account would otherwise re-acquire unscoped
+        // cross-tenant deactivate power). The checks are now unconditional.
         const callerProfileId = (session?.user as any)?.sessionProfileId
-        const callerIsGlobalAdmin = (session?.user as any)?.role === 'ADMIN'
-        if (!callerIsGlobalAdmin && targetUser.profileId && targetUser.profileId !== callerProfileId) {
+        if (targetUser.profileId && targetUser.profileId !== callerProfileId) {
             return {
                 success: false,
                 error: 'Bạn không thể deactivate user thuộc Profile khác.',
@@ -124,10 +149,10 @@ export async function deactivateUser(userId: string, workspaceId: string) {
             select: { role: true },
         })
         const targetIsWorkspaceOwner = targetWorkspaceMember?.role === 'OWNER'
-        if (targetIsWorkspaceOwner && !callerIsGlobalAdmin && actorWorkspaceRole !== 'OWNER') {
+        if (targetIsWorkspaceOwner && actorWorkspaceRole !== 'OWNER') {
             return {
                 success: false,
-                error: 'Chỉ OWNER hoặc super admin mới có quyền deactivate OWNER khác.',
+                error: 'Chỉ OWNER mới có quyền deactivate OWNER khác.',
             }
         }
 
@@ -148,7 +173,7 @@ export async function deactivateUser(userId: string, workspaceId: string) {
                 select: { profileId: true },
             })
             const callerIsNativeProfileMember = callerUser?.profileId === workspace.profileId
-            if (!callerIsGlobalAdmin && !callerIsNativeProfileMember) {
+            if (!callerIsNativeProfileMember) {
                 return {
                     success: false,
                     error: 'Bạn không phải native member của Profile này. Không thể deactivate user gốc.',

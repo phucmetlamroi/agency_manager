@@ -78,6 +78,19 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile rồi thử lại.' }
         }
 
+        // [QA R2 fix] Pre-validate the (single, shared) assignee exists so a stale id
+        // fails with a clear message instead of an opaque FK error that rolls back the
+        // whole batch (mirrors the per-row pre-check in createTasksFromBatch).
+        if (data.assigneeId) {
+            const assigneeExists = await prisma.user.findUnique({
+                where: { id: data.assigneeId },
+                select: { id: true },
+            })
+            if (!assigneeExists) {
+                return { error: 'Người được giao không còn tồn tại — vui lòng chọn lại editor.' }
+            }
+        }
+
         // Use standard prisma instead of extension for this complex transaction
         const createdTasks: { id: string; title: string }[] = []
         await prisma.$transaction(async (tx) => {
@@ -175,7 +188,10 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
         revalidatePath(`/${workspaceId}/admin/queue`)
         revalidatePath(`/${workspaceId}/admin/crm`)
 
-        return { success: true, count: data.titles.length }
+        // [QA R1 fix] Report the ACTUAL created count (blank/whitespace titles are
+        // skipped at line 85) + return the new ids so the caller can attach a
+        // Multi-Hook Map to the first task of the batch.
+        return { success: true, count: createdTasks.length, taskIds: createdTasks.map((t) => t.id) }
 
     } catch (e) {
         console.error('Batch create error:', e)
@@ -495,6 +511,20 @@ export async function bulkUpdateTaskStatus(
         // status ∈ ['Revision', 'Hoàn tất'] → clear deadline.
         const updateData: any = { status: newStatus, version: { increment: 1 } }
         enforceStatusDeadlineInvariant(updateData)
+        // [QA R2 fix] Bulk-setting status to 'Đang đợi giao' (= back to pool) must also
+        // clear the assignee (assigneeId↔status invariant) — otherwise the tasks stay
+        // glued to their editors yet vanish from the admin board.
+        if (newStatus === 'Đang đợi giao') {
+            updateData.assigneeId = null
+            updateData.isPenalized = false
+            updateData.deadline = null
+        }
+        // [Design decision — auto-archive on cancel] Mirror updateTaskStatus: bulk-setting
+        // 'Đã hủy' archives the tasks so they leave the active board + Total Tasks count,
+        // with restore available from /[workspaceId]/admin/cancelled.
+        if (newStatus === 'Đã hủy') {
+            updateData.isArchived = true
+        }
 
         await prisma.task.updateMany({
             where: { id: { in: validTasks.map((t) => t.id) }, workspaceId },
@@ -593,6 +623,8 @@ export async function bulkUpdateTaskStatus(
         revalidatePath(`/${workspaceId}/admin/queue`)
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/dashboard`)
+        // [auto-archive on cancel] refresh the cancelled/archive view too
+        revalidatePath(`/${workspaceId}/admin/cancelled`)
 
         return {
             success: true,
@@ -643,6 +675,12 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
             updateData.assigneeId = null
             updateData.assignedAgencyId = null
             updateData.status = '\u0110ang \u0111\u1ee3i giao'
+            // [QA R3 fix] Match every other pool-transition path (updateTaskStatus,
+            // bulkUpdateTaskStatus, assignTask): a task sent back to the pool clears its
+            // deadline + penalty flag too, so the queue row doesn't show a stale deadline
+            // / 'penalized' state.
+            updateData.deadline = null
+            updateData.isPenalized = false
         }
 
         // Execute Update — capture old assignees for unassign notifications

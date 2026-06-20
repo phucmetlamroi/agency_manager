@@ -183,13 +183,21 @@ export async function updateProfile(userId: string, data: {
     avatar?: string // Placeholder for future
 }, workspaceId: string) {
     try {
+        // [AUDIT R2 — CRITICAL fix] Was UNAUTHENTICATED and trusted the client-supplied
+        // `userId` → anyone could rewrite ANY user's email/nickname/phone (account
+        // takeover via the email-based password reset). Bind the write to the caller's
+        // own account; the client-supplied userId is ignored.
+        const session = await getSession()
+        if (!session?.user?.id) return { error: 'Unauthorized' }
+        const targetId = session.user.id
+
         await prisma.user.update({
-            where: { id: userId },
+            where: { id: targetId },
             data: {
                 nickname: data.nickname || null,
                 phoneNumber: data.phoneNumber || null,
                 email: data.email || null,
-                // avatar: data.avatar 
+                // avatar: data.avatar
             }
         })
 
@@ -468,8 +476,15 @@ export async function getMyTrashedProfiles() {
 
 export async function changePassword(userId: string, currentPass: string, newPass: string, workspaceId: string) {
     try {
+        // [AUDIT R3 — fix] Was operating on the client-supplied userId with no session
+        // requirement (mirror of the updateProfile hole). Bind to the caller's own
+        // account; the client-supplied userId is ignored.
+        const session = await getSession()
+        if (!session?.user?.id) return { error: 'Unauthorized' }
+        const targetId = session.user.id
+
         const user = await prisma.user.findUnique({
-            where: { id: userId }
+            where: { id: targetId }
         })
 
         if (!user) {
@@ -491,8 +506,12 @@ export async function changePassword(userId: string, currentPass: string, newPas
         // Hash new password
         const hashedPassword = await hash(newPass, 12)
 
+        // [AUDIT R4 — BLOCKER fix] The R3 patch rebound the READ+verify to targetId but
+        // left this WRITE pointed at the untrusted `userId` param → the current-password
+        // check ran against the CALLER's row while the new hash landed on the victim
+        // (account takeover). Bind the write to the authenticated caller.
         await prisma.user.update({
-            where: { id: userId },
+            where: { id: targetId },
             data: {
                 password: hashedPassword
             }

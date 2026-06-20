@@ -524,6 +524,14 @@ export default function AddTaskModal({
         step: number
         veloxBatchRaw: string[]
         veloxFilledFields: string[]
+        // [QA R1 fix] Persist the Multi-Hook Map whiteboard + its mode so a built
+        // graph survives reload / close+reopen within the 3-min draft window.
+        hookGraph: HookGraph | null
+        rawFootageMode: 'PER_LINK' | 'MULTI_HOOK_MAP'
+        // [QA R2 fix] Persist the V3 deep-scan payload too — without it, restore
+        // silently downgraded a V3 batch to V1 (losing shared assets / B-roll
+        // encoding / per-task brief notes).
+        veloxV3Payload: VeloxApplyPayloadV3 | null
     }>(
         DRAFT_KEY,
         {
@@ -531,6 +539,9 @@ export default function AddTaskModal({
             step,
             veloxBatchRaw,
             veloxFilledFields: Array.from(veloxFilledFields),
+            hookGraph,
+            rawFootageMode,
+            veloxV3Payload,
         },
         (draft) => {
             // Restore từ localStorage khi mở modal
@@ -546,17 +557,32 @@ export default function AddTaskModal({
                     new Set(draft.veloxFilledFields as (keyof VeloxFormPrefill)[]),
                 )
             }
+            // [QA R2 fix] Restore the V3 payload so a V3 batch isn't downgraded to V1.
+            if (draft.veloxV3Payload) {
+                setVeloxV3Payload(draft.veloxV3Payload)
+            }
+            // [QA R1 fix] Restore the Multi-Hook Map. [QA R2 fix] Only force
+            // MULTI_HOOK_MAP when the restored graph actually HAS blocks — otherwise
+            // honour the mode the user last left (don't snap them back into the Map tab
+            // after they emptied it and switched to 'Link lẻ'). Guard older draft shapes.
+            if (draft.hookGraph && ((draft.hookGraph as HookGraph).blocks?.length ?? 0) > 0) {
+                setHookGraph(draft.hookGraph)
+                setRawFootageMode('MULTI_HOOK_MAP')
+            } else if (draft.rawFootageMode === 'MULTI_HOOK_MAP') {
+                setRawFootageMode('MULTI_HOOK_MAP')
+            }
         },
         {
             ttlMs: 3 * 60 * 1000, // 3 phút sliding TTL
             debounceMs: 500,
             enabled: open && !submitted, // chỉ save khi modal đang mở + chưa submit
-            shouldSave: ({ form, veloxBatchRaw, veloxFilledFields }) => {
-                // Save nếu form có content HOẶC Velox đã apply (kể cả form chưa
-                // hoàn chỉnh, có Velox state là đáng save vì user đã đầu tư công
-                // scan folder).
+            shouldSave: ({ form, veloxBatchRaw, veloxFilledFields, hookGraph, veloxV3Payload }) => {
+                // Save nếu form có content HOẶC Velox đã apply (V1/V3) HOẶC đã dựng
+                // Multi-Hook Map (kể cả form chưa hoàn chỉnh — user đã đầu tư công).
                 return Boolean(
-                    veloxBatchRaw.length > 0 ||
+                    veloxV3Payload != null ||
+                        (hookGraph && hookGraph.blocks.length > 0) ||
+                        veloxBatchRaw.length > 0 ||
                         veloxFilledFields.length > 0 ||
                         form.clientId ||
                         form.assigneeId ||
@@ -676,6 +702,20 @@ export default function AddTaskModal({
             setVeloxBatchRaw([])
         }
 
+        // [QA R4 fix] Mirror the V1 R3 fix for the V3 Deep Scan path. The V3 submit
+        // builds every row from v3.mainItems titles (taskNameByMode) and ignores
+        // data.videoList entirely (DashboardActionWrapper rows = v3.mainItems.map).
+        // Force-overwrite videoList to those exact titles and drop it from the conflict
+        // set — otherwise 'Giữ'/'Gộp' keeps the old/merged value and the locked Video
+        // list + Step 5 Preview would show titles that differ from the tasks actually
+        // created (the textarea is locked once veloxV3Payload != null).
+        if (prefill.videoList != null && payload.mainItems.length >= 1) {
+            const veloxVideoList = prefill.videoList
+            setForm((prev) => ({ ...prev, videoList: veloxVideoList }))
+            filledFields.add('videoList')
+            delete prefill.videoList
+        }
+
         // Stash V3 result on form via assetsContext (consumed at submit)
         setVeloxV3Payload(payload)
 
@@ -729,6 +769,17 @@ export default function AddTaskModal({
             delete prefill.rawFootage
             filledFields.delete('rawFootage')
             setVeloxBatchRaw(selectedRows.map((r) => r.previewUrl ?? ''))
+            // [QA R3 fix] Per-video raw links are keyed 1:1 to the Velox video ORDER, so
+            // the video list MUST equal the Velox titles. Force-overwrite videoList and
+            // remove it from the conflict set — otherwise 'Giữ'/'Gộp' would shift /
+            // scramble every per-video link (the count-only submit guard can't detect a
+            // same-length-but-misaligned list).
+            if (prefill.videoList != null) {
+                const veloxVideoList = prefill.videoList
+                setForm((prev) => ({ ...prev, videoList: veloxVideoList }))
+                filledFields.add('videoList')
+                delete prefill.videoList
+            }
         } else {
             // Single video OR linkFootage toggle OFF → clear any stale batch state
             setVeloxBatchRaw([])
@@ -844,6 +895,11 @@ export default function AddTaskModal({
             setVeloxFilledFields(new Set())
             setVeloxBatchRaw([])
             setVeloxV3Payload(null)
+            // [QA R1 fix] Reset the Multi-Hook Map too — without this, a map built for
+            // batch #1 bleeds into every later task created in the same session.
+            setHookGraph(null)
+            setRawFootageMode('PER_LINK')
+            setMhmFolderUrl('')
         } catch (err: any) {
             toast.error(err?.message || "Lỗi khi tạo task. Vui lòng thử lại.")
         } finally {
@@ -858,12 +914,21 @@ export default function AddTaskModal({
         setVeloxFilledFields(new Set())
         setVeloxBatchRaw([])
         setVeloxV3Payload(null)
+        // [QA R1 fix] Reset the Multi-Hook Map state for the next open.
+        setHookGraph(null)
+        setRawFootageMode('PER_LINK')
+        setMhmFolderUrl('')
         onClose()
     }
 
     /* ---- step renderers ---- */
 
     const renderStep = () => {
+        // [QA R1 — user decision] Once Velox has applied, lock the Video list so editing
+        // it can't silently drop the per-video footage links (V1) or desync the titles
+        // (V3). Names/links are then managed inside the Velox preview popup.
+        const videoListLocked =
+            veloxFilledFields.has('videoList') || veloxBatchRaw.length > 0 || veloxV3Payload != null
         switch (step) {
             /* ============ STEP 1 : General Info ============ */
             case 0: {
@@ -971,12 +1036,32 @@ export default function AddTaskModal({
                             >
                             <textarea
                                 className={textareaBase}
-                                style={{ minHeight: 220 }}
+                                style={{ minHeight: 220, ...(videoListLocked ? { opacity: 0.6, cursor: "not-allowed" } : {}) }}
                                 placeholder="Video name (one per line)..."
                                 value={form.videoList}
                                 onChange={(e) => set("videoList", e.target.value)}
+                                readOnly={videoListLocked}
                             />
                             </VeloxField>
+                            {videoListLocked && (
+                                <div className="flex items-start justify-between gap-2 pl-1">
+                                    <p className="text-[11px] text-amber-400/80 flex-1">
+                                        🔒 Danh sách video do Velox quản lý — sửa tên/link trong mục Velox (bước Assets), hoặc <strong>Bỏ Velox</strong> để nhập tay lại.
+                                    </p>
+                                    {/* [QA R2 fix] Un-apply Velox so the user isn't trapped by the lock. */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setVeloxBatchRaw([])
+                                            setVeloxV3Payload(null)
+                                            setVeloxFilledFields(new Set())
+                                        }}
+                                        className="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors"
+                                    >
+                                        Bỏ Velox
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         <p className="text-[11px] text-zinc-600 pl-1">
                             {videoCount} video(s) added
@@ -1337,29 +1422,57 @@ export default function AddTaskModal({
 
     /* ---- success state ---- */
 
-    const renderSuccess = () => (
-        <motion.div
-            className="flex flex-col items-center justify-center py-12 gap-5"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-        >
-            <div className="flex items-center justify-center w-[72px] h-[72px] rounded-full bg-[#8B5CF6]/20 border border-[#8B5CF6]/30">
-                <Check size={36} className="text-[#A855F7]" strokeWidth={2.5} />
-            </div>
-            <h3 className="text-xl font-bold text-white">Successfully</h3>
-            <p className="text-sm text-[#A1A1AA] text-center max-w-[320px]">
-                Task đã được thêm thành công vào hàng đợi. Bạn có thể xem trong Task Queue.
-            </p>
-            <button
-                type="button"
-                onClick={handleDone}
-                className="mt-2 h-11 px-10 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
+    const renderSuccess = () => {
+        // [Fix — "vô tri" success message] When the task was assigned to a specific
+        // editor at creation, it goes STRAIGHT to that editor's dashboard (status
+        // 'Nhận task'), NOT the pool/queue — so the generic "đã vào hàng đợi" line was
+        // misleading. Show an editor-specific message instead. The backend already
+        // fires a TASK_ASSIGNED in-app notification + broadcast on every assigned
+        // creation path (createTask / createBatchTasks / createTasksFromBatch), so the
+        // "đã gửi thông báo" claim is truthful. form is only reset in handleDone, so
+        // form.assigneeId + assigneeName are still valid here.
+        // Gate on assigneeId alone (not assigneeName) so an assigned task always shows
+        // the "đã giao" message even in the rare case the assignee isn't in the loaded
+        // users list — falling back to the pool copy there would wrongly say "queue".
+        const successAssigned = Boolean(form.assigneeId)
+        const successAssigneeLabel = assigneeName || 'editor được chọn'
+        const successCount = Math.max(1, videoCount)
+        const taskLabel = successCount > 1 ? `${successCount} task` : 'Task'
+        const heading = successAssigned ? 'Đã giao task!' : 'Đã thêm vào hàng đợi!'
+        return (
+            <motion.div
+                className="flex flex-col items-center justify-center py-12 gap-5"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
             >
-                Done
-            </button>
-        </motion.div>
-    )
+                <div className="flex items-center justify-center w-[72px] h-[72px] rounded-full bg-[#8B5CF6]/20 border border-[#8B5CF6]/30">
+                    <Check size={36} className="text-[#A855F7]" strokeWidth={2.5} />
+                </div>
+                <h3 className="text-xl font-bold text-white">{heading}</h3>
+                <p className="text-sm text-[#A1A1AA] text-center max-w-[340px]">
+                    {successAssigned ? (
+                        <>
+                            {taskLabel} đã được giao cho{' '}
+                            <span className="font-semibold text-[#A855F7]">{successAssigneeLabel}</span>{' '}
+                            và hiện ngay trên màn hình làm việc của họ. Đã gửi thông báo cho {successAssigneeLabel}.
+                        </>
+                    ) : (
+                        <>
+                            {taskLabel} đã vào chợ task chờ (hàng đợi). Bạn có thể giao cho editor bất cứ lúc nào, hoặc để editor tự nhận trong Task Queue.
+                        </>
+                    )}
+                </p>
+                <button
+                    type="button"
+                    onClick={handleDone}
+                    className="mt-2 h-11 px-10 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
+                >
+                    Done
+                </button>
+            </motion.div>
+        )
+    }
 
     /* ================================================================ */
     /*  Render                                                           */

@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { XCircle } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import { isMobileDevice } from '@/lib/device'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
@@ -77,6 +79,10 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         },
         orderBy: { createdAt: 'desc' }
     })
+
+    // [auto-archive on cancel] Count archived/cancelled tasks for the entry-point
+    // badge below the board — so the admin knows there's something to recover.
+    const cancelledCount = await workspacePrisma.task.count({ where: { isArchived: true } })
 
     // 3. Users list
     const users = await workspacePrisma.user.findMany({
@@ -290,6 +296,25 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 isAdmin={true}
                 workspaceId={workspaceId}
             />
+
+            {/* ── Cancelled / archived tasks entry ─────────────────
+                [auto-archive on cancel] Cancelled tasks ('Đã hủy') are archived
+                and hidden from the board above. This link is the only way back to
+                view + restore them. */}
+            <div className="mt-3 flex justify-end">
+                <Link
+                    href={`/${workspaceId}/admin/cancelled`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-900/50 hover:bg-zinc-800/60 border border-white/10 text-[12px] text-zinc-400 hover:text-zinc-200 transition-colors"
+                >
+                    <XCircle size={12} />
+                    Task đã hủy / lưu trữ
+                    {cancelledCount > 0 && (
+                        <span className="ml-0.5 px-1.5 py-px rounded-full bg-red-500/15 text-red-300 text-[11px] font-semibold">
+                            {cancelledCount}
+                        </span>
+                    )}
+                </Link>
+            </div>
 
             {/* Safe spacer */}
             <div className="h-10" />

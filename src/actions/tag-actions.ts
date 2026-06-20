@@ -180,7 +180,21 @@ export async function setTaskTags(taskId: string, tagCategoryIds: string[], work
 // ─── Get tags for a task ──────────────────────────────────────
 export async function getTaskTags(taskId: string) {
     const session = await getSession()
-    if (!session) return { error: 'Unauthorized', tags: [] }
+    if (!session?.user?.id) return { error: 'Unauthorized', tags: [] }
+
+    // [AUDIT R1 — HIGH fix #19] Was a bare session check → any authenticated user
+    // could read the tags of ANY task by id (no workspace scoping). Resolve the
+    // task's workspace and require the caller to be a member of it.
+    const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { workspaceId: true }
+    })
+    if (!task?.workspaceId) return { tags: [] }
+    try {
+        await verifyWorkspaceAccess(task.workspaceId, 'MEMBER')
+    } catch {
+        return { error: 'Unauthorized', tags: [] }
+    }
 
     const tags = await prisma.taskTag.findMany({
         where: { taskId },

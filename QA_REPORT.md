@@ -24,8 +24,13 @@
 - **Ô video-list** → **khoá** sau khi Velox apply (kèm nút "Bỏ Velox" để gỡ).
 - **Tỷ giá** → dùng **tỷ giá LIVE** cho mọi path tạo task.
 
-### ⚠️ Còn 1 quyết định UX để bạn chốt (Medium, không chặn luồng chính)
-**Task 'Đã hủy' hiện là "hố đen":** khi admin đặt một task sang `Đã hủy`, nó **biến mất khỏi mọi tab** (đúng như bạn yêu cầu ẩn), NHƯNG task vẫn **không bị archive** → vẫn **đếm vào "Tổng task"** và **không có đường nào xem/khôi phục lại**. Đây là hệ quả phụ của quyết định "ẩn tab Đã hủy" mà có thể bạn chưa lường tới. Mình để bạn chọn hướng xử lý (xem câu hỏi cuối tin nhắn). Chi tiết: mục **Medium · assign-status-final** ở cuối báo cáo.
+### ✅ Quyết định UX cuối đã chốt + đã làm (Medium "hố đen Đã hủy")
+Bạn chọn **"Tự động archive khi hủy"**. Đã triển khai (commit `15f2d73`):
+- Đặt task sang `Đã hủy` → `isArchived=true`: task **rời khỏi bảng làm việc + "Tổng task"** (cả admin lẫn editor — đã thêm `isArchived:false` vào query dashboard user).
+- Thêm trang admin **`/[workspaceId]/admin/cancelled`** (link + badge số dưới bảng task) để **xem lại + Khôi phục** task hủy nhầm. Khôi phục = bỏ archive + đưa status về trạng thái hiển thị (`Nhận task` nếu còn người nhận, ngược lại về chợ `Đang đợi giao`), xoá deadline/penalty cũ.
+- Giữ nguyên quyết định R1 "không có tab Đã hủy trên bảng".
+
+Chi tiết kỹ thuật gốc: mục **Medium · assign-status-final** ở cuối báo cáo.
 
 ### Còn 1 Medium thuần kỹ thuật đã ghi nhận (không sửa đợt này — bạn quyết)
 - Một số mục Medium/Low từ Vòng 1 vẫn để ngỏ cho bạn cân nhắc (empty-submit không bị chặn ở Preview, câu chữ màn success, guard chuyển trạng thái FSM đang tắt, task pool không hiện trên bảng /admin chính, badge marketplace cũ…). Xem các mục Medium/Low bên dưới.

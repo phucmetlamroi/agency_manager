@@ -155,6 +155,31 @@ export async function verifyWorkspaceAccess(
 }
 
 /**
+ * [AUDIT R7 — fix] Authorization for invoice/finance operations that expose
+ * jobPriceUSD (agency USD revenue) or billed invoices. The GLOBAL User.isTreasurer
+ * flag is NOT a cross-tenant grant: a treasurer of profile A who is merely a member
+ * of profile B must never read/act on B's finances. Require finance authority IN
+ * this workspace's PROFILE — a treasurer who is a profile OWNER/ADMIN of the
+ * workspace's profile. (A foreign member-treasurer has profileRole USER/null →
+ * rejected.) Throws SECURITY_VIOLATION otherwise; on success returns the same
+ * workspace-access object as verifyWorkspaceAccess.
+ */
+export async function verifyFinanceAccess(
+    workspaceId: string,
+): Promise<Awaited<ReturnType<typeof verifyWorkspaceAccess>>> {
+    const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    const dbUser = await prisma.user.findUnique({
+        where: { id: access.userId },
+        select: { isTreasurer: true },
+    })
+    const isProfileAdmin = access.profileRole === 'OWNER' || access.profileRole === 'ADMIN'
+    if (!dbUser?.isTreasurer || !isProfileAdmin) {
+        throw new Error('SECURITY_VIOLATION: Bạn không có quyền tài chính tại Workspace này.')
+    }
+    return access
+}
+
+/**
  * Kiểm tra Session chống lưu Cookie cũ chưa hết hạn (Session Fixation Block).
  * Hàm này dùng để đảm bảo mỗi khi gọi data, user chưa bị Locked bởi Admin.
  *

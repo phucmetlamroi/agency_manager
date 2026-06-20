@@ -181,6 +181,12 @@ async function findScopedTask(
             id: taskId,
             clientId: { in: scope.clientIds },
             workspaceId: { in: scope.workspaceIds },
+            // [AUDIT R6 — fix] Match the getShareSnapshot read filter (isArchived:false).
+            // Since cancel→archive ('Đã hủy' sets isArchived=true) the snapshot hides
+            // archived tasks; without this, a client holding an old deliverable URL
+            // could still approve/request-changes on a cancelled task, flipping its
+            // status while isArchived stays true (status desync, invisible to admin).
+            isArchived: false,
         },
         select: select as any,
     })) as any

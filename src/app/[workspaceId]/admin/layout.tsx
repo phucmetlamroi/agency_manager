@@ -1,7 +1,7 @@
 import { logout } from '@/lib/auth'
 // Removed duplicate globals.css import
 import { redirect, notFound } from 'next/navigation'
-import { verifyActiveSession } from '@/lib/security'
+import { verifyActiveSession, verifyWorkspaceAccess } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import MobileLayoutShell from '@/components/layout/MobileLayoutShell'
@@ -40,14 +40,38 @@ export default async function AdminLayout({
         redirect('/api/auth/logout')
     }
 
-    // Workspace-scoped authorization: allow access if user is
-    // (a) global ADMIN/treasurer, OR (b) OWNER/ADMIN of this workspace.
+    // workspaceRole (from the explicit WorkspaceMember row) drives the nav shells.
     const membership = await prisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
         select: { role: true },
     })
     const workspaceRole = membership?.role ?? null
-    const canAccessAdmin = isAdmin || workspaceRole === 'OWNER' || workspaceRole === 'ADMIN'
+
+    // [AUDIT R6 — CRITICAL fix] The previous gate `isAdmin || workspaceRole === …`
+    // honored the GLOBAL isTreasurer flag (isAdmin) as a cross-tenant grant: a
+    // treasurer of profile A could open profile B's /admin/payroll and read its
+    // salaries. Authorize via the hardened verifyWorkspaceAccess (ProfileAccess +
+    // WorkspaceMember, which deliberately does NOT honor the global flag). A
+    // treasurer keeps finance access ONLY inside a profile they actually belong to.
+    let canAccessAdmin = false
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        canAccessAdmin = true
+    } catch {
+        if (isAdmin) {
+            const ws = await prisma.workspace.findUnique({
+                where: { id: workspaceId },
+                select: { profileId: true },
+            })
+            if (ws?.profileId) {
+                const pa = await prisma.profileAccess.findUnique({
+                    where: { userId_profileId: { userId: dbUser.id, profileId: ws.profileId } },
+                    select: { role: true },
+                })
+                if (pa) canAccessAdmin = true
+            }
+        }
+    }
 
     if (!canAccessAdmin) {
         redirect(`/${workspaceId}/dashboard`)

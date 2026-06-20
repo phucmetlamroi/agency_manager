@@ -16,7 +16,29 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
         // SECURITY: Verify caller is ADMIN of THIS workspace (not just global ADMIN).
         // Previously: any global ADMIN could change any user's role across all workspaces.
         const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const actorId = session.user.id
         const profileId = (session?.user as any)?.sessionProfileId
+
+        // [AUDIT R2 — fix] Without these guards a workspace ADMIN could (a) escalate
+        // anyone to the legacy global ADMIN (super-admin) role, (b) set an arbitrary/
+        // invalid role string, or (c) change the role of a user in ANOTHER tenant
+        // (User is a global model — workspacePrisma does NOT scope it). Account-level
+        // admin-ness now lives in ProfileRole (changeProfileRoleAction), so the only
+        // roles assignable here are non-privileged.
+        const ASSIGNABLE_ROLES: UserRole[] = [UserRole.USER, UserRole.AGENCY_ADMIN]
+        if (!ASSIGNABLE_ROLES.includes(newRole as UserRole)) {
+            return { error: 'Vai trò không hợp lệ cho thao tác này.' }
+        }
+        if (userId === actorId) {
+            return { error: 'Không thể tự đổi vai trò của chính mình.' }
+        }
+        const target = await prisma.user.findUnique({ where: { id: userId }, select: { profileId: true } })
+        if (!target) return { error: 'Người dùng không tồn tại.' }
+        const callerIsGlobalAdmin = (session?.user as any)?.role === 'ADMIN'
+        if (!callerIsGlobalAdmin && target.profileId && target.profileId !== profileId) {
+            return { error: 'Bạn không thể đổi vai trò của user thuộc Profile khác.' }
+        }
+
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         await workspacePrisma.user.update({
             where: { id: userId },

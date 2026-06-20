@@ -183,13 +183,21 @@ export async function updateProfile(userId: string, data: {
     avatar?: string // Placeholder for future
 }, workspaceId: string) {
     try {
+        // [AUDIT R2 — CRITICAL fix] Was UNAUTHENTICATED and trusted the client-supplied
+        // `userId` → anyone could rewrite ANY user's email/nickname/phone (account
+        // takeover via the email-based password reset). Bind the write to the caller's
+        // own account; the client-supplied userId is ignored.
+        const session = await getSession()
+        if (!session?.user?.id) return { error: 'Unauthorized' }
+        const targetId = session.user.id
+
         await prisma.user.update({
-            where: { id: userId },
+            where: { id: targetId },
             data: {
                 nickname: data.nickname || null,
                 phoneNumber: data.phoneNumber || null,
                 email: data.email || null,
-                // avatar: data.avatar 
+                // avatar: data.avatar
             }
         })
 

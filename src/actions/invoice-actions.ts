@@ -247,24 +247,36 @@ export async function getUnbilledTasks(clientId: number, workspaceId: string) {
 
 // Preview Invoice Calculations (No DB connection needed for calc, but good for validation)
 export async function calculateInvoicePreview(taskIds: string[], taxRate: number = 0, depositCurrent: number = 0, workspaceId: string) {
-    // This is a utility action to help frontend validation if needed
-    const workspacePrisma = getWorkspacePrisma(workspaceId)
-    // Fetch fresh data to ensure security
-    const tasks = await workspacePrisma.task.findMany({
-        where: { id: { in: taskIds } },
-        select: { jobPriceUSD: true }
-    })
+    // [AUDIT R1/R2 — HIGH fix #14] This had NO auth and returned a subtotal of
+    // jobPriceUSD (agency USD revenue, which must never reach non-finance staff).
+    // Require workspace membership + finance role; return zeros otherwise.
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const user = await getCurrentUser()
+        if (!user || (!user.isSuperAdmin && !user.isTreasurer)) {
+            return { subtotal: 0, taxAmount: 0, totalDue: 0 }
+        }
+        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        // Fetch fresh data to ensure security
+        const tasks = await workspacePrisma.task.findMany({
+            where: { id: { in: taskIds } },
+            select: { jobPriceUSD: true }
+        })
 
-    const subtotal = tasks.reduce((sum, t) => sum + Number(t.jobPriceUSD || 0), 0)
-    const taxAmount = subtotal * (taxRate / 100)
+        const subtotal = tasks.reduce((sum, t) => sum + Number(t.jobPriceUSD || 0), 0)
+        const taxAmount = subtotal * (taxRate / 100)
 
-    let totalDue = subtotal + taxAmount - depositCurrent
-    if (totalDue < 0) totalDue = 0
+        let totalDue = subtotal + taxAmount - depositCurrent
+        if (totalDue < 0) totalDue = 0
 
-    return {
-        subtotal,
-        taxAmount,
-        totalDue
+        return {
+            subtotal,
+            taxAmount,
+            totalDue
+        }
+    } catch (error) {
+        console.error('calculateInvoicePreview error:', error)
+        return { subtotal: 0, taxAmount: 0, totalDue: 0 }
     }
 }
 
@@ -481,10 +493,17 @@ export async function getClientInvoices(clientId: number, workspaceId: string) {
 // Void Invoice (Revert actions)
 export async function voidInvoice(invoiceId: string, workspaceId: string) {
     try {
+        // [AUDIT R1/R2 — BLOCKER fix #3] Same cross-tenant gap as createInvoiceRecord:
+        // global finance flags with no workspace scope let a treasurer of one tenant
+        // void invoices of another (flipping their tasks to UNBILLED + refunding their
+        // client deposit). Require membership of THIS workspace first; resolve profileId
+        // so the client deposit-refund (Client is profile-scoped) actually runs.
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
         const user = await getCurrentUser()
         if (!user || (!user.isSuperAdmin && !user.isTreasurer)) return { error: 'Unauthorized' }
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
         const invoice = await workspacePrisma.invoice.findUnique({
             where: { id: invoiceId },
@@ -525,8 +544,11 @@ export async function voidInvoice(invoiceId: string, workspaceId: string) {
         revalidatePath(`/${workspaceId}/admin/crm/${invoice.clientId}`)
         return { success: true }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Void Invoice Error:', error)
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) {
+            return { error: error.message }
+        }
         return { error: 'Failed to void invoice' }
     }
 }

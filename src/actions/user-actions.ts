@@ -38,14 +38,34 @@ export async function changePassword(formData: FormData, workspaceId: string) {
 export async function updateUserRole(userId: string, newRole: string, workspaceId: string) {
     try {
         // SECURITY: workspace-scoped admin check (was global ADMIN only).
-        const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+
+        // [AUDIT R2 — fix] Constrain assignable roles (never the legacy global ADMIN /
+        // super-admin — that would be a privilege-escalation), scope the target to the
+        // caller's profile (User is a GLOBAL model, not workspace-scoped, so without
+        // this a workspace admin could re-role a user in another tenant), and forbid
+        // self-target. Account-level admin-ness now lives in ProfileRole
+        // (changeProfileRoleAction), not User.role.
+        const ASSIGNABLE_ROLES: UserRole[] = [UserRole.USER, UserRole.AGENCY_ADMIN]
+        if (!ASSIGNABLE_ROLES.includes(newRole as UserRole)) {
+            return { success: false, error: 'Vai trò không hợp lệ cho thao tác này.' }
+        }
+        if (userId === actorId) {
+            return { success: false, error: 'Không thể tự đổi vai trò của chính mình.' }
+        }
 
         // [Sprint Z] Super admin protection removed — admin user deleted in Z.12.
         // Profile-level role changes use changeProfileRoleAction instead.
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { role: true },
+            select: { role: true, profileId: true },
         })
+        if (!targetUser) return { success: false, error: 'Người dùng không tồn tại.' }
+        const callerProfileId = (session?.user as any)?.sessionProfileId
+        const callerIsGlobalAdmin = (session?.user as any)?.role === 'ADMIN'
+        if (!callerIsGlobalAdmin && targetUser.profileId && targetUser.profileId !== callerProfileId) {
+            return { success: false, error: 'Bạn không thể đổi vai trò của user thuộc Profile khác.' }
+        }
 
         await prisma.user.update({
             where: { id: userId },

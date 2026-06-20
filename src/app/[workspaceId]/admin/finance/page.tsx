@@ -20,15 +20,19 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
 
     if (!user) redirect('/login')
 
-    // [Sprint Z] Super admin gate removed. Gate finance access b\u1eb1ng profile OWNER/ADMIN
-    // role (workspace's profile) HO\u1eb6C isTreasurer flag (financial role).
+    // [AUDIT R8 \u2014 fix] Gate finance VIEW on profile-scoped OWNER/ADMIN of THIS
+    // workspace's profile \u2014 the SAME predicate finance WRITE uses (verifyFinanceAccess).
+    // The old `|| !!user.isTreasurer` disjunct honored the GLOBAL treasurer flag, so a
+    // treasurer of another tenant who landed on this page could read its revenue /
+    // jobPriceUSD / profit margins. The global flag has no per-profile binding and is
+    // never a finance grant here.
     const { getProfileRole } = await import('@/lib/profile-permissions')
     const workspace = await prisma.workspace.findUnique({
         where: { id: workspaceId },
         select: { profileId: true }
     })
     const profileRole = workspace?.profileId ? await getProfileRole(user.id, workspace.profileId) : null
-    const canViewFinance = profileRole === 'OWNER' || profileRole === 'ADMIN' || !!user.isTreasurer
+    const canViewFinance = profileRole === 'OWNER' || profileRole === 'ADMIN'
 
     if (!canViewFinance) {
         return (

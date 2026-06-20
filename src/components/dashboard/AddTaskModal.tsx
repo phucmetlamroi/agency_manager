@@ -1422,29 +1422,57 @@ export default function AddTaskModal({
 
     /* ---- success state ---- */
 
-    const renderSuccess = () => (
-        <motion.div
-            className="flex flex-col items-center justify-center py-12 gap-5"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-        >
-            <div className="flex items-center justify-center w-[72px] h-[72px] rounded-full bg-[#8B5CF6]/20 border border-[#8B5CF6]/30">
-                <Check size={36} className="text-[#A855F7]" strokeWidth={2.5} />
-            </div>
-            <h3 className="text-xl font-bold text-white">Successfully</h3>
-            <p className="text-sm text-[#A1A1AA] text-center max-w-[320px]">
-                Task đã được thêm thành công vào hàng đợi. Bạn có thể xem trong Task Queue.
-            </p>
-            <button
-                type="button"
-                onClick={handleDone}
-                className="mt-2 h-11 px-10 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
+    const renderSuccess = () => {
+        // [Fix — "vô tri" success message] When the task was assigned to a specific
+        // editor at creation, it goes STRAIGHT to that editor's dashboard (status
+        // 'Nhận task'), NOT the pool/queue — so the generic "đã vào hàng đợi" line was
+        // misleading. Show an editor-specific message instead. The backend already
+        // fires a TASK_ASSIGNED in-app notification + broadcast on every assigned
+        // creation path (createTask / createBatchTasks / createTasksFromBatch), so the
+        // "đã gửi thông báo" claim is truthful. form is only reset in handleDone, so
+        // form.assigneeId + assigneeName are still valid here.
+        // Gate on assigneeId alone (not assigneeName) so an assigned task always shows
+        // the "đã giao" message even in the rare case the assignee isn't in the loaded
+        // users list — falling back to the pool copy there would wrongly say "queue".
+        const successAssigned = Boolean(form.assigneeId)
+        const successAssigneeLabel = assigneeName || 'editor được chọn'
+        const successCount = Math.max(1, videoCount)
+        const taskLabel = successCount > 1 ? `${successCount} task` : 'Task'
+        const heading = successAssigned ? 'Đã giao task!' : 'Đã thêm vào hàng đợi!'
+        return (
+            <motion.div
+                className="flex flex-col items-center justify-center py-12 gap-5"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
             >
-                Done
-            </button>
-        </motion.div>
-    )
+                <div className="flex items-center justify-center w-[72px] h-[72px] rounded-full bg-[#8B5CF6]/20 border border-[#8B5CF6]/30">
+                    <Check size={36} className="text-[#A855F7]" strokeWidth={2.5} />
+                </div>
+                <h3 className="text-xl font-bold text-white">{heading}</h3>
+                <p className="text-sm text-[#A1A1AA] text-center max-w-[340px]">
+                    {successAssigned ? (
+                        <>
+                            {taskLabel} đã được giao cho{' '}
+                            <span className="font-semibold text-[#A855F7]">{successAssigneeLabel}</span>{' '}
+                            và hiện ngay trên màn hình làm việc của họ. Đã gửi thông báo cho {successAssigneeLabel}.
+                        </>
+                    ) : (
+                        <>
+                            {taskLabel} đã vào chợ task chờ (hàng đợi). Bạn có thể giao cho editor bất cứ lúc nào, hoặc để editor tự nhận trong Task Queue.
+                        </>
+                    )}
+                </p>
+                <button
+                    type="button"
+                    onClick={handleDone}
+                    className="mt-2 h-11 px-10 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
+                >
+                    Done
+                </button>
+            </motion.div>
+        )
+    }
 
     /* ================================================================ */
     /*  Render                                                           */

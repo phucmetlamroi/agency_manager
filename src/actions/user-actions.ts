@@ -139,6 +139,42 @@ export async function deactivateUser(userId: string, workspaceId: string) {
             }
         }
 
+        // [AUDIT R10 — HIGH fix] The guard above is a NO-OP when targetUser.profileId is
+        // null (cross-team users who joined another profile only via ProfileAccess, or
+        // fresh signups with no home profile), which let a workspace admin set role=LOCKED
+        // + bump sessionVersion on ANY account — a platform-wide, cross-tenant account
+        // lockout (DoS) on a user with zero relationship to this workspace. Require a
+        // POSITIVE tenancy link to THIS workspace's profile (native home profile, a
+        // ProfileAccess row, or a WorkspaceMember row) before any state change — mirroring
+        // the membership requirement in toggleTreasurer / startImpersonation.
+        const wsForTenancy = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        const tenantProfileId = wsForTenancy?.profileId ?? null
+        const [tenancyMember, tenancyAccess] = await Promise.all([
+            prisma.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId, workspaceId } },
+                select: { role: true },
+            }),
+            tenantProfileId
+                ? prisma.profileAccess.findUnique({
+                      where: { userId_profileId: { userId, profileId: tenantProfileId } },
+                      select: { role: true },
+                  })
+                : Promise.resolve(null),
+        ])
+        const targetBelongsToTenant =
+            (!!tenantProfileId && targetUser.profileId === tenantProfileId) ||
+            !!tenancyMember ||
+            !!tenancyAccess
+        if (!targetBelongsToTenant) {
+            return {
+                success: false,
+                error: 'Không thể deactivate user không thuộc Workspace/Profile này.',
+            }
+        }
+
         // [Sprint Z] Super admin protection removed — admin user deleted in Z.12.
 
         // [Audit] Workspace OWNER protection — chỉ OWNER hoặc global admin được
@@ -229,9 +265,39 @@ export async function reactivateUser(userId: string, newRole: 'USER' | 'AGENCY_A
 
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { username: true, role: true },
+            select: { username: true, role: true, profileId: true },
         })
         if (!targetUser) return { success: false, error: 'User không tồn tại.' }
+
+        // [AUDIT R10 — fix] reactivateUser had ZERO tenant guard, so a workspace admin
+        // could unlock + re-role (incl. AGENCY_ADMIN) any LOCKED account in ANOTHER tenant,
+        // undoing that tenant's security action. Require the same positive tenancy link to
+        // THIS workspace's profile that deactivateUser now enforces.
+        const wsForTenancy = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        const tenantProfileId = wsForTenancy?.profileId ?? null
+        const [tenancyMember, tenancyAccess] = await Promise.all([
+            prisma.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId, workspaceId } },
+                select: { role: true },
+            }),
+            tenantProfileId
+                ? prisma.profileAccess.findUnique({
+                      where: { userId_profileId: { userId, profileId: tenantProfileId } },
+                      select: { role: true },
+                  })
+                : Promise.resolve(null),
+        ])
+        const targetBelongsToTenant =
+            (!!tenantProfileId && targetUser.profileId === tenantProfileId) ||
+            !!tenancyMember ||
+            !!tenancyAccess
+        if (!targetBelongsToTenant) {
+            return { success: false, error: 'Không thể reactivate user không thuộc Workspace/Profile này.' }
+        }
+
         if (targetUser.role !== 'LOCKED') {
             return { success: false, error: 'User không ở trạng thái deactivated.' }
         }

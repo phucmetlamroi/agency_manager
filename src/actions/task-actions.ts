@@ -112,6 +112,14 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             ? { assigneeId: null, isPenalized: false, deadline: null }
             : {}
 
+        // [Design decision — user chose "auto-archive on cancel"] Setting status to
+        // 'Đã hủy' archives the task so it leaves the active admin board + Total Tasks
+        // count (admin/page fetches isArchived:false) AND the user dashboard (now also
+        // filters isArchived:false) — instead of becoming a counted-but-invisible ghost.
+        // assigneeId is preserved so restoreCancelledTask can re-attach the same editor.
+        // Admins view + restore from /[workspaceId]/admin/cancelled.
+        const archiveUpdate = newStatus === 'Đã hủy' ? { isArchived: true } : {}
+
         // --- SMART STOPWATCH LOGIC ---
         // (Removed to save database usage)
 
@@ -130,6 +138,7 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
                 ...(newNotes ? { notes_vi: newNotes } : {}),
                 ...deadlineUpdate,
                 ...poolReset,
+                ...archiveUpdate,
                 version: { increment: 1 }
             }
 
@@ -395,6 +404,8 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/dashboard`)
         revalidatePath(`/${workspaceId}/admin/payroll`)
+        // [auto-archive on cancel] keep the cancelled/archive view fresh
+        revalidatePath(`/${workspaceId}/admin/cancelled`)
 
         return { success: true }
     } catch (e: any) {
@@ -444,4 +455,120 @@ async function notifyTaskStatusChanged(
             isRead: false,
         })
     } catch {/* swallow */}
+}
+
+/* ════════════════════════════════════════════════════════════════════════ */
+/*  Cancelled / archived tasks — view + restore (admin only)                */
+/*                                                                          */
+/*  [Design decision — user chose "auto-archive on cancel"]                 */
+/*  Setting a task to 'Đã hủy' archives it (isArchived=true) so it leaves    */
+/*  the active board + Total Tasks count instead of becoming an invisible    */
+/*  ghost. These two actions back the admin-only /[workspaceId]/admin/       */
+/*  cancelled page so the admin can review what was cancelled and restore    */
+/*  anything cancelled by mistake.                                          */
+/* ════════════════════════════════════════════════════════════════════════ */
+
+export type CancelledTaskRow = {
+    id: string
+    title: string
+    status: string
+    deadline: string | null
+    updatedAt: string | null
+    assigneeName: string | null
+    clientName: string | null
+}
+
+/**
+ * List archived tasks for the workspace (admin only). Covers cancelled
+ * ('Đã hủy' → auto-archived) plus any other archived task, newest first.
+ * Returns a scalar-only projection (no Decimal fields) so no serialization
+ * is needed and no pricing data leaks to the client bundle.
+ */
+export async function getCancelledTasks(
+    workspaceId: string,
+): Promise<{ success: true; data: CancelledTaskRow[] } | { success: false; error: string }> {
+    try {
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const wp = getWorkspacePrisma(workspaceId)
+        const tasks = await wp.task.findMany({
+            where: { isArchived: true },
+            select: {
+                id: true,
+                title: true,
+                status: true,
+                deadline: true,
+                updatedAt: true,
+                assignee: { select: { nickname: true, username: true } },
+                client: { select: { name: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+        })
+        return {
+            success: true,
+            data: tasks.map((t) => ({
+                id: t.id,
+                title: t.title || 'Untitled',
+                status: t.status,
+                deadline: t.deadline ? t.deadline.toISOString() : null,
+                updatedAt: t.updatedAt ? t.updatedAt.toISOString() : null,
+                assigneeName: t.assignee?.nickname || t.assignee?.username || null,
+                clientName: t.client?.name || null,
+            })),
+        }
+    } catch (error) {
+        console.error('getCancelledTasks failed:', error)
+        return { success: false, error: 'Lỗi tải danh sách task đã hủy / lưu trữ.' }
+    }
+}
+
+/**
+ * Restore an archived task back to the active board (admin only). Un-archives
+ * and resets the status to a visible state per the assigneeId↔status invariant:
+ * an assigned task returns as 'Nhận task', an unassigned one to the pool
+ * ('Đang đợi giao'). Deadline + penalty are cleared so a stale past deadline
+ * doesn't immediately re-flag the restored task as 'Quá hạn'.
+ */
+export async function restoreCancelledTask(
+    taskId: string,
+    workspaceId: string,
+): Promise<{ success: true; restoredStatus: string } | { error: string }> {
+    try {
+        const user = await getCurrentUser()
+        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const wp = getWorkspacePrisma(workspaceId)
+        const task = await wp.task.findUnique({
+            where: { id: taskId },
+            select: { id: true, assigneeId: true },
+        })
+        if (!task) return { error: 'Không tìm thấy task.' }
+
+        const restoredStatus = task.assigneeId ? 'Nhận task' : 'Đang đợi giao'
+        await wp.task.update({
+            where: { id: taskId },
+            data: {
+                isArchived: false,
+                status: restoredStatus,
+                deadline: null,
+                isPenalized: false,
+                version: { increment: 1 },
+            },
+        })
+
+        void audit({
+            workspaceId,
+            actorUserId: user.id,
+            action: 'task.restored',
+            targetType: 'Task',
+            targetId: taskId,
+            after: { restoredStatus },
+        })
+
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/dashboard`)
+        revalidatePath(`/${workspaceId}/admin/cancelled`)
+        return { success: true, restoredStatus }
+    } catch (error: any) {
+        console.error('restoreCancelledTask failed:', error)
+        return { error: error?.message || 'Không thể khôi phục task.' }
+    }
 }

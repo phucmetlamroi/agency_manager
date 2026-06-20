@@ -67,6 +67,7 @@ export type AuditAction =
     | 'task.started'    // User bấm "Bắt đầu" (Nhận task → Đang thực hiện) (GĐ3)
     | 'task.delivered'  // User submit productLink (Đang thực hiện → Revision) (GĐ4)
     | 'task.completed'  // Admin/User mark Hoàn tất
+    | 'task.restored'   // Admin un-archives a cancelled/archived task from /admin/cancelled
     // [Client Portal] client-driven review actions
     | 'task.client_approved'           // Client approved a deliverable → Hoàn tất
     | 'task.client_changes_requested'  // Client requested changes → Revision + feedback

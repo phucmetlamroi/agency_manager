@@ -107,8 +107,13 @@ export default async function UserDashboard({ params, searchParams }: {
     const initials = formatUserInitials(currentUser) || 'US'
 
     // ── User's tasks (for widgets + TaskTable) ───────────────────
+    // [auto-archive on cancel] Exclude archived tasks so a cancelled task
+    // ('Đã hủy' → isArchived:true) leaves the editor's Total Tasks count + tabs,
+    // matching the admin board (admin/page filters isArchived:false). Without this
+    // the cancelled task would stay a counted-but-unrenderable ghost on the
+    // user dashboard (no tab matches 'Đã hủy').
     const rawTasks = await (workspacePrisma as any).task.findMany({
-        where: { assigneeId: userId },
+        where: { assigneeId: userId, isArchived: false },
         include: {
             client: { include: { parent: true } },
             assignee: {

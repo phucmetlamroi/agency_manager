@@ -519,6 +519,12 @@ export async function bulkUpdateTaskStatus(
             updateData.isPenalized = false
             updateData.deadline = null
         }
+        // [Design decision — auto-archive on cancel] Mirror updateTaskStatus: bulk-setting
+        // 'Đã hủy' archives the tasks so they leave the active board + Total Tasks count,
+        // with restore available from /[workspaceId]/admin/cancelled.
+        if (newStatus === 'Đã hủy') {
+            updateData.isArchived = true
+        }
 
         await prisma.task.updateMany({
             where: { id: { in: validTasks.map((t) => t.id) }, workspaceId },
@@ -617,6 +623,8 @@ export async function bulkUpdateTaskStatus(
         revalidatePath(`/${workspaceId}/admin/queue`)
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/dashboard`)
+        // [auto-archive on cancel] refresh the cancelled/archive view too
+        revalidatePath(`/${workspaceId}/admin/cancelled`)
 
         return {
             success: true,

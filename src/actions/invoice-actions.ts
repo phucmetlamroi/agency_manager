@@ -27,10 +27,13 @@ export async function getBillingProfiles(workspaceId?: string) {
         if (!workspaceId) return { error: 'workspaceId required' }
         let profileId: string | null = null;
         if (workspaceId) {
-            // SECURITY: Verify caller is a member of the workspace before reading
-            // its associated profile's billing data. Otherwise any user could
-            // dump billing data of any workspace by passing its ID.
-            await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+            // [AUDIT R9 — HIGH fix] BillingProfile rows carry the agency's bank wiring
+            // (beneficiaryName/bankName/accountNumber/swiftCode). The R4 fix closed the
+            // no-workspaceId branch but left the role bar at MEMBER, so ANY non-finance
+            // staff (e.g. a freelance editor) could dump bank details by calling this
+            // server action directly. Require profile-scoped finance authority — the same
+            // gate the create/update/delete billing actions and getUnbilledTasks use.
+            await verifyFinanceAccess(workspaceId)
 
             const ws = await prisma.workspace.findUnique({
                 where: { id: workspaceId },
@@ -493,7 +496,10 @@ export async function getClientInvoices(clientId: number, workspaceId: string) {
     try {
         // [Canonical Clients] profileId required for the client query —
         // see getUnbilledTasks above for rationale.
-        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        // [AUDIT R9 — fix] Invoice rows expose billed USD totals (subtotal/tax/totalDue
+        // = agency revenue). Same finance-data-to-non-admin leak class as
+        // getBillingProfiles — gate on profile-scoped finance authority, not MEMBER.
+        const { session } = await verifyFinanceAccess(workspaceId)
         const profileId = (session?.user as any)?.sessionProfileId as string | undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // 1. Get all related Client IDs (Parent + Children)

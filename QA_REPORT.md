@@ -1,11 +1,41 @@
 # QA_REPORT.md — Frontend / Luồng Task · Velox · Multi-Hook Map
 
-> Vòng 1 (code-traced QA, đa-agent + xác minh đối kháng 2 phiếu). Xếp hạng theo **mức khó chịu cho người dùng**, không phải bảo mật. KHÔNG sửa code trong lúc audit — đợt sửa là bước riêng.
+> Code-traced QA (đa-agent + xác minh đối kháng 2 phiếu). Xếp hạng theo **mức khó chịu cho người dùng**, không phải bảo mật. Bắt đầu là báo cáo Vòng 1; sau đó chuyển sang **vòng lặp sửa→tái kiểm** theo lệnh `/loop /goal` của người dùng.
 
-## Tóm tắt
+## ✅ TRẠNG THÁI CUỐI — ĐÃ HỘI TỤ (sau 4 vòng)
+
+**Vòng 4 hội tụ:** 0 regression · 0 Blocker · 0 High · 0 lỗi cơ học còn lại. Loop dừng theo điều kiện người dùng đặt ("kiểm đến khi không còn lỗi thì thôi").
+
+| Vòng | Blocker | High | Regression của bản sửa trước | Hành động |
+|---|---|---|---|---|
+| R1 | 1 | 8 | — | Sửa thẳng phần cơ học, hỏi 4 quyết định UX |
+| R2 | 0 | 4 | bắt 2 regression của chính bản sửa R1 | Sửa thẳng |
+| R3 | 0 | 1 | bắt 1 regression của bản sửa R2 ('Gộp' lệch link) | Sửa thẳng |
+| **R4** | **0** | **0** | **0** | Sửa nốt 1 Medium cơ học (V3 videoList), còn lại 2 Medium |
+
+### Đã sửa & commit trong loop (chưa push — tất cả còn ở local branch `claude/cranky-austin`)
+- **`1a4df25` (R3)** — Force-overwrite videoList khi apply Velox **V1 batch** (sửa lệch link khi chọn 'Gộp') + reset pool khi unassign (clear deadline/isPenalized).
+- **`5cd4ef9` (R4)** — Force-overwrite videoList khi apply Velox **V3 Deep Scan** (đồng bộ "Video list bị khoá" + Preview Bước 5 với title task thực sự được tạo).
+- *(Các bản sửa R1/R2 — draft lưu hookGraph + veloxV3Payload, nút "Bỏ Velox", khoá ô video-list, tab 'Quá hạn' cho editor, gắn Map vào task đầu của lô + toast, tỷ giá LIVE mọi path, collectFile cho batch, reset map giữa các lô, pool-reset khi về 'Đang đợi giao' — nằm trong các commit trước đó của loop.)*
+
+### Quyết định UX người dùng đã chốt (R1) và đã áp dụng
+- **Batch + Multi-Hook Map** → gắn Map vào **task ĐẦU của lô** + toast báo.
+- **Task 'Đã hủy'** → **bỏ hẳn tab 'Đã hủy'**, thay vào đó **thêm tab 'Quá hạn'** cho editor (đã làm).
+- **Ô video-list** → **khoá** sau khi Velox apply (kèm nút "Bỏ Velox" để gỡ).
+- **Tỷ giá** → dùng **tỷ giá LIVE** cho mọi path tạo task.
+
+### ⚠️ Còn 1 quyết định UX để bạn chốt (Medium, không chặn luồng chính)
+**Task 'Đã hủy' hiện là "hố đen":** khi admin đặt một task sang `Đã hủy`, nó **biến mất khỏi mọi tab** (đúng như bạn yêu cầu ẩn), NHƯNG task vẫn **không bị archive** → vẫn **đếm vào "Tổng task"** và **không có đường nào xem/khôi phục lại**. Đây là hệ quả phụ của quyết định "ẩn tab Đã hủy" mà có thể bạn chưa lường tới. Mình để bạn chọn hướng xử lý (xem câu hỏi cuối tin nhắn). Chi tiết: mục **Medium · assign-status-final** ở cuối báo cáo.
+
+### Còn 1 Medium thuần kỹ thuật đã ghi nhận (không sửa đợt này — bạn quyết)
+- Một số mục Medium/Low từ Vòng 1 vẫn để ngỏ cho bạn cân nhắc (empty-submit không bị chặn ở Preview, câu chữ màn success, guard chuyển trạng thái FSM đang tắt, task pool không hiện trên bảng /admin chính, badge marketplace cũ…). Xem các mục Medium/Low bên dưới.
+
+---
+
+## Tóm tắt Vòng 1 (gốc — để tham chiếu repro/evidence)
 - **Blocker:** 1 · **High:** 8 · **Medium:** 11 · **Low:** 5
 - Trong số Blocker/High đã xác nhận: **sửa thẳng (cơ học)** = 5, **cần quyết định UX** = 5.
-- Hội tụ (0 Blocker/High): **CHƯA**
+- Hội tụ (0 Blocker/High): **ĐÃ ĐẠT ở Vòng 4** (xem mục trạng thái cuối ở trên).
 
 ## BLOCKER (1)
 

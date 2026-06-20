@@ -667,6 +667,12 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
             updateData.assigneeId = null
             updateData.assignedAgencyId = null
             updateData.status = '\u0110ang \u0111\u1ee3i giao'
+            // [QA R3 fix] Match every other pool-transition path (updateTaskStatus,
+            // bulkUpdateTaskStatus, assignTask): a task sent back to the pool clears its
+            // deadline + penalty flag too, so the queue row doesn't show a stale deadline
+            // / 'penalized' state.
+            updateData.deadline = null
+            updateData.isPenalized = false
         }
 
         // Execute Update — capture old assignees for unassign notifications

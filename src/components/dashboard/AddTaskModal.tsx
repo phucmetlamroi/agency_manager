@@ -755,6 +755,17 @@ export default function AddTaskModal({
             delete prefill.rawFootage
             filledFields.delete('rawFootage')
             setVeloxBatchRaw(selectedRows.map((r) => r.previewUrl ?? ''))
+            // [QA R3 fix] Per-video raw links are keyed 1:1 to the Velox video ORDER, so
+            // the video list MUST equal the Velox titles. Force-overwrite videoList and
+            // remove it from the conflict set — otherwise 'Giữ'/'Gộp' would shift /
+            // scramble every per-video link (the count-only submit guard can't detect a
+            // same-length-but-misaligned list).
+            if (prefill.videoList != null) {
+                const veloxVideoList = prefill.videoList
+                setForm((prev) => ({ ...prev, videoList: veloxVideoList }))
+                filledFields.add('videoList')
+                delete prefill.videoList
+            }
         } else {
             // Single video OR linkFootage toggle OFF → clear any stale batch state
             setVeloxBatchRaw([])

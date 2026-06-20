@@ -175,7 +175,10 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
         revalidatePath(`/${workspaceId}/admin/queue`)
         revalidatePath(`/${workspaceId}/admin/crm`)
 
-        return { success: true, count: data.titles.length }
+        // [QA R1 fix] Report the ACTUAL created count (blank/whitespace titles are
+        // skipped at line 85) + return the new ids so the caller can attach a
+        // Multi-Hook Map to the first task of the batch.
+        return { success: true, count: createdTasks.length, taskIds: createdTasks.map((t) => t.id) }
 
     } catch (e) {
         console.error('Batch create error:', e)

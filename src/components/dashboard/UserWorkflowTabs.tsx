@@ -31,7 +31,7 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
 }
 
 // ─── Tabs config — matches Figma HOME-USER-VER-1.0 ─
-type TabId = "assignee" | "progress" | "revise" | "complete"
+type TabId = "assignee" | "progress" | "overdue" | "revise" | "complete"
 
 interface TabConfig {
     id: TabId
@@ -40,10 +40,13 @@ interface TabConfig {
     color: string
 }
 
-// Figma: 4 tabs only — Assignee | Progress | Revise | Complete
+// [QA R1 — user decision] Editor now gets a dedicated "Quá hạn" tab (mirrors the
+// admin board) so overdue tasks are clearly surfaced instead of being folded into
+// Progress. 'Đã hủy' intentionally has NO tab (cancelled tasks stay hidden).
 const TABS: TabConfig[] = [
     { id: "assignee", label: "Assignee", statuses: ["Nhận task", "Đã nhận task", "Đang đợi giao", "Tạm ngưng"], color: "#8B5CF6" },
-    { id: "progress", label: "Progress", statuses: ["Đang thực hiện", "Quá hạn"],                                color: "#EAB308" },
+    { id: "progress", label: "Progress", statuses: ["Đang thực hiện"],                                          color: "#EAB308" },
+    { id: "overdue",  label: "Quá hạn",  statuses: ["Quá hạn"],                                                 color: "#DC2626" },
     { id: "revise",   label: "Revise",   statuses: ["Revision", "Sửa frame", "Gửi lại"],                  color: "#F97316" },
     { id: "complete", label: "Complete", statuses: ["Hoàn tất"],                                                color: "#10B981" },
 ]

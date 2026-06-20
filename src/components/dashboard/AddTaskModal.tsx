@@ -887,6 +887,11 @@ export default function AddTaskModal({
     /* ---- step renderers ---- */
 
     const renderStep = () => {
+        // [QA R1 — user decision] Once Velox has applied, lock the Video list so editing
+        // it can't silently drop the per-video footage links (V1) or desync the titles
+        // (V3). Names/links are then managed inside the Velox preview popup.
+        const videoListLocked =
+            veloxFilledFields.has('videoList') || veloxBatchRaw.length > 0 || veloxV3Payload != null
         switch (step) {
             /* ============ STEP 1 : General Info ============ */
             case 0: {
@@ -994,12 +999,18 @@ export default function AddTaskModal({
                             >
                             <textarea
                                 className={textareaBase}
-                                style={{ minHeight: 220 }}
+                                style={{ minHeight: 220, ...(videoListLocked ? { opacity: 0.6, cursor: "not-allowed" } : {}) }}
                                 placeholder="Video name (one per line)..."
                                 value={form.videoList}
                                 onChange={(e) => set("videoList", e.target.value)}
+                                readOnly={videoListLocked}
                             />
                             </VeloxField>
+                            {videoListLocked && (
+                                <p className="text-[11px] text-amber-400/80 pl-1">
+                                    🔒 Danh sách video do Velox quản lý — sửa tên/link trong mục Velox (bước Assets) để không làm mất link đã trích xuất.
+                                </p>
+                            )}
                         </div>
                         <p className="text-[11px] text-zinc-600 pl-1">
                             {videoCount} video(s) added

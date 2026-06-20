@@ -43,6 +43,26 @@ interface DashboardActionWrapperProps {
   onTaskCreated?: () => void
 }
 
+// [QA R1 — user decision] A Multi-Hook Map can't fan out across a batch — attach it to
+// the FIRST created task + toast so the admin's work isn't silently discarded.
+async function attachMapToFirstBatchTask(
+  graph: import('@/lib/velox/hook-graph-types').HookGraph | undefined,
+  taskIds: string[] | undefined,
+) {
+  if (!graph || graph.blocks.length === 0 || !taskIds || taskIds.length === 0) return
+  try {
+    const saveResult = await saveHookGraph(taskIds[0], graph)
+    if ('error' in saveResult) {
+      toast.error(`Đã tạo các task nhưng không lưu được Multi-Hook Map: ${saveResult.error}`)
+    } else {
+      toast.success(`Đã gắn Multi-Hook Map vào task đầu của lô (${taskIds.length} task).`)
+    }
+  } catch (err) {
+    console.error('[hook-graph] batch attach threw:', err)
+    toast.error('Đã tạo các task nhưng lưu Multi-Hook Map thất bại — thử lại từ Task detail.')
+  }
+}
+
 export default function DashboardActionWrapper({
   workspaceId,
   clients,
@@ -185,10 +205,12 @@ export default function DashboardActionWrapper({
         }
       })
       const result = await createTasksFromBatch(
-        { rows, exchangeRate: 25000 },
+        { rows, exchangeRate },
         workspaceId,
       )
       if ('error' in result) throw new Error(result.error)
+      // [QA R1 — user decision] Attach the Multi-Hook Map to the batch's first task.
+      await attachMapToFirstBatchTask(options?.hookGraphV1, result.taskIds)
 
       startTransition(() => {
         router.refresh()
@@ -231,10 +253,12 @@ export default function DashboardActionWrapper({
         }
       })
       const result = await createTasksFromBatch(
-        { rows, exchangeRate: 25000 },
+        { rows, exchangeRate },
         workspaceId,
       )
       if ('error' in result) throw new Error(result.error)
+      // [QA R1 — user decision] Attach the Multi-Hook Map to the batch's first task.
+      await attachMapToFirstBatchTask(options?.hookGraphV1, result.taskIds)
     } else if (titles.length === 1) {
       // Single task — use the original createTask path
       const fd = new FormData()
@@ -244,7 +268,7 @@ export default function DashboardActionWrapper({
       fd.set("deadline", data.deadline || "")
       fd.set("jobPriceUSD", data.jobPriceUSD || "0")
       fd.set("value", data.editorFee || "0")
-      fd.set("exchangeRate", "25000")
+      fd.set("exchangeRate", String(exchangeRate))
       fd.set("references", packedReferences)
       fd.set("resources", packedResources)
       fd.set("fileLink", "")                     // [FIX] Empty — bRoll giờ packed trong resources
@@ -284,7 +308,7 @@ export default function DashboardActionWrapper({
           assigneeId: data.assigneeId || null,
           deadline: data.deadline || null,
           jobPriceUSD: parseFloat(data.jobPriceUSD) || 0,
-          exchangeRate: 25000,
+          exchangeRate,
           wageVND: parseFloat(data.editorFee) || 0,
           resources: packedResources || null,
           references: packedReferences || null,
@@ -302,6 +326,8 @@ export default function DashboardActionWrapper({
         workspaceId
       )
       if (result?.error) throw new Error(result.error)
+      // [QA R1 — user decision] Attach the Multi-Hook Map to the batch's first task.
+      await attachMapToFirstBatchTask(options?.hookGraphV1, (result as { taskIds?: string[] })?.taskIds)
     }
 
     startTransition(() => {

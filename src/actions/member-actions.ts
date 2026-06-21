@@ -665,52 +665,44 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             select: { id: true, isClientInvite: true, clientId: true, workspace: { select: { profileId: true, name: true } } },
         })
         if (priorAccepted) {
-            // [AUDIT invite-flow R2 — fix] Only treat this as a harmless idempotent re-accept if
-            // the user is STILL a member. If they were REMOVED since that prior accept (the
-            // historical ACCEPTED invitation lingers), a fresh re-invite must actually re-grant
-            // access — otherwise the click falsely reports "already a member" while no membership
-            // exists. Re-mint membership directly via idempotent upserts (the ACCEPTED rows are
-            // left untouched, so the @@unique([workspaceId,invitedUserId,status]) constraint is
-            // never tripped). Eligibility (LOCKED/CLIENT) was re-checked at the top of this action.
+            // [AUDIT invite-flow R3 — fix HIGH] This branch is PURELY the idempotent "already a
+            // member" short-circuit — it avoids the @@unique([workspaceId,invitedUserId,status])
+            // collision a genuine double-accept would trip. It must NEVER re-grant access.
+            //
+            // The R2 version re-minted WorkspaceMember + ProfileAccess here when the user was no
+            // longer a member, which let a REMOVED user replay a stale DECLINED/REVOKED/EXPIRED
+            // invitation id (a lingering ACCEPTED row makes priorAccepted truthy) and silently
+            // restore their own access BEFORE the status/expiry gate below ever ran (R3 High).
+            //
+            // Now: only short-circuit when the user is STILL a member; otherwise fall through to
+            // the normal status/CAS flow, which grants access ONLY for a genuinely-valid PENDING
+            // invitation. (Removal also now hard-deletes the user's invitation rows, so a stale
+            // ACCEPTED row should not survive a proper removal — this is defense-in-depth, and it
+            // means the legitimate "re-invite after removal" case flows through the normal CAS.)
             const stillMember = await prisma.workspaceMember.findUnique({
                 where: { userId_workspaceId: { userId: session.user.id, workspaceId: probe.workspaceId } },
                 select: { userId: true },
             })
-            if (!stillMember) {
-                const reRole = isWorkspaceRole(probe.role) ? probe.role : 'MEMBER'
-                await prisma.$transaction(async (tx) => {
-                    await tx.workspaceMember.upsert({
-                        where: { userId_workspaceId: { userId: session.user.id, workspaceId: probe.workspaceId } },
-                        create: { userId: session.user.id, workspaceId: probe.workspaceId, role: reRole },
-                        update: {},
-                    })
-                    if (priorAccepted.workspace.profileId) {
-                        await tx.profileAccess.upsert({
-                            where: { userId_profileId: { userId: session.user.id, profileId: priorAccepted.workspace.profileId } },
-                            create: { userId: session.user.id, profileId: priorAccepted.workspace.profileId, role: 'USER' },
-                            update: {},
+            if (stillMember) {
+                try {
+                    if (probe.status === 'PENDING') {
+                        await prisma.workspaceInvitation.updateMany({
+                            where: { id: probe.id, status: 'PENDING' },
+                            data: { status: 'EXPIRED', respondedAt: new Date() },
                         })
                     }
-                })
-            }
-            // Retire the current PENDING row (idempotent) and signal success — the user is now
-            // (or was already) a member either way.
-            try {
-                if (probe.status === 'PENDING') {
-                    await prisma.workspaceInvitation.updateMany({
-                        where: { id: probe.id, status: 'PENDING' },
-                        data: { status: 'EXPIRED', respondedAt: new Date() },
-                    })
+                } catch (e) {
+                    console.warn('[acceptWorkspaceInvitation] idempotent-accept retire failed (non-fatal):', e)
                 }
-            } catch (e) {
-                console.warn('[acceptWorkspaceInvitation] idempotent-accept repair failed (non-fatal):', e)
+                return {
+                    success: true,
+                    workspaceId: probe.workspaceId,
+                    workspaceName: priorAccepted.workspace.name,
+                    alreadyMember: true,
+                }
             }
-            return {
-                success: true,
-                workspaceId: probe.workspaceId,
-                workspaceName: priorAccepted.workspace.name,
-                alreadyMember: stillMember ? true : false,
-            }
+            // stillMember === null → user was removed since the prior accept. Do NOT short-circuit
+            // and do NOT re-mint; fall through so only a valid PENDING invitation can grant access.
         }
 
         if (probe.status !== 'PENDING' || probe.expiresAt <= new Date()) {
@@ -1196,19 +1188,21 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
         }
     }
 
-    // [AUDIT R14 — fix] Remove the membership AND revoke any still-PENDING invitation for
-    // this user in the same transaction — otherwise a stale PENDING WorkspaceInvitation
-    // would let the removed user call acceptWorkspaceInvitation again and re-mint their
-    // WorkspaceMember row with the invitation's role, silently undoing the removal.
+    // [AUDIT R14 + invite-flow R3 — fix HIGH] Remove the membership AND HARD-DELETE all of this
+    // user's invitation rows for the workspace in the same transaction. The R14 fix only revoked
+    // PENDING invites, but a lingering ACCEPTED/DECLINED row could later be replayed through
+    // acceptWorkspaceInvitation's priorAccepted branch to silently re-mint membership (R3 High).
+    // Deleting every (workspaceId, invitedUserId) row removes that replay trigger entirely — and
+    // because the @@unique([workspaceId,invitedUserId,status]) constraint makes "set all to one
+    // terminal status" collision-prone, deleteMany is also the cleanest revoke.
     const removalOps: any[] = [
         prisma.workspaceMember.delete({
             where: {
                 userId_workspaceId: { userId: targetUserId, workspaceId }
             }
         }),
-        prisma.workspaceInvitation.updateMany({
-            where: { workspaceId, invitedUserId: targetUserId, status: 'PENDING' },
-            data: { status: 'REVOKED', respondedAt: new Date() },
+        prisma.workspaceInvitation.deleteMany({
+            where: { workspaceId, invitedUserId: targetUserId },
         }),
     ]
     if (alsoRevokeProfileAccess && removalWorkspace?.profileId) {

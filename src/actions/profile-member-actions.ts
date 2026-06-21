@@ -250,13 +250,13 @@ export async function removeFromProfileAction(profileId: string, targetUserId: s
         prisma.workspaceMember.deleteMany({
             where: { userId: targetUserId, workspaceId: { in: workspaceIds } },
         }),
-        // [AUDIT invite-flow R1] Revoke any still-PENDING workspace invitations in this profile
-        // too — otherwise the removed member could re-accept a stale invite and re-mint a
-        // WorkspaceMember row, silently undoing the removal (mirrors the R14 fix in
-        // removeWorkspaceMember).
-        prisma.workspaceInvitation.updateMany({
-            where: { workspaceId: { in: workspaceIds }, invitedUserId: targetUserId, status: 'PENDING' },
-            data: { status: 'REVOKED', respondedAt: new Date() },
+        // [AUDIT invite-flow R1+R3 — fix] HARD-DELETE all of this user's invitation rows across
+        // the profile's workspaces. Revoking only PENDING rows left a lingering ACCEPTED/DECLINED
+        // row that could be replayed through acceptWorkspaceInvitation's priorAccepted branch to
+        // re-mint membership (R3 High). Deleting every (workspaceId, invitedUserId) row removes
+        // that replay trigger (mirrors the removeWorkspaceMember fix).
+        prisma.workspaceInvitation.deleteMany({
+            where: { workspaceId: { in: workspaceIds }, invitedUserId: targetUserId },
         }),
         // Delete ProfileAccess row
         prisma.profileAccess.delete({

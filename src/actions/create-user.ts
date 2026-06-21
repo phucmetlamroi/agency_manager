@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db'
 import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
-import { getSession } from '@/lib/auth'
+import { verifyProfileAdminAccess } from '@/lib/security'
 import { validateEmailForSignup } from '@/lib/email-validator'
 
 /**
@@ -14,8 +14,18 @@ import { validateEmailForSignup } from '@/lib/email-validator'
  * không có email migrate. Giờ thêm OPTIONAL email field với validation.
  */
 export async function createUser(formData: FormData, workspaceId: string) {
-    const session = await getSession()
-    if (!session?.user) return { error: 'Unauthorized' }
+    // [AUDIT R12 — fix] Was gated only by getSession() — ANY authenticated user could
+    // mint login-able accounts (with attacker-chosen passwords) and stamp them role=ADMIN
+    // in their own tenant. Require profile-scoped ADMIN authority (the same predicate the
+    // admin UI uses), matching the sibling invite flows (inviteToWorkspace/inviteToProfile).
+    let access
+    try {
+        access = await verifyProfileAdminAccess(workspaceId)
+    } catch (e: any) {
+        if (e?.message?.startsWith('SECURITY_VIOLATION')) return { error: 'Forbidden' }
+        return { error: 'Unauthorized' }
+    }
+    const session = access.session
 
     const username = (formData.get('username') as string || '').trim()
     const password = formData.get('password') as string
@@ -25,6 +35,13 @@ export async function createUser(formData: FormData, workspaceId: string) {
     let incomingProfileId = formData.get('profileId') as string || null
 
     if (!username || !password) return { error: 'Missing fields' }
+
+    // [AUDIT R12 — fix] Constrain to non-privileged roles — never let this path mint the
+    // legacy global ADMIN (or CLIENT/LOCKED). Mirrors ASSIGNABLE_ROLES in updateUserRole.
+    const ASSIGNABLE_ROLES: UserRole[] = [UserRole.USER, UserRole.AGENCY_ADMIN]
+    if (!ASSIGNABLE_ROLES.includes(role)) {
+        return { error: 'Vai trò không hợp lệ.' }
+    }
 
     // Audit fix #3.7: validate email nếu có (optional field)
     if (email) {

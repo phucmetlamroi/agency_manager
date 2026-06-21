@@ -388,9 +388,37 @@ export async function triggerForcePasswordReset(userId: string, workspaceId: str
 
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true, username: true, email: true, displayName: true, role: true },
+            select: { id: true, username: true, email: true, displayName: true, role: true, profileId: true },
         })
         if (!targetUser) return { success: false, error: 'User không tồn tại.' }
+
+        // [AUDIT R12 — fix] Same positive-tenancy requirement as deactivate/reactivate/
+        // updateUserRole — without it a workspace admin could trigger a real password-reset
+        // OTP email to a user in ANOTHER tenant (no profileId/membership link here).
+        const wsForTenancy = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        const tenantProfileId = wsForTenancy?.profileId ?? null
+        const [tenancyMember, tenancyAccess] = await Promise.all([
+            prisma.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId, workspaceId } },
+                select: { role: true },
+            }),
+            tenantProfileId
+                ? prisma.profileAccess.findUnique({
+                      where: { userId_profileId: { userId, profileId: tenantProfileId } },
+                      select: { role: true },
+                  })
+                : Promise.resolve(null),
+        ])
+        const targetBelongsToTenant =
+            (!!tenantProfileId && targetUser.profileId === tenantProfileId) ||
+            !!tenancyMember ||
+            !!tenancyAccess
+        if (!targetBelongsToTenant) {
+            return { success: false, error: 'Không thể reset password cho user không thuộc Workspace/Profile này.' }
+        }
 
         // User chưa có email → không thể gửi OTP
         if (!targetUser.email) {

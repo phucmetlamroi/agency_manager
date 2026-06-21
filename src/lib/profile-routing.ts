@@ -45,7 +45,11 @@ export async function determineLandingForProfile(
         return { workspaceId: ws?.id ?? null, view: 'portal' }
     }
 
-    if (isGlobalAdmin) {
+    // [AUDIT R14 — fix] Only honor the global-admin shortcut for a caller who actually
+    // belongs to THIS profile (clientAccess present, and non-CLIENT since CLIENT returned
+    // above). Without this, a global treasurer could enumerate any profile's newest
+    // workspace UUID + the view='admin' signal by passing an arbitrary profileId.
+    if (isGlobalAdmin && clientAccess) {
         const ws = await prisma.workspace.findFirst({
             where: { profileId },
             orderBy: { createdAt: 'desc' },
@@ -68,6 +72,15 @@ export async function determineLandingForProfile(
     })
 
     if (workspaces.length === 0) {
+        return { workspaceId: null, view: 'dashboard' }
+    }
+
+    // [AUDIT R14 — fix] Don't return a workspace id to a caller who is NOT a member of
+    // this profile (no ProfileAccess and no WorkspaceMember row in any of its
+    // workspaces) — that would disclose the profile's newest workspace UUID to an
+    // outsider. A real member always has clientAccess or a members[] hit.
+    const hasAnyMembership = clientAccess != null || workspaces.some((ws) => ws.members.length > 0)
+    if (!hasAnyMembership) {
         return { workspaceId: null, view: 'dashboard' }
     }
 

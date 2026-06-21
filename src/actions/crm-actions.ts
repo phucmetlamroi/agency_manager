@@ -132,6 +132,12 @@ export async function createProject(data: { name: string, clientId: number, code
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT R14 — fix] Require a real session profile (consistent with the other
+        // create paths) so the clientId profile-filter below can't degrade to an
+        // unscoped `profileId: undefined` query.
+        if (!profileId || typeof profileId !== 'string') {
+            return { success: false, error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile.' }
+        }
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // [AUDIT R14 — fix] Validate clientId belongs to THIS profile before binding the
         // project to it — a foreign numeric clientId would otherwise attach + surface

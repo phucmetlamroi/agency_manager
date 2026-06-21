@@ -24,12 +24,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { WorkspaceRole } from '@/lib/workspace-roles'
 
 type Candidate = {
-    id: string
     username: string
     displayName: string | null
     email: string | null
     avatarUrl: string | null
-    role: string
 }
 
 type Props = {
@@ -190,7 +188,7 @@ export default function InviteMemberModal({ workspaceId, onClose, onSuccess }: P
                             const displayName = user.displayName?.trim() || user.username
                             return (
                                 <button
-                                    key={user.id}
+                                    key={user.username}
                                     onClick={() => handleInvite(user.username)}
                                     disabled={inviting}
                                     className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-zinc-900/30 border border-white/5 hover:border-indigo-500/30 hover:bg-zinc-900/60 transition-all text-left disabled:opacity-50"

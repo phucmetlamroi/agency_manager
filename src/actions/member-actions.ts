@@ -350,6 +350,15 @@ export async function inviteToWorkspace(
         return { error: 'Bạn không thể tự mời chính mình.' }
     }
 
+    // [AUDIT invite-flow R1 — fix HIGH] Reject LOCKED/CLIENT targets up front, covering BOTH
+    // the same-profile direct-add branch and the cross-profile invite branch. Previously only
+    // acceptWorkspaceInvitation (M8) guarded CLIENT, so a same-profile direct-add could mint a
+    // staff WorkspaceMember row for a view-only CLIENT — a ghost member with real MEMBER-level
+    // access. The lookup already selects `role`.
+    if (targetUser.role === 'LOCKED' || targetUser.role === 'CLIENT') {
+        return { error: 'Tài khoản này không thể được thêm làm thành viên (CLIENT chỉ xem, hoặc tài khoản đã bị khóa).' }
+    }
+
     // Audit fix #2.8: Cross-profile invite consent
     // Nếu target user đã tắt allowExternalInvites và user thuộc Profile khác →
     // không cho mời. User được quyền refuse "spam invite" từ unknown organizations.
@@ -362,6 +371,21 @@ export async function inviteToWorkspace(
             return {
                 error: `User ${targetUser.username} đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.`,
             }
+        }
+    }
+
+    // [AUDIT invite-flow R1 — fix HIGH] Mirror the M8 accept guard on the invite/direct-add
+    // side: if the target already holds a CLIENT ProfileAccess for THIS workspace's profile,
+    // refuse. Minting a staff WorkspaceMember alongside a CLIENT ProfileAccess is the exact
+    // inconsistent mixed-state M8 blocks (ghost member + fail-closed portal redirect). Covers
+    // the per-profile CLIENT case where User.role is normal but PA(role=CLIENT) exists.
+    if (workspace?.profileId) {
+        const targetPA = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId: targetUser.id, profileId: workspace.profileId } },
+            select: { role: true },
+        })
+        if (targetPA?.role === 'CLIENT') {
+            return { error: 'Tài khoản này đang là CLIENT của tổ chức — hãy gỡ vai trò CLIENT trước khi mời làm thành viên nội bộ.' }
         }
     }
 
@@ -1040,7 +1064,7 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
             userId_workspaceId: { userId: targetUserId, workspaceId }
         },
         include: {
-            user: { select: { username: true, nickname: true } }
+            user: { select: { username: true, nickname: true, profileId: true } }
         }
     })
 
@@ -1068,11 +1092,44 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
         }
     }
 
+    // [AUDIT invite-flow R1 — fix HIGH] A cross-profile invitee's accept minted a
+    // ProfileAccess(role=USER) for THIS workspace's profile, and that PA grants MEMBER access
+    // to EVERY workspace in the profile via the verifyWorkspaceAccess fallback. Deleting only
+    // the WorkspaceMember row leaves that PA behind, so the "removed" external user silently
+    // keeps profile-wide access. When the removed user is a CROSS-profile invitee (home profile
+    // differs), holds a plain USER ProfileAccess, and has no OTHER WorkspaceMember row in this
+    // profile, also revoke that PA. Never strip a home-profile member or an OWNER/ADMIN/CLIENT PA.
+    const removalWorkspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    let alsoRevokeProfileAccess = false
+    if (
+        removalWorkspace?.profileId &&
+        targetMember.user.profileId &&
+        removalWorkspace.profileId !== targetMember.user.profileId
+    ) {
+        const targetPA = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId: targetUserId, profileId: removalWorkspace.profileId } },
+            select: { role: true },
+        })
+        if (targetPA?.role === 'USER') {
+            const otherMemberships = await prisma.workspaceMember.count({
+                where: {
+                    userId: targetUserId,
+                    workspaceId: { not: workspaceId },
+                    workspace: { profileId: removalWorkspace.profileId },
+                },
+            })
+            if (otherMemberships === 0) alsoRevokeProfileAccess = true
+        }
+    }
+
     // [AUDIT R14 — fix] Remove the membership AND revoke any still-PENDING invitation for
     // this user in the same transaction — otherwise a stale PENDING WorkspaceInvitation
     // would let the removed user call acceptWorkspaceInvitation again and re-mint their
     // WorkspaceMember row with the invitation's role, silently undoing the removal.
-    await prisma.$transaction([
+    const removalOps: any[] = [
         prisma.workspaceMember.delete({
             where: {
                 userId_workspaceId: { userId: targetUserId, workspaceId }
@@ -1082,7 +1139,15 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
             where: { workspaceId, invitedUserId: targetUserId, status: 'PENDING' },
             data: { status: 'REVOKED', respondedAt: new Date() },
         }),
-    ])
+    ]
+    if (alsoRevokeProfileAccess && removalWorkspace?.profileId) {
+        removalOps.push(
+            prisma.profileAccess.delete({
+                where: { userId_profileId: { userId: targetUserId, profileId: removalWorkspace.profileId } },
+            }),
+        )
+    }
+    await prisma.$transaction(removalOps)
 
     await audit({
         workspaceId,

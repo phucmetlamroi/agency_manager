@@ -19,6 +19,7 @@ import {
     getProfileAccess,
 } from '@/lib/profile-permissions'
 import { audit } from '@/lib/audit-log'
+import { findUserByEmailOrUsername } from '@/lib/user-lookup'
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Helpers                                                              */
@@ -121,20 +122,48 @@ export async function inviteToProfileAction(
     const trimmed = usernameOrEmail.trim()
     if (!trimmed) return { error: 'Tên đăng nhập / email không được để trống.' }
 
-    // Find target user
-    const targetUser = await prisma.user.findFirst({
-        where: {
-            OR: [{ username: trimmed }, { email: trimmed }],
-        },
-        select: { id: true, username: true, nickname: true, displayName: true },
+    // [AUDIT invite-flow R1 — fix HIGH] Deterministic lookup. User.email is NOT @unique
+    // (duplicate rows exist on prod), so a raw findFirst({ OR:[username,email] }) could bind
+    // ProfileAccess to the WRONG duplicate account. Route through findUserByEmailOrUsername
+    // (case-insensitive, activity-ordered) and refuse on matchCount>1 — mirrors inviteToWorkspace.
+    const lookup = await findUserByEmailOrUsername<{
+        id: string; username: string; nickname: string | null; displayName: string | null;
+        role: string; profileId: string | null; allowExternalInvites: boolean
+    }>(trimmed, {
+        id: true, username: true, nickname: true, displayName: true,
+        role: true, profileId: true, allowExternalInvites: true,
     })
-
+    if (lookup.matchCount > 1) {
+        return { error: `Có ${lookup.matchCount} tài khoản dùng email/username "${trimmed}". Yêu cầu admin gộp các tài khoản trùng email trước khi mời.` }
+    }
+    const targetUser = lookup.user
     if (!targetUser) {
         return { error: 'Tài khoản không tồn tại.' }
     }
 
     if (targetUser.id === session.user.id) {
         return { error: 'Bạn đã ở trong Profile này.' }
+    }
+
+    // [AUDIT invite-flow R1 — fix HIGH] Never grant profile membership to a view-only CLIENT
+    // or a banned LOCKED account. The workspace-invite path enforces this; this profile-level
+    // door previously skipped it, so a CLIENT could be elevated to internal MEMBER via the
+    // ProfileAccess(USER) → workspaceRole MEMBER fallback (security.ts).
+    if (targetUser.role === 'LOCKED' || targetUser.role === 'CLIENT') {
+        return { error: 'Tài khoản này không thể được thêm làm thành viên nội bộ của Profile.' }
+    }
+
+    // [AUDIT invite-flow R1 — fix HIGH] Cross-org consent: honor allowExternalInvites when the
+    // target's home profile differs from this one (mirrors member-actions.ts inviteToWorkspace).
+    // Without this, any profile admin could force-add an unconsenting external user as a member.
+    if (
+        targetUser.profileId &&
+        targetUser.profileId !== profileId &&
+        targetUser.allowExternalInvites === false
+    ) {
+        return {
+            error: `${targetUser.displayName ?? targetUser.nickname ?? targetUser.username} đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.`,
+        }
     }
 
     // Check không trùng existing access
@@ -207,6 +236,14 @@ export async function removeFromProfileAction(profileId: string, targetUserId: s
         // Delete WorkspaceMember rows in profile's workspaces
         prisma.workspaceMember.deleteMany({
             where: { userId: targetUserId, workspaceId: { in: workspaceIds } },
+        }),
+        // [AUDIT invite-flow R1] Revoke any still-PENDING workspace invitations in this profile
+        // too — otherwise the removed member could re-accept a stale invite and re-mint a
+        // WorkspaceMember row, silently undoing the removal (mirrors the R14 fix in
+        // removeWorkspaceMember).
+        prisma.workspaceInvitation.updateMany({
+            where: { workspaceId: { in: workspaceIds }, invitedUserId: targetUserId, status: 'PENDING' },
+            data: { status: 'REVOKED', respondedAt: new Date() },
         }),
         // Delete ProfileAccess row
         prisma.profileAccess.delete({

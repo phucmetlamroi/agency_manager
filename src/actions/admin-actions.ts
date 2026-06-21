@@ -153,6 +153,19 @@ export async function createTask(formData: FormData, workspaceId: string) {
 
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
+        // [AUDIT R14 — fix] Validate clientId belongs to THIS profile (Client is
+        // profile-scoped; a foreign numeric id would otherwise attach to the task and
+        // surface another profile's client name wherever task.client is included).
+        if (clientId != null) {
+            const clientOk = await prisma.client.findFirst({
+                where: { id: clientId, profileId },
+                select: { id: true },
+            })
+            if (!clientOk) {
+                return { error: 'Khách hàng được chọn không hợp lệ.' }
+            }
+        }
+
         // [Bug 2026-06-10 — Task_assigneeId_fkey FK violation]
         // Velox auto-assign and the manual editor picker can both surface a
         // stale userId — e.g. the autoSave draft was authored when the user
@@ -175,6 +188,14 @@ export async function createTask(formData: FormData, workspaceId: string) {
                         'có thể đã bị xoá hoặc bạn vừa chuyển workspace. ' +
                         'Vui lòng bỏ chọn assignee (Leave Blank → Task Pool) hoặc chọn lại editor khác rồi thử lại.',
                 }
+            }
+            // [AUDIT R14 — fix] The assignee must already belong to THIS workspace's
+            // profile — otherwise an admin could pass a foreign-tenant userId, whom
+            // ensureWorkspaceMembership below would silently provision into this profile.
+            const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
+            const assigneeAllowed = await isAssigneeInWorkspaceProfile(assigneeId, workspaceId, profileId)
+            if (!assigneeAllowed) {
+                return { error: 'Editor được chọn không thuộc workspace/profile này. Hãy mời họ vào workspace trước khi giao việc.' }
             }
         }
 

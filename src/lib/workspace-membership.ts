@@ -19,6 +19,46 @@ import { prisma } from '@/lib/db'
  *
  * @returns true if row was created, false if already existed
  */
+/**
+ * [AUDIT R14 — fix] True if `userId` already belongs to the workspace's PROFILE — a
+ * native member (User.profileId), a ProfileAccess holder, or a WorkspaceMember row.
+ * Gate assigneeId on this BEFORE createTask/assignTask provisions it via
+ * ensureWorkspaceMembership (which upserts a ProfileAccess for any global userId, an
+ * unsanctioned cross-tenant member-injection primitive). A user with NO profile
+ * affiliation at all is also rejected — net-new people must come through the gated
+ * invite flow, not task assignment.
+ */
+export async function isAssigneeInWorkspaceProfile(
+    userId: string,
+    workspaceId: string,
+    profileId?: string | null,
+): Promise<boolean> {
+    if (!userId || !workspaceId) return false
+    let pid = profileId ?? null
+    if (!pid) {
+        const ws = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        pid = ws?.profileId ?? null
+    }
+    const [user, member, access] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId }, select: { profileId: true } }),
+        prisma.workspaceMember.findUnique({
+            where: { userId_workspaceId: { userId, workspaceId } },
+            select: { role: true },
+        }),
+        pid
+            ? prisma.profileAccess.findUnique({
+                  where: { userId_profileId: { userId, profileId: pid } },
+                  select: { role: true },
+              })
+            : Promise.resolve(null),
+    ])
+    if (!user) return false
+    return (!!pid && user.profileId === pid) || !!member || !!access
+}
+
 export async function ensureWorkspaceMembership(
     userId: string,
     workspaceId: string,

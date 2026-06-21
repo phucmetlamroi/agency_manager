@@ -155,6 +155,15 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
                 return { error: 'Không thể giao Task: Nhân sự đang bị Phạt thẻ đỏ (Rank D).' }
             }
 
+            // [AUDIT R14 — fix] The assignee must belong to THIS workspace's profile —
+            // don't let an admin assign a task (with its wage/client data + notification)
+            // to a foreign-tenant userId passed via RPC.
+            const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
+            const assigneeAllowed = await isAssigneeInWorkspaceProfile(assignmentId, workspaceId)
+            if (!assigneeAllowed) {
+                return { error: 'Editor được chọn không thuộc workspace/profile này.' }
+            }
+
             updateData = {
                 assigneeId: assignmentId,
                 assignedAgencyId: null,

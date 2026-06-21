@@ -133,6 +133,16 @@ export async function createProject(data: { name: string, clientId: number, code
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+        // [AUDIT R14 — fix] Validate clientId belongs to THIS profile before binding the
+        // project to it — a foreign numeric clientId would otherwise attach + surface
+        // another profile's client name on read-back.
+        const clientOk = await prisma.client.findFirst({
+            where: { id: data.clientId, profileId },
+            select: { id: true },
+        })
+        if (!clientOk) {
+            return { success: false, error: 'Khách hàng được chọn không hợp lệ.' }
+        }
         await workspacePrisma.project.create({
             data: {
                 name: data.name,

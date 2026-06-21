@@ -20,6 +20,7 @@ import {
 } from '@/lib/profile-permissions'
 import { audit } from '@/lib/audit-log'
 import { findUserByEmailOrUsername } from '@/lib/user-lookup'
+import { checkInviteCallerRate } from '@/lib/rate-limit-upstash'
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Helpers                                                              */
@@ -41,9 +42,12 @@ export async function getProfileMembers(profileId: string) {
     const { error, session } = await requireAuthenticated()
     if (error || !session) return { error, members: [] }
 
-    // Caller phải có role trong profile (kể cả USER cũng read được list)
+    // Caller phải có role trong profile (kể cả USER cũng read được list).
+    // [AUDIT invite-flow R2 — fix] A CLIENT ProfileAccess is a view-only portal grant and must
+    // NOT read the internal staff roster. The UI redirects clients away, but this server action
+    // is directly callable — reject CLIENT explicitly (mirrors verifyWorkspaceAccess / canAccessWorkspace).
     const role = await getProfileRole(session.user.id, profileId)
-    if (!role) {
+    if (!role || role === 'CLIENT') {
         return { error: 'Bạn không có quyền truy cập profile này.', members: [] }
     }
 
@@ -122,6 +126,13 @@ export async function inviteToProfileAction(
     const trimmed = usernameOrEmail.trim()
     if (!trimmed) return { error: 'Tên đăng nhập / email không được để trống.' }
 
+    // [AUDIT invite-flow R2 — fix HIGH] Caller-scoped throttle BEFORE the user lookup, to cap
+    // account-enumeration via probing distinct emails on this profile-invite door (40/h/caller).
+    const callerRate = await checkInviteCallerRate(session.user.id)
+    if (!callerRate.success) {
+        return { error: `Bạn đang thao tác quá nhanh. Vui lòng thử lại sau ${callerRate.retryAfter ?? 3600} giây.` }
+    }
+
     // [AUDIT invite-flow R1 — fix HIGH] Deterministic lookup. User.email is NOT @unique
     // (duplicate rows exist on prod), so a raw findFirst({ OR:[username,email] }) could bind
     // ProfileAccess to the WRONG duplicate account. Route through findUserByEmailOrUsername
@@ -161,8 +172,10 @@ export async function inviteToProfileAction(
         targetUser.profileId !== profileId &&
         targetUser.allowExternalInvites === false
     ) {
+        // [AUDIT invite-flow R2 — fix HIGH] Generic message — do NOT echo the resolved
+        // displayName/username of a cross-tenant account to a caller who supplied only an email.
         return {
-            error: `${targetUser.displayName ?? targetUser.nickname ?? targetUser.username} đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.`,
+            error: 'Người dùng này đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.',
         }
     }
 

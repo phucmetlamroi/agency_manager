@@ -140,7 +140,7 @@ export async function deleteUser(userId: string, workspaceId: string) {
  */
 export async function deactivateUser(userId: string, workspaceId: string) {
     try {
-        const { userId: actorId, workspaceRole: actorWorkspaceRole, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId, workspaceRole: actorWorkspaceRole, profileRole: actorProfileRole, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
@@ -211,8 +211,16 @@ export async function deactivateUser(userId: string, workspaceId: string) {
             where: { userId_workspaceId: { userId, workspaceId } },
             select: { role: true },
         })
-        const targetIsWorkspaceOwner = targetWorkspaceMember?.role === 'OWNER'
-        if (targetIsWorkspaceOwner && actorWorkspaceRole !== 'OWNER') {
+        // [AUDIT R13 — CRITICAL fix] A profile OWNER's authority lives in
+        // ProfileAccess(role=OWNER), NOT a WorkspaceMember row, and createProfileForUser
+        // leaves User.profileId unset — so neither the WorkspaceMember-OWNER check nor the
+        // native-owner guard below fired, letting a profile ADMIN LOCK the profile OWNER and
+        // seize the tenant (the R10 tenancy gate only checked that a ProfileAccess row EXISTS,
+        // never its role). Treat a ProfileAccess-OWNER as a protected OWNER target too, and
+        // require the actor to be an OWNER (workspace OR profile) to deactivate any OWNER.
+        const targetIsOwner = targetWorkspaceMember?.role === 'OWNER' || tenancyAccess?.role === 'OWNER'
+        const actorIsOwner = actorWorkspaceRole === 'OWNER' || actorProfileRole === 'OWNER'
+        if (targetIsOwner && !actorIsOwner) {
             return {
                 success: false,
                 error: 'Chỉ OWNER mới có quyền deactivate OWNER khác.',
@@ -288,7 +296,7 @@ export async function deactivateUser(userId: string, workspaceId: string) {
  */
 export async function reactivateUser(userId: string, newRole: 'USER' | 'AGENCY_ADMIN' | 'CLIENT', workspaceId: string) {
     try {
-        const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId, workspaceRole: actorWorkspaceRole, profileRole: actorProfileRole } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
@@ -323,6 +331,15 @@ export async function reactivateUser(userId: string, newRole: 'USER' | 'AGENCY_A
             !!tenancyAccess
         if (!targetBelongsToTenant) {
             return { success: false, error: 'Không thể reactivate user không thuộc Workspace/Profile này.' }
+        }
+
+        // [AUDIT R13 — fix] Symmetric OWNER protection: don't let a non-owner reactivate +
+        // re-role a profile OWNER (e.g. to CLIENT, which middleware bounces to /login — a
+        // soft-lockout). A ProfileAccess-OWNER is an OWNER even without a WorkspaceMember row.
+        const targetIsOwner = tenancyMember?.role === 'OWNER' || tenancyAccess?.role === 'OWNER'
+        const actorIsOwner = actorWorkspaceRole === 'OWNER' || actorProfileRole === 'OWNER'
+        if (targetIsOwner && !actorIsOwner) {
+            return { success: false, error: 'Chỉ OWNER mới có quyền reactivate/đổi vai trò OWNER khác.' }
         }
 
         if (targetUser.role !== 'LOCKED') {

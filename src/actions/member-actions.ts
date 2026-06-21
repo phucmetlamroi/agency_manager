@@ -1068,11 +1068,21 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
         }
     }
 
-    await prisma.workspaceMember.delete({
-        where: {
-            userId_workspaceId: { userId: targetUserId, workspaceId }
-        }
-    })
+    // [AUDIT R14 — fix] Remove the membership AND revoke any still-PENDING invitation for
+    // this user in the same transaction — otherwise a stale PENDING WorkspaceInvitation
+    // would let the removed user call acceptWorkspaceInvitation again and re-mint their
+    // WorkspaceMember row with the invitation's role, silently undoing the removal.
+    await prisma.$transaction([
+        prisma.workspaceMember.delete({
+            where: {
+                userId_workspaceId: { userId: targetUserId, workspaceId }
+            }
+        }),
+        prisma.workspaceInvitation.updateMany({
+            where: { workspaceId, invitedUserId: targetUserId, status: 'PENDING' },
+            data: { status: 'REVOKED', respondedAt: new Date() },
+        }),
+    ])
 
     await audit({
         workspaceId,

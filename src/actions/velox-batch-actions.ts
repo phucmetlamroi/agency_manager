@@ -22,7 +22,7 @@ import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
-import { ensureWorkspaceMembership } from '@/lib/workspace-membership'
+import { ensureWorkspaceMembership, isAssigneeInWorkspaceProfile } from '@/lib/workspace-membership'
 import { audit } from '@/lib/audit-log'
 
 /* ──────────────────────────────────────────────────────────────────── */
@@ -173,6 +173,31 @@ export async function createTasksFromBatch(
                         `(có thể đã bị xoá hoặc workspace đã được clone). ` +
                         `Vui lòng bỏ chọn assignee các row đó (Leave Blank) hoặc chọn editor khác rồi thử lại.`,
                 }
+            }
+        }
+
+        // [AUDIT R14 — fix] Each assignee must already belong to THIS workspace's profile —
+        // reject foreign-tenant userIds before ensureWorkspaceMembership provisions them
+        // (it upserts a ProfileAccess for any global id, a cross-tenant injection primitive).
+        for (const assigneeId of uniqueAssignees) {
+            const ok = await isAssigneeInWorkspaceProfile(assigneeId, workspaceId, profileId)
+            if (!ok) {
+                return { error: 'Có editor được gán không thuộc workspace/profile này. Hãy mời họ vào workspace trước khi giao việc.' }
+            }
+        }
+
+        // [AUDIT R14 — fix] Every per-row clientId must belong to THIS profile — a foreign
+        // numeric clientId would otherwise attach and surface another profile's client name.
+        const uniqueClientIds = Array.from(
+            new Set(validRows.map((r) => r.row.clientId).filter((c): c is number => c != null)),
+        )
+        if (uniqueClientIds.length > 0) {
+            const validClients = await prisma.client.findMany({
+                where: { id: { in: uniqueClientIds }, profileId },
+                select: { id: true },
+            })
+            if (validClients.length !== uniqueClientIds.length) {
+                return { error: 'Có khách hàng được chọn không hợp lệ (không thuộc profile này).' }
             }
         }
 

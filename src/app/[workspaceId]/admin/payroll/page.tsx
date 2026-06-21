@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { verifyProfileAdminAccess } from '@/lib/security'
 import BonusCalculator from './BonusCalculator'
 import PayrollCard from '@/components/admin/PayrollCard'
 import PayrollKpiStrip from '@/components/admin/PayrollKpiStrip'
@@ -22,6 +23,13 @@ function extractMonthParam(workspaceName?: string | null): string | null {
 
 export default async function PayrollPage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
+
+    // [AUDIT R8 — defense in depth] Salaries are the most sensitive data here. The
+    // admin layout already gates /admin, but re-assert profile-scoped ADMIN authority
+    // so a cross-tenant hit can never reach payroll even if the layout is bypassed.
+    // Uses the SAME predicate as the layout (verifyProfileAdminAccess) — never the
+    // global isTreasurer flag, which leaked salaries cross-tenant in R8.
+    await verifyProfileAdminAccess(workspaceId)
 
     const workspacePrisma = getWorkspacePrisma(workspaceId)
 

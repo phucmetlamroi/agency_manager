@@ -306,7 +306,7 @@ export async function inviteToWorkspace(
     role: WorkspaceRole = 'MEMBER',
     message?: string
 ) {
-    const { userId: inviterId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    const { userId: inviterId, workspaceRole: inviterRole } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
     // [Sprint B] Subscription gating removed — tất cả admin có quyền mời member.
 
@@ -316,6 +316,15 @@ export async function inviteToWorkspace(
     }
     if (!isWorkspaceRole(role)) {
         return { error: 'Vai trò không hợp lệ.' }
+    }
+
+    // [AUDIT R7 — fix HIGH #1] Privilege-escalation gate: chỉ OWNER mới được mời/cấp
+    // vai trò ADMIN. Trước đây một ADMIN bất kỳ có thể mời thêm ADMIN (peer escalation),
+    // ngược với sibling changeWorkspaceMemberRole vốn đã chặn (chỉ OWNER đổi ADMIN/OWNER).
+    // Path cross-profile lưu invitation.role rồi acceptWorkspaceInvitation honor verbatim,
+    // nên gate tại thời điểm mời này bao trùm cả hai luồng.
+    if (role === 'ADMIN' && inviterRole !== 'OWNER') {
+        return { error: 'Chỉ chủ sở hữu (OWNER) mới có quyền mời/cấp vai trò ADMIN.' }
     }
 
     const trimmedUsername = targetUsername.trim()
@@ -1059,11 +1068,21 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
         }
     }
 
-    await prisma.workspaceMember.delete({
-        where: {
-            userId_workspaceId: { userId: targetUserId, workspaceId }
-        }
-    })
+    // [AUDIT R14 — fix] Remove the membership AND revoke any still-PENDING invitation for
+    // this user in the same transaction — otherwise a stale PENDING WorkspaceInvitation
+    // would let the removed user call acceptWorkspaceInvitation again and re-mint their
+    // WorkspaceMember row with the invitation's role, silently undoing the removal.
+    await prisma.$transaction([
+        prisma.workspaceMember.delete({
+            where: {
+                userId_workspaceId: { userId: targetUserId, workspaceId }
+            }
+        }),
+        prisma.workspaceInvitation.updateMany({
+            where: { workspaceId, invitedUserId: targetUserId, status: 'PENDING' },
+            data: { status: 'REVOKED', respondedAt: new Date() },
+        }),
+    ])
 
     await audit({
         workspaceId,

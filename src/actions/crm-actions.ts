@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
-import { verifyWorkspaceAccess } from '@/lib/security'
+import { verifyWorkspaceAccess, verifyFinanceAccess } from '@/lib/security'
 import { serializeDecimal } from '@/lib/serialization'
 import { audit } from '@/lib/audit-log'
 
@@ -14,8 +14,13 @@ import { audit } from '@/lib/audit-log'
 export async function getClients(workspaceId: string) {
     try {
         // [AUDIT R1 — HIGH fix #15] CRM actions had NO workspace authz — any
-        // authenticated user could read/mutate clients. Require membership to read.
-        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        // authenticated user could read/mutate clients.
+        // [AUDIT R10 — HIGH fix] The nested task/client includes carry finance scalars
+        // (jobPriceUSD, wageVND, profitVND, exchangeRate) + client depositBalance, so a
+        // bare MEMBER could RPC-replay this and read agency revenue + coworker wages. Gate
+        // on profile-scoped finance/admin authority — the SAME predicate the admin layout
+        // (verifyProfileAdminAccess) uses, so every real CRM/task-picker caller still passes.
+        await verifyFinanceAccess(workspaceId)
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
@@ -127,7 +132,23 @@ export async function createProject(data: { name: string, clientId: number, code
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT R14 — fix] Require a real session profile (consistent with the other
+        // create paths) so the clientId profile-filter below can't degrade to an
+        // unscoped `profileId: undefined` query.
+        if (!profileId || typeof profileId !== 'string') {
+            return { success: false, error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile.' }
+        }
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+        // [AUDIT R14 — fix] Validate clientId belongs to THIS profile before binding the
+        // project to it — a foreign numeric clientId would otherwise attach + surface
+        // another profile's client name on read-back.
+        const clientOk = await prisma.client.findFirst({
+            where: { id: data.clientId, profileId },
+            select: { id: true },
+        })
+        if (!clientOk) {
+            return { success: false, error: 'Khách hàng được chọn không hợp lệ.' }
+        }
         await workspacePrisma.project.create({
             data: {
                 name: data.name,
@@ -391,7 +412,12 @@ export async function unmergeClient(clientId: number, workspaceId: string) {
  */
 export async function getClientDetail(clientId: number, workspaceId: string) {
     try {
-        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        // [AUDIT R10 — HIGH fix] Returns per-task jobPriceUSD/wageVND/profitVND, full
+        // invoice totals, and client depositBalance (all serializeDecimal'd, NOT stripped).
+        // Was gated at MEMBER → a non-finance editor could RPC-replay it for full agency
+        // finance. Gate on profile-scoped finance authority (same as the admin CRM that
+        // is its only caller).
+        await verifyFinanceAccess(workspaceId)
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)

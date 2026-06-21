@@ -1,6 +1,6 @@
 'use server'
 
-import { getSession } from '@/lib/auth'
+import { getSession, login } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
@@ -12,6 +12,14 @@ export async function changePassword(formData: FormData, workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
 
+    // [AUDIT R14 — fix] Refuse credential changes inside an impersonation session — the
+    // session principal is the impersonated victim, so this would silently plant a
+    // password on an account the admin does not own.
+    if ((session.user as any).isImpersonating) {
+        return { error: 'Không thể đổi mật khẩu khi đang ở phiên impersonation.' }
+    }
+
+    const currentPassword = formData.get('currentPassword') as string
     const newPassword = formData.get('newPassword') as string
 
     if (!newPassword || newPassword.length < 6) {
@@ -19,13 +27,45 @@ export async function changePassword(formData: FormData, workspaceId: string) {
     }
 
     try {
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { id: true, password: true },
+        })
+        if (!user) return { error: 'User not found' }
+
+        // [AUDIT R14 — fix] Re-authenticate with the CURRENT password (was missing — any
+        // holder of a valid session, incl. a borrowed/impersonated one, could silently
+        // reset the account password with no paper trail). Google-only accounts (null
+        // password) must set their first password via the public "forgot password" flow.
+        if (!user.password) {
+            return { error: 'Tài khoản này đăng nhập bằng Google. Dùng "Quên mật khẩu" để đặt mật khẩu lần đầu.' }
+        }
+        if (!currentPassword) {
+            return { error: 'Vui lòng nhập mật khẩu hiện tại.' }
+        }
+        const isValid = await bcrypt.compare(currentPassword, user.password)
+        if (!isValid) {
+            return { error: 'Mật khẩu hiện tại không đúng' }
+        }
+
         const hashedPassword = await bcrypt.hash(newPassword, 10)
 
-        await prisma.user.update({
-            where: { id: session.user.id },
-            data: {
-                password: hashedPassword
-            }
+        // [AUDIT R14 — fix] Bump sessionVersion so every OTHER outstanding JWT for this
+        // account is revoked at the DAL (a password change must evict other devices), then
+        // re-issue THIS caller's cookie with the new version so they aren't logged out.
+        const updated = await prisma.user.update({
+            where: { id: user.id },
+            data: { password: hashedPassword, sessionVersion: { increment: 1 } },
+            select: { sessionVersion: true },
+        })
+        await login({ ...(session.user as any), sessionVersion: updated.sessionVersion })
+
+        await audit({
+            workspaceId,
+            actorUserId: user.id,
+            action: 'auth.password_changed',
+            targetType: 'User',
+            targetId: user.id,
         })
 
         revalidatePath(`/${workspaceId}/dashboard`)
@@ -66,6 +106,33 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
         const callerProfileId = (session?.user as any)?.sessionProfileId
         if (targetUser.profileId && targetUser.profileId !== callerProfileId) {
             return { success: false, error: 'Bạn không thể đổi vai trò của user thuộc Profile khác.' }
+        }
+        // [AUDIT R11 — fix] The guard above no-ops when targetUser.profileId is null (same
+        // null-profileId class closed for deactivateUser in R10). Require a positive tenancy
+        // link to THIS workspace's profile before the global User.role write.
+        const wsForTenancy = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        const tenantProfileId = wsForTenancy?.profileId ?? null
+        const [tenancyMember, tenancyAccess] = await Promise.all([
+            prisma.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId, workspaceId } },
+                select: { role: true },
+            }),
+            tenantProfileId
+                ? prisma.profileAccess.findUnique({
+                      where: { userId_profileId: { userId, profileId: tenantProfileId } },
+                      select: { role: true },
+                  })
+                : Promise.resolve(null),
+        ])
+        const targetBelongsToTenant =
+            (!!tenantProfileId && targetUser.profileId === tenantProfileId) ||
+            !!tenancyMember ||
+            !!tenancyAccess
+        if (!targetBelongsToTenant) {
+            return { success: false, error: 'Không thể đổi vai trò của user không thuộc Workspace/Profile này.' }
         }
 
         await prisma.user.update({
@@ -113,7 +180,7 @@ export async function deleteUser(userId: string, workspaceId: string) {
  */
 export async function deactivateUser(userId: string, workspaceId: string) {
     try {
-        const { userId: actorId, workspaceRole: actorWorkspaceRole, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId, workspaceRole: actorWorkspaceRole, profileRole: actorProfileRole, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
@@ -139,6 +206,42 @@ export async function deactivateUser(userId: string, workspaceId: string) {
             }
         }
 
+        // [AUDIT R10 — HIGH fix] The guard above is a NO-OP when targetUser.profileId is
+        // null (cross-team users who joined another profile only via ProfileAccess, or
+        // fresh signups with no home profile), which let a workspace admin set role=LOCKED
+        // + bump sessionVersion on ANY account — a platform-wide, cross-tenant account
+        // lockout (DoS) on a user with zero relationship to this workspace. Require a
+        // POSITIVE tenancy link to THIS workspace's profile (native home profile, a
+        // ProfileAccess row, or a WorkspaceMember row) before any state change — mirroring
+        // the membership requirement in toggleTreasurer / startImpersonation.
+        const wsForTenancy = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        const tenantProfileId = wsForTenancy?.profileId ?? null
+        const [tenancyMember, tenancyAccess] = await Promise.all([
+            prisma.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId, workspaceId } },
+                select: { role: true },
+            }),
+            tenantProfileId
+                ? prisma.profileAccess.findUnique({
+                      where: { userId_profileId: { userId, profileId: tenantProfileId } },
+                      select: { role: true },
+                  })
+                : Promise.resolve(null),
+        ])
+        const targetBelongsToTenant =
+            (!!tenantProfileId && targetUser.profileId === tenantProfileId) ||
+            !!tenancyMember ||
+            !!tenancyAccess
+        if (!targetBelongsToTenant) {
+            return {
+                success: false,
+                error: 'Không thể deactivate user không thuộc Workspace/Profile này.',
+            }
+        }
+
         // [Sprint Z] Super admin protection removed — admin user deleted in Z.12.
 
         // [Audit] Workspace OWNER protection — chỉ OWNER hoặc global admin được
@@ -148,8 +251,16 @@ export async function deactivateUser(userId: string, workspaceId: string) {
             where: { userId_workspaceId: { userId, workspaceId } },
             select: { role: true },
         })
-        const targetIsWorkspaceOwner = targetWorkspaceMember?.role === 'OWNER'
-        if (targetIsWorkspaceOwner && actorWorkspaceRole !== 'OWNER') {
+        // [AUDIT R13 — CRITICAL fix] A profile OWNER's authority lives in
+        // ProfileAccess(role=OWNER), NOT a WorkspaceMember row, and createProfileForUser
+        // leaves User.profileId unset — so neither the WorkspaceMember-OWNER check nor the
+        // native-owner guard below fired, letting a profile ADMIN LOCK the profile OWNER and
+        // seize the tenant (the R10 tenancy gate only checked that a ProfileAccess row EXISTS,
+        // never its role). Treat a ProfileAccess-OWNER as a protected OWNER target too, and
+        // require the actor to be an OWNER (workspace OR profile) to deactivate any OWNER.
+        const targetIsOwner = targetWorkspaceMember?.role === 'OWNER' || tenancyAccess?.role === 'OWNER'
+        const actorIsOwner = actorWorkspaceRole === 'OWNER' || actorProfileRole === 'OWNER'
+        if (targetIsOwner && !actorIsOwner) {
             return {
                 success: false,
                 error: 'Chỉ OWNER mới có quyền deactivate OWNER khác.',
@@ -225,13 +336,52 @@ export async function deactivateUser(userId: string, workspaceId: string) {
  */
 export async function reactivateUser(userId: string, newRole: 'USER' | 'AGENCY_ADMIN' | 'CLIENT', workspaceId: string) {
     try {
-        const { userId: actorId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const { userId: actorId, workspaceRole: actorWorkspaceRole, profileRole: actorProfileRole } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { username: true, role: true },
+            select: { username: true, role: true, profileId: true },
         })
         if (!targetUser) return { success: false, error: 'User không tồn tại.' }
+
+        // [AUDIT R10 — fix] reactivateUser had ZERO tenant guard, so a workspace admin
+        // could unlock + re-role (incl. AGENCY_ADMIN) any LOCKED account in ANOTHER tenant,
+        // undoing that tenant's security action. Require the same positive tenancy link to
+        // THIS workspace's profile that deactivateUser now enforces.
+        const wsForTenancy = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        const tenantProfileId = wsForTenancy?.profileId ?? null
+        const [tenancyMember, tenancyAccess] = await Promise.all([
+            prisma.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId, workspaceId } },
+                select: { role: true },
+            }),
+            tenantProfileId
+                ? prisma.profileAccess.findUnique({
+                      where: { userId_profileId: { userId, profileId: tenantProfileId } },
+                      select: { role: true },
+                  })
+                : Promise.resolve(null),
+        ])
+        const targetBelongsToTenant =
+            (!!tenantProfileId && targetUser.profileId === tenantProfileId) ||
+            !!tenancyMember ||
+            !!tenancyAccess
+        if (!targetBelongsToTenant) {
+            return { success: false, error: 'Không thể reactivate user không thuộc Workspace/Profile này.' }
+        }
+
+        // [AUDIT R13 — fix] Symmetric OWNER protection: don't let a non-owner reactivate +
+        // re-role a profile OWNER (e.g. to CLIENT, which middleware bounces to /login — a
+        // soft-lockout). A ProfileAccess-OWNER is an OWNER even without a WorkspaceMember row.
+        const targetIsOwner = tenancyMember?.role === 'OWNER' || tenancyAccess?.role === 'OWNER'
+        const actorIsOwner = actorWorkspaceRole === 'OWNER' || actorProfileRole === 'OWNER'
+        if (targetIsOwner && !actorIsOwner) {
+            return { success: false, error: 'Chỉ OWNER mới có quyền reactivate/đổi vai trò OWNER khác.' }
+        }
+
         if (targetUser.role !== 'LOCKED') {
             return { success: false, error: 'User không ở trạng thái deactivated.' }
         }
@@ -295,9 +445,37 @@ export async function triggerForcePasswordReset(userId: string, workspaceId: str
 
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true, username: true, email: true, displayName: true, role: true },
+            select: { id: true, username: true, email: true, displayName: true, role: true, profileId: true },
         })
         if (!targetUser) return { success: false, error: 'User không tồn tại.' }
+
+        // [AUDIT R12 — fix] Same positive-tenancy requirement as deactivate/reactivate/
+        // updateUserRole — without it a workspace admin could trigger a real password-reset
+        // OTP email to a user in ANOTHER tenant (no profileId/membership link here).
+        const wsForTenancy = await prisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        const tenantProfileId = wsForTenancy?.profileId ?? null
+        const [tenancyMember, tenancyAccess] = await Promise.all([
+            prisma.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId, workspaceId } },
+                select: { role: true },
+            }),
+            tenantProfileId
+                ? prisma.profileAccess.findUnique({
+                      where: { userId_profileId: { userId, profileId: tenantProfileId } },
+                      select: { role: true },
+                  })
+                : Promise.resolve(null),
+        ])
+        const targetBelongsToTenant =
+            (!!tenantProfileId && targetUser.profileId === tenantProfileId) ||
+            !!tenancyMember ||
+            !!tenancyAccess
+        if (!targetBelongsToTenant) {
+            return { success: false, error: 'Không thể reset password cho user không thuộc Workspace/Profile này.' }
+        }
 
         // User chưa có email → không thể gửi OTP
         if (!targetUser.email) {

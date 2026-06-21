@@ -8,12 +8,26 @@ const MAX_TEMPLATES = 15
 
 export async function getTemplates(workspaceId: string) {
     try {
+        // [AUDIT R12 — HIGH fix] This READ had NO authz and used the global prisma client
+        // (no getWorkspacePrisma scope), so ANY caller — incl. a member of another tenant —
+        // could pass any workspaceId and read its PriceTemplate rows, leaking priceUSD (the
+        // agency's USD price-per-video = revenue/margin) + wageVND cross-tenant. Gate like
+        // listPricingRules: require membership, and strip the USD revenue field for non-admins
+        // (keep wageVND for the wage dropdown). createTemplate/deleteTemplate already gate ADMIN.
+        const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const isAdmin =
+            access.workspaceRole === 'OWNER' || access.workspaceRole === 'ADMIN' ||
+            access.profileRole === 'OWNER' || access.profileRole === 'ADMIN'
+
         const templates = await prisma.priceTemplate.findMany({
             where: { workspaceId },
             orderBy: { sortOrder: 'asc' },
             take: MAX_TEMPLATES,
         })
-        return { templates }
+        const safeTemplates = isAdmin
+            ? templates
+            : templates.map(t => ({ ...t, priceUSD: null }))
+        return { templates: safeTemplates }
     } catch (error) {
         console.error('Get Templates Error:', error)
         return { templates: [] }

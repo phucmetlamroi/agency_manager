@@ -52,6 +52,7 @@ export type AuditAction =
     | 'auth.impersonation_started'
     | 'auth.impersonation_ended'
     | 'auth.admin_force_reset_triggered'
+    | 'auth.password_changed'
     | 'payroll.bonus_calculated'
     | 'payroll.bonus_reverted'
     | 'payroll.locked'

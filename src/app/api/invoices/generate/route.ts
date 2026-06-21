@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateInvoicePDF, InvoiceData } from '@/lib/invoice-generator'
-import { getCurrentUser } from '@/lib/auth-guard'
+import { verifyFinanceAccess } from '@/lib/security'
 
 export async function POST(req: NextRequest) {
     try {
-        // Security Check
-        const user = await getCurrentUser()
-        if (!user || user.role !== 'ADMIN') { // Treasurer check needed? Assuming Admin for now
-            if (!user?.isTreasurer) return new NextResponse('Unauthorized', { status: 401 })
-        }
-
         const body = await req.json()
-        const data: InvoiceData = body
+        const { workspaceId, ...data } = (body ?? {}) as InvoiceData & { workspaceId?: string }
+
+        // [AUDIT R14 — fix] Was gated on the GLOBAL User.role==='ADMIN' / isTreasurer flags
+        // with no workspace scope (the pre-R8 pattern). Require profile-scoped finance
+        // authority in the claimed workspace, matching the invoice download route. (The PDF
+        // is rendered from caller-supplied body data, so this is a consistency/hardening gate
+        // rather than a stored-data leak.)
+        if (!workspaceId) return new NextResponse('Workspace ID required', { status: 400 })
+        try {
+            await verifyFinanceAccess(workspaceId)
+        } catch (e: any) {
+            if (e?.message?.startsWith('SECURITY_VIOLATION')) return new NextResponse('Forbidden', { status: 403 })
+            throw e
+        }
 
         // Validate basic fields
         if (!data.invoiceNumber || !data.items || !data.totalDue) {

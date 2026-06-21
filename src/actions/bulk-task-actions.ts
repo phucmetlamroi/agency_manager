@@ -89,6 +89,24 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             if (!assigneeExists) {
                 return { error: 'Người được giao không còn tồn tại — vui lòng chọn lại editor.' }
             }
+            // [AUDIT R14 — fix] The assignee must belong to THIS workspace's profile —
+            // don't let an admin glue a batch of tasks to a foreign-tenant user.
+            const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
+            const assigneeAllowed = await isAssigneeInWorkspaceProfile(data.assigneeId, workspaceId, currentProfileId)
+            if (!assigneeAllowed) {
+                return { error: 'Editor được chọn không thuộc workspace/profile này. Hãy mời họ vào workspace trước khi giao việc.' }
+            }
+        }
+
+        // [AUDIT R14 — fix] clientId must belong to THIS profile (Client is profile-scoped).
+        if (data.clientId != null) {
+            const clientOk = await prisma.client.findFirst({
+                where: { id: data.clientId, profileId: currentProfileId },
+                select: { id: true },
+            })
+            if (!clientOk) {
+                return { error: 'Khách hàng được chọn không hợp lệ.' }
+            }
         }
 
         // Use standard prisma instead of extension for this complex transaction
@@ -664,6 +682,14 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
             })
             if (latestRank && latestRank.rank === 'D') {
                 return { error: 'Kh\u00f4ng th\u1ec3 giao Task: Nh\u00e2n s\u1ef1 \u0111ang b\u1ecb C\u1ea3nh c\u00e1o \u0110\u1ecf (Rank D).' }
+            }
+
+            // [AUDIT R14 \u2014 fix] Assignee must belong to THIS workspace's profile \u2014 don't
+            // let an admin bulk-assign tasks to a foreign-tenant userId passed via RPC.
+            const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
+            const assigneeAllowed = await isAssigneeInWorkspaceProfile(cleanAssigneeId, workspaceId)
+            if (!assigneeAllowed) {
+                return { error: 'Editor \u0111\u01b0\u1ee3c ch\u1ecdn kh\u00f4ng thu\u1ed9c workspace/profile n\u00e0y.' }
             }
 
             // Assign to USER

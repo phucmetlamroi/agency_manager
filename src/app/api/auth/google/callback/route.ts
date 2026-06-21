@@ -57,6 +57,15 @@ export async function GET(req: Request) {
     }
     if (!user) redirect('/login?error=google')
 
+    // [AUDIT R14 — fix] Mirror the password login path (auth-actions.ts: rejects LOCKED at
+    // :277 and CLIENT at :337). A banned (deactivated → role=LOCKED, sessionVersion bumped)
+    // or legacy CLIENT account must NOT obtain a fresh session via OAuth — relying solely on
+    // the downstream DAL is a single point of failure and the new session would re-arm a
+    // valid sessionVersion, defeating the ban. Kept outside the try/catch so NEXT_REDIRECT
+    // propagates.
+    if (user.role === 'LOCKED') redirect('/login?error=account_locked')
+    if (user.role === 'CLIENT') redirect('/login?error=client_account')
+
     // Build session payload — mirror loginAction (auth-actions.ts). Google email is
     // verified, so no restriction; requiresEmailMigration follows the user record.
     const sessionPayload = {

@@ -11,15 +11,37 @@ export async function startImpersonation(targetUserId: string, workspaceId: stri
     // with NO scope check on the target → cross-tenant account takeover. Now require
     // the caller to be a workspace ADMIN, the target to be a member of THIS
     // workspace, and forbid impersonating a (legacy) global-admin account.
-    await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+    const { workspaceRole: callerRole } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
     const session = await getSession()
     if (!session?.user) throw new Error('Unauthorized')
 
     const targetMember = await prisma.workspaceMember.findFirst({
         where: { userId: targetUserId, workspaceId },
-        select: { id: true },
+        select: { role: true },
     })
     if (!targetMember) throw new Error('Người này không thuộc workspace của bạn.')
+
+    // [AUDIT R6 — CRITICAL fix] Block role-rank escalation. Previously the ONLY
+    // target guard was the legacy global `User.role === 'ADMIN'` — which a normal
+    // profile OWNER does NOT have — so a mere workspace/profile ADMIN could
+    // impersonate the OWNER and then transfer ownership / mint admins / evict the
+    // owner = full single-tenant takeover. Resolve the target's EFFECTIVE role
+    // (WorkspaceMember + ProfileAccess): never impersonate an OWNER, and only an
+    // OWNER may impersonate an ADMIN.
+    const ws = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    const targetPa = ws?.profileId
+        ? await prisma.profileAccess.findUnique({
+              where: { userId_profileId: { userId: targetUserId, profileId: ws.profileId } },
+              select: { role: true },
+          })
+        : null
+    const targetIsOwner = targetMember.role === 'OWNER' || targetPa?.role === 'OWNER'
+    const targetIsAdmin = targetMember.role === 'ADMIN' || targetPa?.role === 'ADMIN'
+    if (targetIsOwner) throw new Error('Không thể đóng vai chủ sở hữu Workspace.')
+    if (targetIsAdmin && callerRole !== 'OWNER') throw new Error('Chỉ chủ sở hữu mới được đóng vai quản trị viên.')
 
     const targetUser = await prisma.user.findUnique({
         where: { id: targetUserId },

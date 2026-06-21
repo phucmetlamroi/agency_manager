@@ -1,7 +1,7 @@
 import { logout } from '@/lib/auth'
 // Removed duplicate globals.css import
 import { redirect, notFound } from 'next/navigation'
-import { verifyActiveSession } from '@/lib/security'
+import { verifyActiveSession, verifyProfileAdminAccess } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import { AdminShell } from '@/components/layout/AdminShell'
 import MobileLayoutShell from '@/components/layout/MobileLayoutShell'
@@ -30,7 +30,7 @@ export default async function AdminLayout({
         notFound()
     }
 
-    const { status, session, dbUser, isAdmin } = await verifyActiveSession()
+    const { status, session, dbUser } = await verifyActiveSession()
 
     if (status === 'unauthorized') {
         redirect('/login')
@@ -40,14 +40,28 @@ export default async function AdminLayout({
         redirect('/api/auth/logout')
     }
 
-    // Workspace-scoped authorization: allow access if user is
-    // (a) global ADMIN/treasurer, OR (b) OWNER/ADMIN of this workspace.
+    // workspaceRole (from the explicit WorkspaceMember row) drives the nav shells.
     const membership = await prisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
         select: { role: true },
     })
     const workspaceRole = membership?.role ?? null
-    const canAccessAdmin = isAdmin || workspaceRole === 'OWNER' || workspaceRole === 'ADMIN'
+
+    // [AUDIT R8 — CRITICAL fix] Authorize via verifyProfileAdminAccess: profile-scoped
+    // OWNER/ADMIN of THIS workspace (covers a profile ADMIN viewing a workspace created
+    // before their grant, where verifyWorkspaceAccess downgrades them to MEMBER). The R6
+    // form re-opened the cross-tenant leak it tried to close: its `catch` fallback granted
+    // /admin whenever the GLOBAL isTreasurer flag was set AND *any* ProfileAccess row
+    // existed — it never checked the row's ROLE, so a treasurer of profile A who was only a
+    // USER/CLIENT of profile B got full /admin in B (salaries + jobPriceUSD revenue).
+    // verifyProfileAdminAccess never consults the global flag and requires an OWNER/ADMIN role.
+    let canAccessAdmin = false
+    try {
+        await verifyProfileAdminAccess(workspaceId)
+        canAccessAdmin = true
+    } catch {
+        canAccessAdmin = false
+    }
 
     if (!canAccessAdmin) {
         redirect(`/${workspaceId}/dashboard`)

@@ -155,6 +155,48 @@ export async function verifyWorkspaceAccess(
 }
 
 /**
+ * [AUDIT R8 — fix] Profile-scoped ADMIN authorization. This is the ONLY safe
+ * predicate for admin/finance access in the multi-tenant model: the caller must be
+ * an OWNER/ADMIN of THIS workspace (via verifyWorkspaceAccess's workspaceRole) OR an
+ * OWNER/ADMIN of this workspace's PROFILE (profileRole — covers a profile ADMIN
+ * viewing a workspace created BEFORE their grant, where verifyWorkspaceAccess
+ * downgrades workspaceRole to MEMBER). It deliberately does NOT consult the GLOBAL
+ * User.isTreasurer flag — that flag has no per-profile binding, so using it as a
+ * grant is exactly what leaked finance/admin access cross-tenant (R7 HIGH #2 +
+ * R8 CRITICAL: a treasurer of profile A who is merely a USER/CLIENT of profile B
+ * could open B's /admin and read its salaries + jobPriceUSD). Throws
+ * SECURITY_VIOLATION otherwise; on success returns the verifyWorkspaceAccess object.
+ */
+export async function verifyProfileAdminAccess(
+    workspaceId: string,
+): Promise<Awaited<ReturnType<typeof verifyWorkspaceAccess>>> {
+    const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+    const ok =
+        access.workspaceRole === 'OWNER' || access.workspaceRole === 'ADMIN' ||
+        access.profileRole === 'OWNER' || access.profileRole === 'ADMIN'
+    if (!ok) {
+        throw new Error('SECURITY_VIOLATION: Bạn không có quyền quản trị tại Workspace này.')
+    }
+    return access
+}
+
+/**
+ * [AUDIT R7→R8 — fix] Authorization for invoice/finance operations that expose
+ * jobPriceUSD (agency USD revenue) or billed invoices. Finance authority == being a
+ * profile-scoped ADMIN of this workspace (see verifyProfileAdminAccess). The earlier
+ * R7 form required the GLOBAL isTreasurer flag AND profile-admin, which (a) still
+ * leaked when combined with the admin-layout fallback and (b) locked out a legitimate
+ * profile OWNER whose isTreasurer defaults to false — they could VIEW finance but got
+ * "Forbidden" when billing. Delegating to verifyProfileAdminAccess closes the leak and
+ * unifies finance VIEW with finance WRITE on one profile-scoped predicate.
+ */
+export async function verifyFinanceAccess(
+    workspaceId: string,
+): Promise<Awaited<ReturnType<typeof verifyWorkspaceAccess>>> {
+    return verifyProfileAdminAccess(workspaceId)
+}
+
+/**
  * Kiểm tra Session chống lưu Cookie cũ chưa hết hạn (Session Fixation Block).
  * Hàm này dùng để đảm bảo mỗi khi gọi data, user chưa bị Locked bởi Admin.
  *

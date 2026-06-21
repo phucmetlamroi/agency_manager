@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateInvoicePDF, InvoiceData } from '@/lib/invoice-generator'
-import { getCurrentUser } from '@/lib/auth-guard'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
-import { verifyWorkspaceAccess } from '@/lib/security'
+import { verifyFinanceAccess } from '@/lib/security'
 
 export async function GET(
     req: NextRequest,
@@ -14,20 +13,18 @@ export async function GET(
 
         if (!workspaceId) return new NextResponse('Workspace ID required', { status: 400 })
 
-        // 1. Auth Check
-        const user = await getCurrentUser()
-        if (!user || (user.role !== 'ADMIN' && !user.isTreasurer)) {
-            return new NextResponse('Unauthorized', { status: 401 })
-        }
-
-        // 2. SECURITY: Verify caller belongs to this workspace.
-        // Without this, any global ADMIN could download invoices from ANY workspace,
-        // and the workspaceId param was previously trusted blindly.
+        // 1+2. SECURITY: finance authorization + workspace scope. [AUDIT R7 — fix]
+        // verifyFinanceAccess requires membership of THIS workspace's profile AND
+        // profile-scoped finance authority (a treasurer who is a profile OWNER/ADMIN),
+        // replacing the old GLOBAL isTreasurer flag that let a treasurer of another
+        // tenant download this tenant's invoices.
+        let financeUserId: string
         try {
-            await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+            const access = await verifyFinanceAccess(workspaceId)
+            financeUserId = access.userId
         } catch (e: any) {
             if (e?.message?.startsWith('SECURITY_VIOLATION')) {
-                return new NextResponse(e.message, { status: 403 })
+                return new NextResponse('Forbidden', { status: 403 })
             }
             throw e
         }
@@ -50,7 +47,7 @@ export async function GET(
         // có bug → bypass. Check thêm tại đây để bullet-proof anti-IDOR.
         // Audit finding #6 (HIGH): Invoice download cross-workspace risk.
         if ((invoice as any).workspaceId && (invoice as any).workspaceId !== workspaceId) {
-            console.error(`[IDOR] User ${user.id} attempted download invoice ${id} from workspace ${(invoice as any).workspaceId} via param ${workspaceId}`)
+            console.error(`[IDOR] User ${financeUserId} attempted download invoice ${id} from workspace ${(invoice as any).workspaceId} via param ${workspaceId}`)
             return new NextResponse('Forbidden: Invoice does not belong to this workspace', { status: 403 })
         }
 

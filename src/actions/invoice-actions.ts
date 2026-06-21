@@ -2,11 +2,10 @@
 
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { getCurrentUser } from '@/lib/auth-guard'
 import { sendEmail } from '@/lib/email'
 import { emailTemplates } from '@/lib/email-templates'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
-import { verifyWorkspaceAccess } from '@/lib/security'
+import { verifyWorkspaceAccess, verifyFinanceAccess } from '@/lib/security'
 
 // Helper to safely convert Decimal/Number/String to Number
 const toSafeNumber = (val: any) => {
@@ -28,10 +27,13 @@ export async function getBillingProfiles(workspaceId?: string) {
         if (!workspaceId) return { error: 'workspaceId required' }
         let profileId: string | null = null;
         if (workspaceId) {
-            // SECURITY: Verify caller is a member of the workspace before reading
-            // its associated profile's billing data. Otherwise any user could
-            // dump billing data of any workspace by passing its ID.
-            await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+            // [AUDIT R9 — HIGH fix] BillingProfile rows carry the agency's bank wiring
+            // (beneficiaryName/bankName/accountNumber/swiftCode). The R4 fix closed the
+            // no-workspaceId branch but left the role bar at MEMBER, so ANY non-finance
+            // staff (e.g. a freelance editor) could dump bank details by calling this
+            // server action directly. Require profile-scoped finance authority — the same
+            // gate the create/update/delete billing actions and getUnbilledTasks use.
+            await verifyFinanceAccess(workspaceId)
 
             const ws = await prisma.workspace.findUnique({
                 where: { id: workspaceId },
@@ -215,14 +217,17 @@ export async function getUnbilledTasks(clientId: number, workspaceId: string) {
         // [Canonical Clients] Client is now profile-scoped → the middleware
         // REQUIRES profileId for client queries (fail-closed guard). Resolve
         // it via the session (also gives us the missing membership check).
-        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
-        // [AUDIT R3 — fix] This returns per-task jobPriceUSD (agency USD revenue) which
-        // must never reach non-finance staff. Require a finance role (the invoice
-        // builder that calls this is admin/treasurer-only anyway).
-        const caller = await getCurrentUser()
-        if (!caller || (!caller.isSuperAdmin && !caller.isTreasurer)) {
+        // [AUDIT R7 — fix] This returns per-task jobPriceUSD (agency USD revenue).
+        // Gate by FINANCE authority scoped to THIS workspace's profile — the global
+        // isTreasurer flag leaked revenue cross-tenant to a treasurer of another profile
+        // who happened to be a member here.
+        let access
+        try {
+            access = await verifyFinanceAccess(workspaceId)
+        } catch {
             return { error: 'Forbidden' }
         }
+        const { session } = access
         const profileId = (session?.user as any)?.sessionProfileId as string | undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // 1. Get all related Client IDs (Parent + Children) — skip archived subs
@@ -274,9 +279,11 @@ export async function calculateInvoicePreview(taskIds: string[], taxRate: number
     // jobPriceUSD (agency USD revenue, which must never reach non-finance staff).
     // Require workspace membership + finance role; return zeros otherwise.
     try {
-        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
-        const user = await getCurrentUser()
-        if (!user || (!user.isSuperAdmin && !user.isTreasurer)) {
+        // [AUDIT R7 — fix] Returns a subtotal of jobPriceUSD — gate by profile-scoped
+        // finance authority, not the global isTreasurer flag.
+        try {
+            await verifyFinanceAccess(workspaceId)
+        } catch {
             return { subtotal: 0, taxAmount: 0, totalDue: 0 }
         }
         const workspacePrisma = getWorkspacePrisma(workspaceId)
@@ -329,11 +336,24 @@ export async function createInvoiceRecord(data: {
         // first (scope), then keep the finance-role gate. profileId is resolved so
         // the client-deposit write below is correctly profile-scoped (Client is
         // profile-scoped and fail-closes without it).
-        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        // [AUDIT R7 — fix] Profile-scoped finance gate (was global isTreasurer, which
+        // let a treasurer of another tenant create invoices here by passing this id).
+        let access
+        try {
+            access = await verifyFinanceAccess(workspaceId)
+        } catch {
+            return { error: 'Unauthorized' }
+        }
+        const { session } = access
         const profileId = (session?.user as any)?.sessionProfileId as string | undefined
-        const user = await getCurrentUser()
-        // Determine if user has permission (Admin or Treasurer)
-        if (!user || (!user.isSuperAdmin && !user.isTreasurer)) return { error: 'Unauthorized' }
+
+        // [AUDIT R7] verifyFinanceAccess replaced getCurrentUser — fetch the actor's
+        // contact fields (createdBy + notification email) explicitly, since the JWT
+        // session payload doesn't reliably carry nickname/username/email.
+        const actor = await prisma.user.findUnique({
+            where: { id: access.userId },
+            select: { id: true, email: true, username: true, nickname: true },
+        })
 
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
@@ -357,7 +377,7 @@ export async function createInvoiceRecord(data: {
                 data: {
                     invoiceNumber: data.invoiceNumber,
                     clientId: data.clientId,
-                    createdBy: user.id,
+                    createdBy: access.userId,
                     issueDate: data.issueDate,
                     dueDate: data.dueDate,
                     subtotalAmount: data.subtotalAmount,
@@ -423,9 +443,9 @@ export async function createInvoiceRecord(data: {
         })
 
         // 4. Send Email Notification (Fire and Forget)
-        if (user.email) {
+        if (actor?.email) {
             const emailHtml = emailTemplates.invoiceCreated(
-                user.nickname || user.username || 'Admin',
+                actor.nickname || actor.username || 'Admin',
                 result.invoiceNumber,
                 data.clientName || 'Client',
                 new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.totalDue),
@@ -433,7 +453,7 @@ export async function createInvoiceRecord(data: {
             )
 
             sendEmail({
-                to: user.email,
+                to: actor.email,
                 subject: `[Invoice] Created #${result.invoiceNumber}`,
                 html: emailHtml
             })
@@ -476,7 +496,10 @@ export async function getClientInvoices(clientId: number, workspaceId: string) {
     try {
         // [Canonical Clients] profileId required for the client query —
         // see getUnbilledTasks above for rationale.
-        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        // [AUDIT R9 — fix] Invoice rows expose billed USD totals (subtotal/tax/totalDue
+        // = agency revenue). Same finance-data-to-non-admin leak class as
+        // getBillingProfiles — gate on profile-scoped finance authority, not MEMBER.
+        const { session } = await verifyFinanceAccess(workspaceId)
         const profileId = (session?.user as any)?.sessionProfileId as string | undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // 1. Get all related Client IDs (Parent + Children)
@@ -521,10 +544,16 @@ export async function voidInvoice(invoiceId: string, workspaceId: string) {
         // void invoices of another (flipping their tasks to UNBILLED + refunding their
         // client deposit). Require membership of THIS workspace first; resolve profileId
         // so the client deposit-refund (Client is profile-scoped) actually runs.
-        const { session } = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        // [AUDIT R7 — fix] Profile-scoped finance gate (was global isTreasurer, which
+        // let a treasurer of another tenant void this tenant's invoices).
+        let access
+        try {
+            access = await verifyFinanceAccess(workspaceId)
+        } catch {
+            return { error: 'Unauthorized' }
+        }
+        const { session } = access
         const profileId = (session?.user as any)?.sessionProfileId as string | undefined
-        const user = await getCurrentUser()
-        if (!user || (!user.isSuperAdmin && !user.isTreasurer)) return { error: 'Unauthorized' }
 
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 

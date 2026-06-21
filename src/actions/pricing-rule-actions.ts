@@ -129,11 +129,35 @@ function validateConfig(ruleType: RuleType, config: any): string | null {
 /*  1. listPricingRules                                                */
 /* ──────────────────────────────────────────────────────────────────── */
 
+/**
+ * [AUDIT R11 — HIGH fix] Recursively drop any USD-denominated config field
+ * (priceUSD / ratePerMinuteUSD / minimumUSD / tier priceUSD, etc.) — that is the
+ * agency's USD price-per-video (revenue / margin) which must never reach non-admin
+ * staff. VND fields (wageVND, ...) are kept so the Quick Create wage dropdown still
+ * works for a member.
+ */
+function stripUsdFromConfig(config: any): any {
+    if (Array.isArray(config)) return config.map(stripUsdFromConfig)
+    if (config && typeof config === 'object') {
+        const out: Record<string, any> = {}
+        for (const [k, v] of Object.entries(config)) {
+            if (/usd/i.test(k)) continue
+            out[k] = stripUsdFromConfig(v)
+        }
+        return out
+    }
+    return config
+}
+
 export async function listPricingRules(workspaceId: string) {
     try {
-        // MEMBER role can READ pricing rules (needed for Quick Create dropdown
-        // — non-admin doesn't see Settings page but may use Quick Create).
-        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        // MEMBER role can READ pricing rules (needed for the Quick Create wage dropdown
+        // — non-admin doesn't see Settings page but may use Quick Create). The USD revenue
+        // side of each rule's `config` is stripped for non-admins below (AUDIT R11).
+        const access = await verifyWorkspaceAccess(workspaceId, 'MEMBER')
+        const isAdmin =
+            access.workspaceRole === 'OWNER' || access.workspaceRole === 'ADMIN' ||
+            access.profileRole === 'OWNER' || access.profileRole === 'ADMIN'
 
         const rules = await prisma.pricingRule.findMany({
             where: { workspaceId },
@@ -145,7 +169,10 @@ export async function listPricingRules(workspaceId: string) {
             orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
         })
 
-        return { rules }
+        const safeRules = isAdmin
+            ? rules
+            : rules.map(r => ({ ...r, config: stripUsdFromConfig((r as any).config) }))
+        return { rules: safeRules }
     } catch (err: any) {
         if (err?.message?.startsWith('SECURITY_VIOLATION')) {
             return { error: 'Bạn không có quyền truy cập workspace này.' }

@@ -19,9 +19,11 @@ const isValidDateKey = (dateKey: string): boolean => {
     return /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
 }
 
-const ensureWorkspaceAccess = async (userId: string, workspaceId: string, userRole?: string, userProfileId?: string | null) => {
-    if (userRole === 'ADMIN') return
-
+const ensureWorkspaceAccess = async (userId: string, workspaceId: string, _userRole?: string, userProfileId?: string | null) => {
+    // [AUDIT R12 — fix] Removed `if (userRole === 'ADMIN') return` — a residual global
+    // super-admin grant that let any account holding the legacy global User.role='ADMIN'
+    // read/write availability across tenant boundaries with no membership. Sprint Z removed
+    // the super-admin model; authorize purely on WorkspaceMember or same-profile below.
     const membership = await globalPrisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId, workspaceId } }
     })

@@ -386,7 +386,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
             const response = await fetch('/api/invoices/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pdfPayload)
+                // [AUDIT R14] include workspaceId so the route can gate on verifyFinanceAccess.
+                body: JSON.stringify({ ...pdfPayload, workspaceId })
             })
 
             if (!response.ok) {

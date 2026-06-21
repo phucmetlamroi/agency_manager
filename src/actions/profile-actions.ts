@@ -2,9 +2,10 @@
 
 import { prisma } from '@/lib/db'
 import { cookies } from 'next/headers'
-import { getSession } from '@/lib/auth'
+import { getSession, login } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { hash, compare } from 'bcryptjs'
+import { audit } from '@/lib/audit-log'
 import { redirect } from 'next/navigation'
 import { UserRole } from '@prisma/client'
 
@@ -483,6 +484,13 @@ export async function changePassword(userId: string, currentPass: string, newPas
         if (!session?.user?.id) return { error: 'Unauthorized' }
         const targetId = session.user.id
 
+        // [AUDIT R14 — fix] Refuse credential changes inside an impersonation session — the
+        // session principal is the impersonated victim, so this would change THEIR password
+        // (a silent takeover that survives the impersonation TTL).
+        if ((session.user as any).isImpersonating) {
+            return { error: 'Không thể đổi mật khẩu khi đang ở phiên impersonation.' }
+        }
+
         const user = await prisma.user.findUnique({
             where: { id: targetId }
         })
@@ -510,11 +518,26 @@ export async function changePassword(userId: string, currentPass: string, newPas
         // left this WRITE pointed at the untrusted `userId` param → the current-password
         // check ran against the CALLER's row while the new hash landed on the victim
         // (account takeover). Bind the write to the authenticated caller.
-        await prisma.user.update({
+        // [AUDIT R14 — fix] Bump sessionVersion so every OTHER outstanding JWT for this
+        // account is revoked (a password change must evict other devices — the public reset
+        // + email-migration flows already do this), then re-issue THIS caller's cookie with
+        // the new version so they aren't immediately logged out.
+        const updated = await prisma.user.update({
             where: { id: targetId },
             data: {
-                password: hashedPassword
-            }
+                password: hashedPassword,
+                sessionVersion: { increment: 1 },
+            },
+            select: { sessionVersion: true },
+        })
+        await login({ ...(session.user as any), sessionVersion: updated.sessionVersion })
+
+        await audit({
+            workspaceId,
+            actorUserId: targetId,
+            action: 'auth.password_changed',
+            targetType: 'User',
+            targetId,
         })
 
         revalidatePath(`/${workspaceId}/dashboard/profile`)

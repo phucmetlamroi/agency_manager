@@ -1,6 +1,6 @@
 'use server'
 
-import { getSession } from '@/lib/auth'
+import { getSession, login } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
@@ -12,6 +12,14 @@ export async function changePassword(formData: FormData, workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
 
+    // [AUDIT R14 — fix] Refuse credential changes inside an impersonation session — the
+    // session principal is the impersonated victim, so this would silently plant a
+    // password on an account the admin does not own.
+    if ((session.user as any).isImpersonating) {
+        return { error: 'Không thể đổi mật khẩu khi đang ở phiên impersonation.' }
+    }
+
+    const currentPassword = formData.get('currentPassword') as string
     const newPassword = formData.get('newPassword') as string
 
     if (!newPassword || newPassword.length < 6) {
@@ -19,13 +27,45 @@ export async function changePassword(formData: FormData, workspaceId: string) {
     }
 
     try {
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { id: true, password: true },
+        })
+        if (!user) return { error: 'User not found' }
+
+        // [AUDIT R14 — fix] Re-authenticate with the CURRENT password (was missing — any
+        // holder of a valid session, incl. a borrowed/impersonated one, could silently
+        // reset the account password with no paper trail). Google-only accounts (null
+        // password) must set their first password via the public "forgot password" flow.
+        if (!user.password) {
+            return { error: 'Tài khoản này đăng nhập bằng Google. Dùng "Quên mật khẩu" để đặt mật khẩu lần đầu.' }
+        }
+        if (!currentPassword) {
+            return { error: 'Vui lòng nhập mật khẩu hiện tại.' }
+        }
+        const isValid = await bcrypt.compare(currentPassword, user.password)
+        if (!isValid) {
+            return { error: 'Mật khẩu hiện tại không đúng' }
+        }
+
         const hashedPassword = await bcrypt.hash(newPassword, 10)
 
-        await prisma.user.update({
-            where: { id: session.user.id },
-            data: {
-                password: hashedPassword
-            }
+        // [AUDIT R14 — fix] Bump sessionVersion so every OTHER outstanding JWT for this
+        // account is revoked at the DAL (a password change must evict other devices), then
+        // re-issue THIS caller's cookie with the new version so they aren't logged out.
+        const updated = await prisma.user.update({
+            where: { id: user.id },
+            data: { password: hashedPassword, sessionVersion: { increment: 1 } },
+            select: { sessionVersion: true },
+        })
+        await login({ ...(session.user as any), sessionVersion: updated.sessionVersion })
+
+        await audit({
+            workspaceId,
+            actorUserId: user.id,
+            action: 'auth.password_changed',
+            targetType: 'User',
+            targetId: user.id,
         })
 
         revalidatePath(`/${workspaceId}/dashboard`)

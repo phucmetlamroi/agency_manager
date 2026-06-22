@@ -443,11 +443,13 @@ export async function inviteToWorkspace(
                     success: true,
                     directAdd: true,
                     repaired: true,
-                    username: targetUser.nickname || targetUser.username,
+                    // [AUDIT invite-flow R5 — fix] Echo the caller-supplied identifier, not the
+                    // resolved handle (completes the R4 cross-tenant de-anon fix symmetrically).
+                    username: trimmedUsername,
                 }
             }
         }
-        return { error: `${targetUser.nickname || targetUser.username} đã là thành viên của workspace này.` }
+        return { error: `${trimmedUsername} đã là thành viên của workspace này.` }
     }
 
     // [Re-invite policy] Cho phép invite NHIỀU LẦN kể cả khi đã có lời mời
@@ -1179,9 +1181,14 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
     ) {
         const targetPA = await prisma.profileAccess.findUnique({
             where: { userId_profileId: { userId: targetUserId, profileId: removalWorkspace.profileId } },
-            select: { role: true },
+            select: { role: true, grantedAt: true },
         })
-        if (targetPA?.role === 'USER') {
+        // [AUDIT invite-flow R5 — fix] Only revoke a PA that was MINTED BY a workspace accept
+        // (grantedAt >= this membership's joinedAt — accept upserts the WorkspaceMember then the
+        // ProfileAccess). A cross-profile user invited DIRECTLY to the profile
+        // (inviteToProfileAction) has a PA granted BEFORE they ever joined a workspace — that is a
+        // standalone profile membership and must SURVIVE removal from a single workspace.
+        if (targetPA?.role === 'USER' && targetPA.grantedAt >= targetMember.joinedAt) {
             const otherMemberships = await prisma.workspaceMember.count({
                 where: {
                     userId: targetUserId,
@@ -1201,10 +1208,11 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
     // because the @@unique([workspaceId,invitedUserId,status]) constraint makes "set all to one
     // terminal status" collision-prone, deleteMany is also the cleanest revoke.
     const removalOps: any[] = [
-        prisma.workspaceMember.delete({
-            where: {
-                userId_workspaceId: { userId: targetUserId, workspaceId }
-            }
+        // [AUDIT invite-flow R5 — fix] deleteMany (not delete) so a concurrent double-remove is a
+        // no-op (count=0) instead of throwing P2025 and rolling back the invitation hard-delete.
+        // targetMember existence was already validated above.
+        prisma.workspaceMember.deleteMany({
+            where: { userId: targetUserId, workspaceId },
         }),
         prisma.workspaceInvitation.deleteMany({
             where: { workspaceId, invitedUserId: targetUserId },
@@ -1269,9 +1277,12 @@ export async function leaveWorkspace(workspaceId: string) {
     if (leaveWs?.profileId && member.user.profileId && leaveWs.profileId !== member.user.profileId) {
         const targetPA = await prisma.profileAccess.findUnique({
             where: { userId_profileId: { userId, profileId: leaveWs.profileId } },
-            select: { role: true },
+            select: { role: true, grantedAt: true },
         })
-        if (targetPA?.role === 'USER') {
+        // [AUDIT invite-flow R5 — fix] Only revoke a PA minted BY a workspace accept
+        // (grantedAt >= joinedAt). A directly profile-invited member's PA predates joining any
+        // workspace and is a standalone profile membership that must survive leaving one workspace.
+        if (targetPA?.role === 'USER' && targetPA.grantedAt >= member.joinedAt) {
             const otherMemberships = await prisma.workspaceMember.count({
                 where: { userId, workspaceId: { not: workspaceId }, workspace: { profileId: leaveWs.profileId } },
             })

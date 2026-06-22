@@ -570,7 +570,12 @@ export async function inviteToWorkspace(
             success: true,
             directAdd: false,
             reinvite: isReinvite,
-            username: targetUser.nickname || targetUser.username,
+            // [AUDIT invite-flow R4 — fix HIGH] Echo back the caller-supplied identifier, NOT the
+            // resolved nickname/@username. On the CROSS-profile path the caller may have supplied
+            // only an email; returning the resolved account's handle/nickname is an email→identity
+            // de-anonymization (R2 stripped this from the consent-failure branch but missed this
+            // success path). trimmedUsername is exactly what the caller already typed.
+            username: trimmedUsername,
         }
     } catch (err: any) {
         if (err?.code === 'P2021') {
@@ -1246,14 +1251,50 @@ export async function leaveWorkspace(workspaceId: string) {
 
     const member = await prisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId, workspaceId } },
-        include: { user: { select: { username: true } } }
+        include: { user: { select: { username: true, profileId: true } } }
     })
 
     if (!member) return { error: 'Bạn không phải thành viên workspace này.' }
 
-    await prisma.workspaceMember.delete({
-        where: { userId_workspaceId: { userId, workspaceId } }
+    // [AUDIT invite-flow R4 — fix] Mirror removeWorkspaceMember on self-leave: (1) hard-delete the
+    // leaver's invitation rows for this workspace so a future re-invite's accept doesn't collide on
+    // @@unique([workspaceId,invitedUserId,status]); (2) revoke the invite-minted ProfileAccess(USER)
+    // when the leaver is a CROSS-profile invitee with no other membership in the profile, so
+    // "leaving" actually revokes the profile-wide MEMBER fallback rather than leaving it behind.
+    const leaveWs = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
     })
+    let alsoRevokeProfileAccess = false
+    if (leaveWs?.profileId && member.user.profileId && leaveWs.profileId !== member.user.profileId) {
+        const targetPA = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId, profileId: leaveWs.profileId } },
+            select: { role: true },
+        })
+        if (targetPA?.role === 'USER') {
+            const otherMemberships = await prisma.workspaceMember.count({
+                where: { userId, workspaceId: { not: workspaceId }, workspace: { profileId: leaveWs.profileId } },
+            })
+            if (otherMemberships === 0) alsoRevokeProfileAccess = true
+        }
+    }
+
+    const leaveOps: any[] = [
+        prisma.workspaceMember.delete({
+            where: { userId_workspaceId: { userId, workspaceId } }
+        }),
+        prisma.workspaceInvitation.deleteMany({
+            where: { workspaceId, invitedUserId: userId },
+        }),
+    ]
+    if (alsoRevokeProfileAccess && leaveWs?.profileId) {
+        leaveOps.push(
+            prisma.profileAccess.deleteMany({
+                where: { userId, profileId: leaveWs.profileId },
+            }),
+        )
+    }
+    await prisma.$transaction(leaveOps)
 
     await audit({
         workspaceId,

@@ -207,7 +207,10 @@ export async function inviteToProfileAction(
     })
 
     revalidatePath('/', 'layout')
-    return { success: true, member: { userId: targetUser.id, role } }
+    // [AUDIT invite-flow R4 — fix] Do NOT return the resolved cross-tenant userId. For an
+    // email-only input this is an email→userId oracle; the UI (InviteToProfileModal) only reads
+    // result.error / result.success, so the resolved id is never needed by the caller.
+    return { success: true, member: { role } }
 }
 
 /* ──────────────────────────────────────────────────────────────────── */
@@ -312,6 +315,11 @@ export async function changeProfileRoleAction(
     if (targetAccess.role === 'OWNER') {
         return { error: 'Không thể demote OWNER. Transfer ownership trước.' }
     }
+    // [AUDIT invite-flow R4 — fix] A CLIENT is a view-only portal grant — never promote it to an
+    // internal USER/ADMIN role here (mirror the CLIENT guards in inviteToProfileAction / accept).
+    if (targetAccess.role === 'CLIENT') {
+        return { error: 'Tài khoản này đang là CLIENT (chỉ xem). Hãy gỡ vai trò CLIENT trước khi đổi sang vai trò nội bộ.' }
+    }
     if (targetAccess.role === newRole) {
         return { error: 'Thành viên đã có role này.' }
     }
@@ -364,6 +372,10 @@ export async function transferProfileOwnershipAction(profileId: string, newOwner
     })
     if (!targetAccess) {
         return { error: 'Người được transfer phải là thành viên hiện tại của Profile.' }
+    }
+    // [AUDIT invite-flow R4 — fix] Never transfer ownership to a view-only CLIENT access row.
+    if (targetAccess.role === 'CLIENT') {
+        return { error: 'Không thể chuyển quyền sở hữu cho tài khoản CLIENT (chỉ xem). Hãy chuyển họ thành thành viên nội bộ trước.' }
     }
 
     // Atomic swap: caller OWNER → ADMIN, target → OWNER

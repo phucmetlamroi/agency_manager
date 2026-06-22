@@ -1181,14 +1181,27 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
     ) {
         const targetPA = await prisma.profileAccess.findUnique({
             where: { userId_profileId: { userId: targetUserId, profileId: removalWorkspace.profileId } },
-            select: { role: true, grantedAt: true },
+            select: { role: true },
         })
-        // [AUDIT invite-flow R5 — fix] Only revoke a PA that was MINTED BY a workspace accept
-        // (grantedAt >= this membership's joinedAt — accept upserts the WorkspaceMember then the
-        // ProfileAccess). A cross-profile user invited DIRECTLY to the profile
-        // (inviteToProfileAction) has a PA granted BEFORE they ever joined a workspace — that is a
-        // standalone profile membership and must SURVIVE removal from a single workspace.
-        if (targetPA?.role === 'USER' && targetPA.grantedAt >= targetMember.joinedAt) {
+        // [AUDIT invite-flow R6 — fix HIGH] Fail-safe-CLOSED: when a cross-profile USER has NO
+        // remaining WorkspaceMember row in the profile, revoke their USER ProfileAccess so a
+        // removed user cannot keep tenant-wide MEMBER access via the verifyWorkspaceAccess
+        // PA->MEMBER fallback (security.ts).
+        //
+        // The R5 attempt to preserve a separately-granted profile membership via
+        // `grantedAt >= joinedAt` was UNSOUND: PA.grantedAt is frozen at the user's FIRST
+        // accept-join for the profile (the accept-time PA upsert is a no-op on later accepts), so
+        // removing a MULTI-workspace invitee's later-joined workspace LAST wrongly skipped the
+        // revoke and re-opened the removal bypass (R6 High). The two legitimate PA provenances
+        // (workspace-accept vs direct profile-invite) are indistinguishable in current state
+        // without a schema column, so we choose the SAFE (deny, not leak) direction.
+        //
+        // Blast radius of the resulting over-revoke is narrow: a directly profile-invited member
+        // with NO workspace membership is NEVER reached here (this path requires a WorkspaceMember
+        // row); only a profile member who ALSO held explicit workspace membership(s) and is removed
+        // from ALL of them loses their profile grant — recoverable (OWNER re-invites via
+        // inviteToProfileAction). ADMIN/OWNER/CLIENT PAs are never touched (role==='USER' gate).
+        if (targetPA?.role === 'USER') {
             const otherMemberships = await prisma.workspaceMember.count({
                 where: {
                     userId: targetUserId,
@@ -1277,12 +1290,14 @@ export async function leaveWorkspace(workspaceId: string) {
     if (leaveWs?.profileId && member.user.profileId && leaveWs.profileId !== member.user.profileId) {
         const targetPA = await prisma.profileAccess.findUnique({
             where: { userId_profileId: { userId, profileId: leaveWs.profileId } },
-            select: { role: true, grantedAt: true },
+            select: { role: true },
         })
-        // [AUDIT invite-flow R5 — fix] Only revoke a PA minted BY a workspace accept
-        // (grantedAt >= joinedAt). A directly profile-invited member's PA predates joining any
-        // workspace and is a standalone profile membership that must survive leaving one workspace.
-        if (targetPA?.role === 'USER' && targetPA.grantedAt >= member.joinedAt) {
+        // [AUDIT invite-flow R6 — fix HIGH] Fail-safe-CLOSED, symmetric with removeWorkspaceMember:
+        // revoke a cross-profile USER's ProfileAccess when they have no remaining WorkspaceMember
+        // in the profile. The R5 grantedAt>=joinedAt heuristic was unsound (grantedAt is frozen at
+        // the first accept-join, so leaving a later-joined workspace last skipped the revoke and
+        // re-opened the bypass). See the full rationale at removeWorkspaceMember.
+        if (targetPA?.role === 'USER') {
             const otherMemberships = await prisma.workspaceMember.count({
                 where: { userId, workspaceId: { not: workspaceId }, workspace: { profileId: leaveWs.profileId } },
             })

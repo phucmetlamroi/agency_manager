@@ -226,7 +226,13 @@ export async function createTasksFromBatch(
                         notes_vi: row.notes,
                         notes_en: null,
                         productLink: null,
-                        assigneeId: row.assigneeId,
+                        // [Velox blank-assignee fix] Coalesce '' → null at the INSERT sink. When a
+                        // user picks "Leave Blank (Task Pool)" the form assigneeId is the empty
+                        // string '' (AutocompleteInput emptyLabel → onSelect('')); the V3 path keeps
+                        // it via `??`, and '' is NOT null, so a raw insert trips Task_assigneeId_fkey.
+                        // The pre-validation above filters '' out (treats it as blank) so it never
+                        // caught this. Normalizing here covers BOTH the V1 and V3 batch sources.
+                        assigneeId: row.assigneeId || null,
                         status,
                         jobPriceUSD: row.jobPriceUSD,
                         wageVND: row.wageVND,

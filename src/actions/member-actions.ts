@@ -1174,9 +1174,14 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
         select: { profileId: true },
     })
     // Cross-profile invitee? Then this profile's USER ProfileAccess is a revoke candidate.
+    // [AUDIT invite-flow R8 — fix] Do NOT additionally require user.profileId to be non-null: a
+    // cross-profile invitee may have NO home profile (User.profileId === null, e.g. a Google
+    // signup who never created one). `removalWorkspace.profileId !== null` is true, so dropping the
+    // null guard naturally includes them; a home-profile member (profileId === this profile) is
+    // still excluded by the `!==` check. The in-tx role='USER' filter + remaining-membership recount
+    // protect OWNER/ADMIN/CLIENT PAs and prevent over-revoke.
     const revokeProfileId =
         removalWorkspace?.profileId &&
-        targetMember.user.profileId &&
         removalWorkspace.profileId !== targetMember.user.profileId
             ? removalWorkspace.profileId
             : null
@@ -1260,8 +1265,10 @@ export async function leaveWorkspace(workspaceId: string) {
         where: { id: workspaceId },
         select: { profileId: true },
     })
+    // [AUDIT invite-flow R8 — fix] Include null-home-profile cross-profile invitees (see
+    // removeWorkspaceMember): drop the user.profileId non-null requirement; `!==` handles null.
     const revokeProfileId =
-        leaveWs?.profileId && member.user.profileId && leaveWs.profileId !== member.user.profileId
+        leaveWs?.profileId && leaveWs.profileId !== member.user.profileId
             ? leaveWs.profileId
             : null
 

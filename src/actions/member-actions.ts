@@ -1173,75 +1173,49 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
         where: { id: workspaceId },
         select: { profileId: true },
     })
-    let alsoRevokeProfileAccess = false
-    if (
+    // Cross-profile invitee? Then this profile's USER ProfileAccess is a revoke candidate.
+    const revokeProfileId =
         removalWorkspace?.profileId &&
         targetMember.user.profileId &&
         removalWorkspace.profileId !== targetMember.user.profileId
-    ) {
-        const targetPA = await prisma.profileAccess.findUnique({
-            where: { userId_profileId: { userId: targetUserId, profileId: removalWorkspace.profileId } },
-            select: { role: true },
-        })
-        // [AUDIT invite-flow R6 — fix HIGH] Fail-safe-CLOSED: when a cross-profile USER has NO
-        // remaining WorkspaceMember row in the profile, revoke their USER ProfileAccess so a
-        // removed user cannot keep tenant-wide MEMBER access via the verifyWorkspaceAccess
-        // PA->MEMBER fallback (security.ts).
-        //
-        // The R5 attempt to preserve a separately-granted profile membership via
-        // `grantedAt >= joinedAt` was UNSOUND: PA.grantedAt is frozen at the user's FIRST
-        // accept-join for the profile (the accept-time PA upsert is a no-op on later accepts), so
-        // removing a MULTI-workspace invitee's later-joined workspace LAST wrongly skipped the
-        // revoke and re-opened the removal bypass (R6 High). The two legitimate PA provenances
-        // (workspace-accept vs direct profile-invite) are indistinguishable in current state
-        // without a schema column, so we choose the SAFE (deny, not leak) direction.
-        //
-        // Blast radius of the resulting over-revoke is narrow: a directly profile-invited member
-        // with NO workspace membership is NEVER reached here (this path requires a WorkspaceMember
-        // row); only a profile member who ALSO held explicit workspace membership(s) and is removed
-        // from ALL of them loses their profile grant — recoverable (OWNER re-invites via
-        // inviteToProfileAction). ADMIN/OWNER/CLIENT PAs are never touched (role==='USER' gate).
-        if (targetPA?.role === 'USER') {
-            const otherMemberships = await prisma.workspaceMember.count({
-                where: {
-                    userId: targetUserId,
-                    workspaceId: { not: workspaceId },
-                    workspace: { profileId: removalWorkspace.profileId },
-                },
-            })
-            if (otherMemberships === 0) alsoRevokeProfileAccess = true
-        }
-    }
+            ? removalWorkspace.profileId
+            : null
 
-    // [AUDIT R14 + invite-flow R3 — fix HIGH] Remove the membership AND HARD-DELETE all of this
-    // user's invitation rows for the workspace in the same transaction. The R14 fix only revoked
-    // PENDING invites, but a lingering ACCEPTED/DECLINED row could later be replayed through
-    // acceptWorkspaceInvitation's priorAccepted branch to silently re-mint membership (R3 High).
-    // Deleting every (workspaceId, invitedUserId) row removes that replay trigger entirely — and
-    // because the @@unique([workspaceId,invitedUserId,status]) constraint makes "set all to one
-    // terminal status" collision-prone, deleteMany is also the cleanest revoke.
-    const removalOps: any[] = [
-        // [AUDIT invite-flow R5 — fix] deleteMany (not delete) so a concurrent double-remove is a
-        // no-op (count=0) instead of throwing P2025 and rolling back the invitation hard-delete.
-        // targetMember existence was already validated above.
-        prisma.workspaceMember.deleteMany({
-            where: { userId: targetUserId, workspaceId },
-        }),
-        prisma.workspaceInvitation.deleteMany({
-            where: { workspaceId, invitedUserId: targetUserId },
-        }),
-    ]
-    if (alsoRevokeProfileAccess && removalWorkspace?.profileId) {
-        // [AUDIT invite-flow R2 — fix] deleteMany (not delete) so a concurrent removal of the
-        // same ProfileAccess row is a no-op (count=0) instead of throwing P2025 and rolling back
-        // the entire removal transaction (which would silently leave the member in place).
-        removalOps.push(
-            prisma.profileAccess.deleteMany({
-                where: { userId: targetUserId, profileId: removalWorkspace.profileId },
-            }),
-        )
-    }
-    await prisma.$transaction(removalOps)
+    // [AUDIT invite-flow R1/R3/R6/R7 — fix HIGH] One interactive, SERIALIZED transaction that:
+    //  (1) deletes the WorkspaceMember row (deleteMany = idempotent under concurrent double-remove);
+    //  (2) HARD-DELETES the user's invitation rows for the workspace — a lingering ACCEPTED/DECLINED
+    //      row could otherwise be replayed via acceptWorkspaceInvitation's priorAccepted branch to
+    //      re-mint membership (R3), and the @@unique([ws,user,status]) makes "set to one terminal
+    //      status" collision-prone, so delete is cleanest;
+    //  (3) for a cross-profile invitee left with NO membership in the profile, revokes their USER
+    //      ProfileAccess — otherwise it grants MEMBER on EVERY workspace in the profile via the
+    //      verifyWorkspaceAccess fallback (security.ts), so a "removed" user keeps tenant-wide access.
+    //
+    // The remaining-membership count runs INSIDE the tx AFTER the member delete, and a `FOR UPDATE`
+    // lock on the user's ProfileAccess row serializes concurrent removals of the SAME user
+    // (R7 fix): without it, two near-simultaneous removals of the user's last two workspaces each
+    // saw the other's membership in a pre-transaction count and both skipped the revoke, orphaning
+    // the PA (TOCTOU under Read Committed). With the lock the second removal observes zero remaining
+    // memberships and revokes. The PA delete is filtered role='USER' so OWNER/ADMIN/CLIENT PAs are
+    // never touched. The resulting over-revoke of a directly profile-invited member who ALSO held
+    // explicit workspace membership(s) is a deliberate, narrow, recoverable, safe-direction tradeoff.
+    await prisma.$transaction(async (tx) => {
+        if (revokeProfileId) {
+            await tx.$queryRaw`SELECT 1 FROM "ProfileAccess" WHERE "userId" = ${targetUserId} AND "profileId" = ${revokeProfileId} FOR UPDATE`
+        }
+        await tx.workspaceMember.deleteMany({ where: { userId: targetUserId, workspaceId } })
+        await tx.workspaceInvitation.deleteMany({ where: { workspaceId, invitedUserId: targetUserId } })
+        if (revokeProfileId) {
+            const remaining = await tx.workspaceMember.count({
+                where: { userId: targetUserId, workspace: { profileId: revokeProfileId } },
+            })
+            if (remaining === 0) {
+                await tx.profileAccess.deleteMany({
+                    where: { userId: targetUserId, profileId: revokeProfileId, role: 'USER' },
+                })
+            }
+        }
+    })
 
     await audit({
         workspaceId,
@@ -1286,41 +1260,34 @@ export async function leaveWorkspace(workspaceId: string) {
         where: { id: workspaceId },
         select: { profileId: true },
     })
-    let alsoRevokeProfileAccess = false
-    if (leaveWs?.profileId && member.user.profileId && leaveWs.profileId !== member.user.profileId) {
-        const targetPA = await prisma.profileAccess.findUnique({
-            where: { userId_profileId: { userId, profileId: leaveWs.profileId } },
-            select: { role: true },
-        })
-        // [AUDIT invite-flow R6 — fix HIGH] Fail-safe-CLOSED, symmetric with removeWorkspaceMember:
-        // revoke a cross-profile USER's ProfileAccess when they have no remaining WorkspaceMember
-        // in the profile. The R5 grantedAt>=joinedAt heuristic was unsound (grantedAt is frozen at
-        // the first accept-join, so leaving a later-joined workspace last skipped the revoke and
-        // re-opened the bypass). See the full rationale at removeWorkspaceMember.
-        if (targetPA?.role === 'USER') {
-            const otherMemberships = await prisma.workspaceMember.count({
-                where: { userId, workspaceId: { not: workspaceId }, workspace: { profileId: leaveWs.profileId } },
-            })
-            if (otherMemberships === 0) alsoRevokeProfileAccess = true
-        }
-    }
+    const revokeProfileId =
+        leaveWs?.profileId && member.user.profileId && leaveWs.profileId !== member.user.profileId
+            ? leaveWs.profileId
+            : null
 
-    const leaveOps: any[] = [
-        prisma.workspaceMember.delete({
-            where: { userId_workspaceId: { userId, workspaceId } }
-        }),
-        prisma.workspaceInvitation.deleteMany({
-            where: { workspaceId, invitedUserId: userId },
-        }),
-    ]
-    if (alsoRevokeProfileAccess && leaveWs?.profileId) {
-        leaveOps.push(
-            prisma.profileAccess.deleteMany({
-                where: { userId, profileId: leaveWs.profileId },
-            }),
-        )
-    }
-    await prisma.$transaction(leaveOps)
+    // [AUDIT invite-flow R4/R6/R7 — fix HIGH] Interactive, SERIALIZED self-leave, symmetric with
+    // removeWorkspaceMember: delete the membership + the leaver's invitations, and (for a
+    // cross-profile invitee left with no membership in the profile) revoke their USER ProfileAccess.
+    // The remaining-membership count runs inside the tx after the delete, and a FOR UPDATE lock on
+    // the PA row serializes two concurrent leaves of the user's last two workspaces so the second
+    // observes zero remaining memberships and revokes (closes the R7 TOCTOU). See removeWorkspaceMember.
+    await prisma.$transaction(async (tx) => {
+        if (revokeProfileId) {
+            await tx.$queryRaw`SELECT 1 FROM "ProfileAccess" WHERE "userId" = ${userId} AND "profileId" = ${revokeProfileId} FOR UPDATE`
+        }
+        await tx.workspaceMember.deleteMany({ where: { userId, workspaceId } })
+        await tx.workspaceInvitation.deleteMany({ where: { workspaceId, invitedUserId: userId } })
+        if (revokeProfileId) {
+            const remaining = await tx.workspaceMember.count({
+                where: { userId, workspace: { profileId: revokeProfileId } },
+            })
+            if (remaining === 0) {
+                await tx.profileAccess.deleteMany({
+                    where: { userId, profileId: revokeProfileId, role: 'USER' },
+                })
+            }
+        }
+    })
 
     await audit({
         workspaceId,

@@ -1,6 +1,6 @@
 'use server'
 
-import { put } from '@vercel/blob'
+import { uploadPublicImage } from '@/lib/storage'
 import { prisma } from '@/lib/db'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import sharp from 'sharp'
@@ -95,10 +95,7 @@ export async function uploadPaymentQr(userId: string, formData: FormData) {
         // Filename: user-id-timestamp.webp
         const filename = `payment-qr-${userId}-${Date.now()}.webp`
 
-        const blob = await put(filename, optimizedBuffer, {
-            access: 'public',
-            contentType: 'image/webp'
-        })
+        const blob = await uploadPublicImage(filename, optimizedBuffer, 'image/webp')
 
         // 4. Update Database
         await prisma.user.update({
@@ -157,10 +154,7 @@ export async function uploadAvatar(userId: string, formData: FormData) {
 
         // 3. Upload to Vercel Blob
         const filename = `avatar-${userId}-${Date.now()}.webp`
-        const blob = await put(filename, optimizedBuffer, {
-            access: 'public',
-            contentType: 'image/webp'
-        })
+        const blob = await uploadPublicImage(filename, optimizedBuffer, 'image/webp')
 
         // 4. Update Database
         const { prisma } = await import('@/lib/db')
@@ -240,10 +234,7 @@ export async function uploadProfileBanner(profileId: string, formData: FormData)
         }
 
         const filename = `profile-banner-${profileId}-${Date.now()}.webp`
-        const blob = await put(filename, optimizedBuffer, {
-            access: 'public',
-            contentType: 'image/webp',
-        })
+        const blob = await uploadPublicImage(filename, optimizedBuffer, 'image/webp')
 
         await prisma.profile.update({
             where: { id: profileId },
@@ -290,10 +281,7 @@ export async function uploadProfileLogo(profileId: string, formData: FormData) {
         }
 
         const filename = `profile-logo-${profileId}-${Date.now()}.webp`
-        const blob = await put(filename, optimizedBuffer, {
-            access: 'public',
-            contentType: 'image/webp',
-        })
+        const blob = await uploadPublicImage(filename, optimizedBuffer, 'image/webp')
 
         await prisma.profile.update({
             where: { id: profileId },

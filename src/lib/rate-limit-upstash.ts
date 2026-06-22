@@ -121,6 +121,23 @@ function getInviteLimiter() {
     return _inviteLimiter
 }
 
+let _inviteCallerLimiter: Ratelimit | null = null
+function getInviteCallerLimiter() {
+    if (_inviteCallerLimiter) return _inviteCallerLimiter
+    const redis = getRedis()
+    if (!redis) return null
+    // [AUDIT invite-flow R2] 40 invite/profile-add attempts / hour / CALLER. The per-(workspace,
+    // target) checkInviteRate runs AFTER the user lookup and is keyed by the RESOLVED target, so
+    // it does not cap probing thousands of DISTINCT emails. This caller-scoped limit throttles
+    // account-enumeration via inviteToWorkspace / inviteToProfileAction (40/h is comfortable for
+    // a real admin onboarding a team, but kills mass email harvesting).
+    _inviteCallerLimiter = new Ratelimit({
+        redis, limiter: Ratelimit.slidingWindow(40, '1 h'),
+        analytics: true, prefix: 'rl:invite:caller',
+    })
+    return _inviteCallerLimiter
+}
+
 // ─── Public API ──────────────────────────────────────────────────
 
 export type RateLimitResult = {
@@ -221,6 +238,24 @@ export async function checkInviteRate(workspaceId: string, targetUserId: string)
     const limiter = getInviteLimiter()
     if (!limiter) return { success: true }
     const r = await limiter.limit(`ws:${workspaceId}:user:${targetUserId}`)
+    return {
+        success: r.success,
+        limit: r.limit,
+        remaining: r.remaining,
+        reset: r.reset,
+        retryAfter: r.success ? undefined : Math.max(1, Math.ceil((r.reset - Date.now()) / 1000)),
+    }
+}
+
+/**
+ * [AUDIT invite-flow R2] Caller-scoped invite throttle (40/h/user). Placed BEFORE the
+ * user lookup in inviteToWorkspace / inviteToProfileAction to cap account-enumeration via
+ * probing distinct emails — which the per-(workspace,target) checkInviteRate cannot stop.
+ */
+export async function checkInviteCallerRate(userId: string): Promise<RateLimitResult> {
+    const limiter = getInviteCallerLimiter()
+    if (!limiter) return { success: true }
+    const r = await limiter.limit(`caller:${userId}`)
     return {
         success: r.success,
         limit: r.limit,

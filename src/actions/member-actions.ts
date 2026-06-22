@@ -6,7 +6,7 @@ import { verifyWorkspaceAccess } from '@/lib/security'
 import { ensureNotLastOwner, LastOwnerProtectionError } from '@/lib/workspace-guards'
 import { isWorkspaceRole, hasAtLeastRole, type WorkspaceRole } from '@/lib/workspace-roles'
 import { audit } from '@/lib/audit-log'
-import { checkInviteRate } from '@/lib/rate-limit-upstash'
+import { checkInviteRate, checkInviteCallerRate } from '@/lib/rate-limit-upstash'
 import { findUserByEmailOrUsername } from '@/lib/user-lookup'
 
 const INVITATION_EXPIRY_DAYS = 14
@@ -308,6 +308,15 @@ export async function inviteToWorkspace(
 ) {
     const { userId: inviterId, workspaceRole: inviterRole } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
+    // [AUDIT invite-flow R2 — fix HIGH] Caller-scoped throttle BEFORE the user lookup. The
+    // per-(workspace,target) checkInviteRate below runs after the lookup keyed on the resolved
+    // target, so it cannot cap probing thousands of DISTINCT emails. This caps the account-
+    // enumeration primitive (distinct-email existence oracle) at 40/h/caller.
+    const callerRate = await checkInviteCallerRate(inviterId)
+    if (!callerRate.success) {
+        return { error: `Bạn đang gửi lời mời quá nhanh. Vui lòng thử lại sau ${callerRate.retryAfter ?? 3600} giây.` }
+    }
+
     // [Sprint B] Subscription gating removed — tất cả admin có quyền mời member.
 
     // Validate role — can't invite as OWNER directly
@@ -350,6 +359,15 @@ export async function inviteToWorkspace(
         return { error: 'Bạn không thể tự mời chính mình.' }
     }
 
+    // [AUDIT invite-flow R1 — fix HIGH] Reject LOCKED/CLIENT targets up front, covering BOTH
+    // the same-profile direct-add branch and the cross-profile invite branch. Previously only
+    // acceptWorkspaceInvitation (M8) guarded CLIENT, so a same-profile direct-add could mint a
+    // staff WorkspaceMember row for a view-only CLIENT — a ghost member with real MEMBER-level
+    // access. The lookup already selects `role`.
+    if (targetUser.role === 'LOCKED' || targetUser.role === 'CLIENT') {
+        return { error: 'Tài khoản này không thể được thêm làm thành viên (CLIENT chỉ xem, hoặc tài khoản đã bị khóa).' }
+    }
+
     // Audit fix #2.8: Cross-profile invite consent
     // Nếu target user đã tắt allowExternalInvites và user thuộc Profile khác →
     // không cho mời. User được quyền refuse "spam invite" từ unknown organizations.
@@ -359,9 +377,27 @@ export async function inviteToWorkspace(
     })
     if (workspace?.profileId && targetUser.profileId && workspace.profileId !== targetUser.profileId) {
         if (targetUser.allowExternalInvites === false) {
+            // [AUDIT invite-flow R2 — fix HIGH] Do NOT echo the resolved @username — a caller who
+            // supplied only an email would otherwise convert it into that cross-tenant user's
+            // username (email→username de-anonymization).
             return {
-                error: `User ${targetUser.username} đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.`,
+                error: 'Người dùng này đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.',
             }
+        }
+    }
+
+    // [AUDIT invite-flow R1 — fix HIGH] Mirror the M8 accept guard on the invite/direct-add
+    // side: if the target already holds a CLIENT ProfileAccess for THIS workspace's profile,
+    // refuse. Minting a staff WorkspaceMember alongside a CLIENT ProfileAccess is the exact
+    // inconsistent mixed-state M8 blocks (ghost member + fail-closed portal redirect). Covers
+    // the per-profile CLIENT case where User.role is normal but PA(role=CLIENT) exists.
+    if (workspace?.profileId) {
+        const targetPA = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId: targetUser.id, profileId: workspace.profileId } },
+            select: { role: true },
+        })
+        if (targetPA?.role === 'CLIENT') {
+            return { error: 'Tài khoản này đang là CLIENT của tổ chức — hãy gỡ vai trò CLIENT trước khi mời làm thành viên nội bộ.' }
         }
     }
 
@@ -407,11 +443,13 @@ export async function inviteToWorkspace(
                     success: true,
                     directAdd: true,
                     repaired: true,
-                    username: targetUser.nickname || targetUser.username,
+                    // [AUDIT invite-flow R5 — fix] Echo the caller-supplied identifier, not the
+                    // resolved handle (completes the R4 cross-tenant de-anon fix symmetrically).
+                    username: trimmedUsername,
                 }
             }
         }
-        return { error: `${targetUser.nickname || targetUser.username} đã là thành viên của workspace này.` }
+        return { error: `${trimmedUsername} đã là thành viên của workspace này.` }
     }
 
     // [Re-invite policy] Cho phép invite NHIỀU LẦN kể cả khi đã có lời mời
@@ -534,11 +572,21 @@ export async function inviteToWorkspace(
             success: true,
             directAdd: false,
             reinvite: isReinvite,
-            username: targetUser.nickname || targetUser.username,
+            // [AUDIT invite-flow R4 — fix HIGH] Echo back the caller-supplied identifier, NOT the
+            // resolved nickname/@username. On the CROSS-profile path the caller may have supplied
+            // only an email; returning the resolved account's handle/nickname is an email→identity
+            // de-anonymization (R2 stripped this from the consent-failure branch but missed this
+            // success path). trimmedUsername is exactly what the caller already typed.
+            username: trimmedUsername,
         }
     } catch (err: any) {
         if (err?.code === 'P2021') {
-            // Fallback: if invitation table doesn't exist, add directly
+            // Fallback: if the invitation table doesn't exist, add directly — but ONLY for
+            // same-profile users. [AUDIT invite-flow R2] A cross-profile direct-add here would
+            // bypass the Accept/Decline consent gate, so refuse it rather than force-join.
+            if (!isSameProfile) {
+                return { error: 'Hệ thống lời mời tạm thời không khả dụng. Vui lòng thử lại sau.' }
+            }
             await prisma.workspaceMember.create({
                 data: {
                     userId: targetUser.id,
@@ -568,6 +616,22 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
     if (!session?.user?.id) return { error: 'Unauthorized' }
 
     try {
+        // [AUDIT invite-flow R2 — fix HIGH] accept/decline are the only write paths in the invite
+        // flow that authenticate with getSession() alone (JWT decrypt) and skip verifyWorkspaceAccess.
+        // Re-assert the account here so a LOCKED (banned) / CLIENT account, or a session revoked via
+        // password-reset / "logout all devices" (sessionVersion bump), cannot mint a WorkspaceMember
+        // + ProfileAccess(USER) row in another tenant's profile.
+        const acceptingUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true, sessionVersion: true },
+        })
+        if (!acceptingUser || acceptingUser.role === 'LOCKED' || acceptingUser.role === 'CLIENT') {
+            return { error: 'Tài khoản không đủ điều kiện tham gia workspace (đã bị khóa hoặc là tài khoản khách).' }
+        }
+        if (((session.user as any).sessionVersion ?? 0) < (acceptingUser.sessionVersion ?? 0)) {
+            return { error: 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.' }
+        }
+
         // [F1 diagnostic + F3 smart-fallback] Before the CAS update, inspect the
         // invitation pointed to by the (possibly stale) notification. Common
         // failure modes — give precise messages, and when the user is clicking a
@@ -575,7 +639,7 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
         // invitation for the same workspace so the click "just works".
         const probe = await prisma.workspaceInvitation.findUnique({
             where: { id: invitationId },
-            select: { id: true, workspaceId: true, invitedUserId: true, status: true, expiresAt: true, isClientInvite: true, clientId: true },
+            select: { id: true, workspaceId: true, invitedUserId: true, status: true, expiresAt: true, isClientInvite: true, clientId: true, role: true },
         })
 
         let effectiveId = invitationId
@@ -608,28 +672,44 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
             select: { id: true, isClientInvite: true, clientId: true, workspace: { select: { profileId: true, name: true } } },
         })
         if (priorAccepted) {
-            // The user already accepted a previous invitation for this same
-            // workspace + user pair. Retire the current PENDING row and signal
-            // success without throwing.
-            // [Canonical Clients] The old isClientInvite repair (re-creating a
-            // CLIENT ProfileAccess) was removed with the account portal — no
-            // new CLIENT memberships are ever minted now.
-            try {
-                if (probe.status === 'PENDING') {
-                    await prisma.workspaceInvitation.updateMany({
-                        where: { id: probe.id, status: 'PENDING' },
-                        data: { status: 'EXPIRED', respondedAt: new Date() },
-                    })
+            // [AUDIT invite-flow R3 — fix HIGH] This branch is PURELY the idempotent "already a
+            // member" short-circuit — it avoids the @@unique([workspaceId,invitedUserId,status])
+            // collision a genuine double-accept would trip. It must NEVER re-grant access.
+            //
+            // The R2 version re-minted WorkspaceMember + ProfileAccess here when the user was no
+            // longer a member, which let a REMOVED user replay a stale DECLINED/REVOKED/EXPIRED
+            // invitation id (a lingering ACCEPTED row makes priorAccepted truthy) and silently
+            // restore their own access BEFORE the status/expiry gate below ever ran (R3 High).
+            //
+            // Now: only short-circuit when the user is STILL a member; otherwise fall through to
+            // the normal status/CAS flow, which grants access ONLY for a genuinely-valid PENDING
+            // invitation. (Removal also now hard-deletes the user's invitation rows, so a stale
+            // ACCEPTED row should not survive a proper removal — this is defense-in-depth, and it
+            // means the legitimate "re-invite after removal" case flows through the normal CAS.)
+            const stillMember = await prisma.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId: session.user.id, workspaceId: probe.workspaceId } },
+                select: { userId: true },
+            })
+            if (stillMember) {
+                try {
+                    if (probe.status === 'PENDING') {
+                        await prisma.workspaceInvitation.updateMany({
+                            where: { id: probe.id, status: 'PENDING' },
+                            data: { status: 'EXPIRED', respondedAt: new Date() },
+                        })
+                    }
+                } catch (e) {
+                    console.warn('[acceptWorkspaceInvitation] idempotent-accept retire failed (non-fatal):', e)
                 }
-            } catch (e) {
-                console.warn('[acceptWorkspaceInvitation] idempotent-accept repair failed (non-fatal):', e)
+                return {
+                    success: true,
+                    workspaceId: probe.workspaceId,
+                    workspaceName: priorAccepted.workspace.name,
+                    alreadyMember: true,
+                }
             }
-            return {
-                success: true,
-                workspaceId: probe.workspaceId,
-                workspaceName: priorAccepted.workspace.name,
-                alreadyMember: true,
-            }
+            // stillMember === null → user was removed since the prior accept. Do NOT short-circuit
+            // and do NOT re-mint; fall through so only a valid PENDING invitation can grant access.
         }
 
         if (probe.status !== 'PENDING' || probe.expiresAt <= new Date()) {
@@ -852,6 +932,20 @@ export async function declineWorkspaceInvitation(invitationId: string) {
     if (!session?.user?.id) return { error: 'Unauthorized' }
 
     try {
+        // [AUDIT invite-flow R2 — fix] Re-assert the account on this getSession()-only write path:
+        // reject a LOCKED account or a stale/revoked session (sessionVersion bumped) from mutating
+        // invitation state.
+        const decliningUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true, sessionVersion: true },
+        })
+        if (!decliningUser || decliningUser.role === 'LOCKED') {
+            return { error: 'Tài khoản đã bị khóa hoặc không tồn tại.' }
+        }
+        if (((session.user as any).sessionVersion ?? 0) < (decliningUser.sessionVersion ?? 0)) {
+            return { error: 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.' }
+        }
+
         const invitation = await prisma.workspaceInvitation.findUnique({
             where: { id: invitationId },
             include: {
@@ -1040,7 +1134,7 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
             userId_workspaceId: { userId: targetUserId, workspaceId }
         },
         include: {
-            user: { select: { username: true, nickname: true } }
+            user: { select: { username: true, nickname: true, profileId: true } }
         }
     })
 
@@ -1068,21 +1162,65 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
         }
     }
 
-    // [AUDIT R14 — fix] Remove the membership AND revoke any still-PENDING invitation for
-    // this user in the same transaction — otherwise a stale PENDING WorkspaceInvitation
-    // would let the removed user call acceptWorkspaceInvitation again and re-mint their
-    // WorkspaceMember row with the invitation's role, silently undoing the removal.
-    await prisma.$transaction([
-        prisma.workspaceMember.delete({
-            where: {
-                userId_workspaceId: { userId: targetUserId, workspaceId }
+    // [AUDIT invite-flow R1 — fix HIGH] A cross-profile invitee's accept minted a
+    // ProfileAccess(role=USER) for THIS workspace's profile, and that PA grants MEMBER access
+    // to EVERY workspace in the profile via the verifyWorkspaceAccess fallback. Deleting only
+    // the WorkspaceMember row leaves that PA behind, so the "removed" external user silently
+    // keeps profile-wide access. When the removed user is a CROSS-profile invitee (home profile
+    // differs), holds a plain USER ProfileAccess, and has no OTHER WorkspaceMember row in this
+    // profile, also revoke that PA. Never strip a home-profile member or an OWNER/ADMIN/CLIENT PA.
+    const removalWorkspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    // Cross-profile invitee? Then this profile's USER ProfileAccess is a revoke candidate.
+    // [AUDIT invite-flow R8 — fix] Do NOT additionally require user.profileId to be non-null: a
+    // cross-profile invitee may have NO home profile (User.profileId === null, e.g. a Google
+    // signup who never created one). `removalWorkspace.profileId !== null` is true, so dropping the
+    // null guard naturally includes them; a home-profile member (profileId === this profile) is
+    // still excluded by the `!==` check. The in-tx role='USER' filter + remaining-membership recount
+    // protect OWNER/ADMIN/CLIENT PAs and prevent over-revoke.
+    const revokeProfileId =
+        removalWorkspace?.profileId &&
+        removalWorkspace.profileId !== targetMember.user.profileId
+            ? removalWorkspace.profileId
+            : null
+
+    // [AUDIT invite-flow R1/R3/R6/R7 — fix HIGH] One interactive, SERIALIZED transaction that:
+    //  (1) deletes the WorkspaceMember row (deleteMany = idempotent under concurrent double-remove);
+    //  (2) HARD-DELETES the user's invitation rows for the workspace — a lingering ACCEPTED/DECLINED
+    //      row could otherwise be replayed via acceptWorkspaceInvitation's priorAccepted branch to
+    //      re-mint membership (R3), and the @@unique([ws,user,status]) makes "set to one terminal
+    //      status" collision-prone, so delete is cleanest;
+    //  (3) for a cross-profile invitee left with NO membership in the profile, revokes their USER
+    //      ProfileAccess — otherwise it grants MEMBER on EVERY workspace in the profile via the
+    //      verifyWorkspaceAccess fallback (security.ts), so a "removed" user keeps tenant-wide access.
+    //
+    // The remaining-membership count runs INSIDE the tx AFTER the member delete, and a `FOR UPDATE`
+    // lock on the user's ProfileAccess row serializes concurrent removals of the SAME user
+    // (R7 fix): without it, two near-simultaneous removals of the user's last two workspaces each
+    // saw the other's membership in a pre-transaction count and both skipped the revoke, orphaning
+    // the PA (TOCTOU under Read Committed). With the lock the second removal observes zero remaining
+    // memberships and revokes. The PA delete is filtered role='USER' so OWNER/ADMIN/CLIENT PAs are
+    // never touched. The resulting over-revoke of a directly profile-invited member who ALSO held
+    // explicit workspace membership(s) is a deliberate, narrow, recoverable, safe-direction tradeoff.
+    await prisma.$transaction(async (tx) => {
+        if (revokeProfileId) {
+            await tx.$queryRaw`SELECT 1 FROM "ProfileAccess" WHERE "userId" = ${targetUserId} AND "profileId" = ${revokeProfileId} FOR UPDATE`
+        }
+        await tx.workspaceMember.deleteMany({ where: { userId: targetUserId, workspaceId } })
+        await tx.workspaceInvitation.deleteMany({ where: { workspaceId, invitedUserId: targetUserId } })
+        if (revokeProfileId) {
+            const remaining = await tx.workspaceMember.count({
+                where: { userId: targetUserId, workspace: { profileId: revokeProfileId } },
+            })
+            if (remaining === 0) {
+                await tx.profileAccess.deleteMany({
+                    where: { userId: targetUserId, profileId: revokeProfileId, role: 'USER' },
+                })
             }
-        }),
-        prisma.workspaceInvitation.updateMany({
-            where: { workspaceId, invitedUserId: targetUserId, status: 'PENDING' },
-            data: { status: 'REVOKED', respondedAt: new Date() },
-        }),
-    ])
+        }
+    })
 
     await audit({
         workspaceId,
@@ -1113,13 +1251,49 @@ export async function leaveWorkspace(workspaceId: string) {
 
     const member = await prisma.workspaceMember.findUnique({
         where: { userId_workspaceId: { userId, workspaceId } },
-        include: { user: { select: { username: true } } }
+        include: { user: { select: { username: true, profileId: true } } }
     })
 
     if (!member) return { error: 'Bạn không phải thành viên workspace này.' }
 
-    await prisma.workspaceMember.delete({
-        where: { userId_workspaceId: { userId, workspaceId } }
+    // [AUDIT invite-flow R4 — fix] Mirror removeWorkspaceMember on self-leave: (1) hard-delete the
+    // leaver's invitation rows for this workspace so a future re-invite's accept doesn't collide on
+    // @@unique([workspaceId,invitedUserId,status]); (2) revoke the invite-minted ProfileAccess(USER)
+    // when the leaver is a CROSS-profile invitee with no other membership in the profile, so
+    // "leaving" actually revokes the profile-wide MEMBER fallback rather than leaving it behind.
+    const leaveWs = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    // [AUDIT invite-flow R8 — fix] Include null-home-profile cross-profile invitees (see
+    // removeWorkspaceMember): drop the user.profileId non-null requirement; `!==` handles null.
+    const revokeProfileId =
+        leaveWs?.profileId && leaveWs.profileId !== member.user.profileId
+            ? leaveWs.profileId
+            : null
+
+    // [AUDIT invite-flow R4/R6/R7 — fix HIGH] Interactive, SERIALIZED self-leave, symmetric with
+    // removeWorkspaceMember: delete the membership + the leaver's invitations, and (for a
+    // cross-profile invitee left with no membership in the profile) revoke their USER ProfileAccess.
+    // The remaining-membership count runs inside the tx after the delete, and a FOR UPDATE lock on
+    // the PA row serializes two concurrent leaves of the user's last two workspaces so the second
+    // observes zero remaining memberships and revokes (closes the R7 TOCTOU). See removeWorkspaceMember.
+    await prisma.$transaction(async (tx) => {
+        if (revokeProfileId) {
+            await tx.$queryRaw`SELECT 1 FROM "ProfileAccess" WHERE "userId" = ${userId} AND "profileId" = ${revokeProfileId} FOR UPDATE`
+        }
+        await tx.workspaceMember.deleteMany({ where: { userId, workspaceId } })
+        await tx.workspaceInvitation.deleteMany({ where: { workspaceId, invitedUserId: userId } })
+        if (revokeProfileId) {
+            const remaining = await tx.workspaceMember.count({
+                where: { userId, workspace: { profileId: revokeProfileId } },
+            })
+            if (remaining === 0) {
+                await tx.profileAccess.deleteMany({
+                    where: { userId, profileId: revokeProfileId, role: 'USER' },
+                })
+            }
+        }
     })
 
     await audit({

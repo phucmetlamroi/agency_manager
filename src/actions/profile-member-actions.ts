@@ -19,6 +19,8 @@ import {
     getProfileAccess,
 } from '@/lib/profile-permissions'
 import { audit } from '@/lib/audit-log'
+import { findUserByEmailOrUsername } from '@/lib/user-lookup'
+import { checkInviteCallerRate } from '@/lib/rate-limit-upstash'
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Helpers                                                              */
@@ -40,9 +42,12 @@ export async function getProfileMembers(profileId: string) {
     const { error, session } = await requireAuthenticated()
     if (error || !session) return { error, members: [] }
 
-    // Caller phải có role trong profile (kể cả USER cũng read được list)
+    // Caller phải có role trong profile (kể cả USER cũng read được list).
+    // [AUDIT invite-flow R2 — fix] A CLIENT ProfileAccess is a view-only portal grant and must
+    // NOT read the internal staff roster. The UI redirects clients away, but this server action
+    // is directly callable — reject CLIENT explicitly (mirrors verifyWorkspaceAccess / canAccessWorkspace).
     const role = await getProfileRole(session.user.id, profileId)
-    if (!role) {
+    if (!role || role === 'CLIENT') {
         return { error: 'Bạn không có quyền truy cập profile này.', members: [] }
     }
 
@@ -121,20 +126,57 @@ export async function inviteToProfileAction(
     const trimmed = usernameOrEmail.trim()
     if (!trimmed) return { error: 'Tên đăng nhập / email không được để trống.' }
 
-    // Find target user
-    const targetUser = await prisma.user.findFirst({
-        where: {
-            OR: [{ username: trimmed }, { email: trimmed }],
-        },
-        select: { id: true, username: true, nickname: true, displayName: true },
-    })
+    // [AUDIT invite-flow R2 — fix HIGH] Caller-scoped throttle BEFORE the user lookup, to cap
+    // account-enumeration via probing distinct emails on this profile-invite door (40/h/caller).
+    const callerRate = await checkInviteCallerRate(session.user.id)
+    if (!callerRate.success) {
+        return { error: `Bạn đang thao tác quá nhanh. Vui lòng thử lại sau ${callerRate.retryAfter ?? 3600} giây.` }
+    }
 
+    // [AUDIT invite-flow R1 — fix HIGH] Deterministic lookup. User.email is NOT @unique
+    // (duplicate rows exist on prod), so a raw findFirst({ OR:[username,email] }) could bind
+    // ProfileAccess to the WRONG duplicate account. Route through findUserByEmailOrUsername
+    // (case-insensitive, activity-ordered) and refuse on matchCount>1 — mirrors inviteToWorkspace.
+    const lookup = await findUserByEmailOrUsername<{
+        id: string; username: string; nickname: string | null; displayName: string | null;
+        role: string; profileId: string | null; allowExternalInvites: boolean
+    }>(trimmed, {
+        id: true, username: true, nickname: true, displayName: true,
+        role: true, profileId: true, allowExternalInvites: true,
+    })
+    if (lookup.matchCount > 1) {
+        return { error: `Có ${lookup.matchCount} tài khoản dùng email/username "${trimmed}". Yêu cầu admin gộp các tài khoản trùng email trước khi mời.` }
+    }
+    const targetUser = lookup.user
     if (!targetUser) {
         return { error: 'Tài khoản không tồn tại.' }
     }
 
     if (targetUser.id === session.user.id) {
         return { error: 'Bạn đã ở trong Profile này.' }
+    }
+
+    // [AUDIT invite-flow R1 — fix HIGH] Never grant profile membership to a view-only CLIENT
+    // or a banned LOCKED account. The workspace-invite path enforces this; this profile-level
+    // door previously skipped it, so a CLIENT could be elevated to internal MEMBER via the
+    // ProfileAccess(USER) → workspaceRole MEMBER fallback (security.ts).
+    if (targetUser.role === 'LOCKED' || targetUser.role === 'CLIENT') {
+        return { error: 'Tài khoản này không thể được thêm làm thành viên nội bộ của Profile.' }
+    }
+
+    // [AUDIT invite-flow R1 — fix HIGH] Cross-org consent: honor allowExternalInvites when the
+    // target's home profile differs from this one (mirrors member-actions.ts inviteToWorkspace).
+    // Without this, any profile admin could force-add an unconsenting external user as a member.
+    if (
+        targetUser.profileId &&
+        targetUser.profileId !== profileId &&
+        targetUser.allowExternalInvites === false
+    ) {
+        // [AUDIT invite-flow R2 — fix HIGH] Generic message — do NOT echo the resolved
+        // displayName/username of a cross-tenant account to a caller who supplied only an email.
+        return {
+            error: 'Người dùng này đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.',
+        }
     }
 
     // Check không trùng existing access
@@ -165,7 +207,10 @@ export async function inviteToProfileAction(
     })
 
     revalidatePath('/', 'layout')
-    return { success: true, member: { userId: targetUser.id, role } }
+    // [AUDIT invite-flow R4 — fix] Do NOT return the resolved cross-tenant userId. For an
+    // email-only input this is an email→userId oracle; the UI (InviteToProfileModal) only reads
+    // result.error / result.success, so the resolved id is never needed by the caller.
+    return { success: true, member: { role } }
 }
 
 /* ──────────────────────────────────────────────────────────────────── */
@@ -207,6 +252,14 @@ export async function removeFromProfileAction(profileId: string, targetUserId: s
         // Delete WorkspaceMember rows in profile's workspaces
         prisma.workspaceMember.deleteMany({
             where: { userId: targetUserId, workspaceId: { in: workspaceIds } },
+        }),
+        // [AUDIT invite-flow R1+R3 — fix] HARD-DELETE all of this user's invitation rows across
+        // the profile's workspaces. Revoking only PENDING rows left a lingering ACCEPTED/DECLINED
+        // row that could be replayed through acceptWorkspaceInvitation's priorAccepted branch to
+        // re-mint membership (R3 High). Deleting every (workspaceId, invitedUserId) row removes
+        // that replay trigger (mirrors the removeWorkspaceMember fix).
+        prisma.workspaceInvitation.deleteMany({
+            where: { workspaceId: { in: workspaceIds }, invitedUserId: targetUserId },
         }),
         // Delete ProfileAccess row
         prisma.profileAccess.delete({
@@ -262,6 +315,11 @@ export async function changeProfileRoleAction(
     if (targetAccess.role === 'OWNER') {
         return { error: 'Không thể demote OWNER. Transfer ownership trước.' }
     }
+    // [AUDIT invite-flow R4 — fix] A CLIENT is a view-only portal grant — never promote it to an
+    // internal USER/ADMIN role here (mirror the CLIENT guards in inviteToProfileAction / accept).
+    if (targetAccess.role === 'CLIENT') {
+        return { error: 'Tài khoản này đang là CLIENT (chỉ xem). Hãy gỡ vai trò CLIENT trước khi đổi sang vai trò nội bộ.' }
+    }
     if (targetAccess.role === newRole) {
         return { error: 'Thành viên đã có role này.' }
     }
@@ -314,6 +372,10 @@ export async function transferProfileOwnershipAction(profileId: string, newOwner
     })
     if (!targetAccess) {
         return { error: 'Người được transfer phải là thành viên hiện tại của Profile.' }
+    }
+    // [AUDIT invite-flow R4 — fix] Never transfer ownership to a view-only CLIENT access row.
+    if (targetAccess.role === 'CLIENT') {
+        return { error: 'Không thể chuyển quyền sở hữu cho tài khoản CLIENT (chỉ xem). Hãy chuyển họ thành thành viên nội bộ trước.' }
     }
 
     // Atomic swap: caller OWNER → ADMIN, target → OWNER

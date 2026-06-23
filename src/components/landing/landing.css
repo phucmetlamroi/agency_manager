@@ -27,10 +27,14 @@ html {
   --sage: #8fbfa6; /* success: completed / approved / paid */
   --clay: #db8163; /* alert: revision / changes requested */
 
-  /* ---- Type ---- */
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-body: 'Hanken Grotesk', system-ui, sans-serif;
-  --font-mono: 'Space Mono', ui-monospace, monospace;
+  /* ---- Type ----
+     Families come from next/font (self-hosted, incl. the vietnamese subset)
+     via the --font-* variables set on the .htl root. Fallbacks are
+     Vietnamese-safe (Georgia / Times / Noto carry precomposed ố ắ ế), so a
+     headline never renders detached tone marks even if a web font fails. */
+  --font-display: var(--font-fraunces), Georgia, 'Times New Roman', 'Noto Serif', serif;
+  --font-body: var(--font-hanken), system-ui, 'Segoe UI', 'Noto Sans', sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, 'Noto Sans Mono', monospace;
 
   /* ---- Surfaces ---- */
   --glass-bg: rgba(40, 33, 24, 0.4);

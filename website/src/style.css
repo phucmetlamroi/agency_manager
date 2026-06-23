@@ -16,10 +16,13 @@
   --sage: #8fbfa6; /* success: completed / approved / paid */
   --clay: #db8163; /* alert: revision / changes requested */
 
-  /* ---- Type ---- */
-  --font-display: 'Fraunces', serif;
-  --font-body: 'Hanken Grotesk', system-ui, sans-serif;
-  --font-mono: 'Space Mono', monospace;
+  /* ---- Type ----
+     Fallbacks are Vietnamese-safe on purpose: Georgia / Times New Roman /
+     Noto Serif all carry the precomposed Vietnamese vowels, so if a web font
+     ever fails the headline still renders ố ắ ế correctly (never detached). */
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', 'Noto Serif', serif;
+  --font-body: 'Hanken Grotesk', system-ui, 'Segoe UI', 'Noto Sans', sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, 'Noto Sans Mono', monospace;
 
   /* ---- Surfaces ---- */
   --glass-bg: rgba(40, 33, 24, 0.4);

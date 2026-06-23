@@ -12,16 +12,20 @@ import '@/styles/portal-calm.css'
  * with optical sizing) carries headlines + figures, Hanken Grotesk does the
  * working text. Both are scoped via CSS variables consumed in portal-calm.css.
  */
+// [Vietnamese subset] Client/task names + portal copy can be Vietnamese, so
+// both faces must ship the `vietnamese` subset — otherwise next/font omits
+// those glyphs and the browser falls back to a serif that detaches the dấu
+// sắc/huyền on ô ă ê (ố→ô´). 'latin' alone was the bug.
 const fraunces = Fraunces({
     variable: '--font-fraunces',
-    subsets: ['latin'],
+    subsets: ['latin', 'vietnamese'],
     weight: ['400', '500', '600', '700'],
     style: ['normal'],
     display: 'swap',
 })
 const hanken = Hanken_Grotesk({
     variable: '--font-hanken',
-    subsets: ['latin'],
+    subsets: ['latin', 'vietnamese'],
     weight: ['400', '500', '600', '700', '800'],
     display: 'swap',
 })

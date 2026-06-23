@@ -106,8 +106,8 @@ export default function DashboardTopBar({
             color: "#A1A1AA",
           }}
         >
-          Welcome back, <span className="text-zinc-300">{displayName}</span>.
-          Here&apos;s what&apos;s happening today.
+          Chào mừng trở lại, <span className="text-zinc-300">{displayName}</span>.
+          Đây là tình hình hôm nay.
         </p>
       </div>
 
@@ -127,7 +127,7 @@ export default function DashboardTopBar({
           onMouseLeave={(e) => {
             e.currentTarget.style.background = "transparent"
           }}
-          aria-label="Search"
+          aria-label="Tìm kiếm"
         >
           <Search size={18} strokeWidth={2} style={{ color: "#A1A1AA" }} />
         </button>
@@ -202,7 +202,7 @@ export default function DashboardTopBar({
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
               >
-                Profiles
+                Tổ chức
               </p>
 
               <ul className="flex flex-col gap-0.5">
@@ -268,7 +268,7 @@ export default function DashboardTopBar({
                             className="truncate text-[11px]"
                             style={{ color: "#71717A" }}
                           >
-                            {isActive ? "Active" : "Switch to this profile"}
+                            {isActive ? "Đang hoạt động" : "Chuyển sang tổ chức này"}
                           </span>
                         </div>
 
@@ -307,7 +307,7 @@ export default function DashboardTopBar({
                   className="text-sm font-semibold"
                   style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                 >
-                  Tạo Profile mới
+                  Tạo tổ chức mới
                 </span>
               </button>
             </div>

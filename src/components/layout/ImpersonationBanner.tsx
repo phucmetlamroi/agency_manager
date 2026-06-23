@@ -24,7 +24,7 @@ export default function ImpersonationBanner({
             <div className="flex items-center gap-3">
                 <ShieldAlert size={18} className="animate-pulse" />
                 <div className="text-sm font-medium">
-                    You are currently viewing and acting as <strong className="bg-black/20 px-1.5 py-0.5 rounded ml-1">{username}</strong>
+                    Bạn đang xem và thao tác với tư cách <strong className="bg-black/20 px-1.5 py-0.5 rounded ml-1">{username}</strong>
                 </div>
             </div>
             
@@ -34,7 +34,7 @@ export default function ImpersonationBanner({
                 className="bg-black/20 hover:bg-black/40 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 disabled:opacity-50"
             >
                 {isPending ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
-                Return to Admin
+                Quay lại Quản trị
             </button>
         </div>
     )

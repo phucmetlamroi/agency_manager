@@ -30,7 +30,7 @@ function formatPrice(usd: number | null, vnd: number | null): string {
     const parts: string[] = []
     if (usd != null && usd > 0) parts.push(`$${usd}`)
     if (vnd != null && vnd > 0) parts.push(`${(vnd / 1000).toFixed(0)}k`)
-    return parts.join(' / ') || 'Empty'
+    return parts.join(' / ') || 'Trống'
 }
 
 // ─── Hook: Exposes onMouseDown for parent container ──────
@@ -96,7 +96,7 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
             if (idx !== null && idx < templates.length) {
                 const t = templates[idx]
                 onSelect({ usd: t.priceUSD, vnd: t.wageVND })
-                toast.success(`Applied: ${t.name}`)
+                toast.success(`Đã áp dụng: ${t.name}`)
             }
             setShowRadial(false)
             setHoveredSlot(null)
@@ -121,17 +121,17 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
 
         // ─── CRUD ────────────────────────────────────────
         const handleCreate = async () => {
-            if (!newName.trim()) return toast.error('Template name required')
+            if (!newName.trim()) return toast.error('Vui lòng nhập tên mẫu')
             const usdVal = newUsd ? parseFloat(newUsd) : null
             const vndVal = newVnd ? parseFloat(newVnd.replace(/\D/g, '')) : null
-            if (!usdVal && !vndVal) return toast.error('Enter at least USD or VND')
+            if (!usdVal && !vndVal) return toast.error('Nhập ít nhất USD hoặc VND')
 
             setLoading(true)
             const { createTemplate } = await import('@/actions/price-template-actions')
             const res = await createTemplate({ name: newName, priceUSD: usdVal, wageVND: vndVal }, workspaceId)
             if (res.error) toast.error(res.error)
             else {
-                toast.success('Template created')
+                toast.success('Đã tạo mẫu')
                 setNewName(''); setNewUsd(''); setNewVnd('')
                 setShowCreate(false)
                 await fetchTemplates()
@@ -143,13 +143,13 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
             const { deleteTemplate } = await import('@/actions/price-template-actions')
             const res = await deleteTemplate(id, workspaceId)
             if (res.error) toast.error(res.error)
-            else { toast.success('Deleted'); await fetchTemplates() }
+            else { toast.success('Đã xoá'); await fetchTemplates() }
         }
 
         const handleSelect = (t: Template) => {
             onSelect({ usd: t.priceUSD, vnd: t.wageVND })
             setShowDropdown(false)
-            toast.success(`Applied: ${t.name}`)
+            toast.success(`Đã áp dụng: ${t.name}`)
         }
 
         // ─── Radial geometry ─────────────────────────────
@@ -164,7 +164,7 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
                         type="button"
                         onClick={() => setShowDropdown(!showDropdown)}
                         className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center hover:bg-emerald-500/25 hover:scale-110 transition-all duration-150"
-                        title="Price Templates (Ctrl+Click area for radial)"
+                        title="Mẫu giá (Ctrl+Click vào vùng để mở menu vòng)"
                     >
                         <Plus className="w-4 h-4" />
                     </button>
@@ -172,7 +172,7 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
                     {showDropdown && (
                         <div className="absolute top-full right-0 mt-2 w-72 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl shadow-black/50 z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
                             <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Templates</span>
+                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Mẫu giá</span>
                                 <button onClick={() => setShowDropdown(false)} className="text-zinc-600 hover:text-zinc-300">
                                     <X className="w-3.5 h-3.5" />
                                 </button>
@@ -180,7 +180,7 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
 
                             <div className="max-h-[200px] overflow-y-auto">
                                 {templates.length === 0 ? (
-                                    <div className="px-3 py-4 text-center text-xs text-zinc-600 italic">No templates yet</div>
+                                    <div className="px-3 py-4 text-center text-xs text-zinc-600 italic">Chưa có mẫu nào</div>
                                 ) : (
                                     templates.map(t => (
                                         <div key={t.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-white/5 transition-colors group">
@@ -204,27 +204,27 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
                             <div className="border-t border-white/5">
                                 {!showCreate ? (
                                     <button type="button" onClick={() => setShowCreate(true)} className="w-full px-3 py-2.5 text-xs text-indigo-400 hover:bg-indigo-500/10 transition-colors flex items-center gap-1.5 font-bold">
-                                        <Plus className="w-3.5 h-3.5" /> Create Template
+                                        <Plus className="w-3.5 h-3.5" /> Tạo mẫu
                                     </button>
                                 ) : (
                                     <div className="p-3 space-y-2">
-                                        <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Template name..." className="w-full px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50" />
+                                        <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Tên mẫu..." className="w-full px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50" />
                                         <div className="grid grid-cols-2 gap-2">
                                             <input type="number" value={newUsd} onChange={e => setNewUsd(e.target.value)} placeholder="USD" className="px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50" />
                                             <input type="text" value={newVnd} onChange={e => setNewVnd(e.target.value)} placeholder="VND" className="px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-yellow-500/50" />
                                         </div>
                                         <div className="flex gap-2">
                                             <button type="button" onClick={handleCreate} disabled={loading} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors">
-                                                {loading ? '...' : 'Save'}
+                                                {loading ? '...' : 'Lưu'}
                                             </button>
-                                            <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-1.5 bg-zinc-800 text-zinc-400 text-xs rounded-lg hover:bg-zinc-700 transition-colors">Cancel</button>
+                                            <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-1.5 bg-zinc-800 text-zinc-400 text-xs rounded-lg hover:bg-zinc-700 transition-colors">Huỷ</button>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
                             <div className="px-3 py-1.5 border-t border-white/5 text-[10px] text-zinc-700 text-center">
-                                Tip: Ctrl + Click on finance area for radial menu
+                                Mẹo: Ctrl + Click vào vùng tài chính để mở menu vòng
                             </div>
                         </div>
                     )}
@@ -292,7 +292,7 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
                                     }}
                                 >
                                     {isEmpty ? (
-                                        <span className="text-[9px] font-medium">Empty</span>
+                                        <span className="text-[9px] font-medium">Trống</span>
                                     ) : (
                                         <>
                                             <span className="text-[11px] font-bold leading-tight text-center px-1">
@@ -315,7 +315,7 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
                         >
                             {hoveredSlot !== null && templates[hoveredSlot]
                                 ? `\u2705 ${templates[hoveredSlot].name}`
-                                : '\u2191 Move to a slot, release to select'}
+                                : '\u2191 Di chuy\u1ec3n t\u1edbi m\u1ed9t \u00f4, th\u1ea3 chu\u1ed9t \u0111\u1ec3 ch\u1ecdn'}
                         </div>
                     </div>,
                     document.body

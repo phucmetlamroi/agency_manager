@@ -5,6 +5,7 @@ import { Search, ChevronDown, Loader2, ArrowRightLeft, Check, Plus } from "lucid
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { MarketplaceTriggerButton } from "@/components/marketplace/MarketplaceTriggerButton"
 import CreateProfileModal from "@/components/workspace/CreateProfileModal"
+import { roleLabel } from "@/lib/display-labels"
 
 interface ProfileItem {
     id: string
@@ -138,7 +139,7 @@ export default function UserHomeTopBar({
                         color: "#A1A1AA",
                     }}
                 >
-                    Welcome back, <span className="text-zinc-300">{displayName}</span> <span aria-hidden>👋</span>
+                    Chào mừng trở lại, <span className="text-zinc-300">{displayName}</span> <span aria-hidden>👋</span>
                 </p>
             </div>
 
@@ -162,7 +163,7 @@ export default function UserHomeTopBar({
                                 autoFocus
                                 value={searchValue}
                                 onChange={(e) => setSearchValue(e.target.value)}
-                                placeholder="Search tasks…"
+                                placeholder="Tìm task…"
                                 className="flex-1 outline-none border-none bg-transparent"
                                 style={{
                                     color: "#FFFFFF",
@@ -186,7 +187,7 @@ export default function UserHomeTopBar({
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.background = "transparent"
                             }}
-                            aria-label="Search"
+                            aria-label="Tìm kiếm"
                         >
                             <Search size={18} strokeWidth={2} style={{ color: "#A1A1AA" }} />
                         </button>
@@ -241,7 +242,7 @@ export default function UserHomeTopBar({
                                 className="text-[10px] font-bold uppercase tracking-[0.12em]"
                                 style={{ color: "#A1A1AA" }}
                             >
-                                {userRole}
+                                {roleLabel(userRole)}
                             </span>
                         </div>
 
@@ -276,7 +277,7 @@ export default function UserHomeTopBar({
                                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         }}
                                     >
-                                        Profiles
+                                        Tổ chức
                                     </p>
                                     <ul className="flex flex-col gap-0.5">
                                         {profiles.map((profile, idx) => {
@@ -342,7 +343,7 @@ export default function UserHomeTopBar({
                                                                 className="truncate text-[11px]"
                                                                 style={{ color: "#71717A" }}
                                                             >
-                                                                {isActive ? "Active" : "Switch to this profile"}
+                                                                {isActive ? "Đang hoạt động" : "Chuyển sang tổ chức này"}
                                                             </span>
                                                         </div>
 
@@ -390,7 +391,7 @@ export default function UserHomeTopBar({
                                     className="text-sm font-semibold"
                                     style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                                 >
-                                    Tạo Profile mới
+                                    Tạo tổ chức mới
                                 </span>
                             </button>
 
@@ -423,7 +424,7 @@ export default function UserHomeTopBar({
                                             className="text-sm"
                                             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                                         >
-                                            Switch to Admin View
+                                            Chuyển sang giao diện Quản trị
                                         </span>
                                     </button>
                                 </>

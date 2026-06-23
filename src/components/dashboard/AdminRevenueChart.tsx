@@ -120,7 +120,7 @@ export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props
                             lineHeight: 1.3,
                         }}
                     >
-                        Revenue Overview
+                        Tổng quan doanh thu
                     </span>
 
                     {/* Value — [Sprint O] VND/USD aware */}
@@ -186,7 +186,7 @@ export function AdminRevenueChart({ data, totalRevenueVND, exchangeRate }: Props
                 <button
                     type="button"
                     onClick={toggleCurrency}
-                    aria-label={`Toggle currency (current: ${currency})`}
+                    aria-label={`Đổi đơn vị tiền (hiện tại: ${currency})`}
                     aria-pressed={currency === "USD"}
                     style={{
                         display: "flex",

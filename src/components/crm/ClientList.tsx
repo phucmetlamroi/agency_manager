@@ -192,7 +192,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient }: { cli
                     }}
                     className="animate-pulse"
                 >
-                    Keo va tha vao mot <strong>khach hang chinh khac</strong> de gop thanh khach hang truc thuoc
+                    Kéo và thả vào một <strong>khách hàng chính khác</strong> để gộp thành khách hàng trực thuộc
                 </div>
             )}
 
@@ -205,7 +205,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient }: { cli
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                 }}
             >
-                {['Client', 'Revenue', 'Tasks', 'Friction', 'Status', 'Actions'].map(col => (
+                {['Khách hàng', 'Doanh thu', 'Task', 'Vướng mắc', 'Trạng thái', 'Thao tác'].map(col => (
                     <span
                         key={col}
                         style={{
@@ -231,7 +231,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient }: { cli
                         fontSize: 13,
                     }}
                 >
-                    {searchQuery ? 'Khong tim thay ket qua.' : 'Chua co du lieu khach hang.'}
+                    {searchQuery ? 'Không tìm thấy kết quả.' : 'Chưa có dữ liệu khách hàng.'}
                 </div>
             )}
 
@@ -301,6 +301,11 @@ function StatusPill({ status }: { status: 'ACTIVE' | 'PENDING' | 'INACTIVE' }) {
         INACTIVE: { bg: 'rgba(113,113,122,0.10)', border: 'rgba(113,113,122,0.25)', color: '#71717a', dot: '#71717a' },
     }
     const c = config[status]
+    const labels: Record<'ACTIVE' | 'PENDING' | 'INACTIVE', string> = {
+        ACTIVE: 'Đang hoạt động',
+        PENDING: 'Chờ xử lý',
+        INACTIVE: 'Ngừng',
+    }
     return (
         <span
             style={{
@@ -325,7 +330,7 @@ function StatusPill({ status }: { status: 'ACTIVE' | 'PENDING' | 'INACTIVE' }) {
                     flexShrink: 0,
                 }}
             />
-            {status}
+            {labels[status]}
         </span>
     )
 }
@@ -570,7 +575,7 @@ function ClientItem({
                                 onMouseEnter={(e) => { e.currentTarget.style.color = '#c4b5fd' }}
                                 onMouseLeave={(e) => { e.currentTarget.style.color = '#ffffff' }}
                                 onClick={(e) => { e.stopPropagation(); onEdit(client) }}
-                                title="Click to edit name"
+                                title="Bấm để sửa tên"
                             >
                                 {client.name}
                             </span>
@@ -596,7 +601,7 @@ function ClientItem({
                         </div>
                         {!isSubsidiary && subCount > 0 && (
                             <div style={{ fontSize: 10, color: '#52525b', marginTop: 1 }}>
-                                {subCount} sub-brand{subCount > 1 ? 's' : ''}
+                                {subCount} brand con
                             </div>
                         )}
                     </div>
@@ -745,7 +750,7 @@ function ClientItem({
                                     marginBottom: 6,
                                 }}
                             >
-                                Recent Videos (Aggregated) · {allTasks.length}
+                                Video gần đây (tổng hợp) · {allTasks.length}
                             </div>
                             {/* [Bug fix] scrollable list of ALL tasks (was sliced to 5 with a dead "+N more" line) */}
                             <div className="custom-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
@@ -832,7 +837,7 @@ function ClientItem({
                                     letterSpacing: '0.05em',
                                 }}
                             >
-                                Brands / Subsidiaries
+                                Brand / Khách trực thuộc
                             </div>
                             {(client.subsidiaries || []).map(sub => (
                                 <ClientItem

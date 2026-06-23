@@ -17,9 +17,9 @@ export default async function ProfileTrashPage({ params }: { params: Promise<{ w
     return (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
             <div style={{ marginBottom: '2rem' }}>
-                <h2 className="title-gradient" style={{ marginBottom: 4 }}>Profile Trash</h2>
+                <h2 className="title-gradient" style={{ marginBottom: 4 }}>Thùng rác tổ chức</h2>
                 <p style={{ color: '#71717A', fontSize: 13 }}>
-                    Profiles đã xóa — có thể restore trong 30 ngày trước khi tự động xóa vĩnh viễn.
+                    Tổ chức đã xóa — có thể khôi phục trong 30 ngày trước khi tự động xóa vĩnh viễn.
                 </p>
             </div>
             <ProfileTrashClient workspaceId={workspaceId} profiles={profiles} />

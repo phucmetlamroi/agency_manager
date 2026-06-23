@@ -88,7 +88,7 @@ export default function WidgetNetSalary({
                     className="text-[11px] font-bold uppercase tracking-widest"
                     style={{ color: NP.textMuted }}
                 >
-                    Net Salary
+                    Lương thực nhận
                 </span>
                 {medal && (
                     <span

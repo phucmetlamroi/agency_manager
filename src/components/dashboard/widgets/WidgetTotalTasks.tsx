@@ -34,7 +34,7 @@ export default function WidgetTotalTasks({ total, progress, completed }: Props) 
             <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-1">
                     <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: NP.textMuted }}>
-                        Total Tasks
+                        Tổng số task
                     </span>
                     <span className="text-[28px] font-extrabold leading-tight text-white">
                         {total}
@@ -59,7 +59,7 @@ export default function WidgetTotalTasks({ total, progress, completed }: Props) 
                     }}
                 >
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#818CF8" }} />
-                    {progress} Progress
+                    {progress} Đang làm
                 </span>
                 <span
                     className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full"
@@ -70,7 +70,7 @@ export default function WidgetTotalTasks({ total, progress, completed }: Props) 
                     }}
                 >
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#34D399" }} />
-                    {completed} Completed
+                    {completed} Hoàn tất
                 </span>
             </div>
         </div>

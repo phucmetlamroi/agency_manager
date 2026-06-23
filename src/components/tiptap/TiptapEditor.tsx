@@ -239,13 +239,13 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
             {isLinkModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                     <div className="bg-zinc-950 border border-white/10 p-4 rounded-lg shadow-xl w-80 flex flex-col gap-3">
-                        <h3 className="font-bold text-sm text-zinc-100">Edit Link</h3>
+                        <h3 className="font-bold text-sm text-zinc-100">Sửa liên kết</h3>
                         <div>
-                            <label className="text-xs text-zinc-500 font-bold">Text to display</label>
+                            <label className="text-xs text-zinc-500 font-bold">Văn bản hiển thị</label>
                             <input
                                 value={linkText}
                                 onChange={(e) => setLinkText(e.target.value)}
-                                placeholder="Text..."
+                                placeholder="Nhập văn bản..."
                                 className="w-full p-2 border border-white/10 bg-white/5 text-zinc-200 rounded text-sm mt-1 outline-none focus:border-violet-500/50"
                             />
                         </div>
@@ -259,8 +259,8 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                             />
                         </div>
                         <div className="flex justify-end gap-2 pt-2">
-                            <button onClick={() => setIsLinkModalOpen(false)} className="px-3 py-1 text-xs font-bold text-zinc-400 hover:bg-white/5 rounded">Cancel</button>
-                            <button onClick={saveLink} className="px-3 py-1 text-xs font-bold bg-violet-600 text-white rounded hover:bg-violet-500">Save Link</button>
+                            <button onClick={() => setIsLinkModalOpen(false)} className="px-3 py-1 text-xs font-bold text-zinc-400 hover:bg-white/5 rounded">Huỷ</button>
+                            <button onClick={saveLink} className="px-3 py-1 text-xs font-bold bg-violet-600 text-white rounded hover:bg-violet-500">Lưu liên kết</button>
                         </div>
                     </div>
                 </div>
@@ -273,13 +273,13 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                     <ToolbarButton
                         onClick={() => editor.chain().focus().undo().run()}
                         Icon={Undo2}
-                        title="Undo"
+                        title="Hoàn tác"
                         disabled={!editor.can().undo()}
                     />
                     <ToolbarButton
                         onClick={() => editor.chain().focus().redo().run()}
                         Icon={Redo2}
-                        title="Redo"
+                        title="Làm lại"
                         disabled={!editor.can().redo()}
                     />
                     <Sep />
@@ -289,34 +289,34 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                         onClick={() => editor.chain().focus().toggleBold().run()}
                         isActive={editor.isActive('bold')}
                         Icon={Bold}
-                        title="Bold"
+                        title="In đậm"
                     />
                     <ToolbarButton
                         onClick={() => editor.chain().focus().toggleItalic().run()}
                         isActive={editor.isActive('italic')}
                         Icon={Italic}
-                        title="Italic"
+                        title="In nghiêng"
                     />
                     <ToolbarButton
                         onClick={setLink}
                         isActive={editor.isActive('link')}
                         Icon={LinkIcon}
-                        title="Link"
+                        title="Liên kết"
                     />
                     {editor.isActive('link') && (
-                        <ToolbarButton onClick={removeLink} Icon={Unlink} title="Remove link" />
+                        <ToolbarButton onClick={removeLink} Icon={Unlink} title="Gỡ liên kết" />
                     )}
                     <ToolbarButton
                         onClick={() => editor.chain().focus().toggleUnderline().run()}
                         isActive={editor.isActive('underline')}
                         Icon={UnderlineIcon}
-                        title="Underline"
+                        title="Gạch chân"
                     />
                     <ToolbarButton
                         onClick={() => editor.chain().focus().toggleStrike().run()}
                         isActive={editor.isActive('strike')}
                         Icon={Strikethrough}
-                        title="Strikethrough"
+                        title="Gạch ngang"
                     />
                     <Sep />
 
@@ -325,13 +325,13 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
                         isActive={editor.isActive('heading', { level: 1 })}
                         Icon={Heading1}
-                        title="Heading 1"
+                        title="Tiêu đề 1"
                     />
                     <ToolbarButton
                         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
                         isActive={editor.isActive('heading', { level: 2 })}
                         Icon={Heading2}
-                        title="Heading 2"
+                        title="Tiêu đề 2"
                     />
                     <Sep />
 
@@ -340,19 +340,19 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                         onClick={() => editor.chain().focus().toggleTaskList().run()}
                         isActive={editor.isActive('taskList')}
                         Icon={ListChecks}
-                        title="Task list"
+                        title="Danh sách công việc"
                     />
                     <ToolbarButton
                         onClick={() => editor.chain().focus().toggleBulletList().run()}
                         isActive={editor.isActive('bulletList')}
                         Icon={List}
-                        title="Bullet list"
+                        title="Danh sách dấu đầu dòng"
                     />
                     <ToolbarButton
                         onClick={() => editor.chain().focus().toggleOrderedList().run()}
                         isActive={editor.isActive('orderedList')}
                         Icon={ListOrdered}
-                        title="Ordered list"
+                        title="Danh sách đánh số"
                     />
                     <Sep />
 
@@ -361,25 +361,25 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                         onClick={() => editor.chain().focus().setTextAlign('left').run()}
                         isActive={editor.isActive({ textAlign: 'left' })}
                         Icon={AlignLeft}
-                        title="Align left"
+                        title="Căn trái"
                     />
                     <ToolbarButton
                         onClick={() => editor.chain().focus().setTextAlign('center').run()}
                         isActive={editor.isActive({ textAlign: 'center' })}
                         Icon={AlignCenter}
-                        title="Align center"
+                        title="Căn giữa"
                     />
                     <ToolbarButton
                         onClick={() => editor.chain().focus().setTextAlign('right').run()}
                         isActive={editor.isActive({ textAlign: 'right' })}
                         Icon={AlignRight}
-                        title="Align right"
+                        title="Căn phải"
                     />
                     <ToolbarButton
                         onClick={() => editor.chain().focus().setTextAlign('justify').run()}
                         isActive={editor.isActive({ textAlign: 'justify' })}
                         Icon={AlignJustify}
-                        title="Justify"
+                        title="Căn đều"
                     />
                     <Sep />
 
@@ -388,7 +388,7 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                         <button
                             type="button"
                             onClick={() => setLhMenuOpen((v) => !v)}
-                            title="Line height"
+                            title="Giãn dòng"
                             className={`p-1.5 rounded-md transition-colors flex items-center justify-center ${lhMenuOpen ? 'bg-zinc-200 text-black dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/10'}`}
                         >
                             <MoveVertical size={16} />
@@ -414,7 +414,7 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                                     }}
                                     className="w-full text-left px-3 py-1.5 text-xs text-zinc-500 hover:bg-white/5"
                                 >
-                                    Default
+                                    Mặc định
                                 </button>
                             </div>
                         )}

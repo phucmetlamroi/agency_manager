@@ -7,6 +7,7 @@ import { startImpersonation } from '@/actions/impersonation-actions'
 import { Monitor, Clock, UserCheck, UserMinus, RefreshCw, Eye, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { roleLabel } from '@/lib/display-labels'
 
 export default function LivePresenceBoard() {
     const params = useParams()
@@ -45,9 +46,9 @@ export default function LivePresenceBoard() {
             <div className="p-4 border-b border-white/5 flex justify-between items-center bg-zinc-900/30">
                 <div className="flex items-center gap-2">
                     <UserCheck size={18} className="text-emerald-400" />
-                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">Live Presence</h2>
+                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">Đang trực tuyến</h2>
                     <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 font-mono">
-                        {presence.length} Active
+                        {presence.length} đang hoạt động
                     </span>
                 </div>
                 <button 
@@ -56,7 +57,7 @@ export default function LivePresenceBoard() {
                     className="p-1 px-3 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all transition-colors flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50"
                 >
                     <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-                    Auto-Sync
+                    Tự đồng bộ
                 </button>
             </div>
 
@@ -82,25 +83,25 @@ export default function LivePresenceBoard() {
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2">
                                     <h3 className="text-sm font-semibold text-white truncate">{p.username}</h3>
-                                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{p.role}</span>
+                                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{roleLabel(p.role)}</span>
                                 </div>
                                 <div className="flex items-center gap-3 mt-1">
                                     <div className="flex items-center gap-1.5">
                                         {p.status === 'ONLINE' ? (
                                             <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold">
                                                 <Monitor size={10} />
-                                                <span>Active</span>
+                                                <span>Hoạt động</span>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-1 text-[10px] text-amber-500 font-bold">
                                                 <Clock size={10} />
-                                                <span>Idle</span>
+                                                <span>Tạm vắng</span>
                                             </div>
                                         )}
                                     </div>
                                     <span className="text-[10px] text-zinc-500 flex items-center gap-1">
                                         <Clock size={10} />
-                                        Last seen: {p.lastSeen}
+                                        Hoạt động cuối: {p.lastSeen}
                                     </span>
                                 </div>
                             </div>
@@ -110,7 +111,7 @@ export default function LivePresenceBoard() {
                                         onClick={() => handleImpersonate(p.userId)}
                                         disabled={isPending || loading}
                                         className="shrink-0 w-10 h-10 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-400 transition-all duration-300 disabled:opacity-50 flex items-center justify-center border border-indigo-500/30 hover:border-indigo-500/60 shadow-xl z-20"
-                                        title={`Test as ${p.username}`}
+                                        title={`Xem dưới quyền ${p.username}`}
                                     >
                                         {impersonatingId === p.userId ? (
                                             <Loader2 size={18} className="animate-spin" />
@@ -130,7 +131,7 @@ export default function LivePresenceBoard() {
                     )) : (
                         <div className="h-full flex flex-col items-center justify-center text-zinc-600 gap-3 py-10 italic">
                             <UserMinus size={32} strokeWidth={1} />
-                            <span className="text-xs">No users currently active.</span>
+                            <span className="text-xs">Hiện không có ai đang hoạt động.</span>
                         </div>
                     )}
                 </div>
@@ -139,11 +140,11 @@ export default function LivePresenceBoard() {
             <div className="p-3 bg-zinc-900/20 border-t border-white/5 flex gap-4 justify-center">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Online</span>
+                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Trực tuyến</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Away / Inactive</span>
+                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Tạm vắng / Không hoạt động</span>
                 </div>
             </div>
         </div>

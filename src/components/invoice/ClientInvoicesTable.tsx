@@ -24,17 +24,17 @@ export function ClientInvoicesTable({ invoices, clientId, workspaceId }: { invoi
     const [isVoiding, setIsVoiding] = useState<string | null>(null)
 
     const handleVoid = async (id: string) => {
-        if (!confirm('Are you sure you want to VOID this invoice? This will revert all associated tasks to UNBILLED status and refund any deposit.')) return
+        if (!confirm('Bạn có chắc muốn HUỶ hóa đơn này? Thao tác này sẽ đưa toàn bộ task liên quan về trạng thái chưa xuất hóa đơn và hoàn lại tiền cọc (nếu có).')) return
 
         setIsVoiding(id)
         try {
             const res = await voidInvoice(id, workspaceId)
             if (res.error) throw new Error(res.error)
 
-            toast.success('Invoice voided successfully')
+            toast.success('Đã huỷ hóa đơn thành công')
             router.refresh()
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to void invoice')
+            toast.error(error instanceof Error ? error.message : 'Huỷ hóa đơn không thành công')
         } finally {
             setIsVoiding(null)
         }
@@ -48,7 +48,7 @@ export function ClientInvoicesTable({ invoices, clientId, workspaceId }: { invoi
             
             if (!response.ok) {
                 const errorText = await response.text()
-                throw new Error(errorText || 'Failed to download')
+                throw new Error(errorText || 'Tải xuống không thành công')
             }
 
             const blob = await response.blob()
@@ -69,7 +69,7 @@ export function ClientInvoicesTable({ invoices, clientId, workspaceId }: { invoi
     }
 
     if (invoices.length === 0) {
-        return <div className="text-gray-500 italic text-center py-4">No invoices found.</div>
+        return <div className="text-gray-500 italic text-center py-4">Chưa có hóa đơn nào.</div>
     }
 
     return (
@@ -77,11 +77,11 @@ export function ClientInvoicesTable({ invoices, clientId, workspaceId }: { invoi
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="text-xs text-gray-400 border-b border-gray-700">
-                        <th className="py-2">Invoice #</th>
-                        <th className="py-2">Date</th>
-                        <th className="py-2">Amount</th>
-                        <th className="py-2">Status</th>
-                        <th className="py-2 text-right">Actions</th>
+                        <th className="py-2">Số hóa đơn</th>
+                        <th className="py-2">Ngày</th>
+                        <th className="py-2">Số tiền</th>
+                        <th className="py-2">Trạng thái</th>
+                        <th className="py-2 text-right">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody className="text-sm text-gray-300">

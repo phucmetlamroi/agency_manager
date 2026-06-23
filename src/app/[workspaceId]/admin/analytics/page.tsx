@@ -24,7 +24,7 @@ export default async function AdminAnalyticsPage({ params }: { params: Promise<{
             <div className="flex items-center justify-between shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-red-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent drop-shadow-sm">
-                        Performance Analytics
+                        Phân tích hiệu suất
                     </h1>
                     <p className="text-zinc-400 text-sm mt-2">
                         Bảng thống kê hiệu suất, tỉ lệ lỗi và xếp hạng nhân sự dựa trên Gamification (TanStack Data Grid).

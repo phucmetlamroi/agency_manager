@@ -58,9 +58,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
     // Customizable Fields
     const [customAgencyName, setCustomAgencyName] = useState('Agency Manager')
-    const [customTitle, setCustomTitle] = useState('INVOICE')
+    const [customTitle, setCustomTitle] = useState('HÓA ĐƠN')
     const [customClientAddress, setCustomClientAddress] = useState(clientAddress || '')
-    const [dueDateLabel, setDueDateLabel] = useState('Balance Due')
+    const [dueDateLabel, setDueDateLabel] = useState('Số tiền phải trả')
     const [paymentLink, setPaymentLink] = useState('')
     const [customPrepaid, setCustomPrepaid] = useState(0)
 
@@ -93,7 +93,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
             setInvoiceNumber(`INV-${date.getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`)
 
         } catch (e) {
-            toast.error('Failed to load data')
+            toast.error('Không tải được dữ liệu')
         } finally {
             setIsLoading(false)
         }
@@ -156,7 +156,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 // FLAT LIST (Itemized)
                 const taskItems: InvoiceItem[] = selectedTasks.map(t => ({
                     id: t.id,
-                    description: t.title || 'Untitled Task',
+                    description: t.title || 'Task chưa đặt tên',
                     note: t.productLink ? `Ref: ${t.productLink}` : undefined,
                     quantity: 1,
                     unitPrice: Number(t.jobPriceUSD) || 0,
@@ -188,8 +188,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 } else {
                     groupedItems.push({
                         id: `group-${clientName}-${Date.now()}`, // Temp ID
-                        description: `Production Services [${clientName}]`, // Simplified Description
-                        note: `${selectedTasks.filter(st => (st.originalClientName || 'General') === clientName).length} tasks merged`,
+                        description: `Dịch vụ sản xuất [${clientName}]`, // Simplified Description
+                        note: `Gộp ${selectedTasks.filter(st => (st.originalClientName || 'General') === clientName).length} task`,
                         quantity: 1,
                         unitPrice: amount,
                         amount: amount,
@@ -310,8 +310,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     }
 
     const handleGenerate = async () => {
-        if (!billingProfileId) return toast.error('Please select a Billing Profile')
-        if (activeItems.length === 0) return toast.error('Invoice is empty')
+        if (!billingProfileId) return toast.error('Vui lòng chọn hồ sơ thanh toán')
+        if (activeItems.length === 0) return toast.error('Hóa đơn đang trống')
 
         setIsGenerating(true)
         try {
@@ -346,11 +346,11 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 taskIds: selectedTaskIds
             }
 
-            toast.info('Saving invoice...')
+            toast.info('Đang lưu hóa đơn...')
             const saveRes = await createInvoiceRecord(dbPayload, workspaceId)
             if (saveRes.error) throw new Error(saveRes.error)
 
-            toast.success('Invoice saved! Generating PDF...')
+            toast.success('Đã lưu hóa đơn! Đang tạo PDF...')
 
             const pdfPayload = {
                 ...dbPayload,
@@ -360,7 +360,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 currency,
                 issueDate: issueDate || new Date().toLocaleDateString(),
 
-                dueDate: dueDate || 'On Receipt',
+                dueDate: dueDate || 'Khi nhận hóa đơn',
                 subtotal: activeSubtotal.toFixed(2),
                 taxAmount: activeTaxAmount.toFixed(2),
                 depositDeducted: totalDeducted > 0 ? totalDeducted.toFixed(2) : undefined,
@@ -392,7 +392,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
             if (!response.ok) {
                 const errorText = await response.text()
-                throw new Error(errorText || 'Failed to generate')
+                throw new Error(errorText || 'Tạo hóa đơn không thành công')
             }
 
             const blob = await response.blob()
@@ -404,11 +404,11 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
             a.click()
             a.remove()
 
-            toast.success('Invoice generated & downloaded!')
+            toast.success('Đã tạo & tải hóa đơn về!')
 
         } catch (e: any) {
             console.error(e)
-            toast.error(`Error: ${e.message}`)
+            toast.error(`Lỗi: ${e.message}`)
         } finally {
             setIsGenerating(false)
         }
@@ -420,14 +420,14 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 <div className="w-[420px] shrink-0 bg-zinc-800 border-r border-zinc-700 flex flex-col h-full">
                     <div className="px-5 py-4 border-b border-zinc-700">
                         <h2 className="font-extrabold text-lg text-white tracking-tight">Tạo Hóa Đơn</h2>
-                        <p className="text-xs text-zinc-400 mt-0.5">Chọn tasks chưa xuất hóa đơn</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">Chọn task chưa xuất hóa đơn</p>
                     </div>
 
                     <div className="px-5 pt-4 pb-3 border-b border-zinc-700 space-y-3">
                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Cấu hình</p>
                         <div className="flex gap-3">
                             <div className="flex-1 bg-zinc-900/50 rounded-xl border border-zinc-700 px-3 py-2 flex items-center gap-2">
-                                <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Tax %</span>
+                                <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Thuế %</span>
                                 <input
                                     type="number"
                                     className="flex-1 bg-transparent text-right text-white font-bold text-sm focus:outline-none min-w-0"
@@ -436,7 +436,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                 />
                             </div>
                             <div className="flex-1 bg-zinc-900/50 rounded-xl border border-zinc-700 px-3 py-2 flex items-center gap-2">
-                                <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Prepaid {currency}</span>
+                                <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Trả trước {currency}</span>
                                 <input
                                     type="number"
                                     className="flex-1 bg-transparent text-right text-red-400 font-bold text-sm focus:outline-none min-w-0"
@@ -448,7 +448,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                         </div>
 
                         <div className="bg-zinc-900/50 rounded-xl border border-zinc-700 px-3 py-2 flex items-center gap-2">
-                            <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Payment Link</span>
+                            <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Link thanh toán</span>
                             <input
                                 type="text"
                                 placeholder="https://..."
@@ -473,7 +473,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all duration-200 ${applyDeposit ? 'bg-amber-500/20 border-amber-500/60 text-amber-300' : 'bg-zinc-700 border-zinc-600 text-zinc-400'}`}
                                 >
                                     <span className={`w-2 h-2 rounded-full ${applyDeposit ? 'bg-amber-400' : 'bg-zinc-500'}`} />
-                                    Dùng Deposit (-${maxDeductible})
+                                    Dùng tiền cọc (-${maxDeductible})
                                 </button>
                             )}
                         </div>
@@ -491,7 +491,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         <AccordionTrigger className="px-4 py-2.5 hover:no-underline hover:bg-zinc-700/30 transition-colors">
                                             <div className="flex justify-between items-center w-full mr-2">
                                                 <span className="font-bold text-sm text-zinc-200">{brand}</span>
-                                                <span className="text-[11px] text-zinc-500 font-normal bg-zinc-800 px-2 py-0.5 rounded-full">{brandTasks.length} tasks</span>
+                                                <span className="text-[11px] text-zinc-500 font-normal bg-zinc-800 px-2 py-0.5 rounded-full">{brandTasks.length} task</span>
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent className="px-3 pb-3 pt-0">
@@ -525,7 +525,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
                         <button
                             onClick={() => {
-                                const newItem = { id: `man-${Date.now()}`, description: 'Extra Service', quantity: 1, unitPrice: 0, amount: 0, isManual: true }
+                                const newItem = { id: `man-${Date.now()}`, description: 'Dịch vụ thêm', quantity: 1, unitPrice: 0, amount: 0, isManual: true }
                                 setManualItems([...manualItems, newItem])
                                 setEditingItemId(newItem.id)
                                 setEditForm({ description: newItem.description, unitPrice: 0, quantity: 1 })
@@ -578,7 +578,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     <div className="h-12 border-b border-zinc-800 flex items-center px-6 gap-4 shrink-0">
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Live Preview</span>
+                            <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Xem trước trực tiếp</span>
                         </div>
                         <span className="ml-auto text-[11px] text-zinc-600 font-mono">{invoiceNumber}</span>
                     </div>
@@ -610,7 +610,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
                             <div className="grid grid-cols-2 gap-12 mb-10 border-t border-gray-100 pt-8">
                                 <div>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Bill To</p>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Người nhận hóa đơn</p>
                                     <div className="font-bold text-xl text-gray-900 mb-1">{clientName}</div>
                                     <textarea
                                         value={customClientAddress}
@@ -642,7 +642,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                             type="text"
                                             value={dueDate}
                                             onChange={e => setDueDate(e.target.value)}
-                                            placeholder="e.g. On Request"
+                                            placeholder="vd. Khi có yêu cầu"
                                             className="text-right font-bold text-gray-800 border-b border-dashed border-gray-200 focus:outline-none focus:border-violet-400 bg-transparent placeholder-gray-300"
                                             style={{ width: '10rem' }}
                                         />
@@ -722,7 +722,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         ))}
                                         {activeItems.length === 0 && (
                                             <tr>
-                                                <td colSpan={5} className="py-20 text-center text-gray-300 italic text-sm">Chọn tasks ở bên trái hoặc thêm hạng mục thủ công</td>
+                                                <td colSpan={5} className="py-20 text-center text-gray-300 italic text-sm">Chọn task ở bên trái hoặc thêm hạng mục thủ công</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -742,7 +742,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                 return (
                                                     <div className="space-y-4 text-[13px]">
                                                         <div className="flex flex-col gap-1">
-                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">Beneficiary Name</span>
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">Tên người thụ hưởng</span>
                                                             <input 
                                                                 className="font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-violet-400 w-full px-1 py-0.5 transition-all"
                                                                 defaultValue={p?.beneficiaryName || ''}
@@ -750,14 +750,14 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                         </div>
                                                         <div className="grid grid-cols-2 gap-4">
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Bank Name</span>
+                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Tên ngân hàng</span>
                                                                 <input 
                                                                     className="font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:outline-none focus:border-violet-400 w-full px-1 py-0.5 transition-all"
                                                                     defaultValue={p?.bankName || ''}
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Account Number</span>
+                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Số tài khoản</span>
                                                                 <input 
                                                                     className="font-mono font-bold text-violet-600 bg-violet-50/50 px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-violet-400 w-full transition-all"
                                                                     defaultValue={p?.accountNumber || ''}
@@ -766,7 +766,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                         </div>
                                                         {paymentLink && (
                                                             <div className="mt-2 p-3 bg-white rounded-xl border border-blue-50 shadow-sm flex flex-col gap-1">
-                                                                <span className="text-[9px] font-black text-blue-400 uppercase tracking-tight">Payment Link</span>
+                                                                <span className="text-[9px] font-black text-blue-400 uppercase tracking-tight">Link thanh toán</span>
                                                                 <span className="text-blue-600 font-medium break-all text-xs">{paymentLink}</span>
                                                             </div>
                                                         )}

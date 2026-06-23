@@ -8,10 +8,10 @@ export default function UserTopNav({ workspaceId }: { workspaceId: string }) {
     const pathname = usePathname()
 
     const navItems = [
-        { href: `/${workspaceId}/dashboard`, icon: LayoutDashboard, label: 'Overview' },
+        { href: `/${workspaceId}/dashboard`, icon: LayoutDashboard, label: 'Tổng quan' },
         { href: `/${workspaceId}/dashboard/schedule`, icon: CalendarDays, label: 'Lịch làm' },
         { href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, label: 'Lỗi cá nhân', danger: true },
-        { href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, label: 'Profile' }
+        { href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, label: 'Hồ sơ' }
     ]
 
     return (

@@ -17,6 +17,7 @@ import TransferProfileOwnershipModal from './TransferProfileOwnershipModal'
 import GrantWorkspaceAccessModal from './GrantWorkspaceAccessModal'
 import ProfileSettingsSection from './ProfileSettingsSection'
 import type { ProfileRole } from '@prisma/client'
+import { roleLabel } from '@/lib/display-labels'
 
 type MemberItem = {
     id: string
@@ -48,11 +49,11 @@ type Props = {
     }
 }
 
-const ROLE_BADGE: Record<ProfileRole, { label: string; color: string; icon: any }> = {
-    OWNER: { label: 'Owner', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: Crown },
-    ADMIN: { label: 'Admin', color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', icon: Shield },
-    USER: { label: 'User', color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/20', icon: Users },
-    CLIENT: { label: 'Client', color: 'text-violet-400 bg-violet-500/10 border-violet-500/20', icon: Users },
+const ROLE_BADGE: Record<ProfileRole, { color: string; icon: any }> = {
+    OWNER: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: Crown },
+    ADMIN: { color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', icon: Shield },
+    USER: { color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/20', icon: Users },
+    CLIENT: { color: 'text-violet-400 bg-violet-500/10 border-violet-500/20', icon: Users },
 }
 
 export default function ProfileMembersPanel({
@@ -86,7 +87,7 @@ export default function ProfileMembersPanel({
             if (result.error) {
                 toast.error(result.error)
             } else {
-                toast.success('Đã cập nhật role.')
+                toast.success('Đã cập nhật vai trò.')
                 setExpandedMemberId(null)
                 refresh()
             }
@@ -96,7 +97,7 @@ export default function ProfileMembersPanel({
     }
 
     async function handleRemove(userId: string) {
-        if (!confirm('Xóa thành viên này khỏi Profile? Tất cả workspace memberships trong profile sẽ bị xóa.')) {
+        if (!confirm('Xóa thành viên này khỏi Tổ chức? Tất cả quyền truy cập workspace trong tổ chức sẽ bị xóa.')) {
             return
         }
         setActionLoading(userId)
@@ -137,7 +138,7 @@ export default function ProfileMembersPanel({
                             onClick={() => setShowTransferModal(true)}
                             className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.10] text-zinc-200 text-sm font-semibold transition border border-white/10"
                         >
-                            <ArrowRightLeft size={14} /> Transfer ownership
+                            <ArrowRightLeft size={14} /> Chuyển quyền sở hữu
                         </button>
                     )}
                 </div>
@@ -179,7 +180,7 @@ export default function ProfileMembersPanel({
                                     )}
                                 </div>
                                 <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold ${badge.color}`}>
-                                    <RoleIcon size={11} /> {badge.label}
+                                    <RoleIcon size={11} /> {roleLabel(m.role)}
                                 </div>
 
                                 {canManageThisMember && (
@@ -199,7 +200,7 @@ export default function ProfileMembersPanel({
                                                         onClick={() => handleRoleChange(m.userId, 'ADMIN')}
                                                         className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-white/[0.06] text-indigo-300"
                                                     >
-                                                        <Shield size={13} /> Promote to Admin
+                                                        <Shield size={13} /> Nâng lên Quản trị
                                                     </button>
                                                 )}
                                                 {m.role === 'ADMIN' && (
@@ -208,7 +209,7 @@ export default function ProfileMembersPanel({
                                                             onClick={() => handleRoleChange(m.userId, 'USER')}
                                                             className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-white/[0.06] text-zinc-300"
                                                         >
-                                                            <Users size={13} /> Demote to User
+                                                            <Users size={13} /> Hạ xuống Nhân viên
                                                         </button>
                                                         <button
                                                             onClick={() => {
@@ -226,7 +227,7 @@ export default function ProfileMembersPanel({
                                                     onClick={() => handleRemove(m.userId)}
                                                     className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-red-500/10 text-red-400"
                                                 >
-                                                    <UserMinus size={13} /> Xóa khỏi Profile
+                                                    <UserMinus size={13} /> Xóa khỏi Tổ chức
                                                 </button>
                                             </div>
                                         )}

@@ -18,6 +18,7 @@ import {
 // [Sprint Z+1] TransferOwnershipModal removed — workspace OWNER concept deprecated
 import InviteMemberModal from './InviteMemberModal'
 import type { WorkspaceRole } from '@/lib/workspace-roles'
+import { roleLabel } from '@/lib/display-labels'
 
 type MemberItem = {
     id: string
@@ -66,11 +67,11 @@ type Props = {
     isGlobalAdmin: boolean
 }
 
-const ROLE_BADGE: Record<string, { label: string; color: string; icon: any }> = {
-    OWNER:  { label: 'Owner',  color: 'text-amber-400 bg-amber-500/10 border-amber-500/20',  icon: Crown },
-    ADMIN:  { label: 'Admin',  color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', icon: Shield },
-    MEMBER: { label: 'Member', color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/20',      icon: Users },
-    GUEST:  { label: 'Guest',  color: 'text-zinc-500 bg-zinc-800/50 border-zinc-600/20',      icon: Users },
+const ROLE_BADGE: Record<string, { color: string; icon: any }> = {
+    OWNER:  { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20',  icon: Crown },
+    ADMIN:  { color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', icon: Shield },
+    MEMBER: { color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/20',      icon: Users },
+    GUEST:  { color: 'text-zinc-500 bg-zinc-800/50 border-zinc-600/20',      icon: Users },
 }
 
 export default function WorkspaceMembersPanel({
@@ -244,7 +245,7 @@ export default function WorkspaceMembersPanel({
                                 {/* Role Badge */}
                                 <div className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold flex items-center gap-1.5 shrink-0 ${badge.color}`}>
                                     <BadgeIcon className="w-3 h-3" strokeWidth={2} />
-                                    {badge.label}
+                                    {roleLabel(member.role)}
                                 </div>
 
                                 {/* Actions — chỉ cho explicit WorkspaceMember (source='workspace').
@@ -285,7 +286,7 @@ export default function WorkspaceMembersPanel({
                                                                         : 'text-zinc-300 hover:bg-white/5'
                                                                 }`}
                                                             >
-                                                                {role}
+                                                                {roleLabel(role)}
                                                                 {member.role === role && <Check className="w-3 h-3" />}
                                                             </button>
                                                         ))}
@@ -346,10 +347,10 @@ export default function WorkspaceMembersPanel({
                                 </Avatar>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm text-zinc-300 truncate">
-                                        {inv.invitedUser?.nickname || inv.invitedUser?.username || 'Unknown'}
+                                        {inv.invitedUser?.nickname || inv.invitedUser?.username || 'Không rõ'}
                                     </div>
                                     <div className="text-[10px] text-zinc-500">
-                                        Mời bởi {inv.invitedBy.nickname || inv.invitedBy.username} · Vai trò: {inv.role}
+                                        Mời bởi {inv.invitedBy.nickname || inv.invitedBy.username} · Vai trò: {roleLabel(inv.role)}
                                     </div>
                                 </div>
                                 <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded font-bold shrink-0">

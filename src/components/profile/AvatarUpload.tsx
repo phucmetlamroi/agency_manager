@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import Image from 'next/image'
 import { Loader2, UploadCloud, User, Camera } from 'lucide-react'
 import { Button } from "@/components/ui/button"
+import { roleLabel } from '@/lib/display-labels'
 
 export default function AvatarUpload({ user }: { user: any }) {
     const [isPending, startTransition] = useTransition()
@@ -55,7 +56,7 @@ export default function AvatarUpload({ user }: { user: any }) {
                     {preview ? (
                         <Image
                             src={preview}
-                            alt="Avatar Preview"
+                            alt="Xem trước ảnh đại diện"
                             fill
                             className="object-cover"
                             unoptimized
@@ -63,7 +64,7 @@ export default function AvatarUpload({ user }: { user: any }) {
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 bg-zinc-900">
                             <User className="w-12 h-12 mb-1 opacity-20" />
-                            <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">No Image</span>
+                            <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">Chưa có ảnh</span>
                         </div>
                     )}
 
@@ -71,7 +72,7 @@ export default function AvatarUpload({ user }: { user: any }) {
                     {isPending && (
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center animate-in fade-in duration-300">
                             <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
-                            <span className="text-[10px] text-zinc-300 mt-2 font-bold uppercase tracking-tighter">Uploading...</span>
+                            <span className="text-[10px] text-zinc-300 mt-2 font-bold uppercase tracking-tighter">Đang tải...</span>
                         </div>
                     )}
 
@@ -98,7 +99,7 @@ export default function AvatarUpload({ user }: { user: any }) {
 
             <div className="text-center">
                 <h4 className="text-zinc-200 font-bold text-lg">{user.username}</h4>
-                <p className="text-zinc-500 text-xs uppercase tracking-widest font-medium mt-0.5">{user.role}</p>
+                <p className="text-zinc-500 text-xs uppercase tracking-widest font-medium mt-0.5">{roleLabel(user.role)}</p>
                 
                 <div className="mt-4 flex items-center justify-center gap-2">
                     <Button 

@@ -99,7 +99,7 @@ export default function PaymentQrUpload({ user }: { user: any }) {
                             <div className="relative w-48 h-48">
                                 <Image
                                     src={preview}
-                                    alt="QR Preview"
+                                    alt="Xem trước QR"
                                     fill
                                     className="object-contain rounded-lg"
                                 />

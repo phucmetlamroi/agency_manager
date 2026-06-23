@@ -6,7 +6,7 @@ import { getFrictionData } from '@/actions/tracking-actions'
 import { RefreshCw } from 'lucide-react'
 
 // UI days (Monday to Sunday)
-const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
 const hours = Array.from({ length: 24 }, (_, i) => i)
 
 function getHeatColor(weight: number) {
@@ -45,7 +45,7 @@ export default function FrictionHeatmap() {
                     className="p-1 px-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50"
                 >
                     <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-                    Sync Heatmap
+                    Đồng bộ Heatmap
                 </button>
             </div>
 
@@ -66,7 +66,7 @@ export default function FrictionHeatmap() {
                             return (
                                 <div 
                                     key={`${day}-${hour}`}
-                                    title={`${day} ${hour}:00 - Intensity: ${weight}`}
+                                    title={`${day} ${hour}:00 - Mức độ: ${weight}`}
                                     className={clsx(
                                         "flex-1 rounded-sm transition-all duration-300 cursor-crosshair h-full",
                                         getHeatColor(weight)
@@ -81,12 +81,12 @@ export default function FrictionHeatmap() {
             </div>
             
             <div className="mt-4 flex items-center justify-end gap-2 text-[10px] text-zinc-500 font-bold uppercase">
-                <span>Low Activity</span>
+                <span>Ít hoạt động</span>
                 <div className="w-3 h-3 rounded bg-orange-500/20" />
                 <div className="w-3 h-3 rounded bg-orange-500/50" />
                 <div className="w-3 h-3 rounded bg-orange-600" />
                 <div className="w-3 h-3 rounded bg-red-600" />
-                <span>Critical Friction</span>
+                <span>Tắc nghẽn nghiêm trọng</span>
             </div>
         </div>
     )

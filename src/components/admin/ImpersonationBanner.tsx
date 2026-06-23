@@ -87,7 +87,7 @@ export default function ImpersonationBanner({ impersonatedUsername, expiresAtIso
                     disabled={stopping}
                     className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-md transition-colors disabled:opacity-50"
                 >
-                    {stopping ? 'Stopping...' : '← Stop impersonation'}
+                    {stopping ? 'Đang dừng...' : '← Dừng giả lập'}
                 </button>
             </div>
         </div>

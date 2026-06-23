@@ -48,42 +48,42 @@ export function CommandMenu() {
 
     return (
         <CommandDialog open={open} onOpenChange={setOpen}>
-            <CommandInput placeholder="Type a command or search..." />
+            <CommandInput placeholder="Nhập lệnh hoặc tìm kiếm..." />
             <CommandList>
-                <CommandEmpty>No results found.</CommandEmpty>
-                <CommandGroup heading="Suggestions">
+                <CommandEmpty>Không có kết quả.</CommandEmpty>
+                <CommandGroup heading="Gợi ý">
                     <CommandItem onSelect={() => runCommand(() => router.push('/admin'))}>
                         <LayoutDashboard className="mr-2 h-4 w-4" />
-                        <span>Dashboard</span>
+                        <span>Tổng quan</span>
                     </CommandItem>
                     <CommandItem onSelect={() => runCommand(() => router.push('/admin/queue'))}>
                         <ListTodo className="mr-2 h-4 w-4" />
-                        <span>Task Queue</span>
+                        <span>Hàng chờ task</span>
                     </CommandItem>
                 </CommandGroup>
                 <CommandSeparator />
-                <CommandGroup heading="Management">
+                <CommandGroup heading="Quản lý">
                     <CommandItem onSelect={() => runCommand(() => router.push('/admin/crm'))}>
                         <Smile className="mr-2 h-4 w-4" />
-                        <span>Clients Manager</span>
+                        <span>Quản lý khách hàng</span>
                     </CommandItem>
                     <CommandItem onSelect={() => runCommand(() => router.push('/admin/payroll'))}>
                         <Wallet className="mr-2 h-4 w-4" />
-                        <span>Payroll</span>
+                        <span>Bảng lương</span>
                     </CommandItem>
                 </CommandGroup>
                 <CommandSeparator />
-                <CommandGroup heading="Settings">
+                <CommandGroup heading="Cài đặt">
                     <CommandItem onSelect={() => runCommand(() => router.push('/settings'))}>
                         <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
+                        <span>Cài đặt</span>
                         <CommandShortcut>⌘S</CommandShortcut>
                     </CommandItem>
                     <CommandItem onSelect={() => runCommand(async () => {
                         window.location.href = '/api/auth/logout'
                     })}>
                         <LogOut className="mr-2 h-4 w-4" />
-                        <span>Log out</span>
+                        <span>Đăng xuất</span>
                     </CommandItem>
                 </CommandGroup>
             </CommandList>

@@ -318,7 +318,7 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                                     className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/12 border border-emerald-500/25 rounded-full"
                                                 >
                                                     <TrendingUp className="w-3 h-3 text-emerald-400" strokeWidth={2} />
-                                                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">Live</span>
+                                                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">Đang mở</span>
                                                 </motion.div>
                                             ) : null}
                                         </div>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { X, Loader2, ArrowRightLeft, Crown } from 'lucide-react'
 import { toast } from 'sonner'
 import { transferProfileOwnershipAction } from '@/actions/profile-member-actions'
+import { roleLabel } from '@/lib/display-labels'
 
 type MemberItem = {
     id: string
@@ -37,7 +38,7 @@ export default function TransferProfileOwnershipModal({ profileId, profileName, 
             if (result.error) {
                 toast.error(result.error)
             } else {
-                toast.success('Đã transfer ownership.')
+                toast.success('Đã chuyển quyền sở hữu.')
                 onSuccess()
             }
         } finally {
@@ -52,7 +53,7 @@ export default function TransferProfileOwnershipModal({ profileId, profileName, 
             <div className="bg-zinc-950 border border-amber-500/30 rounded-2xl shadow-2xl w-full max-w-md">
                 <div className="flex items-center justify-between p-5 border-b border-white/5">
                     <h3 className="text-base font-bold text-zinc-100 flex items-center gap-2">
-                        <ArrowRightLeft size={16} className="text-amber-400" /> Transfer Ownership
+                        <ArrowRightLeft size={16} className="text-amber-400" /> Chuyển quyền sở hữu
                     </h3>
                     <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-400">
                         <X size={16} />
@@ -62,8 +63,8 @@ export default function TransferProfileOwnershipModal({ profileId, profileName, 
                     <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3">
                         <p className="text-[12px] text-amber-200 leading-relaxed">
                             <Crown size={11} className="inline mr-1 mb-0.5" />
-                            <strong>Cảnh báo:</strong> Bạn sẽ bị demote thành <strong>ADMIN</strong>.
-                            Người mới sẽ có quyền cao nhất bao gồm xóa member và transfer lại sang người khác.
+                            <strong>Cảnh báo:</strong> Bạn sẽ bị hạ xuống <strong>Quản trị</strong>.
+                            Người mới sẽ có quyền cao nhất bao gồm xóa thành viên và chuyển quyền lại sang người khác.
                         </p>
                     </div>
 
@@ -74,10 +75,10 @@ export default function TransferProfileOwnershipModal({ profileId, profileName, 
                             onChange={(e) => setSelectedUserId(e.target.value)}
                             className="mt-1.5 h-11 w-full rounded-full bg-white/[0.04] border border-white/10 px-[18px] text-[13px] text-zinc-300 outline-none focus:border-amber-500/50"
                         >
-                            <option value="">— Chọn member —</option>
+                            <option value="">— Chọn thành viên —</option>
                             {members.map((m) => (
                                 <option key={m.userId} value={m.userId}>
-                                    {m.user.displayName ?? m.user.nickname ?? m.user.username} ({m.role})
+                                    {m.user.displayName ?? m.user.nickname ?? m.user.username} ({roleLabel(m.role)})
                                 </option>
                             ))}
                         </select>
@@ -85,7 +86,7 @@ export default function TransferProfileOwnershipModal({ profileId, profileName, 
 
                     <div>
                         <label className="text-xs text-zinc-400 font-medium pl-1">
-                            Gõ tên Profile "<strong className="text-amber-300">{profileName}</strong>" để xác nhận
+                            Gõ tên Tổ chức "<strong className="text-amber-300">{profileName}</strong>" để xác nhận
                         </label>
                         <input
                             type="text"
@@ -109,7 +110,7 @@ export default function TransferProfileOwnershipModal({ profileId, profileName, 
                             className="px-4 py-2 rounded-full bg-amber-600 hover:bg-amber-500 text-white text-[13px] font-semibold disabled:opacity-50 flex items-center gap-2"
                         >
                             {loading && <Loader2 size={14} className="animate-spin" />}
-                            Transfer
+                            Chuyển quyền
                         </button>
                     </div>
                 </div>

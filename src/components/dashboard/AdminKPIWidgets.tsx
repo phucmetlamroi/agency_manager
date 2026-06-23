@@ -123,7 +123,7 @@ function CurrencyToggle({
         <button
             type="button"
             onClick={onToggle}
-            aria-label={`Toggle currency (current: ${currency})`}
+            aria-label={`Đổi đơn vị tiền (hiện tại: ${currency})`}
             aria-pressed={currency === "USD"}
             className="inline-flex items-center gap-1.5 text-[13px] font-medium px-3 py-1 rounded-[20px] transition-colors duration-150"
             style={{
@@ -189,7 +189,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                 {/* Header row — [Sprint O] toggle pill */}
                 <div className="flex justify-between items-center">
                     <span className="text-[18px] font-bold text-white">
-                        Gross Revenue
+                        Tổng doanh thu
                     </span>
                     <CurrencyToggle currency={currency} onToggle={toggleCurrency} />
                 </div>
@@ -265,9 +265,9 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                 {/* Header row */}
                 <div className="flex justify-between items-center">
                     <span className="text-[18px] font-bold text-white">
-                        Total Tasks
+                        Tổng số task
                     </span>
-                    <DropdownPill label="This week" />
+                    <DropdownPill label="Tuần này" />
                 </div>
 
                 {/* Value */}
@@ -295,7 +295,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                             className="w-2 h-2 rounded-full flex-shrink-0"
                             style={{ backgroundColor: "#8B5CF6" }}
                         />
-                        {data.tasksInProgress} tasks in progress
+                        {data.tasksInProgress} task đang làm
                     </span>
                     <span
                         className="inline-flex items-center gap-[6px] text-[13px] font-medium px-3 py-1.5 rounded-[20px]"
@@ -307,15 +307,15 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                         }}
                     >
                         <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#8B5CF6" }} />
-                        {data.tasksCompleted} tasks completed
+                        {data.tasksCompleted} task hoàn tất
                     </span>
                 </div>
 
                 {/* Footer */}
                 <span className="text-[13px] mt-auto leading-snug" style={{ color: "#A1A1AA", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    You have <span style={{ color: "#D8B4FE", fontWeight: 600 }}>{data.totalTasks}</span> ongoing tasks
+                    Bạn đang có <span style={{ color: "#D8B4FE", fontWeight: 600 }}>{data.totalTasks}</span> task đang chạy
                     {taskPct !== null
-                        ? <>, <span style={{ color: "#D8B4FE", fontWeight: 600 }}>{taskPct > 0 ? taskPct : Math.abs(taskPct)}%</span> {taskPct >= 0 ? "more" : "less"} than last month.</>
+                        ? <>, <span style={{ color: "#D8B4FE", fontWeight: 600 }}>{taskPct >= 0 ? "nhiều hơn" : "ít hơn"} {taskPct > 0 ? taskPct : Math.abs(taskPct)}%</span> so với tháng trước.</>
                         : "."}
                 </span>
             </motion.div>
@@ -338,9 +338,9 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                 {/* Header row */}
                 <div className="flex justify-between items-center">
                     <span className="text-[18px] font-bold text-white">
-                        Total Clients
+                        Tổng khách hàng
                     </span>
-                    <DropdownPill label="This week" />
+                    <DropdownPill label="Tuần này" />
                 </div>
 
                 {/* Value + Donut */}
@@ -367,7 +367,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
 
                 {/* Footer */}
                 <span className="text-[13px] mt-auto leading-snug" style={{ color: "#A1A1AA", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    You have reached <span style={{ color: "#D8B4FE", fontWeight: 600 }}>{clientPct}%</span> of your target this week.
+                    Bạn đã đạt <span style={{ color: "#D8B4FE", fontWeight: 600 }}>{clientPct}%</span> mục tiêu tuần này.
                 </span>
             </motion.div>
         </div>

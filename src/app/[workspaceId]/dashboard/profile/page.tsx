@@ -32,7 +32,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
             <div className="text-center space-y-2">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] font-bold uppercase tracking-wider mb-2">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    Account Settings
+                    Cài đặt tài khoản
                 </div>
                 <h1 className="text-3xl font-black text-white italic tracking-tighter">
                     THÔNG TIN CÁ NHÂN
@@ -61,7 +61,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
             <div className="space-y-4">
                 <div className="flex items-center gap-2 px-1">
                     <Bell className="w-5 h-5 text-violet-400" />
-                    <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Thong bao Email</h2>
+                    <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Thông báo Email</h2>
                 </div>
                 <NotificationSettings />
             </div>

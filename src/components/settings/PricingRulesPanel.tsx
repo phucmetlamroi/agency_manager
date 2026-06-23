@@ -100,7 +100,7 @@ export default function PricingRulesPanel({ workspaceId, rules, clients }: Props
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-bold text-zinc-100">Pricing Rules</h3>
+                    <h3 className="text-lg font-bold text-zinc-100">Bảng giá</h3>
                     <p className="text-sm text-zinc-400 mt-1">
                         Định nghĩa cách tính giá tự động theo độ dài video. Velox dùng các rule này khi tạo task hàng loạt.
                     </p>

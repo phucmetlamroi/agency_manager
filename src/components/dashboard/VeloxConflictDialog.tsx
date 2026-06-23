@@ -34,15 +34,15 @@ interface Props {
 }
 
 const FIELD_LABEL: Partial<Record<keyof VeloxFormPrefill, string>> = {
-    clientId: 'Client',
-    taskType: 'Task type',
+    clientId: 'Khách hàng',
+    taskType: 'Loại task',
     deadline: 'Deadline',
-    assigneeId: 'Editor (assignee)',
-    videoList: 'Video list',
-    jobPriceUSD: 'Client price (USD)',
-    editorFee: 'Editor wage (VND)',
-    rawFootage: 'Raw footage link',
-    notes: 'Notes',
+    assigneeId: 'Editor (người làm)',
+    videoList: 'Danh sách video',
+    jobPriceUSD: 'Giá khách (USD)',
+    editorFee: 'Thù lao editor (VND)',
+    rawFootage: 'Link raw footage',
+    notes: 'Ghi chú',
 }
 
 export default function VeloxConflictDialog({ open, conflicts, onResolve, onCancel }: Props) {
@@ -86,7 +86,7 @@ export default function VeloxConflictDialog({ open, conflicts, onResolve, onCanc
                             <button
                                 onClick={onCancel}
                                 className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 hover:text-white transition-colors shrink-0"
-                                aria-label="Cancel"
+                                aria-label="Huỷ"
                             >
                                 <X size={14} />
                             </button>

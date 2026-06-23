@@ -132,8 +132,8 @@ function SubfolderTable({ scores }: { scores: ScanDiagnosticsV3['subfolderScores
                 <table className="w-full text-[10px]">
                     <thead className="text-zinc-500">
                         <tr>
-                            <th className="text-left px-1 py-1">Name</th>
-                            <th className="text-left px-1 py-1">Role</th>
+                            <th className="text-left px-1 py-1">Tên</th>
+                            <th className="text-left px-1 py-1">Vai trò</th>
                             <th className="text-left px-1 py-1">br</th>
                             <th className="text-left px-1 py-1">p-br</th>
                             <th className="text-left px-1 py-1">bun</th>
@@ -174,8 +174,8 @@ function FileTable({ scores }: { scores: NonNullable<ScanDiagnosticsV3['fileScor
                 <table className="w-full text-[10px]">
                     <thead className="text-zinc-500">
                         <tr>
-                            <th className="text-left px-1 py-1">Name</th>
-                            <th className="text-left px-1 py-1">Class</th>
+                            <th className="text-left px-1 py-1">Tên</th>
+                            <th className="text-left px-1 py-1">Phân loại</th>
                             <th className="text-left px-1 py-1">main</th>
                             <th className="text-left px-1 py-1">broll</th>
                             <th className="text-left px-1 py-1">shared</th>

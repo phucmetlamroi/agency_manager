@@ -6,6 +6,7 @@ import { MoreVertical, Play, Send, CheckCircle2, Pause, AlertTriangle, Clock } f
 import * as Popover from '@radix-ui/react-popover'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
+import { taskTypeLabel } from '@/lib/display-labels'
 
 // ─── Status palette aligned với design-system ─────────────────
 // emerald=success, indigo=pending, amber=in-progress, red=urgent
@@ -70,10 +71,10 @@ export default function MobileTaskCard({
     )
 
     const PRIMARY_LABEL: Record<string, string> = {
-        'Đang thực hiện': 'Start',
-        'Revision': 'Submit',
-        'Gửi lại': 'Resubmit',
-        'Hoàn tất': 'Complete',
+        'Đang thực hiện': 'Bắt đầu',
+        'Revision': 'Nộp bài',
+        'Gửi lại': 'Gửi lại',
+        'Hoàn tất': 'Hoàn tất',
     }
 
     const handleCardClick = () => onAction(task)
@@ -112,7 +113,7 @@ export default function MobileTaskCard({
                     <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                             <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">
-                                {task.type || 'TASK'}
+                                {taskTypeLabel(task.type) || 'TASK'}
                             </span>
                             {clientLabel && (
                                 <span className="text-[10px] uppercase font-medium text-indigo-400 tracking-wide truncate">
@@ -132,7 +133,7 @@ export default function MobileTaskCard({
                                 <button
                                     onClick={(e) => e.stopPropagation()}
                                     className="flex-shrink-0 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors"
-                                    aria-label="Quick actions"
+                                    aria-label="Thao tác nhanh"
                                 >
                                     <MoreVertical className="w-4 h-4" />
                                 </button>
@@ -154,7 +155,7 @@ export default function MobileTaskCard({
                                                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors text-left"
                                             >
                                                 <Icon className="w-4 h-4 text-zinc-400" />
-                                                <span>Change to "{nextStatus}"</span>
+                                                <span>Chuyển sang "{nextStatus}"</span>
                                             </button>
                                         )
                                     })}

@@ -4,6 +4,7 @@ import React from 'react'
 import Link from 'next/link' 
 import { usePathname } from 'next/navigation'
 import { Home, ListTodo, Crown, CalendarDays, Wallet, Banknote, Building2, LayoutDashboard, Gift, AlertTriangle, ArrowLeftRight, LogOut, Smartphone } from 'lucide-react'
+import { roleLabel } from '@/lib/display-labels'
 
 export default function DesktopLayoutShell({
     children,
@@ -48,7 +49,7 @@ export default function DesktopLayoutShell({
                                 <Banknote className="w-5 h-5" /> Tài chính
                             </Link>
                             <Link href={`/${workspaceId}/admin/payroll`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${pathname === `/${workspaceId}/admin/payroll` ? 'bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/30' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'}`}>
-                                <Wallet className="w-5 h-5" /> Payroll
+                                <Wallet className="w-5 h-5" /> Bảng lương
                             </Link>
                         </>
                     )}
@@ -57,12 +58,12 @@ export default function DesktopLayoutShell({
                 <nav className="flex-1 flex flex-col gap-2 p-4">
                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-2 mb-2">Workspace</p>
                     <Link href={`/${workspaceId}/dashboard`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${pathname === `/${workspaceId}/dashboard` ? 'bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/30' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'}`}>
-                        <LayoutDashboard className="w-5 h-5" /> Overview
+                        <LayoutDashboard className="w-5 h-5" /> Tổng quan
                     </Link>
                     {user?.role === 'ADMIN' && (
                         <>
                             <Link href={`/${workspaceId}/admin/queue`} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${pathname === `/${workspaceId}/admin/queue` ? 'bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/30' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'}`}>
-                                <Gift className="w-5 h-5" /> Queue
+                                <Gift className="w-5 h-5" /> Hàng chờ task
                             </Link>
                         </>
                     )}
@@ -81,7 +82,7 @@ export default function DesktopLayoutShell({
                         </div>
                         <div>
                             <p className="font-bold text-sm text-zinc-100">{user?.username}</p>
-                            <p className="text-xs text-zinc-500">{user?.role}</p>
+                            <p className="text-xs text-zinc-500">{roleLabel(user?.role)}</p>
 
                         </div>
                     </div>
@@ -104,7 +105,7 @@ export default function DesktopLayoutShell({
                             await toggleMobileView(true)
                         }} className="col-span-2">
                             <button className="w-full flex items-center justify-center gap-2 py-2 bg-white/5 text-zinc-400 text-xs rounded-lg border border-white/5 hover:bg-white/10 hover:text-zinc-200 transition-all duration-300">
-                                <Smartphone className="w-3 h-3" /> Test Mobile View
+                                <Smartphone className="w-3 h-3" /> Thử giao diện điện thoại
                             </button>
                             <div className="text-center text-[10px] text-zinc-600 mt-2 font-mono">v1.3.0</div>
                         </form>

@@ -84,7 +84,7 @@ function SortableSegmentRow({
             <span className="flex-1 text-sm text-zinc-300 font-medium">{segment.label}</span>
 
             <span className="text-xs text-zinc-600 font-mono hidden sm:block truncate max-w-[160px]">
-                {segment.path ? segment.path.replace('[workspaceId]', '...') : 'Chua gan'}
+                {segment.path ? segment.path.replace('[workspaceId]', '...') : 'Chưa gán'}
             </span>
 
             {canRemove && (
@@ -262,8 +262,8 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                         <Settings2 className="w-4 h-4 text-violet-400" />
                                     </div>
                                     <div>
-                                        <h2 className="text-sm font-semibold text-zinc-100">Quick Navigation</h2>
-                                        <p className="text-xs text-zinc-500">6 o radial, o nao chua gan se hien &quot;Trong&quot;</p>
+                                        <h2 className="text-sm font-semibold text-zinc-100">Điều hướng nhanh</h2>
+                                        <p className="text-xs text-zinc-500">6 ô radial, ô nào chưa gán sẽ hiện &quot;Trống&quot;</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -282,7 +282,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                     <div className="flex flex-col overflow-hidden">
                                         <div className="px-4 py-3 border-b border-white/5">
                                             <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                                                Trang co the gan vao slot trong
+                                                Trang có thể gán vào slot trống
                                             </p>
                                         </div>
                                         <div className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar">
@@ -301,7 +301,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                     <div className="flex flex-col overflow-hidden">
                                         <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
                                             <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                                                6 Slot hien tai
+                                                6 slot hiện tại
                                             </p>
                                             <div className="flex items-center gap-1.5">
                                                 <span className={`text-xs font-mono ${atMax ? 'text-amber-400' : 'text-zinc-600'}`}>
@@ -346,7 +346,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
 
                                             {atMax && (
                                                 <p className="text-xs text-amber-400/70 mt-2 px-1">
-                                                    Da dung het 6/6 slot. Go mot slot de gan route khac.
+                                                    Đã dùng hết 6/6 slot. Gỡ một slot để gán route khác.
                                                 </p>
                                             )}
                                         </div>
@@ -361,7 +361,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                         hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
                                 >
                                     <RotateCcw className="w-3.5 h-3.5" />
-                                    Reset ve 6 o Trong
+                                    Đặt lại 6 ô Trống
                                 </button>
 
                                 <div className="flex items-center gap-2">
@@ -370,7 +370,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                         className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400
                                             bg-white/5 border border-white/10 hover:bg-white/8 transition-colors"
                                     >
-                                        Huy
+                                        Huỷ
                                     </button>
                                     <button
                                         onClick={handleSave}
@@ -381,7 +381,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                             flex items-center gap-1.5 transition-all active:scale-95"
                                     >
                                         <Save className="w-3.5 h-3.5" />
-                                        Luu thay doi
+                                        Lưu thay đổi
                                     </button>
                                 </div>
                             </div>

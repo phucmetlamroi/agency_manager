@@ -106,7 +106,7 @@ export default function VeloxRawFootagesModal({
                                 </div>
                                 <div className="min-w-0">
                                     <h3 className="text-[15px] font-extrabold text-white">
-                                        Velox Raw Footages
+                                        Link Raw footage Velox
                                     </h3>
                                     <p className="text-[11px] text-zinc-400 mt-0.5">
                                         {filledCount}/{videoTitles.length} link · chỉ chỉnh sửa được URL của từng video
@@ -117,7 +117,7 @@ export default function VeloxRawFootagesModal({
                                 type="button"
                                 onClick={handleCancel}
                                 className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 hover:text-white transition-colors shrink-0"
-                                aria-label="Cancel"
+                                aria-label="Huỷ"
                             >
                                 <X size={14} />
                             </button>
@@ -143,16 +143,16 @@ export default function VeloxRawFootagesModal({
                                             <tr className="text-[10px] font-bold uppercase text-zinc-500">
                                                 <th className="text-left px-2 py-2 border-b border-white/5 w-[8%]">#</th>
                                                 <th className="text-left px-2 py-2 border-b border-white/5 w-[35%]">
-                                                    Video title
+                                                    Tên video
                                                 </th>
                                                 <th className="text-left px-2 py-2 border-b border-white/5">
-                                                    Raw URL
+                                                    Link raw
                                                 </th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {Array.from({ length: rowCount }).map((_, idx) => {
-                                                const title = videoTitles[idx] ?? `(no title for row ${idx + 1})`
+                                                const title = videoTitles[idx] ?? `(chưa có tên cho dòng ${idx + 1})`
                                                 return (
                                                     <tr
                                                         key={idx}

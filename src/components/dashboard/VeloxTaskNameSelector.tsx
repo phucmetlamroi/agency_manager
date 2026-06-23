@@ -24,9 +24,9 @@ interface Props {
 }
 
 const MODE_LABELS: Record<TaskNameMode, string> = {
-    A: 'A — Base raw',
-    B: 'B — Base + Client prefix',
-    C: 'C — Full body filename',
+    A: 'A — Tên gốc',
+    B: 'B — Tên gốc + tiền tố khách hàng',
+    C: 'C — Tên file body đầy đủ',
 }
 
 export default function VeloxTaskNameSelector({
@@ -50,7 +50,7 @@ export default function VeloxTaskNameSelector({
                     Định dạng tên task (D1)
                 </h4>
                 {selectedMode === defaultMode && (
-                    <span className="text-[10px] text-violet-400 font-semibold">[auto-detect]</span>
+                    <span className="text-[10px] text-violet-400 font-semibold">[tự nhận diện]</span>
                 )}
             </div>
 
@@ -62,7 +62,7 @@ export default function VeloxTaskNameSelector({
                 >
                     {(['A', 'B', 'C'] as TaskNameMode[]).map((m) => (
                         <option key={m} value={m}>
-                            {MODE_LABELS[m]} {m === defaultMode ? '(auto-detect)' : ''}
+                            {MODE_LABELS[m]} {m === defaultMode ? '(tự nhận diện)' : ''}
                         </option>
                     ))}
                 </select>
@@ -73,18 +73,18 @@ export default function VeloxTaskNameSelector({
             </div>
 
             <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase text-zinc-500">Preview</p>
+                <p className="text-[10px] font-bold uppercase text-zinc-500">Xem trước</p>
                 {preview.map((name, i) => (
                     <div
                         key={i}
                         className="text-[11px] text-zinc-300 font-mono px-2 py-1 rounded bg-white/[0.03]"
                     >
-                        {name || '(empty)'}
+                        {name || '(trống)'}
                     </div>
                 ))}
                 {mainItems.length > 3 && (
                     <p className="text-[10px] text-zinc-500 italic">
-                        +{mainItems.length - 3} task khác sẽ được rename theo cùng pattern.
+                        +{mainItems.length - 3} task khác sẽ được đổi tên theo cùng định dạng.
                     </p>
                 )}
             </div>

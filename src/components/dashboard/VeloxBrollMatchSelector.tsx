@@ -28,12 +28,12 @@ interface Props {
 }
 
 const POLICY_LABELS: Record<BrollMatchPolicy, string> = {
-    PENDING_USER_CONFIRM: 'Pick một mode...',
-    BOTH: 'Gộp cả 2 (General + Per-Video)',
-    PERVIDEO_ONLY: 'Chỉ Per-Video',
-    GENERAL_ONLY: 'Chỉ General',
-    CUSTOM: 'Custom per task',
-    NONE: 'Không có B-Roll',
+    PENDING_USER_CONFIRM: 'Chọn một chế độ...',
+    BOTH: 'Gộp cả 2 (Chung + Theo video)',
+    PERVIDEO_ONLY: 'Chỉ theo video',
+    GENERAL_ONLY: 'Chỉ dùng chung',
+    CUSTOM: 'Tuỳ chỉnh từng task',
+    NONE: 'Không có B-roll',
 }
 
 export default function VeloxBrollMatchSelector({
@@ -100,24 +100,24 @@ export default function VeloxBrollMatchSelector({
                         }`}
                     >
                         {isPending
-                            ? 'Phát hiện cả General + Per-Video B-Roll'
-                            : 'B-Roll match policy (D2)'}
+                            ? 'Phát hiện cả B-roll Chung + Theo video'
+                            : 'Cách gắn B-roll (D2)'}
                     </h4>
                     <div className="space-y-1 mb-3 text-[11px]">
                         {broll.generalFolders.length > 0 && (
                             <div className="text-zinc-400">
-                                General: {broll.generalFolders.map((g) => g.name).join(', ')} (
-                                {broll.generalFolders.reduce((s, g) => s + g.fileCount, 0)} files)
+                                Chung: {broll.generalFolders.map((g) => g.name).join(', ')} (
+                                {broll.generalFolders.reduce((s, g) => s + g.fileCount, 0)} file)
                             </div>
                         )}
                         {broll.perVideoFolders.length > 0 && (
                             <div className="text-zinc-400">
-                                Per-Video: {broll.perVideoFolders.map((g) => g.name).join(', ')}
+                                Theo video: {broll.perVideoFolders.map((g) => g.name).join(', ')}
                             </div>
                         )}
                         {broll.looseFiles.length > 0 && (
                             <div className="text-zinc-500 italic">
-                                + {broll.looseFiles.length} loose broll file ở root
+                                + {broll.looseFiles.length} file B-roll lẻ ở thư mục gốc
                             </div>
                         )}
                     </div>
@@ -155,7 +155,7 @@ export default function VeloxBrollMatchSelector({
 
                     {isPending && (
                         <p className="mt-2 text-[10px] text-amber-200/70 italic">
-                            Apply disabled cho đến khi pick.
+                            Chưa thể áp dụng cho đến khi bạn chọn.
                         </p>
                     )}
 
@@ -166,7 +166,7 @@ export default function VeloxBrollMatchSelector({
                             className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-500/15 border border-violet-500/30 text-[11px] text-violet-200 font-semibold hover:bg-violet-500/25"
                         >
                             <Sliders size={11} />
-                            Edit custom mapping
+                            Chỉnh gắn B-roll thủ công
                         </button>
                     )}
                 </div>

@@ -162,7 +162,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                             <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center">
                                 <Tag className="w-3.5 h-3.5 text-indigo-400" strokeWidth={2.5} />
                             </div>
-                            <h3 className="text-sm font-bold text-white tracking-tight">Tag Library</h3>
+                            <h3 className="text-sm font-bold text-white tracking-tight">Thư viện Tag</h3>
                             <span className="text-[10px] text-zinc-500 font-bold bg-zinc-800/50 px-1.5 py-0.5 rounded ml-1">{tags.length}/15</span>
                         </div>
                         <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors group">

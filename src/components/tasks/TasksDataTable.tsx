@@ -97,7 +97,7 @@ export function TasksDataTable<TData, TValue>({
         <div className="w-full">
             <div className="flex items-center py-4 gap-2">
                 <Input
-                    placeholder="Search tasks, clients..."
+                    placeholder="Tìm task, khách hàng..."
                     value={globalFilter ?? ""}
                     onChange={(event) => setGlobalFilter(event.target.value)}
                     className="max-w-sm"
@@ -105,7 +105,7 @@ export function TasksDataTable<TData, TValue>({
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="ml-auto">
-                            <SlidersHorizontal className="mr-2 h-4 w-4" /> View
+                            <SlidersHorizontal className="mr-2 h-4 w-4" /> Hiển thị
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -174,7 +174,7 @@ export function TasksDataTable<TData, TValue>({
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    No results.
+                                    Không có kết quả.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -183,15 +183,15 @@ export function TasksDataTable<TData, TValue>({
             </div>
             <div className="flex items-center justify-end space-x-2 py-4">
                 <div className="flex-1 text-sm text-muted-foreground">
-                    {table.getFilteredSelectedRowModel().rows.length} of{" "}
-                    {table.getFilteredRowModel().rows.length} row(s) selected.
+                    Đã chọn {table.getFilteredSelectedRowModel().rows.length}/{" "}
+                    {table.getFilteredRowModel().rows.length} dòng.
                 </div>
                 <div className="space-x-2">
                     <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-                        Previous
+                        Trước
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-                        Next
+                        Sau
                     </Button>
                 </div>
             </div>

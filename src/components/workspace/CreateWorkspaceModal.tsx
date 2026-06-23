@@ -51,7 +51,7 @@ export default function CreateWorkspaceModal({ open, onClose }: Props) {
                 toast.error(result.error)
             } else if (result.success && result.workspaceId) {
                 const newWsId = result.workspaceId
-                toast.success('Workspace mới đã được tạo! Khách hàng của profile sẽ tự hiển thị sẵn.')
+                toast.success('Workspace mới đã được tạo! Khách hàng của tổ chức sẽ tự hiển thị sẵn.')
                 onClose()
                 setName('')
                 setDescription('')
@@ -137,8 +137,8 @@ export default function CreateWorkspaceModal({ open, onClose }: Props) {
                             {/* Info note */}
                             <div className="bg-violet-500/5 border border-violet-500/10 rounded-xl p-3">
                                 <p className="text-xs text-zinc-400 leading-relaxed">
-                                    Bạn sẽ tự động trở thành <span className="text-violet-400 font-bold">OWNER</span> của workspace mới.
-                                    Khách hàng của profile sẽ <span className="text-violet-400 font-bold">tự hiển thị sẵn</span> — không cần sao chép.
+                                    Bạn sẽ tự động trở thành <span className="text-violet-400 font-bold">Chủ sở hữu</span> của workspace mới.
+                                    Khách hàng của tổ chức sẽ <span className="text-violet-400 font-bold">tự hiển thị sẵn</span> — không cần sao chép.
                                 </p>
                             </div>
 

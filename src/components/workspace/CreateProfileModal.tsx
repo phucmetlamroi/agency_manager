@@ -19,11 +19,11 @@ export default function CreateProfileModal({ open, onClose, onCreated }: Props) 
 
     async function handleCreate() {
         if (!name.trim()) {
-            toast.error('Tên Profile không được để trống')
+            toast.error('Tên Tổ chức không được để trống')
             return
         }
         if (name.trim().length > 50) {
-            toast.error('Tên Profile không được quá 50 ký tự')
+            toast.error('Tên Tổ chức không được quá 50 ký tự')
             return
         }
 
@@ -33,7 +33,7 @@ export default function CreateProfileModal({ open, onClose, onCreated }: Props) 
             if ((result as any).error) {
                 toast.error((result as any).error)
             } else if ((result as any).success && (result as any).profile) {
-                toast.success('Profile mới đã được tạo!')
+                toast.success('Tổ chức mới đã được tạo!')
                 onClose()
                 setName('')
                 if (onCreated) {
@@ -44,7 +44,7 @@ export default function CreateProfileModal({ open, onClose, onCreated }: Props) 
                 }
             }
         } catch (err: any) {
-            toast.error(err?.message || 'Lỗi tạo Profile')
+            toast.error(err?.message || 'Lỗi tạo Tổ chức')
         } finally {
             setCreating(false)
         }
@@ -77,7 +77,7 @@ export default function CreateProfileModal({ open, onClose, onCreated }: Props) 
                                 <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center">
                                     <Users className="w-4 h-4 text-violet-400" strokeWidth={1.5} />
                                 </div>
-                                <h3 className="text-lg font-bold text-zinc-100">Tạo Profile mới</h3>
+                                <h3 className="text-lg font-bold text-zinc-100">Tạo Tổ chức mới</h3>
                             </div>
                             <button
                                 onClick={onClose}
@@ -91,7 +91,7 @@ export default function CreateProfileModal({ open, onClose, onCreated }: Props) 
                         <div className="px-6 pb-6 space-y-4 relative z-10">
                             <div>
                                 <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                                    Tên Profile *
+                                    Tên Tổ chức *
                                 </label>
                                 <input
                                     type="text"
@@ -109,8 +109,8 @@ export default function CreateProfileModal({ open, onClose, onCreated }: Props) 
                             {/* Info note */}
                             <div className="bg-violet-500/5 border border-violet-500/10 rounded-xl p-3">
                                 <p className="text-xs text-zinc-400 leading-relaxed">
-                                    Profile là một <span className="text-violet-400 font-bold">Team</span> độc lập với
-                                    workspaces, members và data riêng. Bạn sẽ là người quản lý đầu tiên của profile.
+                                    Tổ chức là một <span className="text-violet-400 font-bold">team</span> độc lập với
+                                    workspace, thành viên và dữ liệu riêng. Bạn sẽ là người quản lý đầu tiên của tổ chức.
                                 </p>
                             </div>
 
@@ -132,7 +132,7 @@ export default function CreateProfileModal({ open, onClose, onCreated }: Props) 
                                     ) : (
                                         <Plus className="w-4 h-4" />
                                     )}
-                                    Tạo Profile
+                                    Tạo Tổ chức
                                 </button>
                             </div>
                         </div>

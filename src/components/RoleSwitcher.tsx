@@ -1,6 +1,7 @@
 'use client'
 
 import { updateUserRole } from '@/actions/admin-actions'
+import { roleLabel } from '@/lib/display-labels'
 import { useState } from 'react'
 
 export default function RoleSwitcher({ userId, initialRole, workspaceId }: { userId: string, initialRole: string, workspaceId: string }) {
@@ -33,9 +34,9 @@ export default function RoleSwitcher({ userId, initialRole, workspaceId }: { use
                     opacity: loading ? 0.7 : 1
                 }}
             >
-                <option value="USER" style={{ color: 'black' }}>User</option>
-                <option value="ADMIN" style={{ color: 'black' }}>Admin</option>
-                <option value="CLIENT" style={{ color: 'black' }}>Client</option>
+                <option value="USER" style={{ color: 'black' }}>{roleLabel('USER')}</option>
+                <option value="ADMIN" style={{ color: 'black' }}>{roleLabel('ADMIN')}</option>
+                <option value="CLIENT" style={{ color: 'black' }}>{roleLabel('CLIENT')}</option>
             </select>
             {loading && <span style={{ position: 'absolute', right: -20, fontSize: '0.8rem' }}>⌛</span>}
         </div>

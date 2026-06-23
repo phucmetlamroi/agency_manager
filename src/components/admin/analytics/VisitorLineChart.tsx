@@ -37,7 +37,7 @@ export default function VisitorLineChart() {
                     className="p-1 px-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50"
                 >
                     <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-                    Refresh Data
+                    Làm mới dữ liệu
                 </button>
             </div>
             
@@ -83,7 +83,7 @@ export default function VisitorLineChart() {
                     </ResponsiveContainer>
                 ) : (
                     <div className="h-full flex items-center justify-center text-zinc-600 text-xs italic">
-                        {loading ? 'Fetching trends...' : 'No session data available for this period.'}
+                        {loading ? 'Đang tải xu hướng...' : 'Không có dữ liệu phiên cho khoảng thời gian này.'}
                     </div>
                 )}
             </div>

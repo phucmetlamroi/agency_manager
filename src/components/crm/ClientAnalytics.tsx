@@ -91,7 +91,7 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                                 <FolderOpen size={14} /> ID: #{client.id}
                             </span>
                             <span className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 flex items-center gap-1.5">
-                                <Activity size={14} /> Credit: ${(Number(client.depositBalance) || 0).toLocaleString()}
+                                <Activity size={14} /> Số dư: ${(Number(client.depositBalance) || 0).toLocaleString()}
                             </span>
                         </div>
                     </div>
@@ -181,7 +181,7 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                     <h3 className="text-lg font-bold mb-2 text-white flex items-center gap-2">
                         <Activity size={20} className="text-violet-400" /> Phân bổ Công việc
                     </h3>
-                    <p className="text-xs text-gray-400 mb-6">Tỷ trọng tasks theo dự án con</p>
+                    <p className="text-xs text-gray-400 mb-6">Tỷ trọng task theo dự án con</p>
                     
                     {distribution.length > 0 ? (
                         <div className="flex-1 w-full mx-auto relative min-h-[250px]">

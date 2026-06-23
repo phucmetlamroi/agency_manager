@@ -10,6 +10,7 @@ import { renameWorkspaceAction, deleteWorkspaceAction, restoreWorkspaceAction } 
 import { toast } from 'sonner'
 import ConnectorsPanel from '@/components/settings/ConnectorsPanel'
 import PricingRulesPanel from '@/components/settings/PricingRulesPanel'
+import { roleLabel } from '@/lib/display-labels'
 
 type IntegrationRow = {
     provider: string
@@ -79,8 +80,8 @@ export default function WorkspaceSettingsPanel({
 
     const TABS: Array<{ id: TabId; label: string; icon: any }> = [
         { id: 'general', label: 'Tổng quan', icon: Settings },
-        { id: 'connectors', label: 'Connectors', icon: Plug },
-        { id: 'pricing', label: 'Pricing Rules', icon: DollarSign },
+        { id: 'connectors', label: 'Kết nối', icon: Plug },
+        { id: 'pricing', label: 'Bảng giá', icon: DollarSign },
     ]
 
     async function handleRename() {
@@ -272,7 +273,7 @@ export default function WorkspaceSettingsPanel({
                         </div>
                         <div className="bg-zinc-900/30 border border-white/5 rounded-xl p-3">
                             <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Vai trò của bạn</div>
-                            <div className="text-sm font-bold text-indigo-400">{currentUserRole}</div>
+                            <div className="text-sm font-bold text-indigo-400">{roleLabel(currentUserRole)}</div>
                         </div>
                     </div>
                 </div>

@@ -36,7 +36,7 @@ export default async function StaffAnalyticsDetailPage({ params }: { params: Pro
         <div className="h-full flex flex-col p-6 w-full max-w-[1200px] mx-auto space-y-6">
             <Link href={`/${workspaceId}/admin/analytics`} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors w-fit">
                 <ChevronLeft className="w-4 h-4" />
-                <span className="text-sm font-medium">Trở về Analytics</span>
+                <span className="text-sm font-medium">Trở về Phân tích</span>
             </Link>
 
             <StaffErrorDetail 

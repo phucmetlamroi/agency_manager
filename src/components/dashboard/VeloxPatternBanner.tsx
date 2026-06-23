@@ -22,11 +22,11 @@ const PATTERN_META: Record<
     // P0_EMPTY = container-folder diagnosis (no videos in tree, many subfolders).
     // Surfaced in red so the user doesn't mistake "0 task" for "scan worked".
     P0_EMPTY: { icon: FolderX, label: 'Folder rỗng video', tone: 'red' },
-    P1: { icon: Film, label: 'P1 — Flat', tone: 'indigo' },
+    P1: { icon: Film, label: 'P1 — Phẳng', tone: 'indigo' },
     P2: { icon: Film, label: 'P2 — Body + Hooks', tone: 'violet' },
-    P3: { icon: FolderTree, label: 'P3 — Folder Bundles', tone: 'violet' },
-    P4: { icon: Layers, label: 'P4 — A-Roll Triplet', tone: 'emerald' },
-    P5: { icon: Sparkles, label: 'P5 — Hybrid', tone: 'emerald' },
+    P3: { icon: FolderTree, label: 'P3 — Bundle theo folder', tone: 'violet' },
+    P4: { icon: Layers, label: 'P4 — Bộ ba A-Roll', tone: 'emerald' },
+    P5: { icon: Sparkles, label: 'P5 — Kết hợp', tone: 'emerald' },
     P7: { icon: AlertTriangle, label: 'P7 — Hỗn loạn', tone: 'amber' },
 }
 
@@ -95,19 +95,19 @@ function buildPatternMessage(result: ScanResultV3): string {
             // this top line short and actionable.
             return `Đã quét toàn bộ folder nhưng KHÔNG tìm thấy file video. Nhiều khả năng đây là folder cha (Khách / Tháng) — hãy dán link 1 project cụ thể bên trong.`
         case 'P1':
-            return `${itemCount} video file ở root, mỗi file = 1 task.`
+            return `${itemCount} file video ở thư mục gốc, mỗi file = 1 task.`
         case 'P2':
             return pairs > 0
-                ? `${pairs} task pair Body+Hooks. ${broll?.looseFiles.length ?? 0} broll loose detected.`
-                : `${itemCount} root file với clean naming.`
+                ? `${pairs} cặp task Body+Hooks. Phát hiện ${broll?.looseFiles.length ?? 0} file B-roll lẻ.`
+                : `${itemCount} file ở gốc với tên gọn gàng.`
         case 'P3':
-            return `${bundles} bundle folder, mỗi folder = 1 task. Broll folders sẵn sàng gắn.`
+            return `${bundles} folder bundle, mỗi folder = 1 task. Các folder B-roll sẵn sàng gắn.`
         case 'P4':
-            return `${pairs} pair từ output container. A-Roll shared + B-Roll variant detected.`
+            return `${pairs} cặp từ output container. Phát hiện A-Roll dùng chung + biến thể B-Roll.`
         case 'P5':
-            return `${pairs} task pair với A-Roll per-video matched. Shared assets: ${sharedAssets.length}.`
+            return `${pairs} cặp task có A-Roll khớp theo từng video. Tài nguyên dùng chung: ${sharedAssets.length}.`
         case 'P7':
-            return `Cảnh báo: folder hỗn loạn, ≥50% files trông như camera dump (DSC/IMG/DJI/...). Review kỹ trước khi tạo task.`
+            return `Cảnh báo: folder hỗn loạn, ≥50% file trông như ảnh máy ảnh đổ ra (DSC/IMG/DJI/...). Kiểm tra kỹ trước khi tạo task.`
     }
 }
 
@@ -133,7 +133,7 @@ export default function VeloxPatternBanner({ result }: Props) {
                 <div className="flex items-center gap-2 mb-1">
                     <h4 className={`text-sm font-extrabold ${tone.text}`}>{meta.label}</h4>
                     <span className={`text-[10px] font-bold uppercase ${tone.sub}`}>
-                        · Confidence {confidencePct}%
+                        · Độ tin cậy {confidencePct}%
                     </span>
                 </div>
                 <p className={`text-[12px] leading-relaxed ${tone.sub}`}>{message}</p>

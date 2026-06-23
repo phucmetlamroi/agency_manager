@@ -24,6 +24,7 @@ import { parseDuration, formatDuration } from "@/lib/duration-parser"
 import { AssigneeCell } from "./cells/AssigneeCell"
 import { StatusCell } from "./cells/StatusCell"
 import { TitleCell } from "./cells/TitleCell"
+import { taskTypeShort } from "@/lib/display-labels"
 
 // Status dot colors - using Unicode escapes to avoid encoding issues
 const STATUS_DOT: Record<string, string> = {
@@ -59,7 +60,7 @@ export const getColumns = (
                         (table.getIsSomePageRowsSelected() && "indeterminate")
                     }
                     onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-                    aria-label="Select all"
+                    aria-label="Chọn tất cả"
                 />
             ),
             cell: ({ row }) => (
@@ -68,7 +69,7 @@ export const getColumns = (
                     <Checkbox
                         checked={row.getIsSelected()}
                         onCheckedChange={(value) => row.toggleSelected(!!value)}
-                        aria-label="Select row"
+                        aria-label="Chọn dòng"
                     />
                 </div>
             ),
@@ -141,7 +142,7 @@ export const getColumns = (
     if (!isAdmin) {
         cols.push({
             accessorKey: "status",
-            header: "Status",
+            header: "Trạng thái",
             cell: ({ row }) => (
                 <StatusCell task={row.original} isAdmin={isAdmin} workspaceId={workspaceId} />
             ),
@@ -151,7 +152,7 @@ export const getColumns = (
     cols.push(
         {
             accessorKey: "assignee",
-            header: "Assignee",
+            header: "Người làm",
             cell: ({ row }) => (
                 <AssigneeCell
                     task={row.original}
@@ -164,7 +165,7 @@ export const getColumns = (
         },
         {
             accessorKey: "type",
-            header: "Type",
+            header: "Loại",
             cell: ({ row }) => {
                 const type = row.original.type
                 let variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info" = "outline"
@@ -175,7 +176,7 @@ export const getColumns = (
 
                 return (
                      <Badge variant={variant} className="text-[10px] uppercase font-black px-1.5 py-0">
-                        {type === 'Short form' ? 'SHORT' : type === 'Long form' ? 'LONG' : type || 'TASK'}
+                        {taskTypeShort(type) || 'TASK'}
                      </Badge>
                 )
             }
@@ -220,7 +221,7 @@ export const getColumns = (
         },
         {
             accessorKey: "price",
-            header: "Amount",
+            header: "Số tiền",
             cell: ({ row }) => {
                 const val = row.getValue("price") ?? row.original.value ?? 0
                 const amount = Number(val)
@@ -242,20 +243,20 @@ export const getColumns = (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
+                                <span className="sr-only">Mở menu</span>
                                 <MoreHorizontal className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
                             <DropdownMenuItem
                                 onClick={() => navigator.clipboard.writeText(task.id)}
                             >
-                                Copy Task ID
+                                Sao chép Task ID
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => onTaskClick(task)}>
-                                <Pen className="mr-2 h-4 w-4" /> Edit Details
+                                <Pen className="mr-2 h-4 w-4" /> Sửa chi tiết
                             </DropdownMenuItem>
                             {/* Hoàn task — only for MARKET-claimed tasks within 10 minutes */}
                             {(() => {
@@ -288,7 +289,7 @@ export const getColumns = (
                                     className="text-red-500 focus:text-red-500"
                                     onClick={() => onDelete(task.id)}
                                 >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    <Trash2 className="mr-2 h-4 w-4" /> Xoá
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>

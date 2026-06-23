@@ -258,7 +258,7 @@ export function TagRadialMenu({ isOpen, origin, tags, selectedTagIds, onToggle, 
                             <span className={`text-[10px] font-bold text-center leading-tight px-1 transition-colors ${
                                 isSelected || isHovered ? 'text-indigo-100' : hasTag ? 'text-zinc-200' : 'text-zinc-600'
                             }`}>
-                                {tag?.name || 'None'}
+                                {tag?.name || 'Trống'}
                             </span>
                         </button>
                     )

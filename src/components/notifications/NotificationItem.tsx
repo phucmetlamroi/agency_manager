@@ -31,13 +31,13 @@ function formatTime(iso: string) {
     const date = new Date(iso)
     const diff = Date.now() - date.getTime()
     const min = Math.floor(diff / 60000)
-    if (min < 1) return 'just now'
-    if (min < 60) return `${min}m`
+    if (min < 1) return 'vừa xong'
+    if (min < 60) return `${min} phút`
     const hr = Math.floor(min / 60)
-    if (hr < 24) return `${hr}h`
+    if (hr < 24) return `${hr} giờ`
     const day = Math.floor(hr / 24)
-    if (day < 7) return `${day}d`
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    if (day < 7) return `${day} ngày`
+    return date.toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' })
 }
 
 export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, onRequestClose }: Props) {
@@ -190,7 +190,7 @@ export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, o
             <button
                 onClick={handleArchive}
                 className="absolute right-2 bottom-2 opacity-0 group-hover/notif:opacity-100 transition-opacity p-1 rounded-md hover:bg-red-500/15 cursor-pointer bg-transparent border-none"
-                title="Archive"
+                title="Lưu trữ"
             >
                 <Trash2 className="w-3 h-3 text-red-400" />
             </button>

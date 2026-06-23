@@ -45,7 +45,7 @@ export default async function AdminMembersPage({ params }: { params: Promise<{ w
     return (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
             <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>
-                Workspace Members
+                Thành viên Workspace
             </h2>
             <WorkspaceMembersPanel
                 workspaceId={workspaceId}

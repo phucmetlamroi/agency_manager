@@ -59,7 +59,7 @@ export default function ClientSelector({ onSelect, workspaceId }: { onSelect: (i
         onSelect(sId || selectedPartner?.id || null)
     }
 
-    if (loading) return <div className="text-gray-500 text-xs">Loading clients...</div>
+    if (loading) return <div className="text-gray-500 text-xs">Đang tải khách hàng...</div>
 
     return (
         <div className="space-y-4">

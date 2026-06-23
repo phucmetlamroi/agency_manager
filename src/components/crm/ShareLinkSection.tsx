@@ -123,7 +123,7 @@ export default function ShareLinkSection({ clientId, clientName, workspaceId, on
                 </button>
 
                 {/* Existing links */}
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#71717a', marginBottom: 8 }}>Links đã tạo</div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#71717a', marginBottom: 8 }}>Link đã tạo</div>
                 {links === null ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#a1a1aa', fontSize: 13, padding: '10px 0' }}>
                         <Loader2 className="w-4 h-4 animate-spin" /> Đang tải…

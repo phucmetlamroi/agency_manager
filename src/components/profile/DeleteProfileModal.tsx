@@ -29,11 +29,11 @@ export default function DeleteProfileModal({ profileId, profileName, onClose }: 
                 setLoading(false)
                 return
             }
-            toast.success('Profile đã được xóa. Có thể restore trong 30 ngày tại trang Profile Trash.')
+            toast.success('Tổ chức đã được xóa. Có thể khôi phục trong 30 ngày tại trang Thùng rác tổ chức.')
             // Redirect away — profile gone from switcher
             window.location.href = '/welcome'
         } catch {
-            toast.error('Lỗi khi xóa Profile.')
+            toast.error('Lỗi khi xóa Tổ chức.')
             setLoading(false)
         }
     }
@@ -43,7 +43,7 @@ export default function DeleteProfileModal({ profileId, profileName, onClose }: 
             <div className="bg-zinc-950 border border-red-500/30 rounded-2xl shadow-2xl w-full max-w-md">
                 <div className="flex items-center justify-between p-5 border-b border-white/5">
                     <h3 className="text-base font-bold text-red-300 flex items-center gap-2">
-                        <Trash2 size={16} /> Xóa Profile
+                        <Trash2 size={16} /> Xóa Tổ chức
                     </h3>
                     <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-400">
                         <X size={16} />
@@ -54,14 +54,14 @@ export default function DeleteProfileModal({ profileId, profileName, onClose }: 
                         <p className="text-[12px] text-red-200 leading-relaxed flex items-start gap-2">
                             <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                             <span>
-                                <strong>Cảnh báo:</strong> Profile sẽ bị soft-delete và sau <strong>30 ngày</strong> tự động xóa vĩnh viễn cùng tất cả workspaces, tasks, members, files. Trong 30 ngày có thể restore tại trang <strong>Profile Trash</strong>.
+                                <strong>Cảnh báo:</strong> Tổ chức sẽ bị xóa tạm và sau <strong>30 ngày</strong> tự động xóa vĩnh viễn cùng tất cả workspace, task, thành viên, file. Trong 30 ngày có thể khôi phục tại trang <strong>Thùng rác tổ chức</strong>.
                             </span>
                         </p>
                     </div>
 
                     <div>
                         <label className="text-xs text-zinc-400 font-medium pl-1">
-                            Gõ tên Profile "<strong className="text-red-300">{profileName}</strong>" để xác nhận
+                            Gõ tên Tổ chức "<strong className="text-red-300">{profileName}</strong>" để xác nhận
                         </label>
                         <input
                             type="text"
@@ -87,7 +87,7 @@ export default function DeleteProfileModal({ profileId, profileName, onClose }: 
                             className="px-4 py-2 rounded-full bg-red-600 hover:bg-red-500 text-white text-[13px] font-semibold disabled:opacity-50 flex items-center gap-2"
                         >
                             {loading && <Loader2 size={14} className="animate-spin" />}
-                            Xóa Profile
+                            Xóa Tổ chức
                         </button>
                     </div>
                 </div>

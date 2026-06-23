@@ -178,14 +178,14 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
             <div className="relative z-10 px-5 pt-5 pb-2 flex items-start justify-between">
                 <div className="flex flex-col gap-0.5">
                     <h3 className="text-lg font-bold text-white leading-tight tracking-tight">
-                        Rankings
+                        Xếp hạng
                     </h3>
-                    <span className="text-xs text-[#A1A1AA]">This workspace</span>
+                    <span className="text-xs text-[#A1A1AA]">Workspace này</span>
                 </div>
 
                 <div className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-[rgba(139,92,246,0.15)] text-[11px] font-medium text-[#A1A1AA] select-none">
-                        This week
+                        Tuần này
                         <ChevronDown className="w-3 h-3 text-[#A1A1AA]/70" />
                     </span>
                     <RefreshLeaderboardButton isAdmin={isWorkspaceAdmin} />

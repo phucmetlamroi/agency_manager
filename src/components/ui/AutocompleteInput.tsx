@@ -174,7 +174,7 @@ export function AutocompleteInput({
                                 </button>
                             ))
                         ) : (
-                            <div className="px-4 py-3 text-[13px] text-zinc-600">No results found</div>
+                            <div className="px-4 py-3 text-[13px] text-zinc-600">Không có kết quả</div>
                         )}
                     </motion.div>
                 )}

@@ -25,7 +25,7 @@ export function TitleCell({ task, isAdmin, onClick }: TitleCellProps) {
             )}
 
             <div className="flex items-center gap-2">
-                {isLocked && <span className="text-lg" title="Start task to unlock">🔒</span>}
+                {isLocked && <span className="text-lg" title="Bắt đầu task để mở khoá">🔒</span>}
                 <span className="font-semibold text-sm truncate group-hover:text-blue-400 transition-colors">
                     {task.title}
                 </span>
@@ -39,8 +39,8 @@ export function TitleCell({ task, isAdmin, onClick }: TitleCellProps) {
                         const now = new Date().getTime()
                         const percent = (end - start) > 0 ? ((now - start) / (end - start)) * 100 : 100
 
-                        if (percent > 100) return <span className="text-[10px] text-red-500 font-bold">🔥 OVERDUE</span>
-                        if (percent >= 90) return <span className="text-[10px] text-orange-500 font-bold">⚠️ RUSH</span>
+                        if (percent > 100) return <span className="text-[10px] text-red-500 font-bold">🔥 QUÁ HẠN</span>
+                        if (percent >= 90) return <span className="text-[10px] text-orange-500 font-bold">⚠️ GẤP</span>
                         return null
                     })()
                 )}

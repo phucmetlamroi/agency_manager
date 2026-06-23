@@ -108,7 +108,7 @@ export default async function AdminSettingsPage({
     return (
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
             <h2 className="title-gradient" style={{ marginBottom: '2rem' }}>
-                Workspace Settings
+                Cài đặt Workspace
             </h2>
             <WorkspaceSettingsPanel
                 workspaceId={workspaceId}

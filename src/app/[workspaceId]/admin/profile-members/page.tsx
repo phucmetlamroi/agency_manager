@@ -51,7 +51,7 @@ export default async function ProfileMembersPage({ params }: { params: Promise<{
     if (error) {
         return (
             <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-                <h2 className="title-gradient">Profile Members</h2>
+                <h2 className="title-gradient">Thành viên tổ chức</h2>
                 <p style={{ color: '#ef4444', marginTop: 16 }}>{error}</p>
             </div>
         )
@@ -61,7 +61,7 @@ export default async function ProfileMembersPage({ params }: { params: Promise<{
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
             <div style={{ marginBottom: '2rem' }}>
                 <h2 className="title-gradient" style={{ marginBottom: 4 }}>
-                    Profile Members
+                    Thành viên tổ chức
                 </h2>
                 <p style={{ color: '#71717A', fontSize: 13 }}>
                     Quản lý thành viên trong <strong style={{ color: '#A1A1AA' }}>{profile.name}</strong>

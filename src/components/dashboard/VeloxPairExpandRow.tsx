@@ -50,7 +50,7 @@ function PairExpansion({ pair }: { pair: MainItemPair }) {
     return (
         <div className="col-span-full pl-8 pr-3 py-2 bg-violet-500/[0.04] border-l-2 border-violet-500/30 ml-2 my-1 rounded text-[10px] text-zinc-300 space-y-1">
             <p className="text-[10px] font-bold uppercase text-violet-300 mb-1">
-                🎬 Pair: {pair.basePart}
+                🎬 Cặp: {pair.basePart}
             </p>
             {pair.body && (
                 <div className="flex items-center gap-2">
@@ -71,19 +71,19 @@ function PairExpansion({ pair }: { pair: MainItemPair }) {
             {pair.extras.map((e, i) => (
                 <div key={i} className="flex items-center gap-2">
                     <Film size={10} className="text-zinc-500 shrink-0" />
-                    <span className="text-zinc-400">Extra:</span>
+                    <span className="text-zinc-400">Phụ:</span>
                     <span className="truncate flex-1">{e.fullName}</span>
                     <span className="text-zinc-500 shrink-0">{formatBytes(e.sizeBytes)}</span>
                 </div>
             ))}
             {pair.perVideoArollUrl && (
                 <div className="flex items-center gap-2 pt-1 border-t border-white/5 mt-1">
-                    <span className="text-indigo-300">📂 A-Roll per-video matched</span>
+                    <span className="text-indigo-300">📂 Đã khớp A-Roll theo từng video</span>
                 </div>
             )}
             {pair.perVideoBrollUrls && pair.perVideoBrollUrls.length > 0 && (
                 <div className="flex items-center gap-2">
-                    <span className="text-indigo-300">📁 {pair.perVideoBrollUrls.length} per-video broll folder matched</span>
+                    <span className="text-indigo-300">📁 Đã khớp {pair.perVideoBrollUrls.length} folder B-roll theo từng video</span>
                 </div>
             )}
         </div>
@@ -95,7 +95,7 @@ function BundleExpansion({ bundle }: { bundle: MainItemFolderBundle }) {
         <div className="col-span-full pl-8 pr-3 py-2 bg-emerald-500/[0.04] border-l-2 border-emerald-500/30 ml-2 my-1 rounded text-[10px] text-zinc-300 space-y-1">
             <p className="text-[10px] font-bold uppercase text-emerald-300 mb-1">
                 <Layers size={10} className="inline mr-1" />
-                Bundle: {bundle.folder.name} ({bundle.folder.videoFiles.length} files)
+                Bundle: {bundle.folder.name} ({bundle.folder.videoFiles.length} file)
             </p>
             {bundle.folder.videoFiles.slice(0, 6).map((f) => (
                 <div key={f.fileId} className="flex items-center gap-2">
@@ -106,7 +106,7 @@ function BundleExpansion({ bundle }: { bundle: MainItemFolderBundle }) {
             ))}
             {bundle.folder.videoFiles.length > 6 && (
                 <p className="text-zinc-500 italic">
-                    +{bundle.folder.videoFiles.length - 6} files khác trong bundle
+                    +{bundle.folder.videoFiles.length - 6} file khác trong bundle
                 </p>
             )}
         </div>

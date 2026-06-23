@@ -247,7 +247,13 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
                     }
                 }
             } else if (platform === 'linux') {
-                executablePath = '/usr/bin/google-chrome'
+                // [Hosting-portable] Honor an explicit Chromium path first (Railway / Docker /
+                // self-host). Railway+Nixpacks installs the `chromium` apt package at
+                // /usr/bin/chromium — set PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium there.
+                // Otherwise probe the common Linux locations.
+                executablePath = process.env.PUPPETEER_EXECUTABLE_PATH
+                    || ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find((p) => fs.existsSync(p))
+                    || '/usr/bin/google-chrome'
             } else if (platform === 'darwin') {
                 executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
             }

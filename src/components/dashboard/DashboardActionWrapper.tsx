@@ -200,7 +200,10 @@ export default function DashboardActionWrapper({
           jobPriceUSD: parseFloat(data.jobPriceUSD) || 0,
           wageVND: parseFloat(data.editorFee) || 0,
           clientId: v3.common.clientId ?? (data.clientId ? parseInt(data.clientId) : null),
-          assigneeId: v3.common.assigneeId ?? data.assigneeId ?? null,
+          // [Velox blank-assignee fix] Use || (not ??) so an empty-string assignee from
+          // "Leave Blank (Task Pool)" coalesces to null instead of being sent as '' (which
+          // is not a valid User FK and trips Task_assigneeId_fkey). No real assigneeId is falsy.
+          assigneeId: v3.common.assigneeId || data.assigneeId || null,
           deadline: v3.common.deadline ?? data.deadline ?? null,
           rawFootage: encodedResources,
           // [QA R1 fix] Forward the "Collect file" link — was dropped on the V3 batch path.

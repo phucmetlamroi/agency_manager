@@ -11,7 +11,10 @@ import { RadialNavProvider } from '@/components/radial-nav/RadialNavProvider';
 // Variable --font-sans + --font-heading đều trỏ đến cùng family qua className.
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
-  subsets: ["latin"],
+  // [Vietnamese subset] App UI is Vietnamese — without this subset next/font
+  // omits the Vietnamese glyphs and the browser falls back per-glyph, which can
+  // detach tone marks. Ship it so the whole app renders in Plus Jakarta Sans.
+  subsets: ["latin", "vietnamese"],
   weight: ["300", "400", "500", "600", "700", "800"],
 });
 

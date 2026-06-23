@@ -1,0 +1,10 @@
+# Railway / Nixpacks build customization.
+#
+# Only adds system packages to the auto-detected Next.js build plan (install →
+# `next build --webpack` → `next start`). Vercel ignores this file entirely.
+#
+# We install Chromium + base fonts so invoice PDF generation (puppeteer-core in
+# src/lib/invoice-generator.ts) works off-Vercel. After deploy, set the Railway env
+# var  PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium  so the generator finds it.
+[phases.setup]
+aptPkgs = ["chromium", "fonts-liberation"]

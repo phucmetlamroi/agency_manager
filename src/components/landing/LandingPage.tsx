@@ -33,7 +33,7 @@ function setVeloxFinal(app: HTMLElement) {
   if (bt) bt.textContent = 'Xong'
 }
 
-export default function LandingPage() {
+export default function LandingPage({ fontVars = '' }: { fontVars?: string }) {
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -227,7 +227,7 @@ export default function LandingPage() {
   }, [])
 
   return (
-    <div className="htl" ref={rootRef} lang="vi" suppressHydrationWarning>
+    <div className={`htl ${fontVars}`} ref={rootRef} lang="vi" suppressHydrationWarning>
       {/* Add the `js` hook before first paint so reveal targets never flash. */}
       <script
         dangerouslySetInnerHTML={{
@@ -235,13 +235,9 @@ export default function LandingPage() {
             "try{document.currentScript.parentElement.classList.add('js')}catch(e){}",
         }}
       />
-      {/* Fonts — React hoists these to <head>; they ship only on the "/" route. */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Hanken+Grotesk:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap"
-        rel="stylesheet"
-      />
+      {/* Fonts are self-hosted via next/font (declared in app/page.tsx) and
+          applied through the `fontVars` CSS-variable classes on this root —
+          no runtime <link> to fonts.gstatic.com (throttled on many VN nets). */}
 
       {/* Keyboard users land here first; off-screen until focused */}
       <a className="skip-link" href="#top">

@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: '*.public.blob.vercel-storage.com',
+      },
+      {
+        // [Hosting-portable] Supabase Storage public bucket (Railway / self-host).
+        protocol: 'https',
+        hostname: '*.supabase.co',
       }
     ],
   },
@@ -48,8 +53,8 @@ const nextConfig: NextConfig = {
           {
             key: 'Content-Security-Policy',
             value: process.env.ELECTRON_DESKTOP
-              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com images.unsplash.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud; media-src 'self' blob:; frame-src 'self' *.frame.io;"
-              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com images.unsplash.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud; media-src 'self' blob:; frame-src 'self' *.frame.io; upgrade-insecure-requests;"
+              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud; media-src 'self' blob:; frame-src 'self' *.frame.io;"
+              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud; media-src 'self' blob:; frame-src 'self' *.frame.io; upgrade-insecure-requests;"
           },
           {
             key: 'X-Frame-Options',
@@ -78,6 +83,10 @@ const nextConfig: NextConfig = {
 // next-intl webpack alias).
 // [Electron] BotId relies on Vercel Edge — disable in desktop builds.
 const resolvedConfig = withNextIntl(nextConfig) as NextConfig;
-export default process.env.ELECTRON_DESKTOP
+// [Hosting-portable] BotId relies on Vercel Edge — only wrap when actually ON Vercel
+// (process.env.VERCEL is set there). On Railway / self-host / Electron, ship the plain
+// config; the signup path's checkBotId() safely returns isBot=false off-Vercel (the
+// existing rate-limit + disposable-email guards still apply).
+export default (process.env.ELECTRON_DESKTOP || !process.env.VERCEL)
   ? resolvedConfig
   : withBotId(resolvedConfig);

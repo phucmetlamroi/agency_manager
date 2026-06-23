@@ -25,13 +25,16 @@
       content="Hệ điều hành vận hành cho team video ngắn. Velox đọc folder rồi bày sẵn công việc: bảng task, khâu duyệt, lương, phiên chợ, gọn trong một tab. Miễn phí để bắt đầu."
     />
 
-    <!-- Fonts: Fraunces (display), Hanken Grotesk (body), Space Mono (specs) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Hanken+Grotesk:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Fonts: SELF-HOSTED (Fraunces / Hanken Grotesk / Space Mono), incl. the
+         vietnamese subset. Served same-origin from /public/fonts so Vietnamese
+         tone marks never depend on fonts.gstatic.com being reachable — that CDN
+         is throttled on many VN networks, which made the heavy Fraunces file
+         fail to load and headings fall back to a serif that detaches the
+         dấu sắc/huyền on ô ă ê (ố→ô´, ằ→ă`). Preload the two critical faces. -->
+    <link rel="preload" href="/fonts/fraunces-vietnamese-normal-400_600.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/fraunces-latin-normal-400_600.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/hankengrotesk-vietnamese-normal-300_600.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/fonts/fonts.css" />
 
     <!-- Add a hook so CSS can hide reveal targets only when JS is active -->
     <script>

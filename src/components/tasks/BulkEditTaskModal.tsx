@@ -8,6 +8,7 @@ import { X, LayoutGrid, FolderOpen, StickyNote, Workflow, Loader2, AlertTriangle
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { bulkUpdateTaskDetails, bulkUpdateTaskStatus } from "@/actions/bulk-task-actions"
+import { taskTypeLabel } from "@/lib/display-labels"
 import dynamic from "next/dynamic"
 
 const TiptapEditor = dynamic(() => import("@/components/tiptap/TiptapEditor"), { ssr: false })
@@ -150,7 +151,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
             <span
                 className="inline-block w-2 h-2 rounded-full ml-2"
                 style={{ background: '#8B5CF6', boxShadow: '0 0 8px rgba(139,92,246,0.6)' }}
-                title="Đã chỉnh — sẽ apply"
+                title="Đã chỉnh — sẽ áp dụng"
             />
         ) : null
 
@@ -202,7 +203,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h2 className="text-[18px] font-extrabold text-white">
-                                        Bulk Edit
+                                        Sửa hàng loạt
                                     </h2>
                                     <p className="text-[12px] text-zinc-400 mt-0.5">
                                         Đang sửa <strong className="text-violet-300">{selectedTaskIds.length}</strong> task ·{' '}
@@ -216,7 +217,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                 <button
                                     type="button"
                                     onClick={handleClose}
-                                    aria-label="Close"
+                                    aria-label="Đóng"
                                     disabled={saving}
                                     className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.04] hover:bg-white/[0.10] text-zinc-400 hover:text-white transition-colors disabled:opacity-50"
                                 >
@@ -244,10 +245,10 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                         <div className="mx-6 my-3 flex items-center bg-white/[0.04] border border-white/5 rounded-full p-1">
                             {(
                                 [
-                                    { id: 'workflow', label: 'Workflow', icon: Workflow },
-                                    { id: 'main', label: 'Main', icon: LayoutGrid },
-                                    { id: 'assets', label: 'Assets', icon: FolderOpen },
-                                    { id: 'notes', label: 'Notes', icon: StickyNote },
+                                    { id: 'workflow', label: 'Quy trình', icon: Workflow },
+                                    { id: 'main', label: 'Chính', icon: LayoutGrid },
+                                    { id: 'assets', label: 'Tài nguyên', icon: FolderOpen },
+                                    { id: 'notes', label: 'Ghi chú', icon: StickyNote },
                                 ] as const
                             ).map((tab) => {
                                 const isActive = activeTab === tab.id
@@ -293,7 +294,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                     {/* Status */}
                                     <div>
                                         <label className={labelBase}>
-                                            Status
+                                            Trạng thái
                                             {dirtyDot('status')}
                                             {clearWarn('status')}
                                         </label>
@@ -313,14 +314,14 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                             ))}
                                         </select>
                                         <p className="text-[10px] text-zinc-500 mt-1">
-                                            Status thay đổi sẽ trigger digest email tới recipient (1 email/người với danh sách task).
+                                            Đổi trạng thái sẽ gửi email tổng hợp tới người nhận (1 email/người kèm danh sách task).
                                         </p>
                                     </div>
 
                                     {/* Type */}
                                     <div>
                                         <label className={labelBase}>
-                                            Type
+                                            Loại
                                             {dirtyDot('type')}
                                         </label>
                                         <select
@@ -334,7 +335,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                             <option value="">— Giữ nguyên —</option>
                                             {TYPE_OPTIONS.map((t) => (
                                                 <option key={t} value={t}>
-                                                    {t}
+                                                    {taskTypeLabel(t)}
                                                 </option>
                                             ))}
                                         </select>
@@ -343,7 +344,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                     {/* Assignee */}
                                     <div>
                                         <label className={labelBase}>
-                                            Assignee
+                                            Người làm
                                             {dirtyDot('assigneeId')}
                                             {clearWarn('assigneeId')}
                                         </label>
@@ -358,7 +359,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                             className={inputBase}
                                         >
                                             <option value="UNTOUCHED">— Giữ nguyên —</option>
-                                            <option value="NONE">⚠ Bỏ assignee (clear)</option>
+                                            <option value="NONE">⚠ Bỏ người làm</option>
                                             {users.map((u) => (
                                                 <option key={u.id} value={u.id}>
                                                     {u.nickname || u.username}
@@ -375,14 +376,14 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                     {/* Delivery (productLink) */}
                                     <div>
                                         <label className={labelBase}>
-                                            Delivery (productLink)
+                                            Bàn giao (productLink)
                                             {dirtyDot('productLink')}
                                             {clearWarn('productLink')}
                                         </label>
                                         <textarea
                                             value={draft.productLink ?? ''}
                                             onChange={(e) => setField('productLink', e.target.value)}
-                                            placeholder="Để trống = giữ nguyên · Type rồi xóa = clear"
+                                            placeholder="Để trống = giữ nguyên · Gõ rồi xoá = xoá sạch"
                                             rows={2}
                                             className="w-full rounded-xl bg-white/[0.04] border border-violet-500/30 px-3 py-2 text-[13px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-violet-500 resize-none"
                                             onFocus={() => {
@@ -413,7 +414,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className={labelBase}>
-                                                Client ($)
+                                                Khách ($)
                                                 {dirtyDot('jobPriceUSD')}
                                             </label>
                                             <input
@@ -429,7 +430,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                         </div>
                                         <div>
                                             <label className={labelBase}>
-                                                Staff (VND)
+                                                Nhân viên (VND)
                                                 {dirtyDot('value')}
                                             </label>
                                             <input
@@ -452,7 +453,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                 <div className="flex flex-col gap-4">
                                     <div>
                                         <label className={labelBase}>
-                                            Resources (RAW / B-Roll / Script / Submission)
+                                            Tài nguyên (RAW / B-Roll / Kịch bản / Nộp bài)
                                             {dirtyDot('resources')}
                                             {clearWarn('resources')}
                                         </label>
@@ -460,7 +461,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                             type="url"
                                             value={draft.resources ?? ''}
                                             onChange={(e) => setField('resources', e.target.value)}
-                                            placeholder="Paste link..."
+                                            placeholder="Dán link..."
                                             className={inputBase}
                                             onFocus={() => {
                                                 if (!('resources' in draft)) setField('resources', '')
@@ -469,7 +470,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                     </div>
                                     <div>
                                         <label className={labelBase}>
-                                            References
+                                            Tham khảo
                                             {dirtyDot('references')}
                                             {clearWarn('references')}
                                         </label>
@@ -477,7 +478,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                             type="url"
                                             value={draft.references ?? ''}
                                             onChange={(e) => setField('references', e.target.value)}
-                                            placeholder="Paste link..."
+                                            placeholder="Dán link..."
                                             className={inputBase}
                                             onFocus={() => {
                                                 if (!('references' in draft)) setField('references', '')
@@ -486,7 +487,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                     </div>
                                     <div>
                                         <label className={labelBase}>
-                                            Sample Project (collectFilesLink)
+                                            Dự án mẫu (collectFilesLink)
                                             {dirtyDot('collectFilesLink')}
                                             {clearWarn('collectFilesLink')}
                                         </label>
@@ -494,7 +495,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                             type="url"
                                             value={draft.collectFilesLink ?? ''}
                                             onChange={(e) => setField('collectFilesLink', e.target.value)}
-                                            placeholder="Paste link..."
+                                            placeholder="Dán link..."
                                             className={inputBase}
                                             onFocus={() => {
                                                 if (!('collectFilesLink' in draft)) setField('collectFilesLink', '')
@@ -508,7 +509,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                             {activeTab === 'notes' && (
                                 <div>
                                     <label className={labelBase}>
-                                        Notes (rich text)
+                                        Ghi chú (rich text)
                                         {dirtyDot('notes')}
                                         {clearWarn('notes')}
                                     </label>
@@ -572,7 +573,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                             Đang lưu…
                                         </>
                                     ) : (
-                                        `Apply to ${selectedTaskIds.length} task`
+                                        `Áp dụng cho ${selectedTaskIds.length} task`
                                     )}
                                 </button>
                             </div>

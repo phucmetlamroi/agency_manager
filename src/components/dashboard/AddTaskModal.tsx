@@ -25,6 +25,7 @@ import { veloxMapToHookGraph } from "@/lib/velox/hook-graph-convert"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
 import type { VeloxScanResult } from "@/lib/velox/v4-types"
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput"
+import { taskTypeLabel } from "@/lib/display-labels"
 import {
     mapVeloxPayloadToFormData,
     mapPayloadV3ToFormData,
@@ -111,19 +112,19 @@ interface AddTaskModalProps {
 /* ------------------------------------------------------------------ */
 
 const STEPS = [
-    { label: "General Info" },
+    { label: "Thông tin chung" },
     { label: "Video" },
-    { label: "Finance" },
-    { label: "Assets" },
-    { label: "Preview" },
+    { label: "Tài chính" },
+    { label: "Tài nguyên" },
+    { label: "Xem trước" },
 ] as const
 
 const STEP_SUBTITLES = [
-    "Add basic task details",
-    "Add video names for this task",
-    "Define pricing and editor compensation",
-    "Add resource links and notes for the editor",
-    "Review everything before submitting",
+    "Nhập thông tin cơ bản của task",
+    "Nhập tên các video cho task này",
+    "Đặt giá và thù lao cho editor",
+    "Thêm link tài nguyên và ghi chú cho editor",
+    "Kiểm tra lại mọi thứ trước khi gửi",
 ] as const
 
 const TASK_TYPES = ["Short form", "Long form", "Trial"] as const
@@ -945,7 +946,7 @@ export default function AddTaskModal({
                 return (
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-xs text-[#A1A1AA] font-medium pl-1">Client&apos;s name</label>
+                            <label className="text-xs text-[#A1A1AA] font-medium pl-1">Tên khách hàng</label>
                             <VeloxField
                                 filled={veloxFilledFields.has('clientId')}
                                 fieldName="clientId"
@@ -955,13 +956,13 @@ export default function AddTaskModal({
                                     selectedId={form.clientId}
                                     onSelect={(id) => set("clientId", id)}
                                     options={clientOptions}
-                                    placeholder="Search client..."
+                                    placeholder="Tìm khách hàng..."
                                 />
                             </VeloxField>
                         </div>
 
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-xs text-[#A1A1AA] font-medium pl-1">Editor&apos;s name</label>
+                            <label className="text-xs text-[#A1A1AA] font-medium pl-1">Tên editor</label>
                             <VeloxField
                                 filled={veloxFilledFields.has('assigneeId')}
                                 fieldName="assigneeId"
@@ -971,15 +972,15 @@ export default function AddTaskModal({
                                     selectedId={form.assigneeId}
                                     onSelect={(id) => set("assigneeId", id)}
                                     options={userOptions}
-                                    placeholder="Search assignee..."
-                                    emptyLabel="Leave Blank (Task Pool)"
+                                    placeholder="Tìm người làm..."
+                                    emptyLabel="Để trống (Chợ task)"
                                 />
                             </VeloxField>
                         </div>
 
                         <div className="flex gap-3">
                             <div className="flex-1 flex flex-col gap-1.5">
-                                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Task Type</label>
+                                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Loại task</label>
                                 <VeloxField
                                     filled={veloxFilledFields.has('taskType')}
                                     fieldName="taskType"
@@ -991,10 +992,10 @@ export default function AddTaskModal({
                                             value={form.taskType}
                                             onChange={(e) => set("taskType", e.target.value)}
                                         >
-                                            <option value="">Select type...</option>
+                                            <option value="">Chọn loại...</option>
                                             {TASK_TYPES.map((t) => (
                                                 <option key={t} value={t}>
-                                                    {t}
+                                                    {taskTypeLabel(t)}
                                                 </option>
                                             ))}
                                         </select>
@@ -1028,7 +1029,7 @@ export default function AddTaskModal({
                 return (
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-xs text-[#A1A1AA] font-medium pl-1">Video list</label>
+                            <label className="text-xs text-[#A1A1AA] font-medium pl-1">Danh sách video</label>
                             <VeloxField
                                 filled={veloxFilledFields.has('videoList')}
                                 fieldName="videoList"
@@ -1037,7 +1038,7 @@ export default function AddTaskModal({
                             <textarea
                                 className={textareaBase}
                                 style={{ minHeight: 220, ...(videoListLocked ? { opacity: 0.6, cursor: "not-allowed" } : {}) }}
-                                placeholder="Video name (one per line)..."
+                                placeholder="Tên video (mỗi dòng một video)..."
                                 value={form.videoList}
                                 onChange={(e) => set("videoList", e.target.value)}
                                 readOnly={videoListLocked}
@@ -1064,7 +1065,7 @@ export default function AddTaskModal({
                             )}
                         </div>
                         <p className="text-[11px] text-zinc-600 pl-1">
-                            {videoCount} video(s) added
+                            Đã thêm {videoCount} video
                         </p>
                     </div>
                 )
@@ -1075,7 +1076,7 @@ export default function AddTaskModal({
                     <div className="flex flex-col gap-5">
                         <div className="flex gap-3">
                             <div className="flex-1 flex flex-col gap-1.5">
-                                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Task Price (USD)</label>
+                                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Giá task (USD)</label>
                                 <VeloxField
                                     filled={veloxFilledFields.has('jobPriceUSD')}
                                     fieldName="jobPriceUSD"
@@ -1092,7 +1093,7 @@ export default function AddTaskModal({
                             </div>
 
                             <div className="flex-1 flex flex-col gap-1.5">
-                                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Editor Reward (VND)</label>
+                                <label className="text-xs text-[#A1A1AA] font-medium pl-1">Thù lao editor (VND)</label>
                                 <VeloxField
                                     filled={veloxFilledFields.has('editorFee')}
                                     fieldName="editorFee"
@@ -1111,7 +1112,7 @@ export default function AddTaskModal({
 
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between px-1">
-                                <span className="text-xs text-[#A1A1AA] font-medium">Revenue (estimated)</span>
+                                <span className="text-xs text-[#A1A1AA] font-medium">Lợi nhuận (ước tính)</span>
                                 <span
                                     className={`text-[13px] font-bold ${revenueVND >= 0 ? "text-emerald-400" : "text-red-400"
                                         }`}
@@ -1131,7 +1132,7 @@ export default function AddTaskModal({
                                 </span>
                             </div>
                             <p className="text-[11px] text-zinc-600 pl-1">
-                                {revenuePercent.toFixed(0)}% margin &middot; Rate: 1 USD = {USD_TO_VND.toLocaleString()} VND
+                                {revenuePercent.toFixed(0)}% biên lợi nhuận &middot; Tỷ giá: 1 USD = {USD_TO_VND.toLocaleString()} VND
                             </p>
                         </div>
                     </div>
@@ -1213,12 +1214,12 @@ export default function AddTaskModal({
                         <div className="grid grid-cols-2 gap-x-4 gap-y-4">
                             {(
                                 [
-                                    ["rawFootage", "Raw footage", "Paste raw footage link"],
-                                    ["collectFile", "Collect file", "Paste collect file link"],
-                                    ["bRoll", "B-rolls", "Paste B-roll link"],
-                                    ["references", "References", "Paste references link"],
-                                    ["submitFolder", "Submit file", "Paste submit location"],
-                                    ["script", "Scription", "Paste scription"],
+                                    ["rawFootage", "Raw footage", "Dán link raw footage"],
+                                    ["collectFile", "File thu thập", "Dán link file thu thập"],
+                                    ["bRoll", "B-roll", "Dán link B-roll"],
+                                    ["references", "Tham khảo", "Dán link tham khảo"],
+                                    ["submitFolder", "Nơi nộp file", "Dán link nơi nộp file"],
+                                    ["script", "Kịch bản", "Dán link kịch bản"],
                                 ] as const
                             ).map(([key, label, placeholder]) => {
                                 // VeloxField indicator: 'rawFootage' (link footage) hoặc 'script'
@@ -1315,7 +1316,7 @@ export default function AddTaskModal({
 
                         {/* Notes — single TipTap rich-text editor (Figma's centerpiece in Step 4) */}
                         <div className="flex flex-col gap-2">
-                            <label className="text-[14px] text-white font-bold pl-1">Notes</label>
+                            <label className="text-[14px] text-white font-bold pl-1">Ghi chú</label>
                             <VeloxField
                                 filled={veloxFilledFields.has('notes')}
                                 fieldName="notes"
@@ -1336,19 +1337,19 @@ export default function AddTaskModal({
             case 4:
                 return (
                     <div className="flex flex-col gap-3">
-                        <PreviewAccordion title="General information" defaultOpen={false}>
+                        <PreviewAccordion title="Thông tin chung" defaultOpen={false}>
                             <div className="flex flex-col">
-                                <PreviewRow label="Client" value={clientFullName} />
-                                <PreviewRow label="Editor" value={assigneeName || "Unassigned (pool)"} />
-                                <PreviewRow label="Task type" value={form.taskType} />
+                                <PreviewRow label="Khách hàng" value={clientFullName} />
+                                <PreviewRow label="Editor" value={assigneeName || "Chưa giao (chợ task)"} />
+                                <PreviewRow label="Loại task" value={form.taskType ? taskTypeLabel(form.taskType) : ""} />
                                 <PreviewRow label="Deadline" value={formatDeadlinePreview(form.deadline)} />
                             </div>
                         </PreviewAccordion>
 
-                        <PreviewAccordion title={`Video(s) (${String(videoCount).padStart(2, "0")})`} defaultOpen={false}>
+                        <PreviewAccordion title={`Video (${String(videoCount).padStart(2, "0")})`} defaultOpen={false}>
                             <div className="flex flex-col gap-1.5">
                                 {videoCount === 0 ? (
-                                    <span className="text-[13px] text-zinc-600">No videos added</span>
+                                    <span className="text-[13px] text-zinc-600">Chưa thêm video nào</span>
                                 ) : (
                                     form.videoList
                                         .split("\n")
@@ -1369,14 +1370,14 @@ export default function AddTaskModal({
                             </div>
                         </PreviewAccordion>
 
-                        <PreviewAccordion title="Finance" defaultOpen={false}>
+                        <PreviewAccordion title="Tài chính" defaultOpen={false}>
                             <div className="flex flex-col">
                                 <PreviewRow
-                                    label="Task price"
+                                    label="Giá task"
                                     value={form.jobPriceUSD ? `$ ${form.jobPriceUSD}` : ""}
                                 />
                                 <PreviewRow
-                                    label="Editor reward"
+                                    label="Thù lao editor"
                                     value={
                                         form.editorFee
                                             ? `đ ${parseFloat(form.editorFee).toLocaleString("vi-VN")}`
@@ -1384,32 +1385,32 @@ export default function AddTaskModal({
                                     }
                                 />
                                 <PreviewRow
-                                    label="Revenue"
+                                    label="Lợi nhuận"
                                     value={`đ ${revenueVND.toLocaleString("vi-VN")}`}
                                 />
                             </div>
                         </PreviewAccordion>
 
-                        <PreviewAccordion title="Assets" defaultOpen={false}>
+                        <PreviewAccordion title="Tài nguyên" defaultOpen={false}>
                             <div className="flex flex-col">
                                 <PreviewRow label="Raw footage" value={form.rawFootage} />
-                                <PreviewRow label="Collected file" value={form.collectFile} />
-                                <PreviewRow label="B-rolls" value={form.bRoll} />
-                                <PreviewRow label="References" value={form.references} />
-                                <PreviewRow label="Submission" value={form.submitFolder} />
-                                <PreviewRow label="Script" value={form.script} />
+                                <PreviewRow label="File thu thập" value={form.collectFile} />
+                                <PreviewRow label="B-roll" value={form.bRoll} />
+                                <PreviewRow label="Tham khảo" value={form.references} />
+                                <PreviewRow label="Nơi nộp file" value={form.submitFolder} />
+                                <PreviewRow label="Kịch bản" value={form.script} />
                             </div>
                         </PreviewAccordion>
 
                         {/* Notations (rich text preview) */}
-                        <PreviewAccordion title="Notations" defaultOpen={false}>
+                        <PreviewAccordion title="Ghi chú" defaultOpen={false}>
                             {form.notes.trim() ? (
                                 <div
                                     className="text-[13px] text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none"
                                     dangerouslySetInnerHTML={{ __html: form.notes }}
                                 />
                             ) : (
-                                <span className="text-[13px] text-zinc-600">No notes added</span>
+                                <span className="text-[13px] text-zinc-600">Chưa thêm ghi chú</span>
                             )}
                         </PreviewAccordion>
                     </div>
@@ -1459,7 +1460,7 @@ export default function AddTaskModal({
                         </>
                     ) : (
                         <>
-                            {taskLabel} đã vào chợ task chờ (hàng đợi). Bạn có thể giao cho editor bất cứ lúc nào, hoặc để editor tự nhận trong Task Queue.
+                            {taskLabel} đã vào chợ task chờ (hàng đợi). Bạn có thể giao cho editor bất cứ lúc nào, hoặc để editor tự nhận trong Hàng chờ task.
                         </>
                     )}
                 </p>
@@ -1468,7 +1469,7 @@ export default function AddTaskModal({
                     onClick={handleDone}
                     className="mt-2 h-11 px-10 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
                 >
-                    Done
+                    Xong
                 </button>
             </motion.div>
         )
@@ -1528,7 +1529,7 @@ export default function AddTaskModal({
                                                 Velox
                                             </>
                                         ) : (
-                                            <>Step {step + 1}. {stepTitle}:</>
+                                            <>Bước {step + 1}. {stepTitle}:</>
                                         )}
                                     </h2>
                                     <p className="text-xs text-[#A1A1AA] mt-0.5">
@@ -1640,7 +1641,7 @@ export default function AddTaskModal({
                                         }`}
                                 >
                                     <ArrowLeft size={15} />
-                                    Back
+                                    Quay lại
                                 </button>
 
                                 {step < STEPS.length - 1 ? (
@@ -1649,7 +1650,7 @@ export default function AddTaskModal({
                                         onClick={goNext}
                                         className="flex items-center gap-2 h-10 px-6 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
                                     >
-                                        Next
+                                        Tiếp tục
                                         <ArrowRight size={15} />
                                     </button>
                                 ) : (
@@ -1660,7 +1661,7 @@ export default function AddTaskModal({
                                         className="flex items-center gap-2 h-10 px-6 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)] disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Check size={15} />
-                                        {submitting ? "Adding..." : "Add task"}
+                                        {submitting ? "Đang thêm..." : "Tạo task"}
                                     </button>
                                 )}
                             </div>

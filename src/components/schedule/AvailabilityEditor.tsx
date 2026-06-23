@@ -145,7 +145,7 @@ export default function AvailabilityEditor({ workspaceId, dateKey, initialSchedu
             </div>
 
             <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Legend</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Chú thích</span>
                 <div className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.35)] ${STATUS_DOT.FREE}`} />
                     <span>{STATUS_LABEL.FREE}</span>
@@ -188,7 +188,7 @@ export default function AvailabilityEditor({ workspaceId, dateKey, initialSchedu
                                 onMouseEnter={() => handleMouseEnter(index)}
                                 onMouseLeave={() => setHoverIndex(null)}
                                 className={`h-12 border-b border-r border-zinc-800 select-none ${STATUS_CLASS[status]} ${locked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${isCurrent ? 'ring-1 ring-white/10 shadow-[0_0_14px_rgba(255,255,255,0.18)]' : ''} ${isDragging && isHovering ? 'shadow-[0_0_18px_rgba(255,255,255,0.22)]' : ''}`}
-                                title={`${index}:00 â€¢ ${STATUS_LABEL[status]}`}
+                                title={`${index}:00 • ${STATUS_LABEL[status]}`}
                             />
                         )
                     })}

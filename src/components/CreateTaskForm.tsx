@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createTask } from '@/actions/admin-actions'
 import { Copy } from 'lucide-react'
 import { toast } from 'sonner'
+import { taskTypeLabel } from '@/lib/display-labels'
 
 type User = {
     id: string
@@ -137,7 +138,7 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
                     </div>
                 </div>
                 <div>
-                    <label style={{ fontSize: '0.8rem', color: '#888' }}>Thù lao Staff (VND)</label>
+                    <label style={{ fontSize: '0.8rem', color: '#888' }}>Thù lao nhân viên (VND)</label>
                     <div style={{ position: 'relative' }}>
                         <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#fbbf24' }}>₫</span>
                         <input
@@ -175,9 +176,9 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
                     <label style={{ fontSize: '0.8rem', color: '#888' }}>Loại Task</label>
                     <select name="type" required
                         style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}>
-                        <option value="Short form">Short form</option>
-                        <option value="Long form">Long form</option>
-                        <option value="Trial">Trial</option>
+                        <option value="Short form">{taskTypeLabel('Short form')}</option>
+                        <option value="Long form">{taskTypeLabel('Long form')}</option>
+                        <option value="Trial">{taskTypeLabel('Trial')}</option>
                     </select>
                 </div>
                 <div>
@@ -188,7 +189,7 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
             </div>
 
             <div>
-                <label style={{ fontSize: '0.8rem', color: '#888' }}>Resources (Raw/B-roll Link)</label>
+                <label style={{ fontSize: '0.8rem', color: '#888' }}>Tài nguyên (link Raw/B-roll)</label>
                 <input name="resources" placeholder="Link folder..."
                     style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }} />
             </div>
@@ -200,7 +201,7 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
             </div>
 
             <div>
-                <label style={{ fontSize: '0.8rem', color: '#888' }}>References (Sample Video)</label>
+                <label style={{ fontSize: '0.8rem', color: '#888' }}>Video tham khảo (mẫu)</label>
                 <input name="references" placeholder="Link video mẫu..."
                     style={{ width: '100%', padding: '0.5rem', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }} />
             </div>

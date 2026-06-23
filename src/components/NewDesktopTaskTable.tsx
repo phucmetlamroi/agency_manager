@@ -13,6 +13,7 @@ import { StatusCell } from './tasks/cells/StatusCell'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { parseDuration, formatDuration } from '@/lib/duration-parser'
 import { returnTask } from '@/actions/claim-actions'
+import { taskTypeShort } from '@/lib/display-labels'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -57,13 +58,13 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-    { id: 'all',      label: 'All Tasks',       statuses: null,                                              color: '#A5B4FC' },
-    { id: 'progress', label: 'In Progress',     statuses: ['Đang thực hiện'],                                     color: '#EAB308' },
-    { id: 'review',   label: 'Revise',           statuses: ['Revision', 'Sửa frame', 'Gửi lại'],              color: '#F97316' },
+    { id: 'all',      label: 'Tất cả task',     statuses: null,                                              color: '#A5B4FC' },
+    { id: 'progress', label: 'Đang làm',        statuses: ['Đang thực hiện'],                                     color: '#EAB308' },
+    { id: 'review',   label: 'Sửa lại',          statuses: ['Revision', 'Sửa frame', 'Gửi lại'],              color: '#F97316' },
     // Tab "Quá hạn" mới: task bị cron auto-set status='Quá hạn' khi deadline qua.
     // Trước đây không có tab dedicated → admin khó phát hiện task overdue assignee.
     { id: 'overdue',  label: 'Quá hạn',         statuses: ['Quá hạn'],                                            color: '#DC2626' },
-    { id: 'done',     label: 'Completed',        statuses: ['Hoàn tất'],                                   color: '#10B981' },
+    { id: 'done',     label: 'Hoàn tất',        statuses: ['Hoàn tất'],                                   color: '#10B981' },
 ]
 
 const PER_PAGE = 8
@@ -158,17 +159,17 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
 
     // ─── Delete handlers ────────────────────────────────
     const handleDelete = async (id: string) => {
-        if (await confirm({ title: 'Delete Task', message: 'Are you sure you want to delete this task?', type: 'danger' })) {
+        if (await confirm({ title: 'Xoá task', message: 'Bạn có chắc muốn xoá task này không?', type: 'danger' })) {
             await deleteTask(id, workspaceId)
-            toast.success('Task deleted')
+            toast.success('Đã xoá task')
             window.location.reload()
         }
     }
 
     const handleBulkDelete = async () => {
         if (await confirm({
-            title: `Delete ${selectedIds.length} Tasks`,
-            message: `Are you sure you want to delete ${selectedIds.length} selected tasks? This cannot be undone.`,
+            title: `Xoá ${selectedIds.length} task`,
+            message: `Bạn có chắc muốn xoá ${selectedIds.length} task đã chọn không? Hành động này không thể hoàn tác.`,
             type: 'danger'
         })) {
             const { bulkDeleteTasks } = await import('@/actions/bulk-task-actions')
@@ -176,7 +177,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
             if (res.error) {
                 toast.error(res.error)
             } else {
-                toast.success(`Deleted ${res.count} tasks`)
+                toast.success(`Đã xoá ${res.count} task`)
                 setRowSelection({})
                 window.location.reload()
             }
@@ -206,10 +207,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
     const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#71717A' }
     const getTypeInfo = (type: string) => TYPE_COLORS[type] || TYPE_DEFAULT
     const getTypeLabel = (type: string) => {
-        if (type === 'Short form') return 'SHORT'
-        if (type === 'Long form') return 'LONG'
-        if (type === 'Trial') return 'TRIAL'
-        return type || 'TASK'
+        return taskTypeShort(type) || 'TASK'
     }
 
     const getDeadlineColor = (deadline: Date | null, status: string) => {
@@ -223,7 +221,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
     }
 
     const formatDeadline = (deadline: Date | null) => {
-        if (!deadline) return 'No Limit'
+        if (!deadline) return 'Không hạn'
         const d = new Date(deadline)
         const date = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
         const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
@@ -289,7 +287,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                     }}
                 >
                     <span className="text-white font-bold text-xs">
-                        {selectedIds.length} tasks selected
+                        Đã chọn {selectedIds.length} task
                     </span>
                     <div className="flex gap-2">
                         {isAdmin && (
@@ -307,7 +305,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                     cursor: 'pointer',
                                 }}
                             >
-                                Delete Selected
+                                Xoá mục đã chọn
                             </button>
                         )}
                     </div>
@@ -339,7 +337,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 fontFamily: "'Plus Jakarta Sans', sans-serif",
                             }}
                         >
-                            Edit selected ({selectedIds.length})
+                            Sửa mục đã chọn ({selectedIds.length})
                         </button>
                         <button
                             type="button"
@@ -373,7 +371,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                     <input
                         value={search}
                         onChange={e => { setSearch(e.target.value); setPage(1) }}
-                        placeholder="Search tasks, clients..."
+                        placeholder="Tìm task, khách hàng..."
                         className="flex-1"
                         style={{
                             background: 'transparent',
@@ -399,7 +397,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                     }}
                 >
                     <Filter style={{ width: 13, height: 13 }} />
-                    View
+                    Lọc
                 </button>
             </div>
 
@@ -438,7 +436,9 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                             )}
                         </button>
                     </div>
-                    {(['Task', 'Status', 'Assignee', 'Type', 'Deadline', 'Amount', ''] as const).map(h => (
+                    {(['Task', 'Status', 'Assignee', 'Type', 'Deadline', 'Amount', ''] as const).map(h => {
+                        const headerLabels: Record<string, string> = { Task: 'Task', Status: 'Trạng thái', Assignee: 'Người làm', Type: 'Loại', Deadline: 'Deadline', Amount: 'Số tiền' }
+                        return (
                         <span
                             key={h || 'actions'}
                             onClick={() => {
@@ -455,12 +455,13 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 letterSpacing: '0.08em',
                             }}
                         >
-                            {h}
+                            {headerLabels[h] ?? h}
                             {sortField === 'title' && h === 'Task' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                             {sortField === 'deadline' && h === 'Deadline' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                             {sortField === 'price' && h === 'Amount' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                         </span>
-                    ))}
+                        )
+                    })}
                 </div>
 
                 {/* Rows */}
@@ -558,7 +559,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 </div>
                                 <div className="flex items-center flex-wrap" style={{ gap: 4, marginTop: 3 }}>
                                     {isOverdue && (
-                                        <span style={{ fontSize: 8, fontWeight: 700, color: '#EF4444' }}>OVERDUE</span>
+                                        <span style={{ fontSize: 8, fontWeight: 700, color: '#EF4444' }}>QUÁ HẠN</span>
                                     )}
                                     {claimSource === 'MARKET' && (
                                         <span style={{
@@ -679,13 +680,13 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                         </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                        <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
                                         <DropdownMenuItem onClick={() => navigator.clipboard.writeText(task.id)}>
-                                            Copy Task ID
+                                            Sao chép ID task
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem onClick={() => handleTaskClick(task)}>
-                                            <Pen className="mr-2 h-4 w-4" /> Edit Details
+                                            <Pen className="mr-2 h-4 w-4" /> Sửa chi tiết
                                         </DropdownMenuItem>
                                         {/* Return task for MARKET claims */}
                                         {(() => {
@@ -704,12 +705,12 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                                         const res = await returnTask(task.id, workspaceId)
                                                         if (res.error) toast.error(res.error)
                                                         else {
-                                                            toast.success('Task returned')
+                                                            toast.success('Đã trả lại task')
                                                             window.location.reload()
                                                         }
                                                     }}
                                                 >
-                                                    <Undo2 className="mr-2 h-4 w-4" /> Return Task
+                                                    <Undo2 className="mr-2 h-4 w-4" /> Trả lại task
                                                 </DropdownMenuItem>
                                             )
                                         })()}
@@ -718,7 +719,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                                 className="text-red-500 focus:text-red-500"
                                                 onClick={() => handleDelete(task.id)}
                                             >
-                                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                <Trash2 className="mr-2 h-4 w-4" /> Xoá
                                             </DropdownMenuItem>
                                         )}
                                     </DropdownMenuContent>
@@ -753,7 +754,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                             }}
                         >
                             <ChevronLeft style={{ width: 12, height: 12 }} />
-                            Back
+                            Trước
                         </button>
 
                         {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
@@ -789,7 +790,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 cursor: page === totalPages ? 'default' : 'pointer',
                             }}
                         >
-                            Next
+                            Sau
                             <ChevronRight style={{ width: 12, height: 12 }} />
                         </button>
                     </div>

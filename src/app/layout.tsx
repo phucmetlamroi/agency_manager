@@ -43,7 +43,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={plusJakarta.variable} suppressHydrationWarning>
+    <html lang="vi" className={plusJakarta.variable} suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
         <ConfirmProvider>
           <RadialNavProvider>

@@ -73,7 +73,7 @@ export default function CrossTeamManager({ userId, currentProfileId, profiles, a
                         const targetProfile = profiles.find(p => p.id === a.profileId)
                         return (
                             <div key={a.id} className="flex items-center gap-1 bg-purple-900/40 text-purple-300 text-[10px] px-2 py-0.5 rounded border border-purple-500/30">
-                                <span>{targetProfile?.name || 'Unknown Team'}</span>
+                                <span>{targetProfile?.name || 'Team không xác định'}</span>
                                 <button onClick={() => handleRemove(a.profileId, targetProfile?.name || '')} className="text-gray-400 hover:text-red-400">
                                     <X className="w-3 h-3" />
                                 </button>
@@ -91,7 +91,7 @@ export default function CrossTeamManager({ userId, currentProfileId, profiles, a
                         return (
                             <div key={r.id} className="flex items-center gap-1 bg-yellow-900/30 text-yellow-400/80 text-[10px] px-2 py-0.5 rounded border border-yellow-500/30 italic" title="Đang chờ duyệt">
                                 <Clock className="w-3 h-3" />
-                                <span>{targetProfile?.name || 'Unknown Team'}</span>
+                                <span>{targetProfile?.name || 'Team không xác định'}</span>
                                 <button onClick={() => handleRemove(r.targetProfileId, targetProfile?.name || '')} className="text-gray-400 hover:text-red-400 ml-1" title="Hủy yêu cầu">
                                     <X className="w-3 h-3" />
                                 </button>

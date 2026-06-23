@@ -92,7 +92,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                                 <>
                                     <Image
                                         src={user.paymentQrUrl}
-                                        alt="QR Payment"
+                                        alt="Mã QR thanh toán"
                                         fill
                                         className="object-contain p-4"
                                     />
@@ -137,7 +137,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                                 className="w-full py-3 bg-gradient-to-r from-[#8B5CF6] to-[#A855F7] text-white font-bold rounded-xl shadow-lg shadow-violet-500/30 hover:scale-[1.02] hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                             >
                                 {loading ? (
-                                    'Processing...'
+                                    'Đang xử lý...'
                                 ) : (
                                     <>
                                         <Check className="w-5 h-5" />

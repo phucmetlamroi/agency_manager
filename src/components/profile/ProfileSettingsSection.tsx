@@ -37,7 +37,7 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
             if ('error' in result && result.error) {
                 toast.error(result.error)
             } else {
-                toast.success('Đã cập nhật tên Profile.')
+                toast.success('Đã cập nhật tên Tổ chức.')
                 router.refresh()
             }
         } finally {
@@ -71,7 +71,7 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
             {/* Header */}
             <div className="p-4 border-b border-white/5">
                 <h3 className="text-sm font-bold text-zinc-200 flex items-center gap-2">
-                    <Settings size={14} /> Profile Settings
+                    <Settings size={14} /> Cài đặt Tổ chức
                 </h3>
             </div>
 
@@ -136,7 +136,7 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
 
                 {/* Name */}
                 <div>
-                    <label className="text-xs text-zinc-400 font-medium pl-1 block mb-2">Tên Profile</label>
+                    <label className="text-xs text-zinc-400 font-medium pl-1 block mb-2">Tên Tổ chức</label>
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -160,16 +160,16 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
             {/* Danger Zone */}
             <div className="p-4 border-t border-red-500/15 bg-red-500/[0.03]">
                 <h4 className="text-[11px] font-bold text-red-300 uppercase tracking-wide flex items-center gap-1.5">
-                    <Trash2 size={11} /> Danger Zone
+                    <Trash2 size={11} /> Vùng nguy hiểm
                 </h4>
                 <p className="text-[12px] text-zinc-400 mt-1.5">
-                    Xóa Profile sẽ làm tất cả workspaces + tasks + members bị xóa <strong className="text-red-300">vĩnh viễn sau 30 ngày</strong>. Trong 30 ngày bạn có thể restore từ trang Profile Trash.
+                    Xóa Tổ chức sẽ làm tất cả workspace + task + thành viên bị xóa <strong className="text-red-300">vĩnh viễn sau 30 ngày</strong>. Trong 30 ngày bạn có thể khôi phục từ trang Thùng rác tổ chức.
                 </p>
                 <button
                     onClick={() => setShowDeleteModal(true)}
                     className="mt-3 px-4 py-2 rounded-full bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/20 text-[12px] font-semibold flex items-center gap-1.5"
                 >
-                    <Trash2 size={12} /> Xóa Profile
+                    <Trash2 size={12} /> Xóa Tổ chức
                 </button>
             </div>
 

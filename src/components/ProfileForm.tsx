@@ -133,8 +133,8 @@ export default function ProfileForm({ user }: { user: any }) {
             >
                 <form action={handleUpdateInfo} id="profile-form">
                     <div className="grid gap-4 md:grid-cols-2">
-                        <GlassInput id="username" label="Username" icon={AtSign} value={user.username} disabled />
-                        <GlassInput id="nickname" name="nickname" label="Nickname (Tên hiển thị)" icon={User} defaultValue={user.nickname || ''} placeholder="Nhập tên hiển thị..." />
+                        <GlassInput id="username" label="Tên đăng nhập" icon={AtSign} value={user.username} disabled />
+                        <GlassInput id="nickname" name="nickname" label="Tên hiển thị" icon={User} defaultValue={user.nickname || ''} placeholder="Nhập tên hiển thị..." />
                         <GlassInput id="email" name="email" label="Email" icon={Mail} type="email" defaultValue={user.email || ''} placeholder="email@example.com" />
                         <GlassInput id="phoneNumber" name="phoneNumber" label="Số điện thoại" icon={Phone} type="tel" defaultValue={user.phoneNumber || ''} placeholder="0912 345 678" />
                     </div>

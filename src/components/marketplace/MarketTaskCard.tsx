@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { useDraggable } from '@dnd-kit/core'
 import { Calendar, Banknote, Timer, GripVertical, ArrowUpRight } from 'lucide-react'
 import { formatDuration, durationToSeconds } from '@/lib/duration-parser'
+import { taskTypeShort } from '@/lib/display-labels'
 
 export type MarketTask = {
     id: string
@@ -87,7 +88,7 @@ function CardBody({ task, style, isOverlay = false }: {
                         {task.title}
                     </h3>
                     <span className={`shrink-0 px-2.5 py-1 bg-gradient-to-r ${style.accent} text-white text-[9px] font-black rounded-lg uppercase tracking-wider shadow-md ${style.glow}`}>
-                        {style.label}
+                        {taskTypeShort(task.type) || style.label}
                     </span>
                 </div>
 

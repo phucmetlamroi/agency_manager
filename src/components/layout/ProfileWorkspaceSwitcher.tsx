@@ -176,7 +176,7 @@ export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewR
                         className="text-[11px] font-bold truncate"
                         style={{ color: MUTED_LIGHT, fontFamily: FONT }}
                     >
-                        {currentProfile?.name || "Profile"}
+                        {currentProfile?.name || "Tổ chức"}
                     </div>
                     <div
                         className="text-[13px] font-semibold truncate"

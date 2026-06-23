@@ -33,7 +33,7 @@ export default function DynamicDashboardGrid({ initialData }: { initialData?: an
         { i: 'traffic_chart', x: 0, y: 6, w: 12, h: 5, minW: 6 },
     ]
 
-    if (!mounted) return <div className="p-12 text-center text-zinc-500 animate-pulse">Loading Workspace Analytics...</div>
+    if (!mounted) return <div className="p-12 text-center text-zinc-500 animate-pulse">Đang tải Phân tích Workspace...</div>
 
     return (
         <div ref={containerRef} className="w-full min-h-[1000px] overflow-hidden">
@@ -48,7 +48,7 @@ export default function DynamicDashboardGrid({ initialData }: { initialData?: an
             >
                 <div key="presence_board" className="bg-zinc-900 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl">
                     <div className="drag-handle bg-zinc-800/50 p-3 px-5 border-b border-white/5 flex items-center justify-between cursor-move">
-                        <h3 className="text-sm font-semibold text-white">Who's Online Now?</h3>
+                        <h3 className="text-sm font-semibold text-white">Ai đang online?</h3>
                     </div>
                     <div className="flex-1 min-h-0">
                         <LivePresenceBoard />
@@ -57,7 +57,7 @@ export default function DynamicDashboardGrid({ initialData }: { initialData?: an
 
                 <div key="traffic_chart" className="bg-zinc-900 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl">
                     <div className="drag-handle bg-zinc-800/50 p-3 px-5 border-b border-white/5 flex items-center justify-between cursor-move">
-                        <h3 className="text-sm font-semibold text-white">Daily Traffic Overview</h3>
+                        <h3 className="text-sm font-semibold text-white">Tổng quan lưu lượng theo ngày</h3>
                     </div>
                     <div className="flex-1 p-4 min-h-0">
                         <VisitorLineChart />

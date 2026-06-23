@@ -86,7 +86,7 @@ export default function CreateClientButton({ partners, workspaceId }: { partners
                         />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="parent" className="text-gray-300">Là con của (Optional)</Label>
+                        <Label htmlFor="parent" className="text-gray-300">Là con của (không bắt buộc)</Label>
                         <Select onValueChange={setParentId} value={parentId}>
                             <SelectTrigger className="w-full bg-[#2a2a2a] border-gray-700 text-white">
                                 <SelectValue placeholder="-- Chọn Partner (Nếu là Brand con) --" />

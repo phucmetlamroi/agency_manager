@@ -16,10 +16,10 @@ interface Props {
     tasks: DeadlineTask[]
 }
 
-const WEEKDAYS_EN = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] as const
+const WEEKDAYS_EN = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"] as const
 const MONTHS_EN = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+    "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12",
 ]
 
 const NP = {
@@ -151,7 +151,7 @@ export default function WidgetUpcomingDeadlines({ tasks }: Props) {
                 <div className="flex flex-col gap-0.5">
                     <h3 className="text-lg font-bold text-white leading-tight tracking-tight flex items-center gap-1.5">
                         <CalendarIcon className="w-4 h-4" style={{ color: NP.accent }} />
-                        Upcoming Deadlines
+                        Deadline sắp tới
                     </h3>
                     <span className="text-xs" style={{ color: NP.textSecondary }}>
                         {MONTHS_EN[cursor.month]} {cursor.year}
@@ -161,7 +161,7 @@ export default function WidgetUpcomingDeadlines({ tasks }: Props) {
                     <button
                         type="button"
                         onClick={goPrev}
-                        aria-label="Previous month"
+                        aria-label="Tháng trước"
                         className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
                         style={{ background: "transparent", border: `1px solid ${NP.border}`, color: NP.textSecondary }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = "#211B31" }}
@@ -172,7 +172,7 @@ export default function WidgetUpcomingDeadlines({ tasks }: Props) {
                     <button
                         type="button"
                         onClick={goNext}
-                        aria-label="Next month"
+                        aria-label="Tháng sau"
                         className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
                         style={{ background: "transparent", border: `1px solid ${NP.border}`, color: NP.textSecondary }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = "#211B31" }}

@@ -79,7 +79,7 @@ export default function VeloxBriefBanner({
                                         className="flex items-center gap-1 text-[10px] text-indigo-300 hover:text-indigo-200 shrink-0"
                                     >
                                         <ExternalLink size={10} />
-                                        Open
+                                        Mở
                                     </a>
                                 </li>
                             ))}
@@ -92,7 +92,7 @@ export default function VeloxBriefBanner({
                                 className="w-3.5 h-3.5 rounded border-white/20 bg-zinc-900 text-indigo-500"
                             />
                             <span className="text-[11px] text-indigo-200">
-                                Auto-append URL vào notes mọi task (D4)
+                                Tự thêm URL vào ghi chú của mọi task (D4)
                             </span>
                         </label>
                     </>
@@ -117,13 +117,13 @@ export default function VeloxBriefBanner({
                                         className="flex items-center gap-1 text-[10px] text-indigo-300 hover:text-indigo-200 shrink-0"
                                     >
                                         <ExternalLink size={10} />
-                                        Open
+                                        Mở
                                     </a>
                                 </li>
                             ))}
                         </ul>
                         <p className="text-[10px] text-indigo-300/70 italic">
-                            Sẽ tự fill vào field <strong>Scription</strong> ở Step 4 Assets.
+                            Sẽ tự điền vào ô <strong>Kịch bản</strong> ở Bước 4 Tài nguyên.
                         </p>
                     </div>
                 )}

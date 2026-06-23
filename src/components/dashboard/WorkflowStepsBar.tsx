@@ -4,10 +4,10 @@ import { motion } from "framer-motion"
 import { CheckCircle2 } from "lucide-react"
 
 const STEPS = [
-    { key: "assignee", label: "Assignee", desc: "Giao việc" },
-    { key: "progress", label: "In Progress", desc: "Đang làm" },
-    { key: "revise",   label: "Revise",     desc: "Chỉnh sửa" },
-    { key: "complete", label: "Complete",   desc: "Hoàn tất" },
+    { key: "assignee", label: "Được giao", desc: "Giao việc" },
+    { key: "progress", label: "Đang làm", desc: "Đang làm" },
+    { key: "revise",   label: "Cần sửa",     desc: "Chỉnh sửa" },
+    { key: "complete", label: "Hoàn tất",   desc: "Hoàn tất" },
 ]
 
 interface Props {

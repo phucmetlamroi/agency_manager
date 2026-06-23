@@ -16,6 +16,7 @@ import { TaskWithUser } from '@/types/admin'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
+import { taskTypeLabel } from '@/lib/display-labels'
 
 
 const statusColors: Record<string, string> = {
@@ -184,7 +185,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
             setIsEditing(false)
             toast.success('\u0110\u00e3 c\u1eadp nh\u1eadt chi ti\u1ebft task')
         } else {
-            toast.error('Failed to update')
+            toast.error('C\u1eadp nh\u1eadt th\u1ea5t b\u1ea1i')
         }
     }
 
@@ -226,7 +227,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                         const val = e.target.value
                                         if (!val) return
                                         if (val === 'Revision') {
-                                            toast.info("Bulk Revision requires individual feedback for better quality control. Please use the task row buttons.")
+                                            toast.info("Chuyển hàng loạt sang Revision cần feedback riêng cho từng task để kiểm soát chất lượng. Vui lòng dùng nút trên từng dòng task.")
                                             return
                                         }
                                         handleStatusChange(selectedIds[0], val)
@@ -331,7 +332,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                             <span className="absolute -left-8 top-1 text-xl" title="Locked until Started">🔒</span>
                                         )}
                                         <span className="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 mt-1 md:mt-0">
-                                            {task.type || 'Review'}
+                                            {taskTypeLabel(task.type) || 'Task'}
                                         </span>
                                         <h4 className="font-semibold text-lg leading-tight text-white mb-0 break-words w-full">
                                             {task.title}
@@ -348,7 +349,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                             <span className={new Date() > new Date(task.deadline) && task.status !== 'Ho\u00e0n t\u1ea5t' ? 'text-red-400 font-bold' : 'text-gray-300'}>
                                                 {new Date(task.deadline).toLocaleDateString('vi-VN')} {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                             </span>
-                                        ) : <span className="italic text-gray-600">No Deadline</span>}
+                                        ) : <span className="italic text-gray-600">Kh\u00f4ng c\u00f3 deadline</span>}
                                     </div>
 
                                     {/* Mobile-Optimized Status/Assignee info */}
@@ -422,19 +423,19 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                         )}
                                         {task.status === '\u0110ang th\u1ef1c hi\u1ec7n' && (
                                             <span className="px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-500 text-xs font-bold border border-yellow-500/30 flex items-center gap-2">
-                                                <span className="animate-pulse">\u25cf</span> Working...
+                                                <span className="animate-pulse">\u25cf</span> \u0110ang l\u00e0m...
                                             </span>
                                         )}
                                         {/* [Sprint A] 'Review' \u0111\u00e3 b\u1ecf \u2014 submit gi\u1edd \u0111i th\u1eb3ng Revision */}
                                         {(task.status === 'T\u1ea1m ng\u01b0ng' || task.status === 'S\u1eeda frame' || task.status === '\u0110ang \u0111\u1ee3i giao' || task.status === 'Revision' || task.status === 'Qu\u00e1 h\u1ea1n') && (
                                             <span className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 text-xs italic border border-gray-700">
-                                                \u23f3 Waiting...
+                                                \u23f3 \u0110ang ch\u1edd...
                                             </span>
                                         )}
                                         {task.status === 'Ho\u00e0n t\u1ea5t' && (
                                             <div className="flex flex-col gap-1 items-end">
                                                 <span className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/30">
-                                                    \ud83c\udfc6 Done
+                                                    \ud83c\udfc6 Xong
                                                 </span>
                                             </div>
                                         )}
@@ -499,7 +500,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                         </div >
                     )
                 })}
-                {tasks.length === 0 && <p className="text-gray-500 italic text-center py-8">No tasks found.</p>}
+                {tasks.length === 0 && <p className="text-gray-500 italic text-center py-8">Không có task nào.</p>}
             </div >
 
             {/* MODAL */}
@@ -538,7 +539,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                         fontWeight: 600
                                     }}
                                 >
-                                    {isEditing ? 'Cancel' : (isAdmin ? 'Edit All' : 'Nộp bài / Ghi chú')}
+                                    {isEditing ? 'Huỷ' : (isAdmin ? 'Sửa tất cả' : 'Nộp bài / Ghi chú')}
                                 </button>
                             )}
                             <button onClick={() => setSelectedTask(null)}
@@ -557,7 +558,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                 fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px',
                                 color: '#8b5cf6'
                             }}>
-                                PROJECT DETAILS
+                                CHI TIẾT DỰ ÁN
                             </span>
                             <h2 style={{ fontSize: '1.5rem', marginTop: '0.5rem', fontWeight: '800', lineHeight: 1.2 }}>
                                 {selectedTask.title}
@@ -602,7 +603,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                                     className="px-3 bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold text-xs transition-colors"
                                                     title="Hủy bỏ"
                                                 >
-                                                    ✕ Cancel
+                                                    ✕ Huỷ
                                                 </button>
                                             )}
                                         </div>
@@ -619,7 +620,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                                     onClick={() => setIsEditingLink(true)}
                                                     className="text-gray-400 hover:text-blue-500 underline"
                                                 >
-                                                    Sửa link (Edit)
+                                                    Sửa link
                                                 </button>
                                             </div>
                                         </div>
@@ -630,14 +631,14 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                             {/* RESOURCES SECTION */}
                             <div className="p-3 rounded-xl border border-gray-100">
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                                    RESOURCES (RAW / B-ROLL / COLLECT FILES)
+                                    TÀI NGUYÊN (RAW / B-ROLL / COLLECT FILES)
                                 </label>
                                 {isEditing && isAdmin ? (
                                     <div className="flex flex-col gap-2">
                                         <input
                                             value={editForm.linkRaw}
                                             onChange={(e) => setEditForm({ ...editForm, linkRaw: e.target.value })}
-                                            placeholder="Link RAW (Source)..."
+                                            placeholder="Link RAW (file gốc)..."
                                             className="w-full p-2 border border-gray-200 rounded text-sm text-black"
                                         />
                                         <input
@@ -680,7 +681,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                             } else if (resString) {
                                                 return (
                                                     <a href={formatLink(resString)} target="_blank" className="text-blue-600 font-semibold hover:underline">
-                                                        📂 Open Resource Folder ↗
+                                                        📂 Mở thư mục tài nguyên ↗
                                                     </a>
                                                 )
                                             }
@@ -695,7 +696,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                         ) : null}
 
                                         {!selectedTask.resources && !selectedTask.fileLink && !selectedTask.collectFilesLink && (
-                                            <span className="text-gray-400 italic">No resources linked.</span>
+                                            <span className="text-gray-400 italic">Chưa gắn tài nguyên nào.</span>
                                         )}
                                     </div>
                                 )}
@@ -705,7 +706,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                             {isAdmin && (
                                 <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 mt-2">
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#374151', marginBottom: '0.5rem' }}>
-                                        💵 FINANCIALS (Edit)
+                                        💵 TÀI CHÍNH
                                     </label>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -725,7 +726,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="text-xs text-gray-500 block mb-1">Lương Staff (VND)</label>
+                                            <label className="text-xs text-gray-500 block mb-1">Thù lao nhân viên (VND)</label>
                                             <div className="relative">
                                                 <span className="absolute left-2 top-1.5 text-yellow-600 font-bold">₫</span>
                                                 {isEditing ? (
@@ -748,7 +749,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                             {/* REFERENCES */}
                             <div className="p-3 rounded-xl border border-gray-100">
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                                    REFERENCES / SAMPLES
+                                    VIDEO THAM KHẢO / MẪU
                                 </label>
                                 {isEditing && isAdmin ? (
                                     <input
@@ -760,9 +761,9 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                 ) : (
                                     selectedTask.references ? (
                                         <a href={formatLink(selectedTask.references)} target="_blank" className="text-purple-600 font-semibold hover:underline">
-                                            📺 Watch Reference Video ↗
+                                            📺 Xem video tham khảo ↗
                                         </a>
-                                    ) : <span className="text-gray-400 italic">No references provided.</span>
+                                    ) : <span className="text-gray-400 italic">Chưa có video tham khảo.</span>
                                 )}
                             </div>
 
@@ -784,20 +785,20 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                             {/* NOTES */}
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                                    NOTES / INSTRUCTIONS
+                                    GHI CHÚ / HƯỚNG DẪN
                                 </label>
                                 {isEditing ? (
                                     <textarea
                                         value={editForm.notes_vi}
                                         onChange={(e) => setEditForm({ ...editForm, notes_vi: e.target.value })}
-                                        placeholder="Enter notes..."
+                                        placeholder="Nhập ghi chú..."
                                         rows={4}
                                         disabled={!isAdmin} // Users can edit notes if needed? Maybe better restricted to Admin for instructions.
                                         style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px', fontFamily: 'inherit' }}
                                     />
                                 ) : (
                                     <div style={{ background: '#fffbeb', padding: '1rem', borderRadius: '12px', color: '#92400e', fontSize: '0.95rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                                        {selectedTask.notes_vi || "No specific instructions."}
+                                        {selectedTask.notes_vi || "Không có hướng dẫn cụ thể."}
                                     </div>
                                 )}
                             </div>
@@ -810,13 +811,13 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                 className="btn btn-primary"
                                 style={{ background: '#000', color: 'white', alignSelf: 'center', width: '100%', borderRadius: '12px' }}
                             >
-                                Save Changes
+                                Lưu thay đổi
                             </button>
                         )}
 
                         {!isEditing && isAdmin && (
                             <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #eee', fontSize: '0.8rem', color: '#666', textAlign: 'center' }}>
-                                Value: <span className="font-bold text-green-600">{selectedTask.value.toLocaleString()} đ</span>
+                                Số tiền: <span className="font-bold text-green-600">{selectedTask.value.toLocaleString()} đ</span>
                             </div>
                         )}
 

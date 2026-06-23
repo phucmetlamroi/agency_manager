@@ -47,6 +47,7 @@ export default function ShareLayout({ children }: { children: ReactNode }) {
         <>
             <meta name="referrer" content="no-referrer" />
             <div
+                lang="en"
                 className={`portal-calm ${fraunces.variable} ${hanken.variable}`}
                 style={{ height: '100vh', width: '100%', overflow: 'hidden' }}
             >

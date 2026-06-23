@@ -41,7 +41,7 @@ export function KPIStats({ tasks }: KPIStatsProps) {
             <Card decoration="top" decorationColor="indigo" className="glass-panel border-none ring-0 bg-transparent p-6">
                 <Flex justifyContent="start" alignItems="baseline" className="space-x-1">
                     <Metric className="text-white text-3xl font-bold">{totalTasks}</Metric>
-                    <Text className="text-tremor-content-subtle">Total Tasks</Text>
+                    <Text className="text-tremor-content-subtle">Tổng số task</Text>
                 </Flex>
                 <NoSSR>
                     <AreaChart
@@ -64,10 +64,10 @@ export function KPIStats({ tasks }: KPIStatsProps) {
             <Card decoration="top" decorationColor="fuchsia" className="glass-panel border-none ring-0 bg-transparent p-6">
                 <Flex justifyContent="start" alignItems="baseline" className="space-x-1">
                     <Metric className="text-white text-3xl font-bold">{completionRate}%</Metric>
-                    <Text className="text-tremor-content-subtle">Completion Rate</Text>
+                    <Text className="text-tremor-content-subtle">Tỷ lệ hoàn tất</Text>
                 </Flex>
                 <Flex className="mt-4">
-                    <Text className="text-emerald-400">+{Math.floor(Math.random() * 20)}% from last week</Text>
+                    <Text className="text-emerald-400">+{Math.floor(Math.random() * 20)}% so với tuần trước</Text>
                 </Flex>
             </Card>
 

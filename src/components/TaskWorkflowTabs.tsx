@@ -14,6 +14,7 @@ import { StatusCell } from './tasks/cells/StatusCell'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { parseDuration, formatDuration } from '@/lib/duration-parser'
 import { returnTask } from '@/actions/claim-actions'
+import { taskTypeLabel } from '@/lib/display-labels'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -61,13 +62,13 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-    { id: 'all',      label: 'Assignee',        statuses: ['Nhận task', 'Đã nhận task', 'Tạm ngưng'],                    color: '#8B5CF6', targetStatus: null },
-    { id: 'progress', label: 'Progress',        statuses: ['Đang thực hiện'],                                     color: '#EAB308', targetStatus: 'Đang thực hiện' },
-    { id: 'review',   label: 'Revise',           statuses: ['Revision', 'Sửa frame', 'Gửi lại'],              color: '#F97316', targetStatus: 'Revision' },
+    { id: 'all',      label: 'Chưa giao',       statuses: ['Nhận task', 'Đã nhận task', 'Tạm ngưng'],                    color: '#8B5CF6', targetStatus: null },
+    { id: 'progress', label: 'Đang làm',        statuses: ['Đang thực hiện'],                                     color: '#EAB308', targetStatus: 'Đang thực hiện' },
+    { id: 'review',   label: 'Sửa lại',          statuses: ['Revision', 'Sửa frame', 'Gửi lại'],              color: '#F97316', targetStatus: 'Revision' },
     // Tab "Quá hạn" mới: task bị cron tự động set status='Quá hạn' khi deadline
     // qua. Trước đây không có tab này → task overdue bị "thất lạc" khỏi UI.
     { id: 'overdue',  label: 'Quá hạn',         statuses: ['Quá hạn'],                                            color: '#DC2626', targetStatus: 'Quá hạn' },
-    { id: 'done',     label: 'Complete',         statuses: ['Hoàn tất'],                                   color: '#10B981', targetStatus: 'Hoàn tất' },
+    { id: 'done',     label: 'Hoàn tất',        statuses: ['Hoàn tất'],                                   color: '#10B981', targetStatus: 'Hoàn tất' },
 ]
 
 const PER_PAGE = 8
@@ -184,24 +185,24 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
 
     // ─── Delete handlers ────────────────────────────────
     const handleDelete = async (id: string) => {
-        if (await confirm({ title: 'Delete Task', message: 'Are you sure?', type: 'danger' })) {
+        if (await confirm({ title: 'Xoá task', message: 'Bạn có chắc không?', type: 'danger' })) {
             await deleteTask(id, workspaceId)
-            toast.success('Task deleted')
+            toast.success('Đã xoá task')
             window.location.reload()
         }
     }
 
     const handleBulkDelete = async () => {
         if (await confirm({
-            title: `Delete ${selectedIds.length} Tasks`,
-            message: `Delete ${selectedIds.length} selected tasks? Cannot be undone.`,
+            title: `Xoá ${selectedIds.length} task`,
+            message: `Xoá ${selectedIds.length} task đã chọn? Không thể hoàn tác.`,
             type: 'danger'
         })) {
             const { bulkDeleteTasks } = await import('@/actions/bulk-task-actions')
             const res = await bulkDeleteTasks(selectedIds, workspaceId)
             if (res.error) toast.error(res.error)
             else {
-                toast.success(`Deleted ${res.count} tasks`)
+                toast.success(`Đã xoá ${res.count} task`)
                 setRowSelection({})
                 window.location.reload()
             }
@@ -271,7 +272,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
         })
 
         if (actualIds.length === 0) {
-            toast.info('Tasks already in this status')
+            toast.info('Các task đã ở trạng thái này rồi')
             return
         }
 
@@ -281,7 +282,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                 const res = await updateTaskStatus(actualIds[0], targetTab.targetStatus, workspaceId)
                 if (res.error) toast.error(res.error)
                 else {
-                    toast.success(`Task moved to ${targetTab.label}`)
+                    toast.success(`Đã chuyển task sang ${targetTab.label}`)
                     setRowSelection({})
                     router.refresh()
                 }
@@ -290,13 +291,13 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                 const res = await bulkUpdateStatus(actualIds, targetTab.targetStatus, workspaceId)
                 if (res.error) toast.error(res.error)
                 else {
-                    toast.success(`${res.count} tasks moved to ${targetTab.label}`)
+                    toast.success(`Đã chuyển ${res.count} task sang ${targetTab.label}`)
                     setRowSelection({})
                     router.refresh()
                 }
             }
         } catch {
-            toast.error('Failed to update status')
+            toast.error('Cập nhật trạng thái thất bại')
         }
     }, [tasks, workspaceId, router])
 
@@ -304,10 +305,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
     const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#71717A' }
     const getTypeInfo = (type: string) => TYPE_COLORS[type] || TYPE_DEFAULT
     const getTypeLabel = (type: string) => {
-        if (type === 'Short form') return 'Short form'
-        if (type === 'Long form') return 'Long form'
-        if (type === 'Trial') return 'Trial'
-        return type || 'Task'
+        return taskTypeLabel(type) || 'Task'
     }
 
     const getDeadlineColor = (deadline: Date | null, status: string) => {
@@ -321,7 +319,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
     }
 
     const formatDeadline = (deadline: Date | null) => {
-        if (!deadline) return 'No Limit'
+        if (!deadline) return 'Không hạn'
         const d = new Date(deadline)
         return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
     }
@@ -393,7 +391,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                     className="text-center text-xs animate-pulse py-1"
                     style={{ color: NP.accent, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                 >
-                    Drag to a tab above to change status
+                    Kéo lên một tab phía trên để đổi trạng thái
                 </div>
             )}
 
@@ -409,7 +407,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                     }}
                 >
                     <span style={{ color: NP.textPrimary, fontWeight: 700, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                        {selectedIds.length} tasks selected {isAdmin ? '- drag to change status' : ''}
+                        Đã chọn {selectedIds.length} task {isAdmin ? '- kéo để đổi trạng thái' : ''}
                     </span>
                     <div className="flex gap-2">
                         {isAdmin && (
@@ -428,7 +426,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                     cursor: 'pointer',
                                 }}
                             >
-                                Delete Selected
+                                Xoá mục đã chọn
                             </button>
                         )}
                     </div>
@@ -460,7 +458,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                 fontFamily: "'Plus Jakarta Sans', sans-serif",
                             }}
                         >
-                            Edit selected ({selectedIds.length})
+                            Sửa mục đã chọn ({selectedIds.length})
                         </button>
                         <button
                             type="button"
@@ -494,7 +492,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                     <input
                         value={search}
                         onChange={e => { setSearch(e.target.value); setPage(1) }}
-                        placeholder="Search tasks..."
+                        placeholder="Tìm task..."
                         className="flex-1"
                         style={{
                             background: 'transparent',
@@ -521,7 +519,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                         cursor: 'pointer',
                     }}
                 >
-                    View
+                    Lọc
                     <Filter style={{ width: 14, height: 14 }} />
                 </button>
             </div>
@@ -561,7 +559,9 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                             )}
                         </button>
                     </div>
-                    {(['Task Name', 'Status', 'Assignee', 'Type', 'Deadline', 'Amount', ''] as const).map(h => (
+                    {(['Task Name', 'Status', 'Assignee', 'Type', 'Deadline', 'Amount', ''] as const).map(h => {
+                        const headerLabels: Record<string, string> = { 'Task Name': 'Tên task', Status: 'Trạng thái', Assignee: 'Người làm', Type: 'Loại', Deadline: 'Deadline', Amount: 'Số tiền' }
+                        return (
                         <span
                             key={h || 'actions'}
                             onClick={() => {
@@ -588,12 +588,13 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                 }
                             }}
                         >
-                            {h}
+                            {headerLabels[h] ?? h}
                             {sortField === 'title' && h === 'Task Name' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                             {sortField === 'deadline' && h === 'Deadline' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                             {sortField === 'price' && h === 'Amount' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                         </span>
-                    ))}
+                        )
+                    })}
                 </div>
 
                 {/* Rows */}
@@ -709,7 +710,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                             fontSize: 9, fontWeight: 700,
                                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                                             color: '#EF4444',
-                                        }}>OVERDUE</span>
+                                        }}>QUÁ HẠN</span>
                                     )}
                                     {claimSource === 'MARKET' && (
                                         <span style={{
@@ -861,13 +862,13 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                         </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                        <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
                                         <DropdownMenuItem onClick={() => navigator.clipboard.writeText(task.id)}>
-                                            Copy Task ID
+                                            Sao chép ID task
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem onClick={() => handleTaskClick(task)}>
-                                            <Pen className="mr-2 h-4 w-4" /> Edit Details
+                                            <Pen className="mr-2 h-4 w-4" /> Sửa chi tiết
                                         </DropdownMenuItem>
                                         {/* Return task for MARKET claims */}
                                         {(() => {
@@ -885,12 +886,12 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                                         const res = await returnTask(task.id, workspaceId)
                                                         if (res.error) toast.error(res.error)
                                                         else {
-                                                            toast.success('Task returned')
+                                                            toast.success('Đã trả lại task')
                                                             window.location.reload()
                                                         }
                                                     }}
                                                 >
-                                                    <Undo2 className="mr-2 h-4 w-4" /> Return Task
+                                                    <Undo2 className="mr-2 h-4 w-4" /> Trả lại task
                                                 </DropdownMenuItem>
                                             )
                                         })()}
@@ -899,7 +900,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                                 className="text-red-500 focus:text-red-500"
                                                 onClick={() => handleDelete(task.id)}
                                             >
-                                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                <Trash2 className="mr-2 h-4 w-4" /> Xoá
                                             </DropdownMenuItem>
                                         )}
                                     </DropdownMenuContent>
@@ -936,7 +937,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                             }}
                         >
                             <ChevronLeft style={{ width: 14, height: 14 }} />
-                            Back
+                            Trước
                         </button>
 
                         {/* Page numbers */}
@@ -979,7 +980,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                 opacity: page === totalPages ? 0.5 : 1,
                             }}
                         >
-                            Next
+                            Sau
                             <ChevronRight style={{ width: 14, height: 14 }} />
                         </button>
                     </div>

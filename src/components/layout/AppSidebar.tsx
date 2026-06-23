@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { roleLabel } from "@/lib/display-labels"
 import { Button } from "@/components/ui/button"
 import {
     LayoutDashboard,
@@ -76,24 +77,24 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
     // non-admin click → admin layout redirects back to /dashboard automatically.
     // [Sprint F.5] Hiệu suất entry removed entirely (page + actions deleted).
     const allItems: NavItem[] = [
-        { label: "Dashboard", href: viewRole === 'USER' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`, icon: LayoutDashboard, roles: ['ADMIN', 'USER'] },
-        { label: "Task Queue", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'] },
+        { label: "Tổng quan", href: viewRole === 'USER' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`, icon: LayoutDashboard, roles: ['ADMIN', 'USER'] },
+        { label: "Hàng chờ task", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'] },
         // [CM merge] "Clients Manager" đã gộp vào Dashboard → bỏ khỏi sidebar.
-        { label: "Schedule", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
-        { label: "My Errors", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },
-        { label: "Profile", href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, roles: ['USER'] },
-        { label: "Payroll", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN', 'USER'] },
-        { label: "Finance", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN', 'USER'] },
-        { label: "Members", href: `/${workspaceId}/admin/members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
+        { label: "Lịch", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
+        { label: "Lỗi của tôi", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },
+        { label: "Hồ sơ", href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, roles: ['USER'] },
+        { label: "Bảng lương", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN', 'USER'] },
+        { label: "Tài chính", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN', 'USER'] },
+        { label: "Thành viên", href: `/${workspaceId}/admin/members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
         // [Sprint Z] Profile-level member management — Owner/Admin only (page-level guard)
-        { label: "Profile Members", href: `/${workspaceId}/admin/profile-members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
+        { label: "Thành viên tổ chức", href: `/${workspaceId}/admin/profile-members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
         // [Sprint Z+1] Profile Trash — Owner only (page-level guard)
-        { label: "Profile Trash", href: `/${workspaceId}/admin/profile-trash`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
-        { label: "Analytics", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN', 'USER'] },
-        { label: "Audit Log", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText, roles: ['ADMIN', 'USER'] },
-        { label: "Settings", href: `/${workspaceId}/admin/settings`, icon: Settings, roles: ['ADMIN', 'USER'] },
+        { label: "Thùng rác tổ chức", href: `/${workspaceId}/admin/profile-trash`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
+        { label: "Phân tích", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN', 'USER'] },
+        { label: "Nhật ký hoạt động", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText, roles: ['ADMIN', 'USER'] },
+        { label: "Cài đặt", href: `/${workspaceId}/admin/settings`, icon: Settings, roles: ['ADMIN', 'USER'] },
         // [User Dashboard Redesign D.7] Help & Feedback — placeholder mailto link
-        { label: "Help & Feedback", href: "mailto:support@hustlytasker.xyz", icon: LifeBuoy, roles: ['USER'], external: true },
+        { label: "Trợ giúp & Góp ý", href: "mailto:support@hustlytasker.xyz", icon: LifeBuoy, roles: ['USER'], external: true },
     ]
     return allItems.filter(item => item.roles.includes(viewRole))
 }
@@ -201,7 +202,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                     style={{ filter: "drop-shadow(0 0 10px rgba(139,92,246,0.4))" }}
                                 />
                                 <span className="text-[9px] uppercase font-mono tracking-[0.18em] ml-auto" style={{ color: INACTIVE_TEXT }}>
-                                    {viewRole === 'ADMIN' ? 'Admin' : 'User'} &middot; v2.4
+                                    {viewRole === 'ADMIN' ? 'Quản trị' : 'Nhân viên'} &middot; v2.4
                                 </span>
                             </div>
 
@@ -256,7 +257,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                         }}
                                     >
                                         <ArrowRightLeft className="w-[20px] h-[20px] flex-shrink-0" />
-                                        <span className="flex-1">Switch to {otherViewRole === 'ADMIN' ? 'Admin' : 'User'} View</span>
+                                        <span className="flex-1">Chuyển sang chế độ {otherViewRole === 'ADMIN' ? 'Quản trị' : 'Nhân viên'}</span>
                                     </Link>
                                 )}
                             </nav>
@@ -277,7 +278,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-[13px] font-bold text-white truncate" style={{ fontFamily: FONT }}>{user.username}</div>
-                                    <div className="text-[11px] font-medium uppercase tracking-[0.08em]" style={{ color: INACTIVE_TEXT, fontFamily: FONT }}>{user.role}</div>
+                                    <div className="text-[11px] font-medium uppercase tracking-[0.08em]" style={{ color: INACTIVE_TEXT, fontFamily: FONT }}>{roleLabel(user.role)}</div>
                                 </div>
                             </div>
                         </div>
@@ -333,7 +334,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 className="text-[9px] uppercase font-mono tracking-[0.18em] whitespace-nowrap ml-auto"
                                 style={{ color: INACTIVE_TEXT, fontFamily: FONT }}
                             >
-                                {viewRole === 'ADMIN' ? 'Admin' : 'User'} &middot; v2.4
+                                {viewRole === 'ADMIN' ? 'Quản trị' : 'Nhân viên'} &middot; v2.4
                             </span>
                         </div>
                     )}
@@ -487,7 +488,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 {!collapsed && (
                                     <div className="flex-1 min-w-0 text-left">
                                         <div className="text-[13px] font-bold text-white truncate" style={{ fontFamily: FONT }}>{user.username}</div>
-                                        <div className="text-[11px] font-medium uppercase tracking-[0.08em]" style={{ color: INACTIVE_TEXT, fontFamily: FONT }}>{user.role}</div>
+                                        <div className="text-[11px] font-medium uppercase tracking-[0.08em]" style={{ color: INACTIVE_TEXT, fontFamily: FONT }}>{roleLabel(user.role)}</div>
                                     </div>
                                 )}
                             </button>
@@ -511,24 +512,24 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                             <DropdownMenuSeparator style={{ background: DIVIDER }} />
                             <DropdownMenuItem onClick={() => window.location.href = `/${workspaceId}/dashboard/profile`}>
                                 <UserCircle className="mr-2 h-4 w-4" />
-                                <span>Profile</span>
+                                <span>Hồ sơ</span>
                             </DropdownMenuItem>
                             {user.isTreasurer && (
                                 <DropdownMenuItem onClick={() => window.location.href = `/${workspaceId}/admin/finance`}>
                                     <Wallet className="mr-2 h-4 w-4" />
-                                    <span>Finance Portal</span>
+                                    <span>Cổng tài chính</span>
                                 </DropdownMenuItem>
                             )}
                             {isAdminUser && (
                                 <DropdownMenuItem onClick={() => window.location.href = switchRoleHref}>
                                     <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                    <span>Switch to {otherViewRole === 'ADMIN' ? 'Admin' : 'User'} View</span>
+                                    <span>Chuyển sang chế độ {otherViewRole === 'ADMIN' ? 'Quản trị' : 'Nhân viên'}</span>
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator style={{ background: DIVIDER }} />
                             <DropdownMenuItem className="text-red-500 focus:text-red-500" onClick={() => window.location.href = '/api/auth/logout'}>
                                 <LogOut className="mr-2 h-4 w-4" />
-                                <span>Log out</span>
+                                <span>Đăng xuất</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

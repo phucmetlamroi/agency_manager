@@ -69,7 +69,7 @@ export default function WelcomeClient({ profileName, canCreateWorkspace = false 
                                 onClick={() => setCreateOpen(true)}
                                 title="Bấm vào đây để tạo workspace đầu tiên của bạn nhé!"
                                 className="group relative w-20 h-20 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 hover:from-violet-400 hover:to-violet-600 flex items-center justify-center mx-auto mb-4 shadow-[0_8px_32px_rgba(139,92,246,0.45)] hover:shadow-[0_12px_40px_rgba(139,92,246,0.6)] transition-all duration-200 cursor-pointer"
-                                aria-label="Create your first workspace"
+                                aria-label="Tạo workspace đầu tiên của bạn"
                             >
                                 <Plus className="w-9 h-9 text-white group-hover:scale-110 transition-transform" strokeWidth={2.5} />
                                 {/* Pulse ring */}

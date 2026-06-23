@@ -130,7 +130,7 @@ export default function VeloxBrollManagerModal({
                                 </div>
                                 <div>
                                     <h3 className="text-[15px] font-extrabold text-white">
-                                        Custom B-Roll Mapping
+                                        Gắn B-roll thủ công
                                     </h3>
                                     <p className="text-[11px] text-zinc-400 mt-0.5">
                                         Tick URL muốn gắn vào mỗi task riêng biệt.
@@ -152,9 +152,9 @@ export default function VeloxBrollManagerModal({
                                 <thead className="sticky top-0 bg-zinc-950/95 backdrop-blur z-10">
                                     <tr className="text-[10px] font-bold uppercase text-zinc-500">
                                         <th className="text-left px-2 py-2 border-b border-white/5">Task</th>
-                                        <th className="text-left px-2 py-2 border-b border-white/5">General ({generalFolderUrls.length})</th>
-                                        <th className="text-left px-2 py-2 border-b border-white/5">Per-Video ({perVideoFolderUrls.length})</th>
-                                        <th className="text-left px-2 py-2 border-b border-white/5">Loose ({looseFileUrls.length})</th>
+                                        <th className="text-left px-2 py-2 border-b border-white/5">Chung ({generalFolderUrls.length})</th>
+                                        <th className="text-left px-2 py-2 border-b border-white/5">Theo video ({perVideoFolderUrls.length})</th>
+                                        <th className="text-left px-2 py-2 border-b border-white/5">Lẻ ({looseFileUrls.length})</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -209,7 +209,7 @@ export default function VeloxBrollManagerModal({
                                                 <td className="px-2 py-2 align-top">
                                                     {looseFileUrls.length > 5 ? (
                                                         <div className="text-[10px] text-zinc-500 italic">
-                                                            {looseFileUrls.length} files — tick top 5 hoặc skip
+                                                            {looseFileUrls.length} file — tick 5 cái đầu hoặc bỏ qua
                                                         </div>
                                                     ) : null}
                                                     <div className="space-y-1 max-h-[100px] overflow-auto">
@@ -250,7 +250,7 @@ export default function VeloxBrollManagerModal({
                                 onClick={handleSave}
                                 className="px-4 py-1.5 rounded-full bg-violet-600 hover:bg-violet-500 text-white text-[12px] font-bold"
                             >
-                                Lưu mapping
+                                Lưu cấu hình
                             </button>
                         </div>
                     </motion.div>

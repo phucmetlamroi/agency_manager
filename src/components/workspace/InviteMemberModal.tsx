@@ -22,6 +22,7 @@ import { searchInviteCandidates } from '@/actions/username-actions'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { WorkspaceRole } from '@/lib/workspace-roles'
+import { roleLabel } from '@/lib/display-labels'
 
 type Candidate = {
     username: string
@@ -133,7 +134,7 @@ export default function InviteMemberModal({ workspaceId, onClose, onSuccess }: P
                                         : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:border-white/10'
                                 }`}
                             >
-                                {role}
+                                {roleLabel(role)}
                             </button>
                         ))}
                     </div>

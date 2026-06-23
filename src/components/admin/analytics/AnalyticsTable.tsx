@@ -49,7 +49,7 @@ const columns = [
     cell: info => <div className="text-red-400 font-mono font-bold text-center">{info.getValue()}</div>
   }),
   columnHelper.accessor('errorRate', {
-    header: 'Error Rate (%)',
+    header: 'Tỷ lệ lỗi (%)',
     cell: info => {
       const val = info.getValue()
       return (
@@ -157,7 +157,7 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
           <h2 className="text-white font-semibold">Bảng Hiệu Suất Editor</h2>
           <input 
             type="text" 
-            placeholder="Search nhân sự..." 
+            placeholder="Tìm nhân sự..."
             value={globalFilter ?? ''}
             onChange={e => setGlobalFilter(e.target.value)}
             className="bg-zinc-950 border border-zinc-800 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 w-64 outline-none"

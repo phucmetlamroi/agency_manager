@@ -6,6 +6,7 @@ import { TaskDetailModal } from "@/components/tasks/TaskDetailModal"
 import { PreStartBlockModal } from "@/components/tasks/PreStartBlockModal"
 import { Search, Filter, ChevronLeft, ChevronRight, CalendarDays, MoreHorizontal } from "lucide-react"
 import { formatClientHierarchy } from "@/lib/client-hierarchy"
+import { taskTypeLabel } from "@/lib/display-labels"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -44,11 +45,11 @@ interface TabConfig {
 // admin board) so overdue tasks are clearly surfaced instead of being folded into
 // Progress. 'Đã hủy' intentionally has NO tab (cancelled tasks stay hidden).
 const TABS: TabConfig[] = [
-    { id: "assignee", label: "Assignee", statuses: ["Nhận task", "Đã nhận task", "Đang đợi giao", "Tạm ngưng"], color: "#8B5CF6" },
-    { id: "progress", label: "Progress", statuses: ["Đang thực hiện"],                                          color: "#EAB308" },
+    { id: "assignee", label: "Được giao", statuses: ["Nhận task", "Đã nhận task", "Đang đợi giao", "Tạm ngưng"], color: "#8B5CF6" },
+    { id: "progress", label: "Đang làm", statuses: ["Đang thực hiện"],                                          color: "#EAB308" },
     { id: "overdue",  label: "Quá hạn",  statuses: ["Quá hạn"],                                                 color: "#DC2626" },
-    { id: "revise",   label: "Revise",   statuses: ["Revision", "Sửa frame", "Gửi lại"],                  color: "#F97316" },
-    { id: "complete", label: "Complete", statuses: ["Hoàn tất"],                                                color: "#10B981" },
+    { id: "revise",   label: "Cần sửa",   statuses: ["Revision", "Sửa frame", "Gửi lại"],                  color: "#F97316" },
+    { id: "complete", label: "Hoàn tất", statuses: ["Hoàn tất"],                                                color: "#10B981" },
 ]
 
 const PER_PAGE = 8
@@ -177,7 +178,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
         STATUS_COLORS[status] || { label: status, color: NP.textMuted }
 
     const formatDeadline = (deadline: Date | string | null) => {
-        if (!deadline) return "No Limit"
+        if (!deadline) return "Không hạn"
         const d = new Date(deadline)
         return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit" })
     }
@@ -275,7 +276,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                             setSearch(e.target.value)
                             setPage(1)
                         }}
-                        placeholder="Search tasks…"
+                        placeholder="Tìm task…"
                         className="flex-1"
                         style={{
                             background: "transparent",
@@ -303,7 +304,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                         cursor: "pointer",
                     }}
                 >
-                    View
+                    Hiển thị
                     <Filter style={{ width: 14, height: 14 }} />
                 </button>
             </div>
@@ -326,7 +327,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                         borderBottom: `1px solid ${NP.borderSubtle}`,
                     }}
                 >
-                    {(["Task Name", "Type", "Assignee", "Deadline", "Status", "Role", ""] as const).map((h) => (
+                    {(["Tên task", "Loại", "Người làm", "Deadline", "Trạng thái", "Vai trò", ""] as const).map((h) => (
                         <span
                             key={h || "actions"}
                             style={{
@@ -352,7 +353,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                         }}
                     >
-                        No tasks here yet.
+                        Chưa có task nào ở đây.
                     </div>
                 )}
 
@@ -361,7 +362,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                     const dlColor = getDeadlineColor(task.deadline, task.status)
                     const clientLabel = formatClientHierarchy(task.client)
                     const isOddRow = idx % 2 === 1
-                    const role = task.assigneeId === currentUserId ? "Assignee" : (task.assignee?.username ? "Member" : "Unassigned")
+                    const role = task.assigneeId === currentUserId ? "Người làm" : (task.assignee?.username ? "Thành viên" : "Chưa giao")
                     const valueDisplay = formatAmount(task)
 
                     return (
@@ -409,7 +410,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                         className="text-[14px] font-bold truncate"
                                         style={{ color: NP.textPrimary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                                     >
-                                        {task.title || 'Untitled'}
+                                        {task.title || 'Chưa đặt tên'}
                                     </span>
                                     {clientLabel && (
                                         <span
@@ -428,7 +429,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                             className="truncate"
                                             style={{ color: NP.textMuted, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                                         >
-                                            {task.type || "Task"}
+                                            {task.type ? taskTypeLabel(task.type) : "Task"}
                                         </span>
                                         <span style={{ color: NP.textMuted }}>·</span>
                                         <span
@@ -506,7 +507,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                 </div>
 
                                 <span style={{ fontSize: 12, fontWeight: 600, color: NP.textSecondary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    {task.type || "Task"}
+                                    {task.type ? taskTypeLabel(task.type) : "Task"}
                                 </span>
 
                                 <span style={{ fontSize: 13, color: NP.textPrimary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -572,13 +573,13 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                             </button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                            <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
                                             <DropdownMenuItem onClick={() => handleRowOpen(task)}>
-                                                View details
+                                                Xem chi tiết
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={() => navigator.clipboard.writeText(task.id)}>
-                                                Copy Task ID
+                                                Sao chép Task ID
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -617,7 +618,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                             }}
                         >
                             <ChevronLeft style={{ width: 14, height: 14 }} />
-                            Back
+                            Quay lại
                         </button>
 
                         <div className="flex items-center" style={{ gap: 4 }}>
@@ -664,7 +665,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                 opacity: page === totalPages ? 0.5 : 1,
                             }}
                         >
-                            Next
+                            Tiếp
                             <ChevronRight style={{ width: 14, height: 14 }} />
                         </button>
                     </div>

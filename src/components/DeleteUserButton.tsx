@@ -25,23 +25,23 @@ export default function DeleteUserButton({ userId, workspaceId }: { userId: stri
 
     const handleDeactivate = async () => {
         if (!(await confirm({
-            title: 'Deactivate User?',
-            message: 'User sẽ bị KHÓA — không thể đăng nhập, mọi session đang active sẽ bị logout.\n\nLƯU Ý: Data của user (tasks, comments, lịch sử) ĐƯỢC GIỮ NGUYÊN. Bạn có thể reactivate sau.\n\nĐể chỉ remove user khỏi workspace này (không khóa account), dùng trang Members.',
+            title: 'Vô hiệu hoá nhân viên?',
+            message: 'Nhân viên sẽ bị KHOÁ — không thể đăng nhập, mọi phiên đang hoạt động sẽ bị đăng xuất.\n\nLƯU Ý: Dữ liệu của nhân viên (Task, bình luận, lịch sử) ĐƯỢC GIỮ NGUYÊN. Bạn có thể kích hoạt lại sau.\n\nĐể chỉ gỡ nhân viên khỏi Workspace này (không khoá tài khoản), dùng trang Thành viên.',
             type: 'danger',
-            confirmText: 'Deactivate',
-            cancelText: 'Hủy'
+            confirmText: 'Vô hiệu hoá',
+            cancelText: 'Huỷ'
         }))) return
 
         setIsDeactivating(true)
         try {
             const result = await deactivateUser(userId, workspaceId)
             if (result.success) {
-                toast.success(result.message ?? 'Đã deactivate user.')
+                toast.success(result.message ?? 'Đã vô hiệu hoá nhân viên.')
             } else {
-                toast.error(result.error ?? 'Lỗi khi deactivate user.')
+                toast.error(result.error ?? 'Lỗi khi vô hiệu hoá nhân viên.')
             }
         } catch {
-            toast.error('Lỗi khi deactivate user.')
+            toast.error('Lỗi khi vô hiệu hoá nhân viên.')
         } finally {
             setIsDeactivating(false)
         }
@@ -52,7 +52,7 @@ export default function DeleteUserButton({ userId, workspaceId }: { userId: stri
             onClick={handleDeactivate}
             disabled={isDeactivating}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all disabled:opacity-50"
-            title="Deactivate User (khóa account, giữ data)"
+            title="Vô hiệu hoá nhân viên (khoá tài khoản, giữ dữ liệu)"
         >
             {isDeactivating ? (
                 <div className="w-3.5 h-3.5 border-2 border-red-500/40 border-t-red-500 rounded-full animate-spin" />

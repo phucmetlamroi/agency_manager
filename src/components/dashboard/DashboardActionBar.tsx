@@ -134,7 +134,7 @@ export default function DashboardActionBar({
                     className="px-2.5 py-4 text-center text-sm"
                     style={{ color: "#71717A" }}
                   >
-                    No workspaces yet
+                    Chưa có Workspace nào
                   </p>
                 ) : (
                   (workspaces ?? []).map((ws) => {
@@ -272,7 +272,7 @@ export default function DashboardActionBar({
         }}
       >
         <Plus className="h-4 w-4" />
-        Add new task
+        Thêm task mới
       </button>
     </div>
   )

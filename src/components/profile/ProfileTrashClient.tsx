@@ -35,7 +35,7 @@ export default function ProfileTrashClient({ workspaceId, profiles }: Props) {
             if ('error' in result && result.error) {
                 toast.error(result.error)
             } else {
-                toast.success('Profile đã được restore.')
+                toast.success('Tổ chức đã được khôi phục.')
                 refresh()
             }
         } finally {
@@ -47,8 +47,8 @@ export default function ProfileTrashClient({ workspaceId, profiles }: Props) {
         return (
             <div className="rounded-2xl bg-zinc-950/60 backdrop-blur-xl border border-[rgba(139,92,246,0.15)] p-8 text-center">
                 <Trash2 size={32} className="mx-auto text-zinc-700 mb-3" />
-                <p className="text-sm text-zinc-400">Không có profile nào trong thùng rác.</p>
-                <p className="text-[12px] text-zinc-600 mt-1">Profiles đã xóa sẽ xuất hiện ở đây.</p>
+                <p className="text-sm text-zinc-400">Không có tổ chức nào trong thùng rác.</p>
+                <p className="text-[12px] text-zinc-600 mt-1">Tổ chức đã xóa sẽ xuất hiện ở đây.</p>
             </div>
         )
     }
@@ -82,7 +82,7 @@ export default function ProfileTrashClient({ workspaceId, profiles }: Props) {
                                 className="px-3 py-1.5 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/20 text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-50"
                             >
                                 {isLoading ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
-                                Restore
+                                Khôi phục
                             </button>
                         </div>
                     )

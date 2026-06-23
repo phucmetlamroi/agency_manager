@@ -38,6 +38,7 @@ import {
 import type { ScannedVideo } from '@/lib/cloud-scanner'
 import { getLastClientNote, suggestRoundRobinAssignee } from '@/actions/velox-helpers-actions'
 import { AutocompleteInput } from '@/components/ui/AutocompleteInput'
+import { taskTypeShort } from '@/lib/display-labels'
 import type {
     VeloxApplyPayload,
     VeloxApplyPayloadV3,
@@ -277,13 +278,13 @@ export default function QuickCreateMode({
                 // Auth integration not connected.
                 if (data?.requiresConnection) {
                     toast.error(
-                        `${data.error} Vào Settings → Connectors để kết nối.`,
+                        `${data.error} Vào Cài đặt → Kết nối để kết nối.`,
                     )
                     return
                 }
                 // Generic — surface the server message if it gave one.
                 const serverMsg = data?.error || rawBody?.slice(0, 200) || `HTTP ${res.status}`
-                toast.error(`Scan thất bại: ${serverMsg}`)
+                toast.error(`Quét thất bại: ${serverMsg}`)
                 return
             }
 
@@ -511,11 +512,11 @@ export default function QuickCreateMode({
                 return
             }
             if (!clientId) {
-                toast.error('Vui lòng chọn Client.')
+                toast.error('Vui lòng chọn khách hàng.')
                 return
             }
             if (brollPolicy === 'PENDING_USER_CONFIRM') {
-                toast.error('Vui lòng pick cách gắn B-Roll (D2) trước khi Apply.')
+                toast.error('Vui lòng chọn cách gắn B-roll (D2) trước khi áp dụng.')
                 return
             }
             if (toggles.uniformDeadline && !deadline) {
@@ -545,7 +546,7 @@ export default function QuickCreateMode({
 
             onApplyToForm(v3Payload)
             if (selectedItems.length === 1) {
-                toast.success('Đã áp dụng vào form. Review + bấm "Add task" để tạo.')
+                toast.success('Đã áp dụng vào form. Kiểm tra lại + bấm "Tạo task" để tạo.')
             }
             return
         }
@@ -598,7 +599,7 @@ export default function QuickCreateMode({
         }
         onApplyToForm(payload)
         if (selectedRows.length === 1) {
-            toast.success('Đã áp dụng vào form. Review + bấm "Add task" để tạo.')
+            toast.success('Đã áp dụng vào form. Kiểm tra lại + bấm "Tạo task" để tạo.')
         }
     }
 
@@ -658,7 +659,7 @@ export default function QuickCreateMode({
                         ) : (
                             <Search size={14} />
                         )}
-                        Scan
+                        Quét
                     </button>
                 </div>
             </div>
@@ -667,7 +668,7 @@ export default function QuickCreateMode({
             <div className="grid grid-cols-2 gap-3">
                 <div>
                     <label className="block text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2">
-                        Client
+                        Khách hàng
                     </label>
                     {/* [Quick Create] Searchable autocomplete giống AddTaskModal — search theo
                         "Parent name + Child name" + hiển thị "Parent / Child" cho hierarchy */}
@@ -679,12 +680,12 @@ export default function QuickCreateMode({
                             label: c.name,
                             parentLabel: c.parentName ?? undefined,
                         }))}
-                        placeholder="Tìm client..."
+                        placeholder="Tìm khách hàng..."
                     />
                 </div>
                 <div>
                     <label className="block text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2">
-                        Pricing Rule
+                        Bảng giá
                     </label>
                     <select
                         value={pricingRuleId}
@@ -708,7 +709,7 @@ export default function QuickCreateMode({
             {/* Automation toggles */}
             <div>
                 <h4 className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-3">
-                    Automation
+                    Tự động hoá
                 </h4>
                 <div className="grid grid-cols-2 gap-2">
                     <ToggleRow
@@ -769,12 +770,12 @@ export default function QuickCreateMode({
             {toggles.autoName && (
                 <div>
                     <label className="block text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2">
-                        Tiền tố tên task (optional)
+                        Tiền tố tên task (tuỳ chọn)
                     </label>
                     <input
                         value={titlePrefix}
                         onChange={(e) => setTitlePrefix(e.target.value)}
-                        placeholder="Vd: [Tháng 5] — sẽ prepend vào mỗi task title"
+                        placeholder="Vd: [Tháng 5] — sẽ thêm vào đầu tên mỗi task"
                         className="w-full px-3 py-2.5 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-violet-500/50"
                     />
                 </div>
@@ -798,7 +799,7 @@ export default function QuickCreateMode({
             {/* Assignee picker (when auto-assign OFF or for manual override) */}
             <div>
                 <label className="block text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2">
-                    Editor (assignee)
+                    Editor (người làm)
                 </label>
                 <select
                     value={assigneeId ?? ''}
@@ -850,17 +851,17 @@ export default function QuickCreateMode({
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <h4 className="text-xs font-bold uppercase tracking-wide text-zinc-400">
-                                Preview ({selectedItemIds.size} / {scanResult.mainItems.length} task)
+                                Xem trước ({selectedItemIds.size} / {scanResult.mainItems.length} task)
                             </h4>
                         </div>
                         <div className="rounded-2xl bg-zinc-950/60 border border-white/8 overflow-hidden">
                             <div className="grid grid-cols-[24px_24px_1fr_140px_100px_80px_90px] gap-2 px-3 py-2 border-b border-white/10 bg-white/[0.02]">
                                 <div></div>
                                 <div></div>
-                                <div className="text-[10px] font-bold uppercase text-zinc-500">Title</div>
-                                <div className="text-[10px] font-bold uppercase text-zinc-500">Source</div>
-                                <div className="text-[10px] font-bold uppercase text-zinc-500">Time</div>
-                                <div className="text-[10px] font-bold uppercase text-zinc-500">Type</div>
+                                <div className="text-[10px] font-bold uppercase text-zinc-500">Tên</div>
+                                <div className="text-[10px] font-bold uppercase text-zinc-500">Nguồn</div>
+                                <div className="text-[10px] font-bold uppercase text-zinc-500">Thời lượng</div>
+                                <div className="text-[10px] font-bold uppercase text-zinc-500">Loại</div>
                                 <div className="text-[10px] font-bold uppercase text-zinc-500">USD</div>
                             </div>
                             <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
@@ -970,9 +971,9 @@ export default function QuickCreateMode({
                                 !clientId ||
                                 v3Pending
                             const disableTitle = v3Pending
-                                ? 'Pick cách gắn B-Roll trước khi Apply'
+                                ? 'Chọn cách gắn B-roll trước khi áp dụng'
                                 : !clientId
-                                  ? 'Chọn Client trước'
+                                  ? 'Chọn khách hàng trước'
                                   : selectedItemIds.size === 0
                                     ? 'Chọn ít nhất 1 task'
                                     : ''
@@ -997,7 +998,7 @@ export default function QuickCreateMode({
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-bold uppercase tracking-wide text-zinc-400">
-                            Preview ({selectedCount} / {previewRows.length} video)
+                            Xem trước ({selectedCount} / {previewRows.length} video)
                         </h4>
                         {!selectedRule && toggles.applyPricing && (
                             <div className="flex items-center gap-1.5 text-[11px] text-amber-300">
@@ -1010,8 +1011,8 @@ export default function QuickCreateMode({
                         <div className="grid grid-cols-[28px_1fr_70px_90px_80px_100px] gap-2 px-3 py-2 text-[10px] font-bold uppercase text-zinc-500 border-b border-white/5">
                             <div></div>
                             <div>Tên task</div>
-                            <div>Time</div>
-                            <div>Type</div>
+                            <div>Thời lượng</div>
+                            <div>Loại</div>
                             <div>USD</div>
                             <div>VND</div>
                         </div>
@@ -1078,8 +1079,8 @@ export default function QuickCreateMode({
                                         disabled={!row.selected}
                                         className="bg-transparent border-0 text-[11px] focus:outline-none focus:bg-zinc-900/60 focus:rounded"
                                     >
-                                        <option value="Short form">Short</option>
-                                        <option value="Long form">Long</option>
+                                        <option value="Short form">{taskTypeShort('Short form')}</option>
+                                        <option value="Long form">{taskTypeShort('Long form')}</option>
                                     </select>
                                     <input
                                         type="number"
@@ -1136,11 +1137,11 @@ export default function QuickCreateMode({
                                 (scannedVideos.length === 0 && !scanResult && allTogglesOff)
 
                             const disableTitle = v3Pending
-                                ? 'Pick cách gắn B-Roll trước khi Apply'
+                                ? 'Chọn cách gắn B-roll trước khi áp dụng'
                                 : scannedVideos.length === 0 && !scanResult && allTogglesOff
-                                  ? 'Bật ít nhất 1 automation hoặc detect ít nhất 1 video'
+                                  ? 'Bật ít nhất 1 mục tự động hoá hoặc nhận diện ít nhất 1 video'
                                   : !clientId
-                                    ? 'Chọn Client trước'
+                                    ? 'Chọn khách hàng trước'
                                     : v1Empty || v3Empty
                                       ? 'Chọn ít nhất 1 task'
                                       : ''
@@ -1164,9 +1165,9 @@ export default function QuickCreateMode({
             {scannedVideos.length === 0 && !scanResult && !scanning && (
                 <div className="rounded-2xl bg-zinc-900/30 border border-dashed border-white/10 p-8 text-center">
                     <Sparkles size={28} className="mx-auto text-zinc-600 mb-2" />
-                    <p className="text-sm text-zinc-400">Chưa scan folder nào.</p>
+                    <p className="text-sm text-zinc-400">Chưa quét folder nào.</p>
                     <p className="text-xs text-zinc-500 mt-1">
-                        Dán link Dropbox/Google Drive folder ở trên rồi bấm Scan.
+                        Dán link folder Dropbox/Google Drive ở trên rồi bấm Quét.
                     </p>
                 </div>
             )}

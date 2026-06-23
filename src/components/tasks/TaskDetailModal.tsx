@@ -18,6 +18,7 @@ import dynamic from 'next/dynamic'
 // only (the modal renders on user interaction, post-hydration).
 import DOMPurify from 'dompurify'
 import { cn } from "@/lib/utils"
+import { taskTypeLabel } from "@/lib/display-labels"
 
 // ── DOMPurify global hook: force every anchor in sanitized HTML to open in
 // a new tab. Runs once at module load (DOMPurify is a singleton, so this
@@ -63,13 +64,13 @@ const STATUS_COLORS: Record<string, { label: string; color: string; bg: string }
     'Nhận task': { label: 'Nhận task', color: '#3B82F6', bg: 'rgba(59,130,246,0.10)' },
     'Đã nhận task': { label: 'Đã nhận task', color: '#3B82F6', bg: 'rgba(59,130,246,0.10)' },
     'Đang đợi giao': { label: 'Đang đợi giao', color: '#A855F7', bg: 'rgba(168,85,247,0.10)' },
-    'Đang thực hiện': { label: 'Progress', color: '#EAB308', bg: 'rgba(234,179,8,0.10)' },
+    'Đang thực hiện': { label: 'Đang thực hiện', color: '#EAB308', bg: 'rgba(234,179,8,0.10)' },
     'Revision': { label: 'Revision', color: '#EF4444', bg: 'rgba(239,68,68,0.10)' },
     'Sửa frame': { label: 'Sửa frame', color: '#EC4899', bg: 'rgba(236,72,153,0.10)' },
     'Gửi lại': { label: 'Gửi lại', color: '#F97316', bg: 'rgba(249,115,22,0.10)' },
     'Tạm ngưng': { label: 'Tạm ngưng', color: '#71717A', bg: 'rgba(113,113,122,0.10)' },
-    'Hoàn tất': { label: 'Complete', color: '#10B981', bg: 'rgba(16,185,129,0.10)' },
-    'Quá hạn': { label: 'Overdue', color: '#DC2626', bg: 'rgba(220,38,38,0.10)' },
+    'Hoàn tất': { label: 'Hoàn tất', color: '#10B981', bg: 'rgba(16,185,129,0.10)' },
+    'Quá hạn': { label: 'Quá hạn', color: '#DC2626', bg: 'rgba(220,38,38,0.10)' },
     'Đã hủy': { label: 'Đã hủy', color: '#52525B', bg: 'rgba(82,82,91,0.10)' },
 }
 const TYPE_COLORS: Record<string, { color: string; bg: string }> = {
@@ -172,7 +173,7 @@ function TypePill({ type }: { type: string }) {
             className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold"
             style={{ background: t.bg, color: t.color, border: `1px solid ${t.color}30` }}
         >
-            {type}
+            {taskTypeLabel(type)}
         </span>
     )
 }
@@ -189,9 +190,9 @@ function TabNav({
     onChange: (tab: 'main' | 'assets' | 'notes') => void
 }) {
     const tabs = [
-        { id: 'main' as const, label: 'Main', icon: LayoutGrid },
-        { id: 'assets' as const, label: 'Assets', icon: FolderOpen },
-        { id: 'notes' as const, label: 'Notes', icon: StickyNote },
+        { id: 'main' as const, label: 'Chính', icon: LayoutGrid },
+        { id: 'assets' as const, label: 'Tài nguyên', icon: FolderOpen },
+        { id: 'notes' as const, label: 'Ghi chú', icon: StickyNote },
     ]
     return (
         <div className="mx-6 my-4 flex items-center bg-white/[0.04] border border-white/5 rounded-full p-1">
@@ -280,14 +281,14 @@ function LinkRow({
                         if (e.key === 'Escape') cancelEdit()
                     }}
                     autoFocus
-                    placeholder="Paste link…"
+                    placeholder="Dán link…"
                     className="flex-1 h-8 rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[12px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-violet-500"
                 />
                 <button
                     type="button"
                     onClick={handleConfirm}
                     disabled={saving}
-                    title="Confirm"
+                    title="Xác nhận"
                     className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
                 >
                     <Check size={13} strokeWidth={3} />
@@ -296,7 +297,7 @@ function LinkRow({
                     type="button"
                     onClick={cancelEdit}
                     disabled={saving}
-                    title="Cancel"
+                    title="Huỷ"
                     className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 disabled:opacity-50 transition-colors"
                 >
                     <X size={13} />
@@ -317,7 +318,7 @@ function LinkRow({
                         className="inline-flex items-center gap-1 text-[12px] text-violet-400 hover:text-violet-300 truncate max-w-[180px]"
                         title={value}
                     >
-                        <span className="truncate">View {label}</span>
+                        <span className="truncate">Xem {label}</span>
                         <ExternalLink size={11} className="flex-shrink-0" />
                     </a>
                 ) : canEdit ? (
@@ -327,16 +328,16 @@ function LinkRow({
                         className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-violet-300 transition-colors"
                     >
                         <Plus size={11} />
-                        Add link
+                        Thêm link
                     </button>
                 ) : (
-                    <span className="text-[12px] text-zinc-600">None</span>
+                    <span className="text-[12px] text-zinc-600">Chưa có</span>
                 )}
                 {canEdit && value?.trim() && (
                     <button
                         type="button"
                         onClick={startEdit}
-                        title="Edit"
+                        title="Sửa"
                         className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/[0.06]"
                     >
                         <Pencil size={11} className="text-zinc-500" />
@@ -352,7 +353,7 @@ function LinkRow({
 /* ────────────────────────────────────────────────────────────────────── */
 
 function EditButton({ onClick, title }: { onClick: () => void; title?: string }) {
-    const label = title ?? "Edit"
+    const label = title ?? "Sửa"
     return (
         <button
             type="button"
@@ -381,8 +382,8 @@ function ConfirmCancelGroup({
                 type="button"
                 onClick={onConfirm}
                 disabled={saving}
-                title="Confirm"
-                aria-label="Confirm"
+                title="Xác nhận"
+                aria-label="Xác nhận"
                 className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
             >
                 <Check size={13} strokeWidth={3} />
@@ -391,8 +392,8 @@ function ConfirmCancelGroup({
                 type="button"
                 onClick={onCancel}
                 disabled={saving}
-                title="Cancel"
-                aria-label="Cancel"
+                title="Huỷ"
+                aria-label="Huỷ"
                 className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 disabled:opacity-50 transition-colors"
             >
                 <X size={13} />
@@ -606,7 +607,7 @@ export function TaskDetailModal({
     // to ALL selected; else → single task save (existing behavior).
     const saveSingle = async (
         patch: Parameters<typeof updateTaskDetails>[1],
-        successMsg = 'Updated',
+        successMsg = 'Đã cập nhật',
     ) => {
         if (isBulkMode && bulkSelectedIds) {
             const res = await bulkUpdateTaskDetails(bulkSelectedIds, patch, workspaceId) as any
@@ -614,7 +615,7 @@ export function TaskDetailModal({
                 toast.success(`Đã cập nhật ${res.count ?? bulkSelectedIds.length} task`)
                 return true
             }
-            toast.error(res?.error ?? 'Bulk save failed')
+            toast.error(res?.error ?? 'Lưu hàng loạt thất bại')
             return false
         }
 
@@ -623,7 +624,7 @@ export function TaskDetailModal({
             toast.success(successMsg)
             return true
         }
-        toast.error('Save failed')
+        toast.error('Lưu thất bại')
         return false
     }
 
@@ -650,7 +651,7 @@ export function TaskDetailModal({
                 // Optimistic update for current task only (others refresh on revalidate)
                 setForm((prev) => ({ ...prev, [key]: newValue }))
             } else {
-                toast.error(res?.error ?? 'Bulk save failed')
+                toast.error(res?.error ?? 'Lưu hàng loạt thất bại')
             }
             return
         }
@@ -691,7 +692,7 @@ export function TaskDetailModal({
                 toast.success(`Đã cập nhật ${key} cho ${res.count ?? bulkSelectedIds.length} task`)
                 setForm((prev) => ({ ...prev, [key]: newValue }))
             } else {
-                toast.error(res?.error ?? 'Bulk save failed')
+                toast.error(res?.error ?? 'Lưu hàng loạt thất bại')
             }
             return
         }
@@ -910,11 +911,11 @@ export function TaskDetailModal({
                         {/* HEADER */}
                         <div className="flex flex-col gap-3 px-6 pt-6 pb-3 border-b border-white/5 relative z-[1]">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-[16px] font-extrabold text-white">Task Details</h2>
+                                <h2 className="text-[16px] font-extrabold text-white">Chi tiết Task</h2>
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    aria-label="Close task details"
+                                    aria-label="Đóng chi tiết task"
                                     className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.04] hover:bg-white/[0.10] text-zinc-400 hover:text-white transition-colors"
                                 >
                                     <X size={16} />
@@ -935,7 +936,7 @@ export function TaskDetailModal({
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-[12px] font-bold text-violet-200">
-                                            Bulk edit — đang chỉnh {bulkCount} task cùng lúc
+                                            Sửa hàng loạt — đang chỉnh {bulkCount} task cùng lúc
                                         </div>
                                         <div className="text-[11px] text-violet-300/80">
                                             Mọi thay đổi sẽ được áp dụng cho toàn bộ task đã tick.
@@ -949,7 +950,7 @@ export function TaskDetailModal({
                                     {localTask.title}
                                 </h3>
                                 <p className="text-[12px] text-zinc-400">
-                                    Follow-up: <span className="text-zinc-300">{formatDate(localTask.deadline)}</span>
+                                    Theo dõi: <span className="text-zinc-300">{formatDate(localTask.deadline)}</span>
                                 </p>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <StatusPill status={localTask.status} />
@@ -991,7 +992,7 @@ export function TaskDetailModal({
                                     <p className="text-[13px] text-zinc-400 mb-7 leading-relaxed max-w-xs">
                                         Bấm <span className="text-violet-300 font-semibold">Bắt đầu</span> để xem chi tiết
                                         và chính thức nhận task. Trạng thái sẽ chuyển sang{' '}
-                                        <span className="text-yellow-300 font-semibold">Progress</span>.
+                                        <span className="text-yellow-300 font-semibold">Đang thực hiện</span>.
                                     </p>
 
                                     {/* Start button — big violet gradient with pulse ring */}
@@ -1051,7 +1052,7 @@ export function TaskDetailModal({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {/* DELIVERY card — editable by BOTH admin and user (assignee submits delivery link here) */}
                                     <Card
-                                        title="Delivery"
+                                        title="Bàn giao"
                                         className="min-h-[220px]"
                                         rightSlot={
                                             !editingDelivery ? (
@@ -1069,7 +1070,7 @@ export function TaskDetailModal({
                                             <textarea
                                                 value={draftDelivery}
                                                 onChange={(e) => setDraftDelivery(e.target.value)}
-                                                placeholder="Paste delivery link or status note…"
+                                                placeholder="Dán link bàn giao hoặc ghi chú trạng thái…"
                                                 className="flex-1 w-full rounded-xl bg-white/[0.04] border border-violet-500/40 p-3 text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none focus:border-violet-500 resize-none min-h-[150px]"
                                                 autoFocus
                                             />
@@ -1081,7 +1082,7 @@ export function TaskDetailModal({
                                                     rel="noopener noreferrer"
                                                     className="text-[13px] text-violet-400 hover:text-violet-300 inline-flex items-center gap-1"
                                                 >
-                                                    <span>View delivery</span>
+                                                    <span>Xem bản bàn giao</span>
                                                     <ExternalLink size={12} className="flex-shrink-0" />
                                                 </a>
                                             ) : (
@@ -1095,7 +1096,7 @@ export function TaskDetailModal({
                                                 onClick={enterEditDelivery}
                                                 className="self-start inline-flex items-center gap-1 text-[12px] text-zinc-500 hover:text-violet-300 transition-colors"
                                             >
-                                                <Plus size={12} /> Add delivery link
+                                                <Plus size={12} /> Thêm link bàn giao
                                             </button>
                                         )}
                                     </Card>
@@ -1132,7 +1133,7 @@ export function TaskDetailModal({
                                         </Card>
 
                                         <Card
-                                            title="Finance"
+                                            title="Tài chính"
                                             rightSlot={
                                                 isAdmin && !editingFinance ? (
                                                     <EditButton onClick={enterEditFinance} />
@@ -1148,7 +1149,7 @@ export function TaskDetailModal({
                                             {editingFinance && isAdmin ? (
                                                 <div className="flex flex-col gap-2">
                                                     <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-[12px] text-zinc-400">Client ($)</span>
+                                                        <span className="text-[12px] text-zinc-400">Khách ($)</span>
                                                         <input
                                                             type="number"
                                                             value={draftFinance.jobPriceUSD}
@@ -1158,7 +1159,7 @@ export function TaskDetailModal({
                                                         />
                                                     </div>
                                                     <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-[12px] text-zinc-400">Staff (VND)</span>
+                                                        <span className="text-[12px] text-zinc-400">Nhân viên (VND)</span>
                                                         <input
                                                             type="number"
                                                             value={draftFinance.value}
@@ -1173,14 +1174,14 @@ export function TaskDetailModal({
                                                         Non-admin (staff) chỉ thấy Staff (VND) — lương riêng của họ. */}
                                                     {isAdmin && (
                                                         <div className="flex items-center justify-between">
-                                                            <span className="text-[12px] text-zinc-400">Client ($)</span>
+                                                            <span className="text-[12px] text-zinc-400">Khách ($)</span>
                                                             <span className="text-[14px] font-bold text-emerald-400">
                                                                 $ {Number(form.jobPriceUSD || 0).toLocaleString('en-US')}
                                                             </span>
                                                         </div>
                                                     )}
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-[12px] text-zinc-400">Staff (VND)</span>
+                                                        <span className="text-[12px] text-zinc-400">Nhân viên (VND)</span>
                                                         <span className="text-[14px] font-bold text-zinc-200">
                                                             VND {Number(form.value || 0).toLocaleString('vi-VN')}
                                                         </span>
@@ -1254,7 +1255,7 @@ export function TaskDetailModal({
                                     </Card>
                                 ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Card title="Resources">
+                                    <Card title="Tài nguyên">
                                         <div className="flex flex-col">
                                             {hookGraph ? (
                                                 /* [Hook Graph] RAW Assets holds a Multi-Hook Map —
@@ -1266,7 +1267,7 @@ export function TaskDetailModal({
                                                     className="group flex w-full items-center justify-between gap-3 border-b border-white/5 py-2 text-left last:border-0"
                                                 >
                                                     <span className="flex-shrink-0 text-[12px] font-medium text-zinc-300">
-                                                        RAW Assets
+                                                        File RAW
                                                     </span>
                                                     <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-[12px] font-semibold text-violet-300 transition-colors group-hover:bg-violet-500/20">
                                                         🗺 Multi-hook Map · {hookGraph.blocks.length} block
@@ -1275,26 +1276,26 @@ export function TaskDetailModal({
                                                 </button>
                                             ) : (
                                                 <LinkRow
-                                                    label="RAW Assets"
+                                                    label="File RAW"
                                                     value={form.linkRaw}
                                                     canEdit={isAdmin}
                                                     onSave={(v) => saveResource('linkRaw', v)}
                                                 />
                                             )}
                                             <LinkRow
-                                                label="B-Roll Assets"
+                                                label="File B-Roll"
                                                 value={form.linkBroll}
                                                 canEdit={isAdmin}
                                                 onSave={(v) => saveResource('linkBroll', v)}
                                             />
                                             <LinkRow
-                                                label="View Script"
+                                                label="Kịch bản"
                                                 value={form.scriptLink}
                                                 canEdit={isAdmin}
                                                 onSave={(v) => saveResource('scriptLink', v)}
                                             />
                                             <LinkRow
-                                                label="Submission Folder"
+                                                label="Thư mục nộp bài"
                                                 value={form.submissionFolder}
                                                 canEdit={isAdmin}
                                                 onSave={(v) => saveResource('submissionFolder', v)}
@@ -1302,16 +1303,16 @@ export function TaskDetailModal({
                                         </div>
                                     </Card>
 
-                                    <Card title="References">
+                                    <Card title="Tham khảo">
                                         <div className="flex flex-col">
                                             <LinkRow
-                                                label="View Reference"
+                                                label="Tài liệu tham khảo"
                                                 value={form.references}
                                                 canEdit={isAdmin}
                                                 onSave={(v) => saveReference('references', v)}
                                             />
                                             <LinkRow
-                                                label="Sample Project"
+                                                label="Dự án mẫu"
                                                 value={form.collectFilesLink}
                                                 canEdit={isAdmin}
                                                 onSave={(v) => saveReference('collectFilesLink', v)}
@@ -1349,7 +1350,7 @@ export function TaskDetailModal({
                                             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(form.notes) }}
                                         />
                                     ) : (
-                                        <p className="text-[13px] text-zinc-600 min-h-[200px]">No notes added.</p>
+                                        <p className="text-[13px] text-zinc-600 min-h-[200px]">Chưa có ghi chú nào.</p>
                                     )}
                                 </Card>
                             )}

@@ -198,7 +198,7 @@ function Flow({
     onChange,
     onSeed,
     onSave,
-    saveLabel = 'Save',
+    saveLabel = 'Lưu',
     height = 520,
 }: HookGraphEditorProps) {
     const rf = useReactFlow<HookNode, Edge>()

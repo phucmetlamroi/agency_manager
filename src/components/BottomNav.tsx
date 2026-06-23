@@ -12,25 +12,25 @@ export default function BottomNav({ role, workspaceId }: { role: string, workspa
     const navItems = [
         {
             href: `/${workspaceId}/dashboard`,
-            label: 'Home',
+            label: 'Trang chủ',
             icon: Home,
             show: true,
         },
         {
             href: role === 'ADMIN' ? `/${workspaceId}/admin` : `/${workspaceId}/dashboard`,
-            label: 'Tasks',
+            label: 'Task',
             icon: ClipboardList,
             show: true,
         },
         {
             href: role === 'ADMIN' ? `/${workspaceId}/admin/schedule` : `/${workspaceId}/dashboard/schedule`,
-            label: 'Schedule',
+            label: 'Lịch',
             icon: CalendarDays,
             show: true,
         },
         {
             href: role === 'ADMIN' ? `/${workspaceId}/admin/payroll` : `/${workspaceId}/dashboard`,
-            label: role === 'ADMIN' ? 'Payroll' : 'Income',
+            label: role === 'ADMIN' ? 'Lương' : 'Thu nhập',
             icon: Wallet,
             show: true,
         },

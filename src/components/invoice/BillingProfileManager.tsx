@@ -83,7 +83,7 @@ export default function BillingProfileManager({
 
     const handleSave = async () => {
         if (!formData.profileName || !formData.beneficiaryName || !formData.accountNumber) {
-            toast.error('Missing required fields')
+            toast.error('Thiếu thông tin bắt buộc')
             return
         }
 
@@ -109,19 +109,19 @@ export default function BillingProfileManager({
         }
 
         if (res.success) {
-            toast.success(editingId ? 'Profile updated' : 'Profile created')
+            toast.success(editingId ? 'Đã cập nhật hồ sơ' : 'Đã tạo hồ sơ')
             setIsEditing(false)
             fetchProfiles()
         } else {
-            toast.error(res.error || 'Failed to save')
+            toast.error(res.error || 'Lưu không thành công')
         }
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this profile?')) return
+        if (!confirm('Bạn có chắc muốn xoá hồ sơ này?')) return
         const res = await deleteBillingProfile(id, workspaceId)
         if (res.success) {
-            toast.success('Profile deleted')
+            toast.success('Đã xoá hồ sơ')
             fetchProfiles()
         } else {
             toast.error(res.error)
@@ -132,52 +132,52 @@ export default function BillingProfileManager({
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2 text-gray-400 border-gray-700 hover:text-white hover:bg-white/5">
-                    <Settings size={14} /> Manage Profiles
+                    <Settings size={14} /> Quản lý hồ sơ
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl bg-gray-900 border-gray-800 text-white max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{isEditing ? (editingId ? 'Edit Profile' : 'New Profile') : 'Manage Billing Profiles'}</DialogTitle>
+                    <DialogTitle>{isEditing ? (editingId ? 'Sửa hồ sơ' : 'Hồ sơ mới') : 'Quản lý hồ sơ thanh toán'}</DialogTitle>
                 </DialogHeader>
 
                 {isEditing ? (
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Profile Name (Internal)</Label>
+                                <Label>Tên hồ sơ (nội bộ)</Label>
                                 <Input
                                     value={formData.profileName || ''}
                                     onChange={e => setFormData({ ...formData, profileName: e.target.value })}
-                                    placeholder="e.g. VCB USD"
+                                    placeholder="vd. VCB USD"
                                     className="bg-gray-800 border-gray-700"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Default Profile</Label>
+                                <Label>Hồ sơ mặc định</Label>
                                 <div className="flex items-center gap-2 pt-2">
                                     <Switch
                                         checked={formData.isDefault}
                                         onCheckedChange={checked => setFormData({ ...formData, isDefault: checked })}
                                     />
-                                    <span className="text-sm text-gray-400">Set as default</span>
+                                    <span className="text-sm text-gray-400">Đặt làm mặc định</span>
                                 </div>
                             </div>
                         </div>
 
                         <div className="space-y-2 border-t border-gray-800 pt-4">
-                            <Label className="text-blue-300">Payment Details</Label>
+                            <Label className="text-blue-300">Thông tin thanh toán</Label>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label>Beneficiary Name</Label>
+                                    <Label>Tên người thụ hưởng</Label>
                                     <Input
                                         value={formData.beneficiaryName || ''}
                                         onChange={e => setFormData({ ...formData, beneficiaryName: e.target.value })}
-                                        placeholder="Full Name"
+                                        placeholder="Họ và tên"
                                         className="bg-gray-800 border-gray-700"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Account / IBAN</Label>
+                                    <Label>Số tài khoản / IBAN</Label>
                                     <Input
                                         value={formData.accountNumber || ''}
                                         onChange={e => setFormData({ ...formData, accountNumber: e.target.value })}
@@ -186,11 +186,11 @@ export default function BillingProfileManager({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Bank Name</Label>
+                                    <Label>Tên ngân hàng</Label>
                                     <Input
                                         value={formData.bankName || ''}
                                         onChange={e => setFormData({ ...formData, bankName: e.target.value })}
-                                        placeholder="Bank Name"
+                                        placeholder="Tên ngân hàng"
                                         className="bg-gray-800 border-gray-700"
                                     />
                                 </div>
@@ -199,53 +199,53 @@ export default function BillingProfileManager({
                                     <Input
                                         value={formData.swiftCode || ''}
                                         onChange={e => setFormData({ ...formData, swiftCode: e.target.value })}
-                                        placeholder="SWIFT code"
+                                        placeholder="Mã SWIFT"
                                         className="bg-gray-800 border-gray-700 font-mono"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label>Bank Address</Label>
+                                <Label>Địa chỉ ngân hàng</Label>
                                 <Input
                                     value={formData.address || ''}
                                     onChange={e => setFormData({ ...formData, address: e.target.value })}
-                                    placeholder="Branch Address"
+                                    placeholder="Địa chỉ chi nhánh"
                                     className="bg-gray-800 border-gray-700"
                                 />
                             </div>
                             <div className="space-y-4 pt-2">
                                 <div className="space-y-2">
-                                    <Label className="text-amber-300">Currency Symbol (Manual Entry)</Label>
+                                    <Label className="text-amber-300">Ký hiệu tiền tệ (nhập tay)</Label>
                                     <Input
                                         value={formData.currency || ''}
                                         onChange={e => setFormData({ ...formData, currency: e.target.value })}
-                                        placeholder="e.g. $, ₫, €, total due:"
+                                        placeholder="vd. $, ₫, €, total due:"
                                         className="bg-gray-800 border-amber-900/50 text-amber-100 font-bold w-full"
                                     />
-                                    <p className="text-[10px] text-gray-500">This symbol will be used on the invoice for all amounts.</p>
+                                    <p className="text-[10px] text-gray-500">Ký hiệu này sẽ hiển thị cho mọi số tiền trên hóa đơn.</p>
                                 </div>
                             </div>
                             <div className="space-y-2">
 
-                                <Label>Notes / Delivery Info</Label>
+                                <Label>Ghi chú / Thông tin giao nhận</Label>
                                 <Textarea
                                     value={formData.notes || ''}
                                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                                    placeholder="e.g. Delivery method: bank deposit..."
+                                    placeholder="vd. Hình thức thanh toán: chuyển khoản ngân hàng..."
                                     className="bg-gray-800 border-gray-700 min-h-[80px]"
                                 />
                             </div>
                         </div>
 
                         <div className="flex justify-end gap-2 pt-4">
-                            <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
-                            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">Save Profile</Button>
+                            <Button variant="ghost" onClick={() => setIsEditing(false)}>Huỷ</Button>
+                            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">Lưu hồ sơ</Button>
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-4">
                         <Button onClick={handleCreate} className="w-full border-dashed border-gray-700 bg-transparent hover:bg-white/5 text-gray-400">
-                            <Plus className="mr-2 h-4 w-4" /> Create New Profile
+                            <Plus className="mr-2 h-4 w-4" /> Tạo hồ sơ mới
                         </Button>
 
                         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
@@ -254,7 +254,7 @@ export default function BillingProfileManager({
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="font-bold text-white">{profile.profileName}</span>
-                                            {profile.isDefault && <span className="text-[10px] bg-green-900 text-green-300 px-1.5 py-0.5 rounded">DEFAULT</span>}
+                                            {profile.isDefault && <span className="text-[10px] bg-green-900 text-green-300 px-1.5 py-0.5 rounded">MẶC ĐỊNH</span>}
                                         </div>
                                         <div className="text-sm text-gray-400">{profile.bankName} - {profile.accountNumber}</div>
                                         <div className="text-xs text-gray-500 mt-1">{profile.beneficiaryName}</div>
@@ -265,7 +265,7 @@ export default function BillingProfileManager({
                                                 onProfileSelect(profile)
                                                 setIsOpen(false)
                                             }}>
-                                                Select
+                                                Chọn
                                             </Button>
                                         )}
                                         <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => handleEdit(profile)}>

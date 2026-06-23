@@ -24,7 +24,7 @@ export const STORAGE_KEY = 'agency-manager:radial-nav-config'
 
 // Slot defaults
 export const RADIAL_SLOT_COUNT = 6
-export const EMPTY_SEGMENT_LABEL = 'Trong'
+export const EMPTY_SEGMENT_LABEL = 'Trống'
 export const EMPTY_SEGMENT_PATH = ''
 
 export function createEmptySegment(index: number): RadialSegment {
@@ -68,19 +68,19 @@ export function getIcon(name: string): LucideIcon {
 // Route registry (role-aware)
 export const ROUTE_REGISTRY: RouteEntry[] = [
     // Admin scope
-    { path: '/[workspaceId]/admin',             label: 'Dashboard',      icon: 'LayoutDashboard', color: 'indigo',  allowedRoles: ['ADMIN'] },
-    { path: '/[workspaceId]/admin/queue',       label: 'Task Queue',     icon: 'ListTodo',        color: 'violet',  allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin',             label: 'Tổng quan',      icon: 'LayoutDashboard', color: 'indigo',  allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/queue',       label: 'Hàng chờ task',  icon: 'ListTodo',        color: 'violet',  allowedRoles: ['ADMIN'] },
     { path: '/[workspaceId]/admin/crm',         label: 'CRM',            icon: 'Smile',           color: 'cyan',    allowedRoles: ['ADMIN'] },
-    { path: '/[workspaceId]/admin/payroll',     label: 'Payroll',        icon: 'Wallet',          color: 'emerald', allowedRoles: ['ADMIN'] },
-    { path: '/[workspaceId]/admin/finance',     label: 'Finance',        icon: 'CreditCard',      color: 'amber',   allowedRoles: ['ADMIN'] },
-    { path: '/[workspaceId]/admin/schedule',    label: 'Schedule',       icon: 'CalendarDays',    color: 'pink',    allowedRoles: ['ADMIN'] },
-    { path: '/[workspaceId]/admin/analytics',   label: 'Analytics',      icon: 'BarChart3',       color: 'orange',  allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/payroll',     label: 'Bảng lương',     icon: 'Wallet',          color: 'emerald', allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/finance',     label: 'Tài chính',      icon: 'CreditCard',      color: 'amber',   allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/schedule',    label: 'Lịch',           icon: 'CalendarDays',    color: 'pink',    allowedRoles: ['ADMIN'] },
+    { path: '/[workspaceId]/admin/analytics',   label: 'Phân tích',      icon: 'BarChart3',       color: 'orange',  allowedRoles: ['ADMIN'] },
 
     // User/member scope
-    { path: '/[workspaceId]/dashboard',            label: 'My Dashboard', icon: 'Home',         color: 'teal',    allowedRoles: ['ADMIN', 'USER'] },
-    { path: '/[workspaceId]/dashboard/schedule',   label: 'My Schedule',  icon: 'CalendarDays', color: 'pink',    allowedRoles: ['ADMIN', 'USER'] },
-    { path: '/[workspaceId]/dashboard/errors',     label: 'My Errors',    icon: 'AlertOctagon', color: 'rose',    allowedRoles: ['ADMIN', 'USER'] },
-    { path: '/[workspaceId]/dashboard/profile',    label: 'My Profile',   icon: 'UserCircle',   color: 'zinc',    allowedRoles: ['ADMIN', 'USER'] },
+    { path: '/[workspaceId]/dashboard',            label: 'Tổng quan của tôi', icon: 'Home',         color: 'teal',    allowedRoles: ['ADMIN', 'USER'] },
+    { path: '/[workspaceId]/dashboard/schedule',   label: 'Lịch của tôi',  icon: 'CalendarDays', color: 'pink',    allowedRoles: ['ADMIN', 'USER'] },
+    { path: '/[workspaceId]/dashboard/errors',     label: 'Lỗi của tôi',    icon: 'AlertOctagon', color: 'rose',    allowedRoles: ['ADMIN', 'USER'] },
+    { path: '/[workspaceId]/dashboard/profile',    label: 'Hồ sơ của tôi',   icon: 'UserCircle',   color: 'zinc',    allowedRoles: ['ADMIN', 'USER'] },
 ]
 
 export function isRouteAllowedForRole(route: RouteEntry, role: string | null | undefined): boolean {

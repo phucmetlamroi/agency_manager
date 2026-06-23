@@ -53,10 +53,10 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
         // BULK ASSIGN CONFIRMATION
         if (isBulk) {
             if (await confirm({
-                title: '⚡ Bulk Assignment',
-                message: `Bạn đang chọn ${selectedIds.length} tasks. Bạn có muốn giao TẤT CẢ tasks này cho người được chọn không?`,
+                title: '⚡ Giao hàng loạt',
+                message: `Bạn đang chọn ${selectedIds.length} task. Bạn có muốn giao TẤT CẢ task này cho người được chọn không?`,
                 type: 'info',
-                confirmText: `Giao cho cả ${selectedIds.length} tasks`,
+                confirmText: `Giao cho cả ${selectedIds.length} task`,
                 cancelText: 'Chỉ giao task này'
             })) {
                 // Perform Bulk Assign
@@ -65,7 +65,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
 
                 if (res.error) toast.error(res.error)
                 else {
-                    toast.success(`Đã giao ${res.count} tasks thành công!`)
+                    toast.success(`Đã giao ${res.count} task thành công!`)
                     router.refresh()
                 }
                 return
@@ -75,11 +75,11 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
         // Single Assign (Default)
         const assignRes = await assignTask(task.id, val === "unassigned" ? null : val, workspaceId)
         if (assignRes?.success) {
-            toast.success("Assignment updated")
+            toast.success("Đã cập nhật người làm")
             // In a real app we might want to optimistically update or revalidate
             router.refresh()
         } else {
-            toast.error("Failed to assign task")
+            toast.error("Giao task thất bại")
         }
     }
 
@@ -97,28 +97,28 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                             <AvatarFallback>{displayName(task.assignee)[0]}</AvatarFallback>
                         </Avatar>
                         {flagColor && (
-                            <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-zinc-900 ${flagColor} shadow-sm`} title={`Rank ${latestRank} Warning`} />
+                            <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-zinc-900 ${flagColor} shadow-sm`} title={`Cảnh báo hạng ${latestRank}`} />
                         )}
                     </div>
                     <span className="text-sm">{displayName(task.assignee)}</span>
                 </div>
             )
         }
-        return <span className="text-muted-foreground text-xs italic">Unassigned</span>
+        return <span className="text-muted-foreground text-xs italic">Chưa giao</span>
     }
 
     // Admin View - Dropdown
     return (
         <Select value={currentValue} onValueChange={handleAssign}>
             <SelectTrigger className="w-[180px] h-8 text-xs bg-transparent border-input">
-                <SelectValue placeholder="Select assignee" />
+                <SelectValue placeholder="Chọn người làm" />
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="sys:revoke" className="text-red-500 font-bold">⛔ Thu hồi về System</SelectItem>
-                <SelectItem value="unassigned">-- Hủy giao (Unassign User) --</SelectItem>
+                <SelectItem value="unassigned">-- Huỷ giao --</SelectItem>
 
                 <SelectGroup>
-                    <SelectLabel>Team Members</SelectLabel>
+                    <SelectLabel>Thành viên nhóm</SelectLabel>
                     {users
                         .filter(u => {
                             const role = (u as any).role
@@ -137,7 +137,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                                 <AvatarFallback>{displayName(u)[0]}</AvatarFallback>
                                             </Avatar>
                                             {flagColor && (
-                                                <div className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${flagColor} shadow-sm`} title={`Rank ${latestRank} Warning`} />
+                                                <div className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${flagColor} shadow-sm`} title={`Cảnh báo hạng ${latestRank}`} />
                                             )}
                                         </div>
                                         <span>{displayName(u)}</span>

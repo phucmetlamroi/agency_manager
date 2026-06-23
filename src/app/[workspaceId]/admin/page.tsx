@@ -277,7 +277,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 rankingsSlot={
                     <Suspense fallback={
                         <div className="h-full rounded-[26px] bg-[#0A0A0A] border border-[rgba(139,92,246,0.15)] animate-pulse flex items-center justify-center text-[#A1A1AA] text-sm">
-                            Loading Rankings...
+                            Đang tải bảng xếp hạng...
                         </div>
                     }>
                         <Leaderboard workspaceId={workspaceId} />

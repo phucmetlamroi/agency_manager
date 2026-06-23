@@ -198,7 +198,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                                         border: '1px solid rgba(255,255,255,0.06)',
                                     }}
                                 >
-                                    Short {shortForm}
+                                    Ngắn {shortForm}
                                 </span>
                             )}
                             {longForm > 0 && (
@@ -212,7 +212,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                                         border: '1px solid rgba(255,255,255,0.06)',
                                     }}
                                 >
-                                    Long {longForm}
+                                    Dài {longForm}
                                 </span>
                             )}
                             {trial > 0 && (
@@ -226,7 +226,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                                         border: '1px solid rgba(255,255,255,0.06)',
                                     }}
                                 >
-                                    Trial {trial}
+                                    Thử {trial}
                                 </span>
                             )}
                             {/* View filter button */}
@@ -243,7 +243,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                                 }}
                             >
                                 <Filter className="w-3 h-3" />
-                                <span>View</span>
+                                <span>Xem</span>
                             </div>
                         </div>
                     )}
@@ -307,7 +307,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                                     }}
                                 >
                                     <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                    All tasks assigned
+                                    Đã phân công hết task
                                 </div>
                                 <div
                                     className="flex items-center gap-2 text-zinc-500 text-xs"

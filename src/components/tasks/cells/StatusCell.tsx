@@ -63,10 +63,10 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                 toast.error(result.error)
                 return
             }
-            toast.success(`Status updated to ${newStatus}`)
+            toast.success(`Đã chuyển trạng thái sang ${newStatus}`)
             router.refresh()
         } catch (error) {
-            toast.error("Failed to update status")
+            toast.error("Cập nhật trạng thái thất bại")
         }
     }
 
@@ -79,10 +79,10 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
             }
             setIsFeedbackOpen(false)
             setFeedback({ type: 'INTERNAL', content: '' })
-            toast.success("Sent revision feedback")
+            toast.success("Đã gửi phản hồi Revision")
             router.refresh()
         } catch (error) {
-            toast.error("Failed to submit feedback")
+            toast.error("Gửi phản hồi thất bại")
         }
     }
 
@@ -106,7 +106,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
                     </span>
-                    Working...
+                    Đang làm...
                 </Badge>
             )
         }
@@ -140,7 +140,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-green-500 hover:text-green-600 hover:bg-green-50"
-                        title="Mark as Feedbacked (Resume)"
+                        title="Đánh dấu đã phản hồi (Tiếp tục)"
                         onClick={() => handleStatusChange('Đang thực hiện')}
                     >
                         ✔
@@ -168,7 +168,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                                     onChange={() => setFeedback({ ...feedback, type: 'CLIENT' })}
                                     className="hidden"
                                 />
-                                <span className="font-bold">👤 Client</span>
+                                <span className="font-bold">👤 Khách hàng</span>
                             </label>
                             <label className={`flex-1 p-3 rounded border cursor-pointer flex items-center justify-center gap-2 ${feedback.type === 'INTERNAL' ? 'bg-yellow-500/10 border-yellow-500 text-yellow-600' : 'border-gray-200'}`}>
                                 <input
@@ -178,12 +178,12 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                                     onChange={() => setFeedback({ ...feedback, type: 'INTERNAL' })}
                                     className="hidden"
                                 />
-                                <span className="font-bold">🏢 Internal</span>
+                                <span className="font-bold">🏢 Nội bộ</span>
                             </label>
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Ghi chú (Optional)</Label>
+                            <Label>Ghi chú (Không bắt buộc)</Label>
                             <textarea
                                 value={feedback.content}
                                 onChange={(e) => setFeedback({ ...feedback, content: e.target.value })}
@@ -194,8 +194,8 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsFeedbackOpen(false)}>Cancel</Button>
-                        <Button variant="destructive" onClick={submitFeedback}>Submit Revision</Button>
+                        <Button variant="outline" onClick={() => setIsFeedbackOpen(false)}>Huỷ</Button>
+                        <Button variant="destructive" onClick={submitFeedback}>Gửi Revision</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

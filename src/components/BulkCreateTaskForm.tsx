@@ -11,6 +11,7 @@ import { TagRadialMenu } from "@/components/tags/TagRadialMenu"
 import { TagPills } from "@/components/tags/TagPills"
 import { getTagsForUser } from "@/actions/tag-actions"
 import { cn } from "@/lib/utils"
+import { taskTypeLabel } from "@/lib/display-labels"
 
 // ── Types ────────────────────────────────────────────────────
 type User = {
@@ -242,9 +243,9 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                 <ClientSelector onSelect={setClientId} workspaceId={workspaceId} />
                 <div className="grid grid-cols-2 gap-3">
                     <FormSelect label="Loại Task" value={type} onChange={(e: any) => setType(e.target.value)}>
-                        <option value="Short form">Short form</option>
-                        <option value="Long form">Long form</option>
-                        <option value="Trial">Trial</option>
+                        <option value="Short form">{taskTypeLabel('Short form')}</option>
+                        <option value="Long form">{taskTypeLabel('Long form')}</option>
+                        <option value="Trial">{taskTypeLabel('Trial')}</option>
                     </FormSelect>
                     <FormInput label="Deadline" type="datetime-local" value={deadline} onChange={(e: any) => setDeadline(e.target.value)} />
                 </div>
@@ -301,7 +302,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                     <h4 className="text-xs font-bold uppercase tracking-widest text-blue-400 flex items-center gap-2">
                         {"T\u00e0i nguy\u00ean & Ghi ch\u00fa"}
                         <span className="text-zinc-600 text-[9px] normal-case font-medium lowercase">
-                            (right-click = tags · ctrl+drag = radial)
+                            (chuột phải = tags · ctrl+kéo = radial)
                         </span>
                     </h4>
                 </div>
@@ -335,7 +336,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
 
                 {/* Notes EN */}
                 <div>
-                    <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">English Notes</label>
+                    <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Ghi chú tiếng Anh</label>
                     <textarea value={notesEn} onChange={e => setNotesEn(e.target.value)} placeholder="Dán nội dung tiếng Anh vào đây..." rows={3}
                         className="w-full px-3 py-2.5 bg-zinc-900/60 border border-emerald-500/15 rounded-xl text-zinc-200 text-sm placeholder:text-zinc-700 focus:outline-none focus:border-emerald-500/40 transition-all duration-200 resize-none" />
                     <p className="text-[10px] text-zinc-700 mt-1 italic">ℹ️ Tự dán kết quả dịch vào đây để tối ưu chi phí.</p>
@@ -378,7 +379,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                         </span>
                     )}
                 </div>
-                <p className="text-[11px] text-zinc-600 mb-2">Paste danh sách tên video vào đây (Mỗi dòng 1 video)</p>
+                <p className="text-[11px] text-zinc-600 mb-2">Dán danh sách tên video vào đây (mỗi dòng 1 video)</p>
                 <textarea
                     value={rawTitles}
                     onChange={e => setRawTitles(e.target.value)}

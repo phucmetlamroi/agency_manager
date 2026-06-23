@@ -26,7 +26,7 @@ export default function InviteToProfileModal({ profileId, profileName, onClose, 
             if (result.error) {
                 toast.error(result.error)
             } else {
-                toast.success('Đã mời thành viên vào Profile.')
+                toast.success('Đã mời thành viên vào Tổ chức.')
                 onSuccess()
             }
         } finally {
@@ -58,7 +58,7 @@ export default function InviteToProfileModal({ profileId, profileName, onClose, 
                         />
                     </div>
                     <div>
-                        <label className="text-xs text-zinc-400 font-medium pl-1">Role</label>
+                        <label className="text-xs text-zinc-400 font-medium pl-1">Vai trò</label>
                         <div className="mt-1.5 flex gap-2">
                             <button
                                 type="button"
@@ -69,7 +69,7 @@ export default function InviteToProfileModal({ profileId, profileName, onClose, 
                                         : 'bg-white/[0.02] text-zinc-500 border-white/5 hover:text-zinc-300'
                                 }`}
                             >
-                                User (Read-only)
+                                Nhân viên (Chỉ xem)
                             </button>
                             <button
                                 type="button"
@@ -80,12 +80,12 @@ export default function InviteToProfileModal({ profileId, profileName, onClose, 
                                         : 'bg-white/[0.02] text-zinc-500 border-white/5 hover:text-zinc-300'
                                 }`}
                             >
-                                Admin
+                                Quản trị
                             </button>
                         </div>
                         <p className="text-[11px] text-zinc-600 mt-2 pl-1 leading-relaxed">
-                            <strong className="text-zinc-400">User:</strong> chỉ xem.{' '}
-                            <strong className="text-zinc-400">Admin:</strong> tạo workspace + mời member (không xóa được). Admin chỉ tự động thấy workspace mới tạo sau khi được mời — workspace cũ cần Owner cấp riêng.
+                            <strong className="text-zinc-400">Nhân viên:</strong> chỉ xem.{' '}
+                            <strong className="text-zinc-400">Quản trị:</strong> tạo workspace + mời thành viên (không xóa được). Quản trị chỉ tự động thấy workspace mới tạo sau khi được mời — workspace cũ cần Chủ sở hữu cấp riêng.
                         </p>
                     </div>
                     <div className="flex items-center justify-end gap-2 pt-2">

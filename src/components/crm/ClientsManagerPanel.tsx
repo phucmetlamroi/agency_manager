@@ -146,7 +146,7 @@ export default function ClientsManagerPanel({
                                 style={{ background: 'none', border: 'none', padding: 0, cursor: view === 'list' ? 'default' : 'pointer', fontFamily: 'inherit' }}
                             >
                                 <span className="text-[18px] font-bold tracking-[-0.01em] truncate" style={{ color: view === 'list' ? '#fff' : '#a1a1aa', transition: 'color .2s' }}>
-                                    Clients Manager
+                                    Quản lý khách hàng
                                 </span>
                                 {view === 'list' && (
                                     <span className="text-xs font-normal" style={{ color: '#A1A1AA' }}>Quản lý Đối tác, Brand con &amp; Hiệu suất</span>
@@ -188,7 +188,7 @@ export default function ClientsManagerPanel({
                                 style={{ padding: '5px 12px', borderRadius: 9999, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)' }}
                             >
                                 <span className="text-[15px] font-extrabold" style={{ color: '#c4b5fd' }}>{clients.length}</span>
-                                <span className="text-[11px] font-semibold" style={{ color: '#a78bfa' }}>Clients</span>
+                                <span className="text-[11px] font-semibold" style={{ color: '#a78bfa' }}>Khách hàng</span>
                             </span>
                             <button
                                 onClick={openPayments}
@@ -213,7 +213,7 @@ export default function ClientsManagerPanel({
                         </button>
                     )}
                     {view === 'invoice' && (
-                        <span className="text-[11px] font-mono tracking-[0.06em]" style={{ color: '#71717a' }}>INVOICE BUILDER</span>
+                        <span className="text-[11px] font-mono tracking-[0.06em]" style={{ color: '#71717a' }}>TRÌNH TẠO HÓA ĐƠN</span>
                     )}
                 </div>
             </div>

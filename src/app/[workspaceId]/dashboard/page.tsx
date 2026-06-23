@@ -103,7 +103,7 @@ export default async function UserDashboard({ params, searchParams }: {
 
     // [Username Handle] Centralized display: displayName → username (never email fallback)
     const { formatUserDisplay, formatUserInitials } = await import('@/lib/format-user')
-    const displayName = formatUserDisplay(currentUser) || 'User'
+    const displayName = formatUserDisplay(currentUser) || 'Người dùng'
     const initials = formatUserInitials(currentUser) || 'US'
 
     // ── User's tasks (for widgets + TaskTable) ───────────────────
@@ -237,7 +237,7 @@ export default async function UserDashboard({ params, searchParams }: {
                 <button
                     type="button"
                     disabled
-                    title="Coming soon"
+                    title="Sắp ra mắt"
                     className="flex items-center gap-1.5 whitespace-nowrap"
                     style={{
                         padding: '8px 16px',
@@ -253,7 +253,7 @@ export default async function UserDashboard({ params, searchParams }: {
                     }}
                 >
                     <Settings2 className="w-3.5 h-3.5" />
-                    Manage widgets
+                    Quản lý tiện ích
                 </button>
             </div>
 

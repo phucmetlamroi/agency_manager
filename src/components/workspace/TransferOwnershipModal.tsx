@@ -5,6 +5,7 @@ import { Crown, AlertTriangle, ArrowRightLeft, X, Loader2 } from 'lucide-react'
 import { transferWorkspaceOwnership } from '@/actions/workspace-actions'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { roleLabel } from '@/lib/display-labels'
 
 type MemberItem = {
     id: string
@@ -126,7 +127,7 @@ export default function TransferOwnershipModal({ workspaceId, members, currentUs
                                                 {m.user.nickname || m.user.username}
                                             </div>
                                             <div className="text-[11px] text-zinc-500">
-                                                @{m.user.username} · {m.role}
+                                                @{m.user.username} · {roleLabel(m.role)}
                                             </div>
                                         </div>
                                         {isSelected && (

@@ -72,7 +72,7 @@ export default function WorkspaceError({
                         Chi tiết lỗi
                     </p>
                     <p className="text-[12px] text-red-300 break-words font-mono mb-1">
-                        {error.message || 'Unknown error'}
+                        {error.message || 'Lỗi không xác định'}
                     </p>
                     {error.digest && (
                         <p className="text-[11px] text-zinc-500 break-all font-mono">

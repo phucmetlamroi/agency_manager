@@ -117,7 +117,7 @@ export default function AdminAvailabilityWeekMatrix({
                                                     <div
                                                         key={s.userId}
                                                         className={`h-2.5 flex-1 min-w-[22%] rounded-sm opacity-80 shadow-md transition-all group-hover:opacity-100 hover:scale-110 border border-white/5 ${STATUS_COLOR[s.status as AvailabilityStatus]}`}
-                                                        title={`${s.name}: ${s.status}`}
+                                                        title={`${s.name}: ${s.status === 'FREE' ? 'Rảnh' : s.status === 'BUSY' ? 'Bận' : s.status === 'TENTATIVE' ? 'Bận tạm' : 'Trống'}`}
                                                     />
                                                 ))}
                                             </div>

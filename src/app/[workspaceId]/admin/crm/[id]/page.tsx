@@ -81,7 +81,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             value: sub.tasks.length
         })).filter(d => d.value > 0)
     } else {
-        distribution = [{ name: 'Direct Tasks', value: client.tasks.length }]
+        distribution = [{ name: 'Task trực tiếp', value: client.tasks.length }]
     }
 
     return (

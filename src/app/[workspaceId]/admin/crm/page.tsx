@@ -47,7 +47,7 @@ export default async function CRMDashboard({ params }: { params: Promise<{ works
                             {clientCount}
                         </span>
                         <span className="text-[11px] text-indigo-500 font-medium">
-                            Clients
+                            Khách hàng
                         </span>
                     </div>
                 </div>

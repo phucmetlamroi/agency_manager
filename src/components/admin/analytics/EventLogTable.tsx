@@ -22,15 +22,15 @@ const columnHelper = createColumnHelper<EventLog>()
 
 const columns = [
   columnHelper.accessor('time', {
-    header: 'Timestamp',
+    header: 'Thời điểm',
     cell: info => <span className="text-zinc-400 font-mono text-[10px]">{info.getValue()}</span>,
   }),
   columnHelper.accessor('user', {
-    header: 'Actor',
+    header: 'Người thực hiện',
     cell: info => <span className="text-white font-semibold text-xs">{info.getValue()}</span>,
   }),
   columnHelper.accessor('event', {
-    header: 'Type',
+    header: 'Loại',
     cell: info => {
         const val = info.getValue()
         let color = 'bg-zinc-800 text-zinc-400'
@@ -42,7 +42,7 @@ const columns = [
     },
   }),
   columnHelper.accessor('feature', {
-    header: 'Context',
+    header: 'Bối cảnh',
     cell: info => <span className="text-zinc-400 text-xs italic">{info.getValue()}</span>,
   }),
 ]
@@ -83,10 +83,10 @@ export default function EventLogTable() {
         <button 
            onClick={handleFlush}
            className="flex items-center gap-2 p-1 px-3 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[10px] font-bold transition-all border border-white/5"
-           title="Force write in-memory buffer to Database"
+           title="Ghi buffer trong bộ nhớ xuống Database ngay"
         >
             <Database size={11} />
-            Commit Buffer
+            Ghi buffer
         </button>
         <button 
            onClick={fetchData}
@@ -94,7 +94,7 @@ export default function EventLogTable() {
            className="flex items-center gap-2 p-1 px-3 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[10px] font-bold transition-all border border-white/5 disabled:opacity-50"
         >
             <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
-            Refresh
+            Làm mới
         </button>
       </div>
       
@@ -125,7 +125,7 @@ export default function EventLogTable() {
         </table>
         {data.length === 0 && !loading && (
             <div className="p-12 text-center text-zinc-600 text-xs italic">
-                No events recorded yet. Perform some actions to see logs.
+                Chưa ghi nhận sự kiện nào. Hãy thao tác để xem nhật ký.
             </div>
         )}
       </div>

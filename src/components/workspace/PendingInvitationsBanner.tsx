@@ -6,6 +6,7 @@ import { Mail, Check, X, Loader2, Sparkles } from 'lucide-react'
 import { getMyPendingInvitations, acceptWorkspaceInvitation, declineWorkspaceInvitation } from '@/actions/member-actions'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { roleLabel } from '@/lib/display-labels'
 
 type Invitation = {
     id: string
@@ -102,7 +103,7 @@ export default function PendingInvitationsBanner() {
                                     {inv.workspace.name}
                                 </div>
                                 <div className="text-[11px] text-zinc-500">
-                                    Mời bởi {inv.invitedBy.nickname || inv.invitedBy.username} · Vai trò: {inv.role}
+                                    Mời bởi {inv.invitedBy.nickname || inv.invitedBy.username} · Vai trò: {roleLabel(inv.role)}
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">

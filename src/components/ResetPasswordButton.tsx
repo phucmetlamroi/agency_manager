@@ -22,8 +22,8 @@ export default function ResetPasswordButton({ userId, username, workspaceId }: {
 
     const handleTrigger = async () => {
         if (!(await confirm({
-            title: 'Force Password Reset?',
-            message: `Server sẽ gửi email OTP tới user "${username}" để họ TỰ đặt password mới.\n\nBạn KHÔNG nhìn thấy password mới — đây là quy trình bảo mật chuẩn (tránh admin impersonation).\n\nNếu user chưa có email trong hệ thống, hãy yêu cầu họ thiết lập email trước.`,
+            title: 'Đặt lại mật khẩu?',
+            message: `Hệ thống sẽ gửi email OTP tới nhân viên "${username}" để họ TỰ đặt mật khẩu mới.\n\nBạn KHÔNG nhìn thấy mật khẩu mới — đây là quy trình bảo mật chuẩn (tránh quản trị viên mạo danh).\n\nNếu nhân viên chưa có email trong hệ thống, hãy yêu cầu họ thiết lập email trước.`,
             type: 'warning',
             confirmText: 'Gửi email OTP',
             cancelText: 'Hủy'
@@ -33,12 +33,12 @@ export default function ResetPasswordButton({ userId, username, workspaceId }: {
         try {
             const res = await triggerForcePasswordReset(userId, workspaceId)
             if (res.success) {
-                toast.success(res.message ?? 'Đã gửi email reset password.')
+                toast.success(res.message ?? 'Đã gửi email đặt lại mật khẩu.')
             } else {
                 toast.error(res.error ?? 'Không thể gửi email.')
             }
         } catch {
-            toast.error('Lỗi khi gửi email reset.')
+            toast.error('Lỗi khi gửi email đặt lại mật khẩu.')
         } finally {
             setLoading(false)
         }
@@ -49,7 +49,7 @@ export default function ResetPasswordButton({ userId, username, workspaceId }: {
             onClick={handleTrigger}
             disabled={loading}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 border border-transparent hover:border-amber-500/20 transition-all disabled:opacity-50"
-            title="Force password reset (gửi email OTP)"
+            title="Đặt lại mật khẩu (gửi email OTP)"
         >
             {loading ? (
                 <div className="w-3.5 h-3.5 border-2 border-amber-500/40 border-t-amber-500 rounded-full animate-spin" />

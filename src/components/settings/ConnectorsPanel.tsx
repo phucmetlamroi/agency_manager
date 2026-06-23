@@ -109,7 +109,7 @@ export default function ConnectorsPanel({ workspaceId, integrations }: Props) {
         <div className="space-y-4">
             {/* Header */}
             <div>
-                <h3 className="text-lg font-bold text-zinc-100">Connectors</h3>
+                <h3 className="text-lg font-bold text-zinc-100">Kết nối</h3>
                 <p className="text-sm text-zinc-400 mt-1">
                     Kết nối tài khoản Dropbox / Google Drive cá nhân để Velox có thể scan folder video và tạo task hàng loạt.
                 </p>
@@ -157,12 +157,12 @@ export default function ConnectorsPanel({ workspaceId, integrations }: Props) {
                                             {isConnected ? (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold uppercase text-emerald-300">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                                    Connected
+                                                    Đã kết nối
                                                 </span>
                                             ) : (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-500/10 border border-zinc-500/20 text-[10px] font-bold uppercase text-zinc-400">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
-                                                    Disconnected
+                                                    Chưa kết nối
                                                 </span>
                                             )}
                                         </div>
@@ -187,7 +187,7 @@ export default function ConnectorsPanel({ workspaceId, integrations }: Props) {
                                             ) : (
                                                 <Unlink size={12} />
                                             )}
-                                            Disconnect
+                                            Ngắt kết nối
                                         </button>
                                     ) : (
                                         <button
@@ -195,7 +195,7 @@ export default function ConnectorsPanel({ workspaceId, integrations }: Props) {
                                             className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-colors"
                                         >
                                             <Link2 size={12} />
-                                            Connect
+                                            Kết nối
                                         </button>
                                     )}
                                 </div>

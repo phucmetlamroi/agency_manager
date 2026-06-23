@@ -66,7 +66,7 @@ export default function GrantWorkspaceAccessModal({ profileId, targetUserId, tar
                 <div className="p-5 flex-1 overflow-y-auto">
                     <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 mb-4">
                         <p className="text-[12px] text-amber-200 leading-relaxed">
-                            Admin chỉ tự động thấy workspaces tạo SAU khi được promote. Danh sách dưới là các workspace CŨ — cần Owner cấp riêng từng cái.
+                            Quản trị chỉ tự động thấy workspace tạo SAU khi được nâng quyền. Danh sách dưới là các workspace CŨ — cần Chủ sở hữu cấp riêng từng cái.
                         </p>
                     </div>
 
@@ -76,7 +76,7 @@ export default function GrantWorkspaceAccessModal({ profileId, targetUserId, tar
                         </div>
                     ) : workspaces.length === 0 ? (
                         <p className="text-[13px] text-zinc-500 py-4 text-center">
-                            Không có workspace cũ nào (Admin được promote trước khi profile có workspace).
+                            Không có workspace cũ nào (Quản trị được nâng quyền trước khi tổ chức có workspace).
                         </p>
                     ) : (
                         <div className="space-y-2">

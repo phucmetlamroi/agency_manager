@@ -39,7 +39,7 @@ export default function PayrollTable({ users, workspaceId }: { users: UserWithPa
                     <thead className="bg-black/20 text-gray-400 uppercase text-xs">
                         <tr>
                             <th className="px-6 py-3">Nhân viên</th>
-                            <th className="px-6 py-3 text-center">Tasks (Tháng này)</th>
+                            <th className="px-6 py-3 text-center">Task (Tháng này)</th>
                             <th className="px-6 py-3 text-right">Lương Cơ Bản</th>
                             <th className="px-6 py-3 text-right">Thưởng</th>
                             <th className="px-6 py-3 text-right">Tổng Thực Nhận</th>
@@ -91,11 +91,11 @@ export default function PayrollTable({ users, workspaceId }: { users: UserWithPa
                                     <td className="px-6 py-4 text-center">
                                         {isPaid ? (
                                             <span className="inline-flex items-center gap-1 text-green-400 bg-green-400/10 px-2 py-1 rounded-full text-xs font-bold border border-green-400/20">
-                                                <CheckCircle2 className="w-3 h-3" /> PAID
+                                                <CheckCircle2 className="w-3 h-3" /> ĐÃ TRẢ
                                             </span>
                                         ) : (
                                             <span className="inline-flex items-center gap-1 text-gray-400 bg-gray-500/10 px-2 py-1 rounded-full text-xs font-bold border border-gray-500/20">
-                                                <CircleDashed className="w-3 h-3" /> UNPAID
+                                                <CircleDashed className="w-3 h-3" /> CHƯA TRẢ
                                             </span>
                                         )}
                                     </td>
@@ -112,7 +112,7 @@ export default function PayrollTable({ users, workspaceId }: { users: UserWithPa
                                             </button>
                                         )}
                                         {isPaid && (
-                                            <span className="text-xs text-gray-600 italic">Is Paid</span>
+                                            <span className="text-xs text-gray-600 italic">Đã trả</span>
                                         )}
                                     </td>
                                 </tr>

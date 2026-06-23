@@ -424,7 +424,7 @@ export function OptimisticGrid({
                
                {/* Now Snapshot */}
                <div className="hidden md:flex items-center gap-3 px-3 py-1.5 bg-background border border-border rounded-xl shadow-sm text-[11px] font-bold">
-                 <span className="flex items-center gap-1.5 text-muted-foreground uppercase tracking-widest border-r pr-3"><Clock className="h-3.5 w-3.5"/> NOW</span>
+                 <span className="flex items-center gap-1.5 text-muted-foreground uppercase tracking-widest border-r pr-3"><Clock className="h-3.5 w-3.5"/> BÂY GIỜ</span>
                  <span className="flex items-center gap-1 text-green-600" title="Sẵn sàng"><div className="w-1.5 h-1.5 rounded-full bg-green-600"/> {getNowStats().free}</span>
                  <span className="flex items-center gap-1 text-red-500" title="Bận"><div className="w-1.5 h-1.5 rounded-full bg-red-500"/> {getNowStats().busy}</span>
                  <span className="flex items-center gap-1 text-muted-foreground/60" title="Chưa rõ"><div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30"/> {getNowStats().tentative}</span>
@@ -477,7 +477,7 @@ export function OptimisticGrid({
         <table className="w-full border-separate border-spacing-0" style={{ minWidth: viewMode === 'TEAM_DAY' ? 220 * users.length : 900 }}>
            <thead className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl">
               <tr>
-                 <th className="sticky left-0 z-50 bg-background border-b border-r py-3 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">TIME</th>
+                 <th className="sticky left-0 z-50 bg-background border-b border-r py-3 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">GIỜ</th>
                  {(viewMode === 'SINGLE_WEEK' ? weekDays : users).map((obj, i) => {
                     const isWeek = viewMode === 'SINGLE_WEEK'
                     const day = isWeek ? (obj as Date) : selectedDay
@@ -488,12 +488,12 @@ export function OptimisticGrid({
                            {isWeek ? DAY_NAMES[day.getDay()] : (obj as GridUser).name}
                         </div>
                         <div className="flex items-center justify-center gap-2">
-                           <span className={cn('font-black tracking-tighter', isToday ? 'text-primary' : 'text-foreground', isCompact ? 'text-sm' : 'text-lg')}>{isWeek ? format(day, 'dd/MM') : 'Member'}</span>
+                           <span className={cn('font-black tracking-tighter', isToday ? 'text-primary' : 'text-foreground', isCompact ? 'text-sm' : 'text-lg')}>{isWeek ? format(day, 'dd/MM') : 'Thành viên'}</span>
                            {isWeek && !readOnly && (
                              <div className="flex gap-1 group">
-                                <button title="Copy day" onClick={() => handleCopyDay(day)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground/30 hover:text-primary transition-all"><Copy className="h-3.5 w-3.5" /></button>
-                                {copyData && <button title="Paste here" onClick={() => handlePasteDay(day, 'ONE')} className="p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20"><ClipboardCheck className="h-3.5 w-3.5" /></button>}
-                                <button title="Clear day" onClick={() => handleClearDay(day)} className="p-1.5 hover:bg-red-50 rounded-lg text-muted-foreground/30 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                                <button title="Sao chép ngày" onClick={() => handleCopyDay(day)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground/30 hover:text-primary transition-all"><Copy className="h-3.5 w-3.5" /></button>
+                                {copyData && <button title="Dán vào đây" onClick={() => handlePasteDay(day, 'ONE')} className="p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20"><ClipboardCheck className="h-3.5 w-3.5" /></button>}
+                                <button title="Xoá lịch ngày" onClick={() => handleClearDay(day)} className="p-1.5 hover:bg-red-50 rounded-lg text-muted-foreground/30 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
                              </div>
                            )}
                         </div>
@@ -552,7 +552,7 @@ export function OptimisticGrid({
 
              <div className="space-y-4">
                 <div className="space-y-1.5">
-                   <div className="text-[9px] font-black text-muted-foreground uppercase pl-1">PRESETS</div>
+                   <div className="text-[9px] font-black text-muted-foreground uppercase pl-1">MẪU NHANH</div>
                    <div className="grid grid-cols-2 gap-1.5">
                       {PRESETS.map(p => (
                         <button key={p.label} onClick={() => applyStatusRange('ADD', p)} className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/50 hover:bg-primary/10 hover:text-primary text-[10px] font-black transition-all text-left leading-none">
@@ -612,7 +612,7 @@ export function OptimisticGrid({
       <div className="flex justify-center p-2 bg-primary/5 border border-primary/20 rounded-2xl">
          <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-primary/60">
             <Info className="h-5 w-5" />
-            <span>TIPS: Kéo từ T2-T6 để áp dụng hàng loạt | Chuột phải để xóa nhanh | Bật "Theo Nhóm" để xem ai đang rảnh</span>
+            <span>MẸO: Kéo từ T2-T6 để áp dụng hàng loạt | Chuột phải để xóa nhanh | Bật "Nhóm" để xem ai đang rảnh</span>
          </div>
       </div>
     </div>

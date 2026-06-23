@@ -10,10 +10,10 @@ const STATUS_CLASS: Record<AvailabilityStatus, string> = {
 }
 
 const STATUS_LABEL: Record<AvailabilityStatus, string> = {
-    EMPTY: 'Trá»‘ng',
-    FREE: 'Ráº£nh',
-    BUSY: 'Báº­n',
-    TENTATIVE: 'Báº­n táº¡m'
+    EMPTY: 'Trống',
+    FREE: 'Rảnh',
+    BUSY: 'Bận',
+    TENTATIVE: 'Bận tạm'
 }
 
 const STATUS_DOT: Record<AvailabilityStatus, string> = {
@@ -43,7 +43,7 @@ export default function AdminAvailabilityMatrix({
     return (
         <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4">
             <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-zinc-400">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Legend</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Chú thích</span>
                 <div className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.35)] ${STATUS_DOT.FREE}`} />
                     <span>{STATUS_LABEL.FREE}</span>
@@ -82,7 +82,7 @@ export default function AdminAvailabilityMatrix({
                             <div
                                 key={`${user.id}-${index}`}
                                 className={`h-12 border-b border-r border-zinc-800 ${STATUS_CLASS[status]} ${index === currentHour ? 'ring-1 ring-white/10 shadow-[0_0_14px_rgba(255,255,255,0.18)]' : ''}`}
-                                title={`${dateKey} ${index}:00 â€¢ ${STATUS_LABEL[status]}`}
+                                title={`${dateKey} ${index}:00 • ${STATUS_LABEL[status]}`}
                             />
                         ))}
                     </div>

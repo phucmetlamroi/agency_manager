@@ -261,9 +261,16 @@ export async function removeFromProfileAction(profileId: string, targetUserId: s
         prisma.workspaceInvitation.deleteMany({
             where: { workspaceId: { in: workspaceIds }, invitedUserId: targetUserId },
         }),
-        // Delete ProfileAccess row
-        prisma.profileAccess.delete({
-            where: { userId_profileId: { userId: targetUserId, profileId } },
+        // [Merge: sole invite path] Delete the ProfileAccess row idempotently. Using deleteMany
+        // (not delete) so two admins removing the SAME member concurrently don't trip a P2025 on
+        // the second call (delete throws on a missing row → whole tx rolls back → unhandled error).
+        // The revoke here is UNCONDITIONAL (unlike the workspace flow's count-gated revoke), so no
+        // FOR UPDATE serialization is needed — there is no read-then-conditionally-delete TOCTOU.
+        // Last-OWNER safety: removing an OWNER is already refused above, and ownership only moves via
+        // transferProfileOwnership (atomic swap, always exactly one OWNER), so this can never leave
+        // the profile ownerless.
+        prisma.profileAccess.deleteMany({
+            where: { userId: targetUserId, profileId },
         }),
     ])
 

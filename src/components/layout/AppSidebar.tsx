@@ -85,9 +85,9 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
         { label: "Hồ sơ", href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, roles: ['USER'] },
         { label: "Bảng lương", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN', 'USER'] },
         { label: "Tài chính", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN', 'USER'] },
-        { label: "Thành viên", href: `/${workspaceId}/admin/members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
-        // [Sprint Z] Profile-level member management — Owner/Admin only (page-level guard)
-        { label: "Thành viên tổ chức", href: `/${workspaceId}/admin/profile-members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
+        // [Merge: one membership menu] The per-workspace "Members" entry was merged into the
+        // org-level membership page below (ProfileAccess, org-wide). Single roster + invite path.
+        { label: "Thành viên", href: `/${workspaceId}/admin/profile-members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
         // [Sprint Z+1] Profile Trash — Owner only (page-level guard)
         { label: "Thùng rác tổ chức", href: `/${workspaceId}/admin/profile-trash`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
         { label: "Phân tích", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN', 'USER'] },

@@ -106,6 +106,17 @@ export async function verifyWorkspaceAccess(
     } else if (profileAccess?.role === 'ADMIN' && workspace.createdAt >= profileAccess.grantedAt) {
         // Profile ADMIN: chỉ workspace tạo SAU khi họ được promote/granted
         workspaceRole = 'ADMIN'
+    } else if (profileAccess?.role === 'CLIENT') {
+        // [AUDIT PE-1 — fix HIGH] CLIENT is a view-only portal grant. The CLIENT exclusion
+        // MUST run BEFORE the WorkspaceMember branch: previously the membership lookup below
+        // ran first and, if a stray/legacy WorkspaceMember row existed (left by a USER→CLIENT
+        // demotion, the client-migration script, or a task-assignment mint), it was honored
+        // VERBATIM — handing a CLIENT internal MEMBER/ADMIN access (and finance/jobPriceUSD via
+        // verifyProfileAdminAccess) before the `role !== 'CLIENT'` guard was ever reached. Now a
+        // CLIENT ProfileAccess can never be overridden by a membership row — fail closed,
+        // mirroring canAccessWorkspace (profile-permissions.ts:104). Leave workspaceRole null →
+        // the IDOR rejection below denies access.
+        workspaceRole = null
     } else {
         // Fall through: explicit WorkspaceMember row (for old workspaces granted
         // by Owner to specific Admin/User)
@@ -118,12 +129,11 @@ export async function verifyWorkspaceAccess(
                 throw new Error('SECURITY_VIOLATION: Vai trò không hợp lệ trong Workspace này.')
             }
             workspaceRole = membership.role
-        } else if (profileAccess && profileAccess.role !== 'CLIENT') {
-            // [Client membership] CLIENT profile members are EXCLUDED here — they are
-            // view-only portal users and must never receive internal MEMBER access.
+        } else if (profileAccess) {
             // [Sprint Z+1 hotfix] Profile member (USER, hoặc ADMIN với workspace cũ hơn grantedAt)
             // → fall back tới MEMBER access. Cần thiết cho USER assigned to task —
-            // họ cần permission update productLink/notes khi nộp delivery.
+            // họ cần permission update productLink/notes khi nộp delivery. (CLIENT is already
+            // excluded by the dedicated branch above, so profileAccess here is USER/ADMIN.)
             //
             // CREATE gates (workspace creation, member invite, role change) đều dùng
             // canCreateWorkspace/canInviteMember từ profile-permissions.ts (based on

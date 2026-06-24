@@ -375,7 +375,11 @@ export async function inviteToWorkspace(
         where: { id: workspaceId },
         select: { profileId: true },
     })
-    if (workspace?.profileId && targetUser.profileId && workspace.profileId !== targetUser.profileId) {
+    // [AUDIT CONSENT-1 — fix] Dropped the `targetUser.profileId &&` precondition so the consent
+    // gate also fires for null-home-profile external users (mirror inviteToProfileAction). A user
+    // is external to this workspace's profile whenever they are not a member of it; null is
+    // `!== workspace.profileId`, so allowExternalInvites=false is now honored for them too.
+    if (workspace?.profileId && targetUser.profileId !== workspace.profileId) {
         if (targetUser.allowExternalInvites === false) {
             // [AUDIT invite-flow R2 — fix HIGH] Do NOT echo the resolved @username — a caller who
             // supplied only an email would otherwise convert it into that cross-tenant user's

@@ -27,6 +27,12 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     title: 'HustlyTasker',
   },
+  // [no-auto-translate] Each surface is already in its target language (staff app = Vietnamese,
+  // client share portal = English). Chrome/Google auto-translate would re-translate the whole
+  // page — including DATA like client names — turning "Jacob" into "Gia-cốp" (Google's Vietnamese
+  // for Jacob) purely in the browser. Tell the browser never to auto-translate; pair with
+  // translate="no" on <html>. Staff/clients see the real stored values.
+  other: { google: 'notranslate' },
 }
 
 export const viewport: Viewport = {
@@ -43,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className={plusJakarta.variable} suppressHydrationWarning>
+    <html lang="vi" translate="no" className={`notranslate ${plusJakarta.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
         <ConfirmProvider>
           <RadialNavProvider>

@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { verifyProfileAdminAccess } from '@/lib/security'
 import { validateEmailForSignup } from '@/lib/email-validator'
+import { checkInviteCallerRate } from '@/lib/rate-limit-upstash'
 
 /**
  * Admin tạo user invite-only (legacy flow song song với public signup).
@@ -48,6 +49,15 @@ export async function createUser(formData: FormData, workspaceId: string) {
         const v = validateEmailForSignup(email)
         if (!v.valid) {
             return { error: v.message ?? 'Email không hợp lệ.' }
+        }
+        // [AUDIT ENUM-1 — fix] The duplicate check below is a GLOBAL (cross-tenant) findFirst that
+        // returns a distinguishable "đã được sử dụng" message → an email→exists oracle. Any
+        // self-registered user is OWNER of their own profile, so this door is reachable. Cap probing
+        // with the SAME caller-scoped throttle the invite doors use (R2) so it can't be looped for
+        // mass email harvesting (40/h/caller).
+        const callerRate = await checkInviteCallerRate(session.user.id)
+        if (!callerRate.success) {
+            return { error: `Bạn đang thao tác quá nhanh. Vui lòng thử lại sau ${callerRate.retryAfter ?? 3600} giây.` }
         }
         // Check email không trùng
         const existing = await prisma.user.findFirst({

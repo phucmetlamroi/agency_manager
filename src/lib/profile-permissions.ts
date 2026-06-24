@@ -30,6 +30,31 @@ export async function getProfileRole(userId: string, profileId: string): Promise
     return access?.role ?? null
 }
 
+/**
+ * [AUDIT SI-1 / SI-2 / MISS-2 — fix] Liveness re-check for mutation / PII-read doors that
+ * authenticate via getSession() alone (JWT decrypt) and never reach verifyWorkspaceAccess —
+ * the canonical profile-member-actions.ts surface and cross-team-actions.ts.
+ *
+ * getSession() (auth.ts) deliberately skips the sessionVersion check (Edge-cheap), and the
+ * permission predicates here only read ProfileAccess.role — they never read User.role or
+ * User.sessionVersion. So without this helper a LOCKED (banned) account, or a session revoked
+ * by "logout all devices" / password-reset (which bumps User.sessionVersion), could still
+ * invite / remove / transfer / approve-du-học with a stale token. Mirrors the guard
+ * acceptWorkspaceInvitation already applies (member-actions.ts) and verifyWorkspaceAccess
+ * (security.ts). Returns true only if the account is live and the token is current.
+ */
+export async function isSessionLive(session: { user?: { id?: string; sessionVersion?: number } } | null): Promise<boolean> {
+    const uid = session?.user?.id
+    if (!uid) return false
+    const dbUser = await prisma.user.findUnique({
+        where: { id: uid },
+        select: { role: true, sessionVersion: true },
+    })
+    if (!dbUser || dbUser.role === 'LOCKED') return false
+    if (((session?.user?.sessionVersion) ?? 0) < (dbUser.sessionVersion ?? 0)) return false
+    return true
+}
+
 export async function getProfileAccess(
     userId: string,
     profileId: string,

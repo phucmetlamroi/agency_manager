@@ -17,6 +17,7 @@
 
 import { prisma } from '@/lib/db'
 import { randomBytes } from 'crypto'
+import { findUserByEmailOrUsername } from '@/lib/user-lookup'
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo'
@@ -150,9 +151,34 @@ export async function findOrCreateGoogleUser(info: GoogleUserInfo): Promise<Goog
     const byGoogle = await prisma.user.findFirst({ where: { googleId: info.googleId } })
     if (byGoogle) return toAuthUser(byGoogle as any, false)
 
-    // 2) Existing account with the same (verified) email → link
-    const byEmail = await prisma.user.findFirst({ where: { email: info.email } })
+    // 2) Existing account with the same (verified) email → link.
+    // [AUDIT OAUTH-LINK-001 — fix HIGH] User.email is NOT @unique (duplicate rows exist on prod);
+    // a raw findFirst({where:{email}}) returned a NON-DETERMINISTIC row and could burn the unique
+    // googleId onto an arbitrary duplicate — a LOCKED/CLIENT row (permanent OAuth lock-out) or a
+    // foreign-tenant row (silent wrong-account login). Route through the deterministic R1 helper,
+    // REFUSE on ambiguity (matchCount>1), and NEVER write googleId onto a LOCKED/CLIENT row.
+    const lookup = await findUserByEmailOrUsername<{
+        id: string; role: string; username: string; profileId: string | null;
+        sessionVersion: number; email: string | null; displayName: string | null;
+        hasCompletedEmailMigration: boolean; emailVerifiedAt: Date | null; avatarUrl: string | null;
+    }>(info.email, {
+        id: true, role: true, username: true, profileId: true, sessionVersion: true,
+        email: true, displayName: true, hasCompletedEmailMigration: true,
+        emailVerifiedAt: true, avatarUrl: true,
+    })
+    if (lookup.matchCount > 1) {
+        // Ambiguous: >1 account shares this email. Refuse to bind the Google identity rather than
+        // pick non-deterministically (callback catches → /login?error=google). Consolidate dupes first.
+        throw new Error('[google-auth] ambiguous email — multiple accounts share it; refusing to link')
+    }
+    const byEmail = lookup.user
     if (byEmail) {
+        // Never burn the unique googleId onto a banned (LOCKED) or view-only (CLIENT) row — that
+        // permanently locks the identity to a dead account. Return as-is so the callback role gate
+        // redirects (account_locked / client_account) WITHOUT having mutated anything.
+        if (byEmail.role === 'LOCKED' || byEmail.role === 'CLIENT') {
+            return toAuthUser(byEmail as any, false)
+        }
         const linked = await prisma.user.update({
             where: { id: byEmail.id },
             data: {

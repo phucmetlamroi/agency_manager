@@ -57,10 +57,13 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
 
     // Customizable Fields
+    // [Invoice i18n fix] Clients are foreign / English-speaking → the values baked into the
+    // client-facing PDF default to ENGLISH (the staff editor chrome stays Vietnamese; only these
+    // payload values reach the customer). Staff can still override any field before exporting.
     const [customAgencyName, setCustomAgencyName] = useState('Agency Manager')
-    const [customTitle, setCustomTitle] = useState('HÓA ĐƠN')
+    const [customTitle, setCustomTitle] = useState('INVOICE')
     const [customClientAddress, setCustomClientAddress] = useState(clientAddress || '')
-    const [dueDateLabel, setDueDateLabel] = useState('Số tiền phải trả')
+    const [dueDateLabel, setDueDateLabel] = useState('Due Date')
     const [paymentLink, setPaymentLink] = useState('')
     const [customPrepaid, setCustomPrepaid] = useState(0)
 
@@ -156,7 +159,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 // FLAT LIST (Itemized)
                 const taskItems: InvoiceItem[] = selectedTasks.map(t => ({
                     id: t.id,
-                    description: t.title || 'Task chưa đặt tên',
+                    description: t.title || 'Untitled task',
                     note: t.productLink ? `Ref: ${t.productLink}` : undefined,
                     quantity: 1,
                     unitPrice: Number(t.jobPriceUSD) || 0,
@@ -188,8 +191,8 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 } else {
                     groupedItems.push({
                         id: `group-${clientName}-${Date.now()}`, // Temp ID
-                        description: `Dịch vụ sản xuất [${clientName}]`, // Simplified Description
-                        note: `Gộp ${selectedTasks.filter(st => (st.originalClientName || 'General') === clientName).length} task`,
+                        description: `Production services [${clientName}]`, // Simplified Description (client-facing → English)
+                        note: `${selectedTasks.filter(st => (st.originalClientName || 'General') === clientName).length} tasks`,
                         quantity: 1,
                         unitPrice: amount,
                         amount: amount,
@@ -360,7 +363,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 currency,
                 issueDate: issueDate || new Date().toLocaleDateString(),
 
-                dueDate: dueDate || 'Khi nhận hóa đơn',
+                dueDate: dueDate || 'Upon receipt',
                 subtotal: activeSubtotal.toFixed(2),
                 taxAmount: activeTaxAmount.toFixed(2),
                 depositDeducted: totalDeducted > 0 ? totalDeducted.toFixed(2) : undefined,
@@ -525,7 +528,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
                         <button
                             onClick={() => {
-                                const newItem = { id: `man-${Date.now()}`, description: 'Dịch vụ thêm', quantity: 1, unitPrice: 0, amount: 0, isManual: true }
+                                const newItem = { id: `man-${Date.now()}`, description: 'Additional service', quantity: 1, unitPrice: 0, amount: 0, isManual: true }
                                 setManualItems([...manualItems, newItem])
                                 setEditingItemId(newItem.id)
                                 setEditForm({ description: newItem.description, unitPrice: 0, quantity: 1 })

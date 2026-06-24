@@ -14,8 +14,12 @@
  *   - otpEmail:    3 OTP / 1 giờ / email + cooldown 60s giữa lần
  *   - otpIp:       10 OTP / 1 giờ / IP (chống bulk enumeration)
  *
- * Fallback: nếu UPSTASH_* env không set → return success=true (cho dev local).
- * Production deploy SẼ FAIL nếu env thiếu vì rate-limit là security-critical.
+ * Fallback policy (AUDIT RL-1 — fix): if UPSTASH_* env is missing →
+ *   - in PRODUCTION: every checkX() fails CLOSED (returns success=false). Upstash IS provisioned
+ *     in production, so a null limiter there means a real outage/misconfig — refusing is safer than
+ *     silently dropping every signup/login/OTP/invite-caller throttle (enumeration + auth-flood
+ *     exposure). The old comment falsely claimed "deploy SẼ FAIL"; no such boot guard ever existed.
+ *   - in DEV: fails OPEN (success=true) so local dev without Upstash still works.
  */
 
 import { Ratelimit } from '@upstash/ratelimit'
@@ -149,11 +153,20 @@ export type RateLimitResult = {
 }
 
 /**
+ * [AUDIT RL-1 — fix] Result when the limiter is unavailable (Upstash env missing). Fail CLOSED in
+ * production (block — Upstash is provisioned there, so null = outage), OPEN in dev. See file header.
+ */
+function noLimiterResult(): RateLimitResult {
+    if (process.env.NODE_ENV === 'production') return { success: false, retryAfter: 60 }
+    return { success: true }
+}
+
+/**
  * Check signup rate limit theo IP. 5/giờ.
  */
 export async function checkSignupIp(ip: string): Promise<RateLimitResult> {
     const limiter = getSignupIpLimiter()
-    if (!limiter) return { success: true } // Dev fallback
+    if (!limiter) return noLimiterResult()
     const r = await limiter.limit(`ip:${ip}`)
     return {
         success: r.success,
@@ -169,7 +182,7 @@ export async function checkSignupIp(ip: string): Promise<RateLimitResult> {
  */
 export async function checkSignupEmail(email: string): Promise<RateLimitResult> {
     const limiter = getSignupEmailLimiter()
-    if (!limiter) return { success: true }
+    if (!limiter) return noLimiterResult()
     const r = await limiter.limit(`email:${email.toLowerCase()}`)
     return {
         success: r.success,
@@ -186,7 +199,7 @@ export async function checkSignupEmail(email: string): Promise<RateLimitResult> 
  */
 export async function checkLoginIp(ip: string): Promise<RateLimitResult> {
     const limiter = getLoginIpLimiter()
-    if (!limiter) return { success: true }
+    if (!limiter) return noLimiterResult()
     const r = await limiter.limit(`ip:${ip}`)
     return {
         success: r.success,
@@ -203,7 +216,7 @@ export async function checkLoginIp(ip: string): Promise<RateLimitResult> {
  */
 export async function checkOtpEmail(email: string): Promise<RateLimitResult> {
     const limiter = getOtpEmailLimiter()
-    if (!limiter) return { success: true }
+    if (!limiter) return noLimiterResult()
     const r = await limiter.limit(`email:${email.toLowerCase()}`)
     return {
         success: r.success,
@@ -219,7 +232,7 @@ export async function checkOtpEmail(email: string): Promise<RateLimitResult> {
  */
 export async function checkOtpIp(ip: string): Promise<RateLimitResult> {
     const limiter = getOtpIpLimiter()
-    if (!limiter) return { success: true }
+    if (!limiter) return noLimiterResult()
     const r = await limiter.limit(`ip:${ip}`)
     return {
         success: r.success,
@@ -236,7 +249,7 @@ export async function checkOtpIp(ip: string): Promise<RateLimitResult> {
  */
 export async function checkInviteRate(workspaceId: string, targetUserId: string): Promise<RateLimitResult> {
     const limiter = getInviteLimiter()
-    if (!limiter) return { success: true }
+    if (!limiter) return noLimiterResult()
     const r = await limiter.limit(`ws:${workspaceId}:user:${targetUserId}`)
     return {
         success: r.success,
@@ -254,7 +267,7 @@ export async function checkInviteRate(workspaceId: string, targetUserId: string)
  */
 export async function checkInviteCallerRate(userId: string): Promise<RateLimitResult> {
     const limiter = getInviteCallerLimiter()
-    if (!limiter) return { success: true }
+    if (!limiter) return noLimiterResult()
     const r = await limiter.limit(`caller:${userId}`)
     return {
         success: r.success,

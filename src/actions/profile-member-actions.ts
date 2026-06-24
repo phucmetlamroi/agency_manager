@@ -17,6 +17,7 @@ import {
     canTransferOwnership,
     getProfileRole,
     getProfileAccess,
+    isSessionLive,
 } from '@/lib/profile-permissions'
 import { audit } from '@/lib/audit-log'
 import { findUserByEmailOrUsername } from '@/lib/user-lookup'
@@ -30,6 +31,15 @@ async function requireAuthenticated() {
     const session = await getSession()
     if (!session?.user?.id) {
         return { error: 'Bạn cần đăng nhập.' as const, session: null }
+    }
+    // [AUDIT SI-1 / SI-2 — fix HIGH] These canonical profile-member doors authenticate via
+    // getSession() (JWT decrypt) only and never reach verifyWorkspaceAccess, so neither the
+    // LOCKED ban nor a sessionVersion bump ("logout all devices" / password reset) was enforced
+    // on the highest-privilege mutation + roster-read surface. Re-assert live account status here
+    // (covers invite / remove / changeRole / transfer / grant / getProfileMembers — all route
+    // through this helper). Mirrors acceptWorkspaceInvitation (member-actions.ts) + verifyWorkspaceAccess.
+    if (!(await isSessionLive(session))) {
+        return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa. Vui lòng đăng nhập lại.' as const, session: null }
     }
     return { error: null, session }
 }
@@ -167,8 +177,13 @@ export async function inviteToProfileAction(
     // [AUDIT invite-flow R1 — fix HIGH] Cross-org consent: honor allowExternalInvites when the
     // target's home profile differs from this one (mirrors member-actions.ts inviteToWorkspace).
     // Without this, any profile admin could force-add an unconsenting external user as a member.
+    // [AUDIT CONSENT-1 — fix] Dropped the `targetUser.profileId &&` precondition: a user is
+    // "external" to this profile whenever they are not a member of it, INCLUDING a null-home-profile
+    // user (a real population — cross-profile invitee whose home profile was deleted, per R8). The
+    // old guard short-circuited to false for profileId===null and silently ignored their
+    // allowExternalInvites=false. `null !== profileId` is true, so the gate now fires for them too.
+    // (This door is a pure force-add with no accept step, so the flag is the ONLY consent gate.)
     if (
-        targetUser.profileId &&
         targetUser.profileId !== profileId &&
         targetUser.allowExternalInvites === false
     ) {
@@ -261,9 +276,17 @@ export async function removeFromProfileAction(profileId: string, targetUserId: s
         prisma.workspaceInvitation.deleteMany({
             where: { workspaceId: { in: workspaceIds }, invitedUserId: targetUserId },
         }),
-        // Delete ProfileAccess row
-        prisma.profileAccess.delete({
-            where: { userId_profileId: { userId: targetUserId, profileId } },
+        // [Merge: sole invite path] Delete the ProfileAccess row idempotently. Using deleteMany
+        // (not delete) so two admins removing the SAME member concurrently don't trip a P2025 on
+        // the second call (delete throws on a missing row → whole tx rolls back → unhandled error).
+        // [AUDIT IR-2 — fix] Scope the delete to non-OWNER rows. The OWNER check above is a
+        // pre-transaction read (TOCTOU): a concurrent transferProfileOwnershipAction could promote
+        // THIS target to OWNER between that read and this delete, and an unconditional delete would
+        // then drop the freshly-minted OWNER row → a profile with 0 OWNERs that no server action can
+        // recover (changeProfileRole blocks newRole=OWNER; transfer requires an existing OWNER). With
+        // `role: { not: 'OWNER' }`, that race deletes 0 rows and the OWNER invariant is preserved.
+        prisma.profileAccess.deleteMany({
+            where: { userId: targetUserId, profileId, role: { not: 'OWNER' } },
         }),
     ])
 
@@ -378,17 +401,33 @@ export async function transferProfileOwnershipAction(profileId: string, newOwner
         return { error: 'Không thể chuyển quyền sở hữu cho tài khoản CLIENT (chỉ xem). Hãy chuyển họ thành thành viên nội bộ trước.' }
     }
 
-    // Atomic swap: caller OWNER → ADMIN, target → OWNER
-    await prisma.$transaction([
-        prisma.profileAccess.update({
-            where: { userId_profileId: { userId: session.user.id, profileId } },
-            data: { role: 'ADMIN' },
-        }),
-        prisma.profileAccess.update({
-            where: { userId_profileId: { userId: newOwnerUserId, profileId } },
-            data: { role: 'OWNER' },
-        }),
-    ])
+    // [AUDIT IR-1 — fix] Atomic compare-and-swap. The previous swap was two unconditional
+    // updates by PK with no lock; two concurrent transfers (O→A and O→B) both passed the
+    // pre-check (O still read OWNER) and both committed, minting a SECOND, unremovable co-OWNER
+    // (changeProfileRole/removeFromProfile both refuse to touch an OWNER). Guard the caller's
+    // demotion with `where: { role: 'OWNER' }`: under Postgres Read Committed the second tx
+    // blocks on the caller's row, re-evaluates after the first commits, matches 0 rows, and
+    // aborts — so exactly one transfer wins. (Same CAS discipline as acceptWorkspaceInvitation.)
+    try {
+        await prisma.$transaction(async (tx) => {
+            const demoted = await tx.profileAccess.updateMany({
+                where: { userId: session.user.id, profileId, role: 'OWNER' },
+                data: { role: 'ADMIN' },
+            })
+            if (demoted.count !== 1) {
+                throw new Error('TRANSFER_CONFLICT')
+            }
+            await tx.profileAccess.update({
+                where: { userId_profileId: { userId: newOwnerUserId, profileId } },
+                data: { role: 'OWNER' },
+            })
+        })
+    } catch (e: any) {
+        if (e?.message === 'TRANSFER_CONFLICT') {
+            return { error: 'Quyền sở hữu vừa được thay đổi bởi một thao tác khác. Vui lòng tải lại trang và thử lại.' }
+        }
+        throw e
+    }
 
     await audit({
         workspaceId: 'SYSTEM',

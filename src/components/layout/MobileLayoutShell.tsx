@@ -117,7 +117,7 @@ export default function MobileLayoutShell({
                             {/* Admin-only links */}
                             {workspaceRole && (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN') && (
                                 <>
-                                    <Link href={`/${workspaceId}/admin/members`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
+                                    <Link href={`/${workspaceId}/admin/profile-members`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
                                         <UsersRound className="w-4 h-4" /> Thành viên
                                     </Link>
                                     <Link href={`/${workspaceId}/admin/audit-log`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">

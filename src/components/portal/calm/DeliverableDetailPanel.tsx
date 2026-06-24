@@ -43,7 +43,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
         if ('success' in res && res.success) {
             onUpdated(d.id, { status: 'Hoàn tất', clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
             actions.activity(d.id).then(setActivity).catch(() => { })
-        } else setErr(('error' in res && res.error) || 'Không thể duyệt.')
+        } else setErr(('error' in res && res.error) || 'Could not approve. Please try again.')
     }
 
     const requestChanges = async () => {
@@ -55,7 +55,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
             onUpdated(d.id, { status: 'Revision', clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
             setMode(null); setNotes('')
             actions.activity(d.id).then(setActivity).catch(() => { })
-        } else setErr(('error' in res && res.error) || 'Không thể gửi yêu cầu.')
+        } else setErr(('error' in res && res.error) || 'Could not send your request. Please try again.')
     }
 
     const done = d.clientStatus === 'Completed'
@@ -249,7 +249,7 @@ function CalmRating({ taskId, actions, existing, onRated }: { taskId: string; ac
         const res = await actions.rate(taskId, cq, rs, cm, fb.trim() || undefined)
         setBusy(false)
         if (res.success) onRated({ creativeQuality: cq, responsiveness: rs, communication: cm, qualitativeFeedback: fb.trim() || null })
-        else setErr(res.error || 'Không thể lưu đánh giá.')
+        else setErr(res.error || 'Could not save your rating. Please try again.')
     }
 
     return (

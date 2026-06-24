@@ -316,7 +316,10 @@ export async function updateProfileSettings(
     const session = await getSession()
     if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
 
-    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const { getProfileRole, isSessionLive } = await import('@/lib/profile-permissions')
+    // [AUDIT MISS-3 — fix] Reject a LOCKED / force-logged-out OWNER (stale JWT) on this
+    // getSession()-only self-tenant mutation (mirror SI-1 / MISS-2 liveness gate).
+    if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
     const role = await getProfileRole(session.user.id, profileId)
     if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền cập nhật Profile.' }
 
@@ -362,7 +365,10 @@ export async function deleteProfileAction(profileId: string) {
     const session = await getSession()
     if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
 
-    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const { getProfileRole, isSessionLive } = await import('@/lib/profile-permissions')
+    // [AUDIT MISS-3 — fix] Reject a LOCKED / force-logged-out OWNER (stale JWT) before a
+    // destructive self-tenant soft-delete (mirror SI-1 / MISS-2 liveness gate).
+    if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
     const role = await getProfileRole(session.user.id, profileId)
     if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền xóa Profile.' }
 
@@ -403,7 +409,10 @@ export async function restoreProfileAction(profileId: string) {
     const session = await getSession()
     if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
 
-    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const { getProfileRole, isSessionLive } = await import('@/lib/profile-permissions')
+    // [AUDIT MISS-3 — fix] Reject a LOCKED / force-logged-out OWNER (stale JWT) on this
+    // getSession()-only self-tenant mutation (mirror SI-1 / MISS-2 liveness gate).
+    if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
     const role = await getProfileRole(session.user.id, profileId)
     if (role !== 'OWNER') return { error: 'Chỉ Owner mới có quyền khôi phục Profile.' }
 

@@ -140,6 +140,10 @@ export async function getShareSnapshot(token: string) {
 
     const mappedTasks = tasks.map((task) => ({
         ...task,
+        // [Invoice i18n] Never ship the raw Vietnamese staff instruction (notes_vi) to a
+        // foreign client. The portal renders only notes_en; null notes_vi here so it can never
+        // leak via a future `notes_en || notes_vi` fallback (the pattern staff TaskDrawer uses).
+        notes_vi: null,
         deadline: iso(task.deadline),
         createdAt: iso(task.createdAt)!,
         updatedAt: iso(task.updatedAt)!,
@@ -233,9 +237,9 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
         id: true, title: true, status: true, assigneeId: true, assignedById: true,
         clientReview: true, workspaceId: true,
     })
-    if (!scope || !task) return { success: false, error: 'Link không hợp lệ hoặc sản phẩm không tồn tại.' }
+    if (!scope || !task) return { success: false, error: 'This link is invalid or the deliverable no longer exists.' }
     if (task.status === 'Hoàn tất' || task.clientReview === 'APPROVED') {
-        return { success: false, error: 'Sản phẩm này đã được duyệt.' }
+        return { success: false, error: 'This deliverable has already been approved.' }
     }
 
     await prisma.task.update({
@@ -274,14 +278,14 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
 /** Client requests changes via the public link → task 'Revision' + feedback. */
 export async function requestChangesViaToken(token: string, taskId: string, feedback: string) {
     const clean = sanitizeClientText(feedback || '', FEEDBACK_MAX_LEN)
-    if (!clean) return { success: false, error: 'Vui lòng nhập nội dung cần chỉnh sửa.' }
+    if (!clean) return { success: false, error: 'Please describe the changes you would like.' }
 
     const { scope, task } = await findScopedTask(token, taskId, {
         id: true, title: true, status: true, assigneeId: true, assignedById: true, workspaceId: true,
     })
-    if (!scope || !task) return { success: false, error: 'Link không hợp lệ hoặc sản phẩm không tồn tại.' }
+    if (!scope || !task) return { success: false, error: 'This link is invalid or the deliverable no longer exists.' }
     if (task.status === 'Hoàn tất') {
-        return { success: false, error: 'Sản phẩm đã hoàn tất — không thể yêu cầu chỉnh sửa.' }
+        return { success: false, error: 'This deliverable is already completed — changes can no longer be requested.' }
     }
 
     await prisma.task.update({
@@ -333,21 +337,21 @@ export async function submitRatingViaToken(
 ) {
     const isValidStar = (n: number) => Number.isInteger(n) && n >= 1 && n <= 5
     if (!isValidStar(creativeQuality) || !isValidStar(responsiveness) || !isValidStar(communication)) {
-        return { success: false, error: 'Điểm đánh giá phải là số nguyên từ 1 đến 5.' }
+        return { success: false, error: 'Ratings must be whole numbers from 1 to 5.' }
     }
 
     const { scope, task } = await findScopedTask(token, taskId, {
         id: true, assigneeId: true, workspaceId: true, status: true, clientReview: true,
     })
-    if (!scope || !task) return { success: false, error: 'Link không hợp lệ hoặc task không tồn tại.' }
+    if (!scope || !task) return { success: false, error: 'This link is invalid or the item no longer exists.' }
 
     const statusOk = task.status === 'Hoàn tất' || task.clientReview === 'APPROVED'
-    if (!statusOk) return { success: false, error: 'Chỉ có thể đánh giá khi task đã hoàn tất.' }
+    if (!statusOk) return { success: false, error: 'You can only rate a completed deliverable.' }
 
     const existing = await prisma.rating.findUnique({ where: { taskId } })
-    if (existing) return { success: false, error: 'Task này đã được đánh giá rồi.' }
+    if (existing) return { success: false, error: 'This deliverable has already been rated.' }
 
-    if (!task.assigneeId) return { success: false, error: 'Task chưa được giao cho ai.' }
+    if (!task.assigneeId) return { success: false, error: 'This deliverable has not been assigned yet.' }
 
     const safeFeedback = qualitativeFeedback
         ? sanitizeClientText(qualitativeFeedback, RATING_FEEDBACK_MAX_LEN)
@@ -371,7 +375,7 @@ export async function submitRatingViaToken(
         return { success: true }
     } catch (err) {
         console.error('[submitRatingViaToken] Error:', err)
-        return { success: false, error: 'Không thể lưu đánh giá.' }
+        return { success: false, error: 'Could not save your rating. Please try again.' }
     }
 }
 

@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
-import { getProfileRole } from '@/lib/profile-permissions'
+import { getProfileRole, isSessionLive } from '@/lib/profile-permissions'
 
 /**
  * Gửi yêu cầu "Du học": Admin team gốc xin cấp quyền cho user vào team khác.
@@ -13,6 +13,10 @@ export async function requestCrossTeamAccess(userId: string, targetProfileId: st
         const session = await getSession()
         const requestedById = session?.user?.id
         if (!requestedById) return { success: false, error: 'Chưa đăng nhập' }
+        // [AUDIT MISS-2 — fix] Re-assert live account (reject LOCKED ban / stale sessionVersion).
+        // These getSession()-only doors never reach verifyWorkspaceAccess, so without this a banned
+        // or force-logged-out admin could still mint/strip cross-tenant access with a stale JWT.
+        if (!(await isSessionLive(session))) return { success: false, error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
 
         // [Sprint K P1] Verify target profile exists trước khi tạo request.
         // Trước đây create với targetProfileId không tồn tại → orphaned PENDING
@@ -92,6 +96,8 @@ export async function approveCrossTeamAccess(requestId: string, workspaceId: str
         const session = await getSession()
         const approvedById = session?.user?.id
         if (!approvedById) return { success: false, error: 'Chưa đăng nhập' }
+        // [AUDIT MISS-2 — fix] Reject a LOCKED / force-logged-out caller (stale JWT) before granting.
+        if (!(await isSessionLive(session))) return { success: false, error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
 
         const request = await prisma.profileAccessRequest.findUnique({ where: { id: requestId } })
         if (!request || request.status !== 'PENDING') return { success: false, error: 'Yêu cầu không hợp lệ hoặc đã xử lý' }
@@ -133,6 +139,8 @@ export async function rejectCrossTeamAccess(requestId: string, workspaceId: stri
         const session = await getSession()
         const approvedById = session?.user?.id
         if (!approvedById) return { success: false, error: 'Chưa đăng nhập' }
+        // [AUDIT MISS-2 — fix] Reject a LOCKED / force-logged-out caller (stale JWT).
+        if (!(await isSessionLive(session))) return { success: false, error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
 
         // [AUDIT R2 — fix] Only an OWNER/ADMIN of the target profile may reject a
         // request into it (mirrors approveCrossTeamAccess).
@@ -166,6 +174,8 @@ export async function removeCrossTeamAccess(userId: string, profileId: string, w
         const session = await getSession()
         const callerId = session?.user?.id
         if (!callerId) return { success: false, error: 'Chưa đăng nhập' }
+        // [AUDIT MISS-2 — fix] Reject a LOCKED / force-logged-out caller (stale JWT).
+        if (!(await isSessionLive(session))) return { success: false, error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
         const callerRole = await getProfileRole(callerId, profileId)
         const isProfileAdmin = callerRole === 'OWNER' || callerRole === 'ADMIN'
         if (!isProfileAdmin && callerId !== userId) {
@@ -188,10 +198,28 @@ export async function removeCrossTeamAccess(userId: string, profileId: string, w
             return { success: false, error: 'Không thể gỡ quyền của chủ sở hữu (OWNER) profile.' }
         }
 
+        // [AUDIT OGS-1 — fix HIGH] ProfileAccess is NOT the only grant: task assignment mints a
+        // real WorkspaceMember row (ensureWorkspaceMembership) for a du-học user, and
+        // verifyWorkspaceAccess honors a bare WorkspaceMember row → a "revoked" cross-team user
+        // would keep ghost MEMBER access to this profile's workspaces. Delete those rows (and
+        // hard-delete invitation rows) in the SAME transaction, mirroring removeFromProfileAction.
+        const workspaces = await prisma.workspace.findMany({
+            where: { profileId },
+            select: { id: true },
+        })
+        const workspaceIds = workspaces.map((w) => w.id)
+
         // Xóa ProfileAccess và Reset luôn ProfileAccessRequest để có thể xin lại sau
         await prisma.$transaction([
-            prisma.profileAccess.delete({
-                where: { userId_profileId: { userId, profileId } }
+            prisma.workspaceMember.deleteMany({
+                where: { userId, workspaceId: { in: workspaceIds } }
+            }),
+            prisma.workspaceInvitation.deleteMany({
+                where: { workspaceId: { in: workspaceIds }, invitedUserId: userId }
+            }),
+            // deleteMany (not delete) → idempotent under concurrent revokes (no P2025 rollback).
+            prisma.profileAccess.deleteMany({
+                where: { userId, profileId, role: { not: 'OWNER' } }
             }),
             prisma.profileAccessRequest.deleteMany({
                 where: { userId, targetProfileId: profileId }

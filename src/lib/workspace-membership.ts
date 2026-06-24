@@ -43,7 +43,7 @@ export async function isAssigneeInWorkspaceProfile(
         pid = ws?.profileId ?? null
     }
     const [user, member, access] = await Promise.all([
-        prisma.user.findUnique({ where: { id: userId }, select: { profileId: true } }),
+        prisma.user.findUnique({ where: { id: userId }, select: { profileId: true, role: true } }),
         prisma.workspaceMember.findUnique({
             where: { userId_workspaceId: { userId, workspaceId } },
             select: { role: true },
@@ -56,6 +56,15 @@ export async function isAssigneeInWorkspaceProfile(
             : Promise.resolve(null),
     ])
     if (!user) return false
+    // [AUDIT CLB-1 — fix HIGH] A CLIENT (view-only portal) — whether legacy global (User.role)
+    // or per-profile (ProfileAccess.role==='CLIENT') — must NEVER be admitted as an assignable
+    // internal member, or task assignment becomes a CLIENT→WorkspaceMember back-door (the row it
+    // mints would then override the CLIENT exclusion in verifyWorkspaceAccess). A LOCKED account
+    // is likewise never provisionable. This guard runs BEFORE every admit clause below, so the
+    // home-profile clause (a per-profile CLIENT has user.profileId === pid) and the `!!access`
+    // clause can no longer let a CLIENT through. Mirrors every sibling door's CLIENT reject.
+    if (user.role === 'CLIENT' || user.role === 'LOCKED') return false
+    if (access?.role === 'CLIENT') return false
     return (!!pid && user.profileId === pid) || !!member || !!access
 }
 
@@ -73,6 +82,24 @@ export async function ensureWorkspaceMembership(
 
     if (existing) return false
 
+    // [AUDIT CLB-1 — fix HIGH] Defense-in-depth: never mint an internal WorkspaceMember for a
+    // CLIENT/LOCKED principal, even if a caller reached here without the isAssigneeInWorkspaceProfile
+    // gate. A CLIENT of this workspace's profile is view-only; a LOCKED account is banned. Mirrors
+    // the M8 accept guard (member-actions.ts) + the inviteToWorkspace CLIENT reject.
+    const ws = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+    if (u?.role === 'CLIENT' || u?.role === 'LOCKED') return false
+    if (ws?.profileId) {
+        const pa = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId, profileId: ws.profileId } },
+            select: { role: true },
+        })
+        if (pa?.role === 'CLIENT') return false
+    }
+
     try {
         await prisma.workspaceMember.create({
             data: { userId, workspaceId, role: defaultRole },
@@ -85,10 +112,6 @@ export async function ensureWorkspaceMembership(
         // where inviteToWorkspace sees existingMember but admin page doesn't
         // show user in assignee dropdown.
         try {
-            const ws = await prisma.workspace.findUnique({
-                where: { id: workspaceId },
-                select: { profileId: true },
-            })
             if (ws?.profileId) {
                 await prisma.profileAccess.upsert({
                     where: { userId_profileId: { userId, profileId: ws.profileId } },

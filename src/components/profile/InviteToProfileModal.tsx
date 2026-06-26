@@ -8,11 +8,12 @@ import { inviteToProfileAction } from '@/actions/profile-member-actions'
 type Props = {
     profileId: string
     profileName: string
+    workspaceId: string
     onClose: () => void
     onSuccess: () => void
 }
 
-export default function InviteToProfileModal({ profileId, profileName, onClose, onSuccess }: Props) {
+export default function InviteToProfileModal({ profileId, profileName, workspaceId, onClose, onSuccess }: Props) {
     const [usernameOrEmail, setUsernameOrEmail] = useState('')
     const [role, setRole] = useState<'ADMIN' | 'USER'>('USER')
     const [loading, setLoading] = useState(false)
@@ -22,11 +23,17 @@ export default function InviteToProfileModal({ profileId, profileName, onClose, 
         if (!usernameOrEmail.trim()) return
         setLoading(true)
         try {
-            const result = await inviteToProfileAction(profileId, usernameOrEmail.trim(), role)
+            const result = await inviteToProfileAction(profileId, workspaceId, usernameOrEmail.trim(), role)
             if (result.error) {
                 toast.error(result.error)
             } else {
-                toast.success('Đã mời thành viên vào Tổ chức.')
+                // The invite now goes through the pending-invitation flow: directAdd=false means a
+                // PENDING invitation + notification was created and the invitee must ACCEPT before
+                // joining (directAdd=true is only the rare same-org direct add).
+                const directAdd = (result as any).directAdd === true
+                toast.success(directAdd
+                    ? 'Đã thêm thành viên vào Tổ chức.'
+                    : 'Đã gửi lời mời — chờ người dùng chấp nhận.')
                 onSuccess()
             }
         } finally {

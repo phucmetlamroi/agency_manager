@@ -844,9 +844,13 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
                     create: {
                         userId: session.user.id,
                         profileId: invitation.workspace.profileId,
-                        role: 'USER',
+                        // [Invite role-carry] The org-level role follows the invitation: an ADMIN
+                        // invitation (only a profile OWNER can create one — enforced at invite time)
+                        // grants ProfileAccess(ADMIN); everything else grants USER. Previously this
+                        // was hardcoded 'USER', so inviting someone as ADMIN landed them as USER.
+                        role: invitation.role === 'ADMIN' ? 'ADMIN' : 'USER',
                     },
-                    update: {},  // don't override existing role
+                    update: {},  // don't override an existing higher role
                 })
             }
 

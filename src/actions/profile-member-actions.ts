@@ -20,8 +20,6 @@ import {
     isSessionLive,
 } from '@/lib/profile-permissions'
 import { audit } from '@/lib/audit-log'
-import { findUserByEmailOrUsername } from '@/lib/user-lookup'
-import { checkInviteCallerRate } from '@/lib/rate-limit-upstash'
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Helpers                                                              */
@@ -62,7 +60,10 @@ export async function getProfileMembers(profileId: string) {
     }
 
     const accesses = await prisma.profileAccess.findMany({
-        where: { profileId },
+        // [Roster fix] Only INTERNAL staff (OWNER/ADMIN/USER). A ProfileAccess(role='CLIENT')
+        // is a view-only portal grant for a CRM client — never an org "member" — so it must NOT
+        // appear in the staff roster (it was leaking client names into "Thành viên tổ chức").
+        where: { profileId, role: { not: 'CLIENT' } },
         orderBy: [{ role: 'asc' }, { grantedAt: 'asc' }],
         select: {
             id: true,
@@ -111,6 +112,7 @@ export async function getProfileMembers(profileId: string) {
 
 export async function inviteToProfileAction(
     profileId: string,
+    workspaceId: string,
     usernameOrEmail: string,
     role: 'ADMIN' | 'USER' = 'USER',
 ) {
@@ -133,99 +135,23 @@ export async function inviteToProfileAction(
         }
     }
 
-    const trimmed = usernameOrEmail.trim()
-    if (!trimmed) return { error: 'Tên đăng nhập / email không được để trống.' }
-
-    // [AUDIT invite-flow R2 — fix HIGH] Caller-scoped throttle BEFORE the user lookup, to cap
-    // account-enumeration via probing distinct emails on this profile-invite door (40/h/caller).
-    const callerRate = await checkInviteCallerRate(session.user.id)
-    if (!callerRate.success) {
-        return { error: `Bạn đang thao tác quá nhanh. Vui lòng thử lại sau ${callerRate.retryAfter ?? 3600} giây.` }
-    }
-
-    // [AUDIT invite-flow R1 — fix HIGH] Deterministic lookup. User.email is NOT @unique
-    // (duplicate rows exist on prod), so a raw findFirst({ OR:[username,email] }) could bind
-    // ProfileAccess to the WRONG duplicate account. Route through findUserByEmailOrUsername
-    // (case-insensitive, activity-ordered) and refuse on matchCount>1 — mirrors inviteToWorkspace.
-    const lookup = await findUserByEmailOrUsername<{
-        id: string; username: string; nickname: string | null; displayName: string | null;
-        role: string; profileId: string | null; allowExternalInvites: boolean
-    }>(trimmed, {
-        id: true, username: true, nickname: true, displayName: true,
-        role: true, profileId: true, allowExternalInvites: true,
-    })
-    if (lookup.matchCount > 1) {
-        return { error: `Có ${lookup.matchCount} tài khoản dùng email/username "${trimmed}". Yêu cầu admin gộp các tài khoản trùng email trước khi mời.` }
-    }
-    const targetUser = lookup.user
-    if (!targetUser) {
-        return { error: 'Tài khoản không tồn tại.' }
-    }
-
-    if (targetUser.id === session.user.id) {
-        return { error: 'Bạn đã ở trong Profile này.' }
-    }
-
-    // [AUDIT invite-flow R1 — fix HIGH] Never grant profile membership to a view-only CLIENT
-    // or a banned LOCKED account. The workspace-invite path enforces this; this profile-level
-    // door previously skipped it, so a CLIENT could be elevated to internal MEMBER via the
-    // ProfileAccess(USER) → workspaceRole MEMBER fallback (security.ts).
-    if (targetUser.role === 'LOCKED' || targetUser.role === 'CLIENT') {
-        return { error: 'Tài khoản này không thể được thêm làm thành viên nội bộ của Profile.' }
-    }
-
-    // [AUDIT invite-flow R1 — fix HIGH] Cross-org consent: honor allowExternalInvites when the
-    // target's home profile differs from this one (mirrors member-actions.ts inviteToWorkspace).
-    // Without this, any profile admin could force-add an unconsenting external user as a member.
-    // [AUDIT CONSENT-1 — fix] Dropped the `targetUser.profileId &&` precondition: a user is
-    // "external" to this profile whenever they are not a member of it, INCLUDING a null-home-profile
-    // user (a real population — cross-profile invitee whose home profile was deleted, per R8). The
-    // old guard short-circuited to false for profileId===null and silently ignored their
-    // allowExternalInvites=false. `null !== profileId` is true, so the gate now fires for them too.
-    // (This door is a pure force-add with no accept step, so the flag is the ONLY consent gate.)
-    if (
-        targetUser.profileId !== profileId &&
-        targetUser.allowExternalInvites === false
-    ) {
-        // [AUDIT invite-flow R2 — fix HIGH] Generic message — do NOT echo the resolved
-        // displayName/username of a cross-tenant account to a caller who supplied only an email.
-        return {
-            error: 'Người dùng này đã tắt nhận lời mời từ tổ chức khác. Hãy yêu cầu họ bật "Allow external invites" trong Settings trước.',
-        }
-    }
-
-    // Check không trùng existing access
-    const existing = await prisma.profileAccess.findUnique({
-        where: { userId_profileId: { userId: targetUser.id, profileId } },
-    })
-    if (existing) {
-        return { error: `${targetUser.displayName ?? targetUser.nickname ?? targetUser.username} đã có trong Profile này (role: ${existing.role}).` }
-    }
-
-    // Create ProfileAccess row với grantedAt = NOW → Admin cutoff applies
-    await prisma.profileAccess.create({
-        data: {
-            userId: targetUser.id,
-            profileId,
-            role,
-            grantedAt: new Date(),
-        },
-    })
-
-    await audit({
-        workspaceId: 'SYSTEM',
-        actorUserId: session.user.id,
-        action: 'profile.member_invited' as any,
-        targetType: 'Profile',
-        targetId: profileId,
-        after: { invitedUserId: targetUser.id, role },
-    })
-
-    revalidatePath('/', 'layout')
-    // [AUDIT invite-flow R4 — fix] Do NOT return the resolved cross-tenant userId. For an
-    // email-only input this is an email→userId oracle; the UI (InviteToProfileModal) only reads
-    // result.error / result.success, so the resolved id is never needed by the caller.
-    return { success: true, member: { role } }
+    // [Invite accept-flow] Org membership = ProfileAccess. Instead of the old instant
+    // ProfileAccess.create (which force-added the invitee WITHOUT their consent — the reported
+    // bug), delegate to the hardened workspace-invitation flow: it creates a PENDING
+    // WorkspaceInvitation + notifies the invitee, who must ACCEPT (the dashboard
+    // PendingInvitationsBanner → acceptWorkspaceInvitation) before any ProfileAccess is created.
+    //
+    // inviteToWorkspace carries ALL the R1–R14 guards (deterministic lookup + matchCount>1 refuse,
+    // CLIENT/LOCKED reject, allowExternalInvites consent, caller + per-target rate-limit,
+    // OWNER-only-grants-ADMIN, no identity echo) and trims/validates the identifier, so we do NOT
+    // re-run any of them here — re-running would double-charge the rate-limiter.
+    //
+    // Role mapping: profile ADMIN → workspace-invitation role 'ADMIN' (acceptWorkspaceInvitation
+    // grants ProfileAccess(ADMIN)); profile USER → 'MEMBER' (→ ProfileAccess(USER)). OWNER-only-ADMIN
+    // is enforced both above AND inside inviteToWorkspace (via the workspace OWNER role, which only
+    // a profile OWNER holds). The invitee not yet in this org always hits the PENDING+accept branch.
+    const { inviteToWorkspace } = await import('./member-actions')
+    return inviteToWorkspace(workspaceId, usernameOrEmail, role === 'ADMIN' ? 'ADMIN' : 'MEMBER')
 }
 
 /* ──────────────────────────────────────────────────────────────────── */

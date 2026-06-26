@@ -244,6 +244,7 @@ export default function ProfileMembersPanel({
                 <InviteToProfileModal
                     profileId={profileId}
                     profileName={profileName}
+                    workspaceId={workspaceId}
                     onClose={() => setShowInviteModal(false)}
                     onSuccess={() => {
                         setShowInviteModal(false)

@@ -451,6 +451,19 @@ async function testConfirmedFindings() {
   // Patched gate condition (inviteToProfileAction / inviteToWorkspace): profileId !== invitingProfile && allowExternalInvites===false.
   const gateFires = nu?.profileId !== A && nu?.allowExternalInvites === false
   check('CONSENT-1: null-home-profile + consent off → gate fires (force-add blocked)', gateFires === true)
+
+  // ── ROSTER (Issue 1): getProfileMembers must exclude CLIENT-role rows ──
+  // Replicates the exact where-clause of getProfileMembers (profile-member-actions.ts). A
+  // regression that drops the `role: { not: 'CLIENT' }` filter (re-leaking client names into the
+  // "Thành viên tổ chức" staff roster) turns this red.
+  const roster = await prisma.profileAccess.findMany({
+    where: { profileId: A, role: { not: 'CLIENT' } },
+    select: { userId: true },
+  })
+  const rosterIds = new Set(roster.map((r: any) => r.userId))
+  check('ROSTER: CLIENT-role member excluded from staff roster', !rosterIds.has(ids.clientA))
+  check('ROSTER: OWNER/ADMIN/USER still present in roster',
+    rosterIds.has(ids.ownerA) && rosterIds.has(ids.adminA) && rosterIds.has(ids.userA))
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */

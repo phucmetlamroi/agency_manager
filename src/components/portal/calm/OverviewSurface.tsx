@@ -36,6 +36,12 @@ export default function OverviewSurface({ deliverables, invoices, scope, brands,
     const overdueInvs = invoices.filter(i => mapInvoiceStatus(i.status) === 'Overdue')
     const overdueSum = overdueInvs.reduce((a, i) => a + Number(i.totalDue || 0), 0)
 
+    // [2026-06-29] Client billing transparency: per-video USD price + a "total to pay" box.
+    // `deliverables` here is already scoped by the active Month/Channel filter, so the total
+    // reflects exactly what the client is looking at.
+    const pricedDels = deliverables.filter(d => d.jobPriceUSD != null && Number(d.jobPriceUSD) > 0)
+    const totalToPay = pricedDels.reduce((a, d) => a + Number(d.jobPriceUSD || 0), 0)
+
     const recent = [...deliverables].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5)
     const upcoming = deliverables.filter(d => d.clientStatus !== 'Completed' && d.clientStatus !== 'Closed' && d.deadline)
         .sort((a, b) => (a.deadline || '').localeCompare(b.deadline || '')).slice(0, 4)
@@ -64,6 +70,17 @@ export default function OverviewSurface({ deliverables, invoices, scope, brands,
                 )}
             </div>
 
+            {/* [2026-06-29] Total to pay — billing transparency (USD), client + admin only */}
+            {totalToPay > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 22px', borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--accent-line)', boxShadow: 'var(--shadow-1)' }}>
+                    <div>
+                        <p className="eyebrow" style={{ marginBottom: 6, color: 'var(--accent-fg)' }}>Total for your videos</p>
+                        <div className="num" style={{ fontSize: 13, color: 'var(--fg-3)' }}>{pricedDels.length} {pricedDels.length === 1 ? 'video' : 'videos'} · in USD</div>
+                    </div>
+                    <div className="num" style={{ fontSize: 30, fontWeight: 800, color: 'var(--fg)', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>{fmtMoney(totalToPay)}</div>
+                </div>
+            )}
+
             {/* Needs your review — the one thing that matters first */}
             {awaiting.length > 0 ? (
                 <section>
@@ -83,6 +100,9 @@ export default function OverviewSurface({ deliverables, invoices, scope, brands,
                                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.title}</div>
                                     <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 1 }}>Ready for your review · {d.client?.name || '—'}</div>
                                 </div>
+                                {d.jobPriceUSD != null && Number(d.jobPriceUSD) > 0 && (
+                                    <span className="num" style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-fg)', flexShrink: 0, whiteSpace: 'nowrap' }}>{fmtMoney(d.jobPriceUSD)}</span>
+                                )}
                                 <span className="pc-btn pc-btn-primary" style={{ pointerEvents: 'none', padding: '8px 15px', fontSize: 13 }}>Review</span>
                             </button>
                         ))}

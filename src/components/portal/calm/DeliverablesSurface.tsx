@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ChevronRight, ChevronDown, Clapperboard, CalendarRange } from 'lucide-react'
 import { StatusBadge, BrandAvatar, FilterChip, Empty, DeliverableTypeIcon } from './ui'
-import { relDeadline } from './format'
+import { relDeadline, fmtMoney } from './format'
 import type { Deliverable, Brand } from './types'
 
 const FILTERS = ['All', 'Needs you', 'In progress', 'In revision', 'Completed'] as const
@@ -39,6 +39,9 @@ function DeliverableRow({ d, onOpen, showPeriod }: { d: Deliverable; onOpen: (id
                 </div>
             </div>
             {showPeriod && d.workspaceName && <span className="hidden md:inline-flex"><PeriodTag name={d.workspaceName} /></span>}
+            {d.jobPriceUSD != null && Number(d.jobPriceUSD) > 0 && (
+                <span className="num" style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--accent-fg)', flexShrink: 0, whiteSpace: 'nowrap' }}>{fmtMoney(d.jobPriceUSD)}</span>
+            )}
             <StatusBadge status={d.clientStatus} />
             <ChevronRight size={17} style={{ color: 'var(--fg-4)', flexShrink: 0 }} />
         </button>

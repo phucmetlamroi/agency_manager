@@ -39,6 +39,9 @@ export interface Deliverable {
     project: { id: number; name: string } | null
     rating: RatingDTO | null
     assignee: { username: string; nickname: string | null } | null
+    /** [2026-06-29] Agency USD price of this job — the price the CLIENT pays. Shown to the
+     *  client (their bill) in the token-gated share portal and to admins; staff never get it. */
+    jobPriceUSD: number | null
     /** [Atelier] The period/workspace this deliverable lives in (admin "Tháng X/2026"). */
     workspaceId: string | null
     workspaceName: string | null

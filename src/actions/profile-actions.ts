@@ -119,20 +119,23 @@ export async function getMyProfilesAndWorkspaces() {
                 orderBy: { createdAt: 'asc' }
             })
         } else if (access?.role === 'ADMIN') {
-            // Workspaces tạo SAU grantedAt + workspaces có explicit WorkspaceMember
-            const autoWs = await prisma.workspace.findMany({
-                where: { profileId: currentProfileId, createdAt: { gte: access.grantedAt } },
+            // [Hotfix 2026-06-29 — "workspaces disappeared except Tháng 5/2026"]
+            // ADMIN must see ALL workspaces of the profile, same as USER and OWNER.
+            // Org-wide membership model (merge 63bb116, confirmed with owner): "a member
+            // of the org is a member of every workspace". The previous filter
+            // (createdAt >= grantedAt) ∪ (explicit WorkspaceMember) silently hid every
+            // workspace created BEFORE the admin was promoted that they weren't an
+            // explicit member of — so an admin granted recently saw ONLY the newest
+            // workspace in their switcher, making it look like all data had vanished.
+            // (The data was always intact; this was purely a listing filter.) Real
+            // access is still gated by verifyWorkspaceAccess (security.ts MEMBER
+            // fallback), so listing them here matches what the admin can already open.
+            // Do NOT reintroduce the grantedAt / explicit-member filter for ADMIN.
+            workspaces = await prisma.workspace.findMany({
+                where: { profileId: currentProfileId },
                 select: { id: true, name: true, description: true },
                 orderBy: { createdAt: 'asc' }
             })
-            const explicitWs = await prisma.workspace.findMany({
-                where: { profileId: currentProfileId, members: { some: { userId } } },
-                select: { id: true, name: true, description: true },
-                orderBy: { createdAt: 'asc' }
-            })
-            const merged = new Map<string, typeof autoWs[number]>()
-            for (const w of [...autoWs, ...explicitWs]) merged.set(w.id, w)
-            workspaces = Array.from(merged.values())
         } else if (access?.role === 'USER') {
             // [Sprint Z+1 hotfix] USER role thấy TẤT CẢ workspaces của profile
             // (read access). Trước đây chỉ thấy workspaces có explicit

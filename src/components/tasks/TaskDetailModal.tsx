@@ -513,6 +513,9 @@ export function TaskDetailModal({
     const [editingDeadline, setEditingDeadline] = useState(false)
     const [editingFinance, setEditingFinance] = useState(false)
     const [editingNotes, setEditingNotes] = useState(false)
+    // [2026-06-30] Rename the task/video title (admin-only, single-task).
+    const [editingTitle, setEditingTitle] = useState(false)
+    const [draftTitle, setDraftTitle] = useState('')
     const [savingCard, setSavingCard] = useState(false)
 
     // [Sprint M] "Bắt đầu" gate — non-admin assignee must click before viewing details
@@ -596,6 +599,7 @@ export function TaskDetailModal({
         setEditingDeadline(false)
         setEditingFinance(false)
         setEditingNotes(false)
+        setEditingTitle(false)
     }, [task])
 
     if (!isOpen || !localTask) return null
@@ -816,7 +820,23 @@ export function TaskDetailModal({
         setSavingCard(false)
     }
 
+    const handleSaveTitle = async () => {
+        const trimmed = draftTitle.trim()
+        if (!trimmed) { toast.error('Tên không được để trống'); return }
+        setSavingCard(true)
+        const ok = await saveSingle({ title: trimmed }, 'Đã đổi tên video')
+        if (ok) {
+            setLocalTask((p) => (p ? { ...p, title: trimmed } : null))
+            setEditingTitle(false)
+        }
+        setSavingCard(false)
+    }
+
     /* ── Edit mode entry helpers (set drafts from current form) ── */
+    const enterEditTitle = () => {
+        setDraftTitle(localTask?.title ?? '')
+        setEditingTitle(true)
+    }
     const enterEditDelivery = () => {
         setDraftDelivery(form.productLink)
         setEditingDelivery(true)
@@ -946,9 +966,30 @@ export function TaskDetailModal({
                             )}
 
                             <div className="flex flex-col gap-2">
-                                <h3 className="text-[18px] font-extrabold text-white tracking-tight truncate">
-                                    {localTask.title}
-                                </h3>
+                                {isAdmin && editingTitle && !isBulkMode ? (
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            autoFocus
+                                            value={draftTitle}
+                                            onChange={(e) => setDraftTitle(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleSaveTitle()
+                                                else if (e.key === 'Escape') setEditingTitle(false)
+                                            }}
+                                            maxLength={200}
+                                            placeholder="Tên video / task"
+                                            className="flex-1 min-w-0 bg-zinc-900/70 border border-violet-500/40 rounded-lg px-3 py-1.5 text-[16px] font-bold text-white outline-none focus:border-violet-400"
+                                        />
+                                        <ConfirmCancelGroup onConfirm={handleSaveTitle} onCancel={() => setEditingTitle(false)} saving={savingCard} />
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <h3 className="text-[18px] font-extrabold text-white tracking-tight truncate">
+                                            {localTask.title}
+                                        </h3>
+                                        {isAdmin && !isBulkMode && <EditButton onClick={enterEditTitle} title="Đổi tên video" />}
+                                    </div>
+                                )}
                                 <p className="text-[12px] text-zinc-400">
                                     Theo dõi: <span className="text-zinc-300">{formatDate(localTask.deadline)}</span>
                                 </p>

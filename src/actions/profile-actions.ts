@@ -114,7 +114,7 @@ export async function getMyProfilesAndWorkspaces() {
         const access = accessMap.get(currentProfileId)
         if (access?.role === 'OWNER') {
             workspaces = await prisma.workspace.findMany({
-                where: { profileId: currentProfileId },
+                where: { profileId: currentProfileId, status: { not: 'SOFT_DELETED' } },
                 select: { id: true, name: true, description: true },
                 orderBy: { createdAt: 'asc' }
             })
@@ -132,7 +132,7 @@ export async function getMyProfilesAndWorkspaces() {
             // fallback), so listing them here matches what the admin can already open.
             // Do NOT reintroduce the grantedAt / explicit-member filter for ADMIN.
             workspaces = await prisma.workspace.findMany({
-                where: { profileId: currentProfileId },
+                where: { profileId: currentProfileId, status: { not: 'SOFT_DELETED' } },
                 select: { id: true, name: true, description: true },
                 orderBy: { createdAt: 'asc' }
             })
@@ -143,7 +143,7 @@ export async function getMyProfilesAndWorkspaces() {
             // workspaces họ là member. Match Sprint Y behavior + role-based gating
             // ở action layer (canCreateWorkspace cho create).
             workspaces = await prisma.workspace.findMany({
-                where: { profileId: currentProfileId },
+                where: { profileId: currentProfileId, status: { not: 'SOFT_DELETED' } },
                 select: { id: true, name: true, description: true },
                 orderBy: { createdAt: 'asc' }
             })

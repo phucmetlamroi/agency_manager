@@ -59,7 +59,13 @@ export async function getShareSnapshot(token: string) {
                 updatedAt: true,
                 type: true,
                 productLink: true,
-                // jobPriceUSD: EXCLUDED — agency revenue, never leaks to clients
+                // [2026-06-29] jobPriceUSD INCLUDED for client billing transparency. The
+                // client PAYS this USD price, so they may see it in their OWN portal. This
+                // path is reachable only via the client's token-gated ClientShareLink (no
+                // staff/editor ever calls getShareSnapshot); staff surfaces still strip it
+                // via sanitizeTaskForUser. Policy change confirmed by owner (admin+client see
+                // USD, no one else). Do NOT add jobPriceUSD to any staff serialization.
+                jobPriceUSD: true,
                 clientId: true,
                 workspaceId: true,
                 notes_vi: true,

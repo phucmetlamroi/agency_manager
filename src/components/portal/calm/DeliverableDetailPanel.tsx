@@ -6,7 +6,7 @@ import {
     Download, KeyRound, Star, History, ChevronDown,
 } from 'lucide-react'
 import { StatusBadge, statusSentence } from './ui'
-import { fmtDate, relDeadline } from './format'
+import { fmtDate, relDeadline, fmtMoney } from './format'
 import type { Deliverable, ActivityItem, DeliverableActions } from './types'
 
 // [Canonical Clients] The panel is credential-agnostic: all server calls go
@@ -69,6 +69,11 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="eyebrow" style={{ fontSize: 10 }}>{brandName}</div>
                         <h2 style={{ margin: '3px 0 0', fontSize: 17, fontWeight: 700, color: 'var(--fg)', lineHeight: 1.25 }}>{d.title}</h2>
+                        {d.jobPriceUSD != null && Number(d.jobPriceUSD) > 0 && (
+                            <div className="num" style={{ marginTop: 6, fontSize: 15, fontWeight: 800, color: 'var(--accent-fg)' }}>
+                                {fmtMoney(d.jobPriceUSD)} <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-3)' }}>· price for this video</span>
+                            </div>
+                        )}
                     </div>
                     <button onClick={onClose} className="pc-btn pc-btn-quiet" style={{ padding: 8, borderRadius: 9 }}><X size={16} /></button>
                 </div>

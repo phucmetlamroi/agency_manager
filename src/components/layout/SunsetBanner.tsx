@@ -4,16 +4,31 @@
 // CHỈ hiển thị trong workspace layout (admin + editor). KHÔNG xuất hiện ở landing page
 // hay portal khách (các route đó không nằm dưới [workspaceId]/layout).
 // Presentational only. Gated bởi src/lib/sunset.ts (SUNSET_ENABLED / SUNSET_DATE).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { sunsetPhase, SUNSET_DATE_VN } from '@/lib/sunset'
 
 export default function SunsetBanner() {
     // Tính theo client để tránh lệch giờ SSR; mặc định 'off' tới khi mount.
     const [phase, setPhase] = useState<'off' | 'banner' | 'blocked'>('off')
+    const [barHeight, setBarHeight] = useState(0)
+    const barRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         setPhase(sunsetPhase())
     }, [])
+
+    // Đo chiều cao banner để chừa đúng khoảng trống (spacer) — banner fixed nên
+    // bị "nhấc" khỏi luồng; spacer giữ nội dung không bị che.
+    useEffect(() => {
+        if (phase !== 'banner') return
+        const el = barRef.current
+        if (!el) return
+        const update = () => setBarHeight(el.offsetHeight)
+        update()
+        const ro = new ResizeObserver(update)
+        ro.observe(el)
+        return () => ro.disconnect()
+    }, [phase])
 
     if (phase === 'off') return null
 
@@ -32,7 +47,7 @@ export default function SunsetBanner() {
         )
     }
 
-    // phase === 'banner' — dải thông báo nổi bật, có hiệu ứng nhấp nháy, full-width trên cùng.
+    // phase === 'banner' — dải thông báo CỐ ĐỊNH trên cùng viewport (không cuộn theo trang).
     return (
         <>
             <style>{`
@@ -49,23 +64,26 @@ export default function SunsetBanner() {
                     100% { background-position: 250% 0; }
                 }
             `}</style>
+
+            {/* Banner CỐ ĐỊNH — ghim đỉnh viewport, đứng yên khi cuộn trang */}
             <div
+                ref={barRef}
                 role="alert"
-                className="relative z-50 w-full overflow-hidden border-b border-red-400/30 bg-gradient-to-r from-red-700/40 via-amber-600/25 to-red-700/40"
+                className="fixed inset-x-0 top-0 z-[60] w-full overflow-hidden border-b border-red-400/30 bg-gradient-to-r from-red-700/95 via-amber-700/90 to-red-700/95 backdrop-blur-md"
                 style={{ animation: 'htlSunsetGlow 2.4s ease-in-out infinite' }}
             >
                 {/* lớp ánh sáng quét ngang tạo cảm giác động */}
                 <div
                     className="pointer-events-none absolute inset-0 opacity-60"
                     style={{
-                        background: 'linear-gradient(100deg, transparent 30%, rgba(255,255,255,.14) 50%, transparent 70%)',
+                        background: 'linear-gradient(100deg, transparent 30%, rgba(255,255,255,.16) 50%, transparent 70%)',
                         backgroundSize: '250% 100%',
                         animation: 'htlSunsetSheen 4.5s linear infinite',
                     }}
                 />
                 <div className="relative mx-auto flex max-w-7xl items-center justify-center gap-3 px-4 py-2.5 text-center">
                     <span
-                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-red-400 shadow-[0_0_10px_2px_rgba(248,113,113,.7)]"
+                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-red-300 shadow-[0_0_10px_2px_rgba(248,113,113,.8)]"
                         style={{ animation: 'htlSunsetDot 1s ease-in-out infinite' }}
                     />
                     <p className="text-[13.5px] font-medium leading-snug tracking-tight text-amber-50">
@@ -76,6 +94,9 @@ export default function SunsetBanner() {
                     </p>
                 </div>
             </div>
+
+            {/* Spacer giữ chỗ trong luồng = chiều cao banner, để nội dung không bị che */}
+            <div aria-hidden style={{ height: barHeight }} className="shrink-0" />
         </>
     )
 }

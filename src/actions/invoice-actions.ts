@@ -377,6 +377,14 @@ export async function createInvoiceRecord(data: {
                 data: {
                     invoiceNumber: data.invoiceNumber,
                     clientId: data.clientId,
+                    // [Invoice visibility fix 2026-06] The getWorkspacePrisma middleware
+                    // does NOT inject workspaceId/profileId into writes performed inside an
+                    // interactive `$transaction(tx => ...)`, so invoices were being created
+                    // with workspaceId=NULL. getClientInvoices is workspace-scoped → those
+                    // invoices vanished from the client's history tab (looked "never billed",
+                    // inviting double-billing). Set both EXPLICITLY here.
+                    workspaceId,
+                    profileId: profileId ?? null,
                     createdBy: access.userId,
                     issueDate: data.issueDate,
                     dueDate: data.dueDate,

@@ -36,9 +36,14 @@ export const RX_PERVIDEO_BROLL =
 export const RX_PERVIDEO_BROLL_LOOSE =
     /(video|ad|ep|spot|cut|reel)\s*\d+.*(b[\s\-_]?roll|broll|extras)/i
 
-/** Bundle folder name (e.g., "AD 1", "Video 2", "01") */
+/** Bundle folder name (e.g., "AD 1", "Video 2", "01", "Video 5 - The 'I'm Not Ready' Myth").
+ *  A "Video N" subfolder = one video deliverable (the folder holds that video's footage).
+ *  The optional `([\s\-_:].*)?` tail accepts a separated title suffix so real client
+ *  folders like "Video 1 - The Buyer's Journey" are recognised as a single video — while
+ *  per-video b-roll / a-roll suffixes ("Video 1 - B-Roll", "Video 1 A-Roll") still win
+ *  their own classification via the higher perVideoBroll/arollPerVideo score (+6 > bundle +5). */
 export const RX_BUNDLE_STRICT =
-    /^(ad|video|ep|episode|spot|cut|reel)[\s_-]?\d+$/i
+    /^(ad|video|ep|episode|spot|cut|reel)[\s_-]?\d+([\s\-_:].*)?$/i
 
 /** A-roll shared folder */
 export const RX_AROLL_SHARED = /^a[\s\-_]?roll$/i

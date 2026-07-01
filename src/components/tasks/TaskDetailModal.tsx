@@ -7,6 +7,7 @@ import { bulkUpdateTaskDetails, bulkUpdateTaskResourceSubfields } from "@/action
 import { updateTaskStatus } from "@/actions/task-actions"
 import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
+import VideoVersionUploader from "@/components/tasks/VideoVersionUploader"
 import { toast } from "sonner"
 import { Dialog } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
@@ -1140,6 +1141,10 @@ export function TaskDetailModal({
                                                 <Plus size={12} /> Thêm link bàn giao
                                             </button>
                                         )}
+
+                                        {/* [Video Review] In-app review upload — editor pushes the cut
+                                            straight to Cloudflare Stream; client reviews it in the portal. */}
+                                        {task?.id && !isBulkMode && <VideoVersionUploader taskId={task.id} />}
                                     </Card>
 
                                     {/* RIGHT — Deadline + Finance stacked */}

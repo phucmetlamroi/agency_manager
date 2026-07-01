@@ -19,7 +19,8 @@ import { prisma } from '@/lib/db'
 import { serializeDecimal } from '@/lib/serialization'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { deriveClientStatus, deriveNeedsYou } from '@/lib/portal-derive'
-import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN } from '@/lib/sanitize'
+import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
+import { rateLimit } from '@/lib/rate-limit'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
@@ -86,6 +87,9 @@ export async function getShareSnapshot(token: string) {
                 project: { select: { id: true, name: true } },
                 rating: true,
                 assignee: { select: { username: true, nickname: true } },
+                // [Video Review] Does this deliverable have an in-app review video?
+                // Drives the portal's "Review video" entry point (count>0 = show).
+                _count: { select: { videoVersions: true } },
             },
             orderBy: { createdAt: 'desc' },
         }),
@@ -144,8 +148,9 @@ export async function getShareSnapshot(token: string) {
     // mirroring how the old getClientInvoices did `.toISOString()`.
     const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
 
-    const mappedTasks = tasks.map((task) => ({
+    const mappedTasks = tasks.map(({ _count, ...task }) => ({
         ...task,
+        hasVideo: (_count?.videoVersions ?? 0) > 0,
         // [Invoice i18n] Never ship the raw Vietnamese staff instruction (notes_vi) to a
         // foreign client. The portal renders only notes_en; null notes_vi here so it can never
         // leak via a future `notes_en || notes_vi` fallback (the pattern staff TaskDrawer uses).
@@ -234,6 +239,36 @@ async function notifyStaff(
         } catch (e) {
             console.error('[share-portal] notify failed', e)
         }
+    }
+}
+
+/**
+ * Notify the profile's OWNER/ADMIN staff that a client submitted a brand-new task.
+ * A fresh client-submitted task has no assignee/assigner yet, so `notifyStaff`
+ * (which targets task.assigneeId/assignedById) doesn't apply — route to the
+ * profile admins instead.
+ */
+async function notifyProfileAdmins(profileId: string, title: string, body: string, taskId: string) {
+    try {
+        const admins = await prisma.profileAccess.findMany({
+            where: { profileId, role: { in: ['OWNER', 'ADMIN'] } },
+            select: { userId: true },
+        })
+        for (const { userId } of admins) {
+            try {
+                const notif = await createNotificationInternal({
+                    userId, type: 'TASK_STATUS_CHANGED', title, body, taskId, actorId: undefined,
+                })
+                void broadcastNotificationToUser(userId, {
+                    id: notif.id, type: notif.type, title: notif.title, body: notif.body,
+                    taskId, createdAt: notif.createdAt, isRead: false,
+                })
+            } catch (e) {
+                console.error('[share-portal] notifyProfileAdmins one failed', e)
+            }
+        }
+    } catch (e) {
+        console.error('[share-portal] notifyProfileAdmins query failed', e)
     }
 }
 
@@ -383,6 +418,137 @@ export async function submitRatingViaToken(
         console.error('[submitRatingViaToken] Error:', err)
         return { success: false, error: 'Could not save your rating. Please try again.' }
     }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Client Task Submission — the client creates a NEW task from the portal.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/** URL sanity: trimmed http(s) link, control/tag stripped, length-capped. */
+function cleanLink(raw: string | undefined): string {
+    return sanitizeClientText(raw || '', LINK_MAX_LEN)
+}
+function looksLikeUrl(s: string): boolean {
+    return /^https?:\/\/\S+$/i.test(s)
+}
+
+/**
+ * Dropdown options for the "create task" form — the client picks BOTH the month
+ * (workspace) and the brand (sub-client), restricted to this link's own scope.
+ * Workspaces are filtered to ACTIVE (never submit into a trashed/archived month).
+ */
+export async function getSubmitOptionsViaToken(token: string) {
+    const scope = await resolveShareToken(token)
+    if (!scope) return null
+    const [workspaces, brands] = await Promise.all([
+        prisma.workspace.findMany({
+            where: { id: { in: scope.workspaceIds }, status: 'ACTIVE' },
+            select: { id: true, name: true },
+            orderBy: { createdAt: 'desc' },
+        }),
+        prisma.client.findMany({
+            where: { id: { in: scope.clientIds }, status: 'ACTIVE' },
+            select: { id: true, name: true },
+        }),
+    ])
+    // Root/canonical client first, then subs alphabetically.
+    const brandList = brands
+        .map((c) => ({ id: c.id, name: c.name }))
+        .sort((a, b) => (a.id === scope.clientId ? -1 : b.id === scope.clientId ? 1 : a.name.localeCompare(b.name)))
+    return {
+        workspaces: workspaces.map((w) => ({ id: w.id, label: w.name })),
+        brands: brandList,
+        clientName: scope.clientName,
+    }
+}
+
+/**
+ * Client creates a task from the portal. Token-authed (no session); every input
+ * is re-validated against the link's scope server-side. The task lands UNASSIGNED
+ * ('Đang đợi giao') with the Raw/B-roll links encoded in the pipe format the admin
+ * TaskDetailModal parses; the requirement goes to notes_vi. Admin then triages.
+ */
+export async function createTaskViaToken(
+    token: string,
+    input: { workspaceId: string; clientId: number; title: string; rawLink: string; brollLink?: string; notes?: string },
+) {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is invalid.' }
+
+    // Per-link burst guard (best-effort; the 256-bit token is the real wall).
+    const rl = await rateLimit(`client-create-task:${scope.shareLinkId}`, 20, 60 * 60 * 1000)
+    if (!rl.success) return { success: false, error: 'Bạn gửi quá nhiều yêu cầu. Vui lòng thử lại sau.' }
+
+    // Fail-closed scope checks — client cannot inject another profile's/client's id.
+    if (!input || typeof input.workspaceId !== 'string' || typeof input.clientId !== 'number') {
+        return { success: false, error: 'Thiếu thông tin.' }
+    }
+    if (!scope.workspaceIds.includes(input.workspaceId)) return { success: false, error: 'Tháng không hợp lệ.' }
+    if (!scope.clientIds.includes(input.clientId)) return { success: false, error: 'Brand không hợp lệ.' }
+
+    // The chosen month must still be ACTIVE.
+    const ws = await prisma.workspace.findFirst({
+        where: { id: input.workspaceId, status: 'ACTIVE' },
+        select: { id: true },
+    })
+    if (!ws) return { success: false, error: 'Tháng này không còn hoạt động.' }
+
+    // Validate + sanitize.
+    const title = sanitizeClientText(input.title || '', TITLE_MAX_LEN)
+    if (!title) return { success: false, error: 'Vui lòng nhập tên dự án/video.' }
+    const rawLink = cleanLink(input.rawLink)
+    if (!looksLikeUrl(rawLink)) return { success: false, error: 'Link raw không hợp lệ (phải bắt đầu bằng http/https).' }
+    const brollLink = input.brollLink ? cleanLink(input.brollLink) : ''
+    if (brollLink && !looksLikeUrl(brollLink)) return { success: false, error: 'Link b-roll không hợp lệ.' }
+    const notes = input.notes ? sanitizeClientText(input.notes, FEEDBACK_MAX_LEN) : ''
+
+    // Encode to the format the admin TaskDetailModal parses (split('|') → RAW:/BROLL:).
+    const resources = `RAW: ${rawLink}` + (brollLink ? ` | BROLL: ${brollLink}` : '')
+
+    let task: { id: string; title: string }
+    try {
+        task = await prisma.task.create({
+            data: {
+                title,
+                resources,
+                notes_vi: notes || null,
+                clientId: input.clientId,
+                workspaceId: input.workspaceId,
+                profileId: scope.profileId,           // from scope, never client input
+                status: 'Đang đợi giao',              // unassigned pool, admin triages
+                assigneeId: null,
+                assignedById: null,
+                type: 'Khách gửi',                    // distinct label → admin spots client submissions
+                version: 0,
+                isArchived: false,
+            },
+            select: { id: true, title: true },
+        })
+    } catch (err) {
+        console.error('[createTaskViaToken] create failed', err)
+        return { success: false, error: 'Không tạo được task. Vui lòng thử lại.' }
+    }
+
+    await notifyProfileAdmins(
+        scope.profileId,
+        'Khách gửi yêu cầu mới',
+        `Khách hàng "${scope.clientName}" vừa gửi task: "${title}"`,
+        task.id,
+    )
+
+    void audit({
+        workspaceId: input.workspaceId, actorUserId: null, action: 'task.client_submitted',
+        targetType: 'Task', targetId: task.id,
+        after: { title, clientId: input.clientId, viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
+    })
+
+    try {
+        revalidatePath(`/${input.workspaceId}/admin`)
+        revalidatePath(`/${input.workspaceId}/admin/queue`)
+        revalidatePath(`/${input.workspaceId}/dashboard`)
+    } catch { /* best-effort */ }
+
+    return { success: true, taskId: task.id }
 }
 
 /** Human labels for the deliverable Activity timeline (port of the account version). */

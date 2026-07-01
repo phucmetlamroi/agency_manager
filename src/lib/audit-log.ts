@@ -72,6 +72,7 @@ export type AuditAction =
     // [Client Portal] client-driven review actions
     | 'task.client_approved'           // Client approved a deliverable → Hoàn tất
     | 'task.client_changes_requested'  // Client requested changes → Revision + feedback
+    | 'task.client_submitted'          // Client created a NEW task via the share-link portal
     // [Sprint Q] Bulk edit lifecycle
     | 'task.bulk_updated'         // Bulk update fields (productLink/notes/deadline/...) of N tasks
     | 'task.bulk_status_updated'  // Bulk status change of N tasks (with digest email)
@@ -98,6 +99,12 @@ export type AuditAction =
     | 'share_link.created'      // profile OWNER/ADMIN generated a public client link
     | 'share_link.revoked'      // link revoked — effective immediately
     | 'share_link.accessed'     // public page opened with a valid token (page-level, not per action)
+    // [Video Review] Frame.io-style review portal on Cloudflare Stream
+    | 'video.version_uploaded'   // editor uploaded a new cut (V1/V2/V3) → VideoVersion row
+    | 'video.review_approved'    // client approved a version via the token portal
+    | 'video.changes_requested'  // client requested changes on a version
+    | 'video.comment_added'      // a review comment was created (client or staff)
+    | 'video.comment_resolved'   // a comment was marked complete/resolved
 
 /**
  * `workspaceId` value semantics (audit fix #2.9):

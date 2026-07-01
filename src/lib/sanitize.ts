@@ -21,6 +21,10 @@
 export const FEEDBACK_MAX_LEN = 4000
 /** submitTaskRating / submitRatingViaToken qualitativeFeedback cap */
 export const RATING_FEEDBACK_MAX_LEN = 2000
+/** Client-submitted task title cap (createTaskViaToken) */
+export const TITLE_MAX_LEN = 200
+/** Client-submitted resource link cap (createTaskViaToken) */
+export const LINK_MAX_LEN = 2000
 
 /**
  * Drop ASCII control characters except TAB (9) and LF (10) so multi-line

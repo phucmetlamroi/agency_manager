@@ -1,12 +1,12 @@
 'use client'
 
-import { X } from 'lucide-react'
+import { X, Plus } from 'lucide-react'
 import ScopeSelector from './ScopeSelector'
 import WorkspaceSelector from './WorkspaceSelector'
 import { fmtDate } from './format'
 import type { Brand, Workspace } from './types'
 
-export default function TopBar({ scope, setScope, brands, lastUpdated, workspaces, wsScope, setWsScope, wsCounts }: {
+export default function TopBar({ scope, setScope, brands, lastUpdated, workspaces, wsScope, setWsScope, wsCounts, onCreateTask }: {
     scope: number | 'all'
     setScope: (s: number | 'all') => void
     brands: Brand[]
@@ -15,6 +15,8 @@ export default function TopBar({ scope, setScope, brands, lastUpdated, workspace
     wsScope: string | 'all'
     setWsScope: (v: string | 'all') => void
     wsCounts: Record<string, number>
+    /** [Client Task Submission] opens the create-task form; absent → button hidden. */
+    onCreateTask?: () => void
 }) {
     const filtering = wsScope !== 'all' || scope !== 'all'
     const clearAll = () => { setWsScope('all'); setScope('all') }
@@ -47,6 +49,11 @@ export default function TopBar({ scope, setScope, brands, lastUpdated, workspace
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ok)' }} />
                     {lastUpdated ? `Updated ${fmtDate(lastUpdated, false)}` : 'Up to date'}
                 </span>
+                {onCreateTask && (
+                    <button onClick={onCreateTask} className="pc-btn pc-btn-primary" style={{ height: 34, padding: '0 14px', gap: 6, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        <Plus size={15} /> New request
+                    </button>
+                )}
             </div>
         </div>
     )

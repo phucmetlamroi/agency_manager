@@ -17,7 +17,16 @@ import {
     requestChangesViaToken,
     submitRatingViaToken,
     getActivityViaToken,
+    getSubmitOptionsViaToken,
+    createTaskViaToken,
 } from '@/actions/share-portal-actions'
+import {
+    getReviewViaToken,
+    getVersionCommentsViaToken,
+    addReviewCommentViaToken,
+    approveReviewViaToken,
+    requestReviewChangesViaToken,
+} from '@/actions/video-review-actions'
 import type { Deliverable, Invoice, Workspace, DeliverableActions } from '@/components/portal/calm/types'
 
 export default function SharePortalClient({ token, clientName, profileName, deliverables, invoices, workspaces }: {
@@ -33,6 +42,14 @@ export default function SharePortalClient({ token, clientName, profileName, deli
         requestChanges: (taskId, notes) => requestChangesViaToken(token, taskId, notes),
         rate: (taskId, cq, rs, cm, fb) => submitRatingViaToken(token, taskId, cq, rs, cm, fb),
         activity: (taskId) => getActivityViaToken(token, taskId),
+        getSubmitOptions: () => getSubmitOptionsViaToken(token),
+        createTask: (input) => createTaskViaToken(token, input),
+        // [Video Review] token-gated review methods
+        getReview: (taskId) => getReviewViaToken(token, taskId),
+        getVersionComments: (taskId, versionId) => getVersionCommentsViaToken(token, taskId, versionId),
+        addReviewComment: (taskId, versionId, input) => addReviewCommentViaToken(token, taskId, versionId, input),
+        approveReview: (taskId, versionId) => approveReviewViaToken(token, taskId, versionId),
+        requestReviewChanges: (taskId, versionId, feedback) => requestReviewChangesViaToken(token, taskId, versionId, feedback),
     }), [token])
 
     return (

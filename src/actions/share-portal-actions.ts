@@ -24,6 +24,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
+import { isValidReaction } from '@/lib/comment-reactions'
 import { audit } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 
@@ -844,6 +845,10 @@ export interface ClientFeedItem {
     label?: string
     createdAt: string
     isMine?: boolean
+    /** [P3] null = top-level; else the parent comment id (reply threads). */
+    parentId?: string | null
+    /** [P3] Aggregated emoji reactions (mine = this share link reacted). */
+    reactions?: { emoji: string; count: number; mine: boolean }[]
 }
 
 export async function getCommentFeedViaToken(token: string, taskId: string): Promise<ClientFeedItem[]> {
@@ -854,13 +859,27 @@ export async function getCommentFeedViaToken(token: string, taskId: string): Pro
         prisma.taskComment.findMany({
             where: { taskId, visibility: 'CLIENT', isDeleted: false },
             orderBy: { createdAt: 'asc' },
-            select: { id: true, authorType: true, body: true, createdAt: true },
+            select: { id: true, authorType: true, body: true, createdAt: true, parentId: true },
         }),
         prisma.auditLog.findMany({
             where: { targetType: 'Task', targetId: taskId, action: { in: Object.keys(ACTIVITY_LABELS) } },
             orderBy: { createdAt: 'asc' }, take: 30,
         }),
     ])
+
+    // [P3] Reactions on the CLIENT-visible comments only; mine = this share link.
+    const commentIds = comments.map(c => c.id)
+    const reactionRows = commentIds.length
+        ? await prisma.taskCommentReaction.findMany({ where: { commentId: { in: commentIds } }, select: { commentId: true, emoji: true, viaShareLinkId: true } })
+        : []
+    const reactionsByComment = new Map<string, { emoji: string; count: number; mine: boolean }[]>()
+    for (const r of reactionRows) {
+        const arr = reactionsByComment.get(r.commentId) || []
+        const existing = arr.find(a => a.emoji === r.emoji)
+        if (existing) { existing.count++; if (r.viaShareLinkId === scope.shareLinkId) existing.mine = true }
+        else arr.push({ emoji: r.emoji, count: 1, mine: r.viaShareLinkId === scope.shareLinkId })
+        reactionsByComment.set(r.commentId, arr)
+    }
 
     const commentItems: ClientFeedItem[] = comments.map(c => ({
         kind: 'comment',
@@ -870,6 +889,8 @@ export async function getCommentFeedViaToken(token: string, taskId: string): Pro
         body: c.body,
         createdAt: c.createdAt.toISOString(),
         isMine: c.authorType === 'CLIENT',
+        parentId: c.parentId ?? null,
+        reactions: reactionsByComment.get(c.id) || [],
     }))
     const eventItems: ClientFeedItem[] = auditRows.map(r => ({
         kind: 'event',
@@ -882,7 +903,7 @@ export async function getCommentFeedViaToken(token: string, taskId: string): Pro
     return [...commentItems, ...eventItems].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
-export async function postCommentViaToken(token: string, taskId: string, body: string) {
+export async function postCommentViaToken(token: string, taskId: string, body: string, parentId?: string | null) {
     const scope = await resolveShareToken(token)
     if (!scope) return { success: false, error: 'This link is invalid.' }
 
@@ -895,6 +916,18 @@ export async function postCommentViaToken(token: string, taskId: string, body: s
     const clean = sanitizeClientText(body || '', FEEDBACK_MAX_LEN)
     if (!clean) return { success: false, error: 'Please write a message.' }
 
+    // [P3] Reply: the parent must be a live CLIENT-visible comment on THIS task
+    // (a client can never reply to — or even see — an internal note).
+    let safeParentId: string | null = null
+    if (parentId) {
+        const parent = await prisma.taskComment.findFirst({
+            where: { id: parentId, taskId, isDeleted: false, visibility: 'CLIENT' },
+            select: { id: true },
+        })
+        if (!parent) return { success: false, error: 'The comment you replied to no longer exists.' }
+        safeParentId = parent.id
+    }
+
     let created: { id: string; createdAt: Date }
     try {
         created = await prisma.taskComment.create({
@@ -906,6 +939,7 @@ export async function postCommentViaToken(token: string, taskId: string, body: s
                 viaShareLinkId: scope.shareLinkId,
                 clientId: task.clientId ?? null,
                 mentions: [],
+                parentId: safeParentId,
             },
             select: { id: true, createdAt: true },
         })
@@ -935,4 +969,40 @@ export async function postCommentViaToken(token: string, taskId: string, body: s
     })
 
     return { success: true, id: created.id, createdAt: created.createdAt.toISOString() }
+}
+
+/**
+ * [P3] Toggle the client's emoji reaction on a CLIENT-visible comment. Keyed by
+ * the share link (anonymous). Re-resolves scope + confirms the comment belongs
+ * to a task in scope AND is CLIENT-visible (never lets a token touch an internal
+ * note). Lightly rate-limited.
+ */
+export async function toggleReactionViaToken(token: string, commentId: string, emoji: string) {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is invalid.' }
+    if (!isValidReaction(emoji)) return { success: false, error: 'Unsupported reaction.' }
+
+    const rl = await rateLimit(`client-react:${scope.shareLinkId}`, 120, 60 * 60 * 1000)
+    if (!rl.success) return { success: false, error: 'Too many actions. Please try again later.' }
+
+    const comment = await prisma.taskComment.findFirst({
+        where: { id: commentId, isDeleted: false, visibility: 'CLIENT' },
+        select: { id: true, taskId: true },
+    })
+    if (!comment) return { success: false, error: 'This comment no longer exists.' }
+
+    // Confirm the comment's task is inside this token's scope.
+    const { task } = await findScopedTask(token, comment.taskId, { id: true })
+    if (!task) return { success: false, error: 'This link is invalid.' }
+
+    const existing = await prisma.taskCommentReaction.findFirst({
+        where: { commentId, emoji, viaShareLinkId: scope.shareLinkId },
+        select: { id: true },
+    })
+    if (existing) {
+        await prisma.taskCommentReaction.delete({ where: { id: existing.id } })
+        return { success: true, reacted: false }
+    }
+    await prisma.taskCommentReaction.create({ data: { commentId, emoji, viaShareLinkId: scope.shareLinkId } })
+    return { success: true, reacted: true }
 }

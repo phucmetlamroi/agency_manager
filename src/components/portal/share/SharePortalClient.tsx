@@ -22,6 +22,7 @@ import {
     createSubClientViaToken,
     getCommentFeedViaToken,
     postCommentViaToken,
+    toggleReactionViaToken,
 } from '@/actions/share-portal-actions'
 import {
     getReviewViaToken,
@@ -49,7 +50,8 @@ export default function SharePortalClient({ token, clientName, profileName, deli
         submitRequest: (input) => submitClientRequestViaToken(token, input),
         createSubClient: (input) => createSubClientViaToken(token, input),
         getCommentFeed: (taskId) => getCommentFeedViaToken(token, taskId),
-        postComment: (taskId, body) => postCommentViaToken(token, taskId, body),
+        postComment: (taskId, body, parentId) => postCommentViaToken(token, taskId, body, parentId),
+        reactComment: (commentId, emoji) => toggleReactionViaToken(token, commentId, emoji),
         // [Video Review] token-gated review methods
         getReview: (taskId) => getReviewViaToken(token, taskId),
         getVersionComments: (taskId, versionId) => getVersionCommentsViaToken(token, taskId, versionId),

@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import TaskCommentThread, { type ThreadItem } from './TaskCommentThread'
-import { getTaskActivityFeed, createTaskComment, editTaskComment, deleteTaskComment } from '@/actions/task-comment-actions'
+import { getTaskActivityFeed, createTaskComment, editTaskComment, deleteTaskComment, toggleTaskCommentReaction } from '@/actions/task-comment-actions'
 
 export default function TaskCommentColumn({ taskId, workspaceId }: { taskId: string; workspaceId: string }) {
     const [items, setItems] = useState<ThreadItem[]>([])
@@ -30,9 +30,10 @@ export default function TaskCommentColumn({ taskId, workspaceId }: { taskId: str
             skin="dark"
             canInternalToggle
             loading={loading}
-            onPost={(body, visibility) => createTaskComment(taskId, workspaceId, { body, visibility })}
+            onPost={(body, visibility, parentId) => createTaskComment(taskId, workspaceId, { body, visibility, parentId })}
             onEdit={(id, body) => editTaskComment(id, workspaceId, body)}
             onDelete={(id) => deleteTaskComment(id, workspaceId)}
+            onReact={(id, emoji) => toggleTaskCommentReaction(id, workspaceId, emoji)}
             onRefresh={load}
         />
     )

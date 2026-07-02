@@ -38,7 +38,8 @@ export default function PortalCommentSection({ taskId, actions }: { taskId: stri
                     skin="light"
                     canInternalToggle={false}
                     loading={loading}
-                    onPost={(body) => actions.postComment!(taskId, body)}
+                    onPost={(body, _visibility, parentId) => actions.postComment!(taskId, body, parentId)}
+                    onReact={actions.reactComment ? (id, emoji) => actions.reactComment!(id, emoji) : undefined}
                     onRefresh={load}
                 />
             </div>

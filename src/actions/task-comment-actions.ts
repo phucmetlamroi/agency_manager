@@ -13,7 +13,15 @@ import { sanitizeClientText, FEEDBACK_MAX_LEN } from '@/lib/sanitize'
 import { audit } from '@/lib/audit-log'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
+import { isValidReaction } from '@/lib/comment-reactions'
 import { revalidatePath } from 'next/cache'
+
+export interface CommentReactionAgg {
+    emoji: string
+    count: number
+    /** The current viewer already reacted with this emoji. */
+    mine: boolean
+}
 
 export interface TaskFeedItem {
     kind: 'comment' | 'event'
@@ -26,6 +34,10 @@ export interface TaskFeedItem {
     mentions?: string[]
     createdAt: string
     editedAt?: string | null
+    /** [P3] null = top-level; else the id of the comment this replies to. */
+    parentId?: string | null
+    /** [P3] Aggregated emoji reactions on this comment. */
+    reactions?: CommentReactionAgg[]
     /** The signed-in staff member authored this (drives edit/delete affordance). */
     isMine?: boolean
     /** May delete (own comment, or admin). */
@@ -81,6 +93,20 @@ export async function getTaskActivityFeed(taskId: string, workspaceId: string): 
         }),
     ])
 
+    // [P3] Aggregate reactions per comment (mine = this staff user reacted).
+    const commentIds = comments.map((c) => c.id)
+    const reactions = commentIds.length
+        ? await prisma.taskCommentReaction.findMany({ where: { commentId: { in: commentIds } }, select: { commentId: true, emoji: true, userId: true } })
+        : []
+    const reactionsByComment = new Map<string, CommentReactionAgg[]>()
+    for (const r of reactions) {
+        const arr = reactionsByComment.get(r.commentId) || []
+        const existing = arr.find((a) => a.emoji === r.emoji)
+        if (existing) { existing.count++; if (r.userId === userId) existing.mine = true }
+        else arr.push({ emoji: r.emoji, count: 1, mine: r.userId === userId })
+        reactionsByComment.set(r.commentId, arr)
+    }
+
     const staffIds = Array.from(new Set([
         ...comments.filter((c) => c.authorUserId).map((c) => c.authorUserId!),
         ...events.map((e) => e.actorUserId).filter((x): x is string => !!x),
@@ -103,6 +129,8 @@ export async function getTaskActivityFeed(taskId: string, workspaceId: string): 
         visibility: c.visibility as 'INTERNAL' | 'CLIENT',
         body: c.body,
         mentions: c.mentions,
+        parentId: c.parentId ?? null,
+        reactions: reactionsByComment.get(c.id) || [],
         createdAt: c.createdAt.toISOString(),
         editedAt: c.editedAt ? c.editedAt.toISOString() : null,
         isMine: c.authorType === 'STAFF' && c.authorUserId === userId,
@@ -119,7 +147,7 @@ export async function getTaskActivityFeed(taskId: string, workspaceId: string): 
     return [...commentItems, ...eventItems].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
-export async function createTaskComment(taskId: string, workspaceId: string, input: { body: string; visibility: 'INTERNAL' | 'CLIENT' }) {
+export async function createTaskComment(taskId: string, workspaceId: string, input: { body: string; visibility: 'INTERNAL' | 'CLIENT'; parentId?: string | null }) {
     const { userId } = await staffCtx(workspaceId)
     const t = await taskInWorkspace(taskId, workspaceId)
     if (!t) return { success: false, error: 'Không tìm thấy task.' }
@@ -129,8 +157,16 @@ export async function createTaskComment(taskId: string, workspaceId: string, inp
     const visibility: 'INTERNAL' | 'CLIENT' = input.visibility === 'INTERNAL' ? 'INTERNAL' : 'CLIENT'
     const mentions = await resolveMentions(body, workspaceId)
 
+    // [P3] Reply: the parent must be a live comment on the SAME task.
+    let parentId: string | null = null
+    if (input.parentId) {
+        const parent = await prisma.taskComment.findFirst({ where: { id: input.parentId, taskId, isDeleted: false }, select: { id: true } })
+        if (!parent) return { success: false, error: 'Bình luận gốc không tồn tại.' }
+        parentId = parent.id
+    }
+
     const c = await prisma.taskComment.create({
-        data: { taskId, authorType: 'STAFF', authorUserId: userId, visibility, body, mentions },
+        data: { taskId, authorType: 'STAFF', authorUserId: userId, visibility, body, mentions, parentId },
         select: { id: true, createdAt: true },
     })
 
@@ -179,4 +215,21 @@ export async function deleteTaskComment(commentId: string, workspaceId: string) 
     await prisma.taskComment.update({ where: { id: commentId }, data: { isDeleted: true } })
     try { revalidatePath(`/${workspaceId}/admin`) } catch { /* best-effort */ }
     return { success: true }
+}
+
+/** [P3] Toggle the caller's emoji reaction on a comment (staff). */
+export async function toggleTaskCommentReaction(commentId: string, workspaceId: string, emoji: string) {
+    const { userId } = await staffCtx(workspaceId)
+    if (!isValidReaction(emoji)) return { success: false, error: 'Emoji không hợp lệ.' }
+    const c = await prisma.taskComment.findUnique({ where: { id: commentId }, select: { taskId: true, isDeleted: true } })
+    if (!c || c.isDeleted) return { success: false, error: 'Không tìm thấy bình luận.' }
+    if (!(await taskInWorkspace(c.taskId, workspaceId))) return { success: false, error: 'Sai workspace.' }
+
+    const existing = await prisma.taskCommentReaction.findFirst({ where: { commentId, emoji, userId }, select: { id: true } })
+    if (existing) {
+        await prisma.taskCommentReaction.delete({ where: { id: existing.id } })
+        return { success: true, reacted: false }
+    }
+    await prisma.taskCommentReaction.create({ data: { commentId, emoji, userId } })
+    return { success: true, reacted: true }
 }

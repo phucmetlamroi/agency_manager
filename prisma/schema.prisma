@@ -1591,6 +1591,28 @@ model TaskComment {
   isDeleted      Boolean           @default(false)
   createdAt      DateTime          @default(now())
 
+  // [Trial P3] Comments v2 — reply threads (self-relation) + emoji reactions.
+  parentId  String? // null = top-level; else a reply to this comment
+  parent    TaskComment?          @relation("TaskCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   TaskComment[]         @relation("TaskCommentReplies")
+  reactions TaskCommentReaction[]
+
   @@index([taskId, createdAt])
   @@index([taskId, visibility])
+  @@index([parentId])
+}
+
+// [Trial P3] One row per (comment, emoji, reactor). Staff reactors carry userId;
+// client reactors carry viaShareLinkId (anonymous). Toggle is enforced in the
+// action layer (find→delete/create) to avoid nullable-column unique headaches.
+model TaskCommentReaction {
+  id             String      @id @default(uuid())
+  commentId      String
+  comment        TaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  emoji          String
+  userId         String? // staff reactor
+  viaShareLinkId String? // client reactor provenance
+  createdAt      DateTime    @default(now())
+
+  @@index([commentId])
 }

@@ -146,10 +146,12 @@ export interface DeliverableActions extends ReviewActions {
     /** [Client Task Submission v2] create a sub-brand under an in-scope parent. */
     createSubClient?: (input: { name: string; parentId: number }) =>
         Promise<{ success?: boolean; error?: string; clientId?: number; name?: string }>
-    /** [Trial P1] Task comment feed for the client (CLIENT-visibility only, hard-filtered server-side). */
-    getCommentFeed?: (taskId: string) => Promise<Array<{ kind: 'comment' | 'event'; id: string; authorName: string; body?: string; label?: string; createdAt: string; isMine?: boolean }>>
-    /** [Trial P1] Client posts a comment (forced CLIENT visibility). */
-    postComment?: (taskId: string, body: string) => Promise<{ success?: boolean; error?: string }>
+    /** [Trial P1/P3] Task comment feed for the client (CLIENT-visibility only, hard-filtered server-side). */
+    getCommentFeed?: (taskId: string) => Promise<Array<{ kind: 'comment' | 'event'; id: string; authorName: string; body?: string; label?: string; createdAt: string; isMine?: boolean; parentId?: string | null; reactions?: { emoji: string; count: number; mine: boolean }[] }>>
+    /** [Trial P1/P3] Client posts a comment (forced CLIENT visibility); parentId → a reply. */
+    postComment?: (taskId: string, body: string, parentId?: string | null) => Promise<{ success?: boolean; error?: string }>
+    /** [Trial P3] Client toggles an emoji reaction on a CLIENT-visible comment. */
+    reactComment?: (commentId: string, emoji: string) => Promise<{ success?: boolean; error?: string }>
 }
 
 /**

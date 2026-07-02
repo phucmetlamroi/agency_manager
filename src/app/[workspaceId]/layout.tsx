@@ -3,7 +3,6 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import PresenceTracker from '@/components/tracking/PresenceTracker'
 import ImpersonationBanner from '@/components/layout/ImpersonationBanner'
-import SunsetBanner from '@/components/layout/SunsetBanner'
 import { NotificationProvider } from '@/components/notifications/NotificationProvider'
 import { MarketplaceProvider } from '@/components/marketplace/MarketplaceProvider'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
@@ -164,7 +163,6 @@ export default async function WorkspaceLayout({
     return (
         <NotificationProvider userId={session.user.id}>
             <div className="workspace-container h-full w-full relative flex flex-col">
-                <SunsetBanner />
                 {session.user.isImpersonating && (
                     <ImpersonationBanner
                         username={(session.user as any).displayName || session.user.nickname || session.user.username}

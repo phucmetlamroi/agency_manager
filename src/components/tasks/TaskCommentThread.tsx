@@ -21,8 +21,8 @@ import { renderCommentMarkdown } from '@/lib/comment-markdown'
 
 export interface ThreadReaction { emoji: string; count: number; mine: boolean }
 
-/** Structural shape of a workspace member for the @mention / assignee dropdown. */
-export interface MentionMember { id: string; username: string; nickname: string | null; avatarUrl: string | null }
+/** Structural shape of a task-relevant member for the @mention / assignee dropdown. */
+export interface MentionMember { id: string; username: string; nickname: string | null; avatarUrl: string | null; relation?: 'editor' | 'manager' | 'client' | 'member' | string }
 
 export interface ThreadItem {
     kind: 'comment' | 'event'
@@ -512,14 +512,23 @@ export default function TaskCommentThread({
                     {/* [B3] @mention dropdown */}
                     {mentionOpen && (
                         <div style={{ position: 'absolute', bottom: 'calc(100% + 4px)', left: 0, zIndex: 40, width: 240, maxHeight: 200, overflowY: 'auto', padding: 5, borderRadius: 10, background: c.pop, border: `1px solid ${c.popLine}`, boxShadow: '0 -8px 28px rgba(0,0,0,0.35)' }}>
-                            {mentionResults.map((m, i) => (
-                                <button key={m.id} onMouseDown={(e) => { e.preventDefault(); insertMention(m) }}
-                                    style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 7, textAlign: 'left', cursor: 'pointer', borderRadius: 7, padding: '5px 7px', border: 'none', background: i === mentionIdx ? c.accentSoft : 'transparent', color: c.text }}>
-                                    <Avatar name={m.nickname || m.username} />
-                                    <span style={{ fontSize: 12.5, fontWeight: 600 }}>{m.nickname || m.username}</span>
-                                    <span style={{ fontSize: 11, color: c.faint }}>@{m.username}</span>
-                                </button>
-                            ))}
+                            {mentionResults.map((m, i) => {
+                                const relLabel = m.relation === 'editor' ? (dark ? 'Người làm' : 'Editor')
+                                    : m.relation === 'manager' ? (dark ? 'Quản lý' : 'Manager')
+                                    : m.relation === 'client' ? (dark ? 'Khách' : 'Client')
+                                    : null // 'member' → no chip (keeps the list clean)
+                                return (
+                                    <button key={m.id} onMouseDown={(e) => { e.preventDefault(); insertMention(m) }}
+                                        style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 7, textAlign: 'left', cursor: 'pointer', borderRadius: 7, padding: '5px 7px', border: 'none', background: i === mentionIdx ? c.accentSoft : 'transparent', color: c.text }}>
+                                        <Avatar name={m.nickname || m.username} />
+                                        <span style={{ fontSize: 12.5, fontWeight: 600 }}>{m.nickname || m.username}</span>
+                                        <span style={{ fontSize: 11, color: c.faint }}>@{m.username}</span>
+                                        {relLabel && (
+                                            <span style={{ marginLeft: 'auto', fontSize: 9.5, fontWeight: 700, color: c.mention, background: c.accentSoft, border: `1px solid ${c.accentLine}`, borderRadius: 999, padding: '1px 6px', flexShrink: 0 }}>{relLabel}</span>
+                                        )}
+                                    </button>
+                                )
+                            })}
                         </div>
                     )}
                     <textarea

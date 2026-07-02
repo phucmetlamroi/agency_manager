@@ -14,13 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
+import { AutocompleteInput } from "@/components/ui/AutocompleteInput"
 import { toast } from 'sonner'
 
 type Client = {
@@ -87,19 +81,13 @@ export default function CreateClientButton({ partners, workspaceId }: { partners
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="parent" className="text-gray-300">Là con của (không bắt buộc)</Label>
-                        <Select onValueChange={setParentId} value={parentId}>
-                            <SelectTrigger className="w-full bg-[#2a2a2a] border-gray-700 text-white">
-                                <SelectValue placeholder="-- Chọn Partner (Nếu là Brand con) --" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-[#2a2a2a] border-gray-700 text-white">
-                                <SelectItem value="0">-- Là Đối tác (Cấp 1) --</SelectItem>
-                                {partners.map((p) => (
-                                    <SelectItem key={p.id} value={p.id.toString()}>
-                                        {p.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <AutocompleteInput
+                            selectedId={parentId}
+                            onSelect={setParentId}
+                            options={partners.map((p) => ({ id: p.id.toString(), label: p.name }))}
+                            placeholder="Gõ tên khách hàng cha để tìm…"
+                            emptyLabel="-- Là Đối tác (Cấp 1) --"
+                        />
                         <p className="text-[10px] text-gray-500">
                             Để trống hoặc chọn Cấp 1 nếu đây là Partner (Agency/Cameraman).
                         </p>

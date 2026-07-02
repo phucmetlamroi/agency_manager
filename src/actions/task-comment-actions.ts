@@ -82,15 +82,61 @@ const EVENT_LABELS: Record<string, string> = {
     'request.accepted': 'nhận từ yêu cầu của khách',
 }
 
-/** Parse @username tokens from the body → workspace-member userIds (unknown handles ignored). */
-async function resolveMentions(body: string, workspaceId: string): Promise<string[]> {
+export type MentionRelation = 'editor' | 'manager' | 'client' | 'member'
+export interface MentionTarget { id: string; username: string; nickname: string | null; avatarUrl: string | null; relation: MentionRelation }
+
+const MENTION_RANK: Record<MentionRelation, number> = { editor: 0, manager: 1, client: 2, member: 3 }
+const MENTION_USER_SELECT = { id: true, username: true, nickname: true, avatarUrl: true } as const
+
+/**
+ * The people relevant to a task, for @mention: the task's EDITOR (assignee) and
+ * MANAGER (assignedById) first, then any client-linked account, then every staff
+ * member of the task's PROFILE (OWNER/ADMIN/USER). Deduped by userId, first
+ * relation wins (so editor/manager keep their label). Powers both the composer
+ * dropdown and server-side mention→notify resolution — one source of truth.
+ */
+async function buildTaskMentionUsers(taskId: string): Promise<MentionTarget[]> {
+    const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { assigneeId: true, assignedById: true, clientId: true, profileId: true },
+    })
+    if (!task) return []
+
+    const byId = new Map<string, MentionTarget>()
+    const add = (u: { id: string; username: string; nickname: string | null; avatarUrl: string | null } | null, relation: MentionRelation) => {
+        if (u && !byId.has(u.id)) byId.set(u.id, { id: u.id, username: u.username, nickname: u.nickname, avatarUrl: u.avatarUrl, relation })
+    }
+
+    // Editor (assignee) + Manager (assignedById) — the two most-relevant.
+    if (task.assigneeId) add(await prisma.user.findUnique({ where: { id: task.assigneeId }, select: MENTION_USER_SELECT }), 'editor')
+    if (task.assignedById) add(await prisma.user.findUnique({ where: { id: task.assignedById }, select: MENTION_USER_SELECT }), 'manager')
+
+    // The client's account(s), if any (token-only clients usually have none — a
+    // mention still can't push to a login-less client, but if a real account is
+    // linked we surface it). Never LOCKED.
+    if (task.clientId != null) {
+        const clientUsers = await prisma.user.findMany({ where: { clientId: task.clientId, role: { not: 'LOCKED' } }, select: MENTION_USER_SELECT })
+        for (const u of clientUsers) add(u, 'client')
+    }
+
+    // Every staff member of the task's PROFILE (not just this workspace).
+    if (task.profileId) {
+        const staff = await prisma.profileAccess.findMany({
+            where: { profileId: task.profileId, role: { in: ['OWNER', 'ADMIN', 'USER'] } },
+            select: { user: { select: MENTION_USER_SELECT } },
+        })
+        for (const s of staff) add(s.user, 'member')
+    }
+
+    return Array.from(byId.values())
+}
+
+/** Parse @username tokens → userIds relevant to THIS task (unknown/irrelevant handles ignored). */
+async function resolveMentions(body: string, taskId: string): Promise<string[]> {
     const handles = Array.from(new Set((body.match(/@([a-zA-Z0-9_.\-]+)/g) || []).map((h) => h.slice(1).toLowerCase())))
     if (!handles.length) return []
-    const members = await prisma.workspaceMember.findMany({
-        where: { workspaceId },
-        select: { user: { select: { id: true, username: true } } },
-    })
-    const byName = new Map(members.map((m) => [m.user.username.toLowerCase(), m.user.id]))
+    const users = await buildTaskMentionUsers(taskId)
+    const byName = new Map(users.map((u) => [u.username.toLowerCase(), u.id]))
     return handles.map((h) => byName.get(h)).filter((x): x is string => !!x)
 }
 
@@ -194,7 +240,7 @@ export async function createTaskComment(taskId: string, workspaceId: string, inp
     const body = sanitizeClientText(input.body || '', FEEDBACK_MAX_LEN)
     if (!body) return { success: false, error: 'Nội dung trống.' }
     const visibility: 'INTERNAL' | 'CLIENT' = input.visibility === 'INTERNAL' ? 'INTERNAL' : 'CLIENT'
-    const mentions = await resolveMentions(body, workspaceId)
+    const mentions = await resolveMentions(body, taskId)
 
     // [P3] Reply: the parent must be a live comment on the SAME task.
     let parentId: string | null = null
@@ -238,7 +284,7 @@ export async function editTaskComment(commentId: string, workspaceId: string, bo
 
     const clean = sanitizeClientText(body || '', FEEDBACK_MAX_LEN)
     if (!clean) return { success: false, error: 'Nội dung trống.' }
-    const mentions = await resolveMentions(clean, workspaceId)
+    const mentions = await resolveMentions(clean, c.taskId)
     await prisma.taskComment.update({ where: { id: commentId }, data: { body: clean, mentions, editedAt: new Date() } })
     broadcastFeedChanged(c.taskId, commentId)
     try { revalidatePath(`/${workspaceId}/admin`) } catch { /* best-effort */ }
@@ -481,4 +527,22 @@ export async function searchWorkspaceMembers(workspaceId: string, q: string): Pr
         ? all.filter((u) => u.username.toLowerCase().includes(query) || (u.nickname || '').toLowerCase().includes(query))
         : all
     return filtered.slice(0, 8).map((u) => ({ id: u.id, username: u.username, nickname: u.nickname, avatarUrl: u.avatarUrl }))
+}
+
+/**
+ * [Chat GĐ3 · B3, task-scoped] @mention suggestions relevant to THIS task only —
+ * editor + manager first, then any client account, then the task's PROFILE staff.
+ * Replaces the workspace-wide list so the dropdown never offers unrelated people.
+ */
+export async function getTaskMentionTargets(taskId: string, workspaceId: string, q: string): Promise<MentionTarget[]> {
+    await staffCtx(workspaceId)
+    if (!(await taskInWorkspace(taskId, workspaceId))) return []
+    const query = (q || '').trim().toLowerCase()
+    const users = await buildTaskMentionUsers(taskId)
+    const filtered = query
+        ? users.filter((u) => u.username.toLowerCase().includes(query) || (u.nickname || '').toLowerCase().includes(query))
+        : users
+    return filtered
+        .sort((a, b) => MENTION_RANK[a.relation] - MENTION_RANK[b.relation] || (a.nickname || a.username).localeCompare(b.nickname || b.username))
+        .slice(0, 10)
 }

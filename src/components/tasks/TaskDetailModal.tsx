@@ -40,7 +40,7 @@ if (typeof window !== 'undefined' && !globalThis.__taskDetailDompurifyLinkHookRe
 }
 import { motion } from "framer-motion"
 import {
-    X, Pencil, LayoutGrid, FolderOpen, StickyNote, ExternalLink, Check, Plus,
+    X, Pencil, LayoutGrid, FolderOpen, ExternalLink, Check, Plus,
     Lock, Play, Loader2,
 } from "lucide-react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
@@ -188,13 +188,12 @@ function TabNav({
     activeTab,
     onChange,
 }: {
-    activeTab: 'main' | 'assets' | 'notes'
-    onChange: (tab: 'main' | 'assets' | 'notes') => void
+    activeTab: 'main' | 'assets'
+    onChange: (tab: 'main' | 'assets') => void
 }) {
     const tabs = [
         { id: 'main' as const, label: 'Chính', icon: LayoutGrid },
         { id: 'assets' as const, label: 'Tài nguyên', icon: FolderOpen },
-        { id: 'notes' as const, label: 'Ghi chú', icon: StickyNote },
     ]
     return (
         <div className="mx-6 my-4 flex items-center bg-white/[0.04] border border-white/5 rounded-full p-1">
@@ -442,7 +441,7 @@ export function TaskDetailModal({
         bulkSelectedIds.includes(task.id)
     )
     const bulkCount = bulkSelectedIds?.length ?? 0
-    const [activeTab, setActiveTab] = useState<'main' | 'assets' | 'notes'>('main')
+    const [activeTab, setActiveTab] = useState<'main' | 'assets'>('main')
     const [localTask, setLocalTask] = useState<TaskWithUser | null>(null)
 
     // [Hook Graph] The saved Multi-Hook Map for this task (fetched on open).
@@ -1369,8 +1368,11 @@ export function TaskDetailModal({
                                 ))}
 
                             {/* TAB NOTES */}
-                            {activeTab === 'notes' && (
+                            {/* [Trial] GHI CHÚ — không còn là tab; luôn hiển thị dưới nội dung
+                                tab ("Chính" / "Tài nguyên" vẫn switch qua lại ở trên). */}
+                            <div className="mt-5 pt-5 border-t border-white/5">
                                 <Card
+                                    title="Ghi chú"
                                     rightSlot={
                                         isAdmin && !editingNotes ? (
                                             <EditButton onClick={enterEditNotes} />
@@ -1399,7 +1401,7 @@ export function TaskDetailModal({
                                         <p className="text-[13px] text-zinc-600 min-h-[200px]">Chưa có ghi chú nào.</p>
                                     )}
                                 </Card>
-                            )}
+                            </div>
 
                         </div>
 

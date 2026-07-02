@@ -990,9 +990,11 @@ export function TaskDetailModal({
                                         {isAdmin && !isBulkMode && <EditButton onClick={enterEditTitle} title="Đổi tên video" />}
                                     </div>
                                 )}
-                                <p className="text-[12px] text-zinc-400">
-                                    Theo dõi: <span className="text-zinc-300">{formatDate(localTask.deadline)}</span>
-                                </p>
+                                <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-[12px] text-zinc-400">
+                                    <span>Quản lý: <span className="text-zinc-200 font-medium">{(localTask.assignedBy as any)?.nickname || (localTask.assignedBy as any)?.username || '—'}</span></span>
+                                    <span className="text-zinc-600">·</span>
+                                    <span>Người làm: <span className="text-zinc-200 font-medium">{(localTask.assignee as any)?.nickname || (localTask.assignee as any)?.username || 'Chưa giao'}</span></span>
+                                </div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <StatusPill status={localTask.status} />
                                     {localTask.type && <TypePill type={localTask.type} />}

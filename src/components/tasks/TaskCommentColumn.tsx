@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import TaskCommentThread, { type ThreadItem } from './TaskCommentThread'
 import {
     getTaskActivityFeed, createTaskComment, editTaskComment, deleteTaskComment, toggleTaskCommentReaction,
-    assignTaskComment, resolveTaskComment, reopenTaskComment, markTaskCommentsRead, searchWorkspaceMembers,
+    assignTaskComment, resolveTaskComment, reopenTaskComment, markTaskCommentsRead, getTaskMentionTargets,
 } from '@/actions/task-comment-actions'
 import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
 import { getTaskCommentChannel, TASK_COMMENT_EVENTS } from '@/lib/notification-channels'
@@ -54,7 +54,7 @@ export default function TaskCommentColumn({ taskId, workspaceId }: { taskId: str
             onEdit={(id, body) => editTaskComment(id, workspaceId, body)}
             onDelete={(id) => deleteTaskComment(id, workspaceId)}
             onReact={(id, emoji) => toggleTaskCommentReaction(id, workspaceId, emoji)}
-            onSearchMembers={(q) => searchWorkspaceMembers(workspaceId, q)}
+            onSearchMembers={(q) => getTaskMentionTargets(taskId, workspaceId, q)}
             onAssign={(id, assigneeUserId) => assignTaskComment(id, workspaceId, assigneeUserId)}
             onResolve={(id) => resolveTaskComment(id, workspaceId)}
             onReopen={(id) => reopenTaskComment(id, workspaceId)}

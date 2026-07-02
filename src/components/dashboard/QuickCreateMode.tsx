@@ -24,7 +24,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { Loader2, Link2, Sparkles, Rocket, AlertCircle, Search } from 'lucide-react'
+import { Loader2, Link2, Sparkles, Rocket, AlertCircle, Search, Settings2, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import {
     isCloudStorageUrl,
@@ -93,6 +93,11 @@ interface Props {
      *  (AddTaskModal) for form prefill. Receives V1 or V3 payload — parent
      *  routes via `version` discriminator on the V3 type. */
     onApplyToForm: (payload: VeloxApplyPayload | VeloxApplyPayloadV3) => void
+    /** [Client Task Submission v2] Seed the folder URL when opened from the
+     *  admin "Hộp thư yêu cầu" → Quét bằng Velox flow (the client's raw link). */
+    initialFolderUrl?: string
+    /** [Client Task Submission v2] Seed the selected client from the request. */
+    initialClientId?: number
 }
 
 interface PreviewRow {
@@ -154,6 +159,8 @@ export default function QuickCreateMode({
     pricingRules,
     exchangeRate = 26300,
     onApplyToForm,
+    initialFolderUrl,
+    initialClientId,
 }: Props) {
     const [url, setUrl] = useState('')
     const [scanning, setScanning] = useState(false)
@@ -161,6 +168,17 @@ export default function QuickCreateMode({
     const [previewRows, setPreviewRows] = useState<PreviewRow[]>([])
 
     const [clientId, setClientId] = useState<number | null>(null)
+    // [Client Task Submission v2] Collapsible ⚙ drawer for the automation toggles
+    // (reveal-only — no persistence). Closed by default so the scan flow is clean.
+    const [showToggles, setShowToggles] = useState(false)
+
+    // [Client Task Submission v2] Seed folder URL + client once when this mode is
+    // opened from the "Quét bằng Velox" inbox flow.
+    useEffect(() => {
+        if (initialFolderUrl) setUrl(initialFolderUrl)
+        if (initialClientId != null) setClientId(initialClientId)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
     const [pricingRuleId, setPricingRuleId] = useState<string>('')
     const [assigneeId, setAssigneeId] = useState<string | null>(null)
     const [deadline, setDeadline] = useState('')
@@ -706,11 +724,19 @@ export default function QuickCreateMode({
                 </div>
             </div>
 
-            {/* Automation toggles */}
+            {/* Automation toggles — behind a ⚙ gear drawer (reveal-only, no persistence) */}
             <div>
-                <h4 className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-3">
-                    Tự động hoá
-                </h4>
+                <button
+                    type="button"
+                    onClick={() => setShowToggles((s) => !s)}
+                    className="w-full flex items-center justify-between gap-2 mb-3 group"
+                >
+                    <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-zinc-400 group-hover:text-zinc-200 transition-colors">
+                        <Settings2 size={13} /> Tuỳ chọn Velox
+                    </span>
+                    <ChevronDown size={15} className={`text-zinc-500 transition-transform ${showToggles ? 'rotate-180' : ''}`} />
+                </button>
+                {showToggles && (
                 <div className="grid grid-cols-2 gap-2">
                     <ToggleRow
                         label="Tự nhận diện video"
@@ -764,6 +790,7 @@ export default function QuickCreateMode({
                         onChange={(v) => setToggles({ ...toggles, pairBodyHooks: v })}
                     />
                 </div>
+                )}
             </div>
 
             {/* Optional prefix */}

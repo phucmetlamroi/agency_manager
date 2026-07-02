@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { ensureNotLastOwner, LastOwnerProtectionError } from '@/lib/workspace-guards'
 import { audit } from '@/lib/audit-log'
+import { extractPayrollCycle } from '@/lib/payroll-cycle'
+import { SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
 
 export async function createWorkspaceAction(formData: FormData) {
     const session = await getSession()
@@ -355,5 +357,174 @@ export async function restoreWorkspaceAction(workspaceId: string) {
             return { error: error.message }
         }
         return { error: 'Lỗi khi khôi phục Workspace.' }
+    }
+}
+
+/**
+ * [Trial P2] Monthly rollover — "Tạo tháng tiếp theo".
+ *
+ * Creates the NEXT month's workspace (derived from the current workspace's
+ * "Tháng M/YYYY" name via extractPayrollCycle) and copies every UNFINISHED task
+ * into it, so the recurring monthly setup (same clients, editors, managers,
+ * pricing, asset links) doesn't have to be re-typed each cycle. The client's
+ * #1 retention pain: "giảm lặp lại hàng tháng".
+ *
+ * What copies: title, type, deadline (+1 calendar month), client, editor
+ * (assignee), manager (assignedBy), pricing (value/exchangeRate/jobPriceUSD/
+ * profit/wage), asset links (raw/broll/collect/submit/frame), notes, duration.
+ * What RESETS: status → fresh start, delivery outputs (fileLink/productLink),
+ * client-review state, invoice binding (→ UNBILLED), penalty, version,
+ * projectId (Project is workspace-scoped — carrying it would cross-link months).
+ * NOT carried: task tags, Multi-Hook Map (rawFootage), video versions, comments,
+ * client requests.
+ *
+ * Finished ('Hoàn tất') and cancelled ('Đã hủy') and archived tasks are skipped.
+ */
+export async function createNextMonthWithRollover(currentWorkspaceId: string) {
+    let userId: string
+    let profileId: string | null
+    try {
+        // Caller must be ADMIN/OWNER of the source workspace (this also confirms
+        // membership + resolves the profile the new workspace inherits).
+        const access = await verifyWorkspaceAccess(currentWorkspaceId, 'ADMIN')
+        userId = access.userId
+    } catch (error: any) {
+        if (error?.message?.startsWith('SECURITY_VIOLATION')) return { error: error.message }
+        return { error: 'Bạn không có quyền tạo tháng mới cho Workspace này.' }
+    }
+
+    const source = await prisma.workspace.findUnique({
+        where: { id: currentWorkspaceId },
+        select: { id: true, name: true, profileId: true },
+    })
+    if (!source) return { error: 'Không tìm thấy Workspace nguồn.' }
+    profileId = source.profileId
+
+    // Derive next month from the source name ("Tháng 6/2026" → 7/2026).
+    const { month, year } = extractPayrollCycle(source.name)
+    const nextMonth = month === 12 ? 1 : month + 1
+    const nextYear = month === 12 ? year + 1 : year
+    const newName = `Tháng ${nextMonth}/${nextYear}`
+
+    // Guard: don't silently mint a duplicate month.
+    const dup = await prisma.workspace.findFirst({
+        where: { profileId: profileId ?? undefined, name: newName, status: 'ACTIVE' } as any,
+        select: { id: true },
+    })
+    if (dup) {
+        return { error: `Workspace "${newName}" đã tồn tại. Hãy mở workspace đó hoặc đổi tên trước.` }
+    }
+
+    // Mirror createWorkspaceAction's abuse cap (10 owned per user).
+    const ownedCount = await prisma.workspaceMember.count({
+        where: { userId, role: 'OWNER' },
+    })
+    if (ownedCount >= 10) {
+        return { error: 'Bạn đã đạt giới hạn 10 Workspace. Hãy xóa workspace cũ trước khi tạo mới.' }
+    }
+
+    // Pull the unfinished tasks to roll forward.
+    const openTasks = await prisma.task.findMany({
+        where: {
+            workspaceId: currentWorkspaceId,
+            isArchived: false,
+            status: { notIn: [SALARY_COMPLETED_STATUS, 'Đã hủy'] },
+        },
+        select: {
+            title: true, deadline: true, value: true, type: true,
+            references: true, resources: true, notes_vi: true, notes_en: true,
+            assigneeId: true, assignedById: true, clientId: true, assignedAgencyId: true,
+            exchangeRate: true, jobPriceUSD: true, profitVND: true, wageVND: true,
+            collectFilesLink: true, submissionFolder: true,
+            frameUsername: true, framePassword: true, frameNote: true, duration: true,
+        },
+    })
+
+    const addOneMonth = (d: Date | null): Date | null => {
+        if (!d) return null
+        const r = new Date(d)
+        r.setMonth(r.getMonth() + 1)
+        return r
+    }
+
+    try {
+        let newWorkspaceId = ''
+        let copied = 0
+        await prisma.$transaction(async (tx) => {
+            const workspace = await tx.workspace.create({
+                data: {
+                    name: newName,
+                    description: `Chuyển tiếp từ "${source.name}" — task chưa hoàn tất đã được sao chép sang.`,
+                    profileId: profileId ?? undefined,
+                },
+            })
+            newWorkspaceId = workspace.id
+
+            await tx.workspaceMember.create({
+                data: { userId, workspaceId: workspace.id, role: 'OWNER' },
+            })
+
+            if (openTasks.length > 0) {
+                const rows = openTasks.map((t) => ({
+                    title: t.title,
+                    deadline: addOneMonth(t.deadline),
+                    value: t.value,
+                    // Fresh start: assigned-but-not-started if it has an editor,
+                    // else waiting-to-assign.
+                    status: t.assigneeId ? 'Nhận task' : 'Đang đợi giao',
+                    type: t.type,
+                    references: t.references,
+                    resources: t.resources,
+                    notes_vi: t.notes_vi,
+                    notes_en: t.notes_en,
+                    assigneeId: t.assigneeId,
+                    assignedById: t.assignedById,
+                    clientId: t.clientId,
+                    assignedAgencyId: t.assignedAgencyId,
+                    exchangeRate: t.exchangeRate,
+                    jobPriceUSD: t.jobPriceUSD,
+                    profitVND: t.profitVND,
+                    wageVND: t.wageVND,
+                    collectFilesLink: t.collectFilesLink,
+                    submissionFolder: t.submissionFolder,
+                    frameUsername: t.frameUsername,
+                    framePassword: t.framePassword,
+                    frameNote: t.frameNote,
+                    duration: t.duration,
+                    // Reset — new month, nothing delivered/billed yet.
+                    fileLink: null,
+                    productLink: null,
+                    projectId: null,
+                    invoiceId: null,
+                    invoiceStatus: 'UNBILLED' as const,
+                    isArchived: false,
+                    isPenalized: false,
+                    version: 0,
+                    clientReview: null,
+                    clientFeedback: null,
+                    clientReviewedAt: null,
+                    currentVersionId: null,
+                    workspaceId: workspace.id,
+                    profileId: profileId ?? undefined,
+                }))
+                const res = await tx.task.createMany({ data: rows })
+                copied = res.count
+            }
+        }, { timeout: 30000 })
+
+        await audit({
+            workspaceId: newWorkspaceId,
+            actorUserId: userId,
+            action: 'workspace.created',
+            targetType: 'Workspace',
+            targetId: newWorkspaceId,
+            after: { name: newName, rolledFrom: source.name, tasksCopied: copied },
+        })
+
+        revalidatePath('/workspace')
+        return { success: true, workspaceId: newWorkspaceId, name: newName, tasksCopied: copied }
+    } catch (e: any) {
+        console.error('[createNextMonthWithRollover]', e)
+        return { error: 'Lỗi khi tạo tháng mới. Vui lòng thử lại.' }
     }
 }

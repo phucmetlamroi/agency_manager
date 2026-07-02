@@ -72,7 +72,13 @@ export type AuditAction =
     // [Client Portal] client-driven review actions
     | 'task.client_approved'           // Client approved a deliverable → Hoàn tất
     | 'task.client_changes_requested'  // Client requested changes → Revision + feedback
-    | 'task.client_submitted'          // Client created a NEW task via the share-link portal
+    | 'task.client_submitted'          // Client created a NEW task via the share-link portal (v1 — legacy)
+    | 'task.comment_added'             // [Trial P1] A task comment was posted (staff or client)
+    // [Client Task Submission v2] Intake request lifecycle + portal sub-brand create
+    | 'request.client_submitted'       // Client submitted a ClientTaskRequest via the portal wizard
+    | 'request.accepted'               // Admin accepted a request → spawned a Task
+    | 'request.rejected'               // Admin rejected a request
+    | 'client.created_via_share_link'  // Client created a sub-brand via the portal
     // [Sprint Q] Bulk edit lifecycle
     | 'task.bulk_updated'         // Bulk update fields (productLink/notes/deadline/...) of N tasks
     | 'task.bulk_status_updated'  // Bulk status change of N tasks (with digest email)

@@ -24,6 +24,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
+import { isValidReaction } from '@/lib/comment-reactions'
 import { audit } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 
@@ -87,6 +88,8 @@ export async function getShareSnapshot(token: string) {
                 project: { select: { id: true, name: true } },
                 rating: true,
                 assignee: { select: { username: true, nickname: true } },
+                // [Trial P0] Manager ("Người quản lý") — the ONLY staff identity the client may see.
+                assignedBy: { select: { username: true, nickname: true } },
                 // [Video Review] Does this deliverable have an in-app review video?
                 // Drives the portal's "Review video" entry point (count>0 = show).
                 _count: { select: { videoVersions: true } },
@@ -148,9 +151,13 @@ export async function getShareSnapshot(token: string) {
     // mirroring how the old getClientInvoices did `.toISOString()`.
     const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
 
-    const mappedTasks = tasks.map(({ _count, ...task }) => ({
+    const mappedTasks = tasks.map(({ _count, assignedBy, ...task }) => ({
         ...task,
         hasVideo: (_count?.videoVersions ?? 0) > 0,
+        // [Trial P0 — isolation] The client must NEVER receive the editor's identity;
+        // ship the Manager instead ("client làm việc với manager, không biết editor").
+        assignee: null,
+        manager: assignedBy ? (assignedBy.nickname || assignedBy.username) : null,
         // [Invoice i18n] Never ship the raw Vietnamese staff instruction (notes_vi) to a
         // foreign client. The portal renders only notes_en; null notes_vi here so it can never
         // leak via a future `notes_en || notes_vi` fallback (the pattern staff TaskDrawer uses).
@@ -172,9 +179,23 @@ export async function getShareSnapshot(token: string) {
         workspaceName: inv.workspaceId ? wsNameById.get(inv.workspaceId) ?? null : null,
     }))
 
+    // [Trial P3 — white-label] The agency's brand for the client portal lockup:
+    // logo + name + optional accent (settings.portalAccent). Only these three
+    // brand fields leave the server — never any other profile/settings data.
+    const brandProfile = scope.profileId
+        ? await prisma.profile.findUnique({ where: { id: scope.profileId }, select: { name: true, logoUrl: true, settings: true } })
+        : null
+    const rawAccent = brandProfile?.settings && typeof brandProfile.settings === 'object' && !Array.isArray(brandProfile.settings)
+        ? (brandProfile.settings as any).portalAccent
+        : null
+    const brandAccent = typeof rawAccent === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(rawAccent) ? rawAccent : null
+
     return {
         clientName: scope.clientName,
         profileName: scope.profileName,
+        brandName: brandProfile?.name || scope.profileName,
+        brandLogoUrl: brandProfile?.logoUrl || null,
+        brandAccent,
         workspaces,
         tasks: serializeDecimal(mappedTasks) as typeof mappedTasks,
         invoices: serializeDecimal(mappedInvoices) as typeof mappedInvoices,
@@ -551,6 +572,247 @@ export async function createTaskViaToken(
     return { success: true, taskId: task.id }
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Client Task Submission v2 — request INTAKE (ClientTaskRequest) + sub-brand
+   creation. Supersedes the v1 direct-to-Task path above: the portal wizard now
+   calls submitClientRequestViaToken, which creates a NEW ClientTaskRequest and
+   emails every profile OWNER/ADMIN. An admin later accepts it into a real Task
+   from the "Hộp thư yêu cầu" inbox. createTaskViaToken is retained but unused.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const DESIRED_TYPES = new Set(['Short form', 'Long form', 'Trial'])
+/** Max ACTIVE sub-brands a client may create under one parent via the portal. */
+const SUBCLIENT_CAP = 20
+
+/**
+ * Realtime + bespoke-VN-email fan-out to every profile OWNER/ADMIN about a fresh
+ * client request. Uses the TASK_CLIENT_SUBMITTED type so the notification email
+ * pipeline picks the taskClientSubmitted template (all data via metadata — no
+ * Task exists yet).
+ */
+async function notifyProfileAdminsOfRequest(
+    scope: NonNullable<Awaited<ReturnType<typeof resolveShareToken>>>,
+    req: { id: string; title: string; workspaceId: string; rawFootage: string | null; notes: string | null },
+    monthLabel: string | null,
+) {
+    try {
+        const admins = await prisma.profileAccess.findMany({
+            where: { profileId: scope.profileId, role: { in: ['OWNER', 'ADMIN'] } },
+            select: { userId: true },
+        })
+        const body = `Khách hàng "${scope.clientName}" vừa gửi yêu cầu: "${req.title}"`
+        for (const { userId } of admins) {
+            try {
+                const notif = await createNotificationInternal({
+                    userId,
+                    type: 'TASK_CLIENT_SUBMITTED',
+                    title: 'Yêu cầu mới từ khách hàng',
+                    body,
+                    metadata: {
+                        brand: scope.clientName,
+                        projectTitle: req.title,
+                        monthLabel,
+                        rawLink: req.rawFootage,
+                        clientNotes: req.notes,
+                        requestId: req.id,
+                        inboxWorkspaceId: req.workspaceId,
+                    },
+                })
+                void broadcastNotificationToUser(userId, {
+                    id: notif.id, type: notif.type, title: notif.title, body: notif.body,
+                    taskId: null, createdAt: notif.createdAt, isRead: false,
+                })
+            } catch (e) {
+                console.error('[share-portal] notifyProfileAdminsOfRequest one failed', e)
+            }
+        }
+    } catch (e) {
+        console.error('[share-portal] notifyProfileAdminsOfRequest query failed', e)
+    }
+}
+
+export interface SubmitClientRequestInput {
+    workspaceId: string
+    clientId: number
+    title: string
+    videoList?: string
+    desiredType?: string
+    desiredDeadline?: string
+    rawFootage: string
+    collectFile?: string
+    bRoll?: string
+    references?: string
+    submitFolder?: string
+    script?: string
+    notes?: string
+}
+
+/**
+ * Client submits a work request from the portal wizard. Token-authed (no
+ * session); every id is re-validated against the link's scope. Creates a
+ * ClientTaskRequest (status NEW) — NOT a Task — and notifies profile admins.
+ * Carries no finance/assignee/frame fields (leak discipline).
+ */
+export async function submitClientRequestViaToken(token: string, input: SubmitClientRequestInput) {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is invalid.' }
+
+    const rl = await rateLimit(`client-submit-request:${scope.shareLinkId}`, 20, 60 * 60 * 1000)
+    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+
+    // Fail-closed scope checks — client cannot inject another profile's ids.
+    if (!input || typeof input.workspaceId !== 'string' || typeof input.clientId !== 'number') {
+        return { success: false, error: 'Missing information.' }
+    }
+    if (!scope.workspaceIds.includes(input.workspaceId)) return { success: false, error: 'Invalid period.' }
+    if (!scope.clientIds.includes(input.clientId)) return { success: false, error: 'Invalid brand.' }
+
+    const ws = await prisma.workspace.findFirst({
+        where: { id: input.workspaceId, status: 'ACTIVE' },
+        select: { id: true, name: true },
+    })
+    if (!ws) return { success: false, error: 'This period is no longer active.' }
+
+    // Validate + sanitize.
+    const title = sanitizeClientText(input.title || '', TITLE_MAX_LEN)
+    if (!title) return { success: false, error: 'Please enter a project / video name.' }
+
+    const rawFootage = cleanLink(input.rawFootage)
+    if (!looksLikeUrl(rawFootage)) return { success: false, error: 'The raw footage link is invalid (must start with http/https).' }
+
+    // Optional links — validate only when provided.
+    const optLink = (v: string | undefined, label: string):
+        | { ok: true; val: string | null }
+        | { ok: false; error: string } => {
+        if (!v || !v.trim()) return { ok: true, val: null }
+        const c = cleanLink(v)
+        if (!looksLikeUrl(c)) return { ok: false, error: `The ${label} link is invalid.` }
+        return { ok: true, val: c }
+    }
+    const collect = optLink(input.collectFile, 'collect files')
+    if (!collect.ok) return { success: false, error: collect.error }
+    const broll = optLink(input.bRoll, 'b-roll')
+    if (!broll.ok) return { success: false, error: broll.error }
+    const refs = optLink(input.references, 'reference')
+    if (!refs.ok) return { success: false, error: refs.error }
+    const submit = optLink(input.submitFolder, 'submission folder')
+    if (!submit.ok) return { success: false, error: submit.error }
+    const scriptL = optLink(input.script, 'script')
+    if (!scriptL.ok) return { success: false, error: scriptL.error }
+
+    const videoList = input.videoList ? sanitizeClientText(input.videoList, FEEDBACK_MAX_LEN) : null
+    const notes = input.notes ? sanitizeClientText(input.notes, FEEDBACK_MAX_LEN) : null
+    const desiredType = input.desiredType && DESIRED_TYPES.has(input.desiredType) ? input.desiredType : null
+    let desiredDeadline: Date | null = null
+    if (input.desiredDeadline) {
+        const d = new Date(input.desiredDeadline)
+        if (!isNaN(d.getTime())) desiredDeadline = d
+    }
+
+    let req: { id: string }
+    try {
+        req = await prisma.clientTaskRequest.create({
+            data: {
+                profileId: scope.profileId,          // from scope, never client input
+                workspaceId: input.workspaceId,
+                clientId: input.clientId,
+                viaShareLinkId: scope.shareLinkId,
+                submittedVia: 'SHARE_LINK',
+                title,
+                videoList,
+                desiredType,
+                desiredDeadline,
+                rawFootage,
+                collectFile: collect.val,
+                bRoll: broll.val,
+                refs: refs.val,
+                submitFolder: submit.val,
+                script: scriptL.val,
+                notes,
+                status: 'NEW',
+            },
+            select: { id: true },
+        })
+    } catch (err) {
+        console.error('[submitClientRequestViaToken] create failed', err)
+        return { success: false, error: 'Could not send your request. Please try again.' }
+    }
+
+    await notifyProfileAdminsOfRequest(
+        scope,
+        { id: req.id, title, workspaceId: input.workspaceId, rawFootage, notes },
+        ws.name,
+    )
+
+    void audit({
+        workspaceId: input.workspaceId, actorUserId: null, action: 'request.client_submitted',
+        targetType: 'ClientTaskRequest', targetId: req.id,
+        after: { title, clientId: input.clientId, viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
+    })
+
+    try {
+        revalidatePath(`/${input.workspaceId}/admin/requests`)
+    } catch { /* best-effort */ }
+
+    return { success: true, requestId: req.id }
+}
+
+/**
+ * Client creates a sub-brand (child client) under an in-scope parent brand.
+ * Token-authed; parent must be in scope; profileId forced from scope. The new
+ * brand auto-enters the link's scope via name-path resolution on the next
+ * resolveShareToken (no extra wiring). Rate-limited tighter than requests.
+ */
+export async function createSubClientViaToken(token: string, input: { name: string; parentId: number }) {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is invalid.' }
+
+    const rl = await rateLimit(`client-create-subclient:${scope.shareLinkId}`, 10, 60 * 60 * 1000)
+    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+
+    if (!input || typeof input.parentId !== 'number') return { success: false, error: 'Missing information.' }
+    if (!scope.clientIds.includes(input.parentId)) return { success: false, error: 'Invalid parent brand.' }
+
+    const name = sanitizeClientText(input.name || '', TITLE_MAX_LEN)
+    if (!name) return { success: false, error: 'Please enter a brand name.' }
+
+    // Parent must belong to the link's profile (defense-in-depth beyond scope).
+    const parent = await prisma.client.findFirst({
+        where: { id: input.parentId, profileId: scope.profileId, status: 'ACTIVE' },
+        select: { id: true },
+    })
+    if (!parent) return { success: false, error: 'Invalid parent brand.' }
+
+    const existing = await prisma.client.count({
+        where: { parentId: input.parentId, status: 'ACTIVE' },
+    })
+    if (existing >= SUBCLIENT_CAP) return { success: false, error: 'You have reached the maximum number of sub-brands.' }
+
+    let client: { id: number; name: string }
+    try {
+        client = await prisma.client.create({
+            data: {
+                name,
+                parentId: input.parentId,
+                profileId: scope.profileId,   // forced from scope, never client input
+                status: 'ACTIVE',
+            },
+            select: { id: true, name: true },
+        })
+    } catch (err) {
+        console.error('[createSubClientViaToken] create failed', err)
+        return { success: false, error: 'Could not create the brand. Please try again.' }
+    }
+
+    void audit({
+        workspaceId: null, actorUserId: null, action: 'client.created_via_share_link',
+        targetType: 'Client', targetId: String(client.id),
+        after: { name, parentId: input.parentId, viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
+    })
+
+    return { success: true, clientId: client.id, name: client.name }
+}
+
 /** Human labels for the deliverable Activity timeline (port of the account version). */
 const ACTIVITY_LABELS: Record<string, string> = {
     'task.assigned': 'Project opened',
@@ -571,17 +833,190 @@ export async function getActivityViaToken(token: string, taskId: string) {
         take: 30,
     })
 
-    const actorIds = Array.from(new Set(rows.map(r => r.actorUserId).filter(Boolean))) as string[]
-    const users = actorIds.length
-        ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, username: true, nickname: true } })
-        : []
-    const nameById = new Map(users.map(u => [u.id, u.nickname || u.username]))
-
+    // [Trial P0 — isolation fix] NEVER surface a staff member's real name to the
+    // client. Any staff-actor row is shown as a generic label; only the client's
+    // own link-driven rows (actorUserId=null) are "You". (Previously leaked the
+    // editor/admin nickname here, breaking the "client never knows the editor" rule.)
     return rows.map(r => ({
         label: ACTIVITY_LABELS[r.action] || r.action,
-        // Link-driven rows have actorUserId=null → attribute to "You" since
-        // only the client (token holder) performs those.
-        who: r.actorUserId ? (nameById.get(r.actorUserId) || 'Team') : 'You',
+        who: r.actorUserId ? 'Nhóm biên tập' : 'You',
         date: r.createdAt.toISOString(),
     }))
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   [Trial P1] Task comments — the client side of the ClickUp-style feed. The
+   client sees ONLY visibility=CLIENT comments (hard-filtered here) merged with
+   client-safe activity; anything they post is forced to CLIENT visibility. Staff
+   identity is never surfaced (author shows as "The team").
+   ─────────────────────────────────────────────────────────────────────────── */
+
+export interface ClientFeedItem {
+    kind: 'comment' | 'event'
+    id: string
+    authorName: string
+    body?: string
+    label?: string
+    createdAt: string
+    isMine?: boolean
+    /** [P3] null = top-level; else the parent comment id (reply threads). */
+    parentId?: string | null
+    /** [P3] Aggregated emoji reactions (mine = this share link reacted). */
+    reactions?: { emoji: string; count: number; mine: boolean }[]
+}
+
+export async function getCommentFeedViaToken(token: string, taskId: string): Promise<ClientFeedItem[]> {
+    const { scope, task } = await findScopedTask(token, taskId, { id: true })
+    if (!scope || !task) return []
+
+    const [comments, auditRows] = await Promise.all([
+        prisma.taskComment.findMany({
+            where: { taskId, visibility: 'CLIENT', isDeleted: false },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true, authorType: true, body: true, createdAt: true, parentId: true },
+        }),
+        prisma.auditLog.findMany({
+            where: { targetType: 'Task', targetId: taskId, action: { in: Object.keys(ACTIVITY_LABELS) } },
+            orderBy: { createdAt: 'asc' }, take: 30,
+        }),
+    ])
+
+    // [P3] Reactions on the CLIENT-visible comments only; mine = this share link.
+    const commentIds = comments.map(c => c.id)
+    const reactionRows = commentIds.length
+        ? await prisma.taskCommentReaction.findMany({ where: { commentId: { in: commentIds } }, select: { commentId: true, emoji: true, viaShareLinkId: true } })
+        : []
+    const reactionsByComment = new Map<string, { emoji: string; count: number; mine: boolean }[]>()
+    for (const r of reactionRows) {
+        const arr = reactionsByComment.get(r.commentId) || []
+        const existing = arr.find(a => a.emoji === r.emoji)
+        if (existing) { existing.count++; if (r.viaShareLinkId === scope.shareLinkId) existing.mine = true }
+        else arr.push({ emoji: r.emoji, count: 1, mine: r.viaShareLinkId === scope.shareLinkId })
+        reactionsByComment.set(r.commentId, arr)
+    }
+
+    const commentItems: ClientFeedItem[] = comments.map(c => ({
+        kind: 'comment',
+        id: c.id,
+        // Never reveal a staff name to the client; their own posts read as "You".
+        authorName: c.authorType === 'CLIENT' ? 'You' : 'The team',
+        body: c.body,
+        createdAt: c.createdAt.toISOString(),
+        isMine: c.authorType === 'CLIENT',
+        parentId: c.parentId ?? null,
+        reactions: reactionsByComment.get(c.id) || [],
+    }))
+    const eventItems: ClientFeedItem[] = auditRows.map(r => ({
+        kind: 'event',
+        id: `evt-${r.id}`,
+        authorName: r.actorUserId ? 'The team' : 'You',
+        label: ACTIVITY_LABELS[r.action] || r.action,
+        createdAt: r.createdAt.toISOString(),
+    }))
+
+    return [...commentItems, ...eventItems].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
+export async function postCommentViaToken(token: string, taskId: string, body: string, parentId?: string | null) {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is invalid.' }
+
+    const rl = await rateLimit(`client-comment:${scope.shareLinkId}`, 30, 60 * 60 * 1000)
+    if (!rl.success) return { success: false, error: 'Too many messages. Please try again later.' }
+
+    const { task } = await findScopedTask(token, taskId, { id: true, clientId: true, workspaceId: true, assignedById: true, title: true })
+    if (!task) return { success: false, error: 'This link is invalid or the item no longer exists.' }
+
+    const clean = sanitizeClientText(body || '', FEEDBACK_MAX_LEN)
+    if (!clean) return { success: false, error: 'Please write a message.' }
+
+    // [P3] Reply: the parent must be a live CLIENT-visible comment on THIS task
+    // (a client can never reply to — or even see — an internal note).
+    let safeParentId: string | null = null
+    if (parentId) {
+        const parent = await prisma.taskComment.findFirst({
+            where: { id: parentId, taskId, isDeleted: false, visibility: 'CLIENT' },
+            select: { id: true },
+        })
+        if (!parent) return { success: false, error: 'The comment you replied to no longer exists.' }
+        safeParentId = parent.id
+    }
+
+    let created: { id: string; createdAt: Date }
+    try {
+        created = await prisma.taskComment.create({
+            data: {
+                taskId,
+                authorType: 'CLIENT',
+                visibility: 'CLIENT',        // forced — a client can never post an internal note
+                body: clean,
+                viaShareLinkId: scope.shareLinkId,
+                clientId: task.clientId ?? null,
+                mentions: [],
+                parentId: safeParentId,
+            },
+            select: { id: true, createdAt: true },
+        })
+    } catch (err) {
+        console.error('[postCommentViaToken] create failed', err)
+        return { success: false, error: 'Could not post your comment. Please try again.' }
+    }
+
+    // Notify the task's Manager (assignedById) that the client commented.
+    if (task.assignedById) {
+        try {
+            const n = await createNotificationInternal({
+                userId: task.assignedById, type: 'TASK_COMMENT', title: 'Khách hàng bình luận',
+                body: `Khách hàng "${scope.clientName}" bình luận trong "${task.title}": ${clean.slice(0, 140)}`,
+                taskId, metadata: { taskTitle: task.title, preview: clean.slice(0, 200) },
+            })
+            void broadcastNotificationToUser(task.assignedById, {
+                id: n.id, type: n.type, title: n.title, body: n.body, taskId, createdAt: n.createdAt, isRead: false,
+            })
+        } catch (e) { console.error('[postCommentViaToken] notify manager failed', e) }
+    }
+
+    void audit({
+        workspaceId: task.workspaceId, actorUserId: null, action: 'task.comment_added',
+        targetType: 'Task', targetId: taskId,
+        after: { via: 'share_link', viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
+    })
+
+    return { success: true, id: created.id, createdAt: created.createdAt.toISOString() }
+}
+
+/**
+ * [P3] Toggle the client's emoji reaction on a CLIENT-visible comment. Keyed by
+ * the share link (anonymous). Re-resolves scope + confirms the comment belongs
+ * to a task in scope AND is CLIENT-visible (never lets a token touch an internal
+ * note). Lightly rate-limited.
+ */
+export async function toggleReactionViaToken(token: string, commentId: string, emoji: string) {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is invalid.' }
+    if (!isValidReaction(emoji)) return { success: false, error: 'Unsupported reaction.' }
+
+    const rl = await rateLimit(`client-react:${scope.shareLinkId}`, 120, 60 * 60 * 1000)
+    if (!rl.success) return { success: false, error: 'Too many actions. Please try again later.' }
+
+    const comment = await prisma.taskComment.findFirst({
+        where: { id: commentId, isDeleted: false, visibility: 'CLIENT' },
+        select: { id: true, taskId: true },
+    })
+    if (!comment) return { success: false, error: 'This comment no longer exists.' }
+
+    // Confirm the comment's task is inside this token's scope.
+    const { task } = await findScopedTask(token, comment.taskId, { id: true })
+    if (!task) return { success: false, error: 'This link is invalid.' }
+
+    const existing = await prisma.taskCommentReaction.findFirst({
+        where: { commentId, emoji, viaShareLinkId: scope.shareLinkId },
+        select: { id: true },
+    })
+    if (existing) {
+        await prisma.taskCommentReaction.delete({ where: { id: existing.id } })
+        return { success: true, reacted: false }
+    }
+    await prisma.taskCommentReaction.create({ data: { commentId, emoji, viaShareLinkId: scope.shareLinkId } })
+    return { success: true, reacted: true }
 }

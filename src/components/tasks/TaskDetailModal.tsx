@@ -44,6 +44,7 @@ import {
     Lock, Play, Loader2,
 } from "lucide-react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
+import TaskCommentColumn from "./TaskCommentColumn"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
 // [Hook Graph] React Flow is client-only + heavy — lazy-load so it ships only
@@ -899,24 +900,20 @@ export function TaskDetailModal({
 
                 <DialogPrimitive.Content asChild>
                     <motion.div
-                        className="fixed left-1/2 top-1/2 flex flex-col outline-none"
+                        className="fixed right-0 top-0 bottom-0 flex outline-none"
                         style={{
                             zIndex: 9999,
-                            width: 720,
-                            maxWidth: 'calc(100vw - 32px)',
-                            maxHeight: '90vh',
-                            borderRadius: 24,
-                            background: 'rgba(10,10,10,0.95)',
-                            border: '1px solid rgba(139,92,246,0.15)',
+                            width: 1120,
+                            maxWidth: '96vw',
+                            background: 'rgba(10,10,10,0.97)',
+                            borderLeft: '1px solid rgba(139,92,246,0.15)',
                             backdropFilter: 'blur(24px)',
-                            boxShadow: '0 32px 80px rgba(0,0,0,0.70)',
-                            x: '-50%',
-                            y: '-50%',
+                            boxShadow: '-32px 0 80px rgba(0,0,0,0.55)',
                         }}
-                        initial={{ opacity: 0, scale: 0.96, y: '-48%', x: '-50%' }}
-                        animate={{ opacity: 1, scale: 1, y: '-50%', x: '-50%' }}
-                        exit={{ opacity: 0, scale: 0.96, y: '-48%', x: '-50%' }}
-                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                        initial={{ opacity: 0, x: 40 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 40 }}
+                        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                     >
                         <div
                             className="absolute pointer-events-none"
@@ -928,6 +925,9 @@ export function TaskDetailModal({
                                 filter: 'blur(50px)',
                             }}
                         />
+
+                        {/* [Trial P1] LEFT column — task info (was the centered modal body) */}
+                        <div className="flex flex-col min-w-0" style={{ flex: 1, height: '100%', position: 'relative', zIndex: 1 }}>
 
                         {/* HEADER */}
                         <div className="flex flex-col gap-3 px-6 pt-6 pb-3 border-b border-white/5 relative z-[1]">
@@ -1404,6 +1404,15 @@ export function TaskDetailModal({
                         </div>
 
                           </>
+                        )}
+
+                        </div>{/* end LEFT column */}
+
+                        {/* [Trial P1] RIGHT column — ClickUp-style comment + activity feed */}
+                        {task && (
+                            <div style={{ width: 400, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', zIndex: 1, background: 'rgba(0,0,0,0.22)' }}>
+                                <TaskCommentColumn taskId={task.id} workspaceId={workspaceId} />
+                            </div>
                         )}
                     </motion.div>
                 </DialogPrimitive.Content>

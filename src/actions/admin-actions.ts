@@ -122,6 +122,8 @@ export async function createTask(formData: FormData, workspaceId: string) {
         const frameUsername = formData.get('frameUsername') as string
         const framePassword = formData.get('framePassword') as string
         const frameNote = formData.get('frameNote') as string
+        // [Trial P0] "Người quản lý" — optional; defaults to the creator server-side.
+        const managerId = (formData.get('managerId') as string) || ''
 
         const jobPriceUSD = safeNumber(formData.get('jobPriceUSD'))
         const exchangeRate = safeNumber(formData.get('exchangeRate'), 26300)
@@ -199,6 +201,16 @@ export async function createTask(formData: FormData, workspaceId: string) {
             }
         }
 
+        // [Trial P0] Validate the Manager (assignedById) belongs to this workspace/profile
+        // before letting it override the default creator.
+        if (managerId) {
+            const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
+            const managerAllowed = await isAssigneeInWorkspaceProfile(managerId, workspaceId, profileId)
+            if (!managerAllowed) {
+                return { error: 'Người quản lý được chọn không thuộc workspace/profile này.' }
+            }
+        }
+
         const task = await workspacePrisma.task.create({
             data: {
                 title,
@@ -228,7 +240,8 @@ export async function createTask(formData: FormData, workspaceId: string) {
 
                 // [Sprint P] Track admin who assigned this task \u2014 used by email +
                 // in-app notification routing in updateTaskStatus.
-                assignedById: session?.user?.id || null,
+                // [Trial P0] Now the explicit "Ng\u01b0\u1eddi qu\u1ea3n l\u00fd": the picked manager, else the creator.
+                assignedById: managerId || session?.user?.id || null,
             }
         })
 
@@ -324,5 +337,50 @@ export async function createTask(formData: FormData, workspaceId: string) {
             return { error: e.message }
         }
         return { error: 'Error creating task' }
+    }
+}
+
+/**
+ * [Trial P0] Reassign a task's "Người quản lý" (assignedById). Admin-only; the new
+ * manager must belong to this workspace's profile. Pass managerId='' to clear.
+ */
+export async function updateTaskManager(taskId: string, managerId: string, workspaceId: string) {
+    try {
+        const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const profileId = (session?.user as any)?.sessionProfileId
+        if (!profileId || typeof profileId !== 'string') {
+            return { error: 'Lỗi nội bộ: profileId thiếu.' }
+        }
+        const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+
+        // Task must belong to this workspace/profile (middleware scopes the query).
+        const task = await workspacePrisma.task.findFirst({ where: { id: taskId }, select: { id: true } })
+        if (!task) return { error: 'Không tìm thấy task.' }
+
+        const mgr = managerId?.trim() || ''
+        if (mgr) {
+            const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
+            const ok = await isAssigneeInWorkspaceProfile(mgr, workspaceId, profileId)
+            if (!ok) return { error: 'Người quản lý được chọn không thuộc workspace/profile này.' }
+        }
+
+        await workspacePrisma.task.update({
+            where: { id: taskId },
+            data: { assignedById: mgr || null },
+        })
+
+        if (session?.user?.id) {
+            void audit({
+                workspaceId, actorUserId: session.user.id, action: 'task.assigned',
+                targetType: 'Task', targetId: taskId, after: { assignedById: mgr || null, field: 'manager' },
+            })
+        }
+
+        revalidatePath(`/${workspaceId}/admin`)
+        revalidatePath(`/${workspaceId}/admin/queue`)
+        return { success: true }
+    } catch (e: any) {
+        if (e?.message?.startsWith('SECURITY_VIOLATION')) return { error: e.message }
+        return { error: 'Không cập nhật được người quản lý.' }
     }
 }

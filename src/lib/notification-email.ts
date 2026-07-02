@@ -22,6 +22,7 @@ import type {
     TaskOverdueParams,
     TaskStatusChangedParams,
     TaskUnassignedParams,
+    TaskClientSubmittedParams,
 } from '@/lib/notification-emails/shared/types'
 import type { NotificationType } from '@prisma/client'
 
@@ -53,6 +54,9 @@ const BYPASS_CONFIG: Record<string, {
     WORKSPACE_INVITATION_ACCEPTED: { bypassMute: false, bypassDigest: true, bypassQuietHours: false },
     WORKSPACE_INVITATION_DECLINED: { bypassMute: false, bypassDigest: true, bypassQuietHours: false },
     WORKSPACE_INVITATION_RECEIVED: { bypassMute: false, bypassDigest: true, bypassQuietHours: false },
+    // [Client Task Submission v2] A client submitted a work request — admins get
+    // it realtime (bypass digest + quiet hours; it's an inbound job to triage).
+    TASK_CLIENT_SUBMITTED:     { bypassMute: true,  bypassDigest: true,  bypassQuietHours: true },
 }
 
 const DEFAULT_BYPASS = { bypassMute: false, bypassDigest: false, bypassQuietHours: false }
@@ -243,6 +247,22 @@ async function buildTemplateParams(ctx: EnrichmentContext): Promise<RenderedEmai
                 taskId: notification.taskId,
             }
             return await templates.taskComment(params)
+        }
+        case 'taskClientSubmitted': {
+            // No Task exists yet (the request is a separate intake) — every field
+            // comes from the notification metadata written by notifyProfileAdminsOfRequest.
+            const params: TaskClientSubmittedParams = {
+                ...baseParams,
+                brand: meta.brand || 'Khách hàng',
+                projectTitle: meta.projectTitle || meta.taskTitle || 'Yêu cầu mới',
+                monthLabel: meta.monthLabel ?? null,
+                rawLink: meta.rawLink ?? null,
+                clientNotes: meta.clientNotes ?? null,
+                submittedAt: notification.createdAt,
+                requestId: meta.requestId || '',
+                inboxWorkspaceId: meta.inboxWorkspaceId || workspaceId || '',
+            }
+            return await templates.taskClientSubmitted(params)
         }
         default:
             return null

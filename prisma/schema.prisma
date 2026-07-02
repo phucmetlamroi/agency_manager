@@ -230,11 +230,31 @@ model User {
   // [Canonical Clients] Share links this user created (profile OWNER/ADMIN only)
   shareLinksCreated ClientShareLink[] @relation("ShareLinkCreator")
 
+  // [Trial P3] Web-push subscriptions (one per browser/device that opted in).
+  pushSubscriptions PushSubscription[]
+
   profile Profile? @relation(fields: [profileId], references: [id])
 
   // Auth Phase 1 indexes
   @@index([email])
   @@index([lockedUntil])
+}
+
+// [Trial P3] A browser's Web Push subscription (endpoint + keys). One row per
+// device that granted notification permission; pruned when the push service
+// reports it gone (404/410). Sending is fully gated on VAPID env — no keys =
+// nothing sent, table simply stays empty.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model ProfileAccess {
@@ -385,6 +405,13 @@ model Task {
   videoVersions    VideoVersion[] @relation("TaskVideoVersions")
   currentVersionId String?
 
+  // [Client Task Submission v2] Client-submitted request(s) accepted into this
+  // task (usually 0 or 1) — reverse side of ClientTaskRequest.task.
+  clientTaskRequests ClientTaskRequest[] @relation("TaskClientRequests")
+
+  // [Trial P1] ClickUp-style task comments (staff + client, visibility-gated).
+  taskComments TaskComment[] @relation("TaskComments")
+
   @@index([workspaceId, status])
   @@index([workspaceId, isArchived])
   @@index([assignedById])
@@ -501,6 +528,9 @@ model Client {
   // that let the client view their full history without an account.
   shareLinks ClientShareLink[]
 
+  // [Client Task Submission v2] Work requests this client submitted via portal.
+  clientTaskRequests ClientTaskRequest[] @relation("ClientTaskRequests")
+
   // [Soft-delete] Notion-style archive — mirror Profile/Workspace pattern.
   // status: "ACTIVE" | "SOFT_DELETED" | "MERGED".
   // - SOFT_DELETED: hidden from CRM lists/pickers, restorable from Client Trash.
@@ -570,6 +600,64 @@ model ClientShareLink {
 
   @@index([clientId])
   @@index([profileId, revokedAt])
+}
+
+/// [Client Task Submission v2] A client-submitted work request — the token-portal
+/// intake, DISTINCT from a Task. The client fills the 5-step wizard; this row is
+/// created (status NEW) and every profile OWNER/ADMIN is emailed. An admin reviews
+/// it in the "Hộp thư yêu cầu" inbox and, on accept, spawns a real Task (taskId
+/// set); a reject keeps rejectionNote for the trail. Carries NO finance/assignee/
+/// frame fields — those never touch the token portal. Not a bypass model, so
+/// getWorkspacePrisma injects both profileId + workspaceId on admin-side reads.
+enum ClientRequestStatus {
+  NEW
+  REVIEWING
+  ACCEPTED
+  REJECTED
+}
+
+model ClientTaskRequest {
+  id           String @id @default(uuid())
+
+  // Tenancy — both required; the token action sets them explicitly from the
+  // resolved share-link scope (never from client input).
+  profileId      String
+  workspaceId    String
+  clientId       Int?
+  viaShareLinkId String?
+  submittedVia   String  @default("SHARE_LINK") // SHARE_LINK | ACCOUNT
+
+  // Payload — mirrors the client wizard fields (video list + the 6 asset links +
+  // brief). No jobPriceUSD/wage/assignee/frame — leak discipline.
+  title           String
+  videoList       String?   @db.Text // newline-separated video names
+  desiredType     String? // "Short form" | "Long form" | "Trial" hint
+  desiredDeadline DateTime?
+  rawFootage      String?
+  collectFile     String?
+  bRoll           String?
+  refs            String? // reference link (avoid clashing name with Task.references)
+  submitFolder    String?
+  script          String?
+  notes           String?   @db.Text
+
+  // Lifecycle
+  status        ClientRequestStatus @default(NEW)
+  reviewedById  String?
+  reviewedAt    DateTime?
+  rejectionNote String?
+  taskId        String? // set on accept — links the spawned Task
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Client hard-delete must not delete request history (mirror Task.clientId).
+  client Client? @relation("ClientTaskRequests", fields: [clientId], references: [id], onDelete: SetNull)
+  task   Task?   @relation("TaskClientRequests", fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, profileId, status])
+  @@index([clientId, status])
+  @@index([viaShareLinkId])
 }
 
 model Project {
@@ -1124,6 +1212,9 @@ enum NotificationType {
   VIDEO_COMMENT_NEW        // a new review comment landed on a version
   VIDEO_REVIEW_APPROVED    // client approved a version via the share portal
   VIDEO_CHANGES_REQUESTED  // client requested changes on a version
+  // [Client Task Submission v2] Client submitted a NEW work request via the
+  // share portal — fan-out to every profile OWNER/ADMIN (bespoke VN email).
+  TASK_CLIENT_SUBMITTED
 }
 
 model Notification {
@@ -1496,6 +1587,52 @@ model CommentAttachment {
   mimeType  String
   sizeBytes Int
   createdAt DateTime      @default(now())
+
+  @@index([commentId])
+}
+
+/// [Trial P1] ClickUp-style TASK comments — plain text discussion on a task,
+/// DISTINCT from the Frame.io per-version ReviewComment above. Staff see every
+/// comment; the token client portal hard-filters to visibility=CLIENT server-side
+/// and forces CLIENT on anything a client posts. `authorType`: "STAFF" | "CLIENT".
+/// `mentions` holds @-mentioned staff userIds (drives TASK_COMMENT notifications).
+model TaskComment {
+  id             String            @id @default(uuid())
+  taskId         String
+  task           Task              @relation("TaskComments", fields: [taskId], references: [id], onDelete: Cascade)
+  authorType     String            // "STAFF" | "CLIENT"
+  authorUserId   String? // staff author (null for anonymous client comment)
+  viaShareLinkId String? // client author provenance
+  clientId       Int? // brand the share token identifies (anonymous client)
+  visibility     CommentVisibility @default(CLIENT)
+  body           String            @db.Text
+  mentions       String[] // @-mentioned staff userIds
+  editedAt       DateTime?
+  isDeleted      Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+
+  // [Trial P3] Comments v2 — reply threads (self-relation) + emoji reactions.
+  parentId  String? // null = top-level; else a reply to this comment
+  parent    TaskComment?          @relation("TaskCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   TaskComment[]         @relation("TaskCommentReplies")
+  reactions TaskCommentReaction[]
+
+  @@index([taskId, createdAt])
+  @@index([taskId, visibility])
+  @@index([parentId])
+}
+
+// [Trial P3] One row per (comment, emoji, reactor). Staff reactors carry userId;
+// client reactors carry viaShareLinkId (anonymous). Toggle is enforced in the
+// action layer (find→delete/create) to avoid nullable-column unique headaches.
+model TaskCommentReaction {
+  id             String      @id @default(uuid())
+  commentId      String
+  comment        TaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  emoji          String
+  userId         String? // staff reactor
+  viaShareLinkId String? // client reactor provenance
+  createdAt      DateTime    @default(now())
 
   @@index([commentId])
 }

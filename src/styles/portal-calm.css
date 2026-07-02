@@ -155,6 +155,15 @@
 .portal-calm .pc-input::placeholder { color: var(--fg-3); }
 .portal-calm .pc-input:focus { border-color: var(--accent-line); }
 
+/* ── Autocomplete (search → suggest → choose) rows ── */
+.portal-calm .pc-ac-row { background: transparent; transition: background .12s var(--ease); }
+.portal-calm .pc-ac-row:hover { background: var(--surface-2); }
+
+/* ── Segmented control (request-wizard type picker) ── */
+.portal-calm .pc-seg { background: transparent; color: var(--fg-2); border: 1px solid var(--line-2); transition: border-color .12s var(--ease), background .12s var(--ease), color .12s var(--ease); }
+.portal-calm .pc-seg:hover:not([data-on='true']) { border-color: var(--line-hover); color: var(--fg-1); }
+.portal-calm .pc-seg[data-on='true'] { background: var(--accent-soft); color: var(--accent-fg); border-color: var(--accent-line); }
+
 /* ── Status pill ── */
 .portal-calm .pc-pill {
   display: inline-flex; align-items: center; gap: 6px;

@@ -314,7 +314,7 @@ export async function getProfileSettings(profileId: string) {
  */
 export async function updateProfileSettings(
     profileId: string,
-    data: { name?: string; bannerUrl?: string | null; logoUrl?: string | null },
+    data: { name?: string; bannerUrl?: string | null; logoUrl?: string | null; portalAccent?: string | null },
 ) {
     const session = await getSession()
     if (!session?.user?.id) return { error: 'Bạn cần đăng nhập.' }
@@ -335,6 +335,20 @@ export async function updateProfileSettings(
     }
     if (data.bannerUrl !== undefined) updateData.bannerUrl = data.bannerUrl ?? null
     if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl ?? null
+
+    // [Trial P3 — white-label] Portal accent lives in the settings JSON; MERGE so
+    // other settings keys survive. Validate #RGB / #RRGGBB, else clear the key.
+    if (data.portalAccent !== undefined) {
+        const cur = await prisma.profile.findUnique({ where: { id: profileId }, select: { settings: true } })
+        const base: Record<string, unknown> =
+            cur?.settings && typeof cur.settings === 'object' && !Array.isArray(cur.settings)
+                ? { ...(cur.settings as Record<string, unknown>) }
+                : {}
+        const raw = (data.portalAccent ?? '').trim()
+        if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(raw)) base.portalAccent = raw
+        else delete base.portalAccent
+        updateData.settings = base
+    }
 
     if (Object.keys(updateData).length === 0) {
         return { error: 'Không có thay đổi nào.' }

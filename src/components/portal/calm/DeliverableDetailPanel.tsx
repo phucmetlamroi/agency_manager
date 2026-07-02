@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { StatusBadge, statusSentence } from './ui'
 import { fmtDate, relDeadline, fmtMoney } from './format'
+import PortalCommentSection from './PortalCommentSection'
 import ReviewOverlay from './review/ReviewOverlay'
 import type { Deliverable, ActivityItem, DeliverableActions } from './types'
 
@@ -203,8 +204,13 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                             <DetailItem label="Runtime" value={d.duration || '—'} />
                             <DetailItem label={done ? 'Delivered' : 'Target date'} value={fmtDate(done ? d.clientReviewedAt : d.deadline)} valueColor={rel && rel.urgent ? 'var(--attn)' : undefined} />
                             <DetailItem label="Channel" value={brandName} />
+                            {/* [Trial P0] The client's coordinator (Manager). The editor is never shown. */}
+                            {d.manager && <DetailItem label="Managed by" value={d.manager} />}
                         </div>
                     </div>
+
+                    {/* [Trial P1] Task comments — the client chats with the team here (CLIENT-visibility only). */}
+                    <PortalCommentSection taskId={d.id} actions={actions} />
 
                     {/* Activity — tucked behind a disclosure so the panel stays calm */}
                     {activity.length > 0 && (

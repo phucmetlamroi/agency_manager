@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Settings, Image as ImageIcon, Save, Loader2, Trash2 } from 'lucide-react'
+import { Settings, Image as ImageIcon, Save, Loader2, Trash2, Palette } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateProfileSettings } from '@/actions/profile-actions'
 import { uploadProfileBanner, uploadProfileLogo } from '@/actions/upload-actions'
@@ -14,6 +14,7 @@ type Props = {
         name: string
         bannerUrl: string | null
         logoUrl: string | null
+        portalAccent?: string | null
     }
 }
 
@@ -22,12 +23,26 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
     const [name, setName] = useState(initial.name)
     const [bannerUrl, setBannerUrl] = useState(initial.bannerUrl)
     const [logoUrl, setLogoUrl] = useState(initial.logoUrl)
+    const [accent, setAccent] = useState(initial.portalAccent ?? '#C2562F')
     const [savingName, setSavingName] = useState(false)
+    const [savingAccent, setSavingAccent] = useState(false)
     const [uploadingBanner, setUploadingBanner] = useState(false)
     const [uploadingLogo, setUploadingLogo] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
 
     const nameChanged = name.trim() !== initial.name && name.trim().length > 0
+    const accentChanged = accent !== (initial.portalAccent ?? '#C2562F')
+
+    async function handleSaveAccent() {
+        setSavingAccent(true)
+        try {
+            const result = await updateProfileSettings(profileId, { portalAccent: accent })
+            if ('error' in result && result.error) toast.error(result.error)
+            else { toast.success('Đã cập nhật màu thương hiệu Client Portal.'); router.refresh() }
+        } finally {
+            setSavingAccent(false)
+        }
+    }
 
     async function handleSaveName() {
         if (!nameChanged) return
@@ -154,6 +169,40 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
                             Lưu
                         </button>
                     </div>
+                </div>
+
+                {/* [Trial P3] White-label accent — the color the CLIENT sees in their
+                    share portal (buttons, highlights). Logo + name above already brand it. */}
+                <div>
+                    <label className="text-xs text-zinc-400 font-medium pl-1 mb-2 flex items-center gap-1.5">
+                        <Palette size={12} /> Màu thương hiệu (Client Portal)
+                    </label>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="color"
+                            value={/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(accent) ? accent : '#C2562F'}
+                            onChange={(e) => setAccent(e.target.value)}
+                            className="w-11 h-11 rounded-xl bg-transparent border border-white/10 cursor-pointer shrink-0 p-1"
+                            aria-label="Chọn màu thương hiệu"
+                        />
+                        <input
+                            type="text"
+                            value={accent}
+                            onChange={(e) => setAccent(e.target.value)}
+                            placeholder="#C2562F"
+                            maxLength={7}
+                            className="flex-1 h-11 rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-200 outline-none focus:border-violet-500/50 font-mono"
+                        />
+                        <button
+                            onClick={handleSaveAccent}
+                            disabled={!accentChanged || savingAccent}
+                            className="px-4 py-2 rounded-full bg-violet-600 hover:bg-violet-500 text-white text-[12px] font-semibold disabled:opacity-40 flex items-center gap-1.5"
+                        >
+                            {savingAccent ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                            Lưu
+                        </button>
+                    </div>
+                    <p className="text-[11px] text-zinc-600 mt-1.5 pl-1">Khách xem link chia sẻ sẽ thấy màu này. Để trống ô mã màu để dùng mặc định.</p>
                 </div>
             </div>
 

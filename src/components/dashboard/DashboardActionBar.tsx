@@ -247,7 +247,7 @@ export default function DashboardActionBar({
       </div>
 
       {/* [Sprint L] Workspace creation modal — auto navigates /{wsId}/admin */}
-      <CreateWorkspaceModal open={showCreateWs} onClose={() => setShowCreateWs(false)} workspaces={workspaces} />
+      <CreateWorkspaceModal open={showCreateWs} onClose={() => setShowCreateWs(false)} workspaces={workspaces} currentWorkspaceId={workspaceId} currentWorkspaceName={currentName} />
 
       {/* RIGHT: Add new task button */}
       <button

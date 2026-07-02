@@ -5,6 +5,7 @@ import { Loader2, CheckCheck, X } from 'lucide-react'
 import { getNotifications, markAllNotificationsRead } from '@/actions/notification-actions'
 import { NotificationItem } from './NotificationItem'
 import { EmptyNotification } from './EmptyNotification'
+import PushNotificationToggle from './PushNotificationToggle'
 import type { NotificationItem as NotificationItemData } from '@/types/notification'
 import { toast } from 'sonner'
 
@@ -102,6 +103,8 @@ export function NotificationPanel({ isOpen, onClose, onUnreadCountChange, incomi
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-violet-500/10">
                 <h3 className="text-[14px] font-bold text-white m-0">Thông báo</h3>
                 <div className="flex items-center gap-1">
+                    {/* [Trial P3] Opt-in web push — self-hides when the feature is off. */}
+                    <PushNotificationToggle />
                     <button
                         onClick={handleMarkAllRead}
                         className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-white/10 cursor-pointer bg-transparent border-none text-[11px] text-zinc-400"

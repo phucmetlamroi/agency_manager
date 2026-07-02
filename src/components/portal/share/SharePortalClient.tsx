@@ -18,7 +18,11 @@ import {
     submitRatingViaToken,
     getActivityViaToken,
     getSubmitOptionsViaToken,
-    createTaskViaToken,
+    submitClientRequestViaToken,
+    createSubClientViaToken,
+    getCommentFeedViaToken,
+    postCommentViaToken,
+    toggleReactionViaToken,
 } from '@/actions/share-portal-actions'
 import {
     getReviewViaToken,
@@ -29,10 +33,13 @@ import {
 } from '@/actions/video-review-actions'
 import type { Deliverable, Invoice, Workspace, DeliverableActions } from '@/components/portal/calm/types'
 
-export default function SharePortalClient({ token, clientName, profileName, deliverables, invoices, workspaces }: {
+export default function SharePortalClient({ token, clientName, profileName, brandLogoUrl = null, brandAccent = null, deliverables, invoices, workspaces }: {
     token: string
     clientName: string
     profileName: string
+    /** [Trial P3 — white-label] agency logo + accent for the portal lockup. */
+    brandLogoUrl?: string | null
+    brandAccent?: string | null
     deliverables: Deliverable[]
     invoices: Invoice[]
     workspaces: Workspace[]
@@ -43,7 +50,11 @@ export default function SharePortalClient({ token, clientName, profileName, deli
         rate: (taskId, cq, rs, cm, fb) => submitRatingViaToken(token, taskId, cq, rs, cm, fb),
         activity: (taskId) => getActivityViaToken(token, taskId),
         getSubmitOptions: () => getSubmitOptionsViaToken(token),
-        createTask: (input) => createTaskViaToken(token, input),
+        submitRequest: (input) => submitClientRequestViaToken(token, input),
+        createSubClient: (input) => createSubClientViaToken(token, input),
+        getCommentFeed: (taskId) => getCommentFeedViaToken(token, taskId),
+        postComment: (taskId, body, parentId) => postCommentViaToken(token, taskId, body, parentId),
+        reactComment: (commentId, emoji) => toggleReactionViaToken(token, commentId, emoji),
         // [Video Review] token-gated review methods
         getReview: (taskId) => getReviewViaToken(token, taskId),
         getVersionComments: (taskId, versionId) => getVersionCommentsViaToken(token, taskId, versionId),
@@ -62,6 +73,8 @@ export default function SharePortalClient({ token, clientName, profileName, deli
             accountName={clientName}
             contactName={clientName}
             agencyName={profileName}
+            brandLogoUrl={brandLogoUrl}
+            brandAccent={brandAccent}
             initialDeliverables={deliverables}
             initialInvoices={invoices}
             workspaces={workspaces}

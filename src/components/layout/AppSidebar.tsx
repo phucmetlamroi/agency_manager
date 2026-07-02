@@ -12,6 +12,7 @@ import {
     Building2,
     Wallet,
     ListTodo,
+    Inbox,
     LogOut,
     ChevronLeft,
     ChevronRight,
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Logo } from "@/components/brand/Logo"
+import { getUnreadRequestCount } from "@/actions/client-request-actions"
 
 type ViewRole = 'ADMIN' | 'USER'
 
@@ -79,6 +81,8 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
     const allItems: NavItem[] = [
         { label: "Tổng quan", href: viewRole === 'USER' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`, icon: LayoutDashboard, roles: ['ADMIN', 'USER'] },
         { label: "Hàng chờ task", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'] },
+        // [Client Task Submission v2] Client-submitted requests inbox (badge = NEW count).
+        { label: "Hộp thư yêu cầu", href: `/${workspaceId}/admin/requests`, icon: Inbox, roles: ['ADMIN', 'USER'] },
         // [CM merge] "Clients Manager" đã gộp vào Dashboard → bỏ khỏi sidebar.
         { label: "Lịch", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
         { label: "Lỗi của tôi", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },
@@ -152,6 +156,17 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
     // có quyền xem/thao tác phần đó của bên profile đó thôi". Page-level guards
     // (admin layout `canAccessAdmin` redirect) handle permission gating.
     const filteredNavItems = getNavItems(workspaceId, viewRole)
+
+    // [Client Task Submission v2] Live NEW-request count for the inbox nav badge.
+    const requestsHref = `/${workspaceId}/admin/requests`
+    const [reqCount, setReqCount] = React.useState(0)
+    React.useEffect(() => {
+        let alive = true
+        const load = () => getUnreadRequestCount(workspaceId).then((c) => { if (alive) setReqCount(c) }).catch(() => {})
+        load()
+        const t = setInterval(load, 60000)
+        return () => { alive = false; clearInterval(t) }
+    }, [workspaceId])
 
     // ── Mobile: top bar + sheet drawer ──
     if (isMobile) {
@@ -392,6 +407,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                             {...externalProps}
                                             className="flex items-center justify-center w-[46px] h-[46px] mx-auto transition-all duration-200"
                                             style={{
+                                                position: "relative",
                                                 borderRadius: 23,
                                                 background: isActive ? activeBg : "transparent",
                                                 color: isActive ? "#FFFFFF" : inactiveColor,
@@ -411,6 +427,9 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                             }}
                                         >
                                             <item.icon className="w-[20px] h-[20px] flex-shrink-0" />
+                                            {item.href === requestsHref && reqCount > 0 && (
+                                                <span style={{ position: "absolute", top: 8, right: 8, minWidth: 7, height: 7, borderRadius: 999, background: ACTIVE_BG, boxShadow: "0 0 6px rgba(139,92,246,0.7)" }} />
+                                            )}
                                         </NavAnchor>
                                     </TooltipTrigger>
                                     <TooltipContent side="right">{item.label}</TooltipContent>
@@ -449,6 +468,18 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                             >
                                 <item.icon className="w-[20px] h-[20px] flex-shrink-0" />
                                 <span className="flex-1">{item.label}</span>
+                                {item.href === requestsHref && reqCount > 0 && (
+                                    <span style={{
+                                        minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999,
+                                        background: isActive ? '#FFFFFF' : ACTIVE_BG,
+                                        color: isActive ? ACTIVE_BG : '#FFFFFF',
+                                        fontSize: 11, fontWeight: 800, display: 'inline-flex',
+                                        alignItems: 'center', justifyContent: 'center',
+                                        boxShadow: isActive ? 'none' : '0 0 10px rgba(139,92,246,0.5)',
+                                    }}>
+                                        {reqCount > 99 ? '99+' : reqCount}
+                                    </span>
+                                )}
                             </NavAnchor>
                         )
                     })}

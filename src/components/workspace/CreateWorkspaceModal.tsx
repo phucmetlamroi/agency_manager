@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, Plus, Loader2, Layers } from 'lucide-react'
-import { createWorkspaceAction } from '@/actions/workspace-actions'
+import { X, Plus, Loader2, Layers, CalendarPlus } from 'lucide-react'
+import { createWorkspaceAction, createNextMonthWithRollover } from '@/actions/workspace-actions'
 import { toast } from 'sonner'
 
 interface WorkspaceItem {
@@ -18,17 +18,48 @@ interface Props {
     onClose: () => void
     /** Kept for call-site compat — no longer used since clients are profile-scoped. */
     workspaces?: WorkspaceItem[]
+    /**
+     * [Trial P2] When set, shows the "Tạo tháng tiếp theo" one-click rollover:
+     * mints next month's workspace and copies every unfinished task forward
+     * (same clients, editors, managers, pricing, assets — deadlines +1 month).
+     */
+    currentWorkspaceId?: string
+    currentWorkspaceName?: string
 }
 
 // [Canonical Clients 2026-06] The "Sao chép khách hàng" clone section was
 // REMOVED: clients are profile-scoped now, so every new workspace sees the
 // profile's clients automatically — cloning would only mint the duplicate
 // rows the canonical migration just merged.
-export default function CreateWorkspaceModal({ open, onClose }: Props) {
+export default function CreateWorkspaceModal({ open, onClose, currentWorkspaceId, currentWorkspaceName }: Props) {
     const router = useRouter()
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [creating, setCreating] = useState(false)
+    const [rolling, setRolling] = useState(false)
+
+    async function handleRollover() {
+        if (!currentWorkspaceId) return
+        setRolling(true)
+        try {
+            const result = await createNextMonthWithRollover(currentWorkspaceId)
+            if (result.error) {
+                toast.error(result.error)
+            } else if (result.success && result.workspaceId) {
+                toast.success(
+                    result.tasksCopied
+                        ? `Đã tạo "${result.name}" và chuyển ${result.tasksCopied} task chưa xong sang.`
+                        : `Đã tạo "${result.name}". Chưa có task nào cần chuyển.`,
+                )
+                onClose()
+                router.push(`/${result.workspaceId}/admin`)
+            }
+        } catch (err: any) {
+            toast.error(err?.message || 'Lỗi khi tạo tháng mới')
+        } finally {
+            setRolling(false)
+        }
+    }
 
     async function handleCreate() {
         if (!name.trim()) {
@@ -103,6 +134,33 @@ export default function CreateWorkspaceModal({ open, onClose }: Props) {
 
                         {/* Form */}
                         <div className="px-6 pb-6 space-y-4 relative z-10 max-h-[70vh] overflow-y-auto">
+                            {/* [Trial P2] One-click monthly rollover — only shown when opened
+                                from a workspace (admin has a "current month" context). */}
+                            {currentWorkspaceId && (
+                                <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-xl p-4">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        <CalendarPlus className="w-4 h-4 text-emerald-400" strokeWidth={1.5} />
+                                        <span className="text-sm font-bold text-emerald-300">Tạo tháng tiếp theo</span>
+                                    </div>
+                                    <p className="text-xs text-zinc-400 leading-relaxed mb-3">
+                                        Tự động tạo workspace tháng kế tiếp và <span className="text-emerald-300 font-semibold">chuyển toàn bộ task chưa hoàn tất</span> sang
+                                        (giữ nguyên khách, editor, người quản lý, giá & link tài nguyên — hạn chót +1 tháng). Khỏi phải nhập lại từ đầu mỗi tháng.
+                                    </p>
+                                    <button
+                                        onClick={handleRollover}
+                                        disabled={rolling || creating}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {rolling ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarPlus className="w-4 h-4" />}
+                                        Tạo &amp; chuyển task từ {currentWorkspaceName ? `"${currentWorkspaceName}"` : 'tháng hiện tại'}
+                                    </button>
+                                    <div className="flex items-center gap-3 my-1 pt-3">
+                                        <div className="flex-1 h-px bg-white/5" />
+                                        <span className="text-[10px] text-zinc-600 uppercase tracking-wider">hoặc tạo mới</span>
+                                        <div className="flex-1 h-px bg-white/5" />
+                                    </div>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
                                     Tên Workspace *

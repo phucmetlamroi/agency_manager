@@ -49,6 +49,8 @@ interface TaskFormData {
     taskType: string
     deadline: string
     assigneeId: string
+    /** [Trial P0] "Người quản lý" — blank = defaults to the creator server-side. */
+    managerId: string
     videoList: string
     jobPriceUSD: string
     editorFee: string
@@ -105,6 +107,11 @@ interface AddTaskModalProps {
     }>
     /** [Quick Create] Current exchange rate snapshot */
     exchangeRate?: number
+    /** [Client Task Submission v2] When opened from the "Quét bằng Velox" inbox
+     *  flow, open straight into Velox mode seeded with the client's folder link. */
+    veloxInitialFolderUrl?: string
+    /** [Client Task Submission v2] Seed the client from the request. */
+    veloxInitialClientId?: number
 }
 
 /* ------------------------------------------------------------------ */
@@ -134,6 +141,7 @@ const INITIAL_FORM: TaskFormData = {
     taskType: "",
     deadline: "",
     assigneeId: "",
+    managerId: "",
     videoList: "",
     jobPriceUSD: "",
     editorFee: "",
@@ -415,6 +423,8 @@ export default function AddTaskModal({
     onSubmit,
     pricingRules = [],
     exchangeRate = 26300,
+    veloxInitialFolderUrl,
+    veloxInitialClientId,
 }: AddTaskModalProps) {
     const [step, setStep] = useState(0)
     const [form, setForm] = useState<TaskFormData>({ ...INITIAL_FORM })
@@ -628,6 +638,12 @@ export default function AddTaskModal({
             toastedRestore.current = false
         }
     }, [open])
+
+    // [Client Task Submission v2] Opened from the "Quét bằng Velox" inbox flow →
+    // jump straight into Velox mode (QuickCreateMode is seeded with the folder link).
+    useEffect(() => {
+        if (open && veloxInitialFolderUrl) setQuickMode(true)
+    }, [open, veloxInitialFolderUrl])
 
     const set = <K extends keyof TaskFormData>(key: K, value: TaskFormData[K]) => {
         setForm((prev) => ({ ...prev, [key]: value }))
@@ -976,6 +992,18 @@ export default function AddTaskModal({
                                     emptyLabel="Để trống (Chợ task)"
                                 />
                             </VeloxField>
+                        </div>
+
+                        {/* [Trial P0] Người quản lý — người điều phối task; tách khỏi Editor. Client chỉ thấy field này. */}
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs text-[#A1A1AA] font-medium pl-1">Người quản lý</label>
+                            <AutocompleteInput
+                                selectedId={form.managerId}
+                                onSelect={(id) => set("managerId", id)}
+                                options={userOptions}
+                                placeholder="Tìm người quản lý..."
+                                emptyLabel="Mặc định (người tạo task)"
+                            />
                         </div>
 
                         <div className="flex gap-3">
@@ -1606,6 +1634,9 @@ export default function AddTaskModal({
                                 // to form. No self-create. N≥2 multi-link goes into veloxBatchRaw
                                 // state + summary marker in Step 4 (Phase 2 redesign).
                                 onApplyToForm={handleApplyVelox}
+                                // [Client Task Submission v2] Seed from the inbox "Quét bằng Velox" flow.
+                                initialFolderUrl={veloxInitialFolderUrl}
+                                initialClientId={veloxInitialClientId}
                             />
                         ) : (
                         <div className="flex-1 overflow-y-auto px-6 pb-2 custom-scrollbar">

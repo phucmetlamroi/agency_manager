@@ -43,7 +43,9 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
         <SharePortalClient
             token={token}
             clientName={snapshot.clientName}
-            profileName={snapshot.profileName}
+            profileName={snapshot.brandName || snapshot.profileName}
+            brandLogoUrl={snapshot.brandLogoUrl ?? null}
+            brandAccent={snapshot.brandAccent ?? null}
             deliverables={snapshot.tasks as any}
             invoices={snapshot.invoices as any}
             workspaces={snapshot.workspaces}

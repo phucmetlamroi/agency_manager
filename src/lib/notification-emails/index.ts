@@ -12,6 +12,7 @@ import { taskDeadline24h } from './templates/taskDeadline24h'
 import { taskDeadline1h } from './templates/taskDeadline1h'
 import { taskOverdue } from './templates/taskOverdue'
 import { taskComment } from './templates/taskComment'
+import { taskClientSubmitted } from './templates/taskClientSubmitted'
 import { digestHourly } from './templates/digestHourly'
 import { digestDaily } from './templates/digestDaily'
 import type { RenderedEmail } from './shared/types'
@@ -24,6 +25,7 @@ export const templates = {
     taskDeadline1h,
     taskOverdue,
     taskComment,
+    taskClientSubmitted,
     digestHourly,
     digestDaily,
 }
@@ -51,6 +53,8 @@ export function pickTemplate(
             return 'taskOverdue'
         case 'TASK_COMMENT':
             return 'taskComment'
+        case 'TASK_CLIENT_SUBMITTED':
+            return 'taskClientSubmitted'
         default:
             return null
     }

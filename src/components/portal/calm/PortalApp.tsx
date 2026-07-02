@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type CSSProperties } from 'react'
 import { LayoutDashboard, Clapperboard, ReceiptText } from 'lucide-react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
@@ -24,13 +24,16 @@ const NAV: { id: SurfaceId; label: string; Icon: any }[] = [
     { id: 'invoices', label: 'Invoices', Icon: ReceiptText },
 ]
 
-export default function PortalApp({ workspaceId, locale, currentUserId, accountName, contactName, agencyName, initialDeliverables, initialInvoices, initialSurface = 'overview', profiles = [], switcherWorkspaces = [], currentProfileId = null, mode = 'account', actions, workspaces = [] }: {
+export default function PortalApp({ workspaceId, locale, currentUserId, accountName, contactName, agencyName, brandLogoUrl = null, brandAccent = null, initialDeliverables, initialInvoices, initialSurface = 'overview', profiles = [], switcherWorkspaces = [], currentProfileId = null, mode = 'account', actions, workspaces = [] }: {
     workspaceId: string
     locale: string
     currentUserId: string
     accountName: string
     contactName: string
     agencyName: string
+    /** [Trial P3 — white-label] agency logo (sidebar lockup) + accent (portal theme). */
+    brandLogoUrl?: string | null
+    brandAccent?: string | null
     initialDeliverables: Deliverable[]
     initialInvoices: Invoice[]
     initialSurface?: SurfaceId
@@ -102,10 +105,22 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
     const delObj = openDel ? deliverables.find(d => d.id === openDel) || null : null
     const invObj = openInv ? invoices.find(i => i.id === openInv) || null : null
 
+    // [Trial P3 — white-label] Override the portal accent tokens with the agency's
+    // brand color (validated hex from the server). color-mix keeps soft/line tints
+    // consistent for any hue; falls back to the theme's terracotta when unset.
+    const accentStyle: CSSProperties = brandAccent
+        ? ({
+            ['--accent' as any]: brandAccent,
+            ['--accent-fg' as any]: brandAccent,
+            ['--accent-soft' as any]: `color-mix(in srgb, ${brandAccent} 12%, transparent)`,
+            ['--accent-line' as any]: `color-mix(in srgb, ${brandAccent} 35%, transparent)`,
+        })
+        : {}
+
     return (
-        <div style={{ display: 'flex', height: '100%', width: '100%' }}>
+        <div style={{ display: 'flex', height: '100%', width: '100%', ...accentStyle }}>
             <div className="hidden md:flex" style={{ height: '100%' }}>
-                <Sidebar active={active} onNav={onNav} deliverables={scopedDels} invoices={scopedInvs} accountName={accountName} contactName={contactName} agencyName={agencyName} locale={locale} profiles={profiles} switcherWorkspaces={switcherWorkspaces} currentProfileId={currentProfileId} workspaceId={workspaceId} shareMode={mode === 'share'} />
+                <Sidebar active={active} onNav={onNav} deliverables={scopedDels} invoices={scopedInvs} accountName={accountName} contactName={contactName} agencyName={agencyName} brandLogoUrl={brandLogoUrl} locale={locale} profiles={profiles} switcherWorkspaces={switcherWorkspaces} currentProfileId={currentProfileId} workspaceId={workspaceId} shareMode={mode === 'share'} />
             </div>
 
             <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%' }}>

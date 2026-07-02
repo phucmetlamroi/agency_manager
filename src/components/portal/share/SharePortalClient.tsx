@@ -33,10 +33,13 @@ import {
 } from '@/actions/video-review-actions'
 import type { Deliverable, Invoice, Workspace, DeliverableActions } from '@/components/portal/calm/types'
 
-export default function SharePortalClient({ token, clientName, profileName, deliverables, invoices, workspaces }: {
+export default function SharePortalClient({ token, clientName, profileName, brandLogoUrl = null, brandAccent = null, deliverables, invoices, workspaces }: {
     token: string
     clientName: string
     profileName: string
+    /** [Trial P3 — white-label] agency logo + accent for the portal lockup. */
+    brandLogoUrl?: string | null
+    brandAccent?: string | null
     deliverables: Deliverable[]
     invoices: Invoice[]
     workspaces: Workspace[]
@@ -70,6 +73,8 @@ export default function SharePortalClient({ token, clientName, profileName, deli
             accountName={clientName}
             contactName={clientName}
             agencyName={profileName}
+            brandLogoUrl={brandLogoUrl}
+            brandAccent={brandAccent}
             initialDeliverables={deliverables}
             initialInvoices={invoices}
             workspaces={workspaces}

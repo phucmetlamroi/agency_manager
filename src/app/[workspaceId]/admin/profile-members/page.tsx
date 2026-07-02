@@ -37,6 +37,7 @@ export default async function ProfileMembersPage({ params }: { params: Promise<{
             name: true,
             bannerUrl: true,
             logoUrl: true,
+            settings: true,
             status: true as any,
         } as any,
     }) as any
@@ -78,6 +79,9 @@ export default async function ProfileMembersPage({ params }: { params: Promise<{
                     name: profile.name,
                     bannerUrl: profile.bannerUrl ?? null,
                     logoUrl: profile.logoUrl ?? null,
+                    portalAccent: (profile.settings && typeof profile.settings === 'object' && !Array.isArray(profile.settings)
+                        ? ((profile.settings as any).portalAccent ?? null)
+                        : null),
                 }}
             />
         </div>

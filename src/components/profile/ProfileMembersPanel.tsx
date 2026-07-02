@@ -46,6 +46,7 @@ type Props = {
         name: string
         bannerUrl: string | null
         logoUrl: string | null
+        portalAccent?: string | null
     }
 }
 

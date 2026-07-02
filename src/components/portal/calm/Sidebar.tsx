@@ -10,7 +10,7 @@ const NAV: { id: SurfaceId; label: string; Icon: any }[] = [
     { id: 'invoices', label: 'Invoices', Icon: ReceiptText },
 ]
 
-export default function Sidebar({ active, onNav, deliverables, invoices, accountName, contactName, agencyName, locale, profiles = [], switcherWorkspaces = [], currentProfileId = null, workspaceId, shareMode = false }: {
+export default function Sidebar({ active, onNav, deliverables, invoices, accountName, contactName, agencyName, brandLogoUrl = null, locale, profiles = [], switcherWorkspaces = [], currentProfileId = null, workspaceId, shareMode = false }: {
     active: SurfaceId
     onNav: (id: SurfaceId) => void
     deliverables: Deliverable[]
@@ -18,6 +18,8 @@ export default function Sidebar({ active, onNav, deliverables, invoices, account
     accountName: string
     contactName: string
     agencyName: string
+    /** [Trial P3 — white-label] agency logo shown in the "Managed by" lockup. */
+    brandLogoUrl?: string | null
     locale: string
     profiles?: { id: string; name: string }[]
     switcherWorkspaces?: { id: string; name: string }[]
@@ -81,9 +83,14 @@ export default function Sidebar({ active, onNav, deliverables, invoices, account
                         <div style={{ fontSize: 11.5, color: 'var(--fg-3)' }}>Shared view</div>
                     </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '2px 10px', fontSize: 11, color: 'var(--fg-4)' }}>
-                    <ShieldCheck size={12} />
-                    Managed by {agencyName}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', fontSize: 11, color: 'var(--fg-4)' }}>
+                    {brandLogoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={brandLogoUrl} alt={agencyName} style={{ width: 18, height: 18, borderRadius: 5, objectFit: 'cover', border: '1px solid var(--line-2)', flexShrink: 0 }} />
+                    ) : (
+                        <ShieldCheck size={12} />
+                    )}
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Managed by <strong style={{ color: 'var(--fg-3)', fontWeight: 600 }}>{agencyName}</strong></span>
                 </div>
             </div>
         </aside>

@@ -179,9 +179,23 @@ export async function getShareSnapshot(token: string) {
         workspaceName: inv.workspaceId ? wsNameById.get(inv.workspaceId) ?? null : null,
     }))
 
+    // [Trial P3 — white-label] The agency's brand for the client portal lockup:
+    // logo + name + optional accent (settings.portalAccent). Only these three
+    // brand fields leave the server — never any other profile/settings data.
+    const brandProfile = scope.profileId
+        ? await prisma.profile.findUnique({ where: { id: scope.profileId }, select: { name: true, logoUrl: true, settings: true } })
+        : null
+    const rawAccent = brandProfile?.settings && typeof brandProfile.settings === 'object' && !Array.isArray(brandProfile.settings)
+        ? (brandProfile.settings as any).portalAccent
+        : null
+    const brandAccent = typeof rawAccent === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(rawAccent) ? rawAccent : null
+
     return {
         clientName: scope.clientName,
         profileName: scope.profileName,
+        brandName: brandProfile?.name || scope.profileName,
+        brandLogoUrl: brandProfile?.logoUrl || null,
+        brandAccent,
         workspaces,
         tasks: serializeDecimal(mappedTasks) as typeof mappedTasks,
         invoices: serializeDecimal(mappedInvoices) as typeof mappedInvoices,

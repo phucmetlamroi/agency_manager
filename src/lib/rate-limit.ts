@@ -13,6 +13,17 @@ interface RateLimitStore {
 // Global store to persist across hot reloads in Next.js dev
 const store = new Map<string, RateLimitStore>()
 
+/**
+ * [test-only] Clear the in-memory limiter. NO app-code caller — used solely by
+ * the QA harnesses (scripts/test-*.ts) so that re-resolving a share token many
+ * times in one fast run doesn't trip the per-IP resolve limit and produce false
+ * failures, and so the sub-client cap can be tested independently of its own
+ * per-link rate limit. Production behaviour is unchanged.
+ */
+export function __clearRateLimitStore(): void {
+    store.clear()
+}
+
 export async function rateLimit(
     identifier: string,
     limit: number = 10,

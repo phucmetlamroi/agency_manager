@@ -12,6 +12,8 @@ type BatchTaskInput = {
     titles: string[]
     clientId: number | null
     assigneeId: string | null
+    /** [Trial P0] "Người quản lý" — applies to all tasks in the batch; defaults to creator. */
+    managerId?: string | null
     deadline: string | null
     jobPriceUSD: number
     exchangeRate: number
@@ -137,6 +139,8 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         clientId: data.clientId,
                         workspaceId: workspaceId,
                         profileId: currentProfileId,
+                        // [Trial P0] Set the Manager (was a bug: createBatchTasks never set assignedById).
+                        assignedById: data.managerId || (user as any)?.id || null,
 
                         // Additional fields
                         fileLink: data.fileLink || null,

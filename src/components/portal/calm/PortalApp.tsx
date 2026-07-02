@@ -9,7 +9,8 @@ import DeliverablesSurface from './DeliverablesSurface'
 import InvoicesSurface from './InvoicesSurface'
 import DeliverableDetailPanel from './DeliverableDetailPanel'
 import InvoiceDetailPanel from './InvoiceDetailPanel'
-import CreateTaskPanel from './CreateTaskPanel'
+import CreateRequestWizard from './CreateRequestWizard'
+import CreateSubClientPanel from './CreateSubClientPanel'
 import {
     deriveBrands, deriveLastUpdated,
     scopeFilterDeliverables, scopeFilterInvoices,
@@ -60,6 +61,7 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
     const [openDel, setOpenDel] = useState<string | null>(null)
     const [openInv, setOpenInv] = useState<string | null>(null)
     const [createOpen, setCreateOpen] = useState(false)
+    const [subClientOpen, setSubClientOpen] = useState(false)
 
     const effectiveActions: DeliverableActions = actions
     const invoices = initialInvoices
@@ -110,7 +112,8 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
                 <TopBar
                     scope={scope} setScope={setScope} brands={brands} lastUpdated={lastUpdated}
                     workspaces={workspaces} wsScope={wsScope} setWsScope={changeWsScope} wsCounts={wsCounts}
-                    onCreateTask={effectiveActions.createTask ? () => setCreateOpen(true) : undefined}
+                    onCreateTask={effectiveActions.submitRequest ? () => setCreateOpen(true) : undefined}
+                    onCreateSubClient={effectiveActions.createSubClient ? () => setSubClientOpen(true) : undefined}
                 />
 
                 <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
@@ -138,7 +141,8 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
 
             {delObj && <DeliverableDetailPanel d={delObj} actions={effectiveActions} onClose={() => setOpenDel(null)} onUpdated={updateDeliverable} />}
             {invObj && <InvoiceDetailPanel inv={invObj} brands={brands} onClose={() => setOpenInv(null)} />}
-            {createOpen && <CreateTaskPanel actions={effectiveActions} onClose={() => setCreateOpen(false)} />}
+            {createOpen && <CreateRequestWizard actions={effectiveActions} onClose={() => setCreateOpen(false)} />}
+            {subClientOpen && <CreateSubClientPanel actions={effectiveActions} onClose={() => setSubClientOpen(false)} />}
         </div>
     )
 }

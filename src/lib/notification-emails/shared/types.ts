@@ -64,6 +64,18 @@ export interface TaskCommentParams extends BaseParams {
     taskId: string
 }
 
+export interface TaskClientSubmittedParams extends BaseParams {
+    brand: string
+    projectTitle: string
+    monthLabel?: string | null
+    rawLink?: string | null
+    clientNotes?: string | null
+    submittedAt: Date
+    requestId: string
+    /** Workspace the request was submitted into — used for the inbox CTA link. */
+    inboxWorkspaceId: string
+}
+
 export interface DigestNotificationItem {
     type: string
     title: string

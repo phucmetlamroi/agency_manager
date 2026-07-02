@@ -40,7 +40,10 @@ export interface Deliverable {
     clientPath: string
     project: { id: number; name: string } | null
     rating: RatingDTO | null
+    // [Trial P0] The editor (assignee) is NEVER sent to the client — always null on
+    // the token portal. The client only ever sees `manager` (their coordinator).
     assignee: { username: string; nickname: string | null } | null
+    manager?: string | null
     /** [2026-06-29] Agency USD price of this job — the price the CLIENT pays. Shown to the
      *  client (their bill) in the token-gated share portal and to admins; staff never get it. */
     jobPriceUSD: number | null
@@ -112,7 +115,7 @@ export interface DeliverableActions extends ReviewActions {
         brands: { id: number; name: string }[]
         clientName?: string
     } | null>
-    /** [Client Task Submission] create a NEW task from the portal. */
+    /** [Client Task Submission v1 — legacy] create a NEW task from the portal. */
     createTask?: (input: {
         workspaceId: string
         clientId: number
@@ -121,6 +124,28 @@ export interface DeliverableActions extends ReviewActions {
         brollLink?: string
         notes?: string
     }) => Promise<{ success?: boolean; error?: string; taskId?: string }>
+    /**
+     * [Client Task Submission v2] submit a work REQUEST (ClientTaskRequest) from
+     * the 5-step wizard — full asset-link set, no finance/assignee/frame fields.
+     */
+    submitRequest?: (input: {
+        workspaceId: string
+        clientId: number
+        title: string
+        videoList?: string
+        desiredType?: string
+        desiredDeadline?: string
+        rawFootage: string
+        collectFile?: string
+        bRoll?: string
+        references?: string
+        submitFolder?: string
+        script?: string
+        notes?: string
+    }) => Promise<{ success?: boolean; error?: string; requestId?: string }>
+    /** [Client Task Submission v2] create a sub-brand under an in-scope parent. */
+    createSubClient?: (input: { name: string; parentId: number }) =>
+        Promise<{ success?: boolean; error?: string; clientId?: number; name?: string }>
 }
 
 /**

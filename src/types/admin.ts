@@ -15,6 +15,10 @@ export type TaskWithUser = { // Updated with Client Info
     notes_en: string | null
     assigneeId?: string | null
     assignee: { id: string; username: string; nickname?: string | null; displayName?: string | null } | null
+    // [Trial P0] "Người quản lý" — reuses assignedById (the "TaskAssigner"). Separate
+    // from the Editor (assignee); the client portal shows this, never the editor.
+    assignedById?: string | null
+    assignedBy?: { id: string; username: string; nickname?: string | null; displayName?: string | null } | null
     createdAt: Date
     // Removed Stopwatch fields
     client?: {

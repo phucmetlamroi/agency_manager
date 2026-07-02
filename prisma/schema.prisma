@@ -385,6 +385,10 @@ model Task {
   videoVersions    VideoVersion[] @relation("TaskVideoVersions")
   currentVersionId String?
 
+  // [Client Task Submission v2] Client-submitted request(s) accepted into this
+  // task (usually 0 or 1) — reverse side of ClientTaskRequest.task.
+  clientTaskRequests ClientTaskRequest[] @relation("TaskClientRequests")
+
   @@index([workspaceId, status])
   @@index([workspaceId, isArchived])
   @@index([assignedById])
@@ -501,6 +505,9 @@ model Client {
   // that let the client view their full history without an account.
   shareLinks ClientShareLink[]
 
+  // [Client Task Submission v2] Work requests this client submitted via portal.
+  clientTaskRequests ClientTaskRequest[] @relation("ClientTaskRequests")
+
   // [Soft-delete] Notion-style archive — mirror Profile/Workspace pattern.
   // status: "ACTIVE" | "SOFT_DELETED" | "MERGED".
   // - SOFT_DELETED: hidden from CRM lists/pickers, restorable from Client Trash.
@@ -570,6 +577,64 @@ model ClientShareLink {
 
   @@index([clientId])
   @@index([profileId, revokedAt])
+}
+
+/// [Client Task Submission v2] A client-submitted work request — the token-portal
+/// intake, DISTINCT from a Task. The client fills the 5-step wizard; this row is
+/// created (status NEW) and every profile OWNER/ADMIN is emailed. An admin reviews
+/// it in the "Hộp thư yêu cầu" inbox and, on accept, spawns a real Task (taskId
+/// set); a reject keeps rejectionNote for the trail. Carries NO finance/assignee/
+/// frame fields — those never touch the token portal. Not a bypass model, so
+/// getWorkspacePrisma injects both profileId + workspaceId on admin-side reads.
+enum ClientRequestStatus {
+  NEW
+  REVIEWING
+  ACCEPTED
+  REJECTED
+}
+
+model ClientTaskRequest {
+  id           String @id @default(uuid())
+
+  // Tenancy — both required; the token action sets them explicitly from the
+  // resolved share-link scope (never from client input).
+  profileId      String
+  workspaceId    String
+  clientId       Int?
+  viaShareLinkId String?
+  submittedVia   String  @default("SHARE_LINK") // SHARE_LINK | ACCOUNT
+
+  // Payload — mirrors the client wizard fields (video list + the 6 asset links +
+  // brief). No jobPriceUSD/wage/assignee/frame — leak discipline.
+  title           String
+  videoList       String?   @db.Text // newline-separated video names
+  desiredType     String? // "Short form" | "Long form" | "Trial" hint
+  desiredDeadline DateTime?
+  rawFootage      String?
+  collectFile     String?
+  bRoll           String?
+  refs            String? // reference link (avoid clashing name with Task.references)
+  submitFolder    String?
+  script          String?
+  notes           String?   @db.Text
+
+  // Lifecycle
+  status        ClientRequestStatus @default(NEW)
+  reviewedById  String?
+  reviewedAt    DateTime?
+  rejectionNote String?
+  taskId        String? // set on accept — links the spawned Task
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Client hard-delete must not delete request history (mirror Task.clientId).
+  client Client? @relation("ClientTaskRequests", fields: [clientId], references: [id], onDelete: SetNull)
+  task   Task?   @relation("TaskClientRequests", fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, profileId, status])
+  @@index([clientId, status])
+  @@index([viaShareLinkId])
 }
 
 model Project {
@@ -1124,6 +1189,9 @@ enum NotificationType {
   VIDEO_COMMENT_NEW        // a new review comment landed on a version
   VIDEO_REVIEW_APPROVED    // client approved a version via the share portal
   VIDEO_CHANGES_REQUESTED  // client requested changes on a version
+  // [Client Task Submission v2] Client submitted a NEW work request via the
+  // share portal — fan-out to every profile OWNER/ADMIN (bespoke VN email).
+  TASK_CLIENT_SUBMITTED
 }
 
 model Notification {

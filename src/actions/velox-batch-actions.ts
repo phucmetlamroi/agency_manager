@@ -64,6 +64,8 @@ export interface CreateTasksFromBatchInput {
     /** If true, rows failing validation are skipped (still create valid rows).
      *  If false, any invalid row aborts the entire batch. */
     skipInvalid?: boolean
+    /** [Trial P0] "Người quản lý" — applies to every task in the batch; defaults to creator. */
+    managerId?: string | null
 }
 
 export interface CreateTasksFromBatchResult {
@@ -143,7 +145,8 @@ export async function createTasksFromBatch(
             return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile.' }
         }
 
-        const assignedById = session?.user?.id ?? null
+        // [Trial P0] The Manager (picked in the form), else the creator.
+        const assignedById = data.managerId || session?.user?.id || null
 
         // Ensure every unique assignee is a workspace member (best-effort, fire-and-forget
         // is too risky — if membership fails, task creation FK might fail too)

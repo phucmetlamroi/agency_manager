@@ -603,7 +603,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 <StatusCell task={task} isAdmin={isAdmin} workspaceId={workspaceId} />
                             </div>
 
-                            {/* Assignee cell */}
+                            {/* Assignee cell + [Trial P0] Manager ("Người quản lý") secondary line */}
                             <div className="min-w-0">
                                 <AssigneeCell
                                     task={task}
@@ -612,6 +612,14 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                     selectedIds={selectedIds}
                                     workspaceId={workspaceId}
                                 />
+                                {task.assignedBy && (
+                                    <div
+                                        title={`Người quản lý: ${(task.assignedBy as any).nickname || task.assignedBy.username}`}
+                                        style={{ fontSize: 10, color: '#71717A', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    >
+                                        QL: {(task.assignedBy as any).nickname || task.assignedBy.username}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Type cell */}

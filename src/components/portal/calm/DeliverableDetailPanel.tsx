@@ -203,6 +203,8 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                             <DetailItem label="Runtime" value={d.duration || '—'} />
                             <DetailItem label={done ? 'Delivered' : 'Target date'} value={fmtDate(done ? d.clientReviewedAt : d.deadline)} valueColor={rel && rel.urgent ? 'var(--attn)' : undefined} />
                             <DetailItem label="Channel" value={brandName} />
+                            {/* [Trial P0] The client's coordinator (Manager). The editor is never shown. */}
+                            {d.manager && <DetailItem label="Managed by" value={d.manager} />}
                         </div>
                     </div>
 

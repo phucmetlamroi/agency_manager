@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import DashboardActionBar from "./DashboardActionBar"
 import AddTaskModal from "./AddTaskModal"
 import { toast } from "sonner"
 import { createTask } from "@/actions/admin-actions"
+import { markRequestAccepted } from "@/actions/client-request-actions"
 import { saveHookGraph } from "@/actions/raw-footage-actions"
 import { createBatchTasks } from "@/actions/bulk-task-actions"
 import { createTasksFromBatch, type BatchTaskRow } from "@/actions/velox-batch-actions"
@@ -82,12 +83,34 @@ export default function DashboardActionWrapper({
   const router = useRouter()
   const [, startTransition] = useTransition()
 
+  // [Client Task Submission v2] Seed from the admin inbox "Quét bằng Velox" flow —
+  // /admin?veloxRequest=<id>&folder=<url>&clientId=<n> opens AddTaskModal straight
+  // into Velox mode seeded with the client's folder link. Read via window (not
+  // useSearchParams) to avoid a Suspense boundary requirement.
+  const [seed, setSeed] = useState<{ requestId: string; folder: string; clientId?: number } | null>(null)
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    const requestId = sp.get('veloxRequest')
+    if (!requestId) return
+    const clientIdRaw = sp.get('clientId')
+    const clientIdNum = clientIdRaw ? Number(clientIdRaw) : NaN
+    setSeed({ requestId, folder: sp.get('folder') || '', clientId: Number.isFinite(clientIdNum) ? clientIdNum : undefined })
+    setModalOpen(true)
+  }, [])
+
+  const clearSeed = () => {
+    if (seed) { setSeed(null); router.replace(`/${workspaceId}/admin`) }
+  }
+  const closeModal = () => { setModalOpen(false); clearSeed() }
+
   const handleSubmit = async (
     data: {
       clientId: string
       taskType: string
       deadline: string
       assigneeId: string
+      /** [Trial P0] Người quản lý — blank defaults to creator server-side. */
+      managerId: string
       videoList: string
       jobPriceUSD: string
       editorFee: string
@@ -213,7 +236,7 @@ export default function DashboardActionWrapper({
         }
       })
       const result = await createTasksFromBatch(
-        { rows, exchangeRate },
+        { rows, exchangeRate, managerId: data.managerId || null },
         workspaceId,
       )
       if ('error' in result) throw new Error(result.error)
@@ -276,7 +299,7 @@ export default function DashboardActionWrapper({
         }
       })
       const result = await createTasksFromBatch(
-        { rows, exchangeRate },
+        { rows, exchangeRate, managerId: data.managerId || null },
         workspaceId,
       )
       if ('error' in result) throw new Error(result.error)
@@ -288,6 +311,7 @@ export default function DashboardActionWrapper({
       fd.set("title", titles[0])
       fd.set("type", data.taskType || "Short form")
       fd.set("assigneeId", data.assigneeId || "")
+      fd.set("managerId", data.managerId || "")
       fd.set("deadline", data.deadline || "")
       fd.set("jobPriceUSD", data.jobPriceUSD || "0")
       fd.set("value", data.editorFee || "0")
@@ -329,6 +353,7 @@ export default function DashboardActionWrapper({
           titles,
           clientId: data.clientId ? parseInt(data.clientId) : null,
           assigneeId: data.assigneeId || null,
+          managerId: data.managerId || null,
           deadline: data.deadline || null,
           jobPriceUSD: parseFloat(data.jobPriceUSD) || 0,
           exchangeRate,
@@ -358,6 +383,17 @@ export default function DashboardActionWrapper({
     })
   }
 
+  // [Client Task Submission v2] After a Velox-seeded create succeeds, mark the
+  // source request ACCEPTED (Velox already created the task(s)) and clean the URL.
+  const handleSubmitWrapped = async (...args: Parameters<typeof handleSubmit>) => {
+    await handleSubmit(...args)
+    if (seed?.requestId) {
+      try { await markRequestAccepted(seed.requestId, workspaceId) }
+      catch (e) { console.error('[requests] mark accepted failed', e) }
+      clearSeed()
+    }
+  }
+
   return (
     <>
       <DashboardActionBar
@@ -369,13 +405,15 @@ export default function DashboardActionWrapper({
       />
       <AddTaskModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
         workspaceId={workspaceId}
         clients={clients}
         users={users}
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmitWrapped}
         pricingRules={pricingRules}
         exchangeRate={exchangeRate}
+        veloxInitialFolderUrl={seed?.folder}
+        veloxInitialClientId={seed?.clientId}
       />
     </>
   )

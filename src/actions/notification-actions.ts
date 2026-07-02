@@ -6,6 +6,7 @@ import type { NotificationType } from '@prisma/client'
 import type { CreateNotificationParams } from '@/types/notification'
 import { maybeSendNotificationEmail } from '@/lib/notification-email'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
+import { sendWebPushToUser } from '@/lib/web-push'
 
 async function getAuthUserId(): Promise<string | null> {
     const session = await getSession()
@@ -50,6 +51,17 @@ export async function createNotificationInternal(params: CreateNotificationParam
         recipientUser?.email ?? null,
     ).catch((err) => {
         console.error(`[createNotificationInternal] maybeSendNotificationEmail failed for ${type}:`, err)
+    })
+
+    // [Trial P3] Fire-and-forget web push (no-op unless VAPID configured + the
+    // recipient has ≥1 subscription). The link points at the task when present.
+    void sendWebPushToUser(userId, {
+        title,
+        body: body || '',
+        url: (metadata as any)?.url || '/',
+        tag: taskId ? `task-${taskId}` : type,
+    }).catch((err) => {
+        console.error(`[createNotificationInternal] web push failed for ${type}:`, err)
     })
 
     return created

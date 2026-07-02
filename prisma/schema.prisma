@@ -230,11 +230,31 @@ model User {
   // [Canonical Clients] Share links this user created (profile OWNER/ADMIN only)
   shareLinksCreated ClientShareLink[] @relation("ShareLinkCreator")
 
+  // [Trial P3] Web-push subscriptions (one per browser/device that opted in).
+  pushSubscriptions PushSubscription[]
+
   profile Profile? @relation(fields: [profileId], references: [id])
 
   // Auth Phase 1 indexes
   @@index([email])
   @@index([lockedUntil])
+}
+
+// [Trial P3] A browser's Web Push subscription (endpoint + keys). One row per
+// device that granted notification permission; pruned when the push service
+// reports it gone (404/410). Sending is fully gated on VAPID env — no keys =
+// nothing sent, table simply stays empty.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model ProfileAccess {

@@ -828,3 +828,111 @@ export async function getActivityViaToken(token: string, taskId: string) {
         date: r.createdAt.toISOString(),
     }))
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   [Trial P1] Task comments — the client side of the ClickUp-style feed. The
+   client sees ONLY visibility=CLIENT comments (hard-filtered here) merged with
+   client-safe activity; anything they post is forced to CLIENT visibility. Staff
+   identity is never surfaced (author shows as "The team").
+   ─────────────────────────────────────────────────────────────────────────── */
+
+export interface ClientFeedItem {
+    kind: 'comment' | 'event'
+    id: string
+    authorName: string
+    body?: string
+    label?: string
+    createdAt: string
+    isMine?: boolean
+}
+
+export async function getCommentFeedViaToken(token: string, taskId: string): Promise<ClientFeedItem[]> {
+    const { scope, task } = await findScopedTask(token, taskId, { id: true })
+    if (!scope || !task) return []
+
+    const [comments, auditRows] = await Promise.all([
+        prisma.taskComment.findMany({
+            where: { taskId, visibility: 'CLIENT', isDeleted: false },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true, authorType: true, body: true, createdAt: true },
+        }),
+        prisma.auditLog.findMany({
+            where: { targetType: 'Task', targetId: taskId, action: { in: Object.keys(ACTIVITY_LABELS) } },
+            orderBy: { createdAt: 'asc' }, take: 30,
+        }),
+    ])
+
+    const commentItems: ClientFeedItem[] = comments.map(c => ({
+        kind: 'comment',
+        id: c.id,
+        // Never reveal a staff name to the client; their own posts read as "You".
+        authorName: c.authorType === 'CLIENT' ? 'You' : 'The team',
+        body: c.body,
+        createdAt: c.createdAt.toISOString(),
+        isMine: c.authorType === 'CLIENT',
+    }))
+    const eventItems: ClientFeedItem[] = auditRows.map(r => ({
+        kind: 'event',
+        id: `evt-${r.id}`,
+        authorName: r.actorUserId ? 'The team' : 'You',
+        label: ACTIVITY_LABELS[r.action] || r.action,
+        createdAt: r.createdAt.toISOString(),
+    }))
+
+    return [...commentItems, ...eventItems].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
+export async function postCommentViaToken(token: string, taskId: string, body: string) {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is invalid.' }
+
+    const rl = await rateLimit(`client-comment:${scope.shareLinkId}`, 30, 60 * 60 * 1000)
+    if (!rl.success) return { success: false, error: 'Too many messages. Please try again later.' }
+
+    const { task } = await findScopedTask(token, taskId, { id: true, clientId: true, workspaceId: true, assignedById: true, title: true })
+    if (!task) return { success: false, error: 'This link is invalid or the item no longer exists.' }
+
+    const clean = sanitizeClientText(body || '', FEEDBACK_MAX_LEN)
+    if (!clean) return { success: false, error: 'Please write a message.' }
+
+    let created: { id: string; createdAt: Date }
+    try {
+        created = await prisma.taskComment.create({
+            data: {
+                taskId,
+                authorType: 'CLIENT',
+                visibility: 'CLIENT',        // forced — a client can never post an internal note
+                body: clean,
+                viaShareLinkId: scope.shareLinkId,
+                clientId: task.clientId ?? null,
+                mentions: [],
+            },
+            select: { id: true, createdAt: true },
+        })
+    } catch (err) {
+        console.error('[postCommentViaToken] create failed', err)
+        return { success: false, error: 'Could not post your comment. Please try again.' }
+    }
+
+    // Notify the task's Manager (assignedById) that the client commented.
+    if (task.assignedById) {
+        try {
+            const n = await createNotificationInternal({
+                userId: task.assignedById, type: 'TASK_COMMENT', title: 'Khách hàng bình luận',
+                body: `Khách hàng "${scope.clientName}" bình luận trong "${task.title}": ${clean.slice(0, 140)}`,
+                taskId, metadata: { taskTitle: task.title, preview: clean.slice(0, 200) },
+            })
+            void broadcastNotificationToUser(task.assignedById, {
+                id: n.id, type: n.type, title: n.title, body: n.body, taskId, createdAt: n.createdAt, isRead: false,
+            })
+        } catch (e) { console.error('[postCommentViaToken] notify manager failed', e) }
+    }
+
+    void audit({
+        workspaceId: task.workspaceId, actorUserId: null, action: 'task.comment_added',
+        targetType: 'Task', targetId: taskId,
+        after: { via: 'share_link', viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
+    })
+
+    return { success: true, id: created.id, createdAt: created.createdAt.toISOString() }
+}

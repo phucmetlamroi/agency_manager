@@ -73,6 +73,7 @@ export type AuditAction =
     | 'task.client_approved'           // Client approved a deliverable → Hoàn tất
     | 'task.client_changes_requested'  // Client requested changes → Revision + feedback
     | 'task.client_submitted'          // Client created a NEW task via the share-link portal (v1 — legacy)
+    | 'task.comment_added'             // [Trial P1] A task comment was posted (staff or client)
     // [Client Task Submission v2] Intake request lifecycle + portal sub-brand create
     | 'request.client_submitted'       // Client submitted a ClientTaskRequest via the portal wizard
     | 'request.accepted'               // Admin accepted a request → spawned a Task

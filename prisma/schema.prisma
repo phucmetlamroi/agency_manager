@@ -389,6 +389,9 @@ model Task {
   // task (usually 0 or 1) — reverse side of ClientTaskRequest.task.
   clientTaskRequests ClientTaskRequest[] @relation("TaskClientRequests")
 
+  // [Trial P1] ClickUp-style task comments (staff + client, visibility-gated).
+  taskComments TaskComment[] @relation("TaskComments")
+
   @@index([workspaceId, status])
   @@index([workspaceId, isArchived])
   @@index([assignedById])
@@ -1566,4 +1569,28 @@ model CommentAttachment {
   createdAt DateTime      @default(now())
 
   @@index([commentId])
+}
+
+/// [Trial P1] ClickUp-style TASK comments — plain text discussion on a task,
+/// DISTINCT from the Frame.io per-version ReviewComment above. Staff see every
+/// comment; the token client portal hard-filters to visibility=CLIENT server-side
+/// and forces CLIENT on anything a client posts. `authorType`: "STAFF" | "CLIENT".
+/// `mentions` holds @-mentioned staff userIds (drives TASK_COMMENT notifications).
+model TaskComment {
+  id             String            @id @default(uuid())
+  taskId         String
+  task           Task              @relation("TaskComments", fields: [taskId], references: [id], onDelete: Cascade)
+  authorType     String            // "STAFF" | "CLIENT"
+  authorUserId   String? // staff author (null for anonymous client comment)
+  viaShareLinkId String? // client author provenance
+  clientId       Int? // brand the share token identifies (anonymous client)
+  visibility     CommentVisibility @default(CLIENT)
+  body           String            @db.Text
+  mentions       String[] // @-mentioned staff userIds
+  editedAt       DateTime?
+  isDeleted      Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([taskId, visibility])
 }

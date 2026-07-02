@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { StatusBadge, statusSentence } from './ui'
 import { fmtDate, relDeadline, fmtMoney } from './format'
+import PortalCommentSection from './PortalCommentSection'
 import ReviewOverlay from './review/ReviewOverlay'
 import type { Deliverable, ActivityItem, DeliverableActions } from './types'
 
@@ -207,6 +208,9 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                             {d.manager && <DetailItem label="Managed by" value={d.manager} />}
                         </div>
                     </div>
+
+                    {/* [Trial P1] Task comments — the client chats with the team here (CLIENT-visibility only). */}
+                    <PortalCommentSection taskId={d.id} actions={actions} />
 
                     {/* Activity — tucked behind a disclosure so the panel stays calm */}
                     {activity.length > 0 && (

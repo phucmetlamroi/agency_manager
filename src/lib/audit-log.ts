@@ -74,6 +74,11 @@ export type AuditAction =
     | 'task.client_changes_requested'  // Client requested changes → Revision + feedback
     | 'task.client_submitted'          // Client created a NEW task via the share-link portal (v1 — legacy)
     | 'task.comment_added'             // [Trial P1] A task comment was posted (staff or client)
+    // [Chat GĐ3 · C2] Message-as-action-item lifecycle
+    | 'task.comment_assigned'          // A comment was assigned to a staff member (action item)
+    | 'task.comment_unassigned'        // A comment's assignment was cleared
+    | 'task.comment_resolved'          // An action-item comment was marked resolved
+    | 'task.comment_reopened'          // A resolved action-item comment was re-opened
     // [Client Task Submission v2] Intake request lifecycle + portal sub-brand create
     | 'request.client_submitted'       // Client submitted a ClientTaskRequest via the portal wizard
     | 'request.accepted'               // Admin accepted a request → spawned a Task

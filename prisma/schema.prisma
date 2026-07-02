@@ -1215,6 +1215,9 @@ enum NotificationType {
   // [Client Task Submission v2] Client submitted a NEW work request via the
   // share portal — fan-out to every profile OWNER/ADMIN (bespoke VN email).
   TASK_CLIENT_SUBMITTED
+  // [Chat GĐ3 · C2] Message-as-action-item: you were assigned / your item resolved.
+  COMMENT_ASSIGNED
+  COMMENT_RESOLVED
 }
 
 model Notification {
@@ -1617,9 +1620,42 @@ model TaskComment {
   replies   TaskComment[]         @relation("TaskCommentReplies")
   reactions TaskCommentReaction[]
 
+  // [Chat GĐ3 · C2] Turn a message into an action item: assign → resolve.
+  // NOTE: these are the COMMENT's assign/resolve actor ids and are distinct
+  // from Task.assignedById (which is the task "manager"). All nullable →
+  // additive; a comment with assignedToId set + resolvedAt null is "open".
+  actionAssignedToId String?
+  actionAssignedById String?
+  actionAssignedAt   DateTime?
+  actionResolvedAt   DateTime?
+  actionResolvedById String?
+
+  // [Chat GĐ3 · C4] Task spawned from this message (2-way backlink; scalar).
+  spawnedTaskId String?
+
+  // [Chat GĐ5 · F2] Pinned message (surfaced at the top of the feed).
+  pinnedAt   DateTime?
+  pinnedById String?
+
   @@index([taskId, createdAt])
   @@index([taskId, visibility])
   @@index([parentId])
+  @@index([actionAssignedToId, actionResolvedAt]) // FollowUps: "assigned to me, still open"
+  @@index([taskId, pinnedAt]) // pinned list per task
+}
+
+// [Chat GĐ3 · D1] Per-(user, task) read marker. Unread on a task = TaskComment
+// rows (visibility valid for the viewer's role) with createdAt > lastReadAt.
+// One row upserted the first time a user opens the task feed; touched every
+// time they scroll to the bottom. STAFF-only (clients use the token portal).
+model TaskCommentReadState {
+  id         String   @id @default(cuid())
+  userId     String
+  taskId     String
+  lastReadAt DateTime @default(now())
+
+  @@unique([userId, taskId])
+  @@index([userId])
 }
 
 // [Trial P3] One row per (comment, emoji, reactor). Staff reactors carry userId;

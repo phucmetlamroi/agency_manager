@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { TaskWithUser } from '@/types/admin'
 import { TaskDetailModal } from './tasks/TaskDetailModal'
+import { getTaskUnreadCounts, type TaskUnread } from '@/actions/task-comment-actions'
+import { MessageSquare } from 'lucide-react'
 import { BulkEditTaskModal } from './tasks/BulkEditTaskModal'
 import { deleteTask } from '@/actions/task-management-actions'
 import { useConfirm } from '@/components/ui/ConfirmModal'
@@ -84,6 +86,8 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
     const [page, setPage] = useState(1)
     const [selectedTask, setSelectedTask] = useState<TaskWithUser | null>(null)
     const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
+    // [Chat GĐ3 · D1] Per-task comment counts (💬) + unread emphasis for staff.
+    const [unread, setUnread] = useState<Record<string, TaskUnread>>({})
     // [Sprint Q] Bulk-edit modal state
     const [bulkEditOpen, setBulkEditOpen] = useState(false)
     const [sortField, setSortField] = useState<'title' | 'deadline' | 'price' | null>(null)
@@ -125,6 +129,20 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
     const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+
+    // [Chat GĐ3 · D1] Load 💬 counts for the visible page. Refetches when the
+    // page changes and when the detail drawer closes (viewing marks read).
+    const pagedKey = paged.map(t => t.id).join(',')
+    useEffect(() => {
+        const ids = pagedKey ? pagedKey.split(',') : []
+        if (!ids.length) { setUnread({}); return }
+        let alive = true
+        getTaskUnreadCounts(workspaceId, ids)
+            .then(r => { if (alive) setUnread(r) })
+            .catch(() => { /* best-effort — badge just won't show */ })
+        return () => { alive = false }
+        // selectedTask in deps → refetch after the drawer closes (unread → 0).
+    }, [pagedKey, workspaceId, selectedTask])
 
     // ─── Tab counts ─────────────────────────────────────
     const tabCounts = useMemo(() => {
@@ -558,6 +576,26 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                     {task.title}
                                 </div>
                                 <div className="flex items-center flex-wrap" style={{ gap: 4, marginTop: 3 }}>
+                                    {(() => {
+                                        const uc = unread[task.id]
+                                        if (!uc || uc.total === 0) return null
+                                        const hot = uc.unread > 0
+                                        return (
+                                            <span
+                                                title={hot ? `${uc.unread} bình luận chưa đọc / ${uc.total} tổng` : `${uc.total} bình luận`}
+                                                className="inline-flex items-center"
+                                                style={{
+                                                    gap: 3, fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 999,
+                                                    background: hot ? 'rgba(139,92,246,0.16)' : 'rgba(255,255,255,0.05)',
+                                                    color: hot ? '#C4B5FD' : '#A1A1AA',
+                                                    border: `1px solid ${hot ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                                                }}
+                                            >
+                                                {hot && <span style={{ width: 5, height: 5, borderRadius: 999, background: '#8B5CF6', flexShrink: 0 }} />}
+                                                <MessageSquare style={{ width: 8, height: 8 }} /> {uc.total}
+                                            </span>
+                                        )
+                                    })()}
                                     {isOverdue && (
                                         <span style={{ fontSize: 8, fontWeight: 700, color: '#EF4444' }}>QUÁ HẠN</span>
                                     )}

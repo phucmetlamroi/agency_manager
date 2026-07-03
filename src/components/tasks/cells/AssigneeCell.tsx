@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { TaskWithUser } from "@/types/admin"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -37,16 +38,60 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
     // [UI] Searchable combobox state (admin only).
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState('')
+    const [activeIndex, setActiveIndex] = useState(0)
+    // Fixed-position coords for the portaled popover (escapes overflow-hidden
+    // ancestors like the queue's rounded table card).
+    const [coords, setCoords] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(null)
     const wrapperRef = useRef<HTMLDivElement>(null)
+    const triggerRef = useRef<HTMLButtonElement>(null)
+    const popoverRef = useRef<HTMLDivElement>(null)
 
+    // Compute the popover position from the trigger; flip up near the viewport
+    // bottom so the list is never clipped off-screen.
+    const reposition = useCallback(() => {
+        const el = triggerRef.current
+        if (!el) return
+        const r = el.getBoundingClientRect()
+        const width = 240
+        const estHeight = 300
+        const openUp = r.bottom + estHeight > window.innerHeight && r.top > estHeight
+        setCoords({
+            left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)),
+            top: openUp ? r.top - 6 : r.bottom + 6,
+            width,
+            openUp,
+        })
+    }, [])
+
+    // Keep the portal aligned while the page/table scrolls or the window resizes.
+    useEffect(() => {
+        if (!open) return
+        reposition()
+        const onMove = () => reposition()
+        window.addEventListener('scroll', onMove, true)
+        window.addEventListener('resize', onMove)
+        return () => {
+            window.removeEventListener('scroll', onMove, true)
+            window.removeEventListener('resize', onMove)
+        }
+    }, [open, reposition])
+
+    // Close on outside click — but NOT when clicking inside the portaled popover
+    // (which lives under document.body, outside wrapperRef).
     useEffect(() => {
         if (!open) return
         const handler = (e: MouseEvent) => {
-            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false)
+            const t = e.target as Node
+            if (wrapperRef.current?.contains(t)) return
+            if (popoverRef.current?.contains(t)) return
+            setOpen(false)
         }
         document.addEventListener('mousedown', handler)
         return () => document.removeEventListener('mousedown', handler)
     }, [open])
+
+    // Reset the keyboard highlight whenever the query changes or we reopen.
+    useEffect(() => { setActiveIndex(0) }, [query, open])
 
     const handleAssign = async (val: string) => {
         if (!val) return
@@ -114,11 +159,33 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
     const filtered = q
         ? members.filter((u) => displayName(u).toLowerCase().includes(q) || u.username.toLowerCase().includes(q))
         : members
+    // Special command rows (revoke / unassign) only make sense when NOT searching
+    // a person's name — hide them while filtering so ↑↓/Enter target real people.
+    const showSpecial = !q
+
+    // Keyboard nav over the filtered member list.
+    const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setActiveIndex((i) => Math.min(i + 1, Math.max(0, filtered.length - 1)))
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            setActiveIndex((i) => Math.max(i - 1, 0))
+        } else if (e.key === 'Enter') {
+            e.preventDefault()
+            const u = filtered[activeIndex]
+            if (u) handleAssign(u.id)
+        } else if (e.key === 'Escape') {
+            e.preventDefault()
+            setOpen(false)
+        }
+    }
 
     return (
-        <div ref={wrapperRef} className="relative w-[180px]" onClick={(e) => e.stopPropagation()}>
+        <div ref={wrapperRef} className="w-[180px]" onClick={(e) => e.stopPropagation()}>
             {/* Trigger */}
             <button
+                ref={triggerRef}
                 type="button"
                 onClick={() => setOpen((o) => !o)}
                 className="flex h-8 w-full items-center gap-1.5 rounded-md border border-input bg-transparent px-2 text-xs text-left transition-colors hover:bg-white/5"
@@ -137,37 +204,57 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                 <ChevronsUpDown className="ml-auto h-3.5 w-3.5 shrink-0 text-zinc-500" />
             </button>
 
-            {/* Popover */}
-            {open && (
-                <div className="absolute left-0 top-full z-50 mt-1 w-[220px] overflow-hidden rounded-lg border border-zinc-700 bg-[#18181b] shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
+            {/* Popover — portaled to <body> with fixed positioning so it is never
+                clipped by an overflow-hidden ancestor (the queue table card). */}
+            {open && coords && typeof document !== 'undefined' && createPortal(
+                <div
+                    ref={popoverRef}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                        position: 'fixed',
+                        top: coords.top,
+                        left: coords.left,
+                        width: coords.width,
+                        transform: coords.openUp ? 'translateY(-100%)' : 'none',
+                        zIndex: 1000,
+                    }}
+                    className="overflow-hidden rounded-lg border border-zinc-700 bg-[#18181b] shadow-[0_16px_48px_rgba(0,0,0,0.5)]"
+                >
                     <div className="flex items-center gap-2 border-b border-zinc-800 px-2.5 py-2">
                         <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
                         <input
                             autoFocus
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
+                            onKeyDown={onKeyDown}
                             placeholder="Tìm người làm…"
                             className="w-full bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 outline-none"
                         />
                     </div>
                     <div className="max-h-[240px] overflow-y-auto py-1 custom-scrollbar">
-                        <button type="button" onClick={() => handleAssign('sys:revoke')} className="flex w-full items-center px-3 py-1.5 text-left text-xs font-semibold text-red-400 transition-colors hover:bg-white/5">
-                            ⛔ Thu hồi về System
-                        </button>
-                        <button type="button" onClick={() => handleAssign('unassigned')} className="flex w-full items-center px-3 py-1.5 text-left text-xs text-zinc-400 transition-colors hover:bg-white/5">
-                            — Huỷ giao —
-                        </button>
-                        <div className="my-1 h-px bg-zinc-800" />
+                        {showSpecial && (
+                            <>
+                                <button type="button" onClick={() => handleAssign('sys:revoke')} className="flex w-full items-center px-3 py-1.5 text-left text-xs font-semibold text-red-400 transition-colors hover:bg-white/5">
+                                    ⛔ Thu hồi về System
+                                </button>
+                                <button type="button" onClick={() => handleAssign('unassigned')} className="flex w-full items-center px-3 py-1.5 text-left text-xs text-zinc-400 transition-colors hover:bg-white/5">
+                                    — Huỷ giao —
+                                </button>
+                                <div className="my-1 h-px bg-zinc-800" />
+                            </>
+                        )}
                         {filtered.length > 0 ? (
-                            filtered.map((u) => {
+                            filtered.map((u, idx) => {
                                 const flagColor = rankFlag(u as any)
-                                const active = task.assignee?.id === u.id
+                                const isCurrent = task.assignee?.id === u.id
+                                const isActive = idx === activeIndex
                                 return (
                                     <button
                                         key={u.id}
                                         type="button"
                                         onClick={() => handleAssign(u.id)}
-                                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${active ? 'bg-[#8B5CF6]/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
+                                        onMouseEnter={() => setActiveIndex(idx)}
+                                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isActive ? 'bg-white/10 text-white' : isCurrent ? 'bg-[#8B5CF6]/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
                                     >
                                         <div className="relative">
                                             <Avatar className="h-5 w-5">
@@ -186,7 +273,8 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                             <div className="px-3 py-3 text-xs text-zinc-600">Không có kết quả</div>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body,
             )}
         </div>
     )

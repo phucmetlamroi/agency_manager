@@ -4,7 +4,7 @@ import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { serializeDecimal } from '@/lib/serialization'
-import { Inbox, Sparkles, UserPlus, ListChecks, X, Filter, Clock } from 'lucide-react'
+import { Inbox, Sparkles, UserPlus, ListChecks, Filter, Clock } from 'lucide-react'
 import { MarketplaceToggle } from '@/components/marketplace/MarketplaceToggle'
 import { prisma } from '@/lib/db'
 import { isMobileDevice } from '@/lib/device'
@@ -140,22 +140,11 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="font-bold" style={{ fontSize: 13, color: '#E0E7FF' }}>
-                            Phân Chờ
+                            Phân công
                         </div>
                         <div style={{ fontSize: 11, color: '#818CF8' }}>
                             Chọn task bên dưới và nhấn nút phân công
                         </div>
-                    </div>
-                    {/* Close button (decorative) */}
-                    <div
-                        className="flex items-center justify-center flex-shrink-0 rounded-full"
-                        style={{
-                            width: 24, height: 24,
-                            background: 'rgba(255,255,255,0.06)',
-                            border: '1px solid rgba(255,255,255,0.10)',
-                        }}
-                    >
-                        <X className="w-3 h-3 text-zinc-500" />
                     </div>
                 </div>
             )}

@@ -39,6 +39,47 @@ export interface ReviewSnapshot {
     caps: { allowVideoComments: boolean; canApprove: boolean; allowDownload: boolean }
 }
 
+/* ── Staff-side review DTOs (session-gated; INCLUDES internal comments) ──────
+ * Distinct from the client DTOs above: the staff snapshot carries both
+ * INTERNAL and CLIENT comments, real author names, resolve state, and threaded
+ * replies. NEVER served to the token portal. */
+
+export interface StaffReviewCommentDTO {
+    id: string
+    body: string
+    timestampSec: number | null
+    frame: number | null
+    authorType: string
+    authorName: string
+    /** 'INTERNAL' | 'CLIENT' */
+    visibility: string
+    completed: boolean
+    completedAt: string | null
+    parentId: string | null
+    createdAt: string
+    replies: StaffReviewCommentDTO[]
+}
+
+export interface StaffReviewVersionDTO {
+    id: string
+    versionNumber: number
+    label: string | null
+    ready: boolean
+    status: string
+    durationSec: number | null
+    fps: number | null
+    iframeUrl: string | null
+    createdAt: string
+}
+
+export interface StaffReviewSnapshot {
+    taskId: string
+    taskTitle: string
+    versions: StaffReviewVersionDTO[]
+    currentVersionId: string | null
+    comments: StaffReviewCommentDTO[]
+}
+
 /** Review methods added to the portal's DeliverableActions adapter. */
 export interface ReviewActions {
     getReview?: (taskId: string) => Promise<ReviewSnapshot | null>

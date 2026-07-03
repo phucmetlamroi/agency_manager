@@ -396,13 +396,10 @@ model Task {
   // PER_LINK / BATCH legacy storage stays on `resources` / `references`.
   rawFootage TaskRawFootage?
 
-  // [Video Review] Frame.io-style version stack — each editor cut = one
-  // VideoVersion (Cloudflare Stream UID). `currentVersionId` is the explicit
-  // "cover" pointer (defaults to the newest); kept as a scalar (no FK) so a
-  // version delete can't cascade-null the pointer unexpectedly — resolve it in
-  // queries. `clientReview`/`clientFeedback` above stay in sync with the
-  // current version for the existing portal's backward-compat.
-  videoVersions    VideoVersion[] @relation("TaskVideoVersions")
+  // [P0-pre 2026-07-03] Legacy column from the removed Cloudflare-Stream review
+  // experiment. KEPT on purpose (additive-only: never ALTER Task); verified all
+  // null in prod. The Mux review module (docs/review-module) links via
+  // ReviewAsset.taskId instead — do not reuse this pointer.
   currentVersionId String?
 
   // [Client Task Submission v2] Client-submitted request(s) accepted into this
@@ -1466,133 +1463,15 @@ model BonusConfig {
 }
 
 // ============================================================================
-// [Video Review] Frame.io-style review portal on Cloudflare Stream.
-// Stream stores the video bytes (one UID per version); Neon holds the version
-// stack + comments + review status. Comments are bound to a VERSION (never the
-// abstract deliverable) so feedback on V1 never silently migrates onto V2.
+// [Comments] Shared visibility enum — TaskComment client isolation depends on
+// it (INTERNAL never reaches the token portal).
 // ============================================================================
-
-enum VideoVersionStatus {
-  NEEDS_REVIEW  // cut delivered, waiting on the client — the "action needed" state
-  IN_PROGRESS   // editor mid-work on this version
-  APPROVED      // client signed off
-  NEEDS_CHANGES // client requested changes; editor uploads a new version next
-}
 
 enum CommentVisibility {
   INTERNAL // only staff (editors/admin) — NEVER served to the token portal
   CLIENT   // visible to the client on the share link
 }
 
-enum CommentAuthorType {
-  CLIENT
-  EDITOR
-  ADMIN
-}
-
-// One editor cut of a deliverable. V1/V2/V3 = three rows under the same Task.
-model VideoVersion {
-  id            String             @id @default(uuid())
-  taskId        String
-  task          Task               @relation("TaskVideoVersions", fields: [taskId], references: [id], onDelete: Cascade)
-  versionNumber Int
-  label         String?
-  // Cloudflare Stream media object id, assigned at direct-upload time.
-  streamUid     String?            @unique
-  // Encoding readiness (set true by the Stream webhook once playable) — kept
-  // separate from `status`, which is the REVIEW state (Frame.io semantics).
-  ready         Boolean            @default(false)
-  status        VideoVersionStatus @default(NEEDS_REVIEW)
-  fps           Float?
-  durationSec   Float?
-  thumbnailUrl  String?
-  spritesheetVttUrl String?
-  captionsVttLang   String?
-  watermarkProfileId String?
-  // Staff uploader (scalar — no FK to the large User model on purpose).
-  createdByUserId String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-
-  comments ReviewComment[]
-
-  @@unique([taskId, versionNumber])
-  @@index([taskId, createdAt])
-  @@index([streamUid])
-}
-
-// A review note on a specific version. Top-level notes carry a timecode /
-// range / annotation; replies (parentId set) carry only text and INHERIT the
-// parent's visibility (enforced in the action layer).
-model ReviewComment {
-  id           String            @id @default(uuid())
-  versionId    String
-  version      VideoVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  parentId     String?
-  parent       ReviewComment?    @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies      ReviewComment[]   @relation("CommentReplies")
-  visibility   CommentVisibility @default(CLIENT)
-  body         String            @db.Text
-  // Single-frame anchor (null on replies / general notes).
-  timestampSec Float?
-  frame        Int?
-  // Range/duration comment (both set) — a note spanning an in/out span.
-  rangeStartSec Float?
-  rangeEndSec   Float?
-  // Drawing overlay: array of normalized (0-1) vector shapes. See the player.
-  annotationJson Json?
-  // Click-to-pin a point on the frame (normalized 0-1).
-  anchorX      Float?
-  anchorY      Float?
-  authorType   CommentAuthorType
-  // Staff author (scalar). For anonymous client comments this is null and
-  // `clientId` carries the brand the share token identifies.
-  authorUserId String?
-  clientId     Int?
-  viaShareLinkId String?
-  // Editor to-do: tick a note off as addressed. Independent of review status.
-  completed    Boolean           @default(false)
-  completedAt  DateTime?
-  completedByUserId String?
-  tags         String[]
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-
-  reactions   CommentReaction[]
-  attachments CommentAttachment[]
-
-  @@index([versionId, parentId, createdAt])
-  @@index([versionId, visibility])
-}
-
-// Emoji reaction on a comment. `identity` = staff userId, or a stable
-// token-derived key for anonymous client reactions.
-model CommentReaction {
-  id        String        @id @default(uuid())
-  commentId String
-  comment   ReviewComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  identity  String
-  emoji     String
-  createdAt DateTime      @default(now())
-
-  @@unique([commentId, identity, emoji])
-  @@index([commentId])
-}
-
-// A file attached to a comment (reference image, logo, etc.). Stored in blob
-// storage; this row holds the pointer + metadata.
-model CommentAttachment {
-  id        String        @id @default(uuid())
-  commentId String
-  comment   ReviewComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  url       String
-  filename  String
-  mimeType  String
-  sizeBytes Int
-  createdAt DateTime      @default(now())
-
-  @@index([commentId])
-}
 
 /// [Trial P1] ClickUp-style TASK comments — plain text discussion on a task,
 /// DISTINCT from the Frame.io per-version ReviewComment above. Staff see every

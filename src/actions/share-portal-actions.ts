@@ -90,9 +90,6 @@ export async function getShareSnapshot(token: string) {
                 assignee: { select: { username: true, nickname: true } },
                 // [Trial P0] Manager ("Người quản lý") — the ONLY staff identity the client may see.
                 assignedBy: { select: { username: true, nickname: true } },
-                // [Video Review] Does this deliverable have an in-app review video?
-                // Drives the portal's "Review video" entry point (count>0 = show).
-                _count: { select: { videoVersions: true } },
             },
             orderBy: { createdAt: 'desc' },
         }),
@@ -151,9 +148,8 @@ export async function getShareSnapshot(token: string) {
     // mirroring how the old getClientInvoices did `.toISOString()`.
     const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
 
-    const mappedTasks = tasks.map(({ _count, assignedBy, ...task }) => ({
+    const mappedTasks = tasks.map(({ assignedBy, ...task }) => ({
         ...task,
-        hasVideo: (_count?.videoVersions ?? 0) > 0,
         // [Trial P0 — isolation] The client must NEVER receive the editor's identity;
         // ship the Manager instead ("client làm việc với manager, không biết editor").
         assignee: null,

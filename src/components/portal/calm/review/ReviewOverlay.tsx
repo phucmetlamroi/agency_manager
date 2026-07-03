@@ -93,6 +93,12 @@ export default function ReviewOverlay({ taskId, title, actions, onClose, onAppro
     const onRealtime = useCallback((event: string, payload: any) => {
         if (event === REVIEW_EVENTS.COMMENT_NEW && payload?.id) {
             setComments((prev) => (prev.some((c) => c.id === payload.id) ? prev : [...prev, payload as ReviewCommentDTO]))
+        } else if (event === REVIEW_EVENTS.STATUS_CHANGED && payload?.versionId && payload?.status) {
+            // Another viewer on this link approved / requested changes — reflect
+            // the new status live so the badge + footer don't go stale (B3).
+            setSnap((prev) => prev
+                ? { ...prev, versions: prev.versions.map((v) => v.id === payload.versionId ? { ...v, status: payload.status } : v) }
+                : prev)
         }
     }, [])
     useSupabaseChannel(currentVersionId ? getReviewVersionChannel(currentVersionId) : '', onRealtime, !!currentVersionId)

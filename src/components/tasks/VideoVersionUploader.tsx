@@ -16,6 +16,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { UploadCloud, Film, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { requestVersionUpload, listTaskVersions } from '@/actions/video-review-staff-actions'
+import { useSupabaseChannel } from '@/hooks/useSupabaseChannel'
+import { REVIEW_EVENTS, getReviewTaskChannel } from '@/lib/review-channels'
 
 type VersionRow = { id: string; versionNumber: number; label: string | null; ready: boolean; status: string; createdAt: string }
 
@@ -37,6 +39,16 @@ export default function VideoVersionUploader({ taskId }: { taskId: string }) {
         listTaskVersions(taskId).then((res) => { if (res.success) setVersions(res.versions) }).catch(() => { })
     }
     useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [taskId])
+
+    // [B4/B6] Stay live: the Stream webhook broadcasts VERSION_NEW when encoding
+    // finishes, and client approve / request-changes broadcast STATUS_CHANGED,
+    // both onto this deliverable's channel. Re-fetch so "đang xử lý" clears and
+    // the status column updates without re-opening the task.
+    useSupabaseChannel(
+        getReviewTaskChannel(taskId),
+        (event) => { if (event === REVIEW_EVENTS.VERSION_NEW || event === REVIEW_EVENTS.STATUS_CHANGED) refresh() },
+        true,
+    )
 
     const onPick = async (file: File) => {
         setErr(null); setPct(0); setPhase('minting')

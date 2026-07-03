@@ -32,7 +32,7 @@ import {
     streamIframeUrl,
     streamThumbnailUrl,
 } from '@/lib/cloudflare-stream'
-import { broadcastReviewEvent, REVIEW_EVENTS } from '@/lib/review-realtime'
+import { broadcastReviewEvent, broadcastTaskReviewEvent, REVIEW_EVENTS } from '@/lib/review-realtime'
 import type { ReviewCommentDTO, ReviewVersionDTO, ReviewSnapshot } from '@/components/portal/calm/review-types'
 
 const COMMENT_MAX_LEN = FEEDBACK_MAX_LEN
@@ -294,6 +294,7 @@ export async function approveReviewViaToken(token: string, taskId: string, versi
         before: { status: task.status }, after: { status: 'Hoàn tất', versionId, viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
     })
     void broadcastReviewEvent(versionId, REVIEW_EVENTS.STATUS_CHANGED, { versionId, status: 'APPROVED' })
+    void broadcastTaskReviewEvent(taskId, REVIEW_EVENTS.STATUS_CHANGED, { versionId, status: 'APPROVED' })
     if (task.workspaceId) {
         try { revalidatePath(`/${task.workspaceId}/admin`); revalidatePath(`/${task.workspaceId}/dashboard`) } catch { /* best-effort */ }
     }
@@ -326,6 +327,7 @@ export async function requestReviewChangesViaToken(token: string, taskId: string
         before: { status: task.status }, after: { status: 'Revision', versionId, feedback: clean, viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
     })
     void broadcastReviewEvent(versionId, REVIEW_EVENTS.STATUS_CHANGED, { versionId, status: 'NEEDS_CHANGES' })
+    void broadcastTaskReviewEvent(taskId, REVIEW_EVENTS.STATUS_CHANGED, { versionId, status: 'NEEDS_CHANGES' })
     if (task.workspaceId) {
         try { revalidatePath(`/${task.workspaceId}/admin`); revalidatePath(`/${task.workspaceId}/dashboard`) } catch { /* best-effort */ }
     }

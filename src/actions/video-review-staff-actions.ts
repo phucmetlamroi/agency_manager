@@ -10,7 +10,13 @@
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { audit } from '@/lib/audit-log'
-import { createDirectUpload, isStreamConfigured, getStreamVideo } from '@/lib/cloudflare-stream'
+import { sanitizeClientText, FEEDBACK_MAX_LEN } from '@/lib/sanitize'
+import {
+    createDirectUpload, isStreamConfigured, getStreamVideo,
+    canSignPlayback, mintSignedPlaybackToken, streamIframeUrl,
+} from '@/lib/cloudflare-stream'
+import { broadcastReviewEvent, broadcastTaskReviewEvent, REVIEW_EVENTS } from '@/lib/review-realtime'
+import type { StaffReviewSnapshot, StaffReviewCommentDTO, StaffReviewVersionDTO } from '@/components/portal/calm/review-types'
 
 const MAX_UPLOAD_DURATION_SEC = 1200 // reservation cap; unused portion is released by Stream
 
@@ -140,4 +146,232 @@ export async function listTaskVersions(taskId: string) {
         currentVersionId: task.currentVersionId,
         versions: versions.map(({ streamUid, ...v }) => ({ ...v, createdAt: v.createdAt.toISOString() })),
     }
+}
+
+/* ── Staff review thread (player + internal/client comments + reply/resolve) ──
+ * The editor side of the Frame.io loop. Session-gated (verifyWorkspaceAccess);
+ * returns BOTH internal + client comments (threaded) — NEVER exposed to the
+ * token portal. Isolation on realtime: internal content never rides a client-
+ * facing channel (see the broadcast rules in postStaffReviewComment). */
+
+/** Build the threaded comment list (both visibilities) for a version. */
+async function buildStaffThread(versionId: string): Promise<StaffReviewCommentDTO[]> {
+    const rows = await prisma.reviewComment.findMany({
+        where: { versionId },
+        orderBy: { createdAt: 'asc' },
+        select: {
+            id: true, body: true, timestampSec: true, frame: true, authorType: true,
+            authorUserId: true, clientId: true, visibility: true, completed: true,
+            completedAt: true, parentId: true, createdAt: true,
+        },
+    })
+    if (rows.length === 0) return []
+
+    // Resolve author display names (scalar ids — no FK on the model on purpose).
+    const userIds = [...new Set(rows.map((r) => r.authorUserId).filter((x): x is string => !!x))]
+    const clientIds = [...new Set(rows.map((r) => r.clientId).filter((x): x is number => x != null))]
+    const [users, clients] = await Promise.all([
+        userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, displayName: true, username: true } }) : Promise.resolve([]),
+        clientIds.length ? prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, name: true } }) : Promise.resolve([]),
+    ])
+    const userName = new Map(users.map((u) => [u.id, u.displayName?.trim() || u.username]))
+    const clientName = new Map(clients.map((c) => [c.id, c.name]))
+
+    const toDTO = (c: (typeof rows)[number]): StaffReviewCommentDTO => ({
+        id: c.id, body: c.body, timestampSec: c.timestampSec, frame: c.frame,
+        authorType: c.authorType,
+        authorName: c.authorType === 'CLIENT'
+            ? (c.clientId != null ? clientName.get(c.clientId) ?? 'Khách' : 'Khách')
+            : (c.authorUserId ? userName.get(c.authorUserId) ?? 'Editor' : 'Editor'),
+        visibility: c.visibility, completed: c.completed,
+        completedAt: c.completedAt ? c.completedAt.toISOString() : null,
+        parentId: c.parentId, createdAt: c.createdAt.toISOString(), replies: [],
+    })
+
+    const map = new Map<string, StaffReviewCommentDTO>()
+    const roots: StaffReviewCommentDTO[] = []
+    for (const c of rows) map.set(c.id, toDTO(c))
+    for (const c of rows) {
+        const d = map.get(c.id)!
+        if (c.parentId && map.has(c.parentId)) map.get(c.parentId)!.replies.push(d)
+        else roots.push(d) // top-level, or orphan reply whose parent was deleted
+    }
+    roots.sort((a, b) =>
+        (a.timestampSec ?? Number.POSITIVE_INFINITY) - (b.timestampSec ?? Number.POSITIVE_INFINITY)
+        || a.createdAt.localeCompare(b.createdAt))
+    return roots
+}
+
+/** Full staff review snapshot: versions (signed playback) + current version's
+ *  threaded comments (internal + client). */
+export async function getStaffReview(taskId: string): Promise<{ success: boolean; error?: string; snapshot?: StaffReviewSnapshot }> {
+    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { id: true, title: true, workspaceId: true, currentVersionId: true } })
+    if (!task || !task.workspaceId) return { success: false, error: 'Task không tồn tại.' }
+    try {
+        await verifyWorkspaceAccess(task.workspaceId, 'MEMBER')
+    } catch (e: any) {
+        return { success: false, error: e?.message ?? 'Unauthorized' }
+    }
+
+    const allVersions = await prisma.videoVersion.findMany({
+        where: { taskId },
+        orderBy: { versionNumber: 'asc' },
+        select: { id: true, versionNumber: true, label: true, ready: true, status: true, durationSec: true, fps: true, streamUid: true, createdAt: true },
+    })
+    if (allVersions.length === 0) {
+        return { success: true, snapshot: { taskId: task.id, taskTitle: task.title, versions: [], currentVersionId: null, comments: [] } }
+    }
+
+    // Poll fallback for readiness when the webhook hasn't landed (local dev).
+    if (isStreamConfigured()) {
+        await Promise.all(
+            allVersions.filter((v) => !v.ready && v.streamUid).map(async (v) => {
+                try {
+                    const d = await getStreamVideo(v.streamUid!)
+                    if (d?.readyToStream) {
+                        await prisma.videoVersion.update({ where: { id: v.id }, data: { ready: true, ...(d.durationSec != null ? { durationSec: d.durationSec } : {}) } })
+                        v.ready = true
+                        if (d.durationSec != null) v.durationSec = d.durationSec
+                    }
+                } catch { /* best-effort */ }
+            }),
+        )
+    }
+
+    const latest = allVersions[allVersions.length - 1]
+    const currentVersionId = task.currentVersionId && allVersions.some((v) => v.id === task.currentVersionId)
+        ? task.currentVersionId
+        : latest.id
+
+    const versions: StaffReviewVersionDTO[] = await Promise.all(allVersions.map(async (v) => {
+        let iframeUrl: string | null = null
+        if (v.streamUid && v.ready && canSignPlayback()) {
+            try {
+                const tk = await mintSignedPlaybackToken(v.streamUid, { expSeconds: 3600 })
+                iframeUrl = streamIframeUrl(tk)
+            } catch (e) { console.error('[video-review-staff] sign failed', e) }
+        }
+        return { id: v.id, versionNumber: v.versionNumber, label: v.label, ready: v.ready, status: v.status, durationSec: v.durationSec, fps: v.fps, iframeUrl, createdAt: v.createdAt.toISOString() }
+    }))
+
+    const comments = await buildStaffThread(currentVersionId)
+    return { success: true, snapshot: { taskId: task.id, taskTitle: task.title, versions, currentVersionId, comments } }
+}
+
+/** Threaded comments for a specific version (staff switches version). */
+export async function getStaffVersionComments(taskId: string, versionId: string): Promise<{ success: boolean; error?: string; comments?: StaffReviewCommentDTO[] }> {
+    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { workspaceId: true } })
+    if (!task?.workspaceId) return { success: false, error: 'Task không tồn tại.' }
+    try {
+        await verifyWorkspaceAccess(task.workspaceId, 'MEMBER')
+    } catch (e: any) {
+        return { success: false, error: e?.message ?? 'Unauthorized' }
+    }
+    const belongs = await prisma.videoVersion.findFirst({ where: { id: versionId, taskId }, select: { id: true } })
+    if (!belongs) return { success: false, error: 'Phiên bản không tồn tại.' }
+    return { success: true, comments: await buildStaffThread(versionId) }
+}
+
+/** Staff posts a review comment (internal or client-visible) or a reply. */
+export async function postStaffReviewComment(
+    taskId: string,
+    versionId: string,
+    input: { body: string; timestampSec?: number | null; visibility?: 'INTERNAL' | 'CLIENT'; parentId?: string | null },
+): Promise<{ success: boolean; error?: string }> {
+    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { workspaceId: true } })
+    if (!task?.workspaceId) return { success: false, error: 'Task không tồn tại.' }
+    let userId: string
+    try {
+        const auth = await verifyWorkspaceAccess(task.workspaceId, 'MEMBER')
+        userId = auth.userId
+    } catch (e: any) {
+        return { success: false, error: e?.message ?? 'Unauthorized' }
+    }
+
+    const version = await prisma.videoVersion.findFirst({ where: { id: versionId, taskId }, select: { id: true, fps: true } })
+    if (!version) return { success: false, error: 'Phiên bản không tồn tại.' }
+
+    const body = sanitizeClientText(input?.body || '', FEEDBACK_MAX_LEN)
+    if (!body) return { success: false, error: 'Nội dung trống.' }
+
+    // Replies carry text only and INHERIT the parent's visibility (enforced here,
+    // as the schema promises). Top-level uses the requested visibility (def CLIENT).
+    let visibility: 'INTERNAL' | 'CLIENT' = input?.visibility === 'INTERNAL' ? 'INTERNAL' : 'CLIENT'
+    let parentId: string | null = null
+    if (input?.parentId) {
+        const parent = await prisma.reviewComment.findFirst({ where: { id: input.parentId, versionId }, select: { id: true, visibility: true } })
+        if (!parent) return { success: false, error: 'Bình luận gốc không tồn tại.' }
+        parentId = parent.id
+        visibility = parent.visibility as 'INTERNAL' | 'CLIENT'
+    }
+
+    const tsRaw = input?.timestampSec
+    const timestampSec = !parentId && typeof tsRaw === 'number' && isFinite(tsRaw) && tsRaw >= 0 ? tsRaw : null
+    const frame = timestampSec != null && version.fps ? Math.round(timestampSec * version.fps) : null
+
+    const created = await prisma.reviewComment.create({
+        data: { versionId, parentId, visibility, body, timestampSec, frame, authorType: 'EDITOR', authorUserId: userId },
+        select: { id: true, createdAt: true },
+    })
+
+    void audit({
+        workspaceId: task.workspaceId, actorUserId: userId, action: 'video.comment_added',
+        targetType: 'ReviewComment', targetId: created.id, after: { taskId, versionId, visibility, parentId },
+    })
+
+    // [Isolation] The staff panel refetches (session-gated) via the task channel —
+    // never put INTERNAL bodies on any wire. Only a CLIENT-visible top-level
+    // comment gets a client-safe DTO pushed to the client-facing version channel.
+    void broadcastTaskReviewEvent(taskId, REVIEW_EVENTS.COMMENT_NEW, { versionId })
+    if (visibility === 'CLIENT' && !parentId) {
+        void broadcastReviewEvent(versionId, REVIEW_EVENTS.COMMENT_NEW, {
+            id: created.id, body, timestampSec, frame, authorType: 'EDITOR', authorName: 'Team', createdAt: created.createdAt.toISOString(),
+        })
+    }
+    return { success: true }
+}
+
+/** Resolve context: comment → version → task → workspace, for authorization. */
+async function resolveCommentCtx(commentId: string): Promise<{ workspaceId: string; taskId: string; versionId: string } | null> {
+    const c = await prisma.reviewComment.findUnique({
+        where: { id: commentId },
+        select: { versionId: true, version: { select: { taskId: true, task: { select: { workspaceId: true } } } } },
+    })
+    const ws = c?.version?.task?.workspaceId
+    if (!c || !ws) return null
+    return { workspaceId: ws, taskId: c.version.taskId, versionId: c.versionId }
+}
+
+/** Editor ticks a note off as addressed (independent of review status). */
+export async function resolveReviewComment(commentId: string): Promise<{ success: boolean; error?: string }> {
+    const ctx = await resolveCommentCtx(commentId)
+    if (!ctx) return { success: false, error: 'Bình luận không tồn tại.' }
+    let userId: string
+    try {
+        const auth = await verifyWorkspaceAccess(ctx.workspaceId, 'MEMBER')
+        userId = auth.userId
+    } catch (e: any) {
+        return { success: false, error: e?.message ?? 'Unauthorized' }
+    }
+    await prisma.reviewComment.update({ where: { id: commentId }, data: { completed: true, completedAt: new Date(), completedByUserId: userId } })
+    void audit({ workspaceId: ctx.workspaceId, actorUserId: userId, action: 'video.comment_resolved', targetType: 'ReviewComment', targetId: commentId, after: { completed: true } })
+    void broadcastTaskReviewEvent(ctx.taskId, REVIEW_EVENTS.COMMENT_UPDATED, { versionId: ctx.versionId })
+    return { success: true }
+}
+
+/** Reopen a resolved note. */
+export async function reopenReviewComment(commentId: string): Promise<{ success: boolean; error?: string }> {
+    const ctx = await resolveCommentCtx(commentId)
+    if (!ctx) return { success: false, error: 'Bình luận không tồn tại.' }
+    let userId: string
+    try {
+        const auth = await verifyWorkspaceAccess(ctx.workspaceId, 'MEMBER')
+        userId = auth.userId
+    } catch (e: any) {
+        return { success: false, error: e?.message ?? 'Unauthorized' }
+    }
+    await prisma.reviewComment.update({ where: { id: commentId }, data: { completed: false, completedAt: null, completedByUserId: null } })
+    void audit({ workspaceId: ctx.workspaceId, actorUserId: userId, action: 'video.comment_reopened', targetType: 'ReviewComment', targetId: commentId, after: { completed: false } })
+    void broadcastTaskReviewEvent(ctx.taskId, REVIEW_EVENTS.COMMENT_UPDATED, { versionId: ctx.versionId })
+    return { success: true }
 }

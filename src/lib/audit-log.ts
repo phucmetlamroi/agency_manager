@@ -116,6 +116,7 @@ export type AuditAction =
     | 'video.changes_requested'  // client requested changes on a version
     | 'video.comment_added'      // a review comment was created (client or staff)
     | 'video.comment_resolved'   // a comment was marked complete/resolved
+    | 'video.comment_reopened'   // a resolved comment was reopened by staff
 
 /**
  * `workspaceId` value semantics (audit fix #2.9):

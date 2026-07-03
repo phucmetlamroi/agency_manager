@@ -54,3 +54,12 @@ export function broadcastReviewEvent(versionId: string, event: ReviewEvent, payl
 export function broadcastVersionLanded(taskId: string, payload: unknown) {
     return broadcast(getReviewTaskChannel(taskId), REVIEW_EVENTS.VERSION_NEW, payload)
 }
+
+/**
+ * Broadcast any review event onto the deliverable's channel. The staff upload
+ * panel subscribes here so version readiness + review status stay live without
+ * re-opening the task modal (the per-version channel is client-review-only).
+ */
+export function broadcastTaskReviewEvent(taskId: string, event: ReviewEvent, payload: unknown) {
+    return broadcast(getReviewTaskChannel(taskId), event, payload)
+}

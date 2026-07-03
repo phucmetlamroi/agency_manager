@@ -3,12 +3,11 @@
 import { useEffect, useState } from 'react'
 import {
     X, Play, FolderOpen, ExternalLink, Clock, Check, RotateCcw, Info, CheckCircle2,
-    Download, KeyRound, Star, History, ChevronDown, Film,
+    Download, KeyRound, Star, History, ChevronDown,
 } from 'lucide-react'
 import { StatusBadge, statusSentence } from './ui'
 import { fmtDate, relDeadline, fmtMoney } from './format'
 import PortalCommentSection from './PortalCommentSection'
-import ReviewOverlay from './review/ReviewOverlay'
 import type { Deliverable, ActivityItem, DeliverableActions } from './types'
 
 // [Canonical Clients] The panel is credential-agnostic: all server calls go
@@ -27,11 +26,6 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
     const [activity, setActivity] = useState<ActivityItem[]>([])
     const [showCreds, setShowCreds] = useState(false)
     const [showActivity, setShowActivity] = useState(false)
-    const [reviewOpen, setReviewOpen] = useState(false)
-
-    // [Video Review] show the in-app review entry point when a cut has been
-    // uploaded to Stream (hasVideo) and the token adapter exposes review methods.
-    const hasReview = !!d.hasVideo && !!actions.getReview
 
     const brandName = d.client?.name || '—'
     const rel = d.clientStatus === 'Completed' ? null : relDeadline(d.deadline)
@@ -107,19 +101,6 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                             </div>
                             <ExternalLink size={18} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
                         </a>
-                    )}
-
-                    {/* [Video Review] In-app review — watch + comment on the cut without leaving the portal */}
-                    {hasReview && (
-                        <button onClick={() => setReviewOpen(true)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', width: '100%' }}>
-                            <span style={{ width: 46, height: 46, borderRadius: 12, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface)', border: '1px solid var(--accent-line)', color: 'var(--accent-fg)' }}><Film size={22} /></span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--fg)' }}>Review the video here</div>
-                                <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 2 }}>Watch, comment at any moment, approve or request changes</div>
-                            </div>
-                            <Play size={18} style={{ color: 'var(--accent-fg)', flexShrink: 0 }} />
-                        </button>
                     )}
 
                     {/* Frame review login */}
@@ -239,17 +220,6 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                     )}
                 </div>
             </div>
-
-            {reviewOpen && (
-                <ReviewOverlay
-                    taskId={d.id}
-                    title={d.title}
-                    actions={actions}
-                    onClose={() => setReviewOpen(false)}
-                    onApproved={() => onUpdated(d.id, { status: 'Hoàn tất', clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })}
-                    onChangesRequested={() => onUpdated(d.id, { status: 'Revision', clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES' })}
-                />
-            )}
         </>
     )
 }

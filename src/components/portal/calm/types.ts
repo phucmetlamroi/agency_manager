@@ -1,8 +1,6 @@
 /* Serialized DTO shapes consumed by the Calm-Dark portal surfaces.
    (Output of getClientTasks / getClientInvoices after serializeDecimal.) */
 
-import type { ReviewActions } from './review-types'
-
 export type SurfaceId = 'overview' | 'deliverables' | 'invoices'
 
 export interface RatingDTO {
@@ -50,8 +48,6 @@ export interface Deliverable {
     /** [Atelier] The period/workspace this deliverable lives in (admin "Tháng X/2026"). */
     workspaceId: string | null
     workspaceName: string | null
-    /** [Video Review] true when ≥1 in-app review video (VideoVersion) exists. */
-    hasVideo?: boolean
 }
 
 export interface Invoice {
@@ -98,7 +94,7 @@ export interface ActivityItem {
  * The adapter closes over its credential (workspaceId or token) — the panel
  * never needs to know which world it's in.
  */
-export interface DeliverableActions extends ReviewActions {
+export interface DeliverableActions {
     approve: (taskId: string) => Promise<{ success?: boolean; error?: string }>
     requestChanges: (taskId: string, notes: string) => Promise<{ success?: boolean; error?: string }>
     rate: (

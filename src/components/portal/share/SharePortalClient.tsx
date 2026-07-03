@@ -24,13 +24,6 @@ import {
     postCommentViaToken,
     toggleReactionViaToken,
 } from '@/actions/share-portal-actions'
-import {
-    getReviewViaToken,
-    getVersionCommentsViaToken,
-    addReviewCommentViaToken,
-    approveReviewViaToken,
-    requestReviewChangesViaToken,
-} from '@/actions/video-review-actions'
 import type { Deliverable, Invoice, Workspace, DeliverableActions } from '@/components/portal/calm/types'
 
 export default function SharePortalClient({ token, clientName, profileName, brandLogoUrl = null, brandAccent = null, deliverables, invoices, workspaces }: {
@@ -55,12 +48,6 @@ export default function SharePortalClient({ token, clientName, profileName, bran
         getCommentFeed: (taskId) => getCommentFeedViaToken(token, taskId),
         postComment: (taskId, body, parentId) => postCommentViaToken(token, taskId, body, parentId),
         reactComment: (commentId, emoji) => toggleReactionViaToken(token, commentId, emoji),
-        // [Video Review] token-gated review methods
-        getReview: (taskId) => getReviewViaToken(token, taskId),
-        getVersionComments: (taskId, versionId) => getVersionCommentsViaToken(token, taskId, versionId),
-        addReviewComment: (taskId, versionId, input) => addReviewCommentViaToken(token, taskId, versionId, input),
-        approveReview: (taskId, versionId) => approveReviewViaToken(token, taskId, versionId),
-        requestReviewChanges: (taskId, versionId, feedback) => requestReviewChangesViaToken(token, taskId, versionId, feedback),
     }), [token])
 
     return (

@@ -23,6 +23,8 @@ import {
     type MediaKind,
 } from './media-constants'
 import { buildR2Key, buildSystemKey, computePartSize, computePartCount } from './upload-helpers'
+import { ensureTaskFolderPath, type BreadcrumbItem } from './task-folder'
+import { parseVideoTitle } from './parse-task-context'
 import {
     createMultipart,
     presignUploadPart,
@@ -595,4 +597,101 @@ export async function getUploadStatus(uploadSessionId: string): Promise<UploadSt
         version: dto,
         ...(version.errorMessage ? { error: version.errorMessage } : {}),
     }
+}
+
+// ── task-upload (BÀN GIAO) ─────────────────────────────────────────────────────
+
+export interface TaskInitiateResult {
+    status: 200 | 201
+    body: InitiateBody & { createdNewAsset: boolean; folderPath: BreadcrumbItem[] }
+}
+
+/**
+ * Upload from the task drawer's "Up thẳng video" (API-SPEC §6.1): resolve the
+ * client/brand/video folder tree from the task title, auto-version onto the task's
+ * existing deliverable of the same name (or create it), then reuse initiateUpload.
+ * VIDEO only. NOTE (P1.5): the (taskId, name) asset match has no DB unique — two
+ * truly-simultaneous submits without an Idempotency-Key could make 2 assets; the
+ * idempotency key (client-sent) covers the normal retry case.
+ */
+export async function initiateTaskUpload(input: {
+    taskId: string
+    fileName: string
+    sizeBytes: bigint
+    mimeType: string
+    idempotencyKey?: string | null
+}): Promise<TaskInitiateResult> {
+    const kind = mediaKindFromMime(input.mimeType, input.fileName)
+    if (kind !== 'VIDEO') fail(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ nhận file video ở mục bàn giao.')
+
+    const task = await prisma.task.findFirst({
+        where: { id: input.taskId },
+        select: {
+            id: true, title: true, clientId: true, workspaceId: true, isArchived: true,
+            client: { select: { name: true } },
+            workspace: { select: { name: true } },
+        },
+    })
+    if (!task) fail(404, 'NOT_FOUND', 'Không tìm thấy task.')
+    if (!task.workspaceId) fail(409, 'STATE_INVALID', 'Task chưa thuộc workspace nào.')
+    if (task.isArchived) fail(409, 'STATE_INVALID', 'Task đã lưu trữ — không thể tải bản dựng lên.')
+    const workspaceId = task.workspaceId // narrowed to string for the closures below
+    const access = await requireReviewAccess({ workspaceId })
+
+    const parsed = parseVideoTitle(task.title, task.client?.name ?? '')
+    const clientIdStr = task.clientId != null ? String(task.clientId) : null
+
+    const { videoFolder, breadcrumb } = await ensureTaskFolderPath({
+        workspaceId,
+        rootName: task.workspace?.name ?? 'Team',
+        taskId: task.id,
+        clientId: clientIdStr,
+        parsed,
+        createdById: access.userId,
+    })
+
+    // Auto-version: same task + same (case-insensitive) video name ⇒ a new version on the stack.
+    // ReviewAsset has no unique on (taskId, name), so serialize concurrent uploads to the SAME
+    // deliverable with a transaction-scoped advisory lock on the (unique) video folder → the
+    // find-or-create is atomic and can't fork the stack into two assets. Also scoped by workspaceId
+    // (defence-in-depth against denormalization drift).
+    const resolved = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${videoFolder.id}, 0))`
+        const existing = await tx.reviewAsset.findFirst({
+            where: { taskId: task.id, workspaceId, deletedAt: null, name: { equals: parsed.video, mode: 'insensitive' } },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true },
+        })
+        if (existing) return { assetId: existing.id, createdNewAsset: false }
+        const asset = await tx.reviewAsset.create({
+            data: {
+                folderId: videoFolder.id,
+                workspaceId,
+                clientId: clientIdStr,
+                taskId: task.id,
+                name: parsed.video,
+                mediaKind: ReviewMediaKind.VIDEO,
+                createdById: access.userId,
+            },
+        })
+        return { assetId: asset.id, createdNewAsset: true }
+    })
+    const { assetId, createdNewAsset } = resolved
+
+    const init = await initiateUpload({
+        fileName: input.fileName,
+        sizeBytes: input.sizeBytes,
+        mimeType: input.mimeType,
+        target: { kind: 'asset', assetId },
+        idempotencyKey: input.idempotencyKey,
+    })
+
+    // A brand-new asset's first version is the head from birth (card renders while processing).
+    if (createdNewAsset && init.status === 201) {
+        await prisma.reviewAsset
+            .update({ where: { id: assetId }, data: { currentVersionId: init.body.versionId } })
+            .catch(() => {})
+    }
+
+    return { status: init.status, body: { ...init.body, createdNewAsset, folderPath: breadcrumb } }
 }

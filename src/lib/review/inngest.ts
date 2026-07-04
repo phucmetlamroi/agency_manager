@@ -12,6 +12,10 @@ export const inngest = new Inngest({ id: 'hustlytasker-review' })
 export const REVIEW_EVENTS = {
     MUX_EVENT_RECEIVED: 'review/mux.event.received',
     JANITOR_REQUESTED: 'review/janitor.requested',
+    // Emitted by the complete route after R2 CompleteMultipartUpload for a VIDEO:
+    // the heavy Mux create-asset call runs in the Inngest handler (P1.4), keeping
+    // the request well under Vercel's function timeout.
+    UPLOAD_COMPLETED: 'review/upload.completed',
 } as const
 
 /**

@@ -3,11 +3,20 @@
 // sizeBytes is emitted as a string (apiJson already BigInt-safes it, but the
 // DTO type is `string` so callers building plain objects stay honest).
 
-import type { ReviewPipelineStatus, ReviewState, ReviewVersion } from '@prisma/client'
+import type {
+    ReviewPipelineStatus,
+    ReviewState,
+    ReviewVersion,
+    ReviewFolder,
+    ReviewAsset,
+    ReviewMediaKind,
+} from '@prisma/client'
 import { formatUserDisplay } from '@/lib/format-user'
 
 export type UploadStatusDto = 'uploading' | 'uploaded' | 'processing' | 'ready' | 'failed'
 export type ReviewStateDto = 'draft' | 'awaiting_review' | 'changes_requested' | 'approved'
+export type ItemType = 'folder' | 'asset'
+export type MediaKindDto = 'video' | 'image'
 
 export interface UserRef {
     id: string
@@ -105,5 +114,103 @@ export function serializeVersion(
         uploadedBy: opts.uploader ?? null,
         createdAt: version.createdAt.toISOString(),
         media: opts.media ?? null,
+    }
+}
+
+const MEDIA_KIND_TO_DTO: Record<ReviewMediaKind, MediaKindDto> = {
+    VIDEO: 'video',
+    IMAGE: 'image',
+}
+
+export interface FolderDto {
+    id: string
+    workspaceId: string
+    parentId: string | null
+    name: string
+    /** auto = created by task-upload (systemKey set); manual = user-created in the browser. */
+    origin: 'manual' | 'auto'
+    itemCount: number
+    /** recursive subtree bytes, denormalized — emitted as string (BigInt-safe). */
+    totalBytes: string
+    /** null for auto-folders (createdById is null / system). */
+    createdBy: UserRef | null
+    createdAt: string
+    rowVersion: number
+    deletedAt: string | null
+}
+
+/** Serialize a ReviewFolder → FolderDto. `createdBy` resolved by caller (batched). */
+export function serializeFolder(
+    folder: ReviewFolder,
+    opts: { createdBy?: UserRef | null } = {},
+): FolderDto {
+    return {
+        id: folder.id,
+        workspaceId: folder.workspaceId,
+        parentId: folder.parentId,
+        name: folder.name,
+        origin: folder.systemKey ? 'auto' : 'manual',
+        itemCount: folder.itemCount,
+        totalBytes: folder.totalSizeBytes.toString(),
+        createdBy: opts.createdBy ?? null,
+        createdAt: folder.createdAt.toISOString(),
+        rowVersion: folder.rowVersion,
+        deletedAt: folder.deletedAt ? folder.deletedAt.toISOString() : null,
+    }
+}
+
+export interface AssetDto {
+    id: string
+    workspaceId: string
+    folderId: string | null
+    taskId: string | null
+    clientId: string | null
+    mediaKind: MediaKindDto
+    /** display name — rename changes THIS, never a version's originalName. */
+    title: string
+    /** HustlyTasker task-status string on the card (read dynamically); null = unset. */
+    statusKey: string | null
+    currentVersionId: string | null
+    versionCount: number
+    /** comments across all live versions (internal + public) — UI-only counter. */
+    commentCountTotal: number
+    currentVersion: VersionDto | null
+    createdBy: UserRef | null
+    createdAt: string
+    rowVersion: number
+    deletedAt: string | null
+}
+
+/**
+ * Serialize a ReviewAsset → AssetDto. The head `currentVersion` (serialized with
+ * its media links), `createdBy`, `versionCount`, and `commentCountTotal` are all
+ * resolved by the caller (batched) so one listing = a handful of round-trips.
+ */
+export function serializeAsset(
+    asset: ReviewAsset,
+    opts: {
+        currentVersion?: VersionDto | null
+        createdBy?: UserRef | null
+        versionCount?: number
+        commentCountTotal?: number
+    } = {},
+): AssetDto {
+    return {
+        id: asset.id,
+        workspaceId: asset.workspaceId,
+        folderId: asset.folderId,
+        taskId: asset.taskId,
+        clientId: asset.clientId,
+        mediaKind: MEDIA_KIND_TO_DTO[asset.mediaKind],
+        title: asset.name,
+        statusKey: asset.statusId,
+        currentVersionId: asset.currentVersionId,
+        versionCount: opts.versionCount ?? 0,
+        commentCountTotal: opts.commentCountTotal ?? 0,
+        currentVersion: opts.currentVersion ?? null,
+        createdBy: opts.createdBy ?? null,
+        createdAt: asset.createdAt.toISOString(),
+        rowVersion: asset.rowVersion,
+        deletedAt: asset.deletedAt ? asset.deletedAt.toISOString() : null,
     }
 }

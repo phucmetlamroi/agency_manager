@@ -24,7 +24,8 @@ import {
     ArrowRightLeft,
     Settings,
     ScrollText,
-    LifeBuoy
+    LifeBuoy,
+    Clapperboard
 } from "lucide-react"
 
 import {
@@ -83,6 +84,10 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
         { label: "Hàng chờ task", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'] },
         // [Client Task Submission v2] Client-submitted requests inbox (badge = NEW count).
         { label: "Hộp thư yêu cầu", href: `/${workspaceId}/admin/requests`, icon: Inbox, roles: ['ADMIN', 'USER'] },
+        // [Review module P2] Team asset browser (video review). Admin-only in P2 —
+        // the /admin layout guard gates entry; shown in both views per the unified-nav
+        // convention above (non-admin click → layout redirects to /dashboard).
+        { label: "Team", href: `/${workspaceId}/admin/team`, icon: Clapperboard, roles: ['ADMIN', 'USER'] },
         // [CM merge] "Clients Manager" đã gộp vào Dashboard → bỏ khỏi sidebar.
         { label: "Lịch", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
         { label: "Lỗi của tôi", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },

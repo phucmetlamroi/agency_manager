@@ -1599,6 +1599,8 @@ model ReviewFolder {
   path  String // materialized path "/{rootId}/{...}/{id}/" — ALWAYS includes own id
   depth Int // ids in path - 1; root = 0
 
+  rowVersion Int @default(0) // optimistic locking for rename/move (P2; additive column)
+
   systemKey String? @unique // idempotency key for task-upload auto-folders; null = user-created
 
   // Denormalized context (only set on the auto-created level they belong to)

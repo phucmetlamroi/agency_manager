@@ -8,6 +8,7 @@ import { updateTaskStatus } from "@/actions/task-actions"
 import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
 import { toast } from "sonner"
+import { TaskReviewUploadSection } from "@/components/review/TaskReviewUploadSection"
 import { Dialog } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
 // [Hotfix 2026-06-13] plain 'dompurify' (browser-only, zero deps) replaces
@@ -1142,6 +1143,8 @@ export function TaskDetailModal({
                                             </button>
                                         )}
 
+                                        {/* [Review P1.10] Up thẳng video review — additive; link flow above untouched */}
+                                        {task?.id && <TaskReviewUploadSection taskId={task.id} />}
                                     </Card>
 
                                     {/* RIGHT — Deadline + Finance stacked */}

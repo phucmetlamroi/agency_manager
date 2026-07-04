@@ -3,6 +3,7 @@
 import * as React from "react"
 import { AppSidebar } from "./AppSidebar"
 import { CommandMenu } from "./CommandMenu"
+import { UploadTray } from "@/components/review/UploadTray"
 import { cn } from "@/lib/utils"
 
 
@@ -41,6 +42,8 @@ export function AdminShell({ children, user, workspaceId, viewRole = 'ADMIN', wo
                 </div>
             </main>
             <CommandMenu />
+            {/* [Review P1.10] global upload sheet — persists across admin navigation */}
+            <UploadTray />
         </div>
     )
 }

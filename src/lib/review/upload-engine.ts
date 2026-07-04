@@ -929,6 +929,11 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         const rt = runtimes.get(id)
         const item = store.get(id)
         if (!item) return
+        // A finished (or already-canceled) upload has nothing to cancel — never relabel a
+        // server-finalized 'done' row as 'canceled' (a bulk "Hủy tất cả" would otherwise
+        // do exactly that). Mirrors failFile's terminal-status guard. 'failed' stays
+        // cancelable so the card's "Hủy" button can dismiss a failed row.
+        if (item.status === 'done' || item.status === 'canceled') return
         if (rt) {
             rt.canceled = true
             abortActiveParts(rt, 'cancel')

@@ -8,6 +8,9 @@ export interface ParsedTaskVideo {
     client: string
     brand: string | null
     video: string
+    /** true = the "Khách / Brand · Video" convention matched; false = fell back to the
+     *  task's client name + whole title. Drives the confirm-strip "unrecognized" warning. */
+    matched: boolean
 }
 
 // client = up to the first '/' or '·'; brand = optional, between '/' and '·'/'-';
@@ -24,7 +27,8 @@ export function parseVideoTitle(title: string, fallbackClient: string): ParsedTa
             client: m[1]?.trim() || fb,
             brand: m[2]?.trim() || null,
             video: m[3]?.trim() || t || 'Video',
+            matched: true,
         }
     }
-    return { client: fb, brand: null, video: t || 'Video' }
+    return { client: fb, brand: null, video: t || 'Video', matched: false }
 }

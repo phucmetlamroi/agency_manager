@@ -1551,3 +1551,413 @@ model TaskCommentReaction {
 
   @@index([commentId])
 }
+
+// ============================================================================
+// [Review module — Mux + R2 + Inngest] docs/review-module/ (P0, 2026-07-04).
+// Frame.io-style asset manager + player review + guest share. Additive-only:
+// no existing table is altered. Cross-module references (Task/User/Client/
+// Workspace) are SCALAR STRINGS by deliberate P0 decision — no FK constraints
+// yet, so existing delete flows (deleteTask, hard-delete-workspaces cron) keep
+// their exact behavior; see IMPLEMENTATION-NOTES.md. Raw-SQL constraints
+// (partial uniques, CHECKs) live in prisma/migrations/manual/p0_add_review_module.sql
+// — Prisma cannot express them and its diff engine ignores them (survives the
+// postinstall `db push` on every Vercel build).
+// ============================================================================
+
+enum ReviewMediaKind {
+  IMAGE
+  VIDEO
+}
+
+/// Physical file pipeline — mirrors Frame.io lifecycle. DTO (API-SPEC 0.6)
+/// exposes the lowercase form; field on ReviewVersion = `pipelineStatus`.
+enum ReviewPipelineStatus {
+  UPLOADING // multipart initiated, browser PUTting parts to R2
+  UPLOADED // CompleteMultipartUpload done on R2 (images jump straight to READY)
+  PROCESSING // Mux told to pull; waiting for video.asset.ready webhook
+  READY // playable: muxPlaybackId set (video) / r2Key final (image)
+  FAILED // missing part / Mux errored / janitor abort — errorMessage has the reason
+}
+
+/// Per-VERSION review state machine (Q11/C2) — SEPARATE from task status.
+enum ReviewState {
+  DRAFT // created, pipeline not READY yet
+  AWAITING_REVIEW // auto on READY; waiting on the client
+  CHANGES_REQUESTED // guest clicked Request changes
+  APPROVED // guest clicked Approve (terminal per version)
+}
+
+/// Infinite-depth folder tree of the Team module. One root per Workspace.
+model ReviewFolder {
+  id          String  @id @default(uuid())
+  workspaceId String // FK->Workspace (month workspace) — scalar by design (P0)
+  parentId    String?
+  parent      ReviewFolder?  @relation("ReviewFolderTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children    ReviewFolder[] @relation("ReviewFolderTree")
+
+  name  String // "Untitled Folder" default on right-click create
+  path  String // materialized path "/{rootId}/{...}/{id}/" — ALWAYS includes own id
+  depth Int // ids in path - 1; root = 0
+
+  systemKey String? @unique // idempotency key for task-upload auto-folders; null = user-created
+
+  // Denormalized context (only set on the auto-created level they belong to)
+  clientId String? // FK->Client — set on the client + sub-brand levels
+  taskId   String? // FK->Task — set on the video-title level
+
+  // Denormalized counters (DATA-MODEL 9)
+  itemCount      Int    @default(0) // DIRECT live children: subfolders + stacks
+  totalSizeBytes BigInt @default(0) // RECURSIVE subtree bytes — "N Folders • X GB"
+
+  createdById String? // FK->User; null = system (auto-folder)
+
+  // Soft delete (trash 30 days — DATA-MODEL 10)
+  deletedAt         DateTime?
+  deletedById       String?
+  deleteBatchId     String?
+  orphanedFromPurge Boolean   @default(false) // ancestor purged → re-homed to root
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets     ReviewAsset[]
+  shareItems ShareLinkItem[]
+
+  @@index([workspaceId, parentId])
+  @@index([path(ops: raw("varchar_pattern_ops"))]) // subtree prefix scans (LIKE 'prefix%')
+  @@index([deleteBatchId])
+  @@index([workspaceId, deletedAt])
+}
+
+/// Version stack — the card users see. Every file lives in exactly 1 stack.
+model ReviewAsset {
+  id          String       @id @default(uuid())
+  folderId    String
+  folder      ReviewFolder @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  workspaceId String // FK->Workspace, denormalized from folder
+  taskId      String? // FK->Task — set when stack born from the task-drawer upload; null = free upload
+  clientId    String? // FK->Client, denormalized
+
+  name       String // card name; default = v1 fileName without extension
+  mediaKind  ReviewMediaKind // all versions in a stack share this (no image-over-video stacking)
+  statusId   String? // HustlyTasker task-status string on the card (read dynamically); null = unset
+  rowVersion Int     @default(0) // optimistic locking for rename/move (NOT the video version)
+
+  currentVersionId String?        @unique // head: highest live versionNumber
+  currentVersion   ReviewVersion? @relation("ReviewStackCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  createdById String // FK->User
+
+  deletedAt         DateTime?
+  deletedById       String?
+  deleteBatchId     String?
+  orphanedFromPurge Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions   ReviewVersion[] @relation("ReviewStackVersions")
+  shareItems ShareLinkItem[]
+
+  @@index([folderId, deletedAt])
+  @@index([taskId])
+  @@index([workspaceId, deletedAt])
+  @@index([deleteBatchId])
+}
+
+/// One physical file = one version in a stack. Comments/pipeline/metadata live here.
+model ReviewVersion {
+  id            String      @id @default(uuid())
+  assetId       String
+  asset         ReviewAsset @relation("ReviewStackVersions", fields: [assetId], references: [id], onDelete: Cascade)
+  versionNumber Int // 1,2,3… append-only, numbers never reused/reordered
+  workspaceId   String // FK->Workspace, denormalized (trash/usage queries)
+
+  // ----- Physical file -----
+  fileName  String
+  mediaKind ReviewMediaKind
+  mimeType  String // e.g. "video/mp4" — whitelist validated at the API
+  sizeBytes BigInt
+
+  // ----- Pipeline -----
+  pipelineStatus ReviewPipelineStatus @default(UPLOADING)
+  errorMessage   String? // SPECIFIC failure reason (missing part / Mux errored / 24h abort)
+  uploadedAt     DateTime? // CompleteMultipartUpload succeeded on R2
+  readyAt        DateTime? // webhook video.asset.ready (video) / processed (image)
+
+  // ----- Technical metadata (from Mux asset API at ready; images: probe at complete) -----
+  durationMs     Int?
+  fpsNumerator   Int? // 30000
+  fpsDenominator Int? // 1001 → 29.97fps — RATIONAL fps for SMPTE timecode + frame math
+  width          Int?
+  height         Int? // height > width ⇒ 9:16 player mode
+  videoCodec     String?
+  audioCodec     String? // null = silent video
+
+  // ----- Storage & playback (Mux + R2) -----
+  r2Key         String? // original on R2: "review/{workspaceId}/{assetId}/v{n}/{fileName}"
+  muxAssetId    String? @unique // video only
+  muxPlaybackId String? // video only; SIGNED policy — server mints short JWTs at serve time
+  thumbTime     Float? // Set Frame as Thumb: ?time= seconds on image.mux.com; null = Mux default
+  thumbnailKey  String? // image only: derived thumb in R2 (null in v1 = serve original presigned)
+
+  // ----- Review -----
+  reviewState  ReviewState @default(DRAFT)
+  commentCount Int         @default(0) // live comments incl. replies + internal (internal UI only)
+
+  uploaderId String // FK->User — "Uploader • Date" on the card
+
+  deletedAt     DateTime?
+  deletedById   String?
+  deleteBatchId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comments       ReviewComment[]
+  uploadSessions UploadSession[]
+  currentOf      ReviewAsset?    @relation("ReviewStackCurrentVersion")
+
+  @@unique([assetId, versionNumber]) // race-safe versioning: loser retries with max+1
+  @@index([workspaceId, deletedAt])
+  @@index([pipelineStatus]) // UI poller + janitor sweep of stuck UPLOADING
+  @@index([uploaderId])
+  @@index([deleteBatchId])
+}
+
+/// A review note on a specific VERSION (never the stack). Reply = 1 level.
+model ReviewComment {
+  id        String        @id @default(uuid())
+  versionId String
+  version   ReviewVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  parentId String?
+  parent   ReviewComment?  @relation("ReviewCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  ReviewComment[] @relation("ReviewCommentReplies")
+
+  body String // plain text + mention tokens (composer format of the app)
+
+  // ----- Position on the video -----
+  timecodeMs Int? // ms from start; NULL = general comment (or asset is IMAGE)
+  durationMs Int? // NULL = point comment; set = range [timecodeMs, timecodeMs+durationMs]
+
+  // ----- Drawing annotation (DATA-MODEL 6: {v:1, shapes:[...]}, coords 0..1) -----
+  annotation Json?
+
+  isInternal Boolean @default(true) // true = team only; false = public (guests see it). Replies INHERIT parent value.
+
+  // ----- Author: exactly one of the two (CHECK constraint in manual SQL) -----
+  authorId       String? // FK->User — team member
+  guestSessionId String?
+  guestSession   GuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
+  guestName      String? // SNAPSHOT of guest name at post time (survives GDPR erasure)
+
+  shareLinkId String? // provenance (analytics/audit) — bare string, link may be deleted
+
+  resolvedAt   DateTime? // Mark as Complete — editor revision checklist
+  resolvedById String? // FK->User
+  editedAt     DateTime? // edited label
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  attachments CommentAttachment[]
+  reactions   CommentReaction[]
+
+  @@index([versionId, isInternal, deletedAt, createdAt]) // panel list: visibility filter + sort
+  @@index([versionId, timecodeMs]) // playbar markers, Timecode sort
+  @@index([parentId])
+  @@index([authorId])
+}
+
+/// Image attached to a comment (IMAGES ONLY — CHECK in manual SQL). Max 6/comment (API).
+model CommentAttachment {
+  id        String        @id @default(uuid())
+  commentId String
+  comment   ReviewComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  r2Key     String // "review-attach/{commentId}/{uuid}-{fileName}"
+  fileName  String
+  mimeType  String // MUST be image/* (server + CHECK)
+  sizeBytes BigInt
+  width     Int? // probed at upload — correct aspect placeholder
+  height    Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([commentId])
+}
+
+/// Emoji reaction. reactorKey = "u:{userId}" | "g:{guestSessionId}" (service-set)
+/// — pragmatic XOR-unique across the two nullable actor columns.
+model CommentReaction {
+  id        String        @id @default(uuid())
+  commentId String
+  comment   ReviewComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  emoji String // plain unicode emoji, no shortcodes
+
+  userId         String? // FK->User
+  guestSessionId String?
+  guestSession   GuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: Cascade)
+
+  reactorKey String
+
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, reactorKey, emoji])
+  @@index([commentId])
+}
+
+/// Guest-facing share link → public page /r/{slug}. Slug is an address; the
+/// real controls are passwordHash/expiresAt/revokedAt.
+model ShareLink {
+  id   String @id @default(uuid())
+  slug String @unique // nanoid(12), URL-safe
+
+  workspaceId String // FK->Workspace, denormalized for per-month management
+  taskId      String? // FK->Task — created from the task drawer; null = created in Team
+  name        String? // internal admin label; null = derived from first item
+  rowVersion  Int     @default(0) // optimistic locking on option updates
+
+  // ----- Toggles (Frame.io client-facing security model) -----
+  allowComments            Boolean @default(true)
+  allowDownload            Boolean @default(false)
+  downloadOnlyWhenApproved Boolean @default(true) // only meaningful when allowDownload
+  showAllVersions          Boolean @default(false) // false = guest sees currentVersion only (dynamic link)
+
+  // ----- Access control -----
+  passwordHash String? // bcrypt; null = open link
+  expiresAt    DateTime? // past this → link expired (runtime check)
+  revokedAt    DateTime? // manual kill-switch; un-revoke = set null; never deletes comments
+
+  // ----- Tracking -----
+  viewCount    Int       @default(0) // share.link_opened events, batched increments
+  lastViewedAt DateTime?
+
+  createdById String // FK->User
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items  ShareLinkItem[]
+  guests GuestSession[]
+
+  @@index([workspaceId, createdAt])
+  @@index([taskId])
+}
+
+/// What a share link exposes: exactly one of folderId XOR assetId (CHECK in SQL).
+/// Share always targets the STACK (dynamic per-version), never a ReviewVersion.
+model ShareLinkItem {
+  id          String    @id @default(uuid())
+  shareLinkId String
+  shareLink   ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+
+  folderId String?
+  folder   ReviewFolder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  assetId  String?
+  asset    ReviewAsset?  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  sortIndex Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([shareLinkId, folderId]) // Postgres: NULLs do not collide
+  @@unique([shareLinkId, assetId])
+  @@index([assetId])
+  @@index([folderId])
+}
+
+/// 1 guest browser × 1 share link. Cookie holds the raw token; DB stores hash only.
+model GuestSession {
+  id          String    @id @default(uuid())
+  shareLinkId String
+  shareLink   ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+
+  tokenHash String @unique // sha256(sessionToken); 32-byte random token lives in the HttpOnly cookie
+
+  name  String // required before first comment (Frame.io-style prompt)
+  email String // required with name; identity + notifications (P2); UK GDPR notice at UI
+
+  userAgent   String?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now()) // updated per request, throttled 1/min
+
+  comments  ReviewComment[]
+  reactions CommentReaction[]
+
+  @@index([shareLinkId])
+}
+
+/// Append-only event log (feeds task activity + admin audit surfaces).
+/// NO foreign keys ON PURPOSE — the log must outlive purged rows.
+model ReviewActivity {
+  id   String @id @default(uuid())
+  type String // catalog in DATA-MODEL 4.10 — String (not enum) to extend without migration
+
+  workspaceId String
+  taskId      String?
+  folderId    String?
+  assetId     String?
+  versionId   String?
+  commentId   String?
+  shareLinkId String?
+
+  actorUserId    String? // member actor; null when guest/system
+  guestSessionId String?
+  guestName      String? // snapshot for render without joins
+
+  meta Json? // {versionNumber, old, new, fileName, sizeBytes, ...}
+
+  createdAt DateTime @default(now())
+
+  @@index([taskId, createdAt(sort: Desc)])
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([assetId, createdAt(sort: Desc)])
+  @@index([shareLinkId, createdAt])
+}
+
+/// R2 multipart upload bookkeeping (resume/abort). Not user-facing.
+model UploadSession {
+  id        String        @id @default(uuid())
+  versionId String
+  version   ReviewVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  idempotencyKey String? @unique // client-generated (API-SPEC 0.8); dup key ⇒ replay old response
+
+  r2Key         String // target key (matches ReviewVersion.r2Key after complete)
+  r2UploadId    String // S3 CreateMultipartUpload id — needed for Complete/Abort
+  partSizeBytes Int // 10–50MB, fixed at initiate
+  partsTotal    Int
+  partsDone     Int    @default(0) // resume shows accurate %
+
+  expiresAt   DateTime // createdAt + 24h; janitor aborts expired incomplete sessions
+  completedAt DateTime?
+  abortedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt]) // janitor: completedAt IS NULL AND abortedAt IS NULL AND expiresAt < now()
+  @@index([versionId])
+}
+
+/// Provider webhook ledger — idempotency + replay/debug. id = provider event id.
+model WebhookEvent {
+  id          String    @id // Mux event.id — INSERT-or-ignore dedupes redeliveries
+  provider    String // "mux" (String for future providers)
+  type        String // "video.asset.ready", "video.asset.errored", …
+  payload     Json // raw body
+  processedAt DateTime? // null = Inngest not done; safe retry gate
+  receivedAt  DateTime  @default(now())
+
+  @@index([provider, type, receivedAt])
+}
+
+/// Fixed-window rate limiting on Postgres (guest share routes) — no vendor.
+model RateLimitBucket {
+  key         String   @id // e.g. "share:unlock:{slug}:{ip}"
+  windowStart DateTime
+  count       Int      @default(0)
+}

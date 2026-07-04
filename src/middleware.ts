@@ -36,6 +36,19 @@ export async function middleware(request: NextRequest) {
         return res
     }
 
+    // 1.7. [Review module] /r/[slug] is the PUBLIC guest review page (Q10 —
+    // docs/review-module). Same public treatment as /share: slug is an opaque
+    // address; real access control (password/expiry/revoke) is resolved
+    // server-side by resolveShare() in the page/API layer (Edge has no Prisma).
+    // Middleware only sets a request id for log correlation + anti-index headers.
+    if (pathname.startsWith('/r/')) {
+        const res = NextResponse.next()
+        res.headers.set('X-Robots-Tag', 'noindex, nofollow')
+        res.headers.set('Referrer-Policy', 'no-referrer')
+        res.headers.set('x-request-id', crypto.randomUUID())
+        return res
+    }
+
     // 2. Auth Guard ONLY
     if (!sessionCookie) {
         const protectedPaths = ['/admin', '/dashboard']

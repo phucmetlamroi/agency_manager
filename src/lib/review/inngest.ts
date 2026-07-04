@@ -6,10 +6,12 @@ import { Inngest } from 'inngest'
 import { ReviewMediaKind, ReviewPipelineStatus, ReviewState } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { reviewLog } from './logger'
-import { createMuxAsset, deleteMuxAsset, extractReadyMeta, type MuxAsset } from './mux'
+import { createMuxAsset, deleteMuxAsset, extractReadyMeta, getMuxAsset, MuxError, type MuxAsset } from './mux'
 import { presignGetObject, getObjectRange } from './r2'
 import { looksLikeMedia } from './upload-helpers'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
+// P1.6 janitor reconcile helpers (call-time-only cycle — see upload-service.ts note).
+import { expireInflightUpload, reconcileStuckUploadedVersion } from './upload-service'
 
 export const inngest = new Inngest({ id: 'hustlytasker-review' })
 
@@ -22,6 +24,117 @@ export const REVIEW_EVENTS = {
     // the request well under Vercel's function timeout.
     UPLOAD_COMPLETED: 'review/upload.completed',
 } as const
+
+// Janitor sweep bounds (P1.6). The grace windows keep the nightly reconcile OFF rows that a
+// healthy path is still legitimately finalizing/processing; the batch cap bounds one run (a
+// hit cap is logged, and the next night drains the rest).
+const JANITOR_BATCH = 100
+const UPLOADED_GRACE_MS = 15 * 60 * 1000 // a real R2 finalize lands in seconds
+const PROCESSING_GRACE_MS = 20 * 60 * 1000 // Mux "basic" ready is usually < a few minutes
+const PROCESSING_HARD_LIMIT_MS = 24 * 60 * 60 * 1000 // still PROCESSING with no Mux asset after 24h ⇒ give up
+const WEBHOOK_GRACE_MS = 60 * 60 * 1000 // an un-consumed ledger row is overdue after 1h
+const WEBHOOK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // stop re-enqueuing a row nobody can consume after 7d
+
+/**
+ * Apply a READY Mux asset to a version: the atomic PROCESSING→READY flip + stack-head + the
+ * version.ready activity, all in ONE tx. Idempotent — a redelivered/reconciled event finds it
+ * already READY (flip count 0) and writes nothing. Shared by the webhook consumer AND the
+ * nightly reconcile so the transition can NEVER drift between the two paths. Returns:
+ *   'applied'    — this call performed the transition
+ *   'noop'       — already READY (a real duplicate)
+ *   'unexpected' — flip missed but the version is NOT ready (early webhook / pre-ready state)
+ *   'gone'       — the version no longer exists (purged) → caller consumes the event
+ */
+async function applyMuxReady(
+    versionId: string,
+    asset: MuxAsset,
+): Promise<'applied' | 'noop' | 'unexpected' | 'gone'> {
+    const version = await prisma.reviewVersion.findFirst({
+        where: { id: versionId },
+        include: { asset: { select: { taskId: true } } },
+    })
+    if (!version) return 'gone'
+    const meta = extractReadyMeta(asset)
+    const applied = await prisma.$transaction(async (tx) => {
+        const flip = await tx.reviewVersion.updateMany({
+            where: { id: versionId, pipelineStatus: ReviewPipelineStatus.PROCESSING },
+            data: {
+                pipelineStatus: ReviewPipelineStatus.READY,
+                reviewState: ReviewState.AWAITING_REVIEW,
+                readyAt: new Date(),
+                muxAssetId: asset.id ?? version.muxAssetId,
+                muxPlaybackId: meta.muxPlaybackId,
+                durationMs: meta.durationMs,
+                fpsNumerator: meta.fpsNumerator,
+                fpsDenominator: meta.fpsDenominator,
+                width: meta.width,
+                height: meta.height,
+                videoCodec: meta.videoCodec,
+                audioCodec: meta.audioCodec,
+            },
+        })
+        if (flip.count === 0) return false
+        // The newest ready version becomes the stack head.
+        await tx.reviewAsset.update({ where: { id: version.assetId }, data: { currentVersionId: versionId } })
+        await recordActivity(tx, {
+            type: REVIEW_ACTIVITY.VERSION_READY,
+            workspaceId: version.workspaceId,
+            taskId: version.asset.taskId,
+            assetId: version.assetId,
+            versionId,
+            actorUserId: version.uploaderId,
+            meta: { versionNumber: version.versionNumber, durationMs: meta.durationMs },
+        })
+        return true
+    })
+    if (applied) return 'applied'
+    // flip missed → classify the current state:
+    //   READY  = a true duplicate → 'noop' (consume the event, write nothing).
+    //   FAILED = TERMINAL (an errored webhook / reconcile won first). A late 'ready' can't un-fail
+    //            it (FAILED never transitions back), so it must be CONSUMED, not retried — else the
+    //            event is un-consumable and the nightly re-enqueue sweep loops on it forever.
+    //   gone   = version purged → nothing to apply → 'noop' (consume).
+    //   otherwise (UPLOADED/UPLOADING/PROCESSING) = a genuinely TRANSIENT pre-ready state (early
+    //            webhook / crash) that will soon advance → 'unexpected' so the caller retries.
+    const cur = await prisma.reviewVersion.findUnique({ where: { id: versionId }, select: { pipelineStatus: true } })
+    if (!cur || cur.pipelineStatus === ReviewPipelineStatus.READY || cur.pipelineStatus === ReviewPipelineStatus.FAILED) {
+        return 'noop'
+    }
+    return 'unexpected'
+}
+
+/**
+ * Apply an ERRORED outcome to a version: atomic {PROCESSING|UPLOADED}→FAILED + version.error
+ * activity. Idempotent. Shared by the webhook consumer + the reconcile (Mux GET status errored
+ * / 404). Returns 'applied' | 'noop' (already terminal) | 'gone' (version purged).
+ */
+async function applyMuxErrored(versionId: string, msg: string): Promise<'applied' | 'noop' | 'gone'> {
+    const version = await prisma.reviewVersion.findFirst({
+        where: { id: versionId },
+        include: { asset: { select: { taskId: true } } },
+    })
+    if (!version) return 'gone'
+    return prisma.$transaction(async (tx) => {
+        const flip = await tx.reviewVersion.updateMany({
+            where: {
+                id: versionId,
+                pipelineStatus: { in: [ReviewPipelineStatus.PROCESSING, ReviewPipelineStatus.UPLOADED] },
+            },
+            data: { pipelineStatus: ReviewPipelineStatus.FAILED, errorMessage: msg },
+        })
+        if (flip.count === 0) return 'noop'
+        await recordActivity(tx, {
+            type: REVIEW_ACTIVITY.VERSION_ERROR,
+            workspaceId: version.workspaceId,
+            taskId: version.asset.taskId,
+            assetId: version.assetId,
+            versionId,
+            actorUserId: version.uploaderId,
+            meta: { versionNumber: version.versionNumber, errorMessage: msg },
+        })
+        return 'applied'
+    })
+}
 
 /**
  * P1.3: consume a Mux webhook (video.asset.ready / video.asset.errored) and apply
@@ -67,91 +180,27 @@ export const reviewMuxWebhook = inngest.createFunction(
 
         if ((isReady || isErrored) && versionId) {
             await step.run('apply', async () => {
-                const version = await prisma.reviewVersion.findFirst({
-                    where: { id: versionId },
-                    include: { asset: { select: { taskId: true } } },
-                })
-                if (!version) {
+                if (isReady) {
+                    const outcome = await applyMuxReady(versionId, ledger.asset as MuxAsset)
+                    if (outcome === 'gone') {
+                        reviewLog('warn', 'inngest.mux_webhook.version_missing', { webhookEventId, versionId })
+                        return { orphan: true }
+                    }
+                    // Unexpected pre-ready state (early webhook / crash): DON'T let mark-processed
+                    // swallow the event — throw so Inngest retries, and the nightly reconcile backstops.
+                    if (outcome === 'unexpected') {
+                        throw new Error(`ready webhook for version ${versionId} not in PROCESSING — retry`)
+                    }
+                    reviewLog('info', `inngest.mux_webhook.ready_${outcome}`, { versionId })
+                    return { applied: outcome === 'applied' ? 'ready' : 'noop' }
+                }
+                // errored
+                const msg = (ledger.asset as MuxAsset).errors?.messages?.join('; ') || 'Mux xử lý video thất bại.'
+                const outcome = await applyMuxErrored(versionId, msg)
+                if (outcome === 'gone') {
                     reviewLog('warn', 'inngest.mux_webhook.version_missing', { webhookEventId, versionId })
                     return { orphan: true }
                 }
-
-                if (isReady) {
-                    const meta = extractReadyMeta(ledger.asset as MuxAsset)
-                    // Atomic (flip + head + activity in ONE tx): a redelivered event finds it already
-                    // READY (flip count 0) and writes nothing ("3× dup ⇒ 1 activity"); a mid-apply
-                    // failure rolls back the flip so the Inngest retry re-applies cleanly.
-                    const outcome = await prisma.$transaction(async (tx) => {
-                        const flip = await tx.reviewVersion.updateMany({
-                            where: { id: versionId, pipelineStatus: ReviewPipelineStatus.PROCESSING },
-                            data: {
-                                pipelineStatus: ReviewPipelineStatus.READY,
-                                reviewState: ReviewState.AWAITING_REVIEW,
-                                readyAt: new Date(),
-                                muxAssetId: (ledger.asset as MuxAsset).id ?? version.muxAssetId,
-                                muxPlaybackId: meta.muxPlaybackId,
-                                durationMs: meta.durationMs,
-                                fpsNumerator: meta.fpsNumerator,
-                                fpsDenominator: meta.fpsDenominator,
-                                width: meta.width,
-                                height: meta.height,
-                                videoCodec: meta.videoCodec,
-                                audioCodec: meta.audioCodec,
-                            },
-                        })
-                        if (flip.count === 0) return 'noop'
-                        // The newest ready version becomes the stack head.
-                        await tx.reviewAsset.update({ where: { id: version.assetId }, data: { currentVersionId: versionId } })
-                        await recordActivity(tx, {
-                            type: REVIEW_ACTIVITY.VERSION_READY,
-                            workspaceId: version.workspaceId,
-                            taskId: version.asset.taskId,
-                            assetId: version.assetId,
-                            versionId,
-                            actorUserId: version.uploaderId,
-                            meta: { versionNumber: version.versionNumber, durationMs: meta.durationMs },
-                        })
-                        return 'applied'
-                    })
-                    if (outcome === 'noop') {
-                        // flip.count===0 → either already READY (a redelivered event = real noop) or the
-                        // version is in an UNEXPECTED pre-ready state (early webhook / crash). In the
-                        // latter case DON'T let mark-processed swallow the event — throw so Inngest
-                        // retries and, failing that, the nightly reconcile re-enqueues it.
-                        const cur = await prisma.reviewVersion.findUnique({
-                            where: { id: versionId },
-                            select: { pipelineStatus: true },
-                        })
-                        if (cur && cur.pipelineStatus !== ReviewPipelineStatus.READY) {
-                            throw new Error(`ready webhook for version ${versionId} in state ${cur.pipelineStatus} — retry`)
-                        }
-                    }
-                    reviewLog('info', `inngest.mux_webhook.ready_${outcome}`, { versionId, durationMs: meta.durationMs })
-                    return { applied: outcome === 'applied' ? 'ready' : 'noop' }
-                }
-
-                // errored
-                const msg = (ledger.asset as MuxAsset).errors?.messages?.join('; ') || 'Mux xử lý video thất bại.'
-                const outcome = await prisma.$transaction(async (tx) => {
-                    const flip = await tx.reviewVersion.updateMany({
-                        where: {
-                            id: versionId,
-                            pipelineStatus: { in: [ReviewPipelineStatus.PROCESSING, ReviewPipelineStatus.UPLOADED] },
-                        },
-                        data: { pipelineStatus: ReviewPipelineStatus.FAILED, errorMessage: msg },
-                    })
-                    if (flip.count === 0) return 'noop'
-                    await recordActivity(tx, {
-                        type: REVIEW_ACTIVITY.VERSION_ERROR,
-                        workspaceId: version.workspaceId,
-                        taskId: version.asset.taskId,
-                        assetId: version.assetId,
-                        versionId,
-                        actorUserId: version.uploaderId,
-                        meta: { versionNumber: version.versionNumber, errorMessage: msg },
-                    })
-                    return 'applied'
-                })
                 reviewLog('warn', `inngest.mux_webhook.errored_${outcome}`, { versionId, msg })
                 return { applied: outcome === 'applied' ? 'errored' : 'noop' }
             })
@@ -268,9 +317,16 @@ export const reviewProcessUpload = inngest.createFunction(
                     data: { muxAssetId: created.assetId },
                 })
                 if (res.count === 0) {
-                    // A concurrent run already set a (different) asset — ours is the orphan → delete it.
-                    reviewLog('warn', 'inngest.process_upload.duplicate_asset', { versionId, muxAssetId: created.assetId })
-                    await deleteMuxAsset(created.assetId).catch(() => {})
+                    // count 0 = the (PROCESSING & muxAssetId=null) guard missed. Two causes:
+                    //   (i) a concurrent run stored a DIFFERENT asset → ours is the orphan → delete it.
+                    //   (ii) a fast ready-webhook already set muxAssetId to OUR asset + flipped READY
+                    //        (reachable when this run RETRIES after create-mux-asset memoized) → our
+                    //        asset is LIVE, must NOT delete it. Re-read to tell them apart.
+                    const cur = await prisma.reviewVersion.findUnique({ where: { id: versionId }, select: { muxAssetId: true } })
+                    if (cur?.muxAssetId !== created.assetId) {
+                        reviewLog('warn', 'inngest.process_upload.duplicate_asset', { versionId, muxAssetId: created.assetId })
+                        await deleteMuxAsset(created.assetId).catch(() => {})
+                    }
                 }
                 return res.count
             })
@@ -281,17 +337,178 @@ export const reviewProcessUpload = inngest.createFunction(
 )
 
 /**
- * P0 skeleton: nightly janitor fan-out (no-op children). P1 adds
- * review/multipart-abort + review/reconcile; P6 adds review/trash-purge.
+ * One stuck-PROCESSING video (P1.6): the Mux webhook was missed (or the create-asset job never
+ * landed). Consult Mux directly and apply the SAME transition the webhook would have, or re-fire
+ * the create-asset job. Idempotent — races the real webhook safely (both do the atomic flip).
+ */
+async function reconcileProcessingVersion(versionId: string, muxAssetId: string | null, stale: boolean): Promise<string> {
+    if (!muxAssetId) {
+        if (stale) {
+            // The create-mux-asset job has failed to land for >24h — stop re-firing nightly; fail it
+            // so the card shows a retryable error instead of spinning "processing" forever.
+            await applyMuxErrored(versionId, 'Không thể khởi tạo xử lý video (quá thời gian).')
+            return 'create-timeout-failed'
+        }
+        // The create-mux-asset job (reviewProcessUpload) never landed → re-fire it (idempotent:
+        // it re-checks muxAssetId + PROCESSING and no-ops if a concurrent run already made one).
+        await inngest.send({ name: REVIEW_EVENTS.UPLOAD_COMPLETED, data: { versionId } })
+        return 're-enqueued-create'
+    }
+    let asset: MuxAsset
+    try {
+        asset = await getMuxAsset(muxAssetId)
+    } catch (e) {
+        if (e instanceof MuxError && e.status === 404) {
+            // Mux lost/deleted the asset → fail so the card shows a retryable error.
+            await applyMuxErrored(versionId, 'Mux không còn asset cho bản dựng này.')
+            return 'mux-404-failed'
+        }
+        reviewLog('warn', 'inngest.janitor.mux_get_failed', { versionId, muxAssetId, error: String(e) })
+        return 'mux-get-error'
+    }
+    if (asset.status === 'ready') return `ready-${await applyMuxReady(versionId, asset)}`
+    if (asset.status === 'errored') {
+        const msg = asset.errors?.messages?.join('; ') || 'Mux xử lý video thất bại.'
+        return `errored-${await applyMuxErrored(versionId, msg)}`
+    }
+    // Still 'preparing'. Normally we leave it (Mux will emit ready/errored). But a Mux-side ingest
+    // stall can leave an asset in 'preparing' forever with no terminal webhook — so past the 24h
+    // hard limit, give up per spec (UPLOAD-PIPELINE §24h): fail the version + delete the stuck
+    // (billable) Mux asset, so the card shows a retryable error instead of spinning indefinitely.
+    if (stale) {
+        const outcome = await applyMuxErrored(versionId, 'Xử lý video quá thời gian (Mux treo ở "preparing").')
+        // Reap the stuck (billable) Mux asset — but ONLY once the version is terminally FAILED with
+        // this exact asset still attached. The getMuxAsset 'preparing' read is a snapshot that may be
+        // stale: a real ready webhook could have flipped PROCESSING→READY concurrently (applyMuxErrored
+        // then returns 'noop'), and deleting would kill a LIVE playback. Re-confirming FAILED avoids
+        // that AND self-heals a prior run that flipped FAILED but crashed before deleting (also 'noop').
+        if (outcome === 'applied' || outcome === 'noop') {
+            const cur = await prisma.reviewVersion.findUnique({
+                where: { id: versionId },
+                select: { pipelineStatus: true, muxAssetId: true },
+            })
+            if (cur?.pipelineStatus === ReviewPipelineStatus.FAILED && cur.muxAssetId === muxAssetId) {
+                await deleteMuxAsset(muxAssetId).catch(() => {})
+            }
+        }
+        return `preparing-timeout-${outcome}`
+    }
+    return 'still-preparing'
+}
+
+/**
+ * P1.6: nightly reconcile (KIEN-TRUC §6.2). Four idempotent, status-guarded sweeps that repair
+ * every residual the happy path can strand (crashed browser mid-upload, dropped Mux webhook,
+ * un-consumed ledger row). Each is its own step so a mid-run failure retries ONLY that sweep;
+ * every write re-checks state, so a re-run is a no-op. Batch caps bound one run (a hit cap is
+ * logged — "no silent truncation" — and the next night drains the rest). `inngest.send` inside a
+ * step is fine here: the consumers are keyed idempotent, so a re-send on step retry is absorbed.
  */
 export const reviewJanitor = inngest.createFunction(
-    { id: 'review-janitor', triggers: [{ event: REVIEW_EVENTS.JANITOR_REQUESTED }] },
+    { id: 'review-janitor', retries: 2, triggers: [{ event: REVIEW_EVENTS.JANITOR_REQUESTED }] },
     async ({ step }) => {
-        await step.run('fan-out', async () => {
-            reviewLog('info', 'inngest.janitor.run', { children: 'none-yet (P0 skeleton)' })
-            return true
+        // (a) Dead in-flight uploads: version still UPLOADING past its 24h window.
+        const aborted = await step.run('abort-expired-uploading', async () => {
+            const sessions = await prisma.uploadSession.findMany({
+                where: {
+                    completedAt: null,
+                    abortedAt: null,
+                    expiresAt: { lt: new Date() },
+                    version: { is: { pipelineStatus: ReviewPipelineStatus.UPLOADING } },
+                },
+                select: { id: true },
+                take: JANITOR_BATCH,
+            })
+            let expired = 0
+            for (const s of sessions) {
+                try {
+                    if ((await expireInflightUpload(s.id)) === 'expired') expired++
+                } catch (e) {
+                    reviewLog('error', 'inngest.janitor.abort_failed', { sessionId: s.id, error: String(e) })
+                }
+            }
+            if (sessions.length === JANITOR_BATCH) reviewLog('warn', 'inngest.janitor.abort_cap_hit', { batch: JANITOR_BATCH })
+            return { scanned: sessions.length, expired }
         })
-        return { ok: true }
+
+        // (b) Stuck-UPLOADED crash window: finalize claimed but the transition never ran.
+        const redriven = await step.run('redrive-stuck-uploaded', async () => {
+            const cutoff = new Date(Date.now() - UPLOADED_GRACE_MS)
+            const versions = await prisma.reviewVersion.findMany({
+                where: { pipelineStatus: ReviewPipelineStatus.UPLOADED, deletedAt: null, updatedAt: { lt: cutoff } },
+                select: { id: true },
+                take: JANITOR_BATCH,
+            })
+            const tally = { scanned: versions.length, driven: 0, failed: 0, waiting: 0 }
+            for (const v of versions) {
+                try {
+                    const r = await reconcileStuckUploadedVersion(v.id)
+                    if (r === 'driven') tally.driven++
+                    else if (r === 'failed') tally.failed++
+                    else if (r === 'waiting') tally.waiting++
+                } catch (e) {
+                    reviewLog('error', 'inngest.janitor.redrive_failed', { versionId: v.id, error: String(e) })
+                }
+            }
+            if (versions.length === JANITOR_BATCH) reviewLog('warn', 'inngest.janitor.redrive_cap_hit', { batch: JANITOR_BATCH })
+            return tally
+        })
+
+        // (c) Stuck-PROCESSING videos: a Mux webhook was missed (or create-asset never landed).
+        const reconciled = await step.run('reconcile-processing', async () => {
+            const cutoff = new Date(Date.now() - PROCESSING_GRACE_MS)
+            const versions = await prisma.reviewVersion.findMany({
+                where: {
+                    pipelineStatus: ReviewPipelineStatus.PROCESSING,
+                    mediaKind: ReviewMediaKind.VIDEO,
+                    deletedAt: null,
+                    updatedAt: { lt: cutoff },
+                },
+                select: { id: true, muxAssetId: true, updatedAt: true },
+                take: JANITOR_BATCH,
+            })
+            const hardCutoff = Date.now() - PROCESSING_HARD_LIMIT_MS
+            const tally: Record<string, number> = { scanned: versions.length }
+            for (const v of versions) {
+                try {
+                    const r = await reconcileProcessingVersion(v.id, v.muxAssetId, v.updatedAt.getTime() < hardCutoff)
+                    tally[r] = (tally[r] ?? 0) + 1
+                } catch (e) {
+                    reviewLog('error', 'inngest.janitor.reconcile_failed', { versionId: v.id, error: String(e) })
+                }
+            }
+            if (versions.length === JANITOR_BATCH) reviewLog('warn', 'inngest.janitor.reconcile_cap_hit', { batch: JANITOR_BATCH })
+            return tally
+        })
+
+        // (d) Un-consumed webhook ledger rows (1h..7d old): re-enqueue the consumer. The 7d floor
+        // stops re-driving a row nobody can ever consume (defence-in-depth — the consumer already
+        // consumes terminal/orphan events, so these should be rare); such rows are counted + logged.
+        const reEnqueued = await step.run('reenqueue-webhooks', async () => {
+            const now = Date.now()
+            const rows = await prisma.webhookEvent.findMany({
+                where: {
+                    processedAt: null,
+                    receivedAt: { gte: new Date(now - WEBHOOK_MAX_AGE_MS), lt: new Date(now - WEBHOOK_GRACE_MS) },
+                },
+                select: { id: true },
+                take: JANITOR_BATCH,
+            })
+            for (const w of rows) {
+                await inngest
+                    .send({ name: REVIEW_EVENTS.MUX_EVENT_RECEIVED, data: { webhookEventId: w.id } })
+                    .catch((e) => reviewLog('error', 'inngest.janitor.reenqueue_failed', { webhookEventId: w.id, error: String(e) }))
+            }
+            if (rows.length === JANITOR_BATCH) reviewLog('warn', 'inngest.janitor.reenqueue_cap_hit', { batch: JANITOR_BATCH })
+            const abandoned = await prisma.webhookEvent.count({
+                where: { processedAt: null, receivedAt: { lt: new Date(now - WEBHOOK_MAX_AGE_MS) } },
+            })
+            if (abandoned > 0) reviewLog('warn', 'inngest.janitor.webhooks_abandoned', { abandoned })
+            return { reEnqueued: rows.length, abandoned }
+        })
+
+        reviewLog('info', 'inngest.janitor.done', { aborted, redriven, reconciled, reEnqueued })
+        return { ok: true, aborted, redriven, reconciled, reEnqueued }
     },
 )
 

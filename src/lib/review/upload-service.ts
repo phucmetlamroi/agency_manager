@@ -366,7 +366,7 @@ export interface CompleteResult {
  * on retry). MUST only be called once R2 is confirmed finalized (session.completedAt
  * set). Returns the resulting status; throws 409 if a concurrent abort deleted it.
  */
-async function driveCompletion(versionId: string): Promise<UploadStatusDto> {
+export async function driveCompletion(versionId: string): Promise<UploadStatusDto> {
     const version = await prisma.reviewVersion.findUnique({
         where: { id: versionId },
         include: { asset: { select: { taskId: true } } },
@@ -694,4 +694,126 @@ export async function initiateTaskUpload(input: {
     }
 
     return { status: init.status, body: { ...init.body, createdNewAsset, folderPath: breadcrumb } }
+}
+
+// ── janitor reconcile (P1.6) ─────────────────────────────────────────────────
+// Run from the nightly Inngest janitor (no request session → NO requireReviewAccess:
+// these operate on server-resolved ids only). Each is idempotent + status-guarded so a
+// step retry, a racing client complete/abort, or a re-run next night is all safe.
+// NOTE the intentional call-time import cycle: inngest.ts imports these; this file imports
+// `inngest` (driveCompletion emits UPLOAD_COMPLETED). Both sides touch the other only INSIDE
+// functions (never at module top-level), so ES live-bindings resolve cleanly.
+
+/**
+ * A dead in-flight upload: the version is still UPLOADING past its 24h window (the editor's
+ * browser died mid-upload). Free the staged R2 bytes and mark the version FAILED so the card
+ * shows a retryable error. Unlike abortUpload (an explicit user cancel that DELETES the
+ * version + empty asset), the janitor KEEPS the row — a timeout is "this upload died", not
+ * "forget it happened"; the user sees "failed" and re-uploads onto the same card. The atomic
+ * claim (UPLOADING→FAILED) is mutually exclusive with a late complete/abort over the row.
+ */
+export async function expireInflightUpload(sessionId: string): Promise<'expired' | 'noop'> {
+    const session = await prisma.uploadSession.findUnique({
+        where: { id: sessionId },
+        include: { version: { include: { asset: { select: { taskId: true } } } } },
+    })
+    if (!session || session.completedAt || session.abortedAt) return 'noop'
+    const version = session.version
+    // State change (claim + session.abortedAt + activity) is atomic so a retry after a partial
+    // write can't leave a FAILED version with no VERSION_ERROR activity.
+    const claimed = await prisma.$transaction(async (tx) => {
+        const claim = await tx.reviewVersion.updateMany({
+            where: { id: version.id, pipelineStatus: ReviewPipelineStatus.UPLOADING },
+            data: { pipelineStatus: ReviewPipelineStatus.FAILED, errorMessage: 'Phiên tải lên đã hết hạn (quá 24 giờ).' },
+        })
+        if (claim.count === 0) return false // a late complete/abort won the row → leave it
+        await tx.uploadSession.updateMany({ where: { id: session.id, abortedAt: null }, data: { abortedAt: new Date() } })
+        await recordActivity(tx, {
+            type: REVIEW_ACTIVITY.VERSION_ERROR,
+            workspaceId: version.workspaceId,
+            taskId: version.asset.taskId,
+            assetId: version.assetId,
+            versionId: version.id,
+            actorUserId: version.uploaderId,
+            meta: { versionNumber: version.versionNumber, errorMessage: 'expired-24h' },
+        })
+        return true
+    })
+    if (!claimed) return 'noop'
+    // Free the staged bytes (best-effort, outside the tx; R2 abort/delete are idempotent — a
+    // missed call just leaves orphan parts that R2's own lifecycle rule eventually reaps).
+    if (session.r2UploadId) await abortMultipart(session.r2Key, session.r2UploadId).catch(() => {})
+    else await deleteObject(session.r2Key).catch(() => {})
+    reviewLog('info', 'upload.janitor.expired', { sessionId, versionId: version.id })
+    return 'expired'
+}
+
+/**
+ * A version stuck in UPLOADED: a complete claimed the finalize, then the process died before
+ * driving the transition. The client's 3s poller only stops on ready|failed, so a dead browser
+ * leaves it hung forever (a client retry of `complete` just echoes UPLOADED — it never re-runs
+ * the finalize). Recover FORWARD when R2 actually holds the object, else FAIL once the window
+ * has closed. Covers both crash windows:
+ *   C2 — session.completedAt set (R2 confirmed final) → driveCompletion.
+ *   C1 — completedAt lost but the object IS on R2 (crash between completeMultipart and the
+ *        completedAt write) → restore completedAt + drive.
+ *   C1' — object absent AND the session expired → abort R2 + mark FAILED (the parts' ETags
+ *        were only in the client's complete request, so we can't finish it ourselves).
+ * The caller's grace filter keeps us off versions whose finalize is still legitimately in flight.
+ */
+export async function reconcileStuckUploadedVersion(
+    versionId: string,
+): Promise<'driven' | 'failed' | 'waiting' | 'noop'> {
+    const version = await prisma.reviewVersion.findFirst({
+        where: { id: versionId, pipelineStatus: ReviewPipelineStatus.UPLOADED },
+        include: {
+            asset: { select: { taskId: true } },
+            uploadSessions: { orderBy: { createdAt: 'desc' }, take: 1 },
+        },
+    })
+    if (!version) return 'noop' // a concurrent complete/poll already drove it
+    const session = version.uploadSessions[0]
+    if (!session) {
+        reviewLog('warn', 'upload.janitor.uploaded_no_session', { versionId })
+        return 'noop'
+    }
+
+    // Forward recovery — R2 is (or turns out to be) finalized.
+    if (session.completedAt) {
+        await driveCompletion(versionId)
+        return 'driven'
+    }
+    const obj = await headObject(session.r2Key).catch(() => null)
+    if (obj) {
+        await prisma.uploadSession.updateMany({ where: { id: session.id, completedAt: null }, data: { completedAt: new Date() } })
+        await driveCompletion(versionId)
+        reviewLog('info', 'upload.janitor.uploaded_recovered', { versionId })
+        return 'driven'
+    }
+
+    // Object absent. Only give up once the upload window has closed — a not-yet-expired session
+    // may have a complete mid-R2-finalize RIGHT NOW; don't stomp it.
+    if (session.expiresAt.getTime() >= Date.now()) return 'waiting'
+    const failed = await prisma.$transaction(async (tx) => {
+        const flip = await tx.reviewVersion.updateMany({
+            where: { id: versionId, pipelineStatus: ReviewPipelineStatus.UPLOADED },
+            data: { pipelineStatus: ReviewPipelineStatus.FAILED, errorMessage: 'Tải lên không hoàn tất trước khi hết hạn.' },
+        })
+        if (flip.count === 0) return false
+        await tx.uploadSession.updateMany({ where: { id: session.id, abortedAt: null }, data: { abortedAt: new Date() } })
+        await recordActivity(tx, {
+            type: REVIEW_ACTIVITY.VERSION_ERROR,
+            workspaceId: version.workspaceId,
+            taskId: version.asset.taskId,
+            assetId: version.assetId,
+            versionId,
+            actorUserId: version.uploaderId,
+            meta: { versionNumber: version.versionNumber, errorMessage: 'uploaded-finalize-lost' },
+        })
+        return true
+    })
+    if (!failed) return 'noop'
+    if (session.r2UploadId) await abortMultipart(session.r2Key, session.r2UploadId).catch(() => {})
+    reviewLog('warn', 'upload.janitor.uploaded_failed', { versionId })
+    return 'failed'
 }

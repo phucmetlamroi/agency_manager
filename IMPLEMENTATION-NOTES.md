@@ -30,9 +30,11 @@
 5. **Topology deploy (bài học sự cố 2026-07-04):** production deploy từ **main** qua PR merge; push nhánh chỉ tạo preview; postinstall `db push` chạy MỌI build → schema nhánh lên prod DB ngay từ preview build. Hệ quả: thay đổi schema **additive luôn an toàn**; thay đổi **destructive phải chờ code lên main** (đã vi phạm 1 lần → share portal sập ~15 phút, khắc phục bằng restore schema cũ).
 6. **Env:** `CRON_SECRET` + `NEXT_PUBLIC_APP_URL` đã có sẵn — không thêm. Danh sách biến mới trong `.env.example`. Email transport thực tế của repo là **Resend** (không phải SendGrid như file đối chiếu ghi) — liên quan P2 notification.
 
-## Trạng thái provisioning (P0)
+## Trạng thái provisioning (P0) — verify 2026-07-04 (`scripts/probe-review-provisioning.ts`)
 
-- R2: keys đã nhận (bucket `hustly-review` — chờ xác nhận đã tạo + CORS + APAC hint).
-- Mux: `MUX_TOKEN_ID` đã nhận; **THIẾU** `MUX_TOKEN_SECRET`, `MUX_WEBHOOK_SECRET`, `MUX_SIGNING_KEY_ID`; `MUX_SIGNING_PRIVATE_KEY` nhận được NGẮN bất thường (~76 ký tự — Mux trả base64 PEM ~2200 ký tự) → cần lấy lại.
-- Inngest: event key + signing key đã nhận.
-- `REVIEW_COOKIE_SECRET`: đã generate (local .env). Mọi biến cần dán vào Vercel (Prod+Preview+Dev).
+- **R2: ✅ HOÀN CHỈNH.** Bucket `hustly-review` tồn tại, credentials hợp lệ; presigned PUT 1MB → đọc được ETag (= MD5 body), presigned GET round-trip OK; **CORS chuẩn** — preflight 204 cho `hustlytasker.xyz` + `localhost:3000` (PUT/GET/HEAD) và response PUT thật có `Access-Control-Expose-Headers: ETag` (bắt buộc cho multipart từ browser). Lưu ý: `GetBucketCors` qua API trả AccessDenied vì token R2 chỉ có quyền Object R/W (không đọc được config bucket) — vô hại, đã verify bằng preflight thật.
+- **Mux: ✅ dùng được.** Access Token hợp lệ (GET /video/v1/assets → 200); `MUX_SIGNING_PRIVATE_KEY` bản đủ (2240 ký tự base64 → RSA 2048-bit, ký/verify RS256 OK); webhook secret + signing key id đã nhận. ⚠️ Token **không có scope System** → không verify được `MUX_SIGNING_KEY_ID` qua API (403 "correct scope"); việc ký playback JWT là ký LOCAL bằng private key nên không cần scope này — cặp keyId/privateKey sẽ được xác nhận thực tế khi play video signed đầu tiên (P2/P3).
+- **Inngest: ✅ event key hợp lệ** (`inn.gs` → 200 + event id). Signing key đúng format `signkey-prod-<64hex>`; handshake thật diễn ra khi deploy + sync app trên dashboard Inngest.
+- **DoD local `/r/bat-ky` → 404 ✅** (kèm noindex + no-referrer + x-request-id; KHÔNG redirect login — đối chứng `/admin` → 307 /login).
+- `REVIEW_COOKIE_SECRET`: đã generate (nằm trong `.env` local — mở file để copy). **Còn lại (tay user):** dán bộ biến trong `.env.example` vào Vercel (Prod+Preview+Dev), tạo webhook Mux `https://hustlytasker.xyz/api/webhooks/mux` (video.asset.ready + video.asset.errored), merge PR lên main → rồi chạy DoD còn lại: Mux "Send test event" → 1 row `WebhookEvent` (gửi lại → không thêm row), cron janitor → run xanh trên Inngest.
+- 📌 **P1 TODO — CSP:** `next.config` hiện giới hạn `connect-src`/`media-src` → phải mở thêm `connect-src https://<account>.r2.cloudflarestorage.com` (browser PUT parts) và `media-src blob: https://stream.mux.com` + `img-src https://image.mux.com` (playback P2) khi cắm upload/player.

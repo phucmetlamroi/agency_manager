@@ -29,11 +29,14 @@ import {
     createMultipart,
     presignUploadPart,
     presignPutObject,
+    presignGetObject,
     completeMultipart,
     abortMultipart,
     headObject,
     deleteObject,
 } from './r2'
+import { mintPlaybackTokens } from './mux-jwt'
+import { buildMediaLinks } from './media-links'
 
 const UPLOAD_TTL_MS = 24 * 60 * 60 * 1000 // 24h presigned + session window
 const MAX_VERSION_RETRIES = 5
@@ -590,8 +593,12 @@ export async function getUploadStatus(uploadSessionId: string): Promise<UploadSt
         where: { id: version.uploaderId },
         select: { id: true, displayName: true, username: true, nickname: true, avatarUrl: true },
     })
-    // media links (Mux signed playback) are minted in P1.7; null while uploading/processing.
-    const dto = serializeVersion(version, { uploader: toUserRef(uploader), media: null })
+    // Mux signed poster/storyboard links (P1.7) — only for a READY video with a playback id.
+    const media =
+        version.pipelineStatus === ReviewPipelineStatus.READY
+            ? buildMediaLinks({ muxPlaybackId: version.muxPlaybackId, thumbTime: version.thumbTime })
+            : null
+    const dto = serializeVersion(version, { uploader: toUserRef(uploader), media })
     return {
         uploadStatus: pipelineStatusToDto(version.pipelineStatus),
         version: dto,
@@ -816,4 +823,60 @@ export async function reconcileStuckUploadedVersion(
     if (session.r2UploadId) await abortMultipart(session.r2Key, session.r2UploadId).catch(() => {})
     reviewLog('warn', 'upload.janitor.uploaded_failed', { versionId })
     return 'failed'
+}
+
+// ── playback token + download (P1.7, API-SPEC §2.9) ──────────────────────────
+
+export interface PlaybackTokenResult {
+    playbackId: string
+    tokens: { playback: string; thumbnail: string; storyboard: string }
+    expiresAt: string
+}
+
+/** Mint 6h Mux signed playback tokens for a READY video. Member-scoped: re-checks
+ *  workspace access from the resolved version (never trusts the caller's claim). */
+export async function getVersionPlaybackTokens(versionId: string): Promise<PlaybackTokenResult> {
+    const version = await prisma.reviewVersion.findFirst({
+        where: { id: versionId, deletedAt: null },
+        select: { id: true, workspaceId: true, pipelineStatus: true, mediaKind: true, muxPlaybackId: true },
+    })
+    if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
+    await requireReviewAccess({ workspaceId: version.workspaceId })
+    if (version.mediaKind !== ReviewMediaKind.VIDEO) {
+        fail(409, 'STATE_INVALID', 'Chỉ video mới có playback token.')
+    }
+    if (version.pipelineStatus !== ReviewPipelineStatus.READY || !version.muxPlaybackId) {
+        fail(409, 'STATE_INVALID', 'Phiên bản chưa sẵn sàng để phát.')
+    }
+    const { tokens, expiresAt } = mintPlaybackTokens(version.muxPlaybackId)
+    reviewLog('info', 'review.playback_token', { versionId })
+    return { playbackId: version.muxPlaybackId, tokens, expiresAt }
+}
+
+export interface DownloadUrlResult {
+    url: string
+    fileName: string
+    expiresAt: string
+}
+
+const DOWNLOAD_TTL_SEC = 15 * 60 // short-lived presigned R2 GET for the original
+
+/** Presigned R2 GET of the original file for a READY version (attachment download).
+ *  Member-scoped (internal §2.9 has no approval gate — that's guest-only §5.5.7). */
+export async function getVersionDownloadUrl(versionId: string): Promise<DownloadUrlResult> {
+    const version = await prisma.reviewVersion.findFirst({
+        where: { id: versionId, deletedAt: null },
+        select: { id: true, workspaceId: true, pipelineStatus: true, r2Key: true, fileName: true },
+    })
+    if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
+    await requireReviewAccess({ workspaceId: version.workspaceId })
+    if (version.pipelineStatus !== ReviewPipelineStatus.READY || !version.r2Key) {
+        fail(409, 'STATE_INVALID', 'Phiên bản chưa sẵn sàng để tải xuống.')
+    }
+    const url = await presignGetObject(version.r2Key, {
+        expiresIn: DOWNLOAD_TTL_SEC,
+        downloadFileName: version.fileName,
+    })
+    reviewLog('info', 'review.download_url', { versionId })
+    return { url, fileName: version.fileName, expiresAt: new Date(Date.now() + DOWNLOAD_TTL_SEC * 1000).toISOString() }
 }

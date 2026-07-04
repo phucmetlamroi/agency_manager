@@ -41,7 +41,7 @@
 ## ✅ P0 ĐÓNG — DoD end-to-end PASS 14/14 trên production (2026-07-04, `scripts/probe-review-p0-dod.ts`)
 
 Sau khi merge main + env vào Vercel: `/r/bat-ky` prod → 404 noindex không redirect; **PUT /api/inngest → "Successfully registered"**; cron janitor 401-khi-không-auth / 200-với-Bearer; **asset Mux thật** (demo 23s, basic, đã xoá) → webhook `video.asset.ready` về prod, HMAC pass, ledger 1 row, **Inngest function chạy + claim (`processedAt` set)**; replay cùng event id (ký hợp lệ) → `duplicated:true` không thêm row; chữ ký sai → 401 fail-closed. → **Sang P1 (upload pipeline).**
-- 📌 **P1 TODO — CSP:** `next.config` hiện giới hạn `connect-src`/`media-src` → phải mở thêm `connect-src https://<account>.r2.cloudflarestorage.com` (browser PUT parts) và `media-src blob: https://stream.mux.com` + `img-src https://image.mux.com` (playback P2) khi cắm upload/player.
+- ✅ **CSP đã nới (P1.8):** cả 2 nhánh `next.config.ts` (ELECTRON_DESKTOP + web) — `connect-src` +`https://*.r2.cloudflarestorage.com https://stream.mux.com https://image.mux.com`, `img-src` +`https://image.mux.com`, `media-src` +`https://stream.mux.com` (giữ `blob:` cho MSE).
 
 ## P1.1 + P1.2 — Upload pipeline (2026-07-04)
 
@@ -56,3 +56,9 @@ Sau khi merge main + env vào Vercel: `/r/bat-ky` prod → 404 noindex không re
   - Refactor: rút `applyMuxReady`/`applyMuxErrored` dùng chung webhook + reconcile (1 nguồn transition, không drift). `applyMuxReady` phân biệt terminal `FAILED/READY` (→ consume event) vs pre-ready thật (→ throw-retry) — **vá loop vô hạn** re-enqueue webhook-ready-cho-version-FAILED. Cạnh đó vá `store-mux-id` (Inngest retry không xoá nhầm Mux asset đang live). Cycle import `inngest ↔ upload-service` là **call-time-only** (build xanh).
   - Verify: tsc + `next build --webpack` xanh; **review đối kháng 2 vòng** (4 finder × 2 skeptic, rồi 2 skeptic hội tụ) — 3 finding thật đã fix + 1 TOCTOU tự bắt+vá, tất cả hội tụ CLEAN. Janitor cần Inngest runtime nên không probe tsx được.
 - **DTO probe** `scripts/probe-review-dto.ts` 24/24 (serializeVersion/status maps/toUserRef — phần test được không cần session). Routes cần session cookie nên KHÔNG probe e2e qua tsx được (giới hạn `getSession()`); verify = tsc + build + review đối kháng.
+- ✅ **P1.7 — playback token + download ĐÃ LÀM** (API-SPEC §2.9):
+  - `mux-jwt.ts` — **Mux signed JWT RS256 tự ký** bằng `node:crypto` (0 dep mới): header `{alg:RS256, typ:JWT, kid:MUX_SIGNING_KEY_ID}`, payload `{sub:playbackId, aud, exp}` (không iat, +6h), key = `MUX_SIGNING_PRIVATE_KEY` (base64 PEM, tự decode; nhận cả raw PEM). `mintPlaybackTokens` trả 3 token aud `v`/`t`/`s` cùng exp.
+  - `POST /api/review/versions/:id/playback-token` (member) → `getVersionPlaybackTokens`: 404 nếu không có version, 409 nếu không phải VIDEO / chưa READY / thiếu `muxPlaybackId`; re-check workspace từ `version.workspaceId` (chặn chéo tenant); token bind theo `sub=playbackId`.
+  - `POST /api/review/versions/:id/download-url` (member) → `getVersionDownloadUrl`: presigned R2 GET 15′ của bản gốc, chỉ khi READY + có `r2Key`; nội bộ KHÔNG có cổng approval (đó là của khách §5.5.7).
+  - `media-links.ts` `buildMediaLinks` → poster (`image.mux.com/{id}/thumbnail.webp?time=&token=`) + storyboard vtt; **wired vào `getUploadStatus`** chỉ khi READY + có playback id (ảnh/processing → null). Không log token/key.
+  - Verify: probe crypto `scripts/probe-review-mux-jwt.ts` **30/30** (RS256 sig verify bằng public key + bắt tamper + header/payload/aud/exp đúng); tsc + build xanh; **review đối kháng bảo mật 2 lens (auth-leak + state-spec) → 0 finding**. Route cần session nên không probe e2e được.

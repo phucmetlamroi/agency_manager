@@ -27,3 +27,16 @@ export function useTaskUploads(taskId: string): UploadItem[] {
         [items, taskId],
     )
 }
+
+/**
+ * Items being uploaded into a specific Team folder (P2.4 placeholder cards).
+ * `folderId` null = the workspace root view. Matches the folder-targeted uploads the
+ * Team browser enqueues; used to render live uploading/processing cards in the grid.
+ */
+export function useFolderUploads(folderId: string | null): UploadItem[] {
+    const { items } = useUploadState()
+    return useMemo(
+        () => items.filter((it) => it.target.kind === 'folder' && it.target.folderId === folderId),
+        [items, folderId],
+    )
+}

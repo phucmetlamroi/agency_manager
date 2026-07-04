@@ -6,16 +6,20 @@
 // localStorage 'team.appearance'; refined grid cards + hover-scrub (FR-B05/FR-B06);
 // a 7-column sortable list view; single-select InfoPanel with read-only Mux metadata.
 //
-// Still deferred (disabled affordances / later phases): New Folder + upload → P2.4;
-// context menus + rename/move/copy + multi-select → P2.5; Trash view → P2.6; the
-// in-browser player + image lightbox → P4 (double-click degrades to a toast, never a
-// crash); the live status dropdown → P3 (the card chip is a colored placeholder).
+// P2.4 adds: New Folder (optimistic tile + inline rename), '+ Mới' upload menu,
+// image/video/folder upload + OS drag-drop into the current folder, and live
+// uploading/processing placeholder cards merged into the grid.
+//
+// Still deferred: context menus + rename/move/copy + multi-select → P2.5; Trash view
+// → P2.6; the in-browser player + image lightbox → P4 (double-click degrades to a
+// toast, never a crash); the live status dropdown → P3 (card chip is a placeholder);
+// drop-onto-asset new-version + drop-onto-folder-card → P2.5.
 //
 // All data comes from the P2.1 /api/review/* routes (each re-verifies workspace
 // membership server-side). Sort is server-backed via ?sort=&dir=. Folder navigation
 // updates the URL via history.pushState; the deep-link routes seed initialFolderId.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type ComponentType } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type DragEvent as ReactDragEvent } from 'react'
 import { toast } from 'sonner'
 import {
     Clapperboard,
@@ -23,11 +27,11 @@ import {
     ChevronRight,
     ChevronDown,
     RefreshCw,
-    FolderPlus,
-    UploadCloud,
     Loader2,
     AlertTriangle,
     Layers,
+    UploadCloud,
+    FolderPlus,
 } from 'lucide-react'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
 import {
@@ -39,10 +43,13 @@ import {
     gridMinWidth,
     aspectCss,
 } from '@/lib/review/view-prefs'
+import { useFolderUploads } from '@/lib/review/use-upload-store'
+import { collectDropFiles, fromFileList, filterValid, enqueueFolderTree, UPLOAD_ACCEPT, type DroppedFile } from '@/lib/review/team-upload'
 import { bytesLabel } from './TeamCards'
 import { FolderCardGrid, AssetCardGrid, InfoPanel } from './TeamCards'
 import { TeamListView } from './TeamListView'
 import { AppearanceMenu, SortMenu } from './TeamToolbar'
+import { NewMenu, NewFolderTile, UploadingCard, DropOverlay } from './TeamUpload'
 
 /* ── local mirrors of the P2.1 DTO shapes (no server import → no bundle leak) ── */
 interface BreadcrumbItem {
@@ -295,6 +302,131 @@ export function TeamBrowser({
         else toast('Trình xem video sẽ có ở bản sau.')
     }, [])
 
+    /* ---- P2.4: upload + new folder ---- */
+    const filesInputRef = useRef<HTMLInputElement>(null)
+    const folderInputRef = useRef<HTMLInputElement>(null)
+    const [newFolderEditing, setNewFolderEditing] = useState(false)
+    const [pendingFolderName, setPendingFolderName] = useState<string | null>(null)
+    const [dragOver, setDragOver] = useState(false)
+    const dragDepth = useRef(0)
+
+    // silent refetch (no loading spinner) — used when uploads land so the ready card
+    // replaces its placeholder without flashing the whole grid.
+    const silentRefresh = useCallback(() => {
+        const fid = folderId
+        fetchChildren(fid, null, sortField, sortDir)
+            .then((children) => {
+                if (folderIdRef.current !== fid) return
+                setData(children)
+                setNextCursor(children.nextCursor)
+            })
+            .catch(() => {})
+    }, [folderId, sortField, sortDir, fetchChildren])
+
+    // Enqueue files/folders into the CURRENT folder (folderIdRef, not a stale closure).
+    const ingest = useCallback(
+        async (dropped: DroppedFile[]) => {
+            const { valid, skipped } = filterValid(dropped)
+            if (skipped > 0) toast(`Đã bỏ qua ${skipped} file không phải ảnh/video`)
+            if (valid.length === 0) return
+            try {
+                await enqueueFolderTree(valid, workspaceId, folderIdRef.current)
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Tải lên thất bại.')
+                return
+            }
+            void refreshTree()
+        },
+        [workspaceId, refreshTree],
+    )
+
+    const onFilesPicked = (input: HTMLInputElement) => {
+        const list = input.files
+        if (list && list.length) void ingest(fromFileList(list))
+        input.value = '' // allow re-picking the same file(s)
+    }
+
+    const startNewFolder = useCallback(() => {
+        setSelectedId(null)
+        setNewFolderEditing(true)
+    }, [])
+
+    const commitNewFolder = useCallback(
+        async (name: string) => {
+            setNewFolderEditing(false)
+            setPendingFolderName(name)
+            const tid = toast.loading('Đang tạo thư mục…')
+            try {
+                const res = await fetch('/api/review/folders', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workspaceId, parentId: folderIdRef.current, name }),
+                })
+                if (!res.ok) throw new Error(await errorMessage(res))
+                toast.success('Đã tạo thư mục thành công.', { id: tid })
+                setPendingFolderName(null)
+                silentRefresh() // reconcile without flashing the grid to a skeleton
+                void refreshTree()
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Không tạo được thư mục.', { id: tid })
+                setPendingFolderName(null)
+            }
+        },
+        [workspaceId, refreshTree, silentRefresh],
+    )
+
+    /* ---- live uploads (placeholder cards) ---- */
+    const folderUploads = useFolderUploads(folderId)
+    const liveItems = useMemo(
+        () => folderUploads.filter((it) => it.status !== 'done' && it.status !== 'canceled'),
+        [folderUploads],
+    )
+    const liveAssetIds = useMemo(
+        () => new Set(liveItems.map((it) => it.assetId).filter((x): x is string => !!x)),
+        [liveItems],
+    )
+    // Refetch on any upload status change so a new asset appears + a finished upload's
+    // real card lands. Keyed only on the status signature (not progress) via a ref, so
+    // a sort change doesn't double-fetch.
+    const liveSig = folderUploads.map((it) => `${it.id}:${it.status}`).join('|')
+    const silentRef = useRef(silentRefresh)
+    useEffect(() => {
+        silentRef.current = silentRefresh
+    }, [silentRefresh])
+    useEffect(() => {
+        if (liveSig) silentRef.current()
+    }, [liveSig])
+
+    /* ---- drag-drop (OS files → current folder) ---- */
+    const isFileDrag = (e: ReactDragEvent) => Array.from(e.dataTransfer.types).includes('Files')
+    const onDragEnter = (e: ReactDragEvent) => {
+        if (!isFileDrag(e)) return
+        e.preventDefault()
+        dragDepth.current += 1
+        setDragOver(true)
+    }
+    const onDragOver = (e: ReactDragEvent) => {
+        if (!isFileDrag(e)) return
+        e.preventDefault() // must fire on every dragover to keep the drop allowed
+        e.dataTransfer.dropEffect = 'copy'
+    }
+    const onDragLeave = (e: ReactDragEvent) => {
+        if (!isFileDrag(e)) return
+        dragDepth.current -= 1
+        if (dragDepth.current <= 0) {
+            dragDepth.current = 0
+            setDragOver(false)
+        }
+    }
+    const onDrop = (e: ReactDragEvent) => {
+        if (!isFileDrag(e)) return
+        e.preventDefault()
+        dragDepth.current = 0
+        setDragOver(false)
+        void collectDropFiles(e.dataTransfer).then(ingest)
+    }
+
     /* ---- breadcrumb trail ---- */
     const trail = useMemo<{ id: string | null; name: string }[]>(() => {
         const crumbs: { id: string | null; name: string }[] = breadcrumb.map((b) => ({ id: b.id, name: b.name }))
@@ -305,8 +437,13 @@ export function TeamBrowser({
 
     const folders = data?.folders ?? []
     const assets = data?.assets ?? []
-    const isEmpty = !loading && !error && folders.length === 0 && assets.length === 0
+    // Hide the server asset a live upload already represents (avoid a double card).
+    const visibleAssets = assets.filter((a) => !liveAssetIds.has(a.id))
     const selectedAsset = selectedId ? assets.find((a) => a.id === selectedId) ?? null : null
+    const showNewFolderTile = newFolderEditing || pendingFolderName != null
+    const hasContent =
+        folders.length > 0 || visibleAssets.length > 0 || liveItems.length > 0 || showNewFolderTile
+    const isEmpty = !loading && !error && !hasContent
 
     const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth(prefs.cardSize)}px, 1fr))` }
 
@@ -315,6 +452,24 @@ export function TeamBrowser({
             className="flex flex-col animate-fade-in"
             style={{ fontFamily: "var(--font-sans), 'Plus Jakarta Sans', sans-serif" }}
         >
+            {/* hidden upload inputs (P2.4): flat file picker + webkitdirectory folder picker */}
+            <input
+                ref={filesInputRef}
+                type="file"
+                multiple
+                accept={UPLOAD_ACCEPT}
+                className="hidden"
+                onChange={(e) => onFilesPicked(e.currentTarget)}
+            />
+            <input
+                ref={folderInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => onFilesPicked(e.currentTarget)}
+                {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+            />
+
             {/* ── module title ── */}
             <div className="mb-4 flex items-center gap-3">
                 <div
@@ -405,8 +560,6 @@ export function TeamBrowser({
                             <SortMenu sortField={sortField} sortDir={sortDir} onChange={updatePrefs} />
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <ToolbarButton icon={FolderPlus} label="Thư mục mới" disabledHint="Sắp có (P2.4)" />
-                            <ToolbarButton icon={UploadCloud} label="Tải lên" disabledHint="Sắp có (P2.4)" />
                             <button
                                 type="button"
                                 onClick={reload}
@@ -415,22 +568,47 @@ export function TeamBrowser({
                             >
                                 <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
                             </button>
+                            <NewMenu
+                                onUploadFiles={() => filesInputRef.current?.click()}
+                                onUploadFolder={() => folderInputRef.current?.click()}
+                                onNewFolder={startNewFolder}
+                            />
                         </div>
                     </div>
 
-                    {/* content */}
-                    <div className="min-h-[420px] flex-1 overflow-y-auto p-4">
+                    {/* content (whole area is an OS-file drop target) */}
+                    <div
+                        className="relative min-h-[420px] flex-1 overflow-y-auto p-4"
+                        onDragEnter={onDragEnter}
+                        onDragOver={onDragOver}
+                        onDragLeave={onDragLeave}
+                        onDrop={onDrop}
+                    >
+                        {dragOver && <DropOverlay folderName={currentName} />}
                         {loading ? (
                             <LoadingState prefs={prefs} gridStyle={gridStyle} />
                         ) : error ? (
                             <ErrorState message={error} onRetry={reload} />
                         ) : isEmpty ? (
-                            <EmptyState atRoot={folderId === null} />
+                            <EmptyState
+                                atRoot={folderId === null}
+                                onUpload={() => filesInputRef.current?.click()}
+                                onNewFolder={startNewFolder}
+                            />
                         ) : prefs.layout === 'list' ? (
                             <>
+                                {(showNewFolderTile || liveItems.length > 0) && (
+                                    <div className="mb-4 grid gap-3" style={gridStyle}>
+                                        {newFolderEditing && <NewFolderTile onCommit={commitNewFolder} />}
+                                        {!newFolderEditing && pendingFolderName && <PendingFolderTile name={pendingFolderName} />}
+                                        {liveItems.map((it) => (
+                                            <UploadingCard key={it.id} item={it} aspect={prefs.aspect} showInfo={prefs.showInfo} />
+                                        ))}
+                                    </div>
+                                )}
                                 <TeamListView
                                     folders={folders}
-                                    assets={assets}
+                                    assets={visibleAssets}
                                     sortField={sortField}
                                     sortDir={sortDir}
                                     onSort={onSortColumn}
@@ -444,9 +622,11 @@ export function TeamBrowser({
                             </>
                         ) : (
                             <>
-                                {folders.length > 0 && (
-                                    <Section label="Thư mục" count={folders.length}>
+                                {(folders.length > 0 || showNewFolderTile) && (
+                                    <Section label="Thư mục" count={folders.length + (showNewFolderTile ? 1 : 0)}>
                                         <div className="grid gap-3" style={gridStyle}>
+                                            {newFolderEditing && <NewFolderTile onCommit={commitNewFolder} />}
+                                            {!newFolderEditing && pendingFolderName && <PendingFolderTile name={pendingFolderName} />}
                                             {folders.map((f) => (
                                                 <FolderCardGrid
                                                     key={f.id}
@@ -459,10 +639,13 @@ export function TeamBrowser({
                                         </div>
                                     </Section>
                                 )}
-                                {assets.length > 0 && (
-                                    <Section label="Video" count={assets.length}>
+                                {(liveItems.length > 0 || visibleAssets.length > 0) && (
+                                    <Section label="Video" count={liveItems.length + visibleAssets.length}>
                                         <div className="grid gap-3" style={gridStyle}>
-                                            {assets.map((a) => (
+                                            {liveItems.map((it) => (
+                                                <UploadingCard key={it.id} item={it} aspect={prefs.aspect} showInfo={prefs.showInfo} />
+                                            ))}
+                                            {visibleAssets.map((a) => (
                                                 <AssetCardGrid
                                                     key={a.id}
                                                     asset={a}
@@ -601,27 +784,25 @@ function LoadMore({ show, loading, onClick }: { show: boolean; loading: boolean;
     )
 }
 
-/* ── toolbar affordance (disabled until its phase) ───────────────────────── */
+/* ── optimistic "creating…" folder tile (shown while the POST is in flight) ── */
 
-function ToolbarButton({
-    icon: Icon,
-    label,
-    disabledHint,
-}: {
-    icon: ComponentType<{ size?: number; className?: string }>
-    label: string
-    disabledHint?: string
-}) {
+function PendingFolderTile({ name }: { name: string }) {
     return (
-        <button
-            type="button"
-            disabled
-            title={disabledHint ? `${label} — ${disabledHint}` : label}
-            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-1.5 text-[12.5px] font-medium text-zinc-500 opacity-70"
-        >
-            <Icon size={14} />
-            <span className="hidden sm:inline">{label}</span>
-        </button>
+        <div className="flex flex-col rounded-xl border border-white/5 bg-white/[0.03] p-3 opacity-70">
+            <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300">
+                    <FolderIcon size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-medium text-zinc-100" title={name}>
+                        {name}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-zinc-500">
+                        <Loader2 size={11} className="animate-spin" /> Đang tạo…
+                    </div>
+                </div>
+            </div>
+        </div>
     )
 }
 
@@ -667,7 +848,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
     )
 }
 
-function EmptyState({ atRoot }: { atRoot: boolean }) {
+function EmptyState({ atRoot, onUpload, onNewFolder }: { atRoot: boolean; onUpload: () => void; onNewFolder: () => void }) {
     return (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300">
@@ -679,9 +860,25 @@ function EmptyState({ atRoot }: { atRoot: boolean }) {
                 </p>
                 <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
                     {atRoot
-                        ? 'Upload video từ khối BÀN GIAO của task để hệ thống tự tạo thư mục theo khách hàng. Tải trực tiếp từ đây sẽ có ở bản sau.'
-                        : 'Chưa có thư mục con hay video trong thư mục này.'}
+                        ? 'Upload video từ khối BÀN GIAO của task để hệ thống tự tạo thư mục theo khách hàng, hoặc kéo thả file vào đây.'
+                        : 'Kéo thả file vào đây, hoặc dùng nút “+ Mới” để tải lên.'}
                 </p>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={onUpload}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#8B5CF6] px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#7C3AED]"
+                >
+                    <UploadCloud size={14} /> Tải asset lên
+                </button>
+                <button
+                    type="button"
+                    onClick={onNewFolder}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-4 py-2 text-[12.5px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.12]"
+                >
+                    <FolderPlus size={14} /> Thư mục mới
+                </button>
             </div>
         </div>
     )

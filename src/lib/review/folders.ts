@@ -84,6 +84,26 @@ function validateName(raw: string | undefined | null): string {
     return name
 }
 
+/**
+ * Resolve a non-colliding folder name under `parentId` by appending " (2)", " (3)"…
+ * (FR-B03 AC3). Folder names carry no DB unique, so this is a best-effort read-then-
+ * pick inside the caller's tx; a truly-simultaneous duplicate could still slip a twin
+ * (acceptable — the spec explicitly makes names non-unique). Runs on the caller's tx.
+ */
+async function uniqueChildName(tx: Prisma.TransactionClient, parentId: string, desired: string): Promise<string> {
+    const siblings = await tx.reviewFolder.findMany({
+        where: { parentId, deletedAt: null },
+        select: { name: true },
+    })
+    const taken = new Set(siblings.map((s) => s.name))
+    if (!taken.has(desired)) return desired
+    for (let i = 2; i < 1000; i++) {
+        const candidate = `${desired} (${i})`
+        if (!taken.has(candidate)) return candidate
+    }
+    return `${desired} (${randomUUID().slice(0, 8)})`
+}
+
 /** Add `delta` bytes (may be negative) to every folder in `ids` in one UPDATE. */
 async function addBytesToAncestors(tx: Prisma.TransactionClient, ids: string[], delta: bigint): Promise<void> {
     if (ids.length === 0 || delta === BigInt(0)) return
@@ -187,13 +207,14 @@ export async function createFolder(input: {
         if (parent.depth + 1 > MAX_DEPTH) {
             throw apiError(400, 'VALIDATION_ERROR', 'Vượt quá độ sâu thư mục tối đa.', { reason: 'max_depth' })
         }
+        const finalName = await uniqueChildName(tx, parent.id, name)
         const id = randomUUID()
         const created = await tx.reviewFolder.create({
             data: {
                 id,
                 workspaceId: input.workspaceId,
                 parentId: parent.id,
-                name,
+                name: finalName,
                 path: `${parent.path}${id}/`,
                 depth: parent.depth + 1,
                 createdById: access.userId,
@@ -205,6 +226,114 @@ export async function createFolder(input: {
 
     const createdBy = folder.createdById ? (await loadUserRefs([folder.createdById])).get(folder.createdById) : null
     return serializeFolder(folder, { createdBy: createdBy ?? null })
+}
+
+// ─────────────────────── create folder tree (folder upload) ───────────────────────
+
+const TREE_PATHS_CAP = 250 // folders per folder-upload drop (§3.5/§11.2)
+const TREE_DEPTH_CAP = 10 // relative-path segments per drop
+
+interface FolderRef {
+    id: string
+    path: string
+    depth: number
+}
+
+/** Get-or-create one named child under `parent` (match by name in the SAME parent). */
+async function getOrCreateChild(
+    workspaceId: string,
+    parent: FolderRef,
+    name: string,
+    userId: string,
+): Promise<FolderRef> {
+    const existing = await prisma.reviewFolder.findFirst({
+        where: { parentId: parent.id, workspaceId, name, deletedAt: null },
+        select: { id: true, path: true, depth: true },
+    })
+    if (existing) return existing
+    if (parent.depth + 1 > MAX_DEPTH) {
+        throw apiError(400, 'VALIDATION_ERROR', 'Vượt quá độ sâu thư mục tối đa.', { reason: 'max_depth' })
+    }
+    return prisma.$transaction(async (tx) => {
+        const again = await tx.reviewFolder.findFirst({
+            where: { parentId: parent.id, workspaceId, name, deletedAt: null },
+            select: { id: true, path: true, depth: true },
+        })
+        if (again) return again // lost a race — reuse the winner
+        const id = randomUUID()
+        const created = await tx.reviewFolder.create({
+            data: {
+                id,
+                workspaceId,
+                parentId: parent.id,
+                name,
+                path: `${parent.path}${id}/`,
+                depth: parent.depth + 1,
+                createdById: userId,
+            },
+        })
+        await tx.reviewFolder.update({ where: { id: parent.id }, data: { itemCount: { increment: 1 } } })
+        return { id: created.id, path: created.path, depth: created.depth }
+    })
+}
+
+/**
+ * Recreate a folder tree from a folder-upload's distinct relative dir paths (e.g.
+ * ["Brand A", "Brand A/Teasers"]) under `parentId` (null = workspace root). Get-or-
+ * creates by name within each parent (existing folders are reused, NOT suffixed —
+ * unlike the interactive New-Folder flow). Returns a path→folderId map the client
+ * uses to place each file. Caps: ≤250 folders, ≤10 levels per drop.
+ */
+export async function createFolderTree(input: {
+    workspaceId: string
+    parentId: string | null
+    paths: string[]
+}): Promise<{ map: Record<string, string> }> {
+    const access = await requireReviewAccess({ workspaceId: input.workspaceId })
+
+    // Normalize: trim segments, drop blanks, add every ancestor prefix so intermediate
+    // dirs get created, and dedup.
+    const norm = new Set<string>()
+    for (const raw of input.paths) {
+        const parts = raw.split('/').map((s) => s.trim()).filter(Boolean)
+        if (parts.length === 0) continue
+        if (parts.length > TREE_DEPTH_CAP) {
+            throw apiError(400, 'VALIDATION_ERROR', `Cây thư mục quá sâu (tối đa ${TREE_DEPTH_CAP} cấp).`, { reason: 'tree_depth' })
+        }
+        for (const p of parts) {
+            if (p.length > NAME_MAX) throw apiError(400, 'VALIDATION_ERROR', 'Tên thư mục quá dài.')
+        }
+        for (let i = 1; i <= parts.length; i++) norm.add(parts.slice(0, i).join('/'))
+    }
+    if (norm.size === 0) return { map: {} }
+    if (norm.size > TREE_PATHS_CAP) {
+        throw apiError(400, 'VALIDATION_ERROR', `Vượt quá ${TREE_PATHS_CAP} thư mục trong một lần tải lên.`, { reason: 'tree_cap' })
+    }
+
+    // Ensure the base (root ensured OUTSIDE any tx to dodge the P2002 create race).
+    let baseId = input.parentId
+    if (baseId == null) baseId = (await ensureWorkspaceRoot(input.workspaceId, access.userId)).id
+    const base = await prisma.reviewFolder.findFirst({
+        where: { id: baseId, workspaceId: input.workspaceId, deletedAt: null },
+        select: { id: true, path: true, depth: true },
+    })
+    if (!base) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục đích.')
+
+    // Resolve shallow-first so each parent exists before its children.
+    const sorted = [...norm].sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b))
+    const cache = new Map<string, FolderRef>()
+    cache.set('', base)
+    const map: Record<string, string> = {}
+    for (const path of sorted) {
+        const parts = path.split('/')
+        const name = parts[parts.length - 1]
+        const parent = cache.get(parts.slice(0, -1).join('/'))
+        if (!parent) continue // unreachable given prefixes + shallow-first
+        const folder = await getOrCreateChild(input.workspaceId, parent, name, access.userId)
+        cache.set(path, folder)
+        map[path] = folder.id
+    }
+    return { map }
 }
 
 // ─────────────────────── get + breadcrumb ───────────────────────

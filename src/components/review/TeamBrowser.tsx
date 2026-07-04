@@ -307,18 +307,31 @@ export function TeamBrowser({
     const folderInputRef = useRef<HTMLInputElement>(null)
     const [newFolderEditing, setNewFolderEditing] = useState(false)
     const [pendingFolderName, setPendingFolderName] = useState<string | null>(null)
+    // The folder the New-Folder flow was started in — the tile is only shown there and
+    // the create POSTs under it (so navigating away can't retarget the create).
+    const [newFolderOrigin, setNewFolderOrigin] = useState<string | null>(null)
     const [dragOver, setDragOver] = useState(false)
     const dragDepth = useRef(0)
 
     // silent refetch (no loading spinner) — used when uploads land so the ready card
-    // replaces its placeholder without flashing the whole grid.
+    // replaces its placeholder without flashing the whole grid. Merges the fresh page 1
+    // (upsert by id) into the accumulated list so already loaded-more pages + the cursor
+    // survive an upload-triggered refresh (does NOT reset pagination to page 1).
     const silentRefresh = useCallback(() => {
         const fid = folderId
         fetchChildren(fid, null, sortField, sortDir)
-            .then((children) => {
+            .then((fresh) => {
                 if (folderIdRef.current !== fid) return
-                setData(children)
-                setNextCursor(children.nextCursor)
+                setData((prev) => {
+                    if (!prev) return fresh
+                    const freshIds = new Set(fresh.assets.map((a) => a.id))
+                    return {
+                        folders: fresh.folders,
+                        assets: [...fresh.assets, ...prev.assets.filter((a) => !freshIds.has(a.id))],
+                        summary: fresh.summary,
+                        nextCursor: prev.nextCursor,
+                    }
+                })
             })
             .catch(() => {})
     }, [folderId, sortField, sortDir, fetchChildren])
@@ -348,11 +361,13 @@ export function TeamBrowser({
 
     const startNewFolder = useCallback(() => {
         setSelectedId(null)
+        setNewFolderOrigin(folderIdRef.current)
         setNewFolderEditing(true)
     }, [])
 
     const commitNewFolder = useCallback(
         async (name: string) => {
+            const parentId = newFolderOrigin // the folder the flow started in (not the current one)
             setNewFolderEditing(false)
             setPendingFolderName(name)
             const tid = toast.loading('Đang tạo thư mục…')
@@ -361,7 +376,7 @@ export function TeamBrowser({
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ workspaceId, parentId: folderIdRef.current, name }),
+                    body: JSON.stringify({ workspaceId, parentId, name }),
                 })
                 if (!res.ok) throw new Error(await errorMessage(res))
                 toast.success('Đã tạo thư mục thành công.', { id: tid })
@@ -373,7 +388,7 @@ export function TeamBrowser({
                 setPendingFolderName(null)
             }
         },
-        [workspaceId, refreshTree, silentRefresh],
+        [workspaceId, refreshTree, silentRefresh, newFolderOrigin],
     )
 
     /* ---- live uploads (placeholder cards) ---- */
@@ -382,10 +397,15 @@ export function TeamBrowser({
         () => folderUploads.filter((it) => it.status !== 'done' && it.status !== 'canceled'),
         [folderUploads],
     )
-    const liveAssetIds = useMemo(
-        () => new Set(liveItems.map((it) => it.assetId).filter((x): x is string => !!x)),
-        [liveItems],
-    )
+    const liveAssetIds = useMemo(() => {
+        // Never hide a server asset the backend already reports READY — otherwise a
+        // stale/abandoned 'processing' live item (e.g. Mux took >1h) would suppress the
+        // finished card indefinitely.
+        const ready = new Set(
+            (data?.assets ?? []).filter((a) => a.currentVersion?.uploadStatus === 'ready').map((a) => a.id),
+        )
+        return new Set(liveItems.map((it) => it.assetId).filter((x): x is string => !!x && !ready.has(x)))
+    }, [liveItems, data])
     // Refetch on any upload status change so a new asset appears + a finished upload's
     // real card lands. Keyed only on the status signature (not progress) via a ref, so
     // a sort change doesn't double-fetch.
@@ -440,7 +460,10 @@ export function TeamBrowser({
     // Hide the server asset a live upload already represents (avoid a double card).
     const visibleAssets = assets.filter((a) => !liveAssetIds.has(a.id))
     const selectedAsset = selectedId ? assets.find((a) => a.id === selectedId) ?? null : null
-    const showNewFolderTile = newFolderEditing || pendingFolderName != null
+    // Origin-gated so the tile only renders in the folder the flow started in.
+    const tileEditing = newFolderEditing && newFolderOrigin === folderId
+    const tilePending = !newFolderEditing && pendingFolderName != null && newFolderOrigin === folderId
+    const showNewFolderTile = tileEditing || tilePending
     const hasContent =
         folders.length > 0 || visibleAssets.length > 0 || liveItems.length > 0 || showNewFolderTile
     const isEmpty = !loading && !error && !hasContent
@@ -599,8 +622,8 @@ export function TeamBrowser({
                             <>
                                 {(showNewFolderTile || liveItems.length > 0) && (
                                     <div className="mb-4 grid gap-3" style={gridStyle}>
-                                        {newFolderEditing && <NewFolderTile onCommit={commitNewFolder} />}
-                                        {!newFolderEditing && pendingFolderName && <PendingFolderTile name={pendingFolderName} />}
+                                        {tileEditing && <NewFolderTile onCommit={commitNewFolder} />}
+                                        {tilePending && pendingFolderName && <PendingFolderTile name={pendingFolderName} />}
                                         {liveItems.map((it) => (
                                             <UploadingCard key={it.id} item={it} aspect={prefs.aspect} showInfo={prefs.showInfo} />
                                         ))}
@@ -625,8 +648,8 @@ export function TeamBrowser({
                                 {(folders.length > 0 || showNewFolderTile) && (
                                     <Section label="Thư mục" count={folders.length + (showNewFolderTile ? 1 : 0)}>
                                         <div className="grid gap-3" style={gridStyle}>
-                                            {newFolderEditing && <NewFolderTile onCommit={commitNewFolder} />}
-                                            {!newFolderEditing && pendingFolderName && <PendingFolderTile name={pendingFolderName} />}
+                                            {tileEditing && <NewFolderTile onCommit={commitNewFolder} />}
+                                            {tilePending && pendingFolderName && <PendingFolderTile name={pendingFolderName} />}
                                             {folders.map((f) => (
                                                 <FolderCardGrid
                                                     key={f.id}

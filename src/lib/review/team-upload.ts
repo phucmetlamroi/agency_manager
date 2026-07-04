@@ -22,6 +22,21 @@ export function fileDir(relPath: string): string {
     return i === -1 ? '' : relPath.slice(0, i)
 }
 
+/**
+ * Normalize a dir path the SAME way the server does (createFolderTree trims each
+ * segment + drops blanks), so the client's request keys and per-file lookup keys
+ * match the server's returned map keys. Without this, a folder segment with
+ * surrounding whitespace (e.g. "Teasers ") would miss the map and misfile the file
+ * into the base folder.
+ */
+function normDir(dir: string): string {
+    return dir
+        .split('/')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join('/')
+}
+
 async function readEntry(entry: FileSystemEntry, prefix: string, out: DroppedFile[]): Promise<void> {
     if (entry.isFile) {
         const fileEntry = entry as FileSystemFileEntry
@@ -98,7 +113,7 @@ export async function enqueueFolderTree(
 ): Promise<void> {
     const dirs = new Set<string>()
     for (const d of dropped) {
-        const dir = fileDir(d.relPath)
+        const dir = normDir(fileDir(d.relPath))
         if (dir) dirs.add(dir)
     }
     let map: Record<string, string> = {}
@@ -116,7 +131,7 @@ export async function enqueueFolderTree(
         map = ((await res.json()) as { map: Record<string, string> }).map
     }
     for (const d of dropped) {
-        const dir = fileDir(d.relPath)
+        const dir = normDir(fileDir(d.relPath))
         const folderId = dir ? map[dir] ?? baseFolderId : baseFolderId
         uploadEngine.enqueue(d.file, { kind: 'folder', folderId, workspaceId })
     }

@@ -319,6 +319,14 @@ export async function createFolderTree(input: {
     })
     if (!base) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục đích.')
 
+    // Fail fast on the ABSOLUTE resulting depth (base.depth + deepest relative path).
+    // getOrCreateChild also enforces MAX_DEPTH per folder, but its per-folder tx commits
+    // are not wrapped in one tx — pre-checking here avoids a mid-tree throw leaving orphans.
+    const maxSegments = [...norm].reduce((m, p) => Math.max(m, p.split('/').length), 0)
+    if (base.depth + maxSegments > MAX_DEPTH) {
+        throw apiError(400, 'VALIDATION_ERROR', 'Vượt quá độ sâu thư mục tối đa.', { reason: 'max_depth' })
+    }
+
     // Resolve shallow-first so each parent exists before its children.
     const sorted = [...norm].sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b))
     const cache = new Map<string, FolderRef>()

@@ -1,41 +1,48 @@
 'use client'
 
-// [Review module P2.2] Team asset-browser shell (UI-UX-SPEC §1, §2). Two-column
-// module: an infinite-depth ASSETS folder tree (left) + breadcrumb/toolbar/content
-// (right). Read + navigate is live here; the following land in their own phases and
-// are intentionally shown as disabled affordances (not dead buttons hiding logic):
-//   • Appearance popover + Sort controls + hover-scrub  → P2.3
-//   • New Folder + canvas/folder upload + drag-drop     → P2.4
-//   • Context menus + rename + move/copy + multi-select → P2.5
-//   • Trash view (Recently Deleted) + restore           → P2.6
-//   • In-browser player (open asset)                    → P4
+// [Review module P2.2 shell + P2.3 content] Team asset-browser. Two-column module:
+// an infinite-depth ASSETS folder tree (left) + breadcrumb / toolbar / content (right).
+// P2.3 adds: Appearance (FR-B09) + Sort (FR-B10) popovers persisted per-user to
+// localStorage 'team.appearance'; refined grid cards + hover-scrub (FR-B05/FR-B06);
+// a 7-column sortable list view; single-select InfoPanel with read-only Mux metadata.
 //
-// All data comes from the P2.1 /api/review/* routes; each re-verifies workspace
-// membership server-side, so this component trusts nothing about access. Folder
-// navigation updates the URL via history.pushState (no server round-trip) and the
-// deep-link routes seed `initialFolderId` on hard load / refresh.
+// Still deferred (disabled affordances / later phases): New Folder + upload → P2.4;
+// context menus + rename/move/copy + multi-select → P2.5; Trash view → P2.6; the
+// in-browser player + image lightbox → P4 (double-click degrades to a toast, never a
+// crash); the live status dropdown → P3 (the card chip is a colored placeholder).
+//
+// All data comes from the P2.1 /api/review/* routes (each re-verifies workspace
+// membership server-side). Sort is server-backed via ?sort=&dir=. Folder navigation
+// updates the URL via history.pushState; the deep-link routes seed initialFolderId.
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode, type ComponentType } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type ComponentType } from 'react'
+import { toast } from 'sonner'
 import {
     Clapperboard,
     Folder as FolderIcon,
-    Film,
-    Image as ImageIcon,
     ChevronRight,
     ChevronDown,
-    LayoutGrid,
-    List as ListIcon,
     RefreshCw,
     FolderPlus,
     UploadCloud,
-    ArrowUpDown,
     Loader2,
     AlertTriangle,
-    MessageSquare,
     Layers,
 } from 'lucide-react'
-import { formatBytes } from '@/lib/review/upload-store'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
+import {
+    type ViewPrefs,
+    type SortField,
+    DEFAULT_PREFS,
+    loadPrefs,
+    savePrefs,
+    gridMinWidth,
+    aspectCss,
+} from '@/lib/review/view-prefs'
+import { bytesLabel } from './TeamCards'
+import { FolderCardGrid, AssetCardGrid, InfoPanel } from './TeamCards'
+import { TeamListView } from './TeamListView'
+import { AppearanceMenu, SortMenu } from './TeamToolbar'
 
 /* ── local mirrors of the P2.1 DTO shapes (no server import → no bundle leak) ── */
 interface BreadcrumbItem {
@@ -54,17 +61,13 @@ interface TreeNode {
     name: string
     hasChildren: boolean
 }
-type ViewMode = 'grid' | 'list'
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
 function teamPath(workspaceId: string, folderId: string | null): string {
-    return folderId
-        ? `/${workspaceId}/admin/team/folder/${folderId}`
-        : `/${workspaceId}/admin/team`
+    return folderId ? `/${workspaceId}/admin/team/folder/${folderId}` : `/${workspaceId}/admin/team`
 }
 
-/** Parse a folder id back out of the /admin/team[/folder/:id] pathname. */
 function parseFolderId(pathname: string): string | null {
     const m = pathname.match(/\/admin\/team\/folder\/([^/?#]+)/)
     return m ? decodeURIComponent(m[1]) : null
@@ -78,23 +81,6 @@ async function errorMessage(res: Response): Promise<string> {
         /* non-JSON error body */
     }
     return `Lỗi ${res.status}. Vui lòng thử lại.`
-}
-
-function msToClock(ms: number | null | undefined): string | null {
-    if (ms == null || !Number.isFinite(ms) || ms <= 0) return null
-    const total = Math.round(ms / 1000)
-    const h = Math.floor(total / 3600)
-    const m = Math.floor((total % 3600) / 60)
-    const s = total % 60
-    const mm = String(m).padStart(h > 0 ? 2 : 1, '0')
-    const ss = String(s).padStart(2, '0')
-    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
-}
-
-function bytesLabel(raw: string | number): string {
-    const n = typeof raw === 'number' ? raw : Number(raw)
-    if (!Number.isFinite(n) || n <= 0) return '0 B'
-    return formatBytes(n)
 }
 
 /* ── component ───────────────────────────────────────────────────────────── */
@@ -114,52 +100,76 @@ export function TeamBrowser({
     const [nextCursor, setNextCursor] = useState<string | null>(null)
     const [tree, setTree] = useState<TreeNode[]>([])
     const [expanded, setExpanded] = useState<Set<string>>(new Set())
-    const [view, setView] = useState<ViewMode>('grid')
+    const [prefs, setPrefs] = useState<ViewPrefs>(DEFAULT_PREFS)
+    const [selectedId, setSelectedId] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [loadingMore, setLoadingMore] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
+    const sortField = prefs.sortField
+    const sortDir = prefs.sortDir
+    // `hydrated` gates the first children fetch until prefs are read from
+    // localStorage, so a persisted non-default sort doesn't cause a default-then-
+    // persisted double fetch. `refreshKey` routes manual reload through the same
+    // alive-guarded load effect. `folderIdRef` lets async writes bail after a
+    // folder change (stale-response guard).
+    const [hydrated, setHydrated] = useState(false)
+    const [refreshKey, setRefreshKey] = useState(0)
+    const folderIdRef = useRef(folderId)
+    useEffect(() => {
+        folderIdRef.current = folderId
+    }, [folderId])
+
+    // hydrate per-user prefs from localStorage (client-only, after mount).
+    useEffect(() => {
+        setPrefs(loadPrefs())
+        setHydrated(true)
+    }, [])
+
+    const updatePrefs = useCallback((patch: Partial<ViewPrefs>) => {
+        setPrefs((prev) => {
+            const next = { ...prev, ...patch }
+            savePrefs(next)
+            return next
+        })
+    }, [])
+
     /* ---- fetchers ---- */
     const fetchChildren = useCallback(
-        async (fid: string | null, cursor: string | null): Promise<ChildrenResult> => {
+        async (fid: string | null, cursor: string | null, sf: SortField, sd: string): Promise<ChildrenResult> => {
             const base = fid
                 ? `/api/review/folders/${encodeURIComponent(fid)}/children`
                 : `/api/review/folders/root/children`
             const qs = new URLSearchParams()
             if (!fid) qs.set('workspaceId', workspaceId)
+            qs.set('sort', sf)
+            qs.set('dir', sd)
             if (cursor) qs.set('cursor', cursor)
-            const res = await fetch(`${base}?${qs.toString()}`, {
-                credentials: 'same-origin',
-                cache: 'no-store',
-            })
+            const res = await fetch(`${base}?${qs.toString()}`, { credentials: 'same-origin', cache: 'no-store' })
             if (!res.ok) throw new Error(await errorMessage(res))
             return (await res.json()) as ChildrenResult
         },
         [workspaceId],
     )
 
-    const fetchDetail = useCallback(
-        async (fid: string): Promise<{ folder: FolderDto; breadcrumb: BreadcrumbItem[] }> => {
-            const res = await fetch(`/api/review/folders/${encodeURIComponent(fid)}`, {
-                credentials: 'same-origin',
-                cache: 'no-store',
-            })
-            if (!res.ok) throw new Error(await errorMessage(res))
-            return (await res.json()) as { folder: FolderDto; breadcrumb: BreadcrumbItem[] }
-        },
-        [],
-    )
+    const fetchDetail = useCallback(async (fid: string) => {
+        const res = await fetch(`/api/review/folders/${encodeURIComponent(fid)}`, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+        })
+        if (!res.ok) throw new Error(await errorMessage(res))
+        return (await res.json()) as { folder: FolderDto; breadcrumb: BreadcrumbItem[] }
+    }, [])
 
     const refreshTree = useCallback(async () => {
         try {
-            const res = await fetch(
-                `/api/review/tree?workspaceId=${encodeURIComponent(workspaceId)}`,
-                { credentials: 'same-origin', cache: 'no-store' },
-            )
+            const res = await fetch(`/api/review/tree?workspaceId=${encodeURIComponent(workspaceId)}`, {
+                credentials: 'same-origin',
+                cache: 'no-store',
+            })
             if (!res.ok) return
             const body = (await res.json()) as { folders: TreeNode[] }
             setTree(body.folders)
-            // open the workspace root by default so top-level folders are visible.
             setExpanded((prev) => {
                 const next = new Set(prev)
                 for (const n of body.folders) if (n.parentId === null) next.add(n.id)
@@ -181,47 +191,64 @@ export function TeamBrowser({
         [workspaceId],
     )
 
-    // Back/forward buttons: re-derive the folder from the URL (no push).
     useEffect(() => {
         const onPop = () => setFolderId(parseFolderId(window.location.pathname))
         window.addEventListener('popstate', onPop)
         return () => window.removeEventListener('popstate', onPop)
     }, [])
 
-    /* ---- load current folder on change ---- */
+    /* ---- load children (on folder / sort / manual-reload change) ---- */
     useEffect(() => {
+        if (!hydrated) return // wait for persisted sort so the first fetch is correct
         let alive = true
         setLoading(true)
         setError(null)
-        ;(async () => {
-            try {
-                const [children, detail] = await Promise.all([
-                    fetchChildren(folderId, null),
-                    folderId ? fetchDetail(folderId) : Promise.resolve(null),
-                ])
+        fetchChildren(folderId, null, sortField, sortDir)
+            .then((children) => {
                 if (!alive) return
                 setData(children)
                 setNextCursor(children.nextCursor)
-                setBreadcrumb(detail?.breadcrumb ?? [])
-                setCurrentName(detail?.folder.name ?? 'Team')
-                setCurrentFolder(detail?.folder ?? null)
-            } catch (e) {
-                if (alive) setError(e instanceof Error ? e.message : 'Không tải được nội dung.')
-            } finally {
+            })
+            .catch((e) => {
+                if (alive) setError(e instanceof Error ? e.message : 'Không tải được nội dung thư mục.')
+            })
+            .finally(() => {
                 if (alive) setLoading(false)
-            }
-        })()
+            })
         return () => {
             alive = false
         }
-    }, [folderId, fetchChildren, fetchDetail])
+    }, [hydrated, folderId, sortField, sortDir, refreshKey, fetchChildren])
 
-    // tree once on mount.
+    /* ---- load breadcrumb + reset selection (on folder change only) ---- */
+    useEffect(() => {
+        let alive = true
+        setSelectedId(null)
+        if (!folderId) {
+            setBreadcrumb([])
+            setCurrentName('Team')
+            setCurrentFolder(null)
+            return
+        }
+        fetchDetail(folderId)
+            .then((detail) => {
+                if (!alive) return
+                setBreadcrumb(detail.breadcrumb)
+                setCurrentName(detail.folder.name)
+                setCurrentFolder(detail.folder)
+            })
+            .catch(() => {
+                /* the children fetch surfaces the error; keep the breadcrumb minimal */
+            })
+        return () => {
+            alive = false
+        }
+    }, [folderId, fetchDetail])
+
     useEffect(() => {
         void refreshTree()
     }, [refreshTree])
 
-    // keep the path to the current folder expanded in the tree.
     useEffect(() => {
         setExpanded((prev) => {
             const next = new Set(prev)
@@ -233,9 +260,11 @@ export function TeamBrowser({
 
     const loadMore = useCallback(async () => {
         if (!nextCursor) return
+        const fid = folderId
         setLoadingMore(true)
         try {
-            const more = await fetchChildren(folderId, nextCursor)
+            const more = await fetchChildren(fid, nextCursor, sortField, sortDir)
+            if (folderIdRef.current !== fid) return // navigated away — drop stale page
             setData((prev) => (prev ? { ...prev, assets: [...prev.assets, ...more.assets] } : more))
             setNextCursor(more.nextCursor)
         } catch {
@@ -243,45 +272,43 @@ export function TeamBrowser({
         } finally {
             setLoadingMore(false)
         }
-    }, [nextCursor, folderId, fetchChildren])
+    }, [nextCursor, folderId, sortField, sortDir, fetchChildren])
 
+    // manual reload routes through the alive-guarded load effect (bump refreshKey)
+    // so a slow refetch can never clobber a folder the user has since navigated to.
     const reload = useCallback(() => {
-        // re-run the load effect by nudging folderId identity is unnecessary; refetch directly.
-        setLoading(true)
-        setError(null)
-        Promise.all([
-            fetchChildren(folderId, null),
-            folderId ? fetchDetail(folderId) : Promise.resolve(null),
-        ])
-            .then(([children, detail]) => {
-                setData(children)
-                setNextCursor(children.nextCursor)
-                setBreadcrumb(detail?.breadcrumb ?? [])
-                setCurrentName(detail?.folder.name ?? 'Team')
-                setCurrentFolder(detail?.folder ?? null)
-            })
-            .catch((e) => setError(e instanceof Error ? e.message : 'Không tải được nội dung.'))
-            .finally(() => setLoading(false))
+        setRefreshKey((k) => k + 1)
         void refreshTree()
-    }, [folderId, fetchChildren, fetchDetail, refreshTree])
+    }, [refreshTree])
 
-    /* ---- breadcrumb trail (ancestors + current, all relabelled at the root) ---- */
+    // list-view header click → set field, toggle dir if same field.
+    const onSortColumn = useCallback(
+        (field: SortField) => {
+            if (field === sortField) updatePrefs({ sortDir: sortDir === 'asc' ? 'desc' : 'asc' })
+            else updatePrefs({ sortField: field, sortDir: 'asc' })
+        },
+        [sortField, sortDir, updatePrefs],
+    )
+
+    const openAsset = useCallback((asset: AssetDto) => {
+        if (asset.mediaKind === 'image') toast('Trình xem ảnh sẽ có ở bản sau.')
+        else toast('Trình xem video sẽ có ở bản sau.')
+    }, [])
+
+    /* ---- breadcrumb trail ---- */
     const trail = useMemo<{ id: string | null; name: string }[]>(() => {
-        const crumbs: { id: string | null; name: string }[] = breadcrumb.map((b) => ({
-            id: b.id,
-            name: b.name,
-        }))
-        // The root ("Team") is element 0 of the breadcrumb for nested folders; at the
-        // root view the breadcrumb is empty, so synthesize the Team crumb ourselves.
+        const crumbs: { id: string | null; name: string }[] = breadcrumb.map((b) => ({ id: b.id, name: b.name }))
         if (crumbs.length === 0) return [{ id: null, name: 'Team' }]
-        // element 0's id === the ws-root; make it navigate to the canonical root URL.
-        crumbs[0] = { id: null, name: 'Team' }
+        crumbs[0] = { id: null, name: 'Team' } // element 0 = ws-root → canonical root URL
         return [...crumbs, { id: folderId, name: currentName }]
     }, [breadcrumb, currentName, folderId])
 
     const folders = data?.folders ?? []
     const assets = data?.assets ?? []
     const isEmpty = !loading && !error && folders.length === 0 && assets.length === 0
+    const selectedAsset = selectedId ? assets.find((a) => a.id === selectedId) ?? null : null
+
+    const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth(prefs.cardSize)}px, 1fr))` }
 
     return (
         <div
@@ -292,12 +319,7 @@ export function TeamBrowser({
             <div className="mb-4 flex items-center gap-3">
                 <div
                     className="flex items-center justify-center rounded-xl"
-                    style={{
-                        width: 40,
-                        height: 40,
-                        background: 'rgba(139,92,246,0.15)',
-                        border: '1px solid rgba(139,92,246,0.25)',
-                    }}
+                    style={{ width: 40, height: 40, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)' }}
                 >
                     <Clapperboard className="h-5 w-5" style={{ color: '#C4B5FD' }} />
                 </div>
@@ -379,24 +401,12 @@ export function TeamBrowser({
                     {/* toolbar */}
                     <div className="flex items-center justify-between gap-2 border-b border-white/5 px-4 py-2.5">
                         <div className="flex items-center gap-2">
-                            <ToolbarButton icon={FolderPlus} label="Thư mục mới" disabledHint="Sắp có (P2.4)" />
-                            <ToolbarButton icon={UploadCloud} label="Tải lên" disabledHint="Sắp có (P2.4)" />
+                            <AppearanceMenu prefs={prefs} onChange={updatePrefs} />
+                            <SortMenu sortField={sortField} sortDir={sortDir} onChange={updatePrefs} />
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <ToolbarButton icon={ArrowUpDown} label="Sắp xếp" compact disabledHint="Sắp có (P2.3)" />
-                            <div className="mx-0.5 h-5 w-px bg-white/10" />
-                            <IconToggle
-                                active={view === 'grid'}
-                                onClick={() => setView('grid')}
-                                icon={LayoutGrid}
-                                title="Lưới"
-                            />
-                            <IconToggle
-                                active={view === 'list'}
-                                onClick={() => setView('list')}
-                                icon={ListIcon}
-                                title="Danh sách"
-                            />
+                            <ToolbarButton icon={FolderPlus} label="Thư mục mới" disabledHint="Sắp có (P2.4)" />
+                            <ToolbarButton icon={UploadCloud} label="Tải lên" disabledHint="Sắp có (P2.4)" />
                             <button
                                 type="button"
                                 onClick={reload}
@@ -411,66 +421,64 @@ export function TeamBrowser({
                     {/* content */}
                     <div className="min-h-[420px] flex-1 overflow-y-auto p-4">
                         {loading ? (
-                            <LoadingState view={view} />
+                            <LoadingState prefs={prefs} gridStyle={gridStyle} />
                         ) : error ? (
                             <ErrorState message={error} onRetry={reload} />
                         ) : isEmpty ? (
                             <EmptyState atRoot={folderId === null} />
+                        ) : prefs.layout === 'list' ? (
+                            <>
+                                <TeamListView
+                                    folders={folders}
+                                    assets={assets}
+                                    sortField={sortField}
+                                    sortDir={sortDir}
+                                    onSort={onSortColumn}
+                                    selectedId={selectedId}
+                                    onSelect={setSelectedId}
+                                    onOpenFolder={go}
+                                    onOpenAsset={openAsset}
+                                />
+                                {selectedAsset && <InfoPanel asset={selectedAsset} onClose={() => setSelectedId(null)} />}
+                                <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
+                            </>
                         ) : (
                             <>
                                 {folders.length > 0 && (
                                     <Section label="Thư mục" count={folders.length}>
-                                        <div
-                                            className={
-                                                view === 'grid'
-                                                    ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4'
-                                                    : 'flex flex-col gap-1.5'
-                                            }
-                                        >
-                                            {folders.map((f) =>
-                                                view === 'grid' ? (
-                                                    <FolderCardGrid key={f.id} folder={f} onOpen={() => go(f.id)} />
-                                                ) : (
-                                                    <FolderRow key={f.id} folder={f} onOpen={() => go(f.id)} />
-                                                ),
-                                            )}
+                                        <div className="grid gap-3" style={gridStyle}>
+                                            {folders.map((f) => (
+                                                <FolderCardGrid
+                                                    key={f.id}
+                                                    folder={f}
+                                                    selected={selectedId === f.id}
+                                                    onSelect={() => setSelectedId(f.id)}
+                                                    onOpen={() => go(f.id)}
+                                                />
+                                            ))}
                                         </div>
                                     </Section>
                                 )}
-
                                 {assets.length > 0 && (
                                     <Section label="Video" count={assets.length}>
-                                        <div
-                                            className={
-                                                view === 'grid'
-                                                    ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4'
-                                                    : 'flex flex-col gap-1.5'
-                                            }
-                                        >
-                                            {assets.map((a) =>
-                                                view === 'grid' ? (
-                                                    <AssetCardGrid key={a.id} asset={a} />
-                                                ) : (
-                                                    <AssetRow key={a.id} asset={a} />
-                                                ),
-                                            )}
+                                        <div className="grid gap-3" style={gridStyle}>
+                                            {assets.map((a) => (
+                                                <AssetCardGrid
+                                                    key={a.id}
+                                                    asset={a}
+                                                    aspect={prefs.aspect}
+                                                    thumb={prefs.thumb}
+                                                    showInfo={prefs.showInfo}
+                                                    selected={selectedId === a.id}
+                                                    onSelect={() => setSelectedId(a.id)}
+                                                    onOpen={() => openAsset(a)}
+                                                />
+                                            ))}
                                         </div>
                                     </Section>
                                 )}
-
-                                {nextCursor && (
-                                    <div className="mt-4 flex justify-center">
-                                        <button
-                                            type="button"
-                                            onClick={loadMore}
-                                            disabled={loadingMore}
-                                            className="inline-flex items-center gap-2 rounded-full bg-white/[0.05] px-4 py-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.1] disabled:opacity-60"
-                                        >
-                                            {loadingMore && <Loader2 size={13} className="animate-spin" />}
-                                            Tải thêm
-                                        </button>
-                                    </div>
-                                )}
+                                {selectedAsset && <InfoPanel asset={selectedAsset} onClose={() => setSelectedId(null)} />}
+                                <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
                             </>
                         )}
                     </div>
@@ -520,7 +528,6 @@ function TreeSidebar({
         const isRoot = node.parentId === null
         const kids = childrenOf.get(node.id) ?? []
         const isOpen = expanded.has(node.id)
-        // The ws-root maps to the canonical root view (id = null).
         const targetId = isRoot ? null : node.id
         const selected = isRoot ? currentFolderId === null : currentFolderId === node.id
         return (
@@ -549,16 +556,11 @@ function TreeSidebar({
                         className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left"
                         title={isRoot ? 'Team' : node.name}
                     >
-                        <FolderIcon
-                            size={14}
-                            className={selected ? 'shrink-0 text-violet-300' : 'shrink-0 text-zinc-500'}
-                        />
+                        <FolderIcon size={14} className={selected ? 'shrink-0 text-violet-300' : 'shrink-0 text-zinc-500'} />
                         <span className="truncate text-[12.5px]">{isRoot ? 'Team' : node.name}</span>
                     </button>
                 </div>
-                {isOpen && kids.length > 0 && (
-                    <div>{kids.map((k) => render(k, depth + 1))}</div>
-                )}
+                {isOpen && kids.length > 0 && <div>{kids.map((k) => render(k, depth + 1))}</div>}
             </div>
         )
     }
@@ -582,226 +584,66 @@ function Section({ label, count, children }: { label: string; count: number; chi
     )
 }
 
-/* ── folder card / row ───────────────────────────────────────────────────── */
-
-function FolderCardGrid({ folder, onOpen }: { folder: FolderDto; onOpen: () => void }) {
+function LoadMore({ show, loading, onClick }: { show: boolean; loading: boolean; onClick: () => void }) {
+    if (!show) return null
     return (
-        <button
-            type="button"
-            onClick={onOpen}
-            onDoubleClick={onOpen}
-            className="group flex flex-col rounded-xl border border-white/5 bg-white/[0.03] p-3 text-left transition-all hover:-translate-y-0.5 hover:border-violet-500/30 hover:bg-white/[0.06]"
-        >
-            <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300">
-                    <FolderIcon size={20} />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-zinc-100" title={folder.name}>
-                        {folder.name}
-                    </div>
-                    <div className="mt-0.5 truncate text-[11px] text-zinc-500">
-                        {folder.itemCount} mục · {bytesLabel(folder.totalBytes)}
-                    </div>
-                </div>
-            </div>
-        </button>
-    )
-}
-
-function FolderRow({ folder, onOpen }: { folder: FolderDto; onOpen: () => void }) {
-    return (
-        <button
-            type="button"
-            onClick={onOpen}
-            onDoubleClick={onOpen}
-            className="group flex items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 text-left transition-colors hover:border-white/5 hover:bg-white/[0.05]"
-        >
-            <FolderIcon size={16} className="shrink-0 text-violet-300" />
-            <span className="min-w-0 flex-1 truncate text-[13px] text-zinc-100" title={folder.name}>
-                {folder.name}
-            </span>
-            <span className="shrink-0 text-[11px] text-zinc-500">{folder.itemCount} mục</span>
-            <span className="hidden shrink-0 text-[11px] tabular-nums text-zinc-500 sm:inline">
-                {bytesLabel(folder.totalBytes)}
-            </span>
-        </button>
-    )
-}
-
-/* ── asset thumbnail (poster with graceful fallback) ─────────────────────── */
-
-function AssetThumb({ asset, className }: { asset: AssetDto; className?: string }) {
-    const [failed, setFailed] = useState(false)
-    const poster = asset.currentVersion?.media?.posterUrl
-    const isImage = asset.mediaKind === 'image'
-    if (poster && !failed) {
-        return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-                src={poster}
-                alt={asset.title}
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                onError={() => setFailed(true)}
-                className={className}
-            />
-        )
-    }
-    return (
-        <div className={`grid place-items-center text-zinc-600 ${className ?? ''}`}>
-            {isImage ? <ImageIcon size={22} /> : <Film size={22} />}
+        <div className="mt-4 flex justify-center">
+            <button
+                type="button"
+                onClick={onClick}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-full bg-white/[0.05] px-4 py-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.1] disabled:opacity-60"
+            >
+                {loading && <Loader2 size={13} className="animate-spin" />}
+                Tải thêm
+            </button>
         </div>
     )
 }
 
-/* ── asset card / row (display-only in P2.2; player = P4) ─────────────────── */
-
-function AssetMeta({ asset }: { asset: AssetDto }) {
-    const dur = msToClock(asset.currentVersion?.durationMs)
-    return (
-        <>
-            {asset.versionCount > 1 && (
-                <span className="rounded bg-white/[0.06] px-1 py-px text-[10px] text-zinc-400">
-                    {asset.versionCount} phiên bản
-                </span>
-            )}
-            {dur && <span className="tabular-nums text-zinc-500">{dur}</span>}
-            {asset.commentCountTotal > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-zinc-500">
-                    <MessageSquare size={11} />
-                    {asset.commentCountTotal}
-                </span>
-            )}
-        </>
-    )
-}
-
-function AssetCardGrid({ asset }: { asset: AssetDto }) {
-    return (
-        <div
-            className="flex flex-col overflow-hidden rounded-xl border border-white/5 bg-white/[0.03]"
-            title="Trình xem video sẽ có ở bản sau"
-        >
-            <div className="relative aspect-video w-full bg-black/40">
-                <AssetThumb asset={asset} className="h-full w-full object-cover" />
-                {asset.statusKey && (
-                    <span className="absolute left-1.5 top-1.5 max-w-[80%] truncate rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-violet-200 backdrop-blur-sm">
-                        {asset.statusKey}
-                    </span>
-                )}
-            </div>
-            <div className="flex flex-col gap-1 p-2.5">
-                <div className="truncate text-[12.5px] font-medium text-zinc-100" title={asset.title}>
-                    {asset.title}
-                </div>
-                <div className="flex items-center gap-2 text-[11px]">
-                    <AssetMeta asset={asset} />
-                </div>
-            </div>
-        </div>
-    )
-}
-
-function AssetRow({ asset }: { asset: AssetDto }) {
-    return (
-        <div
-            className="flex items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-white/5 hover:bg-white/[0.04]"
-            title="Trình xem video sẽ có ở bản sau"
-        >
-            <div className="relative h-9 w-16 shrink-0 overflow-hidden rounded-md bg-black/40">
-                <AssetThumb asset={asset} className="h-full w-full object-cover" />
-            </div>
-            <span className="min-w-0 flex-1 truncate text-[13px] text-zinc-100" title={asset.title}>
-                {asset.title}
-            </span>
-            {asset.statusKey && (
-                <span className="hidden shrink-0 truncate rounded-md bg-violet-500/10 px-1.5 py-0.5 text-[10.5px] text-violet-200 sm:inline">
-                    {asset.statusKey}
-                </span>
-            )}
-            <div className="flex shrink-0 items-center gap-2 text-[11px]">
-                <AssetMeta asset={asset} />
-            </div>
-        </div>
-    )
-}
-
-/* ── toolbar affordances ─────────────────────────────────────────────────── */
+/* ── toolbar affordance (disabled until its phase) ───────────────────────── */
 
 function ToolbarButton({
     icon: Icon,
     label,
-    compact,
     disabledHint,
 }: {
     icon: ComponentType<{ size?: number; className?: string }>
     label: string
-    compact?: boolean
     disabledHint?: string
 }) {
-    // P2.2: these open flows that land in later phases — rendered disabled with a hint
-    // rather than firing dead handlers, so the intended layout is visible but honest.
     return (
         <button
             type="button"
             disabled
             title={disabledHint ? `${label} — ${disabledHint}` : label}
-            className={`inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-[12.5px] font-medium text-zinc-500 opacity-70 ${
-                compact ? 'px-2.5 py-1.5' : 'px-3 py-1.5'
-            }`}
+            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-1.5 text-[12.5px] font-medium text-zinc-500 opacity-70"
         >
             <Icon size={14} />
-            {!compact && label}
-            {compact && <span className="hidden sm:inline">{label}</span>}
-        </button>
-    )
-}
-
-function IconToggle({
-    active,
-    onClick,
-    icon: Icon,
-    title,
-}: {
-    active: boolean
-    onClick: () => void
-    icon: ComponentType<{ size?: number; className?: string }>
-    title: string
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            title={title}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-                active ? 'bg-violet-500/20 text-violet-200' : 'text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100'
-            }`}
-        >
-            <Icon size={15} />
+            <span className="hidden sm:inline">{label}</span>
         </button>
     )
 }
 
 /* ── states ──────────────────────────────────────────────────────────────── */
 
-function LoadingState({ view }: { view: ViewMode }) {
-    const cells = Array.from({ length: view === 'grid' ? 8 : 6 })
+function LoadingState({ prefs, gridStyle }: { prefs: ViewPrefs; gridStyle: React.CSSProperties }) {
+    if (prefs.layout === 'list') {
+        return (
+            <div className="flex flex-col gap-1.5">
+                {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-12 animate-pulse rounded-lg border border-white/5 bg-white/[0.03]" />
+                ))}
+            </div>
+        )
+    }
     return (
-        <div
-            className={
-                view === 'grid'
-                    ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4'
-                    : 'flex flex-col gap-1.5'
-            }
-        >
-            {cells.map((_, i) => (
-                <div
-                    key={i}
-                    className={`animate-pulse rounded-xl border border-white/5 bg-white/[0.03] ${
-                        view === 'grid' ? 'aspect-[4/3]' : 'h-12'
-                    }`}
-                />
+        <div className="grid gap-3" style={gridStyle}>
+            {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="animate-pulse overflow-hidden rounded-xl border border-white/5 bg-white/[0.03]">
+                    <div className="w-full bg-white/[0.04]" style={{ aspectRatio: aspectCss(prefs.aspect) }} />
+                    {prefs.showInfo && <div className="h-12" />}
+                </div>
             ))}
         </div>
     )
@@ -813,7 +655,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-300">
                 <AlertTriangle size={22} />
             </div>
-            <p className="max-w-sm text-[13px] text-zinc-400">{message}</p>
+            <p className="max-w-sm text-[13px] text-zinc-400">{message || 'Không tải được nội dung thư mục.'}</p>
             <button
                 type="button"
                 onClick={onRetry}
@@ -833,11 +675,11 @@ function EmptyState({ atRoot }: { atRoot: boolean }) {
             </div>
             <div>
                 <p className="text-[14px] font-medium text-zinc-200">
-                    {atRoot ? 'Chưa có bản dựng nào' : 'Thư mục này trống'}
+                    {atRoot ? 'Chưa có asset nào trong workspace này' : 'Thư mục trống'}
                 </p>
-                <p className="mx-auto mt-1 max-w-xs text-[12px] leading-relaxed text-zinc-500">
+                <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
                     {atRoot
-                        ? 'Bản dựng video tải lên từ ô “Video review” trong task sẽ tự động xuất hiện ở đây.'
+                        ? 'Upload video từ khối BÀN GIAO của task để hệ thống tự tạo thư mục theo khách hàng. Tải trực tiếp từ đây sẽ có ở bản sau.'
                         : 'Chưa có thư mục con hay video trong thư mục này.'}
                 </p>
             </div>

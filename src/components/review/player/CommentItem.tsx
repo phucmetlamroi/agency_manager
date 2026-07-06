@@ -5,7 +5,7 @@
 
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import {
     Lock,
     Clock,
@@ -16,11 +16,15 @@ import {
     Trash2,
     SmilePlus,
     PenLine,
+    ChevronLeft,
+    ChevronRight,
     X,
 } from 'lucide-react'
 import { frameToSmpte, type Fps } from '@/lib/review/timecode'
 import type { CommentDto } from '@/lib/review/comment-client'
 import { CommentComposer } from './CommentComposer'
+
+type Attachment = CommentDto['attachments'][number]
 
 export const REVIEW_REACTIONS = ['👍', '❤️', '🎉', '😂', '👀', '🙏']
 
@@ -135,6 +139,7 @@ function SingleComment({
 }) {
     const authorName = comment.author?.name ?? comment.guest?.name ?? 'Ẩn danh'
     const hasTime = comment.startFrame != null
+    const [lightbox, setLightbox] = useState<number | null>(null)
 
     return (
         <div className="group/comment">
@@ -182,19 +187,29 @@ function SingleComment({
                     {/* body */}
                     <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-white/80">{comment.body}</p>
 
-                    {/* attachments (thumbnails; lightbox in P4.5) */}
+                    {/* attachments (thumbnails → lightbox) */}
                     {comment.attachments.length > 0 && (
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            {comment.attachments.map((a) => (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
+                            {comment.attachments.map((a, i) => (
+                                <button
                                     key={a.id}
-                                    src={a.url}
-                                    alt=""
-                                    className="h-16 w-16 rounded-md border border-white/10 object-cover"
-                                />
+                                    onClick={() => setLightbox(i)}
+                                    className="h-16 w-16 overflow-hidden rounded-md border border-white/10 transition hover:border-white/30"
+                                    aria-label="Xem ảnh"
+                                >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={a.url} alt="" className="h-full w-full object-cover" />
+                                </button>
                             ))}
                         </div>
+                    )}
+                    {lightbox != null && (
+                        <Lightbox
+                            images={comment.attachments}
+                            index={lightbox}
+                            onIndex={setLightbox}
+                            onClose={() => setLightbox(null)}
+                        />
                     )}
 
                     <Reactions comment={comment} onToggle={(e, add) => actions.react(comment.id, e, add)} />
@@ -365,6 +380,92 @@ function InlineEdit({ initial, onSave, onCancel }: { initial: string; onSave: (b
                     Hủy
                 </button>
             </div>
+        </div>
+    )
+}
+
+// Full-screen image viewer for comment attachments. `fixed inset-0` escapes the
+// scrollable panel; a CAPTURE-phase keydown listener handles Esc/←/→ and
+// stopPropagation()s so the player's own arrow/space handler doesn't also fire.
+function Lightbox({
+    images,
+    index,
+    onIndex,
+    onClose,
+}: {
+    images: Attachment[]
+    index: number
+    onIndex: (i: number) => void
+    onClose: () => void
+}) {
+    const count = images.length
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.stopPropagation()
+                e.preventDefault()
+                onClose()
+            } else if (e.key === 'ArrowLeft' && count > 1) {
+                e.stopPropagation()
+                e.preventDefault()
+                onIndex((index - 1 + count) % count)
+            } else if (e.key === 'ArrowRight' && count > 1) {
+                e.stopPropagation()
+                e.preventDefault()
+                onIndex((index + 1) % count)
+            }
+        }
+        window.addEventListener('keydown', onKey, { capture: true })
+        return () => window.removeEventListener('keydown', onKey, { capture: true })
+    }, [index, count, onIndex, onClose])
+
+    const img = images[index]
+    if (!img) return null
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90" onClick={onClose}>
+            <button
+                onClick={onClose}
+                className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
+                aria-label="Đóng"
+            >
+                <X className="h-5 w-5" />
+            </button>
+            {count > 1 && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onIndex((index - 1 + count) % count)
+                    }}
+                    className="absolute left-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
+                    aria-label="Ảnh trước"
+                >
+                    <ChevronLeft className="h-6 w-6" />
+                </button>
+            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={img.url}
+                alt=""
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-[90vh] max-w-[90vw] object-contain"
+            />
+            {count > 1 && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onIndex((index + 1) % count)
+                    }}
+                    className="absolute right-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
+                    aria-label="Ảnh sau"
+                >
+                    <ChevronRight className="h-6 w-6" />
+                </button>
+            )}
+            {count > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white/90 tabular-nums">
+                    {index + 1} / {count}
+                </div>
+            )}
         </div>
     )
 }

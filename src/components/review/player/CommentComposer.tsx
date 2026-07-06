@@ -1,21 +1,32 @@
-// [Review module P4.3 + P4.4] Comment composer (PRD FR-E03/E05/E07). Typing
+// [Review module P4.3 + P4.4 + P4.5] Comment composer (PRD FR-E03/E05/E07). Typing
 // auto-pauses the video; a timecode chip tracks the playhead (video only) and can be
-// toggled off for a general comment. P4.4 adds: a RANGE (In–Out) bracket, and a "Vẽ"
-// button that opens the annotation overlay pinned to the frozen frame — its shapes
-// submit alongside the comment (so a drawing-only comment is allowed). Public/Internal
-// selector defaults to Nội bộ and is remembered for the session. Enter sends,
-// Shift+Enter = newline; focus returns to the player after send. Reply mode is compact
+// toggled off for a general comment. P4.4 adds a RANGE (In–Out) bracket + a "Vẽ" button
+// that opens the annotation overlay pinned to the frozen frame. P4.5 adds an emoji
+// picker (insert at caret) and image attachments (≤6, ≤10MB each) uploaded to R2 before
+// submit — a drawing-only or image-only comment is allowed. Public/Internal defaults to
+// Nội bộ (session-remembered). Enter sends, Shift+Enter = newline. Reply mode is compact
 // (inherits visibility, no timecode / range / annotation).
 
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Lock, Globe, Clock, X, Loader2, Send, PenLine, Brackets } from 'lucide-react'
+import { Lock, Globe, Clock, X, Loader2, Send, PenLine, Brackets, Smile, ImagePlus, AlertTriangle } from 'lucide-react'
 import { frameToSmpte, frameCount, type Fps } from '@/lib/review/timecode'
 import { createComment, type CommentDto } from '@/lib/review/comment-client'
+import { uploadCommentImage, validateImageFile, MAX_ATTACHMENTS, type UploadedAttachment } from '@/lib/review/comment-attachments'
 import type { AnnotationController } from './useAnnotation'
+import { EmojiPicker } from './EmojiPicker'
 
 const SS_KEY = 'review:composer:isInternal'
+
+interface PendingAttachment {
+    localId: string
+    previewUrl: string
+    status: 'uploading' | 'done' | 'error'
+    uploaded?: UploadedAttachment
+    error?: string
+    ctrl?: AbortController
+}
 
 export function CommentComposer({
     versionId,
@@ -55,7 +66,11 @@ export function CommentComposer({
     const [submitting, setSubmitting] = useState(false)
     const [frozenFrame, setFrozenFrame] = useState<number | null>(null)
     const [rangeEnd, setRangeEnd] = useState<number | null>(null)
+    const [pickerOpen, setPickerOpen] = useState(false)
+    const [attachments, setAttachments] = useState<PendingAttachment[]>([])
     const taRef = useRef<HTMLTextAreaElement>(null)
+    const fileRef = useRef<HTMLInputElement>(null)
+    const localIdRef = useRef(0)
 
     const annoActive = canAnnotate && annotation!.active
     const annoCount = annotation?.shapes.length ?? 0
@@ -78,6 +93,11 @@ export function CommentComposer({
     useEffect(() => {
         if (autoFocus) taRef.current?.focus()
     }, [autoFocus])
+
+    // Revoke any object URLs still held when the composer unmounts.
+    const attachRef = useRef<PendingAttachment[]>([])
+    attachRef.current = attachments
+    useEffect(() => () => attachRef.current.forEach((a) => URL.revokeObjectURL(a.previewUrl)), [])
 
     // Frames are 0-indexed → the last valid frame is totalFrames-1. The playhead can
     // land ON totalFrames at the exact end of the clip (round(sec·fps)), which the
@@ -110,21 +130,79 @@ export function CommentComposer({
         return f
     }
 
-    const onChange = (v: string) => {
-        if (body.length === 0 && v.length > 0 && isVideo) {
+    // Apply a new body value + the "first character pauses + freezes the frame" side
+    // effect (shared by typing and emoji-insert).
+    const applyBody = (next: string) => {
+        if (body.length === 0 && next.length > 0 && isVideo) {
             onPauseVideo()
             if (!annoActive) setFrozenFrame(playheadFrame) // keep the draw frame if drawing
         }
-        // Don't unfreeze while an annotation is pinned to this frame.
-        if (v.length === 0 && !annoActive) setFrozenFrame(null)
-        setBody(v)
+        if (next.length === 0 && !annoActive) setFrozenFrame(null)
+        setBody(next)
     }
 
-    const beginDraw = () => {
-        onPauseVideo()
-        setAttachTime(true)
-        const f = frozenFrame ?? freezeHere()
-        annotation?.begin(f)
+    const insertEmoji = (emoji: string) => {
+        const ta = taRef.current
+        const start = ta?.selectionStart ?? body.length
+        const end = ta?.selectionEnd ?? body.length
+        const next = body.slice(0, start) + emoji + body.slice(end)
+        applyBody(next)
+        requestAnimationFrame(() => {
+            const el = taRef.current
+            if (!el) return
+            el.focus()
+            const pos = start + emoji.length
+            el.setSelectionRange(pos, pos)
+        })
+    }
+
+    const addFiles = (files: FileList | null) => {
+        if (!files || files.length === 0) return
+        const room = MAX_ATTACHMENTS - attachments.length
+        if (room <= 0) {
+            alert(`Tối đa ${MAX_ATTACHMENTS} ảnh mỗi bình luận.`)
+            return
+        }
+        const chosen = Array.from(files).slice(0, room)
+        if (files.length > room) alert(`Chỉ thêm được ${room} ảnh nữa (tối đa ${MAX_ATTACHMENTS}).`)
+        for (const file of chosen) {
+            const err = validateImageFile(file)
+            if (err) {
+                alert(`${file.name}: ${err}`)
+                continue
+            }
+            const localId = String(++localIdRef.current)
+            const previewUrl = URL.createObjectURL(file)
+            const ctrl = new AbortController()
+            setAttachments((prev) => [...prev, { localId, previewUrl, status: 'uploading', ctrl }])
+            uploadCommentImage(file, ctrl.signal)
+                .then((up) =>
+                    setAttachments((prev) =>
+                        prev.map((a) => (a.localId === localId ? { ...a, status: 'done', uploaded: up, ctrl: undefined } : a)),
+                    ),
+                )
+                .catch((e) => {
+                    if (ctrl.signal.aborted) return // removed by the user mid-flight
+                    setAttachments((prev) =>
+                        prev.map((a) =>
+                            a.localId === localId
+                                ? { ...a, status: 'error', error: e instanceof Error ? e.message : 'Lỗi', ctrl: undefined }
+                                : a,
+                        ),
+                    )
+                })
+        }
+    }
+
+    const removeAttachment = (localId: string) => {
+        setAttachments((prev) => {
+            const a = prev.find((x) => x.localId === localId)
+            if (a) {
+                a.ctrl?.abort()
+                URL.revokeObjectURL(a.previewUrl)
+            }
+            return prev.filter((x) => x.localId !== localId)
+        })
     }
 
     const enableRange = () => {
@@ -135,7 +213,17 @@ export function CommentComposer({
     }
     const captureOut = () => setRangeEnd(clampFrame(Math.max(shownFrame + 1, playheadFrame)))
 
-    const canSend = !!body.trim() || (annoActive && annoCount > 0)
+    const beginDraw = () => {
+        onPauseVideo()
+        setAttachTime(true)
+        const f = frozenFrame ?? freezeHere()
+        annotation?.begin(f)
+    }
+
+    const uploading = attachments.some((a) => a.status === 'uploading')
+    const doneAttachments = attachments.filter((a): a is PendingAttachment & { uploaded: UploadedAttachment } => a.status === 'done' && !!a.uploaded)
+    const canSend =
+        (!!body.trim() || (annoActive && annoCount > 0) || doneAttachments.length > 0) && !uploading
 
     const submit = async () => {
         if (!canSend || submitting) return
@@ -152,12 +240,15 @@ export function CommentComposer({
                 startFrame,
                 endFrame,
                 annotation: shapes,
+                attachments: doneAttachments.length ? doneAttachments.map((a) => a.uploaded) : undefined,
                 isInternal: isReply ? undefined : isInternal,
             })
             onPosted(comment)
             setBody('')
             setFrozenFrame(null)
             setRangeEnd(null)
+            attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl))
+            setAttachments([])
             annotation?.reset()
             if (isReply) onCancel?.()
             else onFocusPlayer()
@@ -265,16 +356,80 @@ export function CommentComposer({
                 </div>
             )}
 
-            <div className="flex items-end gap-2">
+            {/* attachment thumbnails */}
+            {attachments.length > 0 && (
+                <div className="mb-1.5 flex flex-wrap gap-1.5">
+                    {attachments.map((a) => (
+                        <div key={a.localId} className="relative h-14 w-14 overflow-hidden rounded-md border border-white/10">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={a.previewUrl} alt="" className="h-full w-full object-cover" />
+                            {a.status === 'uploading' && (
+                                <div className="absolute inset-0 grid place-items-center bg-black/50">
+                                    <Loader2 className="h-4 w-4 animate-spin text-white" />
+                                </div>
+                            )}
+                            {a.status === 'error' && (
+                                <div className="absolute inset-0 grid place-items-center bg-red-900/60" title={a.error}>
+                                    <AlertTriangle className="h-4 w-4 text-red-200" />
+                                </div>
+                            )}
+                            <button
+                                onClick={() => removeAttachment(a.localId)}
+                                className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/70 text-white hover:bg-black"
+                                aria-label="Xóa ảnh"
+                            >
+                                <X className="h-2.5 w-2.5" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <div className="flex items-end gap-1.5">
                 <textarea
                     ref={taRef}
                     value={body}
-                    onChange={(e) => onChange(e.target.value)}
+                    onChange={(e) => applyBody(e.target.value)}
                     onKeyDown={onKeyDown}
                     rows={isReply ? 1 : 2}
                     placeholder={isReply ? 'Trả lời…' : annoActive ? 'Ghi chú cho hình vẽ (tuỳ chọn)…' : 'Thêm bình luận…'}
                     className="min-h-[38px] flex-1 resize-none rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-indigo-400/50 focus:outline-none"
                 />
+
+                {/* emoji */}
+                <div className="relative">
+                    <button
+                        type="button"
+                        onClick={() => setPickerOpen((v) => !v)}
+                        className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80"
+                        aria-label="Chèn emoji"
+                    >
+                        <Smile className="h-4 w-4" />
+                    </button>
+                    {pickerOpen && (
+                        <EmojiPicker
+                            onPick={(e) => {
+                                insertEmoji(e)
+                                setPickerOpen(false)
+                            }}
+                            onClose={() => setPickerOpen(false)}
+                        />
+                    )}
+                </div>
+
+                {/* attach image */}
+                <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={attachments.length >= MAX_ATTACHMENTS}
+                    className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80 disabled:opacity-30"
+                    aria-label="Đính kèm ảnh"
+                    title={`Đính kèm ảnh (tối đa ${MAX_ATTACHMENTS}, mỗi ảnh ≤10MB)`}
+                >
+                    <ImagePlus className="h-4 w-4" />
+                </button>
+
+                {/* send */}
                 <button
                     onClick={() => void submit()}
                     disabled={!canSend || submitting}
@@ -284,6 +439,18 @@ export function CommentComposer({
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </button>
             </div>
+
+            <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                    addFiles(e.target.files)
+                    e.target.value = '' // allow re-picking the same file
+                }}
+            />
         </div>
     )
 }

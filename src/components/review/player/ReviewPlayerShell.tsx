@@ -12,6 +12,9 @@ import { listAssetVersions, type AssetVersions, type VersionRow } from '@/lib/re
 import type { Fps } from '@/lib/review/timecode'
 import { useHlsPlayer } from './useHlsPlayer'
 import { VideoStage } from './VideoStage'
+import { useComments } from './useComments'
+import { CommentsPanel } from './CommentsPanel'
+import { TimelineMarkers } from './TimelineMarkers'
 
 type Tab = 'comments' | 'info'
 
@@ -38,7 +41,10 @@ function fmtBytes(s: string): string {
 export function ReviewPlayerShell({
     workspaceId,
     assetId,
+    currentUserId,
+    isAdmin,
     initialVersionId,
+    initialCommentId,
 }: {
     workspaceId: string
     assetId: string
@@ -53,7 +59,9 @@ export function ReviewPlayerShell({
     const [currentVersionId, setCurrentVersionId] = useState<string | null>(initialVersionId)
     const [tab, setTab] = useState<Tab>('comments')
     const [selectorOpen, setSelectorOpen] = useState(false)
+    const [highlightId, setHighlightId] = useState<string | null>(initialCommentId)
     const videoRef = useRef<HTMLVideoElement>(null)
+    const didDeepLink = useRef(false)
 
     // load the stack
     useEffect(() => {
@@ -85,6 +93,52 @@ export function ReviewPlayerShell({
     const posterUrl = version?.media?.posterUrl ?? null
 
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.id : null, fps, enabled })
+    const feed = useComments(version?.id ?? null)
+
+    const onPauseVideo = useCallback(() => controller.pause(), [controller])
+    const onFocusPlayer = useCallback(() => {
+        const el = document.activeElement as HTMLElement | null
+        el?.blur?.()
+    }, [])
+    const handleSeek = useCallback(
+        (frameOrId: number) => {
+            controller.seekToFrame(frameOrId)
+        },
+        [controller],
+    )
+
+    // Keyboard: Space toggles, ←/→ frame-step — when focus is not in a text field.
+    useEffect(() => {
+        if (!enabled) return
+        const onKey = (e: KeyboardEvent) => {
+            const t = e.target as HTMLElement | null
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+            if (e.code === 'Space') {
+                e.preventDefault()
+                controller.toggle()
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault()
+                controller.step(-1)
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault()
+                controller.step(1)
+            }
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [controller, enabled])
+
+    // Deep-link ?comment= : once its comment loads, seek + highlight + scroll to it.
+    useEffect(() => {
+        if (didDeepLink.current || !initialCommentId || feed.comments.length === 0) return
+        const c = feed.comments.find((x) => x.id === initialCommentId)
+        if (!c) return
+        didDeepLink.current = true
+        setTab('comments')
+        setHighlightId(c.id)
+        if (c.startFrame != null) controller.seekToFrame(c.startFrame)
+        requestAnimationFrame(() => document.getElementById(`comment-${c.id}`)?.scrollIntoView({ block: 'center' }))
+    }, [feed.comments, initialCommentId, controller])
 
     const goBack = useCallback(() => {
         const folderId = asset?.folderId
@@ -186,6 +240,15 @@ export function ReviewPlayerShell({
                             mediaKind={isVideo ? 'video' : 'image'}
                             versionId={version.id}
                             posterUrl={posterUrl}
+                            timelineChildren={
+                                <TimelineMarkers
+                                    comments={feed.comments}
+                                    fps={fps}
+                                    durationSec={controller.durationSec}
+                                    onSeek={handleSeek}
+                                    onHighlight={setHighlightId}
+                                />
+                            }
                         />
                     ) : (
                         <div className="grid h-full place-items-center px-6 text-center text-white/60">
@@ -213,13 +276,28 @@ export function ReviewPlayerShell({
                             Thông tin
                         </TabBtn>
                     </div>
-                    <div className="min-h-0 flex-1 overflow-auto">
+                    <div className="min-h-0 flex-1 overflow-hidden">
                         {tab === 'comments' ? (
-                            <div className="grid h-full place-items-center px-6 text-center text-sm text-white/40">
-                                <p>Chưa có bình luận cho phiên bản này.</p>
-                            </div>
+                            version ? (
+                                <CommentsPanel
+                                    versionId={version.id}
+                                    fps={fps}
+                                    mediaKind={isVideo ? 'video' : 'image'}
+                                    currentUserId={currentUserId}
+                                    isAdmin={isAdmin}
+                                    feed={feed}
+                                    playheadFrame={controller.frame}
+                                    onSeekToFrame={handleSeek}
+                                    onPauseVideo={onPauseVideo}
+                                    onFocusPlayer={onFocusPlayer}
+                                    highlightId={highlightId}
+                                    onJumpToVersion={(vid) => setCurrentVersionId(vid)}
+                                />
+                            ) : null
                         ) : (
-                            <InfoTab version={version} />
+                            <div className="h-full overflow-auto">
+                                <InfoTab version={version} />
+                            </div>
                         )}
                     </div>
                 </aside>

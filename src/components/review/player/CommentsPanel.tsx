@@ -1,0 +1,183 @@
+// [Review module P4.3] The right-panel comment feed: threaded list + composer +
+// per-version empty state (FR-E03/E08/E09). Mutations update the SWR cache
+// optimistically (via feed.patch) then reconcile from the server response; a failed
+// call falls back to feed.refresh(). Sort/filter/search toolbar lands in P4.5.
+
+'use client'
+
+import { useMemo } from 'react'
+import { MessageSquare, ArrowRightCircle } from 'lucide-react'
+import type { Fps } from '@/lib/review/timecode'
+import {
+    setCommentResolved,
+    deleteComment,
+    editComment,
+    addReaction,
+    removeReaction,
+    type CommentDto,
+} from '@/lib/review/comment-client'
+import type { CommentsFeed } from './useComments'
+import { CommentThread, type CommentActions } from './CommentItem'
+import { CommentComposer } from './CommentComposer'
+
+function toggleReactionLocal(reactions: CommentDto['reactions'], emoji: string, add: boolean): CommentDto['reactions'] {
+    const idx = reactions.findIndex((r) => r.emoji === emoji)
+    if (add) {
+        if (idx >= 0) {
+            const r = reactions[idx]
+            if (r.reactedByMe) return reactions
+            const copy = [...reactions]
+            copy[idx] = { ...r, count: r.count + 1, reactedByMe: true }
+            return copy
+        }
+        return [...reactions, { emoji, count: 1, reactedByMe: true }]
+    }
+    if (idx < 0) return reactions
+    const r = reactions[idx]
+    if (!r.reactedByMe) return reactions
+    const next = r.count - 1
+    if (next <= 0) return reactions.filter((_, i) => i !== idx)
+    const copy = [...reactions]
+    copy[idx] = { ...r, count: next, reactedByMe: false }
+    return copy
+}
+
+export function CommentsPanel({
+    versionId,
+    fps,
+    mediaKind,
+    currentUserId,
+    isAdmin,
+    feed,
+    playheadFrame,
+    onSeekToFrame,
+    onPauseVideo,
+    onFocusPlayer,
+    highlightId,
+    onJumpToVersion,
+}: {
+    versionId: string
+    fps: Fps | null
+    mediaKind: 'video' | 'image'
+    currentUserId: string
+    isAdmin: boolean
+    feed: CommentsFeed
+    playheadFrame: number
+    onSeekToFrame: (frame: number) => void
+    onPauseVideo: () => void
+    onFocusPlayer: () => void
+    highlightId: string | null
+    onJumpToVersion: (versionId: string) => void
+}) {
+    const { comments } = feed
+
+    const { parents, repliesByParent } = useMemo(() => {
+        const parents: CommentDto[] = []
+        const repliesByParent = new Map<string, CommentDto[]>()
+        for (const c of comments) {
+            if (c.parentId) {
+                const arr = repliesByParent.get(c.parentId) ?? []
+                arr.push(c)
+                repliesByParent.set(c.parentId, arr)
+            } else {
+                parents.push(c)
+            }
+        }
+        for (const arr of repliesByParent.values()) arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        return { parents, repliesByParent }
+    }, [comments])
+
+    const actions: CommentActions = {
+        resolve: (id, resolved) => {
+            feed.patch((list) =>
+                list.map((c) => (c.id === id ? { ...c, completedAt: resolved ? new Date().toISOString() : null } : c)),
+            )
+            setCommentResolved(id, resolved)
+                .then(({ comment }) => feed.patch((list) => list.map((c) => (c.id === comment.id ? comment : c))))
+                .catch(() => feed.refresh())
+        },
+        remove: (id) => {
+            feed.patch((list) => list.filter((c) => c.id !== id && c.parentId !== id))
+            deleteComment(id).catch(() => feed.refresh())
+        },
+        edit: (id, body) => {
+            feed.patch((list) => list.map((c) => (c.id === id ? { ...c, body, editedAt: new Date().toISOString() } : c)))
+            editComment(id, body)
+                .then(({ comment }) => feed.patch((list) => list.map((c) => (c.id === comment.id ? comment : c))))
+                .catch(() => feed.refresh())
+        },
+        react: (id, emoji, add) => {
+            feed.patch((list) => list.map((c) => (c.id === id ? { ...c, reactions: toggleReactionLocal(c.reactions, emoji, add) } : c)))
+            ;(add ? addReaction(id, emoji) : removeReaction(id, emoji))
+                .then(({ reactions }) => feed.patch((list) => list.map((c) => (c.id === id ? { ...c, reactions } : c))))
+                .catch(() => feed.refresh())
+        },
+    }
+
+    const onPosted = (c: CommentDto) => {
+        feed.patch((list) => (list.some((x) => x.id === c.id) ? list : [...list, c]))
+        feed.refresh()
+    }
+
+    const otherWithComments = feed.otherVersions.filter((o) => o.commentCount > 0)
+    const otherTotal = otherWithComments.reduce((s, o) => s + o.commentCount, 0)
+
+    return (
+        <div className="flex h-full flex-col">
+            <div className="min-h-0 flex-1 space-y-1 overflow-auto p-2">
+                {parents.length === 0 ? (
+                    <div className="grid h-full place-items-center px-6 text-center">
+                        <div className="flex flex-col items-center gap-2 text-white/40">
+                            <MessageSquare className="h-8 w-8" />
+                            {otherWithComments.length > 0 ? (
+                                <>
+                                    <p className="text-sm">
+                                        Phiên bản này chưa có bình luận. Có {otherTotal} bình luận ở phiên bản khác.
+                                    </p>
+                                    <button
+                                        onClick={() => onJumpToVersion(otherWithComments[0].versionId)}
+                                        className="mt-1 flex items-center gap-1.5 rounded-lg bg-indigo-500/20 px-3 py-1.5 text-sm text-indigo-200 hover:bg-indigo-500/30"
+                                    >
+                                        <ArrowRightCircle className="h-4 w-4" />
+                                        Xem v{otherWithComments[0].versionNumber}
+                                    </button>
+                                </>
+                            ) : (
+                                <p className="text-sm">Chưa có bình luận cho phiên bản này.</p>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    parents.map((c) => (
+                        <CommentThread
+                            key={c.id}
+                            comment={c}
+                            replies={repliesByParent.get(c.id) ?? []}
+                            fps={fps}
+                            mediaKind={mediaKind}
+                            currentUserId={currentUserId}
+                            isAdmin={isAdmin}
+                            highlighted={highlightId === c.id}
+                            playheadFrame={playheadFrame}
+                            onSeekToFrame={onSeekToFrame}
+                            onPauseVideo={onPauseVideo}
+                            onFocusPlayer={onFocusPlayer}
+                            onReplyPosted={onPosted}
+                            actions={actions}
+                        />
+                    ))
+                )}
+            </div>
+
+            <CommentComposer
+                versionId={versionId}
+                fps={fps}
+                mediaKind={mediaKind}
+                playheadFrame={playheadFrame}
+                onPauseVideo={onPauseVideo}
+                onPosted={onPosted}
+                onFocusPlayer={onFocusPlayer}
+            />
+        </div>
+    )
+}

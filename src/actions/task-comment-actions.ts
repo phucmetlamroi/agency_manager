@@ -85,6 +85,7 @@ const EVENT_LABELS: Record<string, string> = {
     'video.guest_commented': 'khách đã bình luận trên bản review',
     'video.share_created': 'đã tạo link review cho khách',
     'video.share_revoked': 'đã thu hồi link review',
+    'video.share_unrevoked': 'đã mở lại link review',
 }
 
 export type MentionRelation = 'editor' | 'manager' | 'client' | 'member'

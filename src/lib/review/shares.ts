@@ -458,9 +458,10 @@ export async function setShareRevoked(id: string, revoked: boolean): Promise<{ s
         })
         return u
     })
-    // FR-G01: "{user} đã thu hồi/mở lại link review" into the task feed + admin log.
+    // FR-G01: "{user} đã thu hồi / mở lại link review" — distinct actions so the feed
+    // + admin log don't mislabel a re-opened link as revoked.
     void auditReviewFeed({
-        action: 'video.share_revoked',
+        action: revoked ? 'video.share_revoked' : 'video.share_unrevoked',
         workspaceId: row.workspaceId,
         taskId: row.taskId,
         actorUserId: access.userId,

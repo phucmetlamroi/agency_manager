@@ -43,8 +43,16 @@ const emptyStats = (): PurgeStats => ({ versions: 0, assets: 0, folders: 0, muxD
 
 /**
  * Tear down the EXTERNAL objects a version owns (Mux asset + R2 original/thumb +
- * comment-attachment R2 objects), ref-counting the shared keys against live
- * copies. Returns per-version counters. Does NOT delete DB rows.
+ * comment-attachment R2 objects), ref-counting the shared keys. Returns per-version
+ * counters. Does NOT delete DB rows.
+ *
+ * The ref-count counts ANY sibling still holding the key — LIVE **or trashed-but-
+ * not-yet-purged**. A trashed copy is RESTORABLE, so deleting the shared R2/Mux
+ * object while a trashed copy still points at it would silently break that copy on
+ * restore (P6 review BLOCKER). Only the LAST holder of a shared key tears the object
+ * down. For Mux we additionally re-home the muxAssetId onto a surviving sibling when
+ * we skip the delete (copy-on-reference copies carry muxAssetId=null because of the
+ * @unique; without re-homing, purging the original would orphan the Mux asset forever).
  */
 async function teardownVersionExternal(v: Pick<ReviewVersion, 'id' | 'r2Key' | 'thumbnailKey' | 'muxAssetId' | 'muxPlaybackId' | 'sizeBytes'>): Promise<PurgeStats> {
     const s = emptyStats()
@@ -63,10 +71,11 @@ async function teardownVersionExternal(v: Pick<ReviewVersion, 'id' | 'r2Key' | '
         }
     }
 
-    // R2 original + thumb — only if no LIVE version still references the same key.
+    // R2 original + thumb — only when NO other version (live OR trashed) references the
+    // same key. Copies keep their own r2Key column, so the last holder's purge deletes it.
     if (v.r2Key) {
-        const liveRef = await prisma.reviewVersion.count({ where: { r2Key: v.r2Key, deletedAt: null, id: { not: v.id } } })
-        if (liveRef === 0) {
+        const otherRef = await prisma.reviewVersion.count({ where: { r2Key: v.r2Key, id: { not: v.id } } })
+        if (otherRef === 0) {
             try {
                 await deleteObject(v.r2Key)
                 s.r2Deleted++
@@ -78,18 +87,40 @@ async function teardownVersionExternal(v: Pick<ReviewVersion, 'id' | 'r2Key' | '
         }
     }
 
-    // Mux asset — only the ORIGINAL version holds muxAssetId; but its playback id may
-    // be shared by a live copy, so gate on the PLAYBACK id, not the asset id.
-    if (v.muxAssetId && v.muxPlaybackId) {
-        const liveRef = await prisma.reviewVersion.count({
-            where: { muxPlaybackId: v.muxPlaybackId, deletedAt: null, id: { not: v.id } },
+    // Mux asset — gate on the PLAYBACK id (copies share it; only the original holds the
+    // asset id due to @unique).
+    if (v.muxPlaybackId) {
+        const otherRef = await prisma.reviewVersion.count({
+            where: { muxPlaybackId: v.muxPlaybackId, id: { not: v.id } },
         })
-        if (liveRef === 0) {
-            try {
-                await deleteMuxAsset(v.muxAssetId)
-                s.muxDeleted++
-            } catch (e) {
-                reviewLog('error', 'purge.mux_delete_failed', { versionId: v.id, error: String(e) })
+        if (otherRef === 0) {
+            // Last holder → delete the Mux asset (this version must hold the id — either it
+            // was the original, or it was re-homed here on an earlier sibling's purge).
+            if (v.muxAssetId) {
+                try {
+                    await deleteMuxAsset(v.muxAssetId)
+                    s.muxDeleted++
+                } catch (e) {
+                    reviewLog('error', 'purge.mux_delete_failed', { versionId: v.id, error: String(e) })
+                }
+            }
+        } else if (v.muxAssetId) {
+            // NOT the last holder, but THIS version owns the Mux asset id → hand it to a
+            // surviving sibling before this row is deleted, so the asset is reaped when the
+            // last holder is purged (never orphaned). @unique: clear here, set there in 1 tx.
+            const survivor = await prisma.reviewVersion.findFirst({
+                where: { muxPlaybackId: v.muxPlaybackId, id: { not: v.id }, muxAssetId: null },
+                select: { id: true },
+            })
+            if (survivor) {
+                try {
+                    await prisma.$transaction([
+                        prisma.reviewVersion.update({ where: { id: v.id }, data: { muxAssetId: null } }),
+                        prisma.reviewVersion.update({ where: { id: survivor.id }, data: { muxAssetId: v.muxAssetId } }),
+                    ])
+                } catch (e) {
+                    reviewLog('error', 'purge.mux_rehome_failed', { versionId: v.id, error: String(e) })
+                }
             }
         }
     }
@@ -166,13 +197,21 @@ async function purgeStandaloneVersion(versionId: string, actorUserId: string | n
     return s
 }
 
-/** A folder is purgeable only when it has NO live descendant folder/asset (GAP-3). */
-async function folderHasLiveDescendant(folderPath: string): Promise<boolean> {
-    const [liveFolder, liveAsset] = await Promise.all([
-        prisma.reviewFolder.count({ where: { path: { startsWith: folderPath }, deletedAt: null } }),
-        prisma.reviewAsset.count({ where: { folder: { path: { startsWith: folderPath } }, deletedAt: null } }),
+/**
+ * A folder is purgeable only when NO descendant row remains — folder or asset, LIVE
+ * OR still-trashed. Gating on live-only (GAP-3) is necessary but not sufficient: the
+ * cron caps assets at 25/run, so a folder can still hold trashed-not-yet-purged child
+ * assets after the asset step, and ReviewAsset.folder is onDelete:Restrict → deleting
+ * the folder then throws a FK error. Excluding trashed descendants too defers the
+ * folder to a later run (where the asset backlog is drained). Excludes the folder's
+ * OWN row (path startsWith its path matches itself).
+ */
+async function folderHasDescendantRow(folder: { id: string; path: string }): Promise<boolean> {
+    const [childFolders, assets] = await Promise.all([
+        prisma.reviewFolder.count({ where: { path: { startsWith: folder.path }, id: { not: folder.id } } }),
+        prisma.reviewAsset.count({ where: { folder: { path: { startsWith: folder.path } } } }),
     ])
-    return liveFolder > 0 || liveAsset > 0
+    return childFolders > 0 || assets > 0
 }
 
 // ─────────────────────────── nightly cron sweep ───────────────────────────
@@ -183,7 +222,18 @@ async function folderHasLiveDescendant(folderPath: string): Promise<boolean> {
  * a hit cap is logged). Order: assets (cascade their versions) → standalone
  * versions → empty folders (deepest path first, skipping any with a live descendant).
  */
-export async function purgeExpiredTrash(batchSize = 25): Promise<PurgeStats & { capHit: boolean }> {
+export interface PurgeSummary {
+    versions: number
+    assets: number
+    folders: number
+    muxDeleted: number
+    r2Deleted: number
+    attachmentsDeleted: number
+    bytesFreed: string // string, not bigint — this crosses the Inngest step + logger JSON boundary
+    capHit: boolean
+}
+
+export async function purgeExpiredTrash(batchSize = 25): Promise<PurgeSummary> {
     const cutoff = new Date(Date.now() - PURGE_AGE_DAYS * 24 * 60 * 60 * 1000)
     const total = emptyStats()
     let capHit = false
@@ -213,7 +263,9 @@ export async function purgeExpiredTrash(batchSize = 25): Promise<PurgeStats & { 
         take: batchSize,
     })
     for (const f of folders) {
-        if (await folderHasLiveDescendant(f.path)) continue // GAP-3: a restored child keeps it
+        // Skip a folder that still has ANY descendant row (live restored child = GAP-3,
+        // OR trashed child assets left over past the 25-asset cap → onDelete:Restrict FK).
+        if (await folderHasDescendantRow(f)) continue
         await prisma.reviewFolder.delete({ where: { id: f.id } }).catch((e) =>
             reviewLog('error', 'purge.folder_row_delete_failed', { folderId: f.id, error: String(e) }),
         )
@@ -237,7 +289,9 @@ export async function purgeExpiredTrash(batchSize = 25): Promise<PurgeStats & { 
         bytesFreed: total.bytesFreed.toString(),
         capHit,
     })
-    return { ...total, capHit }
+    // bytesFreed → string: this object crosses the Inngest step boundary + the plain
+    // JSON.stringify logger, neither of which can serialize a bigint (would throw).
+    return { ...total, bytesFreed: total.bytesFreed.toString(), capHit }
 }
 
 // ─────────────────────────── manual "Delete forever" (ADMIN) ───────────────────────────
@@ -286,7 +340,7 @@ export async function manualPurgeItems(
             orderBy: { path: 'desc' },
         })
         for (const f of subFolders) {
-            if (await folderHasLiveDescendant(f.path)) continue
+            if (await folderHasDescendantRow(f)) continue // a LIVE (restored) child keeps it
             await prisma.reviewFolder.delete({ where: { id: f.id } }).catch(() => {})
             total.folders++
         }

@@ -77,6 +77,7 @@ export type AuditAction =
     | 'video.guest_commented'         // a guest left a public comment via a share link
     | 'video.share_created'           // a review share link was created
     | 'video.share_revoked'           // a review share link was revoked
+    | 'video.share_unrevoked'         // a revoked review share link was re-opened
     | 'task.client_submitted'          // Client created a NEW task via the share-link portal (v1 — legacy)
     | 'task.comment_added'             // [Trial P1] A task comment was posted (staff or client)
     // [Chat GĐ3 · C2] Message-as-action-item lifecycle

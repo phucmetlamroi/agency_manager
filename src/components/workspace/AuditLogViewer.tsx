@@ -42,6 +42,7 @@ const ACTION_LABELS: Record<string, string> = {
   'video.guest_commented': 'Video review: khách bình luận',
   'video.share_created': 'Video review: tạo link chia sẻ',
   'video.share_revoked': 'Video review: thu hồi link chia sẻ',
+  'video.share_unrevoked': 'Video review: mở lại link chia sẻ',
   'task.client_approved': 'Video review: khách duyệt',
   'task.client_changes_requested': 'Video review: khách yêu cầu chỉnh sửa',
 }

@@ -91,14 +91,16 @@ export interface ItemMenuHandlers {
     canDelete: boolean
     /** P3.4 — asset menu only; present (enabled) when a single asset is the target. */
     onManageVersions?: () => void
+    /** P5.5 — opens the create-share modal for the acting items (FR-F01). */
+    onCreateShare?: () => void
 }
 
-/** FR-B07 — folder menu (9 items, exact order). Share (1–2) disabled until P5. */
+/** FR-B07 — folder menu (9 items, exact order). "Thêm vào link" [S] lands in P6. */
 export function FolderMenuContent(h: ItemMenuHandlers) {
     return (
         <>
-            <Item icon={<Share2 size={15} />} label="Tạo link chia sẻ" disabled hint="Có ở bản sau (P5)" trailing={SOON} />
-            <Item icon={<ListPlus size={15} />} label="Thêm vào link chia sẻ" disabled hint="Có ở bản sau (P5)" trailing={SOON} />
+            <Item icon={<Share2 size={15} />} label="Tạo link chia sẻ" onSelect={h.onCreateShare} disabled={!h.onCreateShare} />
+            <Item icon={<ListPlus size={15} />} label="Thêm vào link chia sẻ" disabled hint="Có ở bản sau (P6)" trailing={SOON} />
             <Sep />
             <Item icon={<Download size={15} />} label="Tải xuống" onSelect={h.onDownload} hint="Tải toàn bộ bản gốc trong thư mục" />
             <Item icon={<LinkIcon size={15} />} label="Sao chép URL thư mục" onSelect={h.onCopyUrl} />
@@ -120,12 +122,12 @@ export function FolderMenuContent(h: ItemMenuHandlers) {
     )
 }
 
-/** FR-B08 — asset menu (10 items, exact order). Share (1–2) disabled until P5. */
+/** FR-B08 — asset menu (10 items, exact order). "Thêm vào link" [S] lands in P6. */
 export function AssetMenuContent(h: ItemMenuHandlers) {
     return (
         <>
-            <Item icon={<Share2 size={15} />} label="Tạo link chia sẻ" disabled hint="Có ở bản sau (P5)" trailing={SOON} />
-            <Item icon={<ListPlus size={15} />} label="Thêm vào link chia sẻ" disabled hint="Có ở bản sau (P5)" trailing={SOON} />
+            <Item icon={<Share2 size={15} />} label="Tạo link chia sẻ" onSelect={h.onCreateShare} disabled={!h.onCreateShare} />
+            <Item icon={<ListPlus size={15} />} label="Thêm vào link chia sẻ" disabled hint="Có ở bản sau (P6)" trailing={SOON} />
             <Item
                 icon={<Layers size={15} />}
                 label="Quản lý phiên bản"

@@ -37,6 +37,7 @@ import {
     ChevronRight,
     ChevronDown,
     RefreshCw,
+    Share2,
     Loader2,
     AlertTriangle,
     Layers,
@@ -79,6 +80,7 @@ import {
 import { bytesLabel, REVIEW_ITEMS_MIME, type ItemDnd } from './TeamCards'
 import { FolderCardGrid, AssetCardGrid, InfoPanel } from './TeamCards'
 import { ManageVersionsModal } from './ManageVersionsModal'
+import { ShareLinkModal, type ShareModalTarget } from './ShareLinkModal'
 import { TeamListView } from './TeamListView'
 import { AppearanceMenu, SortMenu } from './TeamToolbar'
 import { NewMenu, NewFolderTile, UploadingCard, DropOverlay } from './TeamUpload'
@@ -172,6 +174,7 @@ export function TeamBrowser({
     const [anchorId, setAnchorId] = useState<string | null>(null)
     const [renamingId, setRenamingId] = useState<string | null>(null)
     const [menuTarget, setMenuTarget] = useState<MenuTarget | null>(null)
+    const [shareTarget, setShareTarget] = useState<ShareModalTarget | null>(null) // P5.5
     const [moveCopy, setMoveCopy] = useState<{ mode: MoveCopyMode; items: ItemRef[] } | null>(null)
     const [confirmState, setConfirmState] = useState<{ items: ItemRef[]; message: string } | null>(null)
 
@@ -1083,9 +1086,19 @@ export function TeamBrowser({
             onDelete: () => requestDelete(acting),
             canDelete: canDeleteItems(acting),
             onManageVersions: soleAsset ? () => openManageVersions(target.id) : undefined,
+            // P5.5 — share the acting selection (multi-select works via right-click).
+            onCreateShare: () =>
+                setShareTarget({
+                    workspaceId,
+                    items: acting.map((i) => ({
+                        type: i.type,
+                        id: i.id,
+                        title: (i.type === 'folder' ? folderById.get(i.id)?.name : assetById.get(i.id)?.title) ?? '—',
+                    })),
+                }),
         }
         return target.type === 'folder' ? <FolderMenuContent {...h} /> : <AssetMenuContent {...h} />
-    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions])
+    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions, workspaceId, folderById, assetById])
 
     const selectionActive = selectedIds.size > 0
 
@@ -1179,6 +1192,13 @@ export function TeamBrowser({
                             <SortMenu sortField={sortField} sortDir={sortDir} onChange={updatePrefs} />
                         </div>
                         <div className="flex items-center gap-1.5">
+                            <a
+                                href={`/${workspaceId}/admin/team/shares`}
+                                title="Link chia sẻ"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
+                            >
+                                <Share2 size={15} />
+                            </a>
                             <a
                                 href={`/${workspaceId}/admin/team/trash`}
                                 title="Thùng rác"
@@ -1384,6 +1404,9 @@ export function TeamBrowser({
                 onCancel={() => setMergeConfirm(null)}
                 onConfirm={doMergeConfirmed}
             />
+
+            {/* P5.5 Create Share Link */}
+            {shareTarget && <ShareLinkModal target={shareTarget} onClose={() => setShareTarget(null)} />}
 
             {/* P3.4 Manage Versions */}
             {manageVersionsId && (

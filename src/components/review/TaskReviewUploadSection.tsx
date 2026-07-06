@@ -23,17 +23,31 @@ import {
     X,
     RotateCcw,
     Clapperboard,
+    CheckCircle2,
 } from 'lucide-react'
 import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
 import { useTaskUploads } from '@/lib/review/use-upload-store'
 import { formatBytes, type UploadItem } from '@/lib/review/upload-store'
+import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
+import { apiConfirmTaskComplete } from '@/lib/review/team-actions'
 import type { TaskAssetsResult, TaskDeliverableDto } from '@/lib/review/task-assets'
 import type { ReviewStateDto } from '@/lib/review/dto'
 
 const POLL_MS = 3000
 
-export function TaskReviewUploadSection({ taskId }: { taskId: string }) {
+export function TaskReviewUploadSection({
+    taskId,
+    taskStatus,
+    onTaskCompleted,
+}: {
+    taskId: string
+    /** Current task status — drives the "Chuyển task sang Hoàn tất?" banner (FR-D02). */
+    taskStatus?: string | null
+    /** Called after the task is flipped to Hoàn tất, so the drawer can sync its own state. */
+    onTaskCompleted?: () => void
+}) {
     const uploads = useTaskUploads(taskId)
+    const [confirmingComplete, setConfirmingComplete] = useState(false)
     const [data, setData] = useState<TaskAssetsResult | null>(null)
     const [pendingFile, setPendingFile] = useState<File | null>(null)
     const [dragOver, setDragOver] = useState(false)
@@ -124,6 +138,25 @@ export function TaskReviewUploadSection({ taskId }: { taskId: string }) {
 
     const hasCards = liveItems.length > 0 || serverCards.length > 0
 
+    // P3.7 — a linked deliverable is at the "approved" status but the task isn't Hoàn tất yet:
+    // offer to sync the task. The server (confirmTaskHoanTat) re-checks RBAC + the status FSM.
+    const approvedAsset = serverAssets.find((a) => a.statusId === REVIEW_STATUS_MAP.approved) ?? null
+    const showCompleteBanner = !!approvedAsset && taskStatus !== REVIEW_STATUS_MAP.approved
+
+    const confirmComplete = useCallback(async () => {
+        setConfirmingComplete(true)
+        const tid = toast.loading('Đang chuyển task sang Hoàn tất…')
+        try {
+            await apiConfirmTaskComplete(taskId)
+            toast.success('Đã chuyển task sang Hoàn tất.', { id: tid })
+            onTaskCompleted?.()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Không chuyển được trạng thái task.', { id: tid })
+        } finally {
+            setConfirmingComplete(false)
+        }
+    }, [taskId, onTaskCompleted])
+
     return (
         <div
             className={`mt-4 rounded-xl border p-3 transition-colors ${
@@ -141,6 +174,28 @@ export function TaskReviewUploadSection({ taskId }: { taskId: string }) {
                 Video review
                 <span className="font-normal normal-case text-zinc-600">— khách duyệt trực tiếp</span>
             </div>
+
+            {/* P3.7 — sync task → Hoàn tất when a linked deliverable is at the approved status */}
+            {showCompleteBanner && (
+                <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] p-2.5">
+                    <CheckCircle2 size={16} className="shrink-0 text-emerald-300" />
+                    <div className="min-w-0 flex-1">
+                        <div className="text-[12px] font-medium text-emerald-100">Bản dựng đã được duyệt</div>
+                        <div className="truncate text-[11px] text-emerald-200/70">
+                            “{approvedAsset?.name}” đang ở trạng thái “{REVIEW_STATUS_MAP.approved}”. Chuyển task sang Hoàn tất?
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={confirmComplete}
+                        disabled={confirmingComplete}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-[11.5px] font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-60"
+                    >
+                        {confirmingComplete ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                        Chuyển sang Hoàn tất
+                    </button>
+                </div>
+            )}
 
             <input
                 ref={fileInputRef}

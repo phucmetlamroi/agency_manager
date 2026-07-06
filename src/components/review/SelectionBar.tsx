@@ -3,8 +3,8 @@
 // [Review module P2.5] Multi-select bottom bar (FR-B11). Slides up when ≥1 item is
 // selected; shows the count + total size (+ total runtime for assets) with the exact
 // copy from UI-UX-SPEC §1.4.7, and the bulk actions Download / Move to / Copy to /
-// Delete. "Manage Versions" shows (disabled) only when exactly one asset is selected —
-// it wires up in P3. Esc / the clear button dismiss the selection.
+// Delete. "Manage Versions" shows only when exactly one asset is selected (P3.4).
+// Esc / the clear button dismiss the selection.
 
 import { Download, FolderInput, CopyPlus, Trash2, X, Layers } from 'lucide-react'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
@@ -39,6 +39,7 @@ export function SelectionBar({
     onCopy,
     onDelete,
     onClear,
+    onManageVersions,
 }: {
     folders: FolderDto[]
     assets: AssetDto[]
@@ -50,6 +51,8 @@ export function SelectionBar({
     onCopy: () => void
     onDelete: () => void
     onClear: () => void
+    /** P3.4 — open Manage Versions for the sole selected asset. */
+    onManageVersions?: () => void
 }) {
     const nFolders = folders.length
     const nAssets = assets.length
@@ -96,12 +99,12 @@ export function SelectionBar({
                     <BarBtn icon={<Download size={14} />} label="Tải xuống" onClick={onDownload} />
                     <BarBtn icon={<FolderInput size={14} />} label="Di chuyển" onClick={onMove} />
                     <BarBtn icon={<CopyPlus size={14} />} label="Sao chép" onClick={onCopy} />
-                    {soleAsset && (
+                    {soleAsset && onManageVersions && (
                         <BarBtn
                             icon={<Layers size={14} />}
                             label="Phiên bản"
-                            disabled
-                            title="Quản lý phiên bản — có ở bản sau (P3)"
+                            onClick={onManageVersions}
+                            title="Quản lý phiên bản"
                         />
                     )}
                     <BarBtn

@@ -55,7 +55,8 @@ import {
     gridMinWidth,
     aspectCss,
 } from '@/lib/review/view-prefs'
-import { useFolderUploads } from '@/lib/review/use-upload-store'
+import { useFolderUploads, useUploadItems } from '@/lib/review/use-upload-store'
+import { uploadEngine } from '@/lib/review/upload-engine'
 import { collectDropFiles, fromFileList, filterValid, enqueueFolderTree, UPLOAD_ACCEPT, type DroppedFile } from '@/lib/review/team-upload'
 import {
     type ItemKind,
@@ -67,14 +68,17 @@ import {
     apiRenameFolder,
     apiRenameAsset,
     apiRestoreItems,
+    apiSetAssetStatus,
+    apiMergeStacks,
     downloadVersion,
     downloadFolder,
     teamFolderUrl,
     teamAssetUrl,
     copyToClipboard,
 } from '@/lib/review/team-actions'
-import { bytesLabel } from './TeamCards'
+import { bytesLabel, REVIEW_ITEMS_MIME, type ItemDnd } from './TeamCards'
 import { FolderCardGrid, AssetCardGrid, InfoPanel } from './TeamCards'
+import { ManageVersionsModal } from './ManageVersionsModal'
 import { TeamListView } from './TeamListView'
 import { AppearanceMenu, SortMenu } from './TeamToolbar'
 import { NewMenu, NewFolderTile, UploadingCard, DropOverlay } from './TeamUpload'
@@ -171,6 +175,12 @@ export function TeamBrowser({
     const [moveCopy, setMoveCopy] = useState<{ mode: MoveCopyMode; items: ItemRef[] } | null>(null)
     const [confirmState, setConfirmState] = useState<{ items: ItemRef[]; message: string } | null>(null)
 
+    // P3.4/P3.6 — Manage Versions modal + asset→asset merge confirm + drag state.
+    const [manageVersionsId, setManageVersionsId] = useState<string | null>(null)
+    const [mergeConfirm, setMergeConfirm] = useState<{ sourceId: string; targetId: string; sourceName: string; targetName: string } | null>(null)
+    const [draggingIds, setDraggingIds] = useState<Set<string>>(new Set())
+    const [assetFileHover, setAssetFileHover] = useState<string | null>(null)
+
     const sortField = prefs.sortField
     const sortDir = prefs.sortDir
     const [hydrated, setHydrated] = useState(false)
@@ -183,6 +193,11 @@ export function TeamBrowser({
     // must NOT resurrect them from the stale accumulated list. Cleared by the authoritative
     // silentReplace once the server-fresh page confirms they're gone.
     const removedRef = useRef<Set<string>>(new Set())
+    // ids whose card status is mid-write (optimistic value shown). A concurrent
+    // silentRefresh/silentReplace must NOT overwrite the optimistic chip with the stale
+    // server status — it re-applies the pending value until doSetStatus finalizes (same
+    // spirit as removedRef for deleted rows). Maps assetId → optimistic statusKey.
+    const pendingStatusRef = useRef<Map<string, string | null>>(new Map())
 
     useEffect(() => {
         setPrefs(loadPrefs())
@@ -196,6 +211,18 @@ export function TeamBrowser({
             return next
         })
     }, [])
+
+    // Re-apply any in-flight optimistic status onto a fresh server asset list (guards the
+    // status chip against a concurrent silentRefresh/silentReplace reverting it).
+    const applyPendingStatus = useCallback((assets: AssetDto[]): AssetDto[] => {
+        const p = pendingStatusRef.current
+        if (p.size === 0) return assets
+        return assets.map((a) => (p.has(a.id) ? { ...a, statusKey: p.get(a.id) as string | null } : a))
+    }, [])
+    const withPendingStatus = useCallback(
+        (res: ChildrenResult): ChildrenResult => ({ ...res, assets: applyPendingStatus(res.assets) }),
+        [applyPendingStatus],
+    )
 
     /* ---- fetchers ---- */
     const fetchChildren = useCallback(
@@ -352,12 +379,12 @@ export function TeamBrowser({
             .then((fresh) => {
                 if (folderIdRef.current !== fid) return
                 setData((prev) => {
-                    if (!prev) return fresh
+                    if (!prev) return withPendingStatus(fresh)
                     const freshIds = new Set(fresh.assets.map((a) => a.id))
                     return {
                         folders: fresh.folders,
                         assets: [
-                            ...fresh.assets,
+                            ...applyPendingStatus(fresh.assets),
                             ...prev.assets.filter((a) => !freshIds.has(a.id) && !removedRef.current.has(a.id)),
                         ],
                         summary: fresh.summary,
@@ -366,7 +393,7 @@ export function TeamBrowser({
                 })
             })
             .catch(() => {})
-    }, [folderId, sortField, sortDir, fetchChildren])
+    }, [folderId, sortField, sortDir, fetchChildren, applyPendingStatus, withPendingStatus])
 
     // silent REPLACE refetch — for move/copy/delete/rename (items removed/relocated, so a
     // merge would keep stale rows). Resets to page 1 (acceptable after a bulk op).
@@ -375,7 +402,7 @@ export function TeamBrowser({
         fetchChildren(fid, null, sortField, sortDir)
             .then((fresh) => {
                 if (folderIdRef.current !== fid) return
-                setData(fresh)
+                setData(withPendingStatus(fresh))
                 setNextCursor(fresh.nextCursor)
                 removedRef.current = new Set() // fresh page is authoritative — stop suppressing
             })
@@ -483,6 +510,28 @@ export function TeamBrowser({
     useEffect(() => {
         if (liveSig) silentRef.current()
     }, [liveSig])
+
+    // P3.6 — assets with an in-flight new-version upload (target.kind === 'asset') → block
+    // merge/version drops + show a tooltip. Also drives a grid refresh when they change,
+    // since asset-targeted uploads are NOT folder live-cards (liveSig above won't catch them).
+    const allUploads = useUploadItems()
+    const busyAssetIds = useMemo(() => {
+        const s = new Set<string>()
+        for (const it of allUploads) {
+            if (it.target.kind === 'asset' && it.status !== 'done' && it.status !== 'canceled') {
+                s.add(it.target.assetId)
+            }
+        }
+        for (const id of liveAssetIds) s.add(id)
+        return s
+    }, [allUploads, liveAssetIds])
+    const assetUploadSig = allUploads
+        .filter((it) => it.target.kind === 'asset')
+        .map((it) => `${it.id}:${it.status}`)
+        .join('|')
+    useEffect(() => {
+        if (assetUploadSig) silentRef.current()
+    }, [assetUploadSig])
 
     /* ---- lookups + selection helpers ---- */
     const visibleAssets = useMemo(() => assets.filter((a) => !liveAssetIds.has(a.id)), [assets, liveAssetIds])
@@ -761,6 +810,157 @@ export function TeamBrowser({
         [typeOf, folderById, assetById, silentReplace, refreshTree],
     )
 
+    /* ---- P3.5: set / clear an asset's card status (optimistic + optimistic-locked) ---- */
+    const doSetStatus = useCallback(
+        async (assetId: string, statusId: string | null) => {
+            const asset = assetById.get(assetId)
+            if (!asset || asset.statusKey === statusId) return
+            const prevStatus = asset.statusKey
+            const expected = asset.rowVersion
+            // Guard the optimistic chip against a concurrent silentRefresh/silentReplace.
+            pendingStatusRef.current.set(assetId, statusId)
+            setData((d) =>
+                d ? { ...d, assets: d.assets.map((a) => (a.id === assetId ? { ...a, statusKey: statusId } : a)) } : d,
+            )
+            try {
+                const res = await apiSetAssetStatus(assetId, statusId, expected)
+                setData((d) =>
+                    d
+                        ? {
+                              ...d,
+                              assets: d.assets.map((a) =>
+                                  a.id === assetId ? { ...a, statusKey: res.statusKey, rowVersion: res.rowVersion } : a,
+                              ),
+                          }
+                        : d,
+                )
+            } catch (e) {
+                // Roll the chip back; a rowVersion clash means someone else changed it — resync.
+                setData((d) =>
+                    d ? { ...d, assets: d.assets.map((a) => (a.id === assetId ? { ...a, statusKey: prevStatus } : a)) } : d,
+                )
+                toast.error(e instanceof Error ? e.message : 'Không đổi được trạng thái.')
+            } finally {
+                pendingStatusRef.current.delete(assetId)
+            }
+        },
+        [assetById],
+    )
+
+    /* ---- P3.6: drag-and-drop (move onto folder · merge onto asset · file → new version) ---- */
+    const onItemDragStart = useCallback(
+        (e: ReactDragEvent, id: string) => {
+            // Drag the whole selection if the grabbed item is part of it; otherwise just this one.
+            const ids = selectedIds.has(id) ? [...selectedIds] : [id]
+            if (!selectedIds.has(id)) {
+                setSelectedIds(new Set([id]))
+                setAnchorId(id)
+            }
+            try {
+                e.dataTransfer.setData(REVIEW_ITEMS_MIME, JSON.stringify(toItemRefs(ids)))
+                e.dataTransfer.effectAllowed = 'copyMove'
+            } catch {
+                /* setData can throw in odd browsers — the drop handlers no-op without it */
+            }
+            setDraggingIds(new Set(ids))
+        },
+        [selectedIds, toItemRefs],
+    )
+    const onItemDragEnd = useCallback(() => setDraggingIds(new Set()), [])
+
+    const doDropMove = useCallback(
+        async (items: ItemRef[], targetFolderId: string) => {
+            const moving = items.filter((i) => !(i.type === 'folder' && i.id === targetFolderId))
+            if (moving.length === 0) return
+            const tid = toast.loading('Đang di chuyển…')
+            try {
+                await apiMoveItems(toMoveRefs(moving), targetFolderId)
+                for (const it of moving) removedRef.current.add(it.id)
+                toast.success('Đã di chuyển.', { id: tid })
+                clearSelection()
+                silentReplace()
+                void refreshTree()
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Di chuyển thất bại.', { id: tid })
+            }
+        },
+        [toMoveRefs, clearSelection, silentReplace, refreshTree],
+    )
+
+    const onDropItemsOnAsset = useCallback(
+        (items: ItemRef[], targetAssetId: string) => {
+            const assetsOnly = items.filter((i) => i.type === 'asset')
+            if (items.length !== 1 || assetsOnly.length !== 1) {
+                toast('Chỉ gộp được một asset vào một asset.')
+                return
+            }
+            const sourceId = assetsOnly[0].id
+            if (sourceId === targetAssetId) return
+            const source = assetById.get(sourceId)
+            const target = assetById.get(targetAssetId)
+            if (!source || !target) return
+            if (source.mediaKind !== target.mediaKind) {
+                toast.error('Không thể gộp ảnh và video vào cùng một stack.')
+                return
+            }
+            setMergeConfirm({ sourceId, targetId: targetAssetId, sourceName: source.title, targetName: target.title })
+        },
+        [assetById],
+    )
+
+    const doMergeConfirmed = useCallback(async () => {
+        if (!mergeConfirm) return
+        const { sourceId, targetId } = mergeConfirm
+        setMergeConfirm(null)
+        const tid = toast.loading('Đang gộp phiên bản…')
+        try {
+            const r = await apiMergeStacks(sourceId, targetId)
+            removedRef.current.add(sourceId) // source asset is consumed
+            toast.success(`Đã gộp ${r.mergedCount} phiên bản.`, { id: tid })
+            clearSelection()
+            silentReplace()
+            void refreshTree()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Gộp thất bại.', { id: tid })
+        }
+    }, [mergeConfirm, clearSelection, silentReplace, refreshTree])
+
+    const onDropFilesOnAsset = useCallback(
+        (assetId: string, dt: DataTransfer) => {
+            const asset = assetById.get(assetId)
+            void collectDropFiles(dt).then((dropped) => {
+                const { valid, skipped } = filterValid(dropped)
+                if (valid.length === 0) {
+                    toast.error('Không có file ảnh/video hợp lệ để thêm phiên bản.')
+                    return
+                }
+                // A version is one file; if several were dropped, take the first and note the rest.
+                uploadEngine.enqueue(valid[0].file, { kind: 'asset', assetId }, { targetLabel: asset?.title ?? 'Phiên bản mới' })
+                const extra = valid.length - 1 + skipped
+                toast.success(
+                    `Đang tải phiên bản mới${asset ? ` cho “${asset.title}”` : ''}…${extra > 0 ? ` (bỏ qua ${extra} file khác)` : ''}`,
+                )
+            })
+        },
+        [assetById],
+    )
+
+    const dnd: ItemDnd = useMemo(
+        () => ({
+            draggingIds,
+            onDragStart: onItemDragStart,
+            onDragEnd: onItemDragEnd,
+            onDropItemsOnFolder: doDropMove,
+            onDropItemsOnAsset,
+            onDropFilesOnAsset,
+            onFileHoverAsset: setAssetFileHover,
+            busyAssetIds,
+        }),
+        [draggingIds, onItemDragStart, onItemDragEnd, doDropMove, onDropItemsOnAsset, onDropFilesOnAsset, busyAssetIds],
+    )
+
+    const openManageVersions = useCallback((assetId: string) => setManageVersionsId(assetId), [])
+
     /* ---- context-menu target resolution ---- */
     const handleOpenTarget = useCallback(
         (t: MenuTarget | null) => {
@@ -867,6 +1067,7 @@ export function TeamBrowser({
         }
         const target = menuTarget
         const acting: ItemRef[] = selectedIds.size ? toItemRefs([...selectedIds]) : [{ type: target.type, id: target.id }]
+        const soleAsset = target.type === 'asset' && acting.length === 1 && acting[0].type === 'asset'
         const h: ItemMenuHandlers = {
             onDownload: () => doDownload(acting),
             onCopyUrl: () => doCopyUrl(target),
@@ -876,9 +1077,10 @@ export function TeamBrowser({
             onRename: () => startRename(target.id),
             onDelete: () => requestDelete(acting),
             canDelete: canDeleteItems(acting),
+            onManageVersions: soleAsset ? () => openManageVersions(target.id) : undefined,
         }
         return target.type === 'folder' ? <FolderMenuContent {...h} /> : <AssetMenuContent {...h} />
-    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems])
+    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions])
 
     const selectionActive = selectedIds.size > 0
 
@@ -1004,7 +1206,7 @@ export function TeamBrowser({
                             onDragLeave={onDragLeave}
                             onDrop={onDrop}
                         >
-                            {dragOver && <DropOverlay folderName={currentName} />}
+                            {dragOver && !assetFileHover && <DropOverlay folderName={currentName} />}
                             {loading ? (
                                 <LoadingState prefs={prefs} gridStyle={gridStyle} />
                             ) : error ? (
@@ -1042,9 +1244,15 @@ export function TeamBrowser({
                                         onCancelRename={() => setRenamingId(null)}
                                         onOpenFolder={go}
                                         onOpenAsset={openAsset}
+                                        onSetStatus={doSetStatus}
                                     />
                                     {selectedAsset && selectedIds.size === 1 && (
-                                        <InfoPanel asset={selectedAsset} onClose={clearSelection} />
+                                        <InfoPanel
+                                            asset={selectedAsset}
+                                            onClose={clearSelection}
+                                            onSetStatus={(s) => doSetStatus(selectedAsset.id, s)}
+                                            onManageVersions={() => openManageVersions(selectedAsset.id)}
+                                        />
                                     )}
                                     <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
                                 </>
@@ -1066,6 +1274,7 @@ export function TeamBrowser({
                                                         onOpen={() => go(f.id)}
                                                         onCommitRename={(name) => commitRename(f.id, name)}
                                                         onCancelRename={() => setRenamingId(null)}
+                                                        dnd={dnd}
                                                     />
                                                 ))}
                                             </div>
@@ -1091,13 +1300,20 @@ export function TeamBrowser({
                                                         onOpen={() => openAsset(a)}
                                                         onCommitRename={(name) => commitRename(a.id, name)}
                                                         onCancelRename={() => setRenamingId(null)}
+                                                        onSetStatus={(s) => doSetStatus(a.id, s)}
+                                                        dnd={dnd}
                                                     />
                                                 ))}
                                             </div>
                                         </Section>
                                     )}
                                     {selectedAsset && selectedIds.size === 1 && (
-                                        <InfoPanel asset={selectedAsset} onClose={clearSelection} />
+                                        <InfoPanel
+                                            asset={selectedAsset}
+                                            onClose={clearSelection}
+                                            onSetStatus={(s) => doSetStatus(selectedAsset.id, s)}
+                                            onManageVersions={() => openManageVersions(selectedAsset.id)}
+                                        />
                                     )}
                                     <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
                                 </>
@@ -1119,6 +1335,11 @@ export function TeamBrowser({
                     onCopy={() => openMoveCopy('copy', toItemRefs([...selectedIds]))}
                     onDelete={() => requestDelete(toItemRefs([...selectedIds]))}
                     onClear={clearSelection}
+                    onManageVersions={
+                        selectedFolders.length === 0 && selectedAssets.length === 1
+                            ? () => openManageVersions(selectedAssets[0].id)
+                            : undefined
+                    }
                 />
             )}
 
@@ -1142,6 +1363,36 @@ export function TeamBrowser({
                 onCancel={() => setConfirmState(null)}
                 onConfirm={doDeleteConfirmed}
             />
+
+            {/* P3.6 asset → asset merge confirm */}
+            <ConfirmModal
+                open={!!mergeConfirm}
+                tone="primary"
+                title="Gộp thành phiên bản mới?"
+                icon={<Layers size={17} />}
+                message={
+                    mergeConfirm
+                        ? `Gộp “${mergeConfirm.sourceName}” vào “${mergeConfirm.targetName}”? Các phiên bản của “${mergeConfirm.sourceName}” (kèm bình luận) sẽ trở thành phiên bản mới nhất của “${mergeConfirm.targetName}”.`
+                        : ''
+                }
+                confirmLabel="Gộp"
+                onCancel={() => setMergeConfirm(null)}
+                onConfirm={doMergeConfirmed}
+            />
+
+            {/* P3.4 Manage Versions */}
+            {manageVersionsId && (
+                <ManageVersionsModal
+                    assetId={manageVersionsId}
+                    open
+                    onClose={() => setManageVersionsId(null)}
+                    onChanged={() => {
+                        silentReplace()
+                        void refreshTree()
+                    }}
+                    onOpenVersion={() => toast('Trình xem sẽ có ở bản sau.')}
+                />
+            )}
         </div>
     )
 }
@@ -1154,13 +1405,22 @@ function ConfirmModal({
     confirmLabel,
     onCancel,
     onConfirm,
+    title = 'Xác nhận xóa',
+    tone = 'danger',
+    icon,
 }: {
     open: boolean
     message: string
     confirmLabel: string
     onCancel: () => void
     onConfirm: () => void
+    title?: string
+    tone?: 'danger' | 'primary'
+    icon?: ReactNode
 }) {
+    const headIcon = icon ?? <Trash2 size={17} />
+    const iconBox = tone === 'danger' ? 'bg-red-500/10 text-red-300' : 'bg-violet-500/10 text-violet-300'
+    const confirmBtn = tone === 'danger' ? 'bg-red-500 hover:bg-red-600' : 'bg-violet-500 hover:bg-violet-600'
     return (
         <Dialog.Root open={open} onOpenChange={(o) => !o && onCancel()}>
             <Dialog.Portal>
@@ -1170,10 +1430,10 @@ function ConfirmModal({
                     style={{ fontFamily: "var(--font-sans), 'Plus Jakarta Sans', sans-serif" }}
                 >
                     <div className="mb-3 flex items-center gap-2.5">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-300">
-                            <Trash2 size={17} />
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconBox}`}>
+                            {headIcon}
                         </div>
-                        <Dialog.Title className="text-[14px] font-semibold text-zinc-100">Xác nhận xóa</Dialog.Title>
+                        <Dialog.Title className="text-[14px] font-semibold text-zinc-100">{title}</Dialog.Title>
                     </div>
                     <Dialog.Description className="mb-5 text-[12.5px] leading-relaxed text-zinc-400">{message}</Dialog.Description>
                     <div className="flex items-center justify-end gap-2">
@@ -1187,9 +1447,9 @@ function ConfirmModal({
                         <button
                             type="button"
                             onClick={onConfirm}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-red-600"
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12.5px] font-semibold text-white transition-colors ${confirmBtn}`}
                         >
-                            <Trash2 size={14} /> {confirmLabel}
+                            {tone === 'danger' ? <Trash2 size={14} /> : <Layers size={14} />} {confirmLabel}
                         </button>
                     </div>
                 </Dialog.Content>

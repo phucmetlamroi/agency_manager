@@ -8,8 +8,8 @@
 // checkbox + '…' menu affordances are P2.5, so they are not drawn here yet. Folder
 // 2×2 thumbnail preview needs a backend preview feed → deferred (icon shown instead).
 
-import { useState } from 'react'
-import { Folder as FolderIcon, Film, Image as ImageIcon, MessageSquare, Loader2, AlertTriangle, X } from 'lucide-react'
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { Folder as FolderIcon, Film, Image as ImageIcon, MessageSquare, Loader2, AlertTriangle, X, Check } from 'lucide-react'
 import { formatBytes } from '@/lib/review/upload-store'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
 import type { Aspect, ThumbScale } from '@/lib/review/view-prefs'
@@ -86,44 +86,135 @@ function ProcessingOverlay({ state }: { state: 'processing' | 'failed' }) {
     )
 }
 
+/* ── selection + inline-rename affordances (P2.5) ────────────────────────── */
+
+export function SelectCheckbox({ checked, onToggle }: { checked: boolean; onToggle: () => void }) {
+    return (
+        <button
+            type="button"
+            aria-label={checked ? 'Bỏ chọn' : 'Chọn'}
+            onClick={(e) => {
+                e.stopPropagation()
+                onToggle()
+            }}
+            onDoubleClick={(e) => e.stopPropagation()}
+            className={`absolute left-2 top-2 z-10 flex h-[18px] w-[18px] items-center justify-center rounded border transition-all ${
+                checked
+                    ? 'border-violet-400 bg-violet-500 text-white opacity-100'
+                    : 'border-white/40 bg-black/50 text-transparent opacity-0 group-hover:opacity-100'
+            }`}
+        >
+            <Check size={12} strokeWidth={3} />
+        </button>
+    )
+}
+
+/** Inline text editor for rename (auto-focus + select-all; Enter commits, Esc cancels). */
+export function InlineRename({
+    initial,
+    onCommit,
+    onCancel,
+}: {
+    initial: string
+    onCommit: (name: string) => void
+    onCancel: () => void
+}) {
+    const ref = useRef<HTMLInputElement>(null)
+    const done = useRef(false)
+    useEffect(() => {
+        const el = ref.current
+        if (el) {
+            el.focus()
+            el.select()
+        }
+    }, [])
+    const commit = () => {
+        if (done.current) return
+        done.current = true
+        const val = ref.current?.value.trim() ?? ''
+        if (val && val !== initial) onCommit(val)
+        else onCancel()
+    }
+    return (
+        <input
+            ref={ref}
+            defaultValue={initial}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commit()
+                } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    done.current = true
+                    onCancel()
+                }
+            }}
+            onBlur={commit}
+            className="w-full rounded border border-violet-400/60 bg-black/50 px-1.5 py-0.5 text-[12.5px] text-white outline-none focus:border-violet-400"
+        />
+    )
+}
+
 /* ── FOLDER card ─────────────────────────────────────────────────────────── */
 
 export function FolderCardGrid({
     folder,
     selected,
+    renaming,
     onSelect,
+    onToggle,
     onOpen,
+    onCommitRename,
+    onCancelRename,
 }: {
     folder: FolderDto
     selected: boolean
-    onSelect: () => void
+    renaming?: boolean
+    onSelect: (e: ReactMouseEvent) => void
+    onToggle: () => void
     onOpen: () => void
+    onCommitRename?: (name: string) => void
+    onCancelRename?: () => void
 }) {
     return (
-        <button
-            type="button"
+        <div
+            role="button"
+            tabIndex={0}
+            data-review-id={folder.id}
+            data-review-type="folder"
             onClick={onSelect}
-            onDoubleClick={onOpen}
-            className={`group flex flex-col rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 ${
+            onDoubleClick={() => !renaming && onOpen()}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' && !renaming) onOpen()
+            }}
+            className={`group relative flex cursor-pointer flex-col rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 ${
                 selected
                     ? 'border-violet-500 bg-violet-500/[0.08]'
                     : 'border-white/5 bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.06]'
             }`}
         >
+            <SelectCheckbox checked={selected} onToggle={onToggle} />
             <div className="flex items-center gap-2.5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300">
                     <FolderIcon size={20} />
                 </div>
                 <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-zinc-100" title={folder.name}>
-                        {folder.name}
-                    </div>
+                    {renaming && onCommitRename && onCancelRename ? (
+                        <InlineRename initial={folder.name} onCommit={onCommitRename} onCancel={onCancelRename} />
+                    ) : (
+                        <div className="truncate text-[13px] font-medium text-zinc-100" title={folder.name}>
+                            {folder.name}
+                        </div>
+                    )}
                     <div className="mt-0.5 truncate text-[11px] text-zinc-500">
                         {folder.itemCount} mục · {bytesLabel(folder.totalBytes)}
                     </div>
                 </div>
             </div>
-        </button>
+        </div>
     )
 }
 
@@ -135,16 +226,24 @@ export function AssetCardGrid({
     thumb,
     showInfo,
     selected,
+    renaming,
     onSelect,
+    onToggle,
     onOpen,
+    onCommitRename,
+    onCancelRename,
 }: {
     asset: AssetDto
     aspect: Aspect
     thumb: ThumbScale
     showInfo: boolean
     selected: boolean
-    onSelect: () => void
+    renaming?: boolean
+    onSelect: (e: ReactMouseEvent) => void
+    onToggle: () => void
     onOpen: () => void
+    onCommitRename?: (name: string) => void
+    onCancelRename?: () => void
 }) {
     const v = asset.currentVersion
     const state = assetState(asset)
@@ -153,16 +252,20 @@ export function AssetCardGrid({
     const storyboard = v?.media?.storyboardVttUrl
     const isReadyVideo = state === 'ready' && asset.mediaKind === 'video' && !!storyboard
     const commentCount = v?.commentCount ?? 0
+    const canRename = renaming && onCommitRename && onCancelRename
 
     return (
         <div
+            data-review-id={asset.id}
+            data-review-type="asset"
             onClick={onSelect}
-            onDoubleClick={onOpen}
-            className={`group flex cursor-pointer flex-col overflow-hidden rounded-xl border transition-all ${
+            onDoubleClick={() => !renaming && onOpen()}
+            className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border transition-all ${
                 selected ? 'border-violet-500 bg-violet-500/[0.08]' : 'border-white/5 bg-white/[0.03] hover:border-white/15'
             }`}
         >
             <div className="relative w-full bg-black/40" style={{ aspectRatio: aspectCss(aspect) }}>
+                <SelectCheckbox checked={selected} onToggle={onToggle} />
                 {isReadyVideo ? (
                     <HoverScrub storyboardVttUrl={storyboard} durationMs={v?.durationMs ?? null}>
                         <Poster asset={asset} thumb={thumb} />
@@ -175,7 +278,7 @@ export function AssetCardGrid({
 
                 {/* version badge — only when ≥2 versions (FR-B05 AC3) */}
                 {showVersionBadge && (
-                    <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-violet-200 backdrop-blur-sm">
+                    <span className="absolute right-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-violet-200 backdrop-blur-sm">
                         v{v.versionNumber}
                     </span>
                 )}
@@ -187,12 +290,16 @@ export function AssetCardGrid({
                 )}
             </div>
 
-            {showInfo && (
+            {(showInfo || canRename) && (
                 <div className="flex flex-col gap-1 p-2.5">
-                    <div className="truncate text-[12.5px] font-medium text-zinc-100" title={asset.title}>
-                        {asset.title}
-                    </div>
-                    {v?.uploadedBy && (
+                    {canRename ? (
+                        <InlineRename initial={asset.title} onCommit={onCommitRename} onCancel={onCancelRename} />
+                    ) : (
+                        <div className="truncate text-[12.5px] font-medium text-zinc-100" title={asset.title}>
+                            {asset.title}
+                        </div>
+                    )}
+                    {showInfo && v?.uploadedBy && (
                         <div
                             className="truncate text-[11px] text-zinc-500"
                             title={`${v.uploadedBy.name} • ${formatDateTime(v.createdAt)}`}
@@ -200,15 +307,17 @@ export function AssetCardGrid({
                             {v.uploadedBy.name} • {formatDate(v.createdAt)}
                         </div>
                     )}
-                    <div className="mt-0.5 flex items-center justify-between gap-2">
-                        <StatusChip status={asset.statusKey} />
-                        {commentCount > 0 && (
-                            <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-zinc-500">
-                                <MessageSquare size={11} />
-                                {commentCount}
-                            </span>
-                        )}
-                    </div>
+                    {showInfo && (
+                        <div className="mt-0.5 flex items-center justify-between gap-2">
+                            <StatusChip status={asset.statusKey} />
+                            {commentCount > 0 && (
+                                <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-zinc-500">
+                                    <MessageSquare size={11} />
+                                    {commentCount}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

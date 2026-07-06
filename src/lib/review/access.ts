@@ -48,10 +48,23 @@ export async function requireReviewAccess(opts?: {
     if (opts?.workspaceId) {
         try {
             const auth = await verifyWorkspaceAccess(opts.workspaceId, 'MEMBER')
-            return { userId: auth.userId, role, isAdmin: role === 'ADMIN' }
-        } catch {
+            // isAdmin is WORKSPACE-scoped (canonical predicate from verifyProfileAdminAccess):
+            // OWNER/ADMIN of THIS workspace OR its profile. NEVER the global JWT User.role —
+            // a globally-ADMIN user who is only a MEMBER of this workspace must NOT be admin
+            // here (that would let them bypass the FR-B07 folder-delete creator guard on
+            // other members' folders). deleteItems is the sole consumer of this flag.
+            const isWorkspaceAdmin =
+                auth.workspaceRole === 'OWNER' ||
+                auth.workspaceRole === 'ADMIN' ||
+                auth.profileRole === 'OWNER' ||
+                auth.profileRole === 'ADMIN'
+            return { userId: auth.userId, role, isAdmin: isWorkspaceAdmin }
+        } catch (e) {
+            if (e instanceof ReviewAccessError) throw e
             throw new ReviewAccessError(403, 'Không có quyền trên workspace này.')
         }
     }
-    return { userId: user.id, role, isAdmin: role === 'ADMIN' }
+    // No workspace scope → isAdmin is meaningless for authorization (no consumer relies
+    // on it here); report false rather than trusting the global role.
+    return { userId: user.id, role, isAdmin: false }
 }

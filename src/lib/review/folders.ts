@@ -11,7 +11,7 @@
 // scans + ancestor byte-rollups in one UPDATE (DATA-MODEL §9, §11).
 
 import { prisma } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { Prisma, ReviewState } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { requireReviewAccess } from './access'
 import { apiError } from './errors'
@@ -655,6 +655,15 @@ export async function deleteItems(input: {
     const workspaceId = [...workspaces][0]
     const access = await requireReviewAccess({ workspaceId })
 
+    // FR-B07 permission: a USER may only delete FOLDERS they created; ADMIN deletes any
+    // (asset delete is unrestricted for members). Enforced server-side, not just in the UI.
+    if (!access.isAdmin) {
+        const forbidden = folderRows.find((f) => f.createdById !== access.userId)
+        if (forbidden) {
+            throw apiError(403, 'FORBIDDEN', 'Chỉ người tạo hoặc quản trị được xóa thư mục này.', { failedItemId: forbidden.id })
+        }
+    }
+
     const now = new Date()
     await prisma.$transaction(async (tx) => {
         for (const folder of folderRows) {
@@ -873,4 +882,488 @@ export async function restoreItems(input: {
 
         return { restored }
     })
+}
+
+// ─────────────────────── rename asset ───────────────────────
+
+/** 1–255 chars, trimmed. Unlike folders, asset display names MAY contain "/". */
+function validateAssetName(raw: string): string {
+    const name = raw.trim()
+    if (name.length < 1 || name.length > NAME_MAX) {
+        throw apiError(400, 'VALIDATION_ERROR', 'Tên phải từ 1–255 ký tự.')
+    }
+    return name
+}
+
+/** Serialize ONE asset (head version + counts + refs) — used by rename responses. */
+async function loadAssetDto(assetId: string): Promise<AssetDto> {
+    const asset = await prisma.reviewAsset.findFirst({
+        where: { id: assetId, deletedAt: null },
+        include: { currentVersion: true },
+    })
+    if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
+    const [vCount, cSum] = await Promise.all([
+        prisma.reviewVersion.count({ where: { assetId, deletedAt: null } }),
+        prisma.reviewVersion.aggregate({ where: { assetId, deletedAt: null }, _sum: { commentCount: true } }),
+    ])
+    const refs = await loadUserRefs([asset.createdById, asset.currentVersion?.uploaderId])
+    const v = asset.currentVersion
+    const currentVersion = v
+        ? serializeVersion(v, {
+              uploader: v.uploaderId ? refs.get(v.uploaderId) ?? null : null,
+              media: buildMediaLinks({ muxPlaybackId: v.muxPlaybackId, thumbTime: v.thumbTime }),
+          })
+        : null
+    return serializeAsset(asset, {
+        currentVersion,
+        createdBy: asset.createdById ? refs.get(asset.createdById) ?? null : null,
+        versionCount: vCount,
+        commentCountTotal: cSum._sum.commentCount ?? 0,
+    })
+}
+
+export async function renameAsset(
+    assetId: string,
+    input: { name: string; expectedRowVersion: number },
+): Promise<AssetDto> {
+    const name = validateAssetName(input.name)
+    const existing = await prisma.reviewAsset.findFirst({ where: { id: assetId, deletedAt: null } })
+    if (!existing) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
+    await requireReviewAccess({ workspaceId: existing.workspaceId })
+
+    if (existing.rowVersion !== input.expectedRowVersion) {
+        throw apiError(409, 'ROW_VERSION_MISMATCH', 'Asset đã bị thay đổi bởi người khác. Tải lại rồi thử lại.', {
+            current: { id: existing.id, name: existing.name, rowVersion: existing.rowVersion },
+        })
+    }
+    await prisma.reviewAsset.update({ where: { id: assetId }, data: { name, rowVersion: { increment: 1 } } })
+    return loadAssetDto(assetId)
+}
+
+// ─────────────────────── copy / duplicate (copy-on-reference) ───────────────────────
+
+const MAX_COPY_ITEMS = 500 // total rows (folders + assets) created per copy op — safety valve (§1.7)
+
+/**
+ * Copy folders (recursive) + assets into `targetFolderId` (null = workspace root).
+ * COPY-ON-REFERENCE (API-SPEC §1.7): each copied version is a NEW row that SHARES the
+ * source's `r2Key` + `muxPlaybackId` (instant, $0 — no object copy, no re-encode).
+ *
+ * Repo-vs-spec adjustment (IMPLEMENTATION-NOTES): the schema makes `muxAssetId` UNIQUE,
+ * so a copy CANNOT share it — the copy's `muxAssetId` is left null. Every serving path
+ * (playback JWT, thumbnail, storyboard, original download) keys off `muxPlaybackId` /
+ * `r2Key`, so the copy streams/downloads fine; `muxAssetId` is only used for webhook
+ * correlation + purge ref-counting (a P6 concern). Comments/share/old versions are NOT
+ * copied (clean copy, like frame.io). Only READY head versions are copyable: non-ready
+ * assets are SKIPPED (folder copy) or rejected (single-asset copy) so a copy can never be
+ * a permanently-"processing" orphan (it would never receive the source's Mux webhook).
+ *
+ * Built as a two-phase op: plan the whole new subtree in memory (recursive reads via the
+ * materialized path — a handful of queries), then materialize with bulk createMany's, so
+ * even a large subtree is ~6 queries and never trips the tx / function timeout.
+ */
+interface PlannedFolder {
+    newId: string
+    parentNewId: string
+    name: string
+    path: string
+    depth: number
+    itemCount: number
+    bytes: bigint
+}
+interface PlannedAsset {
+    newAssetId: string
+    newVersionId: string
+    folderNewId: string
+    name: string
+    bytes: bigint
+    v: {
+        fileName: string
+        mediaKind: Prisma.ReviewVersionCreateManyInput['mediaKind']
+        mimeType: string
+        sizeBytes: bigint
+        durationMs: number | null
+        fpsNumerator: number | null
+        fpsDenominator: number | null
+        width: number | null
+        height: number | null
+        videoCodec: string | null
+        audioCodec: string | null
+        r2Key: string | null
+        muxPlaybackId: string | null
+        thumbTime: number | null
+        thumbnailKey: string | null
+        pipelineStatus: Prisma.ReviewVersionCreateManyInput['pipelineStatus']
+        uploadedAt: Date | null
+        readyAt: Date | null
+        uploaderId: string
+    }
+    assetMediaKind: Prisma.ReviewAssetCreateManyInput['mediaKind']
+}
+
+export async function copyItems(input: {
+    items: { type: ItemType; id: string }[]
+    targetFolderId: string | null
+    duplicate?: boolean
+}): Promise<{ copied: { type: ItemType; id: string; newId: string }[]; skippedAssets: number }> {
+    if (input.items.length < 1 || input.items.length > BULK_CAP) {
+        throw apiError(400, 'VALIDATION_ERROR', `Số mục phải từ 1–${BULK_CAP}.`)
+    }
+    const folderIds = input.items.filter((i) => i.type === 'folder').map((i) => i.id)
+    const assetIds = input.items.filter((i) => i.type === 'asset').map((i) => i.id)
+    const [srcFolders, srcAssets] = await Promise.all([
+        prisma.reviewFolder.findMany({ where: { id: { in: folderIds }, deletedAt: null } }),
+        prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: null }, include: { currentVersion: true } }),
+    ])
+    if (srcFolders.length !== folderIds.length || srcAssets.length !== assetIds.length) {
+        throw apiError(404, 'NOT_FOUND', 'Một hoặc nhiều mục không tồn tại.')
+    }
+    const workspaces = new Set([...srcFolders.map((f) => f.workspaceId), ...srcAssets.map((a) => a.workspaceId)])
+    if (workspaces.size !== 1) throw apiError(400, 'CROSS_WORKSPACE', 'Các mục không cùng workspace.')
+    const workspaceId = [...workspaces][0]
+    const access = await requireReviewAccess({ workspaceId })
+
+    let resolvedTargetId = input.targetFolderId
+    if (resolvedTargetId == null) resolvedTargetId = (await ensureWorkspaceRoot(workspaceId, access.userId)).id
+    const target = await prisma.reviewFolder.findFirst({
+        where: { id: resolvedTargetId, deletedAt: null },
+        select: { id: true, path: true, depth: true, workspaceId: true },
+    })
+    if (!target) throw apiError(404, 'NOT_FOUND', 'Thư mục đích không hợp lệ hoặc đã bị xóa.')
+    if (target.workspaceId !== workspaceId) throw apiError(400, 'CROSS_WORKSPACE', 'Thư mục đích khác workspace.')
+
+    // ---- plan phase (in memory) ----
+    const plannedFolders: PlannedFolder[] = []
+    const plannedAssets: PlannedAsset[] = []
+    const folderMap = new Map<string, PlannedFolder>() // newId → planned
+    const copied: { type: ItemType; id: string; newId: string }[] = []
+    let skippedAssets = 0
+    const budget = { n: 0 }
+    const consume = () => {
+        budget.n += 1
+        if (budget.n > MAX_COPY_ITEMS) {
+            throw apiError(400, 'VALIDATION_ERROR', `Không thể sao chép quá ${MAX_COPY_ITEMS} mục một lần.`, { reason: 'copy_cap' })
+        }
+    }
+
+    // Sibling names already in the target — top-level copied folders resolve unique names
+    // against this set (+ names assigned during this op) so "(2)" suffixes stay correct.
+    const targetSiblings = await prisma.reviewFolder.findMany({
+        where: { parentId: target.id, deletedAt: null },
+        select: { name: true },
+    })
+    const takenTopNames = new Set(targetSiblings.map((s) => s.name))
+    const uniqueTopName = (desired: string): string => {
+        if (!takenTopNames.has(desired)) {
+            takenTopNames.add(desired)
+            return desired
+        }
+        for (let i = 2; i < 1000; i++) {
+            const cand = `${desired} (${i})`
+            if (!takenTopNames.has(cand)) {
+                takenTopNames.add(cand)
+                return cand
+            }
+        }
+        const cand = `${desired} (${randomUUID().slice(0, 8)})`
+        takenTopNames.add(cand)
+        return cand
+    }
+
+    const planAsset = (
+        source: (typeof srcAssets)[number] | Awaited<ReturnType<typeof prisma.reviewAsset.findMany>>[number] & { currentVersion?: unknown },
+        cv: NonNullable<(typeof srcAssets)[number]['currentVersion']>,
+        folderNewId: string,
+        name: string,
+    ): PlannedAsset => {
+        consume()
+        const pa: PlannedAsset = {
+            newAssetId: randomUUID(),
+            newVersionId: randomUUID(),
+            folderNewId,
+            name,
+            bytes: cv.sizeBytes,
+            assetMediaKind: source.mediaKind,
+            v: {
+                fileName: cv.fileName,
+                mediaKind: cv.mediaKind,
+                mimeType: cv.mimeType,
+                sizeBytes: cv.sizeBytes,
+                durationMs: cv.durationMs,
+                fpsNumerator: cv.fpsNumerator,
+                fpsDenominator: cv.fpsDenominator,
+                width: cv.width,
+                height: cv.height,
+                videoCodec: cv.videoCodec,
+                audioCodec: cv.audioCodec,
+                r2Key: cv.r2Key,
+                muxPlaybackId: cv.muxPlaybackId, // SHARED
+                thumbTime: cv.thumbTime,
+                thumbnailKey: cv.thumbnailKey,
+                pipelineStatus: cv.pipelineStatus, // READY (guaranteed by caller)
+                uploadedAt: cv.uploadedAt,
+                readyAt: cv.readyAt,
+                uploaderId: cv.uploaderId,
+            },
+        }
+        plannedAssets.push(pa)
+        return pa
+    }
+
+    // Plan one source folder subtree under `parentNewId`/`parentPath`/`parentDepth`.
+    const planFolderSubtree = async (
+        sourceFolder: { id: string; path: string; depth: number },
+        topName: string,
+    ): Promise<string> => {
+        // whole subtree in 2 reads via the materialized path (self + descendants).
+        const subFolders = await prisma.reviewFolder.findMany({
+            where: { path: { startsWith: sourceFolder.path }, deletedAt: null },
+            select: { id: true, parentId: true, path: true, depth: true, name: true },
+            orderBy: { depth: 'asc' },
+        })
+        const subFolderIds = subFolders.map((f) => f.id)
+        const subAssets = await prisma.reviewAsset.findMany({
+            where: { folderId: { in: subFolderIds }, deletedAt: null },
+            include: { currentVersion: true },
+        })
+
+        const idMap = new Map<string, string>() // source folderId → new folderId
+        for (const f of subFolders) idMap.set(f.id, randomUUID())
+
+        // Folders shallow-first so a parent's new path is ready before its children.
+        for (const f of subFolders) {
+            consume()
+            const newId = idMap.get(f.id)!
+            const isTop = f.id === sourceFolder.id
+            let parentNewId: string
+            let parentPath: string
+            let parentDepth: number
+            if (isTop) {
+                parentNewId = target.id
+                parentPath = target.path
+                parentDepth = target.depth
+            } else {
+                parentNewId = idMap.get(f.parentId!)! // parent is inside the subtree
+                const parentPlanned = folderMap.get(parentNewId)!
+                parentPath = parentPlanned.path
+                parentDepth = parentPlanned.depth
+            }
+            const depth = parentDepth + 1
+            if (depth > MAX_DEPTH) {
+                throw apiError(400, 'VALIDATION_ERROR', 'Vượt quá độ sâu thư mục tối đa.', { reason: 'max_depth' })
+            }
+            const pf: PlannedFolder = {
+                newId,
+                parentNewId,
+                name: isTop ? topName : f.name,
+                path: `${parentPath}${newId}/`,
+                depth,
+                itemCount: 0,
+                bytes: BigInt(0),
+            }
+            plannedFolders.push(pf)
+            folderMap.set(newId, pf)
+        }
+
+        // Assets in the subtree → copy READY head versions; skip the rest.
+        for (const a of subAssets) {
+            const cv = a.currentVersion
+            if (!cv || cv.pipelineStatus !== 'READY' || !cv.r2Key) {
+                skippedAssets += 1
+                continue
+            }
+            const folderNewId = idMap.get(a.folderId)!
+            planAsset(a, cv, folderNewId, a.name)
+        }
+
+        return idMap.get(sourceFolder.id)!
+    }
+
+    // Top-level items in the requested order.
+    for (const item of input.items) {
+        if (item.type === 'folder') {
+            const f = srcFolders.find((x) => x.id === item.id)!
+            // Cycle guard: can't copy a folder into itself or a descendant.
+            if (target.id === f.id || target.path.startsWith(f.path)) {
+                throw apiError(400, 'FOLDER_CYCLE', 'Không thể sao chép thư mục vào chính nó hoặc thư mục con.', { failedItemId: f.id })
+            }
+            const topName = uniqueTopName(input.duplicate ? `${f.name} (copy)` : f.name)
+            const newId = await planFolderSubtree({ id: f.id, path: f.path, depth: f.depth }, topName)
+            copied.push({ type: 'folder', id: f.id, newId })
+        } else {
+            const a = srcAssets.find((x) => x.id === item.id)!
+            const cv = a.currentVersion
+            if (!cv || cv.pipelineStatus !== 'READY' || !cv.r2Key) {
+                skippedAssets += 1
+                continue
+            }
+            const name = input.duplicate ? `${a.name} (copy)` : a.name
+            const pa = planAsset(a, cv, target.id, name)
+            copied.push({ type: 'asset', id: a.id, newId: pa.newAssetId })
+        }
+    }
+
+    // ---- roll up counters (itemCount + recursive bytes) ----
+    for (const pa of plannedAssets) {
+        const pf = folderMap.get(pa.folderNewId) // undefined = top-level asset copied straight into target
+        if (pf) {
+            pf.itemCount += 1
+            pf.bytes += pa.bytes
+        }
+    }
+    for (const pf of plannedFolders) {
+        const parent = folderMap.get(pf.parentNewId)
+        if (parent) parent.itemCount += 1 // each planned folder is a direct child of its planned parent
+    }
+    // deepest-first so a child's total is finalized before it rolls into its parent.
+    for (const pf of [...plannedFolders].sort((a, b) => b.depth - a.depth)) {
+        const parent = folderMap.get(pf.parentNewId)
+        if (parent) parent.bytes += pf.bytes
+    }
+
+    // Bytes added to the target's ancestor chain + how many direct children target gains.
+    let bytesToTarget = BigInt(0)
+    let targetItemsGained = 0
+    for (const c of copied) {
+        if (c.type === 'folder') {
+            const pf = folderMap.get(c.newId)!
+            bytesToTarget += pf.bytes
+            targetItemsGained += 1
+        } else {
+            const pa = plannedAssets.find((x) => x.newAssetId === c.newId)!
+            bytesToTarget += pa.bytes
+            targetItemsGained += 1
+        }
+    }
+
+    if (plannedFolders.length === 0 && plannedAssets.length === 0) {
+        return { copied, skippedAssets } // nothing copyable (e.g. single non-ready asset skipped)
+    }
+
+    // ---- materialize (bulk) ----
+    await prisma.$transaction(
+        async (tx) => {
+            if (plannedFolders.length) {
+                await tx.reviewFolder.createMany({
+                    data: plannedFolders.map((pf) => ({
+                        id: pf.newId,
+                        workspaceId,
+                        parentId: pf.parentNewId,
+                        name: pf.name,
+                        path: pf.path,
+                        depth: pf.depth,
+                        createdById: access.userId,
+                        itemCount: pf.itemCount,
+                        totalSizeBytes: pf.bytes,
+                    })),
+                })
+            }
+            if (plannedAssets.length) {
+                await tx.reviewAsset.createMany({
+                    data: plannedAssets.map((pa) => ({
+                        id: pa.newAssetId,
+                        folderId: pa.folderNewId,
+                        workspaceId,
+                        name: pa.name,
+                        mediaKind: pa.assetMediaKind,
+                        createdById: access.userId,
+                        currentVersionId: null, // linked after versions exist (circular FK)
+                    })),
+                })
+                await tx.reviewVersion.createMany({
+                    data: plannedAssets.map((pa) => ({
+                        id: pa.newVersionId,
+                        assetId: pa.newAssetId,
+                        versionNumber: 1,
+                        workspaceId,
+                        fileName: pa.v.fileName,
+                        mediaKind: pa.v.mediaKind,
+                        mimeType: pa.v.mimeType,
+                        sizeBytes: pa.v.sizeBytes,
+                        pipelineStatus: pa.v.pipelineStatus,
+                        uploadedAt: pa.v.uploadedAt,
+                        readyAt: pa.v.readyAt,
+                        durationMs: pa.v.durationMs,
+                        fpsNumerator: pa.v.fpsNumerator,
+                        fpsDenominator: pa.v.fpsDenominator,
+                        width: pa.v.width,
+                        height: pa.v.height,
+                        videoCodec: pa.v.videoCodec,
+                        audioCodec: pa.v.audioCodec,
+                        r2Key: pa.v.r2Key,
+                        muxAssetId: null, // MUST be null (schema UNIQUE) — copy shares muxPlaybackId instead
+                        muxPlaybackId: pa.v.muxPlaybackId,
+                        thumbTime: pa.v.thumbTime,
+                        thumbnailKey: pa.v.thumbnailKey,
+                        reviewState: ReviewState.DRAFT,
+                        commentCount: 0,
+                        uploaderId: pa.v.uploaderId,
+                    })),
+                })
+                // Link each new asset's head to its (single) new version in one statement.
+                const newAssetIds = plannedAssets.map((pa) => pa.newAssetId)
+                await tx.$executeRaw(
+                    Prisma.sql`UPDATE "ReviewAsset" a SET "currentVersionId" = v.id FROM "ReviewVersion" v WHERE v."assetId" = a.id AND a.id IN (${Prisma.join(newAssetIds)})`,
+                )
+            }
+            // Target gains the top-level children + the whole copied byte weight up its chain.
+            await tx.reviewFolder.update({ where: { id: target.id }, data: { itemCount: { increment: targetItemsGained } } })
+            await addBytesToAncestors(tx, pathIds(target.path), bytesToTarget)
+        },
+        { timeout: 30000, maxWait: 15000 },
+    )
+
+    return { copied, skippedAssets }
+}
+
+// ─────────────────────── folder download manifest ───────────────────────
+
+const MAX_MANIFEST_FILES = 500 // §1.7 [S] — client-side sequential presigned GET queue
+
+/**
+ * Flatten a folder subtree into a list of its live assets' READY head versions with a
+ * relative path (dir/…/fileName) — the client downloads each via the per-version
+ * download-url route (which re-checks access + presigns). No presigning here (kept in
+ * one place). Truncated at MAX_MANIFEST_FILES (surfaced so the UI can warn).
+ */
+export async function getFolderManifest(
+    folderId: string,
+): Promise<{ folderName: string; files: { versionId: string; fileName: string; relPath: string }[]; truncated: boolean }> {
+    const folder = await prisma.reviewFolder.findFirst({ where: { id: folderId, deletedAt: null } })
+    if (!folder) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
+    await requireReviewAccess({ workspaceId: folder.workspaceId })
+
+    const subFolders = await prisma.reviewFolder.findMany({
+        where: { path: { startsWith: folder.path }, deletedAt: null },
+        select: { id: true, name: true, path: true },
+    })
+    // relative dir for a subfolder = names of the folders BELOW `folder` on its path.
+    const nameById = new Map(subFolders.map((f) => [f.id, f.name]))
+    const relDirOf = (f: { path: string }): string => {
+        const ids = pathIds(f.path)
+        const baseIdx = ids.indexOf(folder.id)
+        const belowBase = baseIdx >= 0 ? ids.slice(baseIdx + 1) : ids
+        return belowBase.map((id) => nameById.get(id) ?? '—').join('/')
+    }
+    const relDirByFolderId = new Map(subFolders.map((f) => [f.id, relDirOf(f)]))
+
+    const assets = await prisma.reviewAsset.findMany({
+        where: { folderId: { in: subFolders.map((f) => f.id) }, deletedAt: null },
+        include: { currentVersion: { select: { id: true, fileName: true, pipelineStatus: true, r2Key: true } } },
+        orderBy: [{ folderId: 'asc' }, { name: 'asc' }],
+    })
+
+    const files: { versionId: string; fileName: string; relPath: string }[] = []
+    let truncated = false
+    for (const a of assets) {
+        const cv = a.currentVersion
+        if (!cv || cv.pipelineStatus !== 'READY' || !cv.r2Key) continue
+        if (files.length >= MAX_MANIFEST_FILES) {
+            truncated = true
+            break
+        }
+        const dir = relDirByFolderId.get(a.folderId) ?? ''
+        files.push({ versionId: cv.id, fileName: cv.fileName, relPath: dir ? `${dir}/${cv.fileName}` : cv.fileName })
+    }
+    return { folderName: folder.name, files, truncated }
 }

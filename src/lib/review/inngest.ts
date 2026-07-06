@@ -17,6 +17,8 @@ import { syncTaskOnChangesRequested } from './task-sync'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { audit } from '@/lib/audit-log'
 import { createAndBroadcastNotifications } from '@/actions/notification-actions'
+// P6.1 notifications.
+import { notifyReview, reviewPlayerUrl } from './notify'
 
 export const inngest = new Inngest({ id: 'hustlytasker-review' })
 
@@ -104,7 +106,18 @@ async function applyMuxReady(
         })
         return true
     })
-    if (applied) return 'applied'
+    if (applied) {
+        // FR-G02: tell the uploader their cut is ready to review (deep-link to the player).
+        void notifyReview({
+            recipientIds: [version.uploaderId],
+            type: 'VIDEO_VERSION_UPLOADED',
+            title: `Bản v${version.versionNumber} đã sẵn sàng để review`,
+            body: 'Video đã xử lý xong — mở review để xem và lấy link cho khách.',
+            taskId: version.asset.taskId,
+            deepLinkUrl: reviewPlayerUrl({ workspaceId: version.workspaceId, assetId: version.assetId, versionId }),
+        })
+        return 'applied'
+    }
     // flip missed → classify the current state:
     //   READY  = a true duplicate → 'noop' (consume the event, write nothing).
     //   FAILED = TERMINAL (an errored webhook / reconcile won first). A late 'ready' can't un-fail
@@ -148,6 +161,15 @@ async function applyMuxErrored(versionId: string, msg: string): Promise<'applied
             versionId,
             actorUserId: version.uploaderId,
             meta: { versionNumber: version.versionNumber, errorMessage: msg },
+        })
+        // FR-G02: tell the uploader their cut failed to process so they can re-upload.
+        void notifyReview({
+            recipientIds: [version.uploaderId],
+            type: 'VIDEO_VERSION_UPLOADED',
+            title: `Bản v${version.versionNumber} xử lý thất bại`,
+            body: `Không xử lý được video: ${msg}. Vui lòng tải lại.`,
+            taskId: version.asset.taskId,
+            deepLinkUrl: reviewPlayerUrl({ workspaceId: version.workspaceId, assetId: version.assetId, versionId }),
         })
         return 'applied'
     })

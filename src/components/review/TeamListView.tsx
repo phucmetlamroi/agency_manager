@@ -14,6 +14,7 @@ import type { FolderDto, AssetDto } from '@/lib/review/dto'
 import type { SortField, SortDir } from '@/lib/review/view-prefs'
 import { msToClock, formatDate } from '@/lib/review/view-prefs'
 import { bytesLabel, StatusChip, InlineRename } from './TeamCards'
+import { StatusControl } from './StatusControl'
 
 interface Col {
     key: SortField
@@ -90,6 +91,7 @@ export function TeamListView({
     onCancelRename,
     onOpenFolder,
     onOpenAsset,
+    onSetStatus,
 }: {
     folders: FolderDto[]
     assets: AssetDto[]
@@ -106,6 +108,8 @@ export function TeamListView({
     onCancelRename: () => void
     onOpenFolder: (id: string) => void
     onOpenAsset: (asset: AssetDto) => void
+    /** P3.5 — set/clear a row's card status. Read-only chip when omitted. */
+    onSetStatus?: (assetId: string, statusId: string | null) => void
 }) {
     const rowCls = (id: string) =>
         `group cursor-pointer border-b border-white/[0.04] transition-colors ${
@@ -215,8 +219,12 @@ export function TeamListView({
                                         )}
                                     </div>
                                 </td>
-                                <td className="px-3 py-2">
-                                    <StatusChip status={a.statusKey} />
+                                <td className="px-3 py-2" onClick={(e) => onSetStatus && e.stopPropagation()}>
+                                    {onSetStatus ? (
+                                        <StatusControl status={a.statusKey} onPick={(s) => onSetStatus(a.id, s)} align="start" />
+                                    ) : (
+                                        <StatusChip status={a.statusKey} />
+                                    )}
                                 </td>
                                 <td className="px-3 py-2 text-zinc-400">{v ? formatDate(v.createdAt) : '—'}</td>
                                 <td className="px-3 py-2 text-zinc-400">{v?.uploadedBy?.name ?? '—'}</td>

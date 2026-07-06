@@ -12,6 +12,12 @@ export const REVIEW_ACTIVITY = {
     VERSION_READY: 'version.ready', // pipeline READY (image now / video webhook)
     VERSION_ERROR: 'version.error', // pipeline FAILED
     FOLDER_CREATED: 'folder.created', // user or auto (task-upload tree)
+    // ── P3: version stack + status + task sync ──
+    VERSION_DELETED: 'version.deleted', // soft-delete one version from a stack (FR-C02)
+    VERSION_DETACHED: 'version.detached', // "Remove from stack" → new standalone asset (FR-C03)
+    STACK_MERGED: 'stack.merged', // drag asset onto asset → merged as newest version (FR-C01 path 2)
+    STATUS_CHANGED: 'asset.status_changed', // member set the card status (FR-D01/D02; meta {old,new})
+    TASK_COMPLETED_FROM_ASSET: 'task.completed_from_asset', // confirmTaskHoanTat (FR-D02/A05)
 } as const
 
 export type ReviewActivityType = (typeof REVIEW_ACTIVITY)[keyof typeof REVIEW_ACTIVITY]

@@ -8,13 +8,60 @@
 // checkbox + '…' menu affordances are P2.5, so they are not drawn here yet. Folder
 // 2×2 thumbnail preview needs a backend preview feed → deferred (icon shown instead).
 
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Folder as FolderIcon, Film, Image as ImageIcon, MessageSquare, Loader2, AlertTriangle, X, Check } from 'lucide-react'
+import {
+    useEffect,
+    useRef,
+    useState,
+    type MouseEvent as ReactMouseEvent,
+    type DragEvent as ReactDragEvent,
+} from 'react'
+import { Folder as FolderIcon, Film, Image as ImageIcon, MessageSquare, Loader2, AlertTriangle, X, Check, Layers, UploadCloud } from 'lucide-react'
 import { formatBytes } from '@/lib/review/upload-store'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
+import type { ItemRef } from '@/lib/review/team-actions'
 import type { Aspect, ThumbScale } from '@/lib/review/view-prefs'
 import { aspectCss, msToClock, formatDate, formatDateTime, statusColor } from '@/lib/review/view-prefs'
 import { HoverScrub } from './HoverScrub'
+import { StatusControl } from './StatusControl'
+
+/* ── P3.6 drag-and-drop wiring (shared by grid + list) ───────────────────────
+   Internal item drags carry an ItemRef[] on this MIME. Dropping an asset onto an
+   asset = merge (version); dropping any item onto a folder = move. Dropping OS
+   files onto an asset card = a new version for that asset. */
+export const REVIEW_ITEMS_MIME = 'application/x-review-items'
+
+export interface ItemDnd {
+    /** Ids currently being dragged (a card suppresses its own drop-target visuals). */
+    draggingIds: Set<string>
+    onDragStart: (e: ReactDragEvent, id: string) => void
+    onDragEnd: () => void
+    /** Drop dragged items onto a folder → move. */
+    onDropItemsOnFolder: (items: ItemRef[], folderId: string) => void
+    /** Drop dragged items onto an asset → merge (only a single asset is valid). */
+    onDropItemsOnAsset: (items: ItemRef[], targetAssetId: string) => void
+    /** Drop OS files onto an asset → new version (parent reads the DataTransfer). */
+    onDropFilesOnAsset: (assetId: string, dt: DataTransfer) => void
+    /** Hover of OS files over an asset (so the folder-level drop overlay can hide). */
+    onFileHoverAsset: (assetId: string | null) => void
+    /** Assets with an in-flight upload — block merge/version + show a tooltip. */
+    busyAssetIds: Set<string>
+}
+
+function dtHasFiles(e: ReactDragEvent): boolean {
+    return Array.from(e.dataTransfer.types).includes('Files')
+}
+function dtHasItems(e: ReactDragEvent): boolean {
+    return Array.from(e.dataTransfer.types).includes(REVIEW_ITEMS_MIME)
+}
+function readItems(e: ReactDragEvent): ItemRef[] {
+    try {
+        const raw = e.dataTransfer.getData(REVIEW_ITEMS_MIME)
+        const parsed = raw ? (JSON.parse(raw) as ItemRef[]) : []
+        return Array.isArray(parsed) ? parsed : []
+    } catch {
+        return []
+    }
+}
 
 export function bytesLabel(raw: string | number): string {
     const n = typeof raw === 'number' ? raw : Number(raw)
@@ -169,6 +216,7 @@ export function FolderCardGrid({
     onOpen,
     onCommitRename,
     onCancelRename,
+    dnd,
 }: {
     folder: FolderDto
     selected: boolean
@@ -178,24 +226,59 @@ export function FolderCardGrid({
     onOpen: () => void
     onCommitRename?: (name: string) => void
     onCancelRename?: () => void
+    dnd?: ItemDnd
 }) {
+    const [moveOver, setMoveOver] = useState(false)
+    const isSource = !!dnd && dnd.draggingIds.has(folder.id)
+
+    const onDragOver = (e: ReactDragEvent) => {
+        if (!dnd || isSource || !dtHasItems(e)) return
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'move'
+        if (!moveOver) setMoveOver(true)
+    }
+    const onDrop = (e: ReactDragEvent) => {
+        if (!dnd || isSource || !dtHasItems(e)) return
+        e.preventDefault()
+        e.stopPropagation()
+        setMoveOver(false)
+        const items = readItems(e).filter((i) => !(i.type === 'folder' && i.id === folder.id))
+        if (items.length) dnd.onDropItemsOnFolder(items, folder.id)
+    }
+
     return (
         <div
             role="button"
             tabIndex={0}
             data-review-id={folder.id}
             data-review-type="folder"
+            draggable={!!dnd && !renaming}
+            onDragStart={(e) => dnd?.onDragStart(e, folder.id)}
+            onDragEnd={() => dnd?.onDragEnd()}
+            onDragOver={onDragOver}
+            onDragLeave={() => setMoveOver(false)}
+            onDrop={onDrop}
             onClick={onSelect}
             onDoubleClick={() => !renaming && onOpen()}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' && !renaming) onOpen()
             }}
             className={`group relative flex cursor-pointer flex-col rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 ${
-                selected
-                    ? 'border-violet-500 bg-violet-500/[0.08]'
-                    : 'border-white/5 bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.06]'
+                moveOver
+                    ? 'border-violet-400 bg-violet-500/[0.14] ring-2 ring-violet-400/60'
+                    : selected
+                      ? 'border-violet-500 bg-violet-500/[0.08]'
+                      : 'border-white/5 bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.06]'
             }`}
         >
+            {moveOver && (
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-violet-950/40">
+                    <span className="rounded-full bg-violet-500 px-2.5 py-1 text-[10.5px] font-semibold text-white shadow-lg">
+                        Di chuyển vào đây
+                    </span>
+                </div>
+            )}
             <SelectCheckbox checked={selected} onToggle={onToggle} />
             <div className="flex items-center gap-2.5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300">
@@ -232,6 +315,8 @@ export function AssetCardGrid({
     onOpen,
     onCommitRename,
     onCancelRename,
+    onSetStatus,
+    dnd,
 }: {
     asset: AssetDto
     aspect: Aspect
@@ -244,6 +329,8 @@ export function AssetCardGrid({
     onOpen: () => void
     onCommitRename?: (name: string) => void
     onCancelRename?: () => void
+    onSetStatus?: (statusId: string | null) => void
+    dnd?: ItemDnd
 }) {
     const v = asset.currentVersion
     const state = assetState(asset)
@@ -254,16 +341,82 @@ export function AssetCardGrid({
     const commentCount = v?.commentCount ?? 0
     const canRename = renaming && onCommitRename && onCancelRename
 
+    // P3.6 drop-target state: 'file' = new-version upload, 'merge' = asset-onto-asset.
+    const [over, setOver] = useState<'none' | 'file' | 'merge'>('none')
+    const isSource = !!dnd && dnd.draggingIds.has(asset.id)
+    const busy = !!dnd && dnd.busyAssetIds.has(asset.id)
+
+    const onDragOver = (e: ReactDragEvent) => {
+        if (!dnd) return
+        if (dtHasFiles(e)) {
+            e.preventDefault()
+            e.stopPropagation()
+            e.dataTransfer.dropEffect = busy ? 'none' : 'copy'
+            if (over !== 'file') {
+                setOver('file')
+                dnd.onFileHoverAsset(asset.id)
+            }
+        } else if (dtHasItems(e) && !isSource) {
+            e.preventDefault()
+            e.stopPropagation()
+            e.dataTransfer.dropEffect = busy ? 'none' : 'copy'
+            if (over !== 'merge') setOver('merge')
+        }
+    }
+    const clearOver = () => {
+        if (over === 'file') dnd?.onFileHoverAsset(null)
+        setOver('none')
+    }
+    const onDrop = (e: ReactDragEvent) => {
+        if (!dnd) return
+        if (dtHasFiles(e)) {
+            e.preventDefault()
+            e.stopPropagation()
+            clearOver()
+            if (!busy) dnd.onDropFilesOnAsset(asset.id, e.dataTransfer)
+        } else if (dtHasItems(e) && !isSource) {
+            e.preventDefault()
+            e.stopPropagation()
+            setOver('none')
+            if (!busy) dnd.onDropItemsOnAsset(readItems(e), asset.id)
+        }
+    }
+
     return (
         <div
             data-review-id={asset.id}
             data-review-type="asset"
+            draggable={!!dnd && !renaming}
+            onDragStart={(e) => dnd?.onDragStart(e, asset.id)}
+            onDragEnd={() => dnd?.onDragEnd()}
+            onDragOver={onDragOver}
+            onDragLeave={clearOver}
+            onDrop={onDrop}
             onClick={onSelect}
             onDoubleClick={() => !renaming && onOpen()}
             className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border transition-all ${
-                selected ? 'border-violet-500 bg-violet-500/[0.08]' : 'border-white/5 bg-white/[0.03] hover:border-white/15'
+                over === 'merge'
+                    ? 'border-violet-400 ring-2 ring-violet-400/60'
+                    : selected
+                      ? 'border-violet-500 bg-violet-500/[0.08]'
+                      : 'border-white/5 bg-white/[0.03] hover:border-white/15'
             }`}
         >
+            {over === 'file' && (
+                <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-violet-400/70 bg-violet-950/70 px-2 text-center">
+                    <UploadCloud size={20} className={busy ? 'text-zinc-400' : 'text-violet-200'} />
+                    <span className={`text-[11px] font-medium ${busy ? 'text-zinc-400' : 'text-violet-100'}`}>
+                        {busy ? 'Chờ upload hiện tại hoàn tất' : `Thả để thêm phiên bản mới vào “${asset.title}”`}
+                    </span>
+                </div>
+            )}
+            {over === 'merge' && (
+                <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-violet-950/60">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-500 px-2.5 py-1 text-[10.5px] font-semibold text-white shadow-lg">
+                        <Layers size={12} /> {busy ? 'Đang bận…' : 'Gộp thành phiên bản mới'}
+                    </span>
+                </div>
+            )}
             <div className="relative w-full bg-black/40" style={{ aspectRatio: aspectCss(aspect) }}>
                 <SelectCheckbox checked={selected} onToggle={onToggle} />
                 {isReadyVideo ? (
@@ -309,7 +462,11 @@ export function AssetCardGrid({
                     )}
                     {showInfo && (
                         <div className="mt-0.5 flex items-center justify-between gap-2">
-                            <StatusChip status={asset.statusKey} />
+                            {onSetStatus ? (
+                                <StatusControl status={asset.statusKey} onPick={onSetStatus} align="start" />
+                            ) : (
+                                <StatusChip status={asset.statusKey} />
+                            )}
                             {commentCount > 0 && (
                                 <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-zinc-500">
                                     <MessageSquare size={11} />
@@ -326,7 +483,17 @@ export function AssetCardGrid({
 
 /* ── single-select InfoPanel (FR-B05: read-only technical metadata) ──────── */
 
-export function InfoPanel({ asset, onClose }: { asset: AssetDto; onClose: () => void }) {
+export function InfoPanel({
+    asset,
+    onClose,
+    onSetStatus,
+    onManageVersions,
+}: {
+    asset: AssetDto
+    onClose: () => void
+    onSetStatus?: (statusId: string | null) => void
+    onManageVersions?: () => void
+}) {
     const v = asset.currentVersion
     const dur = msToClock(v?.durationMs)
     const res = v?.width && v?.height ? `${v.width}×${v.height}` : null
@@ -346,7 +513,16 @@ export function InfoPanel({ asset, onClose }: { asset: AssetDto; onClose: () => 
                     <span className="truncate text-[12.5px] font-semibold text-zinc-100" title={asset.title}>
                         {asset.title}
                     </span>
-                    <StatusChip status={asset.statusKey} />
+                    {onSetStatus ? (
+                        <StatusControl status={asset.statusKey} onPick={onSetStatus} align="start" />
+                    ) : (
+                        <StatusChip status={asset.statusKey} />
+                    )}
+                    {asset.versionCount >= 2 && (
+                        <span className="shrink-0 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+                            {asset.versionCount} phiên bản
+                        </span>
+                    )}
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
                     {items.map((it) => (
@@ -357,6 +533,16 @@ export function InfoPanel({ asset, onClose }: { asset: AssetDto; onClose: () => 
                     ))}
                 </div>
             </div>
+            {onManageVersions && (
+                <button
+                    type="button"
+                    onClick={onManageVersions}
+                    title="Quản lý phiên bản"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white/[0.06] px-2.5 py-1.5 text-[11.5px] text-zinc-200 transition-colors hover:bg-white/[0.12]"
+                >
+                    <Layers size={13} /> Phiên bản
+                </button>
+            )}
             <button
                 type="button"
                 onClick={onClose}

@@ -5,7 +5,7 @@
 // server-side, so nothing here is trusted for authorization. Components own toasts +
 // refresh; these throw a human-readable Error on failure.
 
-import type { FolderDto, AssetDto } from './dto'
+import type { FolderDto, AssetDto, VersionDto } from './dto'
 
 export type ItemKind = 'folder' | 'asset'
 export interface ItemRef {
@@ -93,6 +93,86 @@ export async function apiRenameAsset(id: string, name: string, rowVersion: numbe
     })
     if (!res.ok) throw new Error(await errMessage(res))
     return ((await res.json()) as { asset: AssetDto }).asset
+}
+
+/* ── P3: version stack + dynamic status ──────────────────────────────────────── */
+
+/** One row of the Manage-Versions modal (serialized VersionDto + head flag). */
+export interface VersionRow extends VersionDto {
+    isCurrent: boolean
+}
+export interface AssetVersions {
+    asset: {
+        id: string
+        name: string
+        mediaKind: 'video' | 'image'
+        currentVersionId: string | null
+        folderId: string
+    }
+    versions: VersionRow[]
+}
+
+/** List a stack's live versions, newest → oldest (FR-C02, Manage Versions modal). */
+export async function listAssetVersions(assetId: string): Promise<AssetVersions> {
+    const res = await fetch(`/api/review/assets/${encodeURIComponent(assetId)}/versions`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+    })
+    if (!res.ok) throw new Error(await errMessage(res))
+    return (await res.json()) as AssetVersions
+}
+
+/** Delete one version (deleting the last live version trashes the whole stack). */
+export async function apiDeleteVersion(
+    versionId: string,
+): Promise<{ stackDeleted: boolean; assetId: string; currentVersionId: string | null }> {
+    const res = await fetch(`/api/review/versions/${encodeURIComponent(versionId)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+    })
+    if (!res.ok) throw new Error(await errMessage(res))
+    return (await res.json()) as { stackDeleted: boolean; assetId: string; currentVersionId: string | null }
+}
+
+/** Split one version out into its own standalone asset in the same folder (FR-C03). */
+export async function apiRemoveFromStack(versionId: string): Promise<{ newAssetId: string; assetId: string }> {
+    return postJson(`/api/review/versions/${encodeURIComponent(versionId)}/remove-from-stack`, {})
+}
+
+/** Merge a source stack into a target asset as its newest version(s) (FR-C01 path 2). */
+export async function apiMergeStacks(
+    sourceAssetId: string,
+    targetAssetId: string,
+): Promise<{ targetAssetId: string; mergedCount: number; currentVersionId: string }> {
+    return postJson(`/api/review/assets/${encodeURIComponent(targetAssetId)}/stack`, { sourceAssetId })
+}
+
+/** The status dropdown's options — the app's task-status list, read dynamically (FR-D01). */
+export async function fetchStatusOptions(): Promise<{ value: string; label: string }[]> {
+    const res = await fetch(`/api/review/statuses`, { credentials: 'same-origin', cache: 'no-store' })
+    if (!res.ok) throw new Error(await errMessage(res))
+    return ((await res.json()) as { options: { value: string; label: string }[] }).options
+}
+
+/** Set (or clear, statusId=null) an asset's card status. Optimistic-locked via rowVersion. */
+export async function apiSetAssetStatus(
+    assetId: string,
+    statusId: string | null,
+    expectedRowVersion?: number,
+): Promise<{ id: string; statusKey: string | null; rowVersion: number }> {
+    const res = await fetch(`/api/review/assets/${encodeURIComponent(assetId)}/status`, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statusId, ...(expectedRowVersion !== undefined ? { expectedRowVersion } : {}) }),
+    })
+    if (!res.ok) throw new Error(await errMessage(res))
+    return ((await res.json()) as { asset: { id: string; statusKey: string | null; rowVersion: number } }).asset
+}
+
+/** Confirm "Chuyển task sang Hoàn tất" from the drawer banner (FR-D02). */
+export async function apiConfirmTaskComplete(taskId: string): Promise<{ ok: true; taskId: string; status: string }> {
+    return postJson(`/api/review/tasks/${encodeURIComponent(taskId)}/confirm-complete`, {})
 }
 
 /* ── download ──────────────────────────────────────────────────────────────── */

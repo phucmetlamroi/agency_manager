@@ -64,7 +64,7 @@ export interface TrashItemDto {
 // ─────────────────────────── helpers ───────────────────────────
 
 /** ids embedded in a materialized path "/a/b/c/" → ["a","b","c"] (root → self). */
-function pathIds(path: string): string[] {
+export function pathIds(path: string): string[] {
     return path.split('/').filter(Boolean)
 }
 
@@ -105,7 +105,7 @@ async function uniqueChildName(tx: Prisma.TransactionClient, parentId: string, d
 }
 
 /** Add `delta` bytes (may be negative) to every folder in `ids` in one UPDATE. */
-async function addBytesToAncestors(tx: Prisma.TransactionClient, ids: string[], delta: bigint): Promise<void> {
+export async function addBytesToAncestors(tx: Prisma.TransactionClient, ids: string[], delta: bigint): Promise<void> {
     if (ids.length === 0 || delta === BigInt(0)) return
     await tx.$executeRaw(
         Prisma.sql`UPDATE "ReviewFolder" SET "totalSizeBytes" = "totalSizeBytes" + ${delta} WHERE id IN (${Prisma.join(ids)})`,
@@ -113,7 +113,7 @@ async function addBytesToAncestors(tx: Prisma.TransactionClient, ids: string[], 
 }
 
 /** Sum of live version bytes for a stack (the bytes it contributes to folder rollups). */
-async function liveStackBytes(tx: Prisma.TransactionClient, assetId: string): Promise<bigint> {
+export async function liveStackBytes(tx: Prisma.TransactionClient, assetId: string): Promise<bigint> {
     const agg = await tx.reviewVersion.aggregate({ where: { assetId, deletedAt: null }, _sum: { sizeBytes: true } })
     return agg._sum.sizeBytes ?? BigInt(0)
 }

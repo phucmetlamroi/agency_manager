@@ -1143,8 +1143,16 @@ export function TaskDetailModal({
                                             </button>
                                         )}
 
-                                        {/* [Review P1.10] Up thẳng video review — additive; link flow above untouched */}
-                                        {task?.id && <TaskReviewUploadSection taskId={task.id} />}
+                                        {/* [Review P1.10 + P3.7] Up thẳng video review + sync task → Hoàn tất */}
+                                        {localTask?.id && (
+                                            <TaskReviewUploadSection
+                                                taskId={localTask.id}
+                                                taskStatus={localTask.status}
+                                                onTaskCompleted={() =>
+                                                    setLocalTask((prev) => (prev ? { ...prev, status: 'Hoàn tất' } : prev))
+                                                }
+                                            />
+                                        )}
                                     </Card>
 
                                     {/* RIGHT — Deadline + Finance stacked */}

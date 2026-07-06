@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { MessageSquare, ArrowRightCircle } from 'lucide-react'
 import type { Fps } from '@/lib/review/timecode'
 import {
@@ -70,6 +70,7 @@ export function CommentsPanel({
     onJumpToVersion: (versionId: string) => void
 }) {
     const { comments } = feed
+    const { patch, refresh } = feed
 
     const { parents, repliesByParent } = useMemo(() => {
         const parents: CommentDto[] = []
@@ -83,41 +84,57 @@ export function CommentsPanel({
                 parents.push(c)
             }
         }
+        // Match the server order (timecodeMs asc, nulls first, then createdAt) so an
+        // optimistically-added earlier-timecode comment lands in the right slot, not
+        // at the bottom until the next poll.
+        parents.sort((a, b) => {
+            const fa = a.startFrame ?? -1
+            const fb = b.startFrame ?? -1
+            return fa !== fb ? fa - fb : a.createdAt.localeCompare(b.createdAt)
+        })
         for (const arr of repliesByParent.values()) arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         return { parents, repliesByParent }
     }, [comments])
 
-    const actions: CommentActions = {
-        resolve: (id, resolved) => {
-            feed.patch((list) =>
-                list.map((c) => (c.id === id ? { ...c, completedAt: resolved ? new Date().toISOString() : null } : c)),
-            )
-            setCommentResolved(id, resolved)
-                .then(({ comment }) => feed.patch((list) => list.map((c) => (c.id === comment.id ? comment : c))))
-                .catch(() => feed.refresh())
-        },
-        remove: (id) => {
-            feed.patch((list) => list.filter((c) => c.id !== id && c.parentId !== id))
-            deleteComment(id).catch(() => feed.refresh())
-        },
-        edit: (id, body) => {
-            feed.patch((list) => list.map((c) => (c.id === id ? { ...c, body, editedAt: new Date().toISOString() } : c)))
-            editComment(id, body)
-                .then(({ comment }) => feed.patch((list) => list.map((c) => (c.id === comment.id ? comment : c))))
-                .catch(() => feed.refresh())
-        },
-        react: (id, emoji, add) => {
-            feed.patch((list) => list.map((c) => (c.id === id ? { ...c, reactions: toggleReactionLocal(c.reactions, emoji, add) } : c)))
-            ;(add ? addReaction(id, emoji) : removeReaction(id, emoji))
-                .then(({ reactions }) => feed.patch((list) => list.map((c) => (c.id === id ? { ...c, reactions } : c))))
-                .catch(() => feed.refresh())
-        },
-    }
+    const actions: CommentActions = useMemo(
+        () => ({
+            resolve: (id, resolved) => {
+                patch((list) =>
+                    list.map((c) => (c.id === id ? { ...c, completedAt: resolved ? new Date().toISOString() : null } : c)),
+                )
+                setCommentResolved(id, resolved)
+                    .then(({ comment }) => patch((list) => list.map((c) => (c.id === comment.id ? comment : c))))
+                    .catch(() => refresh())
+            },
+            remove: (id) => {
+                patch((list) => list.filter((c) => c.id !== id && c.parentId !== id))
+                deleteComment(id).catch(() => refresh())
+            },
+            edit: (id, body) => {
+                patch((list) => list.map((c) => (c.id === id ? { ...c, body, editedAt: new Date().toISOString() } : c)))
+                editComment(id, body)
+                    .then(({ comment }) => patch((list) => list.map((c) => (c.id === comment.id ? comment : c))))
+                    .catch(() => refresh())
+            },
+            // Reactions: apply the optimistic local delta only. Do NOT reconcile from the
+            // single request's full-snapshot response — two rapid toggles on one comment
+            // would let the earlier-resolving response clobber the later reaction. The 5s
+            // poll reconciles against the server; failures roll back via refresh().
+            react: (id, emoji, add) => {
+                patch((list) => list.map((c) => (c.id === id ? { ...c, reactions: toggleReactionLocal(c.reactions, emoji, add) } : c)))
+                ;(add ? addReaction(id, emoji) : removeReaction(id, emoji)).catch(() => refresh())
+            },
+        }),
+        [patch, refresh],
+    )
 
-    const onPosted = (c: CommentDto) => {
-        feed.patch((list) => (list.some((x) => x.id === c.id) ? list : [...list, c]))
-        feed.refresh()
-    }
+    const onPosted = useCallback(
+        (c: CommentDto) => {
+            patch((list) => (list.some((x) => x.id === c.id) ? list : [...list, c]))
+            refresh()
+        },
+        [patch, refresh],
+    )
 
     const otherWithComments = feed.otherVersions.filter((o) => o.commentCount > 0)
     const otherTotal = otherWithComments.reduce((s, o) => s + o.commentCount, 0)
@@ -158,7 +175,7 @@ export function CommentsPanel({
                             currentUserId={currentUserId}
                             isAdmin={isAdmin}
                             highlighted={highlightId === c.id}
-                            playheadFrame={playheadFrame}
+                            playheadFrame={0 /* replies carry no timecode; keep the prop stable so memo holds during playback */}
                             onSeekToFrame={onSeekToFrame}
                             onPauseVideo={onPauseVideo}
                             onFocusPlayer={onFocusPlayer}

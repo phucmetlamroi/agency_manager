@@ -295,12 +295,13 @@ export async function createComment(versionId: string, input: CreateCommentInput
         const fps = versionFps(version)
         if (!fps) throw apiError(409, 'STATE_INVALID', 'Phiên bản thiếu thông tin fps.', { reason: 'no_fps' })
         const tf = totalFrames(version)
-        if (input.startFrame < 0 || (tf != null && input.startFrame > tf)) {
+        // Frames are 0-indexed → valid range is [0, tf-1]; frame tf does not exist.
+        if (input.startFrame < 0 || (tf != null && input.startFrame >= tf)) {
             throw apiError(400, 'VALIDATION_ERROR', 'startFrame ngoài phạm vi video.', { field: 'startFrame' })
         }
         timecodeMs = frameToMs(input.startFrame, fps)
         if (input.endFrame != null) {
-            if (input.endFrame <= input.startFrame || (tf != null && input.endFrame > tf)) {
+            if (input.endFrame <= input.startFrame || (tf != null && input.endFrame >= tf)) {
                 throw apiError(400, 'VALIDATION_ERROR', 'endFrame phải lớn hơn startFrame và trong phạm vi.', { field: 'endFrame' })
             }
             durationMs = frameToMs(input.endFrame, fps) - timecodeMs
@@ -323,6 +324,11 @@ export async function createComment(versionId: string, input: CreateCommentInput
             const key = attachmentKey(access.userId, a.attachmentId, a.fileName)
             const head = await headObject(key)
             if (!head) throw apiError(400, 'VALIDATION_ERROR', 'Ảnh đính kèm chưa được tải lên.', { field: 'attachments', attachmentId: a.attachmentId })
+            // Enforce the 10MB cap against the REAL object size (presign carries no
+            // length constraint, so the client-claimed size is not trustworthy).
+            if (head.size > MAX_ATTACH_BYTES) {
+                throw apiError(413, 'FILE_TOO_LARGE', 'Ảnh đính kèm vượt quá 10MB.', { field: 'attachments', attachmentId: a.attachmentId })
+            }
             attachmentsToCreate.push({
                 r2Key: key,
                 fileName: a.fileName,

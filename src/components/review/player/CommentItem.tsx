@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import {
     Lock,
     Clock,
@@ -199,7 +199,7 @@ function SingleComment({
     )
 }
 
-export function CommentThread({
+export const CommentThread = memo(function CommentThread({
     comment,
     replies,
     fps,
@@ -336,7 +336,7 @@ export function CommentThread({
             )}
         </div>
     )
-}
+})
 
 function InlineEdit({ initial, onSave, onCancel }: { initial: string; onSave: (b: string) => void; onCancel: () => void }) {
     const [draft, setDraft] = useState(initial)

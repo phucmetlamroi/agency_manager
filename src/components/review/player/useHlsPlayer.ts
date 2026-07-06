@@ -72,17 +72,24 @@ export function useHlsPlayer(opts: {
     const rvfcHandleRef = useRef<number | null>(null)
     const rafHandleRef = useRef<number | null>(null)
     const lastFrameRef = useRef(-1)
+    const refreshAttemptsRef = useRef(0) // 403 token re-mints since the last successful load
     const fpsRef = useRef<Fps | null>(fps)
     fpsRef.current = fps
 
     const syncFrame = useCallback((time: number) => {
-        setCurrentSec(time)
         const f = fpsRef.current
-        if (!f) return
+        if (!f) {
+            setCurrentSec(time) // no fps (image / metadata missing) — raw seconds
+            return
+        }
+        // Coalesce currentSec with the frame change so a single render carries both,
+        // and we skip a setState entirely when the displayed frame hasn't advanced
+        // (paused 'timeupdate' spam, duplicate ticks) — avoids needless shell renders.
         const fr = timeToFrame(time, f)
         if (fr !== lastFrameRef.current) {
             lastFrameRef.current = fr
             setFrame(fr)
+            setCurrentSec(time)
         }
     }, [])
 
@@ -95,6 +102,7 @@ export function useHlsPlayer(opts: {
         setReady(false)
         setError(null)
         lastFrameRef.current = -1
+        refreshAttemptsRef.current = 0
         setFrame(0)
 
         const nativeCanPlay = video.canPlayType('application/vnd.apple.mpegurl') !== ''
@@ -127,6 +135,7 @@ export function useHlsPlayer(opts: {
                 hls.loadSource(url)
                 hls.attachMedia(video)
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    refreshAttemptsRef.current = 0 // a good load resets the 403 budget
                     const lv: QualityLevel[] = hls.levels.map((l: { height?: number }, i: number) => ({
                         index: i,
                         height: l.height ?? null,
@@ -141,15 +150,18 @@ export function useHlsPlayer(opts: {
                 })
                 hls.on(Hls.Events.ERROR, async (_e: unknown, data: { fatal?: boolean; type?: string; response?: { code?: number } }) => {
                     if (!data.fatal) return
-                    // 403 → the signed token likely expired; re-mint once and reload.
-                    if (data.response?.code === 403) {
+                    // 403 → the signed token likely expired; re-mint and reload — but CAP the
+                    // retries so a genuinely-forbidden version (revoked policy / rotated key)
+                    // can't spin an unbounded re-mint↔403 loop hammering Mux + our token route.
+                    if (data.response?.code === 403 && refreshAttemptsRef.current < 2) {
+                        refreshAttemptsRef.current += 1
                         try {
                             const fresh = await fetchPlaybackToken(versionId!)
                             if (cancelled) return
                             hls.loadSource(hlsUrl(fresh.playbackId, fresh.tokens.playback))
                             return
                         } catch {
-                            /* fall through */
+                            /* fall through to the error surface */
                         }
                     }
                     setError('Không tải được video. Vui lòng thử lại.')

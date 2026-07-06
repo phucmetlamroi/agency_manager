@@ -95,17 +95,17 @@ export function ReviewPlayerShell({
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.id : null, fps, enabled })
     const feed = useComments(version?.id ?? null)
 
-    const onPauseVideo = useCallback(() => controller.pause(), [controller])
+    // The controller object identity changes every render (frame/currentSec state),
+    // but its METHODS are stable useCallbacks — depend on those so playback-rate
+    // re-renders don't tear down/rebuild the window listener 30–60×/sec.
+    const { toggle: ctlToggle, step: ctlStep, pause: ctlPause, seekToFrame: ctlSeek } = controller
+
+    const onPauseVideo = ctlPause
     const onFocusPlayer = useCallback(() => {
         const el = document.activeElement as HTMLElement | null
         el?.blur?.()
     }, [])
-    const handleSeek = useCallback(
-        (frameOrId: number) => {
-            controller.seekToFrame(frameOrId)
-        },
-        [controller],
-    )
+    const handleSeek = ctlSeek
 
     // Keyboard: Space toggles, ←/→ frame-step — when focus is not in a text field.
     useEffect(() => {
@@ -115,18 +115,18 @@ export function ReviewPlayerShell({
             if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
             if (e.code === 'Space') {
                 e.preventDefault()
-                controller.toggle()
+                ctlToggle()
             } else if (e.key === 'ArrowLeft') {
                 e.preventDefault()
-                controller.step(-1)
+                ctlStep(-1)
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault()
-                controller.step(1)
+                ctlStep(1)
             }
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [controller, enabled])
+    }, [enabled, ctlToggle, ctlStep])
 
     // Deep-link ?comment= : once its comment loads, seek + highlight + scroll to it.
     useEffect(() => {
@@ -136,9 +136,9 @@ export function ReviewPlayerShell({
         didDeepLink.current = true
         setTab('comments')
         setHighlightId(c.id)
-        if (c.startFrame != null) controller.seekToFrame(c.startFrame)
+        if (c.startFrame != null) ctlSeek(c.startFrame)
         requestAnimationFrame(() => document.getElementById(`comment-${c.id}`)?.scrollIntoView({ block: 'center' }))
-    }, [feed.comments, initialCommentId, controller])
+    }, [feed.comments, initialCommentId, ctlSeek])
 
     const goBack = useCallback(() => {
         const folderId = asset?.folderId

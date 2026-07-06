@@ -66,14 +66,20 @@ export function VideoStage({
     const toggleFullscreen = useCallback(() => {
         const el = containerRef.current
         if (!el) return
+        // Already in CSS pseudo-fullscreen (touch, or a rejected requestFullscreen
+        // fallback on desktop) → the button must always be able to exit it.
+        if (pseudoFs) {
+            setPseudoFs(false)
+            return
+        }
         // iPhone Safari: element fullscreen would hide comment UI → pseudo-fullscreen.
         if (isTouch || !document.fullscreenEnabled) {
-            setPseudoFs((v) => !v)
+            setPseudoFs(true)
             return
         }
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
         else el.requestFullscreen().catch(() => setPseudoFs(true))
-    }, [isTouch])
+    }, [isTouch, pseudoFs])
 
     const fs = isFullscreen || pseudoFs
 

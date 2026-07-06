@@ -222,14 +222,12 @@ function buildShape(
     if (dist < previewMinDrag) return null
     if (tool === 'line') return { tool: 'line', color, size, x1: sx, y1: sy, x2: ex, y2: ey }
     if (tool === 'arrow') return { tool: 'arrow', color, size, x1: sx, y1: sy, x2: ex, y2: ey }
-    // rect — normalize so w/h are always positive (schema requires 0..1, min 0)
-    return {
-        tool: 'rect',
-        color,
-        size,
-        x: Math.min(sx, ex),
-        y: Math.min(sy, ey),
-        w: Math.abs(ex - sx),
-        h: Math.abs(ey - sy),
-    }
+    // rect — normalize so w/h are always positive (schema requires 0..1, min 0). Reject a
+    // degenerate rect where EITHER axis is ~0 (e.g. an edge-pinned axis-aligned drag where
+    // clamp01 collapses a side to 0/1) — it would store + count but render invisibly
+    // (SVG omits a zero-width/height rect). A near-flat rect is a line → use the line tool.
+    const w = Math.abs(ex - sx)
+    const h = Math.abs(ey - sy)
+    if (w < previewMinDrag || h < previewMinDrag) return null
+    return { tool: 'rect', color, size, x: Math.min(sx, ex), y: Math.min(sy, ey), w, h }
 }

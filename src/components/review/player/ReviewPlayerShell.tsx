@@ -106,6 +106,9 @@ export function ReviewPlayerShell({
     const { reset: annoReset } = annotation
     const [viewAnno, setViewAnno] = useState<{ shapes: AnnotationShape[]; frame: number } | null>(null)
     const canAnnotate = isVideo && !!version?.width && !!version?.height
+    // Latest draw-mode flag for the keydown handler without re-subscribing the listener.
+    const annoActiveRef = useRef(false)
+    annoActiveRef.current = annotation.active
 
     // The controller object identity changes every render (frame/currentSec state),
     // but its METHODS are stable useCallbacks — depend on those so playback-rate
@@ -132,11 +135,26 @@ export function ReviewPlayerShell({
         [annoReset, ctlSeek, ctlPause],
     )
 
-    // The read-only drawing is pinned to a frame → drop it once the video plays or
-    // the user starts a new drawing.
+    // The read-only drawing is pinned to a frame → drop it once the video PLAYS.
+    // (Split from the draw-mode clear below so an `active` true→false transition can't
+    // re-run this with a stale isPlaying and wipe a viewAnno that onViewAnnotation just
+    // set in the same commit — ctlPause() only pauses the DOM, isPlaying flips async.)
     useEffect(() => {
-        if (controller.isPlaying || annotation.active) setViewAnno(null)
-    }, [controller.isPlaying, annotation.active])
+        if (controller.isPlaying) setViewAnno(null)
+    }, [controller.isPlaying])
+
+    // Starting a new drawing also clears the read-only view (mutually exclusive modes).
+    useEffect(() => {
+        if (annotation.active) setViewAnno(null)
+    }, [annotation.active])
+
+    // Invariant: while drawing, the video stays PAUSED so every stroke is committed
+    // against the frame the annotation is pinned to. The keydown handler blocks
+    // Space/step during draw; this backstops the control-bar ▶ button (outside the
+    // overlay) by re-pausing if anything starts playback while draw mode is active.
+    useEffect(() => {
+        if (annotation.active && controller.isPlaying) ctlPause()
+    }, [annotation.active, controller.isPlaying, ctlPause])
 
     // Switching version invalidates any drawing / view tied to the old frame space.
     useEffect(() => {
@@ -150,6 +168,9 @@ export function ReviewPlayerShell({
         const onKey = (e: KeyboardEvent) => {
             const t = e.target as HTMLElement | null
             if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+            // While drawing, the frame is LOCKED to the annotation's pinned frame — block
+            // play/step so strokes can't be committed against a frame they aren't saved to.
+            if (annoActiveRef.current) return
             if (e.code === 'Space') {
                 e.preventDefault()
                 ctlToggle()
@@ -353,6 +374,7 @@ export function ReviewPlayerShell({
                                     isAdmin={isAdmin}
                                     feed={feed}
                                     playheadFrame={controller.frame}
+                                    durationMs={version.durationMs}
                                     annotation={canAnnotate ? annotation : null}
                                     onSeekToFrame={handleSeek}
                                     onPauseVideo={onPauseVideo}

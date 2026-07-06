@@ -51,6 +51,7 @@ export function CommentsPanel({
     isAdmin,
     feed,
     playheadFrame,
+    durationMs,
     annotation,
     onSeekToFrame,
     onPauseVideo,
@@ -66,6 +67,7 @@ export function CommentsPanel({
     isAdmin: boolean
     feed: CommentsFeed
     playheadFrame: number
+    durationMs: number | null
     annotation: AnnotationController | null
     onSeekToFrame: (frame: number) => void
     onPauseVideo: () => void
@@ -197,6 +199,7 @@ export function CommentsPanel({
                 fps={fps}
                 mediaKind={mediaKind}
                 playheadFrame={playheadFrame}
+                durationMs={durationMs}
                 annotation={annotation}
                 onPauseVideo={onPauseVideo}
                 onPosted={onPosted}

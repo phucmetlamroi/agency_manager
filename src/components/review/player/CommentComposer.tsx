@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Lock, Globe, Clock, X, Loader2, Send, PenLine, Brackets } from 'lucide-react'
-import { frameToSmpte, type Fps } from '@/lib/review/timecode'
+import { frameToSmpte, frameCount, type Fps } from '@/lib/review/timecode'
 import { createComment, type CommentDto } from '@/lib/review/comment-client'
 import type { AnnotationController } from './useAnnotation'
 
@@ -22,6 +22,7 @@ export function CommentComposer({
     fps,
     mediaKind,
     playheadFrame,
+    durationMs = null,
     onPauseVideo,
     onPosted,
     onFocusPlayer,
@@ -35,6 +36,7 @@ export function CommentComposer({
     fps: Fps | null
     mediaKind: 'video' | 'image'
     playheadFrame: number
+    durationMs?: number | null
     onPauseVideo: () => void
     onPosted: (c: CommentDto) => void
     onFocusPlayer: () => void
@@ -77,9 +79,19 @@ export function CommentComposer({
         if (autoFocus) taRef.current?.focus()
     }, [autoFocus])
 
+    // Frames are 0-indexed → the last valid frame is totalFrames-1. The playhead can
+    // land ON totalFrames at the exact end of the clip (round(sec·fps)), which the
+    // server rejects (startFrame/endFrame must be < totalFrames), so clamp every frame
+    // we submit or display to a valid index. Null durationMs (missing metadata) = no clamp.
+    const maxFrame = durationMs != null && fps ? Math.max(0, frameCount(durationMs, fps) - 1) : null
+    const clampFrame = (f: number) => {
+        const v = Math.max(0, Math.floor(f))
+        return maxFrame != null ? Math.min(v, maxFrame) : v
+    }
+
     // The chip tracks the live playhead until the user starts typing / drawing (which
     // pauses), then freezes at that frame.
-    const shownFrame = frozenFrame ?? playheadFrame
+    const shownFrame = clampFrame(frozenFrame ?? playheadFrame)
 
     const setInternalPersist = (v: boolean) => {
         setIsInternal(v)
@@ -119,9 +131,9 @@ export function CommentComposer({
         onPauseVideo()
         setAttachTime(true)
         const inF = frozenFrame ?? freezeHere()
-        setRangeEnd(Math.max(inF + 1, playheadFrame))
+        setRangeEnd(clampFrame(Math.max(inF + 1, playheadFrame)))
     }
-    const captureOut = () => setRangeEnd(Math.max(shownFrame + 1, playheadFrame))
+    const captureOut = () => setRangeEnd(clampFrame(Math.max(shownFrame + 1, playheadFrame)))
 
     const canSend = !!body.trim() || (annoActive && annoCount > 0)
 

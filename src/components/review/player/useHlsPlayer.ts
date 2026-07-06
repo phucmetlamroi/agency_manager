@@ -8,8 +8,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchPlaybackToken, hlsUrl } from '@/lib/review/player-api'
+import { hlsUrl } from '@/lib/review/player-api'
 import { frameToSeekTime, timeToFrame, type Fps } from '@/lib/review/timecode'
+import { usePlayerEnv } from './player-env'
 
 export interface QualityLevel {
     index: number // hls.js level index; -1 = auto
@@ -53,6 +54,14 @@ export function useHlsPlayer(opts: {
     enabled: boolean
 }): PlayerController {
     const { videoRef, versionId, fps, enabled } = opts
+    // P5.3: token minting + error copy come from the environment (internal VN
+    // /api/review/* vs guest EN /api/r/{slug}/*). Ref'd so the big attach effect
+    // does not re-run when the env object identity changes.
+    const env = usePlayerEnv()
+    const fetchTokenRef = useRef(env.api.fetchPlaybackToken)
+    fetchTokenRef.current = env.api.fetchPlaybackToken
+    const loadErrorText =
+        env.lang === 'en' ? 'The video failed to load. Please try again.' : 'Không tải được video. Vui lòng thử lại.'
 
     const [ready, setReady] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -109,7 +118,7 @@ export function useHlsPlayer(opts: {
 
         async function setup() {
             try {
-                const token = await fetchPlaybackToken(versionId!)
+                const token = await fetchTokenRef.current(versionId!)
                 if (cancelled || !video) return
                 const url = hlsUrl(token.playbackId, token.tokens.playback)
 
@@ -168,7 +177,7 @@ export function useHlsPlayer(opts: {
                     if (data.response?.code === 403 && refreshAttemptsRef.current < 2) {
                         refreshAttemptsRef.current += 1
                         try {
-                            const fresh = await fetchPlaybackToken(versionId!)
+                            const fresh = await fetchTokenRef.current(versionId!)
                             if (cancelled) return
                             hls.loadSource(hlsUrl(fresh.playbackId, fresh.tokens.playback))
                             return
@@ -176,10 +185,10 @@ export function useHlsPlayer(opts: {
                             /* fall through to the error surface */
                         }
                     }
-                    setError('Không tải được video. Vui lòng thử lại.')
+                    setError(loadErrorText)
                 })
             } catch (e) {
-                if (!cancelled) setError(e instanceof Error ? e.message : 'Không tải được video.')
+                if (!cancelled) setError(e instanceof Error ? e.message : loadErrorText)
             }
         }
         setup()

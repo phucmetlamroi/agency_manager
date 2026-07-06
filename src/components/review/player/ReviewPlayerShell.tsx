@@ -19,6 +19,7 @@ import { AnnotationCanvas } from './AnnotationCanvas'
 import { AnnotationToolbar } from './AnnotationToolbar'
 import { CommentsPanel } from './CommentsPanel'
 import { TimelineMarkers } from './TimelineMarkers'
+import { internalPlayerEnv, PlayerEnvProvider } from './player-env'
 
 type Tab = 'comments' | 'info'
 
@@ -42,21 +43,38 @@ function fmtBytes(s: string): string {
     return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`
 }
 
-export function ReviewPlayerShell({
-    workspaceId,
-    assetId,
-    currentUserId,
-    isAdmin,
-    initialVersionId,
-    initialCommentId,
-}: {
+interface ReviewPlayerShellProps {
     workspaceId: string
     assetId: string
     currentUserId: string
     isAdmin: boolean
     initialVersionId: string | null
     initialCommentId: string | null
-}) {
+}
+
+/** P5.3: the internal shell provides the INTERNAL PlayerEnv (VN copy, /api/review/*,
+ *  full capabilities) — the hooks/components under it read the env instead of
+ *  hard-wiring the API, so the same tree also serves guests on /r/{slug}. */
+export function ReviewPlayerShell(props: ReviewPlayerShellProps) {
+    const env = useMemo(
+        () => internalPlayerEnv({ currentUserId: props.currentUserId, isAdmin: props.isAdmin }),
+        [props.currentUserId, props.isAdmin],
+    )
+    return (
+        <PlayerEnvProvider value={env}>
+            <ReviewPlayerShellInner {...props} />
+        </PlayerEnvProvider>
+    )
+}
+
+function ReviewPlayerShellInner({
+    workspaceId,
+    assetId,
+    currentUserId,
+    isAdmin,
+    initialVersionId,
+    initialCommentId,
+}: ReviewPlayerShellProps) {
     const router = useRouter()
     const [data, setData] = useState<AssetVersions | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)

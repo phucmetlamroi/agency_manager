@@ -21,6 +21,8 @@ import {
 } from 'lucide-react'
 import { frameToSmpte, formatClock, timeToFrame, type Fps } from '@/lib/review/timecode'
 import type { PlayerController } from './useHlsPlayer'
+import { usePlayerEnv } from './player-env'
+import { PLAYER_L10N } from './player-l10n'
 
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2]
 
@@ -59,6 +61,7 @@ export function PlayerControls({
     timelineChildren?: React.ReactNode
 }) {
     const c = controller
+    const L = PLAYER_L10N[usePlayerEnv().lang]
     const trackRef = useRef<HTMLDivElement>(null)
     const [hover, setHover] = useState<{ x: number; sec: number } | null>(null)
     const [speedOpen, setSpeedOpen] = useState(false)
@@ -140,7 +143,7 @@ export function PlayerControls({
                 <button
                     onClick={c.toggle}
                     className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10"
-                    aria-label={c.isPlaying ? 'Tạm dừng' : 'Phát'}
+                    aria-label={c.isPlaying ? L.pause : L.play}
                 >
                     {c.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                 </button>
@@ -150,32 +153,32 @@ export function PlayerControls({
                     <button
                         onClick={() => (isTouch ? c.seekToSeconds(c.currentSec - 1) : c.step(-10))}
                         className="grid h-9 w-9 place-items-center rounded-l-lg hover:bg-white/10"
-                        aria-label={isTouch ? 'Lùi 1 giây' : 'Lùi 10 khung'}
-                        title={isTouch ? '−1s' : '−10 khung'}
+                        aria-label={isTouch ? L.back1s : L.backFrames(10)}
+                        title={isTouch ? '−1s' : `−10 ${L.frameUnit}`}
                     >
                         <ChevronFirst className="h-4 w-4" />
                     </button>
                     <button
                         onClick={() => (isTouch ? c.seekToSeconds(c.currentSec - 1) : c.step(-1))}
                         className="grid h-9 w-8 place-items-center hover:bg-white/10 font-mono text-xs"
-                        aria-label={isTouch ? 'Lùi 1 giây' : 'Lùi 1 khung'}
-                        title={isTouch ? '−1s' : '−1 khung'}
+                        aria-label={isTouch ? L.back1s : L.backFrames(1)}
+                        title={isTouch ? '−1s' : `−1 ${L.frameUnit}`}
                     >
                         ‹
                     </button>
                     <button
                         onClick={() => (isTouch ? c.seekToSeconds(c.currentSec + 1) : c.step(1))}
                         className="grid h-9 w-8 place-items-center hover:bg-white/10 font-mono text-xs"
-                        aria-label={isTouch ? 'Tiến 1 giây' : 'Tiến 1 khung'}
-                        title={isTouch ? '+1s' : '+1 khung'}
+                        aria-label={isTouch ? L.fwd1s : L.fwdFrames(1)}
+                        title={isTouch ? '+1s' : `+1 ${L.frameUnit}`}
                     >
                         ›
                     </button>
                     <button
                         onClick={() => (isTouch ? c.seekToSeconds(c.currentSec + 1) : c.step(10))}
                         className="grid h-9 w-9 place-items-center rounded-r-lg hover:bg-white/10"
-                        aria-label={isTouch ? 'Tiến 1 giây' : 'Tiến 10 khung'}
-                        title={isTouch ? '+1s' : '+10 khung'}
+                        aria-label={isTouch ? L.fwd1s : L.fwdFrames(10)}
+                        title={isTouch ? '+1s' : `+10 ${L.frameUnit}`}
                     >
                         <ChevronLast className="h-4 w-4" />
                     </button>
@@ -193,7 +196,7 @@ export function PlayerControls({
                 <button
                     onClick={c.toggleMute}
                     className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10"
-                    aria-label={c.muted ? 'Bật tiếng' : 'Tắt tiếng'}
+                    aria-label={c.muted ? L.unmute : L.mute}
                 >
                     {c.muted || c.volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                 </button>
@@ -206,7 +209,7 @@ export function PlayerControls({
                             setQualOpen(false)
                         }}
                         className="flex h-9 items-center gap-1 rounded-lg px-2 hover:bg-white/10"
-                        aria-label="Tốc độ phát"
+                        aria-label={L.speed}
                     >
                         <Gauge className="h-4 w-4" />
                         <span className="text-xs font-medium">{c.playbackRate}×</span>
@@ -240,7 +243,7 @@ export function PlayerControls({
                                 setSpeedOpen(false)
                             }}
                             className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10"
-                            aria-label="Chất lượng"
+                            aria-label={L.quality}
                         >
                             <Settings2 className="h-4 w-4" />
                         </button>
@@ -255,7 +258,7 @@ export function PlayerControls({
                                         c.currentLevel === -1 ? 'text-indigo-400' : 'text-white/80'
                                     }`}
                                 >
-                                    Tự động
+                                    {L.autoQuality}
                                 </button>
                                 {c.levels
                                     .slice()
@@ -283,7 +286,7 @@ export function PlayerControls({
                 <button
                     onClick={onToggleFullscreen}
                     className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10"
-                    aria-label={isFullscreen ? 'Thoát toàn màn hình' : 'Toàn màn hình'}
+                    aria-label={isFullscreen ? L.exitFullscreen : L.enterFullscreen}
                 >
                     {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
                 </button>

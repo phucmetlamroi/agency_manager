@@ -12,10 +12,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Lock, Globe, Clock, X, Loader2, Send, PenLine, Brackets, Smile, ImagePlus, RotateCcw } from 'lucide-react'
 import { frameToSmpte, frameCount, type Fps } from '@/lib/review/timecode'
-import { createComment, type CommentDto } from '@/lib/review/comment-client'
+import type { CommentDto } from '@/lib/review/comment-client'
 import { uploadCommentImage, validateImageFile, MAX_ATTACHMENTS, type UploadedAttachment } from '@/lib/review/comment-attachments'
 import type { AnnotationController } from './useAnnotation'
 import { EmojiPicker } from './EmojiPicker'
+import { usePlayerEnv } from './player-env'
+import { PLAYER_L10N } from './player-l10n'
 
 const SS_KEY = 'review:composer:isInternal'
 
@@ -58,6 +60,8 @@ export function CommentComposer({
     autoFocus?: boolean
     onCancel?: () => void
 }) {
+    const env = usePlayerEnv()
+    const L = PLAYER_L10N[env.lang]
     const isReply = parentId != null
     const isVideo = mediaKind === 'video'
     const canAnnotate = !isReply && isVideo && annotation != null
@@ -162,7 +166,7 @@ export function CommentComposer({
         setAttachments((prev) =>
             prev.map((a) => (a.localId === localId ? { ...a, status: 'uploading', error: undefined, ctrl } : a)),
         )
-        uploadCommentImage(file, ctrl.signal)
+        uploadCommentImage(file, ctrl.signal, env.api.initiateAttachment)
             .then((up) =>
                 setAttachments((prev) =>
                     prev.map((a) => (a.localId === localId ? { ...a, status: 'done', uploaded: up, ctrl: undefined } : a)),
@@ -173,7 +177,7 @@ export function CommentComposer({
                 setAttachments((prev) =>
                     prev.map((a) =>
                         a.localId === localId
-                            ? { ...a, status: 'error', error: e instanceof Error ? e.message : 'Lỗi', ctrl: undefined }
+                            ? { ...a, status: 'error', error: e instanceof Error ? e.message : L.uploadError, ctrl: undefined }
                             : a,
                     ),
                 )
@@ -184,11 +188,11 @@ export function CommentComposer({
         if (submitting || !files || files.length === 0) return // no adds mid-send
         const room = MAX_ATTACHMENTS - attachments.length
         if (room <= 0) {
-            alert(`Tối đa ${MAX_ATTACHMENTS} ảnh mỗi bình luận.`)
+            alert(L.maxImages(MAX_ATTACHMENTS))
             return
         }
         const chosen = Array.from(files).slice(0, room)
-        if (files.length > room) alert(`Chỉ thêm được ${room} ảnh nữa (tối đa ${MAX_ATTACHMENTS}).`)
+        if (files.length > room) alert(L.roomLeft(room, MAX_ATTACHMENTS))
         for (const file of chosen) {
             const err = validateImageFile(file)
             if (err) {
@@ -250,14 +254,16 @@ export function CommentComposer({
             const endFrame =
                 startFrame != null && rangeEnd != null && rangeEnd > startFrame ? rangeEnd : null
             const shapes = annoActive && annoCount > 0 ? annotation!.shapes : undefined
-            const { comment } = await createComment(versionId, {
+            const { comment } = await env.api.createComment(versionId, {
                 body: text || undefined,
                 parentId: isReply ? parentId : undefined,
                 startFrame,
                 endFrame,
                 annotation: shapes,
                 attachments: doneAttachments.length ? doneAttachments.map((a) => a.uploaded) : undefined,
-                isInternal: isReply ? undefined : isInternal,
+                // Guests may not send isInternal at all (the guest schema is .strict()
+                // and the server forces public anyway).
+                isInternal: isReply || !env.can.internalToggle ? undefined : isInternal,
             })
             onPosted(comment)
             setBody('')
@@ -270,7 +276,7 @@ export function CommentComposer({
             else onFocusPlayer()
         } catch (e) {
             // surface minimally; the poll will reconcile if it actually landed
-            alert(e instanceof Error ? e.message : 'Không gửi được bình luận.')
+            alert(e instanceof Error ? e.message : L.sendFailed)
         } finally {
             setSubmitting(false)
         }
@@ -307,8 +313,8 @@ export function CommentComposer({
                                             setRangeEnd(null)
                                         }}
                                         className="opacity-50 hover:opacity-100"
-                                        title="Bỏ mốc thời gian"
-                                        aria-label="Bỏ mốc thời gian"
+                                        title={L.dropTime}
+                                        aria-label={L.dropTime}
                                     >
                                         <X className="h-3 w-3" />
                                     </button>
@@ -319,7 +325,7 @@ export function CommentComposer({
                                 onClick={() => setAttachTime(true)}
                                 className="flex items-center gap-1 rounded-md border border-dashed border-white/15 px-2 py-1 text-xs text-white/50 hover:text-white/80"
                             >
-                                <Clock className="h-3 w-3" /> Gắn thời gian
+                                <Clock className="h-3 w-3" /> {L.attachTime}
                             </button>
                         ))}
 
@@ -330,17 +336,17 @@ export function CommentComposer({
                             <button
                                 onClick={captureOut}
                                 className="flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/15"
-                                title="Đặt điểm cuối = vị trí hiện tại"
+                                title={L.setOutTitle}
                             >
-                                <Brackets className="h-3 w-3" /> Đặt cuối
+                                <Brackets className="h-3 w-3" /> {L.setOut}
                             </button>
                         ) : (
                             <button
                                 onClick={enableRange}
                                 className="flex items-center gap-1 rounded-md border border-dashed border-white/15 px-2 py-1 text-xs text-white/50 hover:text-white/80"
-                                title="Tạo bình luận theo khoảng"
+                                title={L.rangeTitle}
                             >
-                                <Brackets className="h-3 w-3" /> Khoảng
+                                <Brackets className="h-3 w-3" /> {L.range}
                             </button>
                         ))}
 
@@ -351,24 +357,26 @@ export function CommentComposer({
                             className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
                                 annoActive ? 'bg-indigo-500 text-white' : 'border border-dashed border-white/15 text-white/50 hover:text-white/80'
                             }`}
-                            title={annoActive ? 'Đang vẽ — bấm để thoát' : 'Vẽ chú thích lên khung hình'}
+                            title={annoActive ? L.drawExitTitle : L.drawTitle}
                         >
                             <PenLine className="h-3 w-3" />
-                            {annoActive ? `Đang vẽ${annoCount ? ` · ${annoCount}` : ''}` : 'Vẽ'}
+                            {annoActive ? L.drawing(annoCount) : L.draw}
                         </button>
                     )}
 
                     <div className="flex-1" />
-                    <button
-                        onClick={() => setInternalPersist(!isInternal)}
-                        className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
-                            isInternal ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'
-                        }`}
-                        title={isInternal ? 'Chỉ nội bộ thấy' : 'Khách cũng thấy'}
-                    >
-                        {isInternal ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
-                        {isInternal ? 'Nội bộ' : 'Công khai'}
-                    </button>
+                    {env.can.internalToggle && (
+                        <button
+                            onClick={() => setInternalPersist(!isInternal)}
+                            className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
+                                isInternal ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'
+                            }`}
+                            title={isInternal ? L.internalOnTitle : L.internalOffTitle}
+                        >
+                            {isInternal ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+                            {isInternal ? L.internalOn : L.internalOff}
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -388,8 +396,8 @@ export function CommentComposer({
                                 <button
                                     onClick={() => retryAttachment(a.localId)}
                                     className="absolute inset-0 grid place-items-center bg-red-900/60 hover:bg-red-900/80"
-                                    title={`${a.error ?? 'Lỗi'} — bấm để thử lại`}
-                                    aria-label="Thử lại"
+                                    title={`${a.error ?? L.uploadError} — ${L.retryUpload}`}
+                                    aria-label={L.retry}
                                 >
                                     <RotateCcw className="h-4 w-4 text-red-100" />
                                 </button>
@@ -397,7 +405,7 @@ export function CommentComposer({
                             <button
                                 onClick={() => removeAttachment(a.localId)}
                                 className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/70 text-white hover:bg-black"
-                                aria-label="Xóa ảnh"
+                                aria-label={L.removeImage}
                             >
                                 <X className="h-2.5 w-2.5" />
                             </button>
@@ -413,7 +421,7 @@ export function CommentComposer({
                     onChange={(e) => applyBody(e.target.value)}
                     onKeyDown={onKeyDown}
                     rows={isReply ? 1 : 2}
-                    placeholder={isReply ? 'Trả lời…' : annoActive ? 'Ghi chú cho hình vẽ (tuỳ chọn)…' : 'Thêm bình luận…'}
+                    placeholder={isReply ? L.placeholderReply : annoActive ? L.placeholderDrawing : L.placeholder}
                     className="min-h-[38px] flex-1 resize-none rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-indigo-400/50 focus:outline-none"
                 />
 
@@ -423,7 +431,7 @@ export function CommentComposer({
                         type="button"
                         onClick={() => setPickerOpen((v) => !v)}
                         className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80"
-                        aria-label="Chèn emoji"
+                        aria-label={L.insertEmoji}
                     >
                         <Smile className="h-4 w-4" />
                     </button>
@@ -444,8 +452,8 @@ export function CommentComposer({
                     onClick={() => fileRef.current?.click()}
                     disabled={attachments.length >= MAX_ATTACHMENTS || submitting}
                     className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80 disabled:opacity-30"
-                    aria-label="Đính kèm ảnh"
-                    title={`Đính kèm ảnh (tối đa ${MAX_ATTACHMENTS}, mỗi ảnh ≤10MB)`}
+                    aria-label={L.attachImage}
+                    title={L.attachImageTitle(MAX_ATTACHMENTS)}
                 >
                     <ImagePlus className="h-4 w-4" />
                 </button>
@@ -455,7 +463,7 @@ export function CommentComposer({
                     onClick={() => void submit()}
                     disabled={!canSend || submitting}
                     className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-indigo-500 text-white transition hover:bg-indigo-400 disabled:opacity-40"
-                    aria-label="Gửi"
+                    aria-label={L.send}
                 >
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </button>

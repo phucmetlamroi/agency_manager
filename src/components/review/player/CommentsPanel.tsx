@@ -8,18 +8,13 @@
 import { useCallback, useMemo } from 'react'
 import { MessageSquare, ArrowRightCircle } from 'lucide-react'
 import type { Fps } from '@/lib/review/timecode'
-import {
-    setCommentResolved,
-    deleteComment,
-    editComment,
-    addReaction,
-    removeReaction,
-    type CommentDto,
-} from '@/lib/review/comment-client'
+import type { CommentDto } from '@/lib/review/comment-client'
 import type { CommentsFeed } from './useComments'
 import type { AnnotationController } from './useAnnotation'
 import { CommentThread, type CommentActions } from './CommentItem'
 import { CommentComposer } from './CommentComposer'
+import { usePlayerEnv } from './player-env'
+import { PLAYER_L10N } from './player-l10n'
 
 function toggleReactionLocal(reactions: CommentDto['reactions'], emoji: string, add: boolean): CommentDto['reactions'] {
     const idx = reactions.findIndex((r) => r.emoji === emoji)
@@ -76,8 +71,11 @@ export function CommentsPanel({
     highlightId: string | null
     onJumpToVersion: (versionId: string) => void
 }) {
+    const env = usePlayerEnv()
+    const L = PLAYER_L10N[env.lang]
     const { comments } = feed
     const { patch, refresh } = feed
+    const api = env.api
 
     const { parents, repliesByParent } = useMemo(() => {
         const parents: CommentDto[] = []
@@ -109,17 +107,17 @@ export function CommentsPanel({
                 patch((list) =>
                     list.map((c) => (c.id === id ? { ...c, completedAt: resolved ? new Date().toISOString() : null } : c)),
                 )
-                setCommentResolved(id, resolved)
+                api.setCommentResolved(id, resolved)
                     .then(({ comment }) => patch((list) => list.map((c) => (c.id === comment.id ? comment : c))))
                     .catch(() => refresh())
             },
             remove: (id) => {
                 patch((list) => list.filter((c) => c.id !== id && c.parentId !== id))
-                deleteComment(id).catch(() => refresh())
+                api.deleteComment(id).catch(() => refresh())
             },
             edit: (id, body) => {
                 patch((list) => list.map((c) => (c.id === id ? { ...c, body, editedAt: new Date().toISOString() } : c)))
-                editComment(id, body)
+                api.editComment(id, body)
                     .then(({ comment }) => patch((list) => list.map((c) => (c.id === comment.id ? comment : c))))
                     .catch(() => refresh())
             },
@@ -129,11 +127,11 @@ export function CommentsPanel({
             // poll reconciles against the server; failures roll back via refresh().
             react: (id, emoji, add) => {
                 patch((list) => list.map((c) => (c.id === id ? { ...c, reactions: toggleReactionLocal(c.reactions, emoji, add) } : c)))
-                ;(add ? addReaction(id, emoji) : removeReaction(id, emoji)).catch(() => refresh())
+                ;(add ? api.addReaction(id, emoji) : api.removeReaction(id, emoji)).catch(() => refresh())
             },
             viewAnnotation: onViewAnnotation,
         }),
-        [patch, refresh, onViewAnnotation],
+        [patch, refresh, onViewAnnotation, api],
     )
 
     const onPosted = useCallback(
@@ -156,19 +154,17 @@ export function CommentsPanel({
                             <MessageSquare className="h-8 w-8" />
                             {otherWithComments.length > 0 ? (
                                 <>
-                                    <p className="text-sm">
-                                        Phiên bản này chưa có bình luận. Có {otherTotal} bình luận ở phiên bản khác.
-                                    </p>
+                                    <p className="text-sm">{L.emptyOtherVersions(otherTotal)}</p>
                                     <button
                                         onClick={() => onJumpToVersion(otherWithComments[0].versionId)}
                                         className="mt-1 flex items-center gap-1.5 rounded-lg bg-indigo-500/20 px-3 py-1.5 text-sm text-indigo-200 hover:bg-indigo-500/30"
                                     >
                                         <ArrowRightCircle className="h-4 w-4" />
-                                        Xem v{otherWithComments[0].versionNumber}
+                                        {L.viewVersion(otherWithComments[0].versionNumber)}
                                     </button>
                                 </>
                             ) : (
-                                <p className="text-sm">Chưa có bình luận cho phiên bản này.</p>
+                                <p className="text-sm">{L.emptyNoComments}</p>
                             )}
                         </div>
                     </div>

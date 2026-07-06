@@ -10,9 +10,13 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock } from 'lucide-react'
 import { listAssetVersions, type AssetVersions, type VersionRow } from '@/lib/review/team-actions'
 import type { Fps } from '@/lib/review/timecode'
+import type { AnnotationShape, CommentDto } from '@/lib/review/comment-client'
 import { useHlsPlayer } from './useHlsPlayer'
 import { VideoStage } from './VideoStage'
 import { useComments } from './useComments'
+import { useAnnotation } from './useAnnotation'
+import { AnnotationCanvas } from './AnnotationCanvas'
+import { AnnotationToolbar } from './AnnotationToolbar'
 import { CommentsPanel } from './CommentsPanel'
 import { TimelineMarkers } from './TimelineMarkers'
 
@@ -95,6 +99,14 @@ export function ReviewPlayerShell({
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.id : null, fps, enabled })
     const feed = useComments(version?.id ?? null)
 
+    // Annotation draw state (P4.4). Owned here because BOTH the overlay and the
+    // composer read it. `viewAnno` is the read-only "show this comment's drawing"
+    // mode (mutually exclusive with drawing).
+    const annotation = useAnnotation()
+    const { reset: annoReset } = annotation
+    const [viewAnno, setViewAnno] = useState<{ shapes: AnnotationShape[]; frame: number } | null>(null)
+    const canAnnotate = isVideo && !!version?.width && !!version?.height
+
     // The controller object identity changes every render (frame/currentSec state),
     // but its METHODS are stable useCallbacks — depend on those so playback-rate
     // re-renders don't tear down/rebuild the window listener 30–60×/sec.
@@ -106,6 +118,31 @@ export function ReviewPlayerShell({
         el?.blur?.()
     }, [])
     const handleSeek = ctlSeek
+
+    // Click a comment's "Hình vẽ" chip → seek + pause + show its drawing read-only.
+    const onViewAnnotation = useCallback(
+        (c: CommentDto) => {
+            if (!c.annotation) return
+            annoReset() // leave any draw-in-progress; the two modes are exclusive
+            if (c.startFrame != null) ctlSeek(c.startFrame)
+            ctlPause()
+            setViewAnno({ shapes: c.annotation, frame: c.startFrame ?? 0 })
+            setHighlightId(c.id)
+        },
+        [annoReset, ctlSeek, ctlPause],
+    )
+
+    // The read-only drawing is pinned to a frame → drop it once the video plays or
+    // the user starts a new drawing.
+    useEffect(() => {
+        if (controller.isPlaying || annotation.active) setViewAnno(null)
+    }, [controller.isPlaying, annotation.active])
+
+    // Switching version invalidates any drawing / view tied to the old frame space.
+    useEffect(() => {
+        annoReset()
+        setViewAnno(null)
+    }, [currentVersionId, annoReset])
 
     // Keyboard: Space toggles, ←/→ frame-step — when focus is not in a text field.
     useEffect(() => {
@@ -164,6 +201,34 @@ export function ReviewPlayerShell({
             </div>
         )
     }
+
+    const annotationOverlay =
+        canAnnotate && annotation.active ? (
+            <>
+                <AnnotationCanvas
+                    editable
+                    shapes={annotation.shapes}
+                    tool={annotation.tool}
+                    color={annotation.color}
+                    size={annotation.size}
+                    intrinsicWidth={version?.width ?? null}
+                    intrinsicHeight={version?.height ?? null}
+                    onCommitShape={annotation.addShape}
+                />
+                <AnnotationToolbar ctl={annotation} />
+            </>
+        ) : canAnnotate && viewAnno && !controller.isPlaying ? (
+            <AnnotationCanvas
+                editable={false}
+                shapes={viewAnno.shapes}
+                tool={annotation.tool}
+                color={annotation.color}
+                size={annotation.size}
+                intrinsicWidth={version?.width ?? null}
+                intrinsicHeight={version?.height ?? null}
+                onCommitShape={annotation.addShape}
+            />
+        ) : null
 
     return (
         <div className="flex h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
@@ -240,6 +305,7 @@ export function ReviewPlayerShell({
                             mediaKind={isVideo ? 'video' : 'image'}
                             versionId={version.id}
                             posterUrl={posterUrl}
+                            overlay={annotationOverlay}
                             timelineChildren={
                                 <TimelineMarkers
                                     comments={feed.comments}
@@ -287,9 +353,11 @@ export function ReviewPlayerShell({
                                     isAdmin={isAdmin}
                                     feed={feed}
                                     playheadFrame={controller.frame}
+                                    annotation={canAnnotate ? annotation : null}
                                     onSeekToFrame={handleSeek}
                                     onPauseVideo={onPauseVideo}
                                     onFocusPlayer={onFocusPlayer}
+                                    onViewAnnotation={onViewAnnotation}
                                     highlightId={highlightId}
                                     onJumpToVersion={(vid) => setCurrentVersionId(vid)}
                                 />

@@ -64,6 +64,8 @@ const rectShape = z.object({
 
 export const annotationShapeSchema = z.discriminatedUnion('tool', [penShape, lineShape, arrowShape, rectShape])
 export type AnnotationShape = z.infer<typeof annotationShapeSchema>
+/** One of the 4 locked review colours (the shape `color` literal union). */
+export type AnnotationColor = AnnotationShape['color']
 
 /** A shape list: 1..100 shapes. Empty list is treated as "no annotation" by the caller. */
 export const annotationSchema = z.array(annotationShapeSchema).min(1).max(MAX_SHAPES)

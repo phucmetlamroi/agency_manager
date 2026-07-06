@@ -17,6 +17,7 @@ import {
     type CommentDto,
 } from '@/lib/review/comment-client'
 import type { CommentsFeed } from './useComments'
+import type { AnnotationController } from './useAnnotation'
 import { CommentThread, type CommentActions } from './CommentItem'
 import { CommentComposer } from './CommentComposer'
 
@@ -50,9 +51,11 @@ export function CommentsPanel({
     isAdmin,
     feed,
     playheadFrame,
+    annotation,
     onSeekToFrame,
     onPauseVideo,
     onFocusPlayer,
+    onViewAnnotation,
     highlightId,
     onJumpToVersion,
 }: {
@@ -63,9 +66,11 @@ export function CommentsPanel({
     isAdmin: boolean
     feed: CommentsFeed
     playheadFrame: number
+    annotation: AnnotationController | null
     onSeekToFrame: (frame: number) => void
     onPauseVideo: () => void
     onFocusPlayer: () => void
+    onViewAnnotation: (c: CommentDto) => void
     highlightId: string | null
     onJumpToVersion: (versionId: string) => void
 }) {
@@ -124,8 +129,9 @@ export function CommentsPanel({
                 patch((list) => list.map((c) => (c.id === id ? { ...c, reactions: toggleReactionLocal(c.reactions, emoji, add) } : c)))
                 ;(add ? addReaction(id, emoji) : removeReaction(id, emoji)).catch(() => refresh())
             },
+            viewAnnotation: onViewAnnotation,
         }),
-        [patch, refresh],
+        [patch, refresh, onViewAnnotation],
     )
 
     const onPosted = useCallback(
@@ -191,6 +197,7 @@ export function CommentsPanel({
                 fps={fps}
                 mediaKind={mediaKind}
                 playheadFrame={playheadFrame}
+                annotation={annotation}
                 onPauseVideo={onPauseVideo}
                 onPosted={onPosted}
                 onFocusPlayer={onFocusPlayer}

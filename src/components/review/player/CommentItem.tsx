@@ -29,6 +29,7 @@ export interface CommentActions {
     remove: (id: string) => void
     edit: (id: string, body: string) => void
     react: (id: string, emoji: string, add: boolean) => void
+    viewAnnotation: (c: CommentDto) => void
 }
 
 function relTime(iso: string): string {
@@ -167,9 +168,13 @@ function SingleComment({
                                 </button>
                             )}
                             {comment.annotation && (
-                                <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/50">
+                                <button
+                                    onClick={() => actions.viewAnnotation(comment)}
+                                    className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/50 hover:bg-white/10 hover:text-white/80"
+                                    title="Xem hình vẽ trên khung hình"
+                                >
                                     <PenLine className="h-3 w-3" /> Hình vẽ
-                                </span>
+                                </button>
                             )}
                         </div>
                     )}

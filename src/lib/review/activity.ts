@@ -22,6 +22,15 @@ export const REVIEW_ACTIVITY = {
     COMMENT_CREATED: 'comment.created', // new comment/reply on a version (meta {timecodeMs, isInternal, parentId})
     COMMENT_RESOLVED: 'comment.resolved', // Mark as Complete
     COMMENT_REOPENED: 'comment.reopened', // un-resolve
+    // ── P5: share links + guest review (FR-F01/F06, DATA-MODEL §4.10) ──
+    SHARE_CREATED: 'share.created', // member created a link (meta {slug})
+    SHARE_REVOKED: 'share.revoked', // kill-switch on (meta {slug})
+    SHARE_UNREVOKED: 'share.unrevoked', // kill-switch back off [S]
+    SHARE_LINK_OPENED: 'share.link_opened', // guest opened /r/{slug} (throttled 30min/session)
+    SHARE_ASSET_VIEWED: 'share.asset_viewed', // guest started playback (meta {versionNumber})
+    SHARE_DOWNLOADED: 'share.downloaded', // guest downloaded the original (meta {versionNumber})
+    REVIEW_APPROVED: 'review.approved', // guest decision (meta {versionNumber}) — P5.4
+    REVIEW_CHANGES_REQUESTED: 'review.changes_requested', // guest decision (meta {versionNumber}) — P5.4
 } as const
 
 export type ReviewActivityType = (typeof REVIEW_ACTIVITY)[keyof typeof REVIEW_ACTIVITY]

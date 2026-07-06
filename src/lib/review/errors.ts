@@ -66,18 +66,22 @@ export function apiJson<T>(data: T, init?: { status?: number }): NextResponse {
 export async function parseBody<T>(
     req: Request,
     schema: ZodSchema<T>,
+    lang: 'vi' | 'en' = 'vi', // guest routes (/api/r/*) pass 'en'
 ): Promise<{ ok: true; data: T } | { ok: false; res: NextResponse }> {
     let raw: unknown
     try {
         raw = await req.json()
     } catch {
-        return { ok: false, res: apiError(400, 'VALIDATION_ERROR', 'Body phải là JSON hợp lệ.') }
+        return {
+            ok: false,
+            res: apiError(400, 'VALIDATION_ERROR', lang === 'en' ? 'Body must be valid JSON.' : 'Body phải là JSON hợp lệ.'),
+        }
     }
     const parsed = schema.safeParse(raw)
     if (!parsed.success) {
         return {
             ok: false,
-            res: apiError(400, 'VALIDATION_ERROR', 'Dữ liệu không hợp lệ.', {
+            res: apiError(400, 'VALIDATION_ERROR', lang === 'en' ? 'Invalid input.' : 'Dữ liệu không hợp lệ.', {
                 issues: parsed.error.flatten(),
             }),
         }

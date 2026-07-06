@@ -10,8 +10,12 @@ import type {
     ReviewFolder,
     ReviewAsset,
     ReviewMediaKind,
+    ReviewComment,
 } from '@prisma/client'
 import { formatUserDisplay } from '@/lib/format-user'
+import type { AnnotationShape } from './annotation'
+
+export type { AnnotationShape } from './annotation'
 
 export type UploadStatusDto = 'uploading' | 'uploaded' | 'processing' | 'ready' | 'failed'
 export type ReviewStateDto = 'draft' | 'awaiting_review' | 'changes_requested' | 'approved'
@@ -212,5 +216,82 @@ export function serializeAsset(
         createdAt: asset.createdAt.toISOString(),
         rowVersion: asset.rowVersion,
         deletedAt: asset.deletedAt ? asset.deletedAt.toISOString() : null,
+    }
+}
+
+// ─────────────────────────── comments (API-SPEC §4 / §0.6) ───────────────────────────
+
+export interface CommentAttachmentDto {
+    id: string
+    url: string
+    width: number | null
+    height: number | null
+}
+
+export interface CommentReactionDto {
+    emoji: string
+    count: number
+    reactedByMe: boolean
+}
+
+export interface CommentDto {
+    id: string
+    versionId: string
+    parentId: string | null
+    author: UserRef | null // null = guest
+    guest: { name: string } | null // email is NEVER emitted (GDPR — ADMIN sees it only in ShareActivity)
+    body: string
+    startFrame: number | null // null = general comment (no timestamp) or an image asset
+    endFrame: number | null // != null = range comment
+    annotation: AnnotationShape[] | null
+    isInternal: boolean
+    attachments: CommentAttachmentDto[]
+    reactions: CommentReactionDto[]
+    completedAt: string | null
+    completedBy: UserRef | null
+    editedAt: string | null
+    createdAt: string
+}
+
+/**
+ * Serialize a ReviewComment → CommentDto. Frame numbers, resolved user refs,
+ * signed attachment URLs, and grouped reactions are all computed by the caller
+ * (comments.ts) — this stays a pure shape mapper (no crypto / no db here).
+ * `startFrame`/`endFrame` are derived from the stored millisecond offsets against
+ * the version fps by the caller; images pass both as null.
+ */
+export function serializeComment(
+    comment: Pick<
+        ReviewComment,
+        'id' | 'versionId' | 'parentId' | 'body' | 'isInternal' | 'resolvedAt' | 'editedAt' | 'createdAt'
+    >,
+    opts: {
+        author: UserRef | null
+        guestName: string | null
+        startFrame: number | null
+        endFrame: number | null
+        annotation: AnnotationShape[] | null
+        attachments: CommentAttachmentDto[]
+        reactions: CommentReactionDto[]
+        completedBy: UserRef | null
+    },
+): CommentDto {
+    return {
+        id: comment.id,
+        versionId: comment.versionId,
+        parentId: comment.parentId,
+        author: opts.author,
+        guest: opts.guestName ? { name: opts.guestName } : null,
+        body: comment.body,
+        startFrame: opts.startFrame,
+        endFrame: opts.endFrame,
+        annotation: opts.annotation,
+        isInternal: comment.isInternal,
+        attachments: opts.attachments,
+        reactions: opts.reactions,
+        completedAt: comment.resolvedAt ? comment.resolvedAt.toISOString() : null,
+        completedBy: opts.completedBy,
+        editedAt: comment.editedAt ? comment.editedAt.toISOString() : null,
+        createdAt: comment.createdAt.toISOString(),
     }
 }

@@ -148,13 +148,18 @@ export function ReviewPlayerShell({
         if (annotation.active) setViewAnno(null)
     }, [annotation.active])
 
-    // Invariant: while drawing, the video stays PAUSED so every stroke is committed
-    // against the frame the annotation is pinned to. The keydown handler blocks
-    // Space/step during draw; this backstops the control-bar ▶ button (outside the
-    // overlay) by re-pausing if anything starts playback while draw mode is active.
+    // Invariant: while drawing, the video stays PAUSED AND PARKED on the pinned frame
+    // so every stroke is committed against the frame the annotation is saved to. The
+    // keydown handler blocks Space/step during draw and click-to-play is disabled on
+    // the stage; this backstops anything else that starts playback (control-bar ▶)
+    // by re-pausing AND seeking back to the pinned frame.
+    const annoFrame = annotation.frame
     useEffect(() => {
-        if (annotation.active && controller.isPlaying) ctlPause()
-    }, [annotation.active, controller.isPlaying, ctlPause])
+        if (annotation.active && controller.isPlaying) {
+            ctlPause()
+            if (annoFrame != null) ctlSeek(annoFrame)
+        }
+    }, [annotation.active, controller.isPlaying, ctlPause, ctlSeek, annoFrame])
 
     // Switching version invalidates any drawing / view tied to the old frame space.
     useEffect(() => {
@@ -327,6 +332,7 @@ export function ReviewPlayerShell({
                             versionId={version.id}
                             posterUrl={posterUrl}
                             overlay={annotationOverlay}
+                            clickToggleDisabled={annotation.active}
                             timelineChildren={
                                 <TimelineMarkers
                                     comments={feed.comments}

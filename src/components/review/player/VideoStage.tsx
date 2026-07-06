@@ -22,6 +22,7 @@ export function VideoStage({
     posterUrl,
     overlay,
     timelineChildren,
+    clickToggleDisabled = false,
 }: {
     videoRef: React.RefObject<HTMLVideoElement | null>
     controller: PlayerController
@@ -31,6 +32,10 @@ export function VideoStage({
     posterUrl: string | null
     overlay?: React.ReactNode
     timelineChildren?: React.ReactNode
+    /** true while the annotation overlay is EDITABLE — disables click-to-play on the
+     *  video surface (the element now covers the letterbox bars too, which the
+     *  editable SVG does not, so a bar click would start playback mid-draw). */
+    clickToggleDisabled?: boolean
 }) {
     const containerRef = useRef<HTMLDivElement>(null)
     const [isFullscreen, setIsFullscreen] = useState(false)
@@ -96,12 +101,20 @@ export function VideoStage({
             <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
                 {mediaKind === 'video' ? (
                     <>
+                        {/* h-full w-full + object-contain: the element's DISPLAY size is pinned
+                            to the stage and the video letterboxes INSIDE it — with the old
+                            max-h/max-w sizing the element tracked the intrinsic size of the
+                            rendition being played, so an ABR switch (e.g. 480p → 1080p) made
+                            the whole frame visibly jump/scale mid-playback. This box also now
+                            matches the annotation overlay's containedBox math exactly. */}
                         <video
                             ref={videoRef}
                             poster={posterUrl ?? undefined}
                             playsInline
-                            className="max-h-full max-w-full"
-                            onClick={() => controller.toggle()}
+                            className="h-full w-full object-contain"
+                            onClick={() => {
+                                if (!clickToggleDisabled) controller.toggle()
+                            }}
                         />
                         {!controller.ready && !controller.error && (
                             <div className="absolute inset-0 grid place-items-center bg-black/40">

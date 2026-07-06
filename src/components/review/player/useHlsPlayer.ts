@@ -135,7 +135,6 @@ export function useHlsPlayer(opts: {
                 hls.loadSource(url)
                 hls.attachMedia(video)
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    refreshAttemptsRef.current = 0 // a good load resets the 403 budget
                     const lv: QualityLevel[] = hls.levels.map((l: { height?: number }, i: number) => ({
                         index: i,
                         height: l.height ?? null,
@@ -143,6 +142,12 @@ export function useHlsPlayer(opts: {
                     }))
                     setLevels(lv)
                     setReady(true)
+                })
+                // Reset the 403 re-mint budget only when MEDIA actually flows. Resetting on
+                // MANIFEST_PARSED (as before) let a "master loads / renditions 403" shape
+                // re-mint forever: refresh → manifest parses (reset) → rendition 403 → refresh…
+                hls.on(Hls.Events.FRAG_BUFFERED, () => {
+                    refreshAttemptsRef.current = 0
                 })
                 hls.on(Hls.Events.LEVEL_SWITCHED, (_e: unknown, data: { level: number }) => {
                     if (hls.autoLevelEnabled) setCurrentLevel(-1)

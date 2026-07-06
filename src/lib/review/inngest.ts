@@ -19,6 +19,8 @@ import { audit } from '@/lib/audit-log'
 import { createAndBroadcastNotifications } from '@/actions/notification-actions'
 // P6.1 notifications.
 import { notifyReview, reviewPlayerUrl } from './notify'
+// P6.2 trash purge.
+import { purgeExpiredTrash } from './purge'
 
 export const inngest = new Inngest({ id: 'hustlytasker-review' })
 
@@ -39,6 +41,7 @@ export const REVIEW_EVENTS = {
 // healthy path is still legitimately finalizing/processing; the batch cap bounds one run (a
 // hit cap is logged, and the next night drains the rest).
 const JANITOR_BATCH = 100
+const PURGE_BATCH = 25 // external deletes (Mux+R2) per version → smaller batch than the DB-only sweeps
 const UPLOADED_GRACE_MS = 15 * 60 * 1000 // a real R2 finalize lands in seconds
 const PROCESSING_GRACE_MS = 20 * 60 * 1000 // Mux "basic" ready is usually < a few minutes
 const PROCESSING_HARD_LIMIT_MS = 24 * 60 * 60 * 1000 // still PROCESSING with no Mux asset after 24h ⇒ give up
@@ -546,8 +549,14 @@ export const reviewJanitor = inngest.createFunction(
             return { reEnqueued: rows.length, abandoned }
         })
 
-        reviewLog('info', 'inngest.janitor.done', { aborted, redriven, reconciled, reEnqueued })
-        return { ok: true, aborted, redriven, reconciled, reEnqueued }
+        // (e) P6.2: purge trash past 30 days — physically delete Mux assets + R2 objects
+        // + DB rows (ref-counted so a live copy's shared object is never removed). Its own
+        // step → a purge failure retries only this sweep, and it rides the SAME nightly
+        // trigger (no new Inngest function → no extra sync step; see GOTCHA in memory).
+        const purged = await step.run('purge-expired-trash', () => purgeExpiredTrash(PURGE_BATCH))
+
+        reviewLog('info', 'inngest.janitor.done', { aborted, redriven, reconciled, reEnqueued, purged })
+        return { ok: true, aborted, redriven, reconciled, reEnqueued, purged }
     },
 )
 

@@ -130,7 +130,12 @@ export function useHlsPlayer(opts: {
                     setReady(true)
                     return
                 }
-                const hls = new Hls({ enableWorker: true, lowLatencyMode: false, maxBufferLength: 30 })
+                // autoStartLoad:false so we can pin the START level to the TOP rendition
+                // before any media loads. hls.js otherwise starts on the lowest rendition
+                // and ABR climbs — a review tool must be sharp from 00:00 (the first
+                // seconds are exactly what reviewers scrutinize). ABR stays enabled
+                // afterwards; the quality menu can still pin a level or return to Auto.
+                const hls = new Hls({ enableWorker: true, lowLatencyMode: false, maxBufferLength: 30, autoStartLoad: false })
                 hlsRef.current = hls
                 hls.loadSource(url)
                 hls.attachMedia(video)
@@ -141,6 +146,8 @@ export function useHlsPlayer(opts: {
                         label: l.height ? `${l.height}p` : `#${i + 1}`,
                     }))
                     setLevels(lv)
+                    hls.startLevel = Math.max(0, hls.levels.length - 1) // begin at highest quality
+                    hls.startLoad()
                     setReady(true)
                 })
                 // Reset the 403 re-mint budget only when MEDIA actually flows. Resetting on

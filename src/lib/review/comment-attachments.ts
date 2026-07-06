@@ -49,10 +49,15 @@ function readImageSize(file: File): Promise<{ width?: number; height?: number }>
 /**
  * Presign → PUT the image to R2 → return the metadata to hand to createComment.
  * `signal` lets the composer abort an in-flight upload if the user removes the chip.
+ * `initiate` (P5.3) swaps the presign endpoint — guests use /api/r/{slug}/… .
  */
-export async function uploadCommentImage(file: File, signal?: AbortSignal): Promise<UploadedAttachment> {
+export async function uploadCommentImage(
+    file: File,
+    signal?: AbortSignal,
+    initiate: typeof initiateAttachment = initiateAttachment,
+): Promise<UploadedAttachment> {
     const mimeType = file.type
-    const { attachmentId, putUrl } = await initiateAttachment({
+    const { attachmentId, putUrl } = await initiate({
         fileName: file.name,
         sizeBytes: file.size,
         mimeType,

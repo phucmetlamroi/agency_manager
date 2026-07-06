@@ -12,6 +12,11 @@ import { looksLikeMedia } from './upload-helpers'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 // P1.6 janitor reconcile helpers (call-time-only cycle — see upload-service.ts note).
 import { expireInflightUpload, reconcileStuckUploadedVersion } from './upload-service'
+// P5.4 decision side-effects.
+import { syncTaskOnChangesRequested } from './task-sync'
+import { REVIEW_STATUS_MAP } from './status-map'
+import { audit } from '@/lib/audit-log'
+import { createAndBroadcastNotifications } from '@/actions/notification-actions'
 
 export const inngest = new Inngest({ id: 'hustlytasker-review' })
 
@@ -23,6 +28,9 @@ export const REVIEW_EVENTS = {
     // the heavy Mux create-asset call runs in the Inngest handler (P1.4), keeping
     // the request well under Vercel's function timeout.
     UPLOAD_COMPLETED: 'review/upload.completed',
+    // P5.4: guest Approve / Request changes was committed to the DB by the
+    // decision route; this event fans out the task-side effects (API-SPEC §6.4).
+    DECISION_RECORDED: 'review/decision.recorded',
 } as const
 
 // Janitor sweep bounds (P1.6). The grace windows keep the nightly reconcile OFF rows that a
@@ -74,7 +82,16 @@ async function applyMuxReady(
             },
         })
         if (flip.count === 0) return false
-        // The newest ready version becomes the stack head.
+        // The newest ready version becomes the stack head. When it does, CLEAR a stale
+        // guest-approval on the asset card (FR-A04 AC2: "upload v2 → không giữ trạng thái
+        // đã duyệt của v1"). P5's guest Approve sets asset.statusId='Hoàn tất'; without
+        // this a new head would leave that banner live and let staff complete the task
+        // against an unreviewed cut. Only clear the approved value — never clobber other
+        // staff-set statuses.
+        await tx.reviewAsset.updateMany({
+            where: { id: version.assetId, statusId: REVIEW_STATUS_MAP.approved },
+            data: { statusId: null, rowVersion: { increment: 1 } },
+        })
         await tx.reviewAsset.update({ where: { id: version.assetId }, data: { currentVersionId: versionId } })
         await recordActivity(tx, {
             type: REVIEW_ACTIVITY.VERSION_READY,
@@ -512,4 +529,120 @@ export const reviewJanitor = inngest.createFunction(
     },
 )
 
-export const reviewFunctions = [reviewMuxWebhook, reviewProcessUpload, reviewJanitor]
+// ────────────────── P5.4: guest decision → task sync (API-SPEC §6.4) ──────────────────
+// The decision itself is ALREADY committed by the decision route (source of
+// truth in the DB); this function only fans out side-effects. Each step retries
+// independently. "Latest wins": if the version's reviewState no longer matches
+// the event's decision (the guest flipped again / a new version reset the state),
+// the side-effects are skipped instead of applying a stale decision.
+interface DecisionEventData {
+    versionId: string
+    assetId: string
+    taskId: string | null
+    workspaceId: string
+    shareLinkId: string
+    decision: 'approve' | 'request_changes'
+    guestName: string | null
+    versionNumber: number
+}
+
+export const reviewShareDecision = inngest.createFunction(
+    { id: 'review-share-decision', retries: 4, triggers: [{ event: REVIEW_EVENTS.DECISION_RECORDED }] },
+    async ({ event, step }) => {
+        const data = event.data as unknown as DecisionEventData
+        const expected = data.decision === 'approve' ? ReviewState.APPROVED : ReviewState.CHANGES_REQUESTED
+
+        const loaded = await step.run('load-state', async () => {
+            const v = await prisma.reviewVersion.findUnique({
+                where: { id: data.versionId },
+                select: { reviewState: true, asset: { select: { currentVersionId: true } } },
+            })
+            return { reviewState: v?.reviewState ?? null, isHead: v?.asset?.currentVersionId === data.versionId }
+        })
+        // "Latest wins": skip when the version's decision was overwritten, OR when a newer
+        // version has since become the head (an old-version decision has no task meaning).
+        // This is the second guard against a delayed/duplicate retry force-flipping a task
+        // hours later after staff moved on (the reviewState-only check can't see a new head
+        // because a decided version keeps its own reviewState).
+        if (loaded.reviewState !== expected || !loaded.isHead) {
+            reviewLog('info', 'share_decision.superseded', {
+                versionId: data.versionId,
+                decision: data.decision,
+                currentState: loaded.reviewState,
+                isHead: loaded.isHead,
+            })
+            return { skipped: 'superseded' }
+        }
+
+        if (!data.taskId) return { ok: true, task: 'none' } // Team-only asset — nothing to sync
+
+        // FR-A05: request_changes AUTO-flips the task; approve only proposes (banner
+        // comes from asset.statusId = "Hoàn tất", set by the decision route).
+        let syncApplied = true
+        if (data.decision === 'request_changes') {
+            const res = await step.run('sync-task-revision', () =>
+                syncTaskOnChangesRequested(data.taskId!, data.workspaceId),
+            )
+            syncApplied = !!res?.applied
+        }
+
+        // Task feed event — the drawer's "Bình luận & hoạt động" merges AuditLog rows;
+        // these two actions already exist app-wide with the exact VN labels
+        // ("khách đã duyệt" / "khách yêu cầu chỉnh sửa"). actor=null renders "Khách hàng".
+        await step.run('task-feed-audit', () =>
+            audit({
+                workspaceId: data.workspaceId,
+                actorUserId: null,
+                action: data.decision === 'approve' ? 'task.client_approved' : 'task.client_changes_requested',
+                targetType: 'Task',
+                targetId: data.taskId,
+                after: {
+                    guestName: data.guestName,
+                    versionNumber: data.versionNumber,
+                    via: 'review-share',
+                    shareLinkId: data.shareLinkId,
+                },
+            }),
+        )
+
+        await step.run('notify-staff', async () => {
+            const task = await prisma.task.findUnique({
+                where: { id: data.taskId! },
+                select: { title: true, assigneeId: true, assignedById: true },
+            })
+            if (!task) return { notified: 0 }
+            const userIds = Array.from(
+                new Set([task.assigneeId, task.assignedById].filter((x): x is string => !!x)),
+            )
+            if (!userIds.length) return { notified: 0 }
+            const who = data.guestName ?? 'Khách'
+            const rows = await createAndBroadcastNotifications(
+                userIds,
+                data.decision === 'approve'
+                    ? {
+                          type: 'VIDEO_REVIEW_APPROVED',
+                          title: `✅ ${who} đã duyệt bản v${data.versionNumber}`,
+                          body: `Task "${task.title}" — mở chi tiết task để xác nhận chuyển Hoàn tất.`,
+                          taskId: data.taskId,
+                      }
+                    : {
+                          type: 'VIDEO_CHANGES_REQUESTED',
+                          title: `✏️ ${who} yêu cầu chỉnh sửa bản v${data.versionNumber}`,
+                          // Only claim the task auto-flipped when it actually did — a
+                          // race-lost / archived / bad-map sync returns applied:false and
+                          // the task kept its status; a false "đã chuyển Revision" would
+                          // mislead staff (finding P5-R#16).
+                          body: syncApplied
+                              ? `Task "${task.title}" đã tự chuyển sang "${REVIEW_STATUS_MAP.changesRequested}".`
+                              : `Task "${task.title}" — khách yêu cầu chỉnh sửa, kiểm tra trạng thái task.`,
+                          taskId: data.taskId,
+                      },
+            )
+            return { notified: rows.length }
+        })
+
+        return { ok: true }
+    },
+)
+
+export const reviewFunctions = [reviewMuxWebhook, reviewProcessUpload, reviewJanitor, reviewShareDecision]

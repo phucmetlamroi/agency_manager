@@ -26,12 +26,14 @@ import {
     RotateCcw,
     Clapperboard,
     CheckCircle2,
+    Link2,
 } from 'lucide-react'
 import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
 import { useTaskUploads } from '@/lib/review/use-upload-store'
 import { formatBytes, type UploadItem } from '@/lib/review/upload-store'
 import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
 import { apiConfirmTaskComplete } from '@/lib/review/team-actions'
+import { apiGetOrCreateAssetShare } from '@/lib/review/share-admin-client'
 import type { TaskAssetsResult, TaskDeliverableDto } from '@/lib/review/task-assets'
 import type { ReviewStateDto } from '@/lib/review/dto'
 
@@ -528,14 +530,17 @@ function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; wo
                         {formatClock(v.createdAt)}
                         {v.commentCount > 0 ? ` • ${v.commentCount} bình luận` : ''}
                     </span>
-                    <button
-                        type="button"
-                        onClick={openReview}
-                        disabled={!workspaceId}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#A855F7] disabled:opacity-50"
-                    >
-                        <PlayCircle size={13} /> Mở review
-                    </button>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                        <CopyGuestLinkButton assetId={asset.assetId} />
+                        <button
+                            type="button"
+                            onClick={openReview}
+                            disabled={!workspaceId}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#A855F7] disabled:opacity-50"
+                        >
+                            <PlayCircle size={13} /> Mở review
+                        </button>
+                    </span>
                 </div>
             </div>
         </div>
@@ -550,4 +555,34 @@ function formatClock(iso: string): string {
     const dd = String(d.getDate()).padStart(2, '0')
     const mo = String(d.getMonth() + 1).padStart(2, '0')
     return `${hh}:${mm} ${dd}/${mo}`
+}
+
+/** [P5.5] "Copy link khách" (FR-A06 AC3): first click creates the asset's default
+ *  share link, every click copies its URL to the clipboard. One click, one toast. */
+function CopyGuestLinkButton({ assetId }: { assetId: string }) {
+    const [busy, setBusy] = useState(false)
+    const onClick = async () => {
+        if (busy) return
+        setBusy(true)
+        try {
+            const { share } = await apiGetOrCreateAssetShare(assetId)
+            await navigator.clipboard.writeText(share.url)
+            toast.success('Đã sao chép link cho khách.')
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Không tạo được link cho khách.')
+        } finally {
+            setBusy(false)
+        }
+    }
+    return (
+        <button
+            type="button"
+            onClick={() => void onClick()}
+            disabled={busy}
+            title="Tạo/copy link review cho khách (không cần tài khoản)"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1.5 text-[11px] font-semibold text-zinc-200 transition-colors hover:bg-white/[0.1] disabled:opacity-50"
+        >
+            {busy ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Copy link khách
+        </button>
+    )
 }

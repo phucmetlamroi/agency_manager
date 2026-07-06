@@ -9,9 +9,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, AlertTriangle } from 'lucide-react'
 import type { Fps } from '@/lib/review/timecode'
-import { fetchDownloadUrl } from '@/lib/review/player-api'
 import type { PlayerController } from './useHlsPlayer'
 import { PlayerControls } from './PlayerControls'
+import { usePlayerEnv } from './player-env'
 
 export function VideoStage({
     videoRef,
@@ -38,6 +38,7 @@ export function VideoStage({
     clickToggleDisabled?: boolean
 }) {
     const containerRef = useRef<HTMLDivElement>(null)
+    const env = usePlayerEnv()
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [pseudoFs, setPseudoFs] = useState(false)
     const [isTouch, setIsTouch] = useState(false)
@@ -48,18 +49,22 @@ export function VideoStage({
         setIsTouch(typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches)
     }, [])
 
-    // Image asset: fetch a short-lived presigned original to display.
+    // Image asset: fetch a short-lived presigned original to display (env-scoped
+    // endpoint — internal download-url vs guest share route).
     useEffect(() => {
         if (mediaKind !== 'image') return
         let cancelled = false
         setImgUrl(null)
         setImgError(null)
-        fetchDownloadUrl(versionId)
+        const fallback = env.lang === 'en' ? 'The image failed to load.' : 'Không tải được ảnh.'
+        env.api
+            .fetchImageUrl(versionId)
             .then((r) => !cancelled && setImgUrl(r.url))
-            .catch((e) => !cancelled && setImgError(e instanceof Error ? e.message : 'Không tải được ảnh.'))
+            .catch((e) => !cancelled && setImgError(e instanceof Error ? e.message : fallback))
         return () => {
             cancelled = true
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mediaKind, versionId])
 
     useEffect(() => {

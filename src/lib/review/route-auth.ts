@@ -41,6 +41,31 @@ export function withReviewRoute<C = unknown>(handler: Handler<C>): Handler<C> {
     }
 }
 
+/**
+ * P5: same boundary for GUEST routes (/api/r/*) — English messages, and an
+ * internal-auth throw here is a bug (guests never hold a session), so it maps
+ * to a generic 500 instead of leaking the internal auth envelope.
+ */
+export function withShareRoute<C = unknown>(handler: Handler<C>): Handler<C> {
+    return async (req, ctx) => {
+        try {
+            return await handler(req, ctx)
+        } catch (e) {
+            if (e instanceof NextResponse) return e
+            if (e instanceof MuxError) {
+                reviewLog('error', 'route.mux_upstream', { path: safePath(req), status: e.status, msg: e.message })
+                return apiError(502, 'UPSTREAM_ERROR', 'Video service error. Please try again.', { provider: 'mux' })
+            }
+            reviewLog('error', 'route.unhandled', {
+                path: safePath(req),
+                reqId: getRequestId(req),
+                error: e instanceof Error ? e.message : String(e),
+            })
+            return apiError(500, 'INTERNAL', 'Something went wrong. Please try again.')
+        }
+    }
+}
+
 function safePath(req: NextRequest): string {
     try {
         return new URL(req.url).pathname

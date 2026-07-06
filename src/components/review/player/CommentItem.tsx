@@ -23,6 +23,8 @@ import {
 import { frameToSmpte, type Fps } from '@/lib/review/timecode'
 import type { CommentDto } from '@/lib/review/comment-client'
 import { CommentComposer } from './CommentComposer'
+import { usePlayerEnv } from './player-env'
+import { PLAYER_L10N, type PlayerL10n } from './player-l10n'
 
 type Attachment = CommentDto['attachments'][number]
 
@@ -36,18 +38,18 @@ export interface CommentActions {
     viewAnnotation: (c: CommentDto) => void
 }
 
-function relTime(iso: string): string {
+function relTime(iso: string, L: PlayerL10n): string {
     const t = new Date(iso).getTime()
     const diff = Date.now() - t
     const m = Math.floor(diff / 60000)
-    if (m < 1) return 'vừa xong'
-    if (m < 60) return `${m} phút trước`
+    if (m < 1) return L.justNow
+    if (m < 60) return L.minutesAgo(m)
     const h = Math.floor(m / 60)
-    if (h < 24) return `${h} giờ trước`
+    if (h < 24) return L.hoursAgo(h)
     const d = Math.floor(h / 24)
-    if (d < 7) return `${d} ngày trước`
+    if (d < 7) return L.daysAgo(d)
     try {
-        return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+        return new Date(iso).toLocaleDateString(L.dateLocale, { day: '2-digit', month: '2-digit' })
     } catch {
         return ''
     }
@@ -73,6 +75,7 @@ function Reactions({
     onToggle: (emoji: string, add: boolean) => void
 }) {
     const [pickerOpen, setPickerOpen] = useState(false)
+    const L = PLAYER_L10N[usePlayerEnv().lang]
     return (
         <div className="mt-1 flex flex-wrap items-center gap-1">
             {comment.reactions.map((r) => (
@@ -93,7 +96,7 @@ function Reactions({
                 <button
                     onClick={() => setPickerOpen((v) => !v)}
                     className="grid h-6 w-6 place-items-center rounded-full text-white/40 hover:bg-white/10 hover:text-white/80"
-                    aria-label="Thêm cảm xúc"
+                    aria-label={L.addReaction}
                 >
                     <SmilePlus className="h-3.5 w-3.5" />
                 </button>
@@ -137,7 +140,8 @@ function SingleComment({
     actions: CommentActions
     isReply?: boolean
 }) {
-    const authorName = comment.author?.name ?? comment.guest?.name ?? 'Ẩn danh'
+    const L = PLAYER_L10N[usePlayerEnv().lang]
+    const authorName = comment.author?.name ?? comment.guest?.name ?? L.anonymous
     const hasTime = comment.startFrame != null
     const [lightbox, setLightbox] = useState<number | null>(null)
 
@@ -149,12 +153,12 @@ function SingleComment({
                     <div className="flex items-center gap-1.5">
                         <span className="truncate text-sm font-medium text-white/90">{authorName}</span>
                         {comment.isInternal && (
-                            <span title="Nội bộ" className="inline-flex">
+                            <span title={L.internalBadge} className="inline-flex">
                                 <Lock className="h-3 w-3 shrink-0 text-amber-400" />
                             </span>
                         )}
-                        <span className="shrink-0 text-xs text-white/35">{relTime(comment.createdAt)}</span>
-                        {comment.editedAt && <span className="text-[10px] text-white/30">(đã sửa)</span>}
+                        <span className="shrink-0 text-xs text-white/35">{relTime(comment.createdAt, L)}</span>
+                        {comment.editedAt && <span className="text-[10px] text-white/30">{L.edited}</span>}
                     </div>
 
                     {/* timecode + annotation chips */}
@@ -176,9 +180,9 @@ function SingleComment({
                                 <button
                                     onClick={() => actions.viewAnnotation(comment)}
                                     className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/50 hover:bg-white/10 hover:text-white/80"
-                                    title="Xem hình vẽ trên khung hình"
+                                    title={L.viewDrawingTitle}
                                 >
-                                    <PenLine className="h-3 w-3" /> Hình vẽ
+                                    <PenLine className="h-3 w-3" /> {L.viewDrawing}
                                 </button>
                             )}
                         </div>
@@ -195,7 +199,7 @@ function SingleComment({
                                     key={a.id}
                                     onClick={() => setLightbox(i)}
                                     className="h-16 w-16 overflow-hidden rounded-md border border-white/10 transition hover:border-white/30"
-                                    aria-label="Xem ảnh"
+                                    aria-label={L.viewImage}
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={a.url} alt="" className="h-full w-full object-cover" />
@@ -233,6 +237,7 @@ export const CommentThread = memo(function CommentThread({
     onFocusPlayer,
     onReplyPosted,
     actions,
+    canReply = true,
 }: {
     comment: CommentDto
     replies: CommentDto[]
@@ -247,12 +252,21 @@ export const CommentThread = memo(function CommentThread({
     onFocusPlayer: () => void
     onReplyPosted: (c: CommentDto) => void
     actions: CommentActions
+    /** false on comments-off guest shares — hides the Reply affordance (a create). */
+    canReply?: boolean
 }) {
+    const env = usePlayerEnv()
+    const L = PLAYER_L10N[env.lang]
     const [replying, setReplying] = useState(false)
     const [editingTop, setEditingTop] = useState(false)
     const resolved = comment.completedAt != null
-    const isMine = !!comment.author && comment.author.id === currentUserId
-    const canDelete = isMine || isAdmin
+    // P5.3: ownership/permission checks live in the env (internal: author/admin
+    // against currentUserId·isAdmin baked into the provider; guest: own comments
+    // of the live session). The props are kept for the internal shell's other uses.
+    void currentUserId
+    void isAdmin
+    const isMine = env.can.editComment(comment)
+    const canDelete = env.can.deleteComment(comment)
 
     return (
         <div
@@ -265,37 +279,48 @@ export const CommentThread = memo(function CommentThread({
 
             {/* action row */}
             <div className="mt-1 flex items-center gap-1 pl-9 text-white/40">
-                <button
-                    onClick={() => setReplying((v) => !v)}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-white/10 hover:text-white/80"
-                >
-                    <CornerUpLeft className="h-3 w-3" /> Trả lời
-                </button>
-                <button
-                    onClick={() => actions.resolve(comment.id, !resolved)}
-                    className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-white/10 ${
-                        resolved ? 'text-emerald-400' : 'hover:text-white/80'
-                    }`}
-                >
-                    {resolved ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-                    {resolved ? 'Đã xử lý' : 'Đánh dấu xử lý'}
-                </button>
+                {canReply && (
+                    <button
+                        onClick={() => setReplying((v) => !v)}
+                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-white/10 hover:text-white/80"
+                    >
+                        <CornerUpLeft className="h-3 w-3" /> {L.reply}
+                    </button>
+                )}
+                {env.can.resolve ? (
+                    <button
+                        onClick={() => actions.resolve(comment.id, !resolved)}
+                        className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-white/10 ${
+                            resolved ? 'text-emerald-400' : 'hover:text-white/80'
+                        }`}
+                    >
+                        {resolved ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                        {resolved ? L.resolved : L.markResolved}
+                    </button>
+                ) : (
+                    // Guests see the resolved state but cannot toggle it (FR-E08).
+                    resolved && (
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 text-xs text-emerald-400">
+                            <CheckCheck className="h-3 w-3" /> {L.resolved}
+                        </span>
+                    )
+                )}
                 {isMine && (
                     <button
                         onClick={() => setEditingTop(true)}
                         className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-white/10 hover:text-white/80"
                     >
-                        <Pencil className="h-3 w-3" /> Sửa
+                        <Pencil className="h-3 w-3" /> {L.edit}
                     </button>
                 )}
                 {canDelete && (
                     <button
                         onClick={() => {
-                            if (confirm('Xóa bình luận này?')) actions.remove(comment.id)
+                            if (confirm(L.confirmDeleteComment)) actions.remove(comment.id)
                         }}
                         className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-red-500/15 hover:text-red-300"
                     >
-                        <Trash2 className="h-3 w-3" /> Xóa
+                        <Trash2 className="h-3 w-3" /> {L.del}
                     </button>
                 )}
             </div>
@@ -320,13 +345,13 @@ export const CommentThread = memo(function CommentThread({
                             <div className="min-w-0 flex-1">
                                 <SingleComment comment={r} fps={fps} onSeekToFrame={onSeekToFrame} actions={actions} isReply />
                             </div>
-                            {(!!r.author && r.author.id === currentUserId) || isAdmin ? (
+                            {env.can.deleteComment(r) ? (
                                 <button
                                     onClick={() => {
-                                        if (confirm('Xóa trả lời này?')) actions.remove(r.id)
+                                        if (confirm(L.confirmDeleteReply)) actions.remove(r.id)
                                     }}
                                     className="mt-1 grid h-6 w-6 shrink-0 place-items-center rounded text-white/30 opacity-0 hover:bg-red-500/15 hover:text-red-300 group-hover/comment:opacity-100"
-                                    aria-label="Xóa"
+                                    aria-label={L.del}
                                 >
                                     <X className="h-3.5 w-3.5" />
                                 </button>
@@ -360,6 +385,7 @@ export const CommentThread = memo(function CommentThread({
 
 function InlineEdit({ initial, onSave, onCancel }: { initial: string; onSave: (b: string) => void; onCancel: () => void }) {
     const [draft, setDraft] = useState(initial)
+    const L = PLAYER_L10N[usePlayerEnv().lang]
     return (
         <div className="mt-1 pl-9">
             <textarea
@@ -374,10 +400,10 @@ function InlineEdit({ initial, onSave, onCancel }: { initial: string; onSave: (b
                     onClick={() => draft.trim() && onSave(draft.trim())}
                     className="rounded-md bg-indigo-500 px-2.5 py-1 text-xs text-white hover:bg-indigo-400"
                 >
-                    Lưu
+                    {L.save}
                 </button>
                 <button onClick={onCancel} className="rounded-md px-2.5 py-1 text-xs text-white/60 hover:bg-white/10">
-                    Hủy
+                    {L.cancel}
                 </button>
             </div>
         </div>
@@ -399,6 +425,7 @@ function Lightbox({
     onClose: () => void
 }) {
     const count = images.length
+    const L = PLAYER_L10N[usePlayerEnv().lang]
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
@@ -426,7 +453,7 @@ function Lightbox({
             <button
                 onClick={onClose}
                 className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
-                aria-label="Đóng"
+                aria-label={L.close}
             >
                 <X className="h-5 w-5" />
             </button>
@@ -437,7 +464,7 @@ function Lightbox({
                         onIndex((index - 1 + count) % count)
                     }}
                     className="absolute left-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
-                    aria-label="Ảnh trước"
+                    aria-label={L.prevImage}
                 >
                     <ChevronLeft className="h-6 w-6" />
                 </button>
@@ -456,7 +483,7 @@ function Lightbox({
                         onIndex((index + 1) % count)
                     }}
                     className="absolute right-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
-                    aria-label="Ảnh sau"
+                    aria-label={L.nextImage}
                 >
                     <ChevronRight className="h-6 w-6" />
                 </button>

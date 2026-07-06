@@ -12,9 +12,12 @@ const MUX_IMAGE = 'https://image.mux.com'
  * yet (still processing) or the version is an image (no Mux asset — served via a
  * presigned R2 URL in a later phase). Mints a fresh short-lived token set per call.
  */
-export function buildMediaLinks(v: { muxPlaybackId: string | null; thumbTime: number | null }): MediaLinks | null {
+export function buildMediaLinks(
+    v: { muxPlaybackId: string | null; thumbTime: number | null },
+    ttlSec?: number, // P5: guest links are capped at min(6h, share expiry)
+): MediaLinks | null {
     if (!v.muxPlaybackId) return null
-    const { tokens } = mintPlaybackTokens(v.muxPlaybackId)
+    const { tokens } = mintPlaybackTokens(v.muxPlaybackId, ttlSec)
     const time = v.thumbTime != null ? `time=${encodeURIComponent(v.thumbTime)}&` : ''
     return {
         playbackId: v.muxPlaybackId,

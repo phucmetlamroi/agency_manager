@@ -8,7 +8,8 @@
 
 import { useCallback } from 'react'
 import useSWR from 'swr'
-import { listComments, type CommentDto, type ListCommentsResponse, type ListCommentsQuery } from '@/lib/review/comment-client'
+import type { CommentDto, ListCommentsResponse, ListCommentsQuery } from '@/lib/review/comment-client'
+import { usePlayerEnv } from './player-env'
 
 export interface CommentsFeed {
     comments: CommentDto[]
@@ -22,10 +23,11 @@ export interface CommentsFeed {
 }
 
 export function useComments(versionId: string | null, query: ListCommentsQuery = {}): CommentsFeed {
-    const key = versionId ? ['review-comments', versionId, JSON.stringify(query)] : null
+    const env = usePlayerEnv() // P5.3: internal vs guest endpoint set
+    const key = versionId ? ['review-comments', env.mode, versionId, JSON.stringify(query)] : null
     const { data, error, isLoading, mutate } = useSWR<ListCommentsResponse>(
         key,
-        () => listComments(versionId as string, query),
+        () => env.api.listComments(versionId as string, query),
         {
             refreshInterval: 5000,
             revalidateOnFocus: true,

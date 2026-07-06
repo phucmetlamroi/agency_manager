@@ -394,7 +394,13 @@ export async function driveCompletion(versionId: string): Promise<UploadStatusDt
         })
         if (flip.count === 0) return false // another request drove it first
         if (isImage) {
-            // image head flips to this version now (video flips on webhook ready — P1.3)
+            // image head flips to this version now (video flips on webhook ready — P1.3).
+            // Clear a stale guest-approval (FR-A04 AC2) — same as applyMuxReady for video.
+            const { REVIEW_STATUS_MAP } = await import('./status-map')
+            await tx.reviewAsset.updateMany({
+                where: { id: version.assetId, statusId: REVIEW_STATUS_MAP.approved },
+                data: { statusId: null, rowVersion: { increment: 1 } },
+            })
             await tx.reviewAsset.update({ where: { id: version.assetId }, data: { currentVersionId: versionId } })
         }
         await recordActivity(tx, {

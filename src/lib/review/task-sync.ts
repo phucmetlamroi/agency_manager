@@ -75,16 +75,23 @@ export async function syncTaskOnChangesRequested(
     }
     const task = await prisma.task.findFirst({
         where: { id: taskId, workspaceId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, isArchived: true },
     })
     if (!task) {
         reviewLog('warn', 'task_sync.task_missing', { taskId, workspaceId })
         return { applied: false }
     }
+    // Never flip a cancelled/archived task to Revision — it would leave an impossible
+    // state (Revision + isArchived, hidden from every working board yet listed on the
+    // cancelled page as "Revision"). Staff must restore it first (finding P5-R#15).
+    if (task.isArchived || task.status === 'Đã hủy') {
+        reviewLog('info', 'task_sync.skipped_archived', { taskId, from: task.status })
+        return { applied: false, from: task.status }
+    }
     if (task.status === target) return { applied: false, from: task.status } // already there
 
     const res = await prisma.task.updateMany({
-        where: { id: taskId, workspaceId, status: task.status }, // lose races cleanly
+        where: { id: taskId, workspaceId, status: task.status, isArchived: false }, // lose races cleanly
         data: {
             status: target,
             version: { increment: 1 },

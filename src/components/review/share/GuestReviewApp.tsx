@@ -69,9 +69,20 @@ export function GuestReviewApp({
         setVersionId(items[safeAssetIndex]?.versions[0]?.versionId ?? null)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [safeAssetIndex])
-    const version: GuestVersionView | null =
-        asset?.versions.find((v) => v.versionId === versionId) ?? asset?.versions[0] ?? null
-    const newHead = asset && version && asset.versions[0]?.versionId !== version.versionId ? asset.versions[0] : null
+    // Snapshot the pinned version's data so that when showAllVersions=false and the poll
+    // drops the old head (new upload became current), we KEEP showing the pinned cut +
+    // the reload banner instead of silently hot-swapping the player mid-review and
+    // letting an in-flight comment post to the wrong version (finding P5-R#5).
+    const liveVersion = asset?.versions.find((v) => v.versionId === versionId) ?? null
+    const [versionSnap, setVersionSnap] = useState<GuestVersionView | null>(liveVersion)
+    useEffect(() => {
+        if (liveVersion) setVersionSnap(liveVersion) // keep latest data for the pinned id
+    }, [liveVersion])
+    const version: GuestVersionView | null = liveVersion ?? versionSnap ?? asset?.versions[0] ?? null
+    // newHead is computed against the PINNED id, not the (possibly fallen-back) resolved
+    // version — so the banner shows even after the poll no longer lists the pinned id.
+    const newHead =
+        asset && asset.versions[0] && version && asset.versions[0].versionId !== version.versionId ? asset.versions[0] : null
 
     // ── identity interception ──
     const [identityOpen, setIdentityOpen] = useState(false)
@@ -146,8 +157,12 @@ export function GuestReviewApp({
                 itemCount={items.length}
                 assetIndex={safeAssetIndex}
                 onAssetIndex={setAssetIndex}
+                ensureIdentity={ensureIdentity}
                 onAdoptNewHead={() => {
-                    if (newHead) setVersionId(newHead.versionId)
+                    if (newHead) {
+                        setVersionSnap(newHead)
+                        setVersionId(newHead.versionId)
+                    }
                     void refreshContent()
                 }}
                 refreshContent={() => void refreshContent()}
@@ -181,6 +196,7 @@ function GuestStage({
     itemCount,
     assetIndex,
     onAssetIndex,
+    ensureIdentity,
     onAdoptNewHead,
     refreshContent,
 }: {
@@ -192,6 +208,8 @@ function GuestStage({
     itemCount: number
     assetIndex: number
     onAssetIndex: (i: number) => void
+    /** opens the Name+Email modal and resolves once the guest submits (rejects if closed) */
+    ensureIdentity: () => Promise<void>
     onAdoptNewHead: () => void
     refreshContent: () => void
 }) {
@@ -293,14 +311,21 @@ function GuestStage({
     }
     const submitDecision = async (decision: 'approve' | 'request_changes', note?: string) => {
         if (!version) return
+        // A decision REQUIRES guest identity (server 401s otherwise). Gate on the modal
+        // the same way comments/reactions do — without this a brand-new guest who opens
+        // the link and clicks Approve dead-ends in a 401 loop (finding P5-R#1, blocker).
+        try {
+            await ensureIdentity()
+        } catch {
+            return // guest closed the identity modal → abort silently, leave decision modal open
+        }
         setDecisionBusy(true)
         try {
-            const res = await api.submitDecision({ versionId: version.versionId, decision, note: note || undefined })
+            await api.submitDecision({ versionId: version.versionId, decision, note: note || undefined })
             setDecisionModal(null)
             showToast(decision === 'approve' ? 'Approved — the team has been notified.' : 'Changes requested — the team has been notified.')
             refreshContent()
             if (note) feed.refresh()
-            void res
         } catch (e) {
             alert(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
             refreshContent() // stale-state 409 → self-heal
@@ -485,6 +510,9 @@ function GuestStage({
                     <div className="min-h-0 flex-1 overflow-hidden">
                         {share.allowComments || feed.comments.length > 0 ? (
                             <CommentsPanel
+                                // key by version so a Reload-driven version switch resets the
+                                // composer draft/frozen-frame — never carries onto another version.
+                                key={version.versionId}
                                 versionId={version.versionId}
                                 fps={fps}
                                 mediaKind={isVideo ? 'video' : 'image'}
@@ -500,6 +528,9 @@ function GuestStage({
                                 onViewAnnotation={onViewAnnotation}
                                 highlightId={highlightId}
                                 onJumpToVersion={() => {}}
+                                // comments off → read-only: old public comments stay visible,
+                                // but no composer/reply that would only 403 after identity capture.
+                                readOnly={!share.allowComments}
                             />
                         ) : (
                             <div className="grid h-full place-items-center px-6 text-center text-sm text-white/40">

@@ -25,6 +25,15 @@ const EXPIRY_PRESETS = [
     { key: '7d', label: '7 ngày' },
     { key: '30d', label: '30 ngày' },
 ] as const
+type ExpiryKey = (typeof EXPIRY_PRESETS)[number]['key'] | 'keep'
+
+function fmtDay(iso: string): string {
+    try {
+        return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    } catch {
+        return iso
+    }
+}
 
 export function ShareLinkModal({
     target,
@@ -49,9 +58,10 @@ export function ShareLinkModal({
     // password: '' = keep (edit) / none (create); typing sets; CLEAR button removes.
     const [password, setPassword] = useState('')
     const [removePassword, setRemovePassword] = useState(false)
-    const [expiry, setExpiry] = useState<(typeof EXPIRY_PRESETS)[number]['key']>(() =>
-        existing?.expiresAt ? '30d' : 'none',
-    )
+    // Edit mode with an existing expiry starts as 'keep' (do NOT touch it) — the old
+    // code prefilled '30d' and then rewrote expiry to now+30d on ANY save, silently
+    // extending a nearly-expired link (finding P5-R#6/#7).
+    const [expiry, setExpiry] = useState<ExpiryKey>(() => (existing?.expiresAt ? 'keep' : 'none'))
     const [busy, setBusy] = useState(false)
 
     const itemsLabel = existing
@@ -59,6 +69,7 @@ export function ShareLinkModal({
         : (target?.items ?? []).map((i) => i.title).join(', ')
 
     const expiresAtValue = (): string | null | undefined => {
+        if (expiry === 'keep') return undefined // leave the existing expiry exactly as-is
         if (isEdit && expiry === 'none' && !existing?.expiresAt) return undefined // untouched
         if (expiry === 'none') return null
         const days = expiry === '7d' ? 7 : 30
@@ -224,7 +235,17 @@ export function ShareLinkModal({
                             </button>
                         )}
                     </div>
-                    <div className="mt-2 flex gap-1.5">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                        {existing?.expiresAt && (
+                            <button
+                                onClick={() => setExpiry('keep')}
+                                className={`rounded-lg px-2.5 py-1 text-[11.5px] ${
+                                    expiry === 'keep' ? 'bg-violet-500/20 text-violet-200' : 'text-zinc-400 hover:bg-white/[0.06]'
+                                }`}
+                            >
+                                Giữ hạn (hết {fmtDay(existing.expiresAt)})
+                            </button>
+                        )}
                         {EXPIRY_PRESETS.map((p) => (
                             <button
                                 key={p.key}

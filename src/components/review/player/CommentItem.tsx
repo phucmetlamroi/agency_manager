@@ -237,6 +237,7 @@ export const CommentThread = memo(function CommentThread({
     onFocusPlayer,
     onReplyPosted,
     actions,
+    canReply = true,
 }: {
     comment: CommentDto
     replies: CommentDto[]
@@ -251,6 +252,8 @@ export const CommentThread = memo(function CommentThread({
     onFocusPlayer: () => void
     onReplyPosted: (c: CommentDto) => void
     actions: CommentActions
+    /** false on comments-off guest shares — hides the Reply affordance (a create). */
+    canReply?: boolean
 }) {
     const env = usePlayerEnv()
     const L = PLAYER_L10N[env.lang]
@@ -276,12 +279,14 @@ export const CommentThread = memo(function CommentThread({
 
             {/* action row */}
             <div className="mt-1 flex items-center gap-1 pl-9 text-white/40">
-                <button
-                    onClick={() => setReplying((v) => !v)}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-white/10 hover:text-white/80"
-                >
-                    <CornerUpLeft className="h-3 w-3" /> {L.reply}
-                </button>
+                {canReply && (
+                    <button
+                        onClick={() => setReplying((v) => !v)}
+                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-white/10 hover:text-white/80"
+                    >
+                        <CornerUpLeft className="h-3 w-3" /> {L.reply}
+                    </button>
+                )}
                 {env.can.resolve ? (
                     <button
                         onClick={() => actions.resolve(comment.id, !resolved)}

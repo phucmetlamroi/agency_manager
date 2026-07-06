@@ -82,7 +82,16 @@ async function applyMuxReady(
             },
         })
         if (flip.count === 0) return false
-        // The newest ready version becomes the stack head.
+        // The newest ready version becomes the stack head. When it does, CLEAR a stale
+        // guest-approval on the asset card (FR-A04 AC2: "upload v2 → không giữ trạng thái
+        // đã duyệt của v1"). P5's guest Approve sets asset.statusId='Hoàn tất'; without
+        // this a new head would leave that banner live and let staff complete the task
+        // against an unreviewed cut. Only clear the approved value — never clobber other
+        // staff-set statuses.
+        await tx.reviewAsset.updateMany({
+            where: { id: version.assetId, statusId: REVIEW_STATUS_MAP.approved },
+            data: { statusId: null, rowVersion: { increment: 1 } },
+        })
         await tx.reviewAsset.update({ where: { id: version.assetId }, data: { currentVersionId: versionId } })
         await recordActivity(tx, {
             type: REVIEW_ACTIVITY.VERSION_READY,
@@ -543,18 +552,24 @@ export const reviewShareDecision = inngest.createFunction(
         const data = event.data as unknown as DecisionEventData
         const expected = data.decision === 'approve' ? ReviewState.APPROVED : ReviewState.CHANGES_REQUESTED
 
-        const currentState = await step.run('load-state', async () => {
+        const loaded = await step.run('load-state', async () => {
             const v = await prisma.reviewVersion.findUnique({
                 where: { id: data.versionId },
-                select: { reviewState: true },
+                select: { reviewState: true, asset: { select: { currentVersionId: true } } },
             })
-            return v?.reviewState ?? null
+            return { reviewState: v?.reviewState ?? null, isHead: v?.asset?.currentVersionId === data.versionId }
         })
-        if (currentState !== expected) {
+        // "Latest wins": skip when the version's decision was overwritten, OR when a newer
+        // version has since become the head (an old-version decision has no task meaning).
+        // This is the second guard against a delayed/duplicate retry force-flipping a task
+        // hours later after staff moved on (the reviewState-only check can't see a new head
+        // because a decided version keeps its own reviewState).
+        if (loaded.reviewState !== expected || !loaded.isHead) {
             reviewLog('info', 'share_decision.superseded', {
                 versionId: data.versionId,
                 decision: data.decision,
-                currentState,
+                currentState: loaded.reviewState,
+                isHead: loaded.isHead,
             })
             return { skipped: 'superseded' }
         }
@@ -563,8 +578,12 @@ export const reviewShareDecision = inngest.createFunction(
 
         // FR-A05: request_changes AUTO-flips the task; approve only proposes (banner
         // comes from asset.statusId = "Hoàn tất", set by the decision route).
+        let syncApplied = true
         if (data.decision === 'request_changes') {
-            await step.run('sync-task-revision', () => syncTaskOnChangesRequested(data.taskId!, data.workspaceId))
+            const res = await step.run('sync-task-revision', () =>
+                syncTaskOnChangesRequested(data.taskId!, data.workspaceId),
+            )
+            syncApplied = !!res?.applied
         }
 
         // Task feed event — the drawer's "Bình luận & hoạt động" merges AuditLog rows;
@@ -609,7 +628,13 @@ export const reviewShareDecision = inngest.createFunction(
                     : {
                           type: 'VIDEO_CHANGES_REQUESTED',
                           title: `✏️ ${who} yêu cầu chỉnh sửa bản v${data.versionNumber}`,
-                          body: `Task "${task.title}" đã tự chuyển sang "${REVIEW_STATUS_MAP.changesRequested}".`,
+                          // Only claim the task auto-flipped when it actually did — a
+                          // race-lost / archived / bad-map sync returns applied:false and
+                          // the task kept its status; a false "đã chuyển Revision" would
+                          // mislead staff (finding P5-R#16).
+                          body: syncApplied
+                              ? `Task "${task.title}" đã tự chuyển sang "${REVIEW_STATUS_MAP.changesRequested}".`
+                              : `Task "${task.title}" — khách yêu cầu chỉnh sửa, kiểm tra trạng thái task.`,
                           taskId: data.taskId,
                       },
             )

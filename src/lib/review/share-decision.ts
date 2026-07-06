@@ -43,6 +43,46 @@ const MESSAGE: Record<GuestDecisionInput['decision'], string> = {
     request_changes: 'Change request sent to the team.',
 }
 
+/** Persist a Request-changes note as a PUBLIC, timecode-less comment (FR-F03 AC2).
+ *  Its own small tx so it survives even when the state flip is a no-op / lost race —
+ *  the note is NEW content the team must never lose, independent of the flip. */
+async function persistDecisionNote(
+    share: ShareWithItems,
+    guest: GuestSession,
+    version: { id: string; versionNumber: number },
+    asset: { id: string; workspaceId: string; taskId: string | null },
+    note: string,
+): Promise<void> {
+    const noteCommentId = randomUUID()
+    await prisma.$transaction(async (tx) => {
+        await tx.reviewComment.create({
+            data: {
+                id: noteCommentId,
+                versionId: version.id,
+                body: note,
+                isInternal: false,
+                authorId: null,
+                guestSessionId: guest.id,
+                guestName: guest.name,
+                shareLinkId: share.id,
+            },
+        })
+        await tx.reviewVersion.update({ where: { id: version.id }, data: { commentCount: { increment: 1 } } })
+        await recordActivity(tx, {
+            type: REVIEW_ACTIVITY.COMMENT_CREATED,
+            workspaceId: asset.workspaceId,
+            taskId: asset.taskId,
+            assetId: asset.id,
+            versionId: version.id,
+            commentId: noteCommentId,
+            shareLinkId: share.id,
+            guestSessionId: guest.id,
+            guestName: guest.name,
+            meta: { timecodeMs: null, isInternal: false, isReply: false, excerpt: note.slice(0, 120) },
+        })
+    })
+}
+
 export async function submitGuestDecision(
     share: ShareWithItems,
     guest: GuestSession,
@@ -53,9 +93,20 @@ export async function submitGuestDecision(
         throw apiError(409, 'STATE_INVALID', 'This version is still processing — check back in a few minutes.')
     }
     const target = TARGET[input.decision]
+    const note = input.decision === 'request_changes' ? (input.note ?? '').trim() : ''
 
-    // Idempotent repeat (double-click, retried request).
+    // A decision only drives the ASSET card status + TASK sync when it's on the CURRENT
+    // head version. With showAllVersions=true a guest can decide on an OLD version; that
+    // must stay version-level (flip its reviewState + record) and never rewrite the
+    // asset's status or complete/revert the task from an obsolete cut. (showAllVersions=
+    // false already 404s non-head decisions in assertVersionInShare.)
+    const isHead = asset.currentVersionId === version.id
+
+    // Idempotent repeat (double-click / retry). The note, if any, is STILL new content
+    // → persist it even though the state flip is a no-op (else the second "Request
+    // changes" note is silently lost while the UI toasts success).
     if (version.reviewState === target) {
+        if (note) await persistDecisionNote(share, guest, version, asset, note)
         return { reviewState: reviewStateToDto(target), message: MESSAGE[input.decision] }
     }
     if (version.reviewState === ReviewState.DRAFT) {
@@ -70,9 +121,6 @@ export async function submitGuestDecision(
         reviewLog('error', 'share.decision.bad_status_map', { decision: input.decision, mappedStatus })
     }
 
-    const note = input.decision === 'request_changes' ? (input.note ?? '').trim() : ''
-    const noteCommentId = note ? randomUUID() : null
-
     const flipped = await prisma.$transaction(async (tx) => {
         // Optimistic guard on the observed state — a concurrent decision/upload
         // loses the race cleanly instead of double-writing.
@@ -82,39 +130,10 @@ export async function submitGuestDecision(
         })
         if (flip.count === 0) return false
 
-        if (statusOk) {
+        if (statusOk && isHead) {
             await tx.reviewAsset.update({
                 where: { id: asset.id },
                 data: { statusId: mappedStatus, rowVersion: { increment: 1 } },
-            })
-        }
-
-        // "Summary of changes" → one PUBLIC comment without a timecode (FR-F03 AC2).
-        if (noteCommentId) {
-            await tx.reviewComment.create({
-                data: {
-                    id: noteCommentId,
-                    versionId: version.id,
-                    body: note,
-                    isInternal: false,
-                    authorId: null,
-                    guestSessionId: guest.id,
-                    guestName: guest.name,
-                    shareLinkId: share.id,
-                },
-            })
-            await tx.reviewVersion.update({ where: { id: version.id }, data: { commentCount: { increment: 1 } } })
-            await recordActivity(tx, {
-                type: REVIEW_ACTIVITY.COMMENT_CREATED,
-                workspaceId: asset.workspaceId,
-                taskId: asset.taskId,
-                assetId: asset.id,
-                versionId: version.id,
-                commentId: noteCommentId,
-                shareLinkId: share.id,
-                guestSessionId: guest.id,
-                guestName: guest.name,
-                meta: { timecodeMs: null, isInternal: false, isReply: false, excerpt: note.slice(0, 120) },
             })
         }
 
@@ -130,38 +149,56 @@ export async function submitGuestDecision(
             shareLinkId: share.id,
             guestSessionId: guest.id,
             guestName: guest.name,
-            meta: { versionNumber: version.versionNumber, decision: input.decision, old: reviewStateToDto(version.reviewState) },
+            meta: { versionNumber: version.versionNumber, decision: input.decision, old: reviewStateToDto(version.reviewState), isHead },
         })
         return true
     })
 
     if (!flipped) {
-        // Re-read: if a concurrent request already landed the SAME target, that's
-        // still success for this guest; anything else = genuinely stale view.
+        // Re-read: if a concurrent request already landed the SAME target, that's still
+        // success for this guest — but the note is new content, so persist it too.
         const now = await prisma.reviewVersion.findUnique({ where: { id: version.id }, select: { reviewState: true } })
         if (now?.reviewState === target) {
+            if (note) await persistDecisionNote(share, guest, version, asset, note)
             return { reviewState: reviewStateToDto(target), message: MESSAGE[input.decision] }
         }
         throw apiError(409, 'STATE_INVALID', 'This version just changed — the page will refresh.')
     }
 
-    reviewLog('info', 'share.decision', {
-        shareId: share.id,
-        versionId: version.id,
-        decision: input.decision,
-    })
-    await inngest.send({
-        name: REVIEW_EVENTS.DECISION_RECORDED,
-        data: {
-            versionId: version.id,
-            assetId: asset.id,
-            taskId: asset.taskId,
-            workspaceId: asset.workspaceId,
-            shareLinkId: share.id,
-            decision: input.decision,
-            guestName: guest.name,
-            versionNumber: version.versionNumber,
-        },
-    })
+    // The flip committed → the note is durable content; persist it now (own tx) so a
+    // later inngest.send failure can't take it down with the 500.
+    if (note) await persistDecisionNote(share, guest, version, asset, note)
+
+    reviewLog('info', 'share.decision', { shareId: share.id, versionId: version.id, decision: input.decision, isHead })
+
+    // Task-side effects (auto Revision, feed audit, notifications) only for a HEAD
+    // decision — an old-version decision has no task meaning. The decision is ALREADY
+    // committed; if the event send fails the guest should still see success (the async
+    // side-effects can be reconciled — see IMPLEMENTATION-NOTES residual risk), not a
+    // 500 that hides a committed decision.
+    if (isHead) {
+        try {
+            await inngest.send({
+                name: REVIEW_EVENTS.DECISION_RECORDED,
+                data: {
+                    versionId: version.id,
+                    assetId: asset.id,
+                    taskId: asset.taskId,
+                    workspaceId: asset.workspaceId,
+                    shareLinkId: share.id,
+                    decision: input.decision,
+                    guestName: guest.name,
+                    versionNumber: version.versionNumber,
+                },
+            })
+        } catch (e) {
+            reviewLog('error', 'share.decision.event_send_failed', {
+                shareId: share.id,
+                versionId: version.id,
+                decision: input.decision,
+                error: e instanceof Error ? e.message : String(e),
+            })
+        }
+    }
     return { reviewState: reviewStateToDto(target), message: MESSAGE[input.decision] }
 }

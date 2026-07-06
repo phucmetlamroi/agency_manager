@@ -241,17 +241,38 @@ export async function getOrCreatePrimaryShareForAsset(
         select: { id: true, workspaceId: true, taskId: true },
     })
     if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
-    await requireReviewAccess({ workspaceId: asset.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
 
+    // Reuse an existing ACTIVE share for this asset — but for a non-admin only if it's
+    // in their FR-F04 scope (own, or on a task assigned to them). Otherwise "Copy link
+    // khách" would hand back a colleague's slug/url (id leak → the getShareDetail vector),
+    // so an out-of-scope member falls through to creating their own default share instead.
+    const scope: Prisma.ShareLinkWhereInput = access.isAdmin
+        ? {}
+        : { OR: [{ createdById: access.userId }, ...(asset.taskId ? [{ taskId: asset.taskId }] : [])] }
     const existing = await prisma.shareLink.findFirst({
         where: {
             revokedAt: null,
-            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, scope],
             items: { some: { assetId: asset.id } },
         },
         orderBy: { createdAt: 'asc' },
         include: { items: true },
     })
+    // A non-admin's task-scope reuse still requires the task to actually be assigned to
+    // them; the `taskId` filter above only narrows to the asset's task, so re-check.
+    if (existing && !access.isAdmin && existing.createdById !== access.userId) {
+        if (asset.taskId) {
+            const mine = await prisma.task.findFirst({
+                where: { id: asset.taskId, workspaceId: asset.workspaceId, assigneeId: access.userId },
+                select: { id: true },
+            })
+            if (!mine) {
+                const { share } = await createShareLink({ workspaceId: asset.workspaceId, items: [{ type: 'asset', id: asset.id }] })
+                return { share, created: true }
+            }
+        }
+    }
     if (existing) return { share: await serializeShare(existing), created: false }
 
     const { share } = await createShareLink({
@@ -320,6 +341,11 @@ export async function getShareDetail(id: string): Promise<{ share: ShareDto; act
     const row = await prisma.shareLink.findUnique({ where: { id }, include: { items: true } })
     if (!row) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy link chia sẻ.')
     const access = await requireReviewAccess({ workspaceId: row.workspaceId })
+    // FR-F04 scope: a plain USER may only see shares they created OR on tasks assigned
+    // to them — same rule listShares enforces. Without this a member could read another
+    // member's guest-activity feed (names/views) by learning the share id. 404 (not 403)
+    // so it doesn't confirm the id exists to an out-of-scope member.
+    await assertShareInScope(row, access)
 
     const events = await prisma.reviewActivity.findMany({
         where: { shareLinkId: row.id },
@@ -428,7 +454,16 @@ export async function setShareRevoked(id: string, revoked: boolean): Promise<{ s
 export async function deleteShare(id: string): Promise<{ deleted: true }> {
     const row = await prisma.shareLink.findUnique({ where: { id } })
     if (!row) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy link chia sẻ.')
-    await requireReviewAccess({ workspaceId: row.workspaceId, admin: true }) // ADMIN only
+    // WORKSPACE-scoped admin (OWNER/ADMIN of the workspace or its profile) — NOT the
+    // global JWT role. `admin:true` on requireReviewAccess gates on the GLOBAL User.role
+    // which both under- and over-permits here: a global-ADMIN who is only a MEMBER of
+    // this workspace could hard-delete (escalation, more than revoke allows), while a
+    // workspace OWNER whose global role is USER could not delete their own link. Use the
+    // same workspace-scoped predicate as revoke/update (access.isAdmin).
+    const access = await requireReviewAccess({ workspaceId: row.workspaceId })
+    if (!access.isAdmin) {
+        throw apiError(403, 'FORBIDDEN', 'Chỉ admin của workspace mới xóa được link.')
+    }
     await prisma.shareLink.delete({ where: { id } }) // activity rows survive (no FK)
     return { deleted: true }
 }
@@ -438,6 +473,23 @@ export async function deleteShare(id: string): Promise<{ deleted: true }> {
 async function requireShareManageAccess(id: string) {
     const { row } = await requireShareManageAccessFull(id)
     return row
+}
+
+/** FR-F04 read scope for a non-admin: creator, or a link on a task assigned to them.
+ *  Throws 404 (anti-enumeration) when out of scope. Admins pass unconditionally. */
+async function assertShareInScope(
+    row: { createdById: string; taskId: string | null; workspaceId: string },
+    access: { userId: string; isAdmin: boolean },
+): Promise<void> {
+    if (access.isAdmin || row.createdById === access.userId) return
+    if (row.taskId) {
+        const mine = await prisma.task.findFirst({
+            where: { id: row.taskId, workspaceId: row.workspaceId, assigneeId: access.userId },
+            select: { id: true },
+        })
+        if (mine) return
+    }
+    throw apiError(404, 'NOT_FOUND', 'Không tìm thấy link chia sẻ.')
 }
 
 /** Creator or workspace-ADMIN — the manage bar for options + revoke (FR-F04 AC3). */

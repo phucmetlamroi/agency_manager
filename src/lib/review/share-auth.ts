@@ -99,6 +99,12 @@ export async function requireShare(slug: string, cookies: CookieReader): Promise
 
 // ─────────────────────────── unlock cookie (password shares) ───────────────────────────
 
+/** A short fingerprint of the CURRENT password hash. Embedded in the unlock JWT so
+ *  that rotating (or removing) the password invalidates every outstanding unlock
+ *  cookie — otherwise a guest who entered a since-leaked password would keep access
+ *  for the full 24h TTL despite the staff changing it. */
+const passwordFingerprint = (passwordHash: string) => sha256hex(passwordHash).slice(0, 16)
+
 /** Mint the unlock JWT after a correct password (unlock route). */
 export async function mintUnlockToken(share: ShareLink): Promise<{ value: string; maxAgeSec: number }> {
     const now = Math.floor(Date.now() / 1000)
@@ -106,7 +112,7 @@ export async function mintUnlockToken(share: ShareLink): Promise<{ value: string
     if (share.expiresAt) {
         ttl = Math.min(ttl, Math.max(60, Math.floor((share.expiresAt.getTime() - Date.now()) / 1000)))
     }
-    const value = await new SignJWT({ sid: share.id })
+    const value = await new SignJWT({ sid: share.id, pv: share.passwordHash ? passwordFingerprint(share.passwordHash) : '' })
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt(now)
         .setExpirationTime(now + ttl)
@@ -115,10 +121,12 @@ export async function mintUnlockToken(share: ShareLink): Promise<{ value: string
 }
 
 async function verifyUnlockCookie(share: ShareLink, cookieValue: string | undefined): Promise<boolean> {
-    if (!cookieValue) return false
+    if (!cookieValue || !share.passwordHash) return false
     try {
         const { payload } = await jwtVerify(cookieValue, cookieSecret(), { algorithms: ['HS256'] })
-        return payload.sid === share.id
+        // Bind to the CURRENT password — a rotated password changes the fingerprint and
+        // invalidates the cookie (guest is re-prompted).
+        return payload.sid === share.id && payload.pv === passwordFingerprint(share.passwordHash)
     } catch {
         return false
     }

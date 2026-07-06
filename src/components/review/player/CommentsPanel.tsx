@@ -54,6 +54,7 @@ export function CommentsPanel({
     onViewAnnotation,
     highlightId,
     onJumpToVersion,
+    readOnly = false,
 }: {
     versionId: string
     fps: Fps | null
@@ -70,6 +71,8 @@ export function CommentsPanel({
     onViewAnnotation: (c: CommentDto) => void
     highlightId: string | null
     onJumpToVersion: (versionId: string) => void
+    /** P5.3 guest comments-off: render existing public comments but no composer/reply. */
+    readOnly?: boolean
 }) {
     const env = usePlayerEnv()
     const L = PLAYER_L10N[env.lang]
@@ -185,22 +188,25 @@ export function CommentsPanel({
                             onFocusPlayer={onFocusPlayer}
                             onReplyPosted={onPosted}
                             actions={actions}
+                            canReply={!readOnly}
                         />
                     ))
                 )}
             </div>
 
-            <CommentComposer
-                versionId={versionId}
-                fps={fps}
-                mediaKind={mediaKind}
-                playheadFrame={playheadFrame}
-                durationMs={durationMs}
-                annotation={annotation}
-                onPauseVideo={onPauseVideo}
-                onPosted={onPosted}
-                onFocusPlayer={onFocusPlayer}
-            />
+            {!readOnly && (
+                <CommentComposer
+                    versionId={versionId}
+                    fps={fps}
+                    mediaKind={mediaKind}
+                    playheadFrame={playheadFrame}
+                    durationMs={durationMs}
+                    annotation={annotation}
+                    onPauseVideo={onPauseVideo}
+                    onPosted={onPosted}
+                    onFocusPlayer={onFocusPlayer}
+                />
+            )}
         </div>
     )
 }

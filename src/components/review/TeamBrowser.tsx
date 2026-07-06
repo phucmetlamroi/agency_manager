@@ -1,26 +1,36 @@
 'use client'
 
-// [Review module P2.2 shell + P2.3 content] Team asset-browser. Two-column module:
-// an infinite-depth ASSETS folder tree (left) + breadcrumb / toolbar / content (right).
-// P2.3 adds: Appearance (FR-B09) + Sort (FR-B10) popovers persisted per-user to
-// localStorage 'team.appearance'; refined grid cards + hover-scrub (FR-B05/FR-B06);
-// a 7-column sortable list view; single-select InfoPanel with read-only Mux metadata.
+// [Review module P2.2 shell + P2.3 content + P2.4 upload + P2.5 actions] Team asset
+// browser. Two-column module: an infinite-depth folder tree (left) + breadcrumb /
+// toolbar / content (right).
+//   P2.3 — Appearance + Sort (per-user localStorage), grid cards + hover-scrub, list
+//          view, single-select InfoPanel.
+//   P2.4 — New Folder (optimistic tile + inline rename), '+ Mới' upload menu, image/
+//          video/folder upload + OS drag-drop, live uploading/processing cards.
+//   P2.5 — right-click context menus (canvas/folder/asset), multi-select (Ctrl/Shift/
+//          checkbox/select-all/Esc, cap 200) + bottom selection bar, rename (inline),
+//          Move/Copy tree-picker, Duplicate, Download (asset + recursive folder), Copy
+//          URL, Delete (confirm → trash). Trash VIEW + restore = P2.6.
 //
-// P2.4 adds: New Folder (optimistic tile + inline rename), '+ Mới' upload menu,
-// image/video/folder upload + OS drag-drop into the current folder, and live
-// uploading/processing placeholder cards merged into the grid.
+// Still deferred: in-browser player + image lightbox → P4 (double-click degrades to a
+// toast, never a crash); live status dropdown → P3; share menu items → P5 (disabled).
 //
-// Still deferred: context menus + rename/move/copy + multi-select → P2.5; Trash view
-// → P2.6; the in-browser player + image lightbox → P4 (double-click degrades to a
-// toast, never a crash); the live status dropdown → P3 (card chip is a placeholder);
-// drop-onto-asset new-version + drop-onto-folder-card → P2.5.
-//
-// All data comes from the P2.1 /api/review/* routes (each re-verifies workspace
-// membership server-side). Sort is server-backed via ?sort=&dir=. Folder navigation
-// updates the URL via history.pushState; the deep-link routes seed initialFolderId.
+// All data comes from the P2.1/P2.5 /api/review/* routes (each re-verifies workspace
+// membership server-side). Sort is server-backed via ?sort=&dir=.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type DragEvent as ReactDragEvent } from 'react'
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactNode,
+    type DragEvent as ReactDragEvent,
+    type MouseEvent as ReactMouseEvent,
+} from 'react'
 import { toast } from 'sonner'
+import * as Dialog from '@radix-ui/react-dialog'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
     Clapperboard,
     Folder as FolderIcon,
@@ -32,6 +42,8 @@ import {
     Layers,
     UploadCloud,
     FolderPlus,
+    Trash2,
+    MoreHorizontal,
 } from 'lucide-react'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
 import {
@@ -45,11 +57,37 @@ import {
 } from '@/lib/review/view-prefs'
 import { useFolderUploads } from '@/lib/review/use-upload-store'
 import { collectDropFiles, fromFileList, filterValid, enqueueFolderTree, UPLOAD_ACCEPT, type DroppedFile } from '@/lib/review/team-upload'
+import {
+    type ItemKind,
+    type ItemRef,
+    type MoveRef,
+    apiMoveItems,
+    apiCopyItems,
+    apiDeleteItems,
+    apiRenameFolder,
+    apiRenameAsset,
+    apiRestoreItems,
+    downloadVersion,
+    downloadFolder,
+    teamFolderUrl,
+    teamAssetUrl,
+    copyToClipboard,
+} from '@/lib/review/team-actions'
 import { bytesLabel } from './TeamCards'
 import { FolderCardGrid, AssetCardGrid, InfoPanel } from './TeamCards'
 import { TeamListView } from './TeamListView'
 import { AppearanceMenu, SortMenu } from './TeamToolbar'
 import { NewMenu, NewFolderTile, UploadingCard, DropOverlay } from './TeamUpload'
+import {
+    TeamContextMenuRoot,
+    FolderMenuContent,
+    AssetMenuContent,
+    CanvasMenuContent,
+    type MenuTarget,
+    type ItemMenuHandlers,
+} from './TeamContextMenu'
+import { MoveCopyDialog, type MoveCopyMode } from './MoveCopyDialog'
+import { SelectionBar } from './SelectionBar'
 
 /* ── local mirrors of the P2.1 DTO shapes (no server import → no bundle leak) ── */
 interface BreadcrumbItem {
@@ -68,6 +106,8 @@ interface TreeNode {
     name: string
     hasChildren: boolean
 }
+
+const SEL_CAP = 200 // FR-B11 multi-select cap
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -90,14 +130,25 @@ async function errorMessage(res: Response): Promise<string> {
     return `Lỗi ${res.status}. Vui lòng thử lại.`
 }
 
+function isEditableTarget(t: EventTarget | null): boolean {
+    const el = t as HTMLElement | null
+    if (!el) return false
+    const tag = el.tagName
+    return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+}
+
 /* ── component ───────────────────────────────────────────────────────────── */
 
 export function TeamBrowser({
     workspaceId,
     initialFolderId,
+    currentUserId,
+    isAdmin,
 }: {
     workspaceId: string
     initialFolderId: string | null
+    currentUserId: string
+    isAdmin: boolean
 }) {
     const [folderId, setFolderId] = useState<string | null>(initialFolderId)
     const [data, setData] = useState<ChildrenResult | null>(null)
@@ -108,26 +159,31 @@ export function TeamBrowser({
     const [tree, setTree] = useState<TreeNode[]>([])
     const [expanded, setExpanded] = useState<Set<string>>(new Set())
     const [prefs, setPrefs] = useState<ViewPrefs>(DEFAULT_PREFS)
-    const [selectedId, setSelectedId] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [loadingMore, setLoadingMore] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
+    // selection + rename + menus (P2.5)
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [anchorId, setAnchorId] = useState<string | null>(null)
+    const [renamingId, setRenamingId] = useState<string | null>(null)
+    const [menuTarget, setMenuTarget] = useState<MenuTarget | null>(null)
+    const [moveCopy, setMoveCopy] = useState<{ mode: MoveCopyMode; items: ItemRef[] } | null>(null)
+    const [confirmState, setConfirmState] = useState<{ items: ItemRef[]; message: string } | null>(null)
+
     const sortField = prefs.sortField
     const sortDir = prefs.sortDir
-    // `hydrated` gates the first children fetch until prefs are read from
-    // localStorage, so a persisted non-default sort doesn't cause a default-then-
-    // persisted double fetch. `refreshKey` routes manual reload through the same
-    // alive-guarded load effect. `folderIdRef` lets async writes bail after a
-    // folder change (stale-response guard).
     const [hydrated, setHydrated] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
     const folderIdRef = useRef(folderId)
     useEffect(() => {
         folderIdRef.current = folderId
     }, [folderId])
+    // ids removed locally (delete / move-out) — a concurrent upload silentRefresh(MERGE)
+    // must NOT resurrect them from the stale accumulated list. Cleared by the authoritative
+    // silentReplace once the server-fresh page confirms they're gone.
+    const removedRef = useRef<Set<string>>(new Set())
 
-    // hydrate per-user prefs from localStorage (client-only, after mount).
     useEffect(() => {
         setPrefs(loadPrefs())
         setHydrated(true)
@@ -206,7 +262,7 @@ export function TeamBrowser({
 
     /* ---- load children (on folder / sort / manual-reload change) ---- */
     useEffect(() => {
-        if (!hydrated) return // wait for persisted sort so the first fetch is correct
+        if (!hydrated) return
         let alive = true
         setLoading(true)
         setError(null)
@@ -227,10 +283,13 @@ export function TeamBrowser({
         }
     }, [hydrated, folderId, sortField, sortDir, refreshKey, fetchChildren])
 
-    /* ---- load breadcrumb + reset selection (on folder change only) ---- */
+    /* ---- load breadcrumb + reset transient UI (on folder change only) ---- */
     useEffect(() => {
         let alive = true
-        setSelectedId(null)
+        setSelectedIds(new Set())
+        setAnchorId(null)
+        setRenamingId(null)
+        setMenuTarget(null)
         if (!folderId) {
             setBreadcrumb([])
             setCurrentName('Team')
@@ -271,7 +330,7 @@ export function TeamBrowser({
         setLoadingMore(true)
         try {
             const more = await fetchChildren(fid, nextCursor, sortField, sortDir)
-            if (folderIdRef.current !== fid) return // navigated away — drop stale page
+            if (folderIdRef.current !== fid) return
             setData((prev) => (prev ? { ...prev, assets: [...prev.assets, ...more.assets] } : more))
             setNextCursor(more.nextCursor)
         } catch {
@@ -281,14 +340,48 @@ export function TeamBrowser({
         }
     }, [nextCursor, folderId, sortField, sortDir, fetchChildren])
 
-    // manual reload routes through the alive-guarded load effect (bump refreshKey)
-    // so a slow refetch can never clobber a folder the user has since navigated to.
     const reload = useCallback(() => {
         setRefreshKey((k) => k + 1)
         void refreshTree()
     }, [refreshTree])
 
-    // list-view header click → set field, toggle dir if same field.
+    // silent MERGE refetch — for uploads (keeps loaded-more pages, upserts page 1).
+    const silentRefresh = useCallback(() => {
+        const fid = folderId
+        fetchChildren(fid, null, sortField, sortDir)
+            .then((fresh) => {
+                if (folderIdRef.current !== fid) return
+                setData((prev) => {
+                    if (!prev) return fresh
+                    const freshIds = new Set(fresh.assets.map((a) => a.id))
+                    return {
+                        folders: fresh.folders,
+                        assets: [
+                            ...fresh.assets,
+                            ...prev.assets.filter((a) => !freshIds.has(a.id) && !removedRef.current.has(a.id)),
+                        ],
+                        summary: fresh.summary,
+                        nextCursor: prev.nextCursor,
+                    }
+                })
+            })
+            .catch(() => {})
+    }, [folderId, sortField, sortDir, fetchChildren])
+
+    // silent REPLACE refetch — for move/copy/delete/rename (items removed/relocated, so a
+    // merge would keep stale rows). Resets to page 1 (acceptable after a bulk op).
+    const silentReplace = useCallback(() => {
+        const fid = folderId
+        fetchChildren(fid, null, sortField, sortDir)
+            .then((fresh) => {
+                if (folderIdRef.current !== fid) return
+                setData(fresh)
+                setNextCursor(fresh.nextCursor)
+                removedRef.current = new Set() // fresh page is authoritative — stop suppressing
+            })
+            .catch(() => {})
+    }, [folderId, sortField, sortDir, fetchChildren])
+
     const onSortColumn = useCallback(
         (field: SortField) => {
             if (field === sortField) updatePrefs({ sortDir: sortDir === 'asc' ? 'desc' : 'asc' })
@@ -307,36 +400,10 @@ export function TeamBrowser({
     const folderInputRef = useRef<HTMLInputElement>(null)
     const [newFolderEditing, setNewFolderEditing] = useState(false)
     const [pendingFolderName, setPendingFolderName] = useState<string | null>(null)
-    // The folder the New-Folder flow was started in — the tile is only shown there and
-    // the create POSTs under it (so navigating away can't retarget the create).
     const [newFolderOrigin, setNewFolderOrigin] = useState<string | null>(null)
     const [dragOver, setDragOver] = useState(false)
     const dragDepth = useRef(0)
 
-    // silent refetch (no loading spinner) — used when uploads land so the ready card
-    // replaces its placeholder without flashing the whole grid. Merges the fresh page 1
-    // (upsert by id) into the accumulated list so already loaded-more pages + the cursor
-    // survive an upload-triggered refresh (does NOT reset pagination to page 1).
-    const silentRefresh = useCallback(() => {
-        const fid = folderId
-        fetchChildren(fid, null, sortField, sortDir)
-            .then((fresh) => {
-                if (folderIdRef.current !== fid) return
-                setData((prev) => {
-                    if (!prev) return fresh
-                    const freshIds = new Set(fresh.assets.map((a) => a.id))
-                    return {
-                        folders: fresh.folders,
-                        assets: [...fresh.assets, ...prev.assets.filter((a) => !freshIds.has(a.id))],
-                        summary: fresh.summary,
-                        nextCursor: prev.nextCursor,
-                    }
-                })
-            })
-            .catch(() => {})
-    }, [folderId, sortField, sortDir, fetchChildren])
-
-    // Enqueue files/folders into the CURRENT folder (folderIdRef, not a stale closure).
     const ingest = useCallback(
         async (dropped: DroppedFile[]) => {
             const { valid, skipped } = filterValid(dropped)
@@ -356,18 +423,18 @@ export function TeamBrowser({
     const onFilesPicked = (input: HTMLInputElement) => {
         const list = input.files
         if (list && list.length) void ingest(fromFileList(list))
-        input.value = '' // allow re-picking the same file(s)
+        input.value = ''
     }
 
     const startNewFolder = useCallback(() => {
-        setSelectedId(null)
+        setSelectedIds(new Set())
         setNewFolderOrigin(folderIdRef.current)
         setNewFolderEditing(true)
     }, [])
 
     const commitNewFolder = useCallback(
         async (name: string) => {
-            const parentId = newFolderOrigin // the folder the flow started in (not the current one)
+            const parentId = newFolderOrigin
             setNewFolderEditing(false)
             setPendingFolderName(name)
             const tid = toast.loading('Đang tạo thư mục…')
@@ -381,7 +448,7 @@ export function TeamBrowser({
                 if (!res.ok) throw new Error(await errorMessage(res))
                 toast.success('Đã tạo thư mục thành công.', { id: tid })
                 setPendingFolderName(null)
-                silentRefresh() // reconcile without flashing the grid to a skeleton
+                silentRefresh()
                 void refreshTree()
             } catch (e) {
                 toast.error(e instanceof Error ? e.message : 'Không tạo được thư mục.', { id: tid })
@@ -397,18 +464,17 @@ export function TeamBrowser({
         () => folderUploads.filter((it) => it.status !== 'done' && it.status !== 'canceled'),
         [folderUploads],
     )
+
+    const folders = data?.folders ?? []
+    const assets = data?.assets ?? []
+
     const liveAssetIds = useMemo(() => {
-        // Never hide a server asset the backend already reports READY — otherwise a
-        // stale/abandoned 'processing' live item (e.g. Mux took >1h) would suppress the
-        // finished card indefinitely.
         const ready = new Set(
-            (data?.assets ?? []).filter((a) => a.currentVersion?.uploadStatus === 'ready').map((a) => a.id),
+            assets.filter((a) => a.currentVersion?.uploadStatus === 'ready').map((a) => a.id),
         )
         return new Set(liveItems.map((it) => it.assetId).filter((x): x is string => !!x && !ready.has(x)))
-    }, [liveItems, data])
-    // Refetch on any upload status change so a new asset appears + a finished upload's
-    // real card lands. Keyed only on the status signature (not progress) via a ref, so
-    // a sort change doesn't double-fetch.
+    }, [liveItems, assets])
+
     const liveSig = folderUploads.map((it) => `${it.id}:${it.status}`).join('|')
     const silentRef = useRef(silentRefresh)
     useEffect(() => {
@@ -417,6 +483,325 @@ export function TeamBrowser({
     useEffect(() => {
         if (liveSig) silentRef.current()
     }, [liveSig])
+
+    /* ---- lookups + selection helpers ---- */
+    const visibleAssets = useMemo(() => assets.filter((a) => !liveAssetIds.has(a.id)), [assets, liveAssetIds])
+    const folderById = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders])
+    const assetById = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets])
+    const folderIdSet = useMemo(() => new Set(folders.map((f) => f.id)), [folders])
+    const typeOf = useCallback((id: string): ItemKind => (folderIdSet.has(id) ? 'folder' : 'asset'), [folderIdSet])
+    // render order: folders first, then visible assets (matches both grid + list).
+    const orderedIds = useMemo(
+        () => [...folders.map((f) => f.id), ...visibleAssets.map((a) => a.id)],
+        [folders, visibleAssets],
+    )
+
+    const capSet = useCallback((s: Set<string>): Set<string> => {
+        if (s.size <= SEL_CAP) return s
+        toast(`Chỉ chọn được tối đa ${SEL_CAP} mục.`)
+        return new Set([...s].slice(0, SEL_CAP))
+    }, [])
+
+    const clearSelection = useCallback(() => {
+        setSelectedIds(new Set())
+        setAnchorId(null)
+    }, [])
+
+    const onItemClick = useCallback(
+        (id: string, e: ReactMouseEvent) => {
+            if (renamingId) return
+            const additive = e.ctrlKey || e.metaKey
+            const range = e.shiftKey
+            if (range && anchorId) {
+                const a = orderedIds.indexOf(anchorId)
+                const b = orderedIds.indexOf(id)
+                if (a >= 0 && b >= 0) {
+                    const [lo, hi] = a < b ? [a, b] : [b, a]
+                    const next = new Set(selectedIds)
+                    for (const rid of orderedIds.slice(lo, hi + 1)) next.add(rid)
+                    setSelectedIds(capSet(next))
+                    return
+                }
+            }
+            if (additive) {
+                const next = new Set(selectedIds)
+                if (next.has(id)) next.delete(id)
+                else next.add(id)
+                setSelectedIds(capSet(next))
+                setAnchorId(id)
+                return
+            }
+            setSelectedIds(new Set([id]))
+            setAnchorId(id)
+        },
+        [renamingId, anchorId, orderedIds, selectedIds, capSet],
+    )
+
+    const onToggleSelect = useCallback(
+        (id: string) => {
+            const next = new Set(selectedIds)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            setSelectedIds(capSet(next))
+            setAnchorId(id)
+        },
+        [selectedIds, capSet],
+    )
+
+    const allVisibleSelected = orderedIds.length > 0 && orderedIds.every((id) => selectedIds.has(id))
+    const anyVisibleSelected = orderedIds.some((id) => selectedIds.has(id))
+    const onSelectAllVisible = useCallback(() => {
+        // Toggle: if ANY visible item is selected → clear. This works even when the 200-item
+        // cap prevented a full "select all" (allVisibleSelected would stay false forever),
+        // so the header checkbox can always deselect.
+        if (anyVisibleSelected) clearSelection()
+        else setSelectedIds(capSet(new Set(orderedIds)))
+    }, [anyVisibleSelected, orderedIds, capSet, clearSelection])
+
+    const toItemRefs = useCallback(
+        (ids: string[]): ItemRef[] => ids.map((id) => ({ type: typeOf(id), id })),
+        [typeOf],
+    )
+    const toMoveRefs = useCallback(
+        (items: ItemRef[]): MoveRef[] =>
+            items.map((i) => ({
+                ...i,
+                rowVersion: (i.type === 'folder' ? folderById.get(i.id)?.rowVersion : assetById.get(i.id)?.rowVersion) ?? 0,
+            })),
+        [folderById, assetById],
+    )
+    const canDeleteItems = useCallback(
+        (items: ItemRef[]): boolean =>
+            items.every((i) => i.type === 'asset' || isAdmin || folderById.get(i.id)?.createdBy?.id === currentUserId),
+        [isAdmin, folderById, currentUserId],
+    )
+
+    /* ---- actions ---- */
+    const doDownload = useCallback(
+        async (items: ItemRef[]) => {
+            if (items.length === 0) return
+            const assetItems = items.filter((i) => i.type === 'asset')
+            const folderItems = items.filter((i) => i.type === 'folder')
+            const tid = toast.loading('Đang chuẩn bị tải xuống…')
+            try {
+                let count = 0
+                let notReady = 0
+                for (const it of assetItems) {
+                    const a = assetById.get(it.id)
+                    if (a?.currentVersion?.uploadStatus === 'ready' && a.currentVersionId) {
+                        await downloadVersion(a.currentVersionId)
+                        count += 1
+                    } else {
+                        notReady += 1
+                    }
+                }
+                for (const it of folderItems) {
+                    const r = await downloadFolder(it.id, (done, total) =>
+                        toast.loading(`Đang tải thư mục… ${done}/${total}`, { id: tid }),
+                    )
+                    count += r.done
+                    if (r.truncated) toast(`Thư mục lớn — chỉ tải ${r.total} tệp đầu tiên.`)
+                }
+                if (count === 0) toast.error('Không có tệp nào sẵn sàng để tải.', { id: tid })
+                else toast.success(`Đã bắt đầu tải ${count} tệp${notReady ? ` (bỏ qua ${notReady} chưa xử lý xong)` : ''}.`, { id: tid })
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Tải xuống thất bại.', { id: tid })
+            }
+        },
+        [assetById],
+    )
+
+    const doCopyUrl = useCallback(
+        async (target: MenuTarget) => {
+            const url = target.type === 'folder' ? teamFolderUrl(workspaceId, target.id) : (() => {
+                const a = assetById.get(target.id)
+                return a ? teamAssetUrl(workspaceId, a) : teamFolderUrl(workspaceId, target.id)
+            })()
+            const ok = await copyToClipboard(url)
+            toast(ok ? 'Đã sao chép link vào clipboard.' : 'Không sao chép được. Hãy sao chép thủ công.')
+        },
+        [workspaceId, assetById],
+    )
+
+    const openMoveCopy = useCallback((mode: MoveCopyMode, items: ItemRef[]) => {
+        if (items.length === 0) return
+        setMoveCopy({ mode, items })
+    }, [])
+
+    const doMoveCopyConfirm = useCallback(
+        async (targetFolderId: string) => {
+            if (!moveCopy) return
+            const { mode, items } = moveCopy
+            setMoveCopy(null)
+            const tid = toast.loading(mode === 'move' ? 'Đang di chuyển…' : 'Đang sao chép…')
+            try {
+                if (mode === 'move') {
+                    await apiMoveItems(toMoveRefs(items), targetFolderId)
+                    for (const it of items) removedRef.current.add(it.id) // suppress until silentReplace confirms
+                    toast.success('Đã di chuyển.', { id: tid })
+                } else {
+                    const r = await apiCopyItems(items, targetFolderId)
+                    toast.success(
+                        `Đã sao chép.${r.skippedAssets ? ` (bỏ qua ${r.skippedAssets} asset chưa xử lý xong)` : ''}`,
+                        { id: tid },
+                    )
+                }
+                clearSelection()
+                silentReplace()
+                void refreshTree()
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Thao tác thất bại.', { id: tid })
+            }
+        },
+        [moveCopy, toMoveRefs, clearSelection, silentReplace, refreshTree],
+    )
+
+    const doDuplicate = useCallback(
+        async (items: ItemRef[]) => {
+            if (items.length === 0) return
+            const tid = toast.loading('Đang nhân bản…')
+            try {
+                const r = await apiCopyItems(items, folderIdRef.current, true)
+                toast.success(
+                    `Đã nhân bản.${r.skippedAssets ? ` (bỏ qua ${r.skippedAssets} asset chưa xử lý xong)` : ''}`,
+                    { id: tid },
+                )
+                clearSelection()
+                silentReplace()
+                void refreshTree()
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Nhân bản thất bại.', { id: tid })
+            }
+        },
+        [clearSelection, silentReplace, refreshTree],
+    )
+
+    const requestDelete = useCallback(
+        (items: ItemRef[]) => {
+            if (items.length === 0) return
+            const folderItems = items.filter((i) => i.type === 'folder')
+            let message: string
+            if (folderItems.length === 1 && items.length === 1) {
+                const f = folderById.get(folderItems[0].id)
+                const inside = f && f.itemCount > 0 ? ` và ${f.itemCount} mục bên trong` : ''
+                message = `Xóa thư mục “${f?.name ?? ''}”${inside}? Có thể khôi phục trong 30 ngày.`
+            } else {
+                message = `Xóa ${items.length} mục đã chọn? Có thể khôi phục trong 30 ngày.`
+            }
+            setConfirmState({ items, message })
+        },
+        [folderById],
+    )
+
+    // Restore just-deleted items (5s Undo affordance on the delete toast — TRS-01).
+    const undoDelete = useCallback(
+        async (items: ItemRef[]) => {
+            const tid = toast.loading('Đang hoàn tác…')
+            try {
+                await apiRestoreItems(items)
+                for (const it of items) removedRef.current.delete(it.id)
+                toast.success('Đã hoàn tác.', { id: tid })
+                silentReplace()
+                void refreshTree()
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Không hoàn tác được.', { id: tid })
+            }
+        },
+        [silentReplace, refreshTree],
+    )
+
+    const doDeleteConfirmed = useCallback(async () => {
+        if (!confirmState) return
+        const items = confirmState.items
+        setConfirmState(null)
+        const tid = toast.loading('Đang xóa…')
+        try {
+            await apiDeleteItems(items)
+            for (const it of items) removedRef.current.add(it.id) // suppress until silentReplace confirms
+            toast.success('Đã chuyển vào “Đã xóa gần đây”.', {
+                id: tid,
+                duration: 6000,
+                action: { label: 'Hoàn tác', onClick: () => void undoDelete(items) },
+            })
+            clearSelection()
+            silentReplace()
+            void refreshTree()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Xóa thất bại.', { id: tid })
+        }
+    }, [confirmState, clearSelection, silentReplace, refreshTree, undoDelete])
+
+    /* ---- rename ---- */
+    const startRename = useCallback((id: string) => {
+        setRenamingId(id)
+        setSelectedIds(new Set([id]))
+        setAnchorId(id)
+    }, [])
+
+    const commitRename = useCallback(
+        async (id: string, name: string) => {
+            setRenamingId(null)
+            const type = typeOf(id)
+            try {
+                if (type === 'folder') {
+                    const f = folderById.get(id)
+                    if (!f) return
+                    await apiRenameFolder(id, name, f.rowVersion)
+                } else {
+                    const a = assetById.get(id)
+                    if (!a) return
+                    await apiRenameAsset(id, name, a.rowVersion)
+                }
+                silentReplace()
+                void refreshTree()
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Đổi tên thất bại.')
+            }
+        },
+        [typeOf, folderById, assetById, silentReplace, refreshTree],
+    )
+
+    /* ---- context-menu target resolution ---- */
+    const handleOpenTarget = useCallback(
+        (t: MenuTarget | null) => {
+            setMenuTarget(t)
+            if (t && !selectedIds.has(t.id)) {
+                setSelectedIds(new Set([t.id]))
+                setAnchorId(t.id)
+            }
+        },
+        [selectedIds],
+    )
+
+    /* ---- keyboard: Esc clear, Ctrl+A select-all, F2 rename ---- */
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (renamingId || isEditableTarget(e.target)) return
+            if (e.key === 'Escape') {
+                if (selectedIds.size) clearSelection()
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+                if (orderedIds.length) {
+                    e.preventDefault()
+                    setSelectedIds(capSet(new Set(orderedIds)))
+                }
+            } else if (e.key === 'F2' && selectedIds.size === 1) {
+                startRename([...selectedIds][0])
+            }
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [renamingId, selectedIds, orderedIds, capSet, clearSelection, startRename])
+
+    /* ---- ?asset= deep-link preselect (once) ---- */
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        const a = new URLSearchParams(window.location.search).get('asset')
+        if (a) {
+            setSelectedIds(new Set([a]))
+            setAnchorId(a)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     /* ---- drag-drop (OS files → current folder) ---- */
     const isFileDrag = (e: ReactDragEvent) => Array.from(e.dataTransfer.types).includes('Files')
@@ -428,7 +813,7 @@ export function TeamBrowser({
     }
     const onDragOver = (e: ReactDragEvent) => {
         if (!isFileDrag(e)) return
-        e.preventDefault() // must fire on every dragover to keep the drop allowed
+        e.preventDefault()
         e.dataTransfer.dropEffect = 'copy'
     }
     const onDragLeave = (e: ReactDragEvent) => {
@@ -451,31 +836,58 @@ export function TeamBrowser({
     const trail = useMemo<{ id: string | null; name: string }[]>(() => {
         const crumbs: { id: string | null; name: string }[] = breadcrumb.map((b) => ({ id: b.id, name: b.name }))
         if (crumbs.length === 0) return [{ id: null, name: 'Team' }]
-        crumbs[0] = { id: null, name: 'Team' } // element 0 = ws-root → canonical root URL
+        crumbs[0] = { id: null, name: 'Team' }
         return [...crumbs, { id: folderId, name: currentName }]
     }, [breadcrumb, currentName, folderId])
 
-    const folders = data?.folders ?? []
-    const assets = data?.assets ?? []
-    // Hide the server asset a live upload already represents (avoid a double card).
-    const visibleAssets = assets.filter((a) => !liveAssetIds.has(a.id))
-    const selectedAsset = selectedId ? assets.find((a) => a.id === selectedId) ?? null : null
-    // Origin-gated so the tile only renders in the folder the flow started in.
+    /* ---- derived render state ---- */
+    const singleSelId = selectedIds.size === 1 ? [...selectedIds][0] : null
+    const selectedAsset = singleSelId ? assetById.get(singleSelId) ?? null : null
+    const selectedFolders = folders.filter((f) => selectedIds.has(f.id))
+    const selectedAssets = assets.filter((a) => selectedIds.has(a.id))
+
     const tileEditing = newFolderEditing && newFolderOrigin === folderId
     const tilePending = !newFolderEditing && pendingFolderName != null && newFolderOrigin === folderId
     const showNewFolderTile = tileEditing || tilePending
-    const hasContent =
-        folders.length > 0 || visibleAssets.length > 0 || liveItems.length > 0 || showNewFolderTile
+    const hasContent = folders.length > 0 || visibleAssets.length > 0 || liveItems.length > 0 || showNewFolderTile
     const isEmpty = !loading && !error && !hasContent
 
     const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth(prefs.cardSize)}px, 1fr))` }
+
+    /* ---- context-menu content ---- */
+    const renderMenu = useCallback((): ReactNode => {
+        if (!menuTarget) {
+            return (
+                <CanvasMenuContent
+                    onUploadFiles={() => filesInputRef.current?.click()}
+                    onUploadFolder={() => folderInputRef.current?.click()}
+                    onNewFolder={startNewFolder}
+                />
+            )
+        }
+        const target = menuTarget
+        const acting: ItemRef[] = selectedIds.size ? toItemRefs([...selectedIds]) : [{ type: target.type, id: target.id }]
+        const h: ItemMenuHandlers = {
+            onDownload: () => doDownload(acting),
+            onCopyUrl: () => doCopyUrl(target),
+            onCopyTo: () => openMoveCopy('copy', acting),
+            onMoveTo: () => openMoveCopy('move', acting),
+            onDuplicate: () => doDuplicate(acting),
+            onRename: () => startRename(target.id),
+            onDelete: () => requestDelete(acting),
+            canDelete: canDeleteItems(acting),
+        }
+        return target.type === 'folder' ? <FolderMenuContent {...h} /> : <AssetMenuContent {...h} />
+    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems])
+
+    const selectionActive = selectedIds.size > 0
 
     return (
         <div
             className="flex flex-col animate-fade-in"
             style={{ fontFamily: "var(--font-sans), 'Plus Jakarta Sans', sans-serif" }}
         >
-            {/* hidden upload inputs (P2.4): flat file picker + webkitdirectory folder picker */}
+            {/* hidden upload inputs (P2.4) */}
             <input
                 ref={filesInputRef}
                 type="file"
@@ -541,30 +953,7 @@ export function TeamBrowser({
                 <section className="flex min-w-0 flex-1 flex-col">
                     {/* breadcrumb header */}
                     <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
-                        <nav className="flex min-w-0 items-center gap-1 text-[13px]">
-                            {trail.map((c, i) => {
-                                const last = i === trail.length - 1
-                                return (
-                                    <span key={`${c.id ?? 'root'}-${i}`} className="flex min-w-0 items-center gap-1">
-                                        {i > 0 && <ChevronRight size={13} className="shrink-0 text-zinc-600" />}
-                                        {last ? (
-                                            <span className="truncate font-semibold text-zinc-100" title={c.name}>
-                                                {c.name}
-                                            </span>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => go(c.id)}
-                                                className="max-w-[180px] truncate text-zinc-400 transition-colors hover:text-violet-300"
-                                                title={c.name}
-                                            >
-                                                {c.name}
-                                            </button>
-                                        )}
-                                    </span>
-                                )
-                            })}
-                        </nav>
+                        <BreadcrumbTrail trail={trail} onNavigate={go} />
                         {currentFolder && (
                             <div className="hidden shrink-0 items-center gap-3 text-[11px] text-zinc-500 sm:flex">
                                 <span>{data?.summary.folderCount ?? 0} thư mục</span>
@@ -583,6 +972,13 @@ export function TeamBrowser({
                             <SortMenu sortField={sortField} sortDir={sortDir} onChange={updatePrefs} />
                         </div>
                         <div className="flex items-center gap-1.5">
+                            <a
+                                href={`/${workspaceId}/admin/team/trash`}
+                                title="Thùng rác"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
+                            >
+                                <Trash2 size={15} />
+                            </a>
                             <button
                                 type="button"
                                 onClick={reload}
@@ -599,98 +995,290 @@ export function TeamBrowser({
                         </div>
                     </div>
 
-                    {/* content (whole area is an OS-file drop target) */}
-                    <div
-                        className="relative min-h-[420px] flex-1 overflow-y-auto p-4"
-                        onDragEnter={onDragEnter}
-                        onDragOver={onDragOver}
-                        onDragLeave={onDragLeave}
-                        onDrop={onDrop}
-                    >
-                        {dragOver && <DropOverlay folderName={currentName} />}
-                        {loading ? (
-                            <LoadingState prefs={prefs} gridStyle={gridStyle} />
-                        ) : error ? (
-                            <ErrorState message={error} onRetry={reload} />
-                        ) : isEmpty ? (
-                            <EmptyState
-                                atRoot={folderId === null}
-                                onUpload={() => filesInputRef.current?.click()}
-                                onNewFolder={startNewFolder}
-                            />
-                        ) : prefs.layout === 'list' ? (
-                            <>
-                                {(showNewFolderTile || liveItems.length > 0) && (
-                                    <div className="mb-4 grid gap-3" style={gridStyle}>
-                                        {tileEditing && <NewFolderTile onCommit={commitNewFolder} />}
-                                        {tilePending && pendingFolderName && <PendingFolderTile name={pendingFolderName} />}
-                                        {liveItems.map((it) => (
-                                            <UploadingCard key={it.id} item={it} aspect={prefs.aspect} showInfo={prefs.showInfo} />
-                                        ))}
-                                    </div>
-                                )}
-                                <TeamListView
-                                    folders={folders}
-                                    assets={visibleAssets}
-                                    sortField={sortField}
-                                    sortDir={sortDir}
-                                    onSort={onSortColumn}
-                                    selectedId={selectedId}
-                                    onSelect={setSelectedId}
-                                    onOpenFolder={go}
-                                    onOpenAsset={openAsset}
+                    {/* content — whole area is an OS-file drop target + right-click context menu */}
+                    <TeamContextMenuRoot onOpenTarget={handleOpenTarget} renderContent={renderMenu}>
+                        <div
+                            className={`relative min-h-[420px] flex-1 overflow-y-auto p-4 ${selectionActive ? 'pb-24' : ''}`}
+                            onDragEnter={onDragEnter}
+                            onDragOver={onDragOver}
+                            onDragLeave={onDragLeave}
+                            onDrop={onDrop}
+                        >
+                            {dragOver && <DropOverlay folderName={currentName} />}
+                            {loading ? (
+                                <LoadingState prefs={prefs} gridStyle={gridStyle} />
+                            ) : error ? (
+                                <ErrorState message={error} onRetry={reload} />
+                            ) : isEmpty ? (
+                                <EmptyState
+                                    atRoot={folderId === null}
+                                    onUpload={() => filesInputRef.current?.click()}
+                                    onNewFolder={startNewFolder}
                                 />
-                                {selectedAsset && <InfoPanel asset={selectedAsset} onClose={() => setSelectedId(null)} />}
-                                <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
-                            </>
-                        ) : (
-                            <>
-                                {(folders.length > 0 || showNewFolderTile) && (
-                                    <Section label="Thư mục" count={folders.length + (showNewFolderTile ? 1 : 0)}>
-                                        <div className="grid gap-3" style={gridStyle}>
+                            ) : prefs.layout === 'list' ? (
+                                <>
+                                    {(showNewFolderTile || liveItems.length > 0) && (
+                                        <div className="mb-4 grid gap-3" style={gridStyle}>
                                             {tileEditing && <NewFolderTile onCommit={commitNewFolder} />}
                                             {tilePending && pendingFolderName && <PendingFolderTile name={pendingFolderName} />}
-                                            {folders.map((f) => (
-                                                <FolderCardGrid
-                                                    key={f.id}
-                                                    folder={f}
-                                                    selected={selectedId === f.id}
-                                                    onSelect={() => setSelectedId(f.id)}
-                                                    onOpen={() => go(f.id)}
-                                                />
-                                            ))}
-                                        </div>
-                                    </Section>
-                                )}
-                                {(liveItems.length > 0 || visibleAssets.length > 0) && (
-                                    <Section label="Video" count={liveItems.length + visibleAssets.length}>
-                                        <div className="grid gap-3" style={gridStyle}>
                                             {liveItems.map((it) => (
                                                 <UploadingCard key={it.id} item={it} aspect={prefs.aspect} showInfo={prefs.showInfo} />
                                             ))}
-                                            {visibleAssets.map((a) => (
-                                                <AssetCardGrid
-                                                    key={a.id}
-                                                    asset={a}
-                                                    aspect={prefs.aspect}
-                                                    thumb={prefs.thumb}
-                                                    showInfo={prefs.showInfo}
-                                                    selected={selectedId === a.id}
-                                                    onSelect={() => setSelectedId(a.id)}
-                                                    onOpen={() => openAsset(a)}
-                                                />
-                                            ))}
                                         </div>
-                                    </Section>
-                                )}
-                                {selectedAsset && <InfoPanel asset={selectedAsset} onClose={() => setSelectedId(null)} />}
-                                <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
-                            </>
-                        )}
-                    </div>
+                                    )}
+                                    <TeamListView
+                                        folders={folders}
+                                        assets={visibleAssets}
+                                        sortField={sortField}
+                                        sortDir={sortDir}
+                                        onSort={onSortColumn}
+                                        selectedIds={selectedIds}
+                                        onRowClick={onItemClick}
+                                        onToggle={onToggleSelect}
+                                        onSelectAllVisible={onSelectAllVisible}
+                                        allVisibleSelected={allVisibleSelected}
+                                        renamingId={renamingId}
+                                        onCommitRename={(name) => renamingId && commitRename(renamingId, name)}
+                                        onCancelRename={() => setRenamingId(null)}
+                                        onOpenFolder={go}
+                                        onOpenAsset={openAsset}
+                                    />
+                                    {selectedAsset && selectedIds.size === 1 && (
+                                        <InfoPanel asset={selectedAsset} onClose={clearSelection} />
+                                    )}
+                                    <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
+                                </>
+                            ) : (
+                                <>
+                                    {(folders.length > 0 || showNewFolderTile) && (
+                                        <Section label="Thư mục" count={folders.length + (showNewFolderTile ? 1 : 0)}>
+                                            <div className="grid gap-3" style={gridStyle}>
+                                                {tileEditing && <NewFolderTile onCommit={commitNewFolder} />}
+                                                {tilePending && pendingFolderName && <PendingFolderTile name={pendingFolderName} />}
+                                                {folders.map((f) => (
+                                                    <FolderCardGrid
+                                                        key={f.id}
+                                                        folder={f}
+                                                        selected={selectedIds.has(f.id)}
+                                                        renaming={renamingId === f.id}
+                                                        onSelect={(e) => onItemClick(f.id, e)}
+                                                        onToggle={() => onToggleSelect(f.id)}
+                                                        onOpen={() => go(f.id)}
+                                                        onCommitRename={(name) => commitRename(f.id, name)}
+                                                        onCancelRename={() => setRenamingId(null)}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </Section>
+                                    )}
+                                    {(liveItems.length > 0 || visibleAssets.length > 0) && (
+                                        <Section label="Video" count={liveItems.length + visibleAssets.length}>
+                                            <div className="grid gap-3" style={gridStyle}>
+                                                {liveItems.map((it) => (
+                                                    <UploadingCard key={it.id} item={it} aspect={prefs.aspect} showInfo={prefs.showInfo} />
+                                                ))}
+                                                {visibleAssets.map((a) => (
+                                                    <AssetCardGrid
+                                                        key={a.id}
+                                                        asset={a}
+                                                        aspect={prefs.aspect}
+                                                        thumb={prefs.thumb}
+                                                        showInfo={prefs.showInfo}
+                                                        selected={selectedIds.has(a.id)}
+                                                        renaming={renamingId === a.id}
+                                                        onSelect={(e) => onItemClick(a.id, e)}
+                                                        onToggle={() => onToggleSelect(a.id)}
+                                                        onOpen={() => openAsset(a)}
+                                                        onCommitRename={(name) => commitRename(a.id, name)}
+                                                        onCancelRename={() => setRenamingId(null)}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </Section>
+                                    )}
+                                    {selectedAsset && selectedIds.size === 1 && (
+                                        <InfoPanel asset={selectedAsset} onClose={clearSelection} />
+                                    )}
+                                    <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
+                                </>
+                            )}
+                        </div>
+                    </TeamContextMenuRoot>
                 </section>
             </div>
+
+            {/* multi-select bottom bar */}
+            {selectionActive && (
+                <SelectionBar
+                    folders={selectedFolders}
+                    assets={selectedAssets}
+                    atCap={selectedIds.size >= SEL_CAP}
+                    canDelete={canDeleteItems(toItemRefs([...selectedIds]))}
+                    onDownload={() => doDownload(toItemRefs([...selectedIds]))}
+                    onMove={() => openMoveCopy('move', toItemRefs([...selectedIds]))}
+                    onCopy={() => openMoveCopy('copy', toItemRefs([...selectedIds]))}
+                    onDelete={() => requestDelete(toItemRefs([...selectedIds]))}
+                    onClear={clearSelection}
+                />
+            )}
+
+            {/* Move / Copy destination picker */}
+            {moveCopy && (
+                <MoveCopyDialog
+                    open
+                    mode={moveCopy.mode}
+                    workspaceId={workspaceId}
+                    folderItemIds={moveCopy.items.filter((i) => i.type === 'folder').map((i) => i.id)}
+                    onClose={() => setMoveCopy(null)}
+                    onConfirm={doMoveCopyConfirm}
+                />
+            )}
+
+            {/* Delete confirm */}
+            <ConfirmModal
+                open={!!confirmState}
+                message={confirmState?.message ?? ''}
+                confirmLabel="Xóa"
+                onCancel={() => setConfirmState(null)}
+                onConfirm={doDeleteConfirmed}
+            />
         </div>
+    )
+}
+
+/* ── delete confirm modal ────────────────────────────────────────────────── */
+
+function ConfirmModal({
+    open,
+    message,
+    confirmLabel,
+    onCancel,
+    onConfirm,
+}: {
+    open: boolean
+    message: string
+    confirmLabel: string
+    onCancel: () => void
+    onConfirm: () => void
+}) {
+    return (
+        <Dialog.Root open={open} onOpenChange={(o) => !o && onCancel()}>
+            <Dialog.Portal>
+                <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
+                <Dialog.Content
+                    className="fixed left-1/2 top-1/2 z-50 w-[380px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/10 bg-zinc-950/95 p-5 shadow-2xl shadow-black/70 backdrop-blur-xl"
+                    style={{ fontFamily: "var(--font-sans), 'Plus Jakarta Sans', sans-serif" }}
+                >
+                    <div className="mb-3 flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-300">
+                            <Trash2 size={17} />
+                        </div>
+                        <Dialog.Title className="text-[14px] font-semibold text-zinc-100">Xác nhận xóa</Dialog.Title>
+                    </div>
+                    <Dialog.Description className="mb-5 text-[12.5px] leading-relaxed text-zinc-400">{message}</Dialog.Description>
+                    <div className="flex items-center justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="rounded-lg px-3.5 py-2 text-[12.5px] font-medium text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-200"
+                        >
+                            Hủy
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onConfirm}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-red-600"
+                        >
+                            <Trash2 size={14} /> {confirmLabel}
+                        </button>
+                    </div>
+                </Dialog.Content>
+            </Dialog.Portal>
+        </Dialog.Root>
+    )
+}
+
+/* ── breadcrumb (collapses the middle to a "…" dropdown for deep paths — FR-B02 AC1) ── */
+
+function BreadcrumbTrail({
+    trail,
+    onNavigate,
+}: {
+    trail: { id: string | null; name: string }[]
+    onNavigate: (id: string | null) => void
+}) {
+    const COLLAPSE_AFTER = 4
+    const Sep = () => <ChevronRight size={13} className="shrink-0 text-zinc-600" />
+    const Crumb = ({ c, last }: { c: { id: string | null; name: string }; last: boolean }) =>
+        last ? (
+            <span className="truncate font-semibold text-zinc-100" title={c.name}>
+                {c.name}
+            </span>
+        ) : (
+            <button
+                type="button"
+                onClick={() => onNavigate(c.id)}
+                className="max-w-[180px] truncate text-zinc-400 transition-colors hover:text-violet-300"
+                title={c.name}
+            >
+                {c.name}
+            </button>
+        )
+
+    if (trail.length <= COLLAPSE_AFTER) {
+        return (
+            <nav className="flex min-w-0 items-center gap-1 text-[13px]">
+                {trail.map((c, i) => (
+                    <span key={`${c.id ?? 'root'}-${i}`} className="flex min-w-0 items-center gap-1">
+                        {i > 0 && <Sep />}
+                        <Crumb c={c} last={i === trail.length - 1} />
+                    </span>
+                ))}
+            </nav>
+        )
+    }
+
+    // Deep path: first · "…" (hidden middle in a dropdown) · parent · current.
+    const first = trail[0]
+    const hidden = trail.slice(1, trail.length - 2)
+    const tail = trail.slice(trail.length - 2)
+    return (
+        <nav className="flex min-w-0 items-center gap-1 text-[13px]">
+            <Crumb c={first} last={false} />
+            <Sep />
+            <DropdownMenu.Root>
+                <DropdownMenu.Trigger
+                    className="flex h-6 items-center rounded px-1 text-zinc-400 outline-none transition-colors hover:bg-white/[0.06] hover:text-violet-300"
+                    aria-label="Các cấp thư mục ẩn"
+                >
+                    <MoreHorizontal size={15} />
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                        align="start"
+                        className="z-50 max-h-[320px] min-w-[180px] overflow-y-auto rounded-xl border border-white/10 bg-zinc-950/95 p-1 text-zinc-200 shadow-2xl shadow-black/60 backdrop-blur-xl"
+                    >
+                        {hidden.map((c, i) => (
+                            <DropdownMenu.Item
+                                key={`${c.id ?? 'h'}-${i}`}
+                                onSelect={() => onNavigate(c.id)}
+                                className="flex cursor-pointer items-center gap-2 truncate rounded-lg px-2.5 py-[7px] text-[12.5px] outline-none data-[highlighted]:bg-violet-500/15 data-[highlighted]:text-white"
+                                style={{ paddingLeft: 10 + i * 10 }}
+                            >
+                                <FolderIcon size={13} className="shrink-0 text-zinc-500" />
+                                <span className="truncate">{c.name}</span>
+                            </DropdownMenu.Item>
+                        ))}
+                    </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+            {tail.map((c, i) => (
+                <span key={`${c.id ?? 'root'}-t${i}`} className="flex min-w-0 items-center gap-1">
+                    <Sep />
+                    <Crumb c={c} last={i === tail.length - 1} />
+                </span>
+            ))}
+        </nav>
     )
 }
 
@@ -807,7 +1395,7 @@ function LoadMore({ show, loading, onClick }: { show: boolean; loading: boolean;
     )
 }
 
-/* ── optimistic "creating…" folder tile (shown while the POST is in flight) ── */
+/* ── optimistic "creating…" folder tile ── */
 
 function PendingFolderTile({ name }: { name: string }) {
     return (

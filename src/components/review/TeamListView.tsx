@@ -1,17 +1,19 @@
 'use client'
 
-// [Review module P2.3] Team-browser LIST view (FR-B09). 7-column table
+// [Review module P2.3/P2.5] Team-browser LIST view (FR-B09). 7-column table
 // (Tên | Trạng thái | Ngày tải lên | Người tải | Bình luận | Dung lượng | Thời lượng);
 // folders always render on top; clicking a column header sorts by that column and
 // toggles asc/desc — the SAME shared sort state as the Sort popover (one source of
 // truth). Folder rows leave duration/comments blank and show the lazy total size.
-// Single-click selects (drives the InfoPanel); double-click opens (folder/player).
+// P2.5: a leading select column (+ select-all header), row data-attrs for the shared
+// context menu, modifier-aware row click for multi-select, and inline rename.
 
-import { Folder as FolderIcon, Film, Image as ImageIcon, ChevronUp, ChevronDown } from 'lucide-react'
+import { Folder as FolderIcon, Film, Image as ImageIcon, ChevronUp, ChevronDown, Check } from 'lucide-react'
+import { type MouseEvent as ReactMouseEvent } from 'react'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
 import type { SortField, SortDir } from '@/lib/review/view-prefs'
 import { msToClock, formatDate } from '@/lib/review/view-prefs'
-import { bytesLabel, StatusChip } from './TeamCards'
+import { bytesLabel, StatusChip, InlineRename } from './TeamCards'
 
 interface Col {
     key: SortField
@@ -52,14 +54,40 @@ function Thumb({ asset }: { asset: AssetDto }) {
     )
 }
 
+function RowCheck({ checked, onToggle }: { checked: boolean; onToggle: () => void }) {
+    return (
+        <button
+            type="button"
+            aria-label={checked ? 'Bỏ chọn' : 'Chọn'}
+            onClick={(e) => {
+                e.stopPropagation()
+                onToggle()
+            }}
+            className={`flex h-[18px] w-[18px] items-center justify-center rounded border transition-all ${
+                checked
+                    ? 'border-violet-400 bg-violet-500 text-white opacity-100'
+                    : 'border-white/40 bg-black/30 text-transparent opacity-0 group-hover:opacity-100'
+            }`}
+        >
+            <Check size={12} strokeWidth={3} />
+        </button>
+    )
+}
+
 export function TeamListView({
     folders,
     assets,
     sortField,
     sortDir,
     onSort,
-    selectedId,
-    onSelect,
+    selectedIds,
+    onRowClick,
+    onToggle,
+    onSelectAllVisible,
+    allVisibleSelected,
+    renamingId,
+    onCommitRename,
+    onCancelRename,
     onOpenFolder,
     onOpenAsset,
 }: {
@@ -68,21 +96,41 @@ export function TeamListView({
     sortField: SortField
     sortDir: SortDir
     onSort: (field: SortField) => void
-    selectedId: string | null
-    onSelect: (id: string) => void
+    selectedIds: Set<string>
+    onRowClick: (id: string, e: ReactMouseEvent) => void
+    onToggle: (id: string) => void
+    onSelectAllVisible: () => void
+    allVisibleSelected: boolean
+    renamingId: string | null
+    onCommitRename: (name: string) => void
+    onCancelRename: () => void
     onOpenFolder: (id: string) => void
     onOpenAsset: (asset: AssetDto) => void
 }) {
     const rowCls = (id: string) =>
-        `cursor-pointer border-b border-white/[0.04] transition-colors ${
-            selectedId === id ? 'bg-violet-500/[0.10]' : 'hover:bg-white/[0.04]'
+        `group cursor-pointer border-b border-white/[0.04] transition-colors ${
+            selectedIds.has(id) ? 'bg-violet-500/[0.10]' : 'hover:bg-white/[0.04]'
         }`
 
     return (
         <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-left">
+            <table className="w-full min-w-[760px] border-collapse text-left">
                 <thead>
                     <tr className="border-b border-white/10 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                        <th className="w-9 px-3 py-2">
+                            <button
+                                type="button"
+                                aria-label={allVisibleSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                                onClick={onSelectAllVisible}
+                                className={`flex h-[18px] w-[18px] items-center justify-center rounded border transition-colors ${
+                                    allVisibleSelected
+                                        ? 'border-violet-400 bg-violet-500 text-white'
+                                        : 'border-white/40 bg-black/30 text-transparent hover:border-white/60'
+                                }`}
+                            >
+                                <Check size={12} strokeWidth={3} />
+                            </button>
+                        </th>
                         {COLS.map((c) => {
                             const activeSort = sortField === c.key
                             return (
@@ -105,18 +153,29 @@ export function TeamListView({
                     {folders.map((f) => (
                         <tr
                             key={`f-${f.id}`}
+                            data-review-id={f.id}
+                            data-review-type="folder"
                             className={rowCls(f.id)}
-                            onClick={() => onSelect(f.id)}
-                            onDoubleClick={() => onOpenFolder(f.id)}
+                            onClick={(e) => onRowClick(f.id, e)}
+                            onDoubleClick={() => renamingId !== f.id && onOpenFolder(f.id)}
                         >
+                            <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                <RowCheck checked={selectedIds.has(f.id)} onToggle={() => onToggle(f.id)} />
+                            </td>
                             <td className="px-3 py-2">
                                 <div className="flex items-center gap-2.5">
                                     <div className="grid h-9 w-14 shrink-0 place-items-center rounded bg-violet-500/10 text-violet-300">
                                         <FolderIcon size={16} />
                                     </div>
-                                    <span className="truncate font-medium text-zinc-100" title={f.name}>
-                                        {f.name}
-                                    </span>
+                                    {renamingId === f.id ? (
+                                        <div className="min-w-0 flex-1">
+                                            <InlineRename initial={f.name} onCommit={onCommitRename} onCancel={onCancelRename} />
+                                        </div>
+                                    ) : (
+                                        <span className="truncate font-medium text-zinc-100" title={f.name}>
+                                            {f.name}
+                                        </span>
+                                    )}
                                 </div>
                             </td>
                             <td className="px-3 py-2 text-zinc-600">—</td>
@@ -133,16 +192,27 @@ export function TeamListView({
                         return (
                             <tr
                                 key={`a-${a.id}`}
+                                data-review-id={a.id}
+                                data-review-type="asset"
                                 className={rowCls(a.id)}
-                                onClick={() => onSelect(a.id)}
-                                onDoubleClick={() => onOpenAsset(a)}
+                                onClick={(e) => onRowClick(a.id, e)}
+                                onDoubleClick={() => renamingId !== a.id && onOpenAsset(a)}
                             >
+                                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                    <RowCheck checked={selectedIds.has(a.id)} onToggle={() => onToggle(a.id)} />
+                                </td>
                                 <td className="px-3 py-2">
                                     <div className="flex items-center gap-2.5">
                                         <Thumb asset={a} />
-                                        <span className="truncate font-medium text-zinc-100" title={a.title}>
-                                            {a.title}
-                                        </span>
+                                        {renamingId === a.id ? (
+                                            <div className="min-w-0 flex-1">
+                                                <InlineRename initial={a.title} onCommit={onCommitRename} onCancel={onCancelRename} />
+                                            </div>
+                                        ) : (
+                                            <span className="truncate font-medium text-zinc-100" title={a.title}>
+                                                {a.title}
+                                            </span>
+                                        )}
                                     </div>
                                 </td>
                                 <td className="px-3 py-2">

@@ -80,6 +80,12 @@ const EVENT_LABELS: Record<string, string> = {
     'task.client_changes_requested': 'khách yêu cầu chỉnh sửa',
     'task.bulk_status_updated': 'đổi trạng thái',
     'request.accepted': 'nhận từ yêu cầu của khách',
+    // [Video Review P6.3] events surfaced into this task's activity feed.
+    'video.version_ready': 'đã tải bản review lên',
+    'video.guest_commented': 'khách đã bình luận trên bản review',
+    'video.share_created': 'đã tạo link review cho khách',
+    'video.share_revoked': 'đã thu hồi link review',
+    'video.share_unrevoked': 'đã mở lại link review',
 }
 
 export type MentionRelation = 'editor' | 'manager' | 'client' | 'member'

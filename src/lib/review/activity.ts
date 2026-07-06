@@ -31,6 +31,8 @@ export const REVIEW_ACTIVITY = {
     SHARE_DOWNLOADED: 'share.downloaded', // guest downloaded the original (meta {versionNumber})
     REVIEW_APPROVED: 'review.approved', // guest decision (meta {versionNumber}) — P5.4
     REVIEW_CHANGES_REQUESTED: 'review.changes_requested', // guest decision (meta {versionNumber}) — P5.4
+    // ── P6: trash purge (FR-B13) ──
+    TRASH_PURGED: 'trash.purged', // 30-day auto-purge OR manual Delete-forever (meta {kind, itemName, deleteBatchId})
 } as const
 
 export type ReviewActivityType = (typeof REVIEW_ACTIVITY)[keyof typeof REVIEW_ACTIVITY]

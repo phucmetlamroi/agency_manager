@@ -22,6 +22,7 @@ import {
     type CommentReactionDto,
     type UserRef,
 } from './dto'
+import { notifyReview, reviewPlayerUrl } from './notify'
 
 const MAX_BODY = 5000
 const MAX_ATTACHMENTS = 6
@@ -371,6 +372,35 @@ export async function createComment(versionId: string, input: CreateCommentInput
         })
         return c
     })
+
+    // FR-G02: @mention fan-out (P6 — the P4 TODO). The client sends resolved userIds;
+    // validate each is REAL staff on the task's profile before notifying (defense in
+    // depth — never notify an arbitrary uuid), exclude the author, and works for
+    // INTERNAL comments too (a guest never sees internal comments, so mentioning an
+    // internal teammate there is safe — AC2). Fire-and-forget.
+    if (input.mentions?.length && asset.taskId) {
+        const mentionIds = [...new Set(input.mentions)].filter((id) => id !== access.userId)
+        if (mentionIds.length) {
+            void (async () => {
+                const task = await prisma.task.findUnique({ where: { id: asset.taskId! }, select: { profileId: true } })
+                if (!task?.profileId) return
+                const staff = await prisma.profileAccess.findMany({
+                    where: { profileId: task.profileId, userId: { in: mentionIds }, role: { in: ['OWNER', 'ADMIN', 'USER'] } },
+                    select: { userId: true },
+                })
+                await notifyReview({
+                    recipientIds: staff.map((s) => s.userId),
+                    excludeUserId: access.userId,
+                    type: 'VIDEO_COMMENT_NEW',
+                    title: 'Bạn được nhắc trong một bình luận review',
+                    body: body ? body.slice(0, 140) : 'Xem hình vẽ / mốc thời gian trong bình luận.',
+                    taskId: asset.taskId,
+                    actorId: access.userId,
+                    deepLinkUrl: reviewPlayerUrl({ workspaceId: asset.workspaceId, assetId: asset.id, versionId, commentId }),
+                })
+            })()
+        }
+    }
 
     const [dto] = await serializeComments([created], version, access.userId)
     return { comment: dto }

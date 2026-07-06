@@ -17,6 +17,12 @@ import { syncTaskOnChangesRequested } from './task-sync'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { audit } from '@/lib/audit-log'
 import { createAndBroadcastNotifications } from '@/actions/notification-actions'
+// P6.1 notifications.
+import { notifyReview, reviewPlayerUrl } from './notify'
+// P6.2 trash purge.
+import { purgeExpiredTrash } from './purge'
+// P6.3 activity feed bridge.
+import { auditReviewFeed } from './feed-audit'
 
 export const inngest = new Inngest({ id: 'hustlytasker-review' })
 
@@ -37,6 +43,7 @@ export const REVIEW_EVENTS = {
 // healthy path is still legitimately finalizing/processing; the batch cap bounds one run (a
 // hit cap is logged, and the next night drains the rest).
 const JANITOR_BATCH = 100
+const PURGE_BATCH = 25 // external deletes (Mux+R2) per version → smaller batch than the DB-only sweeps
 const UPLOADED_GRACE_MS = 15 * 60 * 1000 // a real R2 finalize lands in seconds
 const PROCESSING_GRACE_MS = 20 * 60 * 1000 // Mux "basic" ready is usually < a few minutes
 const PROCESSING_HARD_LIMIT_MS = 24 * 60 * 60 * 1000 // still PROCESSING with no Mux asset after 24h ⇒ give up
@@ -104,7 +111,27 @@ async function applyMuxReady(
         })
         return true
     })
-    if (applied) return 'applied'
+    if (applied) {
+        // FR-G02: tell the uploader their cut is ready to review (deep-link to the player).
+        void notifyReview({
+            recipientIds: [version.uploaderId],
+            type: 'VIDEO_VERSION_UPLOADED',
+            title: `Bản v${version.versionNumber} đã sẵn sàng để review`,
+            body: 'Video đã xử lý xong — mở review để xem và lấy link cho khách.',
+            taskId: version.asset.taskId,
+            deepLinkUrl: reviewPlayerUrl({ workspaceId: version.workspaceId, assetId: version.assetId, versionId }),
+        })
+        // FR-G01: "{editor} đã tải bản vN lên" into the task feed + admin log.
+        void auditReviewFeed({
+            action: 'video.version_ready',
+            workspaceId: version.workspaceId,
+            taskId: version.asset.taskId,
+            assetId: version.assetId,
+            actorUserId: version.uploaderId,
+            meta: { versionNumber: version.versionNumber },
+        })
+        return 'applied'
+    }
     // flip missed → classify the current state:
     //   READY  = a true duplicate → 'noop' (consume the event, write nothing).
     //   FAILED = TERMINAL (an errored webhook / reconcile won first). A late 'ready' can't un-fail
@@ -148,6 +175,15 @@ async function applyMuxErrored(versionId: string, msg: string): Promise<'applied
             versionId,
             actorUserId: version.uploaderId,
             meta: { versionNumber: version.versionNumber, errorMessage: msg },
+        })
+        // FR-G02: tell the uploader their cut failed to process so they can re-upload.
+        void notifyReview({
+            recipientIds: [version.uploaderId],
+            type: 'VIDEO_VERSION_UPLOADED',
+            title: `Bản v${version.versionNumber} xử lý thất bại`,
+            body: `Không xử lý được video: ${msg}. Vui lòng tải lại.`,
+            taskId: version.asset.taskId,
+            deepLinkUrl: reviewPlayerUrl({ workspaceId: version.workspaceId, assetId: version.assetId, versionId }),
         })
         return 'applied'
     })
@@ -524,8 +560,14 @@ export const reviewJanitor = inngest.createFunction(
             return { reEnqueued: rows.length, abandoned }
         })
 
-        reviewLog('info', 'inngest.janitor.done', { aborted, redriven, reconciled, reEnqueued })
-        return { ok: true, aborted, redriven, reconciled, reEnqueued }
+        // (e) P6.2: purge trash past 30 days — physically delete Mux assets + R2 objects
+        // + DB rows (ref-counted so a live copy's shared object is never removed). Its own
+        // step → a purge failure retries only this sweep, and it rides the SAME nightly
+        // trigger (no new Inngest function → no extra sync step; see GOTCHA in memory).
+        const purged = await step.run('purge-expired-trash', () => purgeExpiredTrash(PURGE_BATCH))
+
+        reviewLog('info', 'inngest.janitor.done', { aborted, redriven, reconciled, reEnqueued, purged })
+        return { ok: true, aborted, redriven, reconciled, reEnqueued, purged }
     },
 )
 

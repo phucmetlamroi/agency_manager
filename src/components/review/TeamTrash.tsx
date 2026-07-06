@@ -26,11 +26,13 @@ import {
     Clock,
     RefreshCw,
 } from 'lucide-react'
+import { X } from 'lucide-react'
 import { bytesLabel } from './TeamCards'
-import { apiRestoreItems, type ItemKind, type ItemRef } from '@/lib/review/team-actions'
+import { apiPurgeItems, apiRestoreItems, type ItemKind, type ItemRef } from '@/lib/review/team-actions'
 
 const RESTORE_CAP = 200 // restore route caps items at 200
 const BULK_KEY = '__bulk__'
+const PURGE_BULK_KEY = '__purge_bulk__'
 
 interface TrashItem {
     type: ItemKind
@@ -90,7 +92,7 @@ async function fetchTrash(workspaceId: string, cursor: string | null): Promise<T
     return (await res.json()) as TrashResult
 }
 
-export function TeamTrash({ workspaceId }: { workspaceId: string }) {
+export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: string; isAdmin?: boolean }) {
     const [data, setData] = useState<TrashResult | null>(null) // items ACCUMULATE across pages
     const [loading, setLoading] = useState(true)
     const [loadingMore, setLoadingMore] = useState(false)
@@ -98,6 +100,9 @@ export function TeamTrash({ workspaceId }: { workspaceId: string }) {
     const [refreshKey, setRefreshKey] = useState(0)
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [restoringKey, setRestoringKey] = useState<string | null>(null) // item id | BULK_KEY | null
+    // P6.2 Delete-forever (ADMIN): a confirm modal, then a single-guard purge call.
+    const [purgingKey, setPurgingKey] = useState<string | null>(null) // item id | PURGE_BULK_KEY | null
+    const [purgeConfirm, setPurgeConfirm] = useState<{ refs: ItemRef[]; label: string; key: string } | null>(null)
 
     const teamHref = `/${workspaceId}/admin/team`
 
@@ -207,7 +212,34 @@ export function TeamTrash({ workspaceId }: { workspaceId: string }) {
         void doRestore(refs, BULK_KEY)
     }, [items, selectedIds, doRestore])
 
-    const busy = restoringKey !== null
+    // P6.2 — the actual purge call once the confirm modal is accepted.
+    const doPurge = useCallback(
+        async (refs: ItemRef[], key: string) => {
+            if (refs.length === 0) return
+            setPurgeConfirm(null)
+            setPurgingKey(key)
+            const tid = toast.loading('Đang xóa vĩnh viễn…')
+            try {
+                const r = await apiPurgeItems(refs)
+                toast.success(`Đã xóa vĩnh viễn ${r.assets} asset · ${r.folders} thư mục.`, { id: tid })
+                setSelectedIds(new Set())
+                setRefreshKey((k) => k + 1)
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Xóa vĩnh viễn thất bại.', { id: tid })
+            } finally {
+                setPurgingKey(null)
+            }
+        },
+        [],
+    )
+
+    const purgeSelected = useCallback(() => {
+        const refs: ItemRef[] = items.filter((i) => selectedIds.has(i.id)).map((i) => ({ type: i.type, id: i.id }))
+        if (!refs.length) return
+        setPurgeConfirm({ refs, label: `${refs.length} mục đã chọn`, key: PURGE_BULK_KEY })
+    }, [items, selectedIds])
+
+    const busy = restoringKey !== null || purgingKey !== null
 
     return (
         <div className="flex flex-col animate-fade-in" style={{ fontFamily: "var(--font-sans), 'Plus Jakarta Sans', sans-serif" }}>
@@ -254,6 +286,18 @@ export function TeamTrash({ workspaceId }: { workspaceId: string }) {
                         >
                             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
                         </button>
+                        {anySelected && isAdmin && (
+                            <button
+                                type="button"
+                                onClick={purgeSelected}
+                                disabled={busy}
+                                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60"
+                                style={{ background: 'rgba(244,63,94,0.14)', color: '#FDA4AF' }}
+                            >
+                                {purgingKey === PURGE_BULK_KEY ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                                Xóa vĩnh viễn ({selectedIds.size})
+                            </button>
+                        )}
                         {anySelected && (
                             <button
                                 type="button"
@@ -343,8 +387,11 @@ export function TeamTrash({ workspaceId }: { workspaceId: string }) {
                                         checked={selectedIds.has(it.id)}
                                         onToggle={() => toggle(it.id)}
                                         restoring={restoringKey === it.id}
+                                        purging={purgingKey === it.id}
                                         disabled={busy}
+                                        isAdmin={isAdmin}
                                         onRestore={() => doRestore([{ type: it.type, id: it.id }], it.id)}
+                                        onPurge={() => setPurgeConfirm({ refs: [{ type: it.type, id: it.id }], label: `"${it.name}"`, key: it.id })}
                                     />
                                 ))}
                             </ul>
@@ -365,6 +412,51 @@ export function TeamTrash({ workspaceId }: { workspaceId: string }) {
                     )}
                 </div>
             </div>
+
+            {/* P6.2 Delete-forever confirm (FR-B13 [S], verbatim copy) */}
+            {purgeConfirm && (
+                <PurgeConfirmModal
+                    label={purgeConfirm.label}
+                    onCancel={() => setPurgeConfirm(null)}
+                    onConfirm={() => void doPurge(purgeConfirm.refs, purgeConfirm.key)}
+                />
+            )}
+        </div>
+    )
+}
+
+function PurgeConfirmModal({ label, onCancel, onConfirm }: { label: string; onCancel: () => void; onConfirm: () => void }) {
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onCancel}>
+            <div
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-5 shadow-2xl"
+            >
+                <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(244,63,94,0.14)' }}>
+                        <Trash2 className="h-5 w-5" style={{ color: '#FDA4AF' }} />
+                    </div>
+                    <h2 className="text-[15px] font-bold text-white">Xóa vĩnh viễn {label}?</h2>
+                    <button onClick={onCancel} className="ml-auto grid h-7 w-7 place-items-center rounded-lg text-zinc-500 hover:bg-white/10 hover:text-white">
+                        <X size={16} />
+                    </button>
+                </div>
+                <p className="mb-4 text-[12.5px] leading-relaxed text-zinc-400">
+                    Hành động này không thể hoàn tác. File gốc và mọi bình luận sẽ bị xóa.
+                </p>
+                <div className="flex justify-end gap-2">
+                    <button onClick={onCancel} className="rounded-lg px-3.5 py-2 text-[12.5px] text-zinc-300 hover:bg-white/[0.06]">
+                        Hủy
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        className="rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white"
+                        style={{ background: '#E11D48' }}
+                    >
+                        Xóa vĩnh viễn
+                    </button>
+                </div>
+            </div>
         </div>
     )
 }
@@ -374,15 +466,21 @@ function TrashRow({
     checked,
     onToggle,
     onRestore,
+    onPurge,
     restoring,
+    purging,
     disabled,
+    isAdmin,
 }: {
     item: TrashItem
     checked: boolean
     onToggle: () => void
     onRestore: () => void
+    onPurge: () => void
     restoring: boolean
+    purging: boolean
     disabled: boolean
+    isAdmin: boolean
 }) {
     const isFolder = item.type === 'folder'
     const meta = isFolder
@@ -431,6 +529,19 @@ function TrashRow({
                 {restoring ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
                 <span className="hidden sm:inline">Khôi phục</span>
             </button>
+
+            {isAdmin && (
+                <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={onPurge}
+                    className="inline-flex shrink-0 items-center justify-center rounded-lg px-2 py-1.5 text-zinc-400 transition-colors hover:bg-red-500/[0.12] hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
+                    title="Xóa vĩnh viễn"
+                    aria-label="Xóa vĩnh viễn"
+                >
+                    {purging ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                </button>
+            )}
         </li>
     )
 }

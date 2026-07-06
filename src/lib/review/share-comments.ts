@@ -21,6 +21,8 @@ import { annotationSchema, toAnnotationEnvelope, readAnnotationShapes } from './
 import { serializeComment, toUserRef, type CommentAttachmentDto, type CommentDto, type CommentReactionDto } from './dto'
 import { assertVersionInShare } from './share-guest'
 import type { ShareWithItems } from './share-auth'
+import { notifyReview, resolveTaskRecipients, reviewPlayerUrl } from './notify'
+import { auditReviewFeed } from './feed-audit'
 
 const MAX_BODY = 5000
 const MAX_ATTACHMENTS = 6
@@ -325,6 +327,36 @@ export async function createGuestComment(
         })
         return c
     })
+
+    // FR-G01: guest public comment → task feed + admin log ("Khách hàng {name} đã
+    // bình luận trên bản vN"). Actor null → renders "Khách hàng" in the feed.
+    void auditReviewFeed({
+        action: 'video.guest_commented',
+        workspaceId: asset.workspaceId,
+        taskId: asset.taskId,
+        assetId: asset.id,
+        actorUserId: null,
+        meta: { guestName: guest.name, versionNumber: version.versionNumber, excerpt: (body || '').slice(0, 120) },
+    })
+
+    // FR-G02: a guest public comment notifies the task assignee + profile admins
+    // (deep-link to the exact comment). Fire-and-forget — never block the guest.
+    void (async () => {
+        const rcpt = await resolveTaskRecipients(asset.taskId)
+        await notifyReview({
+            recipientIds: [rcpt.assigneeId, ...rcpt.adminUserIds],
+            type: 'VIDEO_COMMENT_NEW',
+            title: `${guest.name} đã bình luận trên bản v${version.versionNumber}`,
+            body: body ? body.slice(0, 140) : 'Đã gửi hình vẽ / ảnh đính kèm.',
+            taskId: asset.taskId,
+            deepLinkUrl: reviewPlayerUrl({
+                workspaceId: asset.workspaceId,
+                assetId: asset.id,
+                versionId: version.id,
+                commentId,
+            }),
+        })
+    })()
 
     const [dto] = await serializeGuestComments(share.slug, [created], version, guest)
     return { comment: dto }

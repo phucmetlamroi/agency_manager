@@ -410,7 +410,7 @@ function ReviewPlayerShellInner({
                             ) : null
                         ) : (
                             <div className="h-full overflow-auto">
-                                <InfoTab version={version} />
+                                <InfoTab version={version} assetId={assetId} />
                             </div>
                         )}
                     </div>
@@ -434,7 +434,28 @@ function TabBtn({ active, onClick, icon, children }: { active: boolean; onClick:
     )
 }
 
-function InfoTab({ version }: { version: VersionRow | null }) {
+interface StatusHistoryEntry {
+    id: string
+    label: string
+    actor: string
+    versionNumber: number | null
+    createdAt: string
+}
+
+function InfoTab({ version, assetId }: { version: VersionRow | null; assetId: string }) {
+    // FR-G04 "Lịch sử trạng thái": read the append-only status events for this stack.
+    const [history, setHistory] = useState<StatusHistoryEntry[]>([])
+    useEffect(() => {
+        let alive = true
+        fetch(`/api/review/assets/${assetId}/status-history`, { credentials: 'same-origin', cache: 'no-store' })
+            .then((r) => (r.ok ? r.json() : { entries: [] }))
+            .then((d: { entries?: StatusHistoryEntry[] }) => alive && setHistory(d.entries ?? []))
+            .catch(() => {})
+        return () => {
+            alive = false
+        }
+    }, [assetId])
+
     if (!version) return <div className="p-4 text-sm text-white/40">Không có thông tin.</div>
     const rows: [string, string][] = [
         ['Tên file', version.originalName],
@@ -448,15 +469,39 @@ function InfoTab({ version }: { version: VersionRow | null }) {
         ['Bình luận', String(version.commentCount)],
     ]
     return (
-        <dl className="divide-y divide-white/5">
-            {rows.map(([k, v]) => (
-                <div key={k} className="flex items-start justify-between gap-4 px-4 py-2.5">
-                    <dt className="text-xs text-white/40">{k}</dt>
-                    <dd className="max-w-[60%] truncate text-right text-sm text-white/85" title={v}>
-                        {v}
-                    </dd>
+        <div>
+            <dl className="divide-y divide-white/5">
+                {rows.map(([k, v]) => (
+                    <div key={k} className="flex items-start justify-between gap-4 px-4 py-2.5">
+                        <dt className="text-xs text-white/40">{k}</dt>
+                        <dd className="max-w-[60%] truncate text-right text-sm text-white/85" title={v}>
+                            {v}
+                        </dd>
+                    </div>
+                ))}
+            </dl>
+
+            {history.length > 0 && (
+                <div className="border-t border-white/5 px-4 py-3">
+                    <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-white/40">
+                        <Clock className="h-3 w-3" /> Lịch sử trạng thái
+                    </h4>
+                    <ol className="relative space-y-2 pl-3">
+                        {history.map((h) => (
+                            <li key={h.id} className="relative text-sm">
+                                <span className="absolute -left-3 top-1.5 h-1.5 w-1.5 rounded-full bg-indigo-400/70" />
+                                <div className="text-white/85">
+                                    {h.label}
+                                    {h.versionNumber != null && <span className="text-white/40"> · v{h.versionNumber}</span>}
+                                </div>
+                                <div className="text-[11px] text-white/40">
+                                    {h.actor} · {fmtDate(h.createdAt)}
+                                </div>
+                            </li>
+                        ))}
+                    </ol>
                 </div>
-            ))}
-        </dl>
+            )}
+        </div>
     )
 }

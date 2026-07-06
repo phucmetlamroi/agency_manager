@@ -73,6 +73,11 @@ export async function apiRestoreItems(items: ItemRef[]): Promise<RestoreResult> 
     return postJson('/api/review/trash/restore', { items: items.map((i) => ({ type: i.type, id: i.id })) })
 }
 
+/** P6.2 "Delete forever" — ADMIN-only permanent purge (Mux + R2 + rows). */
+export async function apiPurgeItems(items: ItemRef[]): Promise<{ versions: number; assets: number; folders: number }> {
+    return postJson('/api/review/trash/purge', { items: items.map((i) => ({ type: i.type, id: i.id })) })
+}
+
 export async function apiRenameFolder(id: string, name: string, rowVersion: number): Promise<FolderDto> {
     const res = await fetch(`/api/review/folders/${encodeURIComponent(id)}`, {
         method: 'PATCH',

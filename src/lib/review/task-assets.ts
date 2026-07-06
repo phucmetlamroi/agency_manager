@@ -19,6 +19,8 @@ export interface TaskDeliverableDto {
     taskId: string | null
     statusId: string | null
     currentVersion: VersionDto | null
+    /** Unresolved top-level comments on the current version (drives the drawer badge). */
+    unresolvedCommentCount: number
     createdAt: string
     updatedAt: string
 }
@@ -33,6 +35,8 @@ export interface TaskUploadContextDto {
 }
 
 export interface TaskAssetsResult {
+    /** The task's workspace — the client builds the player link `/{workspaceId}/admin/team/asset/{id}`. */
+    workspaceId: string
     assets: TaskDeliverableDto[]
     uploadContext: TaskUploadContextDto
 }
@@ -78,6 +82,18 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
         : []
     const uploaderById = new Map(uploaders.map((u) => [u.id, u]))
 
+    // Unresolved top-level comments per current version (one grouped query).
+    const curVersionIds = assetRows.map((a) => a.currentVersion?.id).filter((x): x is string => !!x)
+    const unresolvedByVersion = new Map<string, number>()
+    if (curVersionIds.length) {
+        const grouped = await prisma.reviewComment.groupBy({
+            by: ['versionId'],
+            where: { versionId: { in: curVersionIds }, parentId: null, resolvedAt: null, deletedAt: null },
+            _count: { _all: true },
+        })
+        for (const g of grouped) unresolvedByVersion.set(g.versionId, g._count._all)
+    }
+
     const assets: TaskDeliverableDto[] = assetRows.map((a) => {
         const v = a.currentVersion
         const currentVersion = v
@@ -92,6 +108,7 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
             taskId: a.taskId,
             statusId: a.statusId,
             currentVersion,
+            unresolvedCommentCount: v ? unresolvedByVersion.get(v.id) ?? 0 : 0,
             createdAt: a.createdAt.toISOString(),
             updatedAt: a.updatedAt.toISOString(),
         }
@@ -121,6 +138,7 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
     }
 
     return {
+        workspaceId,
         assets,
         uploadContext: { breadcrumb, parsedOk: parsed.matched, existingAsset },
     }

@@ -20,6 +20,8 @@ import {
     AlertTriangle,
     Pause,
     Play,
+    PlayCircle,
+    MessageSquare,
     X,
     RotateCcw,
     Clapperboard,
@@ -215,7 +217,7 @@ export function TaskReviewUploadSection({
 
             {/* persisted deliverable cards */}
             {serverCards.map((a) => (
-                <DeliverableCard key={a.assetId} asset={a} />
+                <DeliverableCard key={a.assetId} asset={a} workspaceId={data?.workspaceId ?? ''} />
             ))}
 
             {/* confirm strip after a pick (renders even before context loads) */}
@@ -432,9 +434,12 @@ const REVIEW_STATE: Record<ReviewStateDto, { label: string; cls: string }> = {
     approved: { label: 'Đã duyệt', cls: 'bg-emerald-500/15 text-emerald-300' },
 }
 
-function DeliverableCard({ asset }: { asset: TaskDeliverableDto }) {
+function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; workspaceId: string }) {
     const v = asset.currentVersion
     const status = v?.uploadStatus
+    const openReview = () => {
+        if (workspaceId) window.location.assign(`/${workspaceId}/admin/team/asset/${asset.assetId}`)
+    }
 
     // processing / uploaded (from another session) → transient
     if (!v || status === 'processing' || status === 'uploaded' || status === 'uploading') {
@@ -468,9 +473,16 @@ function DeliverableCard({ asset }: { asset: TaskDeliverableDto }) {
     // ready
     const rs = REVIEW_STATE[v.reviewState]
     const poster = v.media?.posterUrl
+    const unresolved = asset.unresolvedCommentCount
     return (
         <div className="mb-2 flex gap-3 rounded-xl border border-[rgba(139,92,246,0.15)] bg-white/[0.04] p-2.5">
-            <div className="relative aspect-video w-[112px] shrink-0 overflow-hidden rounded-lg bg-black/40">
+            <button
+                type="button"
+                onClick={openReview}
+                disabled={!workspaceId}
+                className="group relative aspect-video w-[112px] shrink-0 overflow-hidden rounded-lg bg-black/40 disabled:cursor-default"
+                aria-label="Mở review"
+            >
                 {poster ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -485,7 +497,12 @@ function DeliverableCard({ asset }: { asset: TaskDeliverableDto }) {
                         <Film size={20} />
                     </div>
                 )}
-            </div>
+                {workspaceId && (
+                    <span className="absolute inset-0 grid place-items-center bg-black/0 text-white/0 transition group-hover:bg-black/40 group-hover:text-white">
+                        <PlayCircle size={26} />
+                    </span>
+                )}
+            </button>
             <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-start gap-2">
                     <span className="flex-1 truncate text-[12.5px] font-medium text-zinc-100" title={asset.name}>
@@ -495,15 +512,30 @@ function DeliverableCard({ asset }: { asset: TaskDeliverableDto }) {
                         v{v.versionNumber}
                     </span>
                 </div>
-                <div className="mt-1">
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[10.5px] font-medium ${rs.cls}`}>
                         {rs.label}
                     </span>
+                    {unresolved > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10.5px] font-medium text-amber-300">
+                            <MessageSquare size={11} /> {unresolved} chưa xử lý
+                        </span>
+                    )}
                 </div>
-                <div className="mt-auto pt-1.5 text-[10.5px] text-zinc-500">
-                    {v.uploadedBy?.name ? `${v.uploadedBy.name} • ` : ''}
-                    {formatClock(v.createdAt)}
-                    {v.commentCount > 0 ? ` • ${v.commentCount} bình luận` : ''}
+                <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
+                    <span className="min-w-0 truncate text-[10.5px] text-zinc-500">
+                        {v.uploadedBy?.name ? `${v.uploadedBy.name} • ` : ''}
+                        {formatClock(v.createdAt)}
+                        {v.commentCount > 0 ? ` • ${v.commentCount} bình luận` : ''}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={openReview}
+                        disabled={!workspaceId}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#A855F7] disabled:opacity-50"
+                    >
+                        <PlayCircle size={13} /> Mở review
+                    </button>
                 </div>
             </div>
         </div>

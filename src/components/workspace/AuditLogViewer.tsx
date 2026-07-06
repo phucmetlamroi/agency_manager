@@ -37,6 +37,13 @@ const ACTION_LABELS: Record<string, string> = {
   'member.role_changed': 'Đổi vai trò',
   'auth.impersonation_started': 'Bắt đầu impersonate',
   'auth.impersonation_ended': 'Kết thúc impersonate',
+  // [Video Review P6.3] "Video review" event group in Nhật ký hoạt động (FR-G03).
+  'video.version_ready': 'Video review: bản dựng sẵn sàng',
+  'video.guest_commented': 'Video review: khách bình luận',
+  'video.share_created': 'Video review: tạo link chia sẻ',
+  'video.share_revoked': 'Video review: thu hồi link chia sẻ',
+  'task.client_approved': 'Video review: khách duyệt',
+  'task.client_changes_requested': 'Video review: khách yêu cầu chỉnh sửa',
 }
 
 function getActionLabel(action: string): string {

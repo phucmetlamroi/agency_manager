@@ -21,6 +21,8 @@ import { createAndBroadcastNotifications } from '@/actions/notification-actions'
 import { notifyReview, reviewPlayerUrl } from './notify'
 // P6.2 trash purge.
 import { purgeExpiredTrash } from './purge'
+// P6.3 activity feed bridge.
+import { auditReviewFeed } from './feed-audit'
 
 export const inngest = new Inngest({ id: 'hustlytasker-review' })
 
@@ -118,6 +120,15 @@ async function applyMuxReady(
             body: 'Video đã xử lý xong — mở review để xem và lấy link cho khách.',
             taskId: version.asset.taskId,
             deepLinkUrl: reviewPlayerUrl({ workspaceId: version.workspaceId, assetId: version.assetId, versionId }),
+        })
+        // FR-G01: "{editor} đã tải bản vN lên" into the task feed + admin log.
+        void auditReviewFeed({
+            action: 'video.version_ready',
+            workspaceId: version.workspaceId,
+            taskId: version.asset.taskId,
+            assetId: version.assetId,
+            actorUserId: version.uploaderId,
+            meta: { versionNumber: version.versionNumber },
         })
         return 'applied'
     }

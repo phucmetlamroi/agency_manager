@@ -15,6 +15,7 @@ import { requireReviewAccess } from './access'
 import { apiError } from './errors'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { toUserRef, type ItemType, type UserRef } from './dto'
+import { auditReviewFeed } from './feed-audit'
 
 const SLUG_LEN = 12
 const MAX_ITEMS = 20
@@ -224,6 +225,15 @@ export async function createShareLink(input: CreateShareInput): Promise<{ share:
             meta: { slug: created.slug },
         })
         return created
+    })
+    // FR-G01: "{user} đã tạo link review" into the task feed + admin log.
+    void auditReviewFeed({
+        action: 'video.share_created',
+        workspaceId: input.workspaceId,
+        taskId,
+        assetId: assets.length === 1 ? assets[0].id : null,
+        actorUserId: access.userId,
+        meta: { slug: share.slug },
     })
     return { share: await serializeShare(share) }
 }
@@ -447,6 +457,14 @@ export async function setShareRevoked(id: string, revoked: boolean): Promise<{ s
             meta: { slug: row.slug },
         })
         return u
+    })
+    // FR-G01: "{user} đã thu hồi/mở lại link review" into the task feed + admin log.
+    void auditReviewFeed({
+        action: 'video.share_revoked',
+        workspaceId: row.workspaceId,
+        taskId: row.taskId,
+        actorUserId: access.userId,
+        meta: { slug: row.slug, revoked },
     })
     return { share: await serializeShare(updated) }
 }

@@ -22,6 +22,7 @@ import { serializeComment, toUserRef, type CommentAttachmentDto, type CommentDto
 import { assertVersionInShare } from './share-guest'
 import type { ShareWithItems } from './share-auth'
 import { notifyReview, resolveTaskRecipients, reviewPlayerUrl } from './notify'
+import { auditReviewFeed } from './feed-audit'
 
 const MAX_BODY = 5000
 const MAX_ATTACHMENTS = 6
@@ -325,6 +326,17 @@ export async function createGuestComment(
             },
         })
         return c
+    })
+
+    // FR-G01: guest public comment → task feed + admin log ("Khách hàng {name} đã
+    // bình luận trên bản vN"). Actor null → renders "Khách hàng" in the feed.
+    void auditReviewFeed({
+        action: 'video.guest_commented',
+        workspaceId: asset.workspaceId,
+        taskId: asset.taskId,
+        assetId: asset.id,
+        actorUserId: null,
+        meta: { guestName: guest.name, versionNumber: version.versionNumber, excerpt: (body || '').slice(0, 120) },
     })
 
     // FR-G02: a guest public comment notifies the task assignee + profile admins

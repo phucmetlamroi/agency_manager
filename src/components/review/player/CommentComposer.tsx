@@ -10,7 +10,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Lock, Globe, Clock, X, Loader2, Send, PenLine, Brackets, Smile, ImagePlus, AlertTriangle } from 'lucide-react'
+import { Lock, Globe, Clock, X, Loader2, Send, PenLine, Brackets, Smile, ImagePlus, RotateCcw } from 'lucide-react'
 import { frameToSmpte, frameCount, type Fps } from '@/lib/review/timecode'
 import { createComment, type CommentDto } from '@/lib/review/comment-client'
 import { uploadCommentImage, validateImageFile, MAX_ATTACHMENTS, type UploadedAttachment } from '@/lib/review/comment-attachments'
@@ -21,6 +21,7 @@ const SS_KEY = 'review:composer:isInternal'
 
 interface PendingAttachment {
     localId: string
+    file: File
     previewUrl: string
     status: 'uploading' | 'done' | 'error'
     uploaded?: UploadedAttachment
@@ -156,8 +157,31 @@ export function CommentComposer({
         })
     }
 
+    const startUpload = (localId: string, file: File) => {
+        const ctrl = new AbortController()
+        setAttachments((prev) =>
+            prev.map((a) => (a.localId === localId ? { ...a, status: 'uploading', error: undefined, ctrl } : a)),
+        )
+        uploadCommentImage(file, ctrl.signal)
+            .then((up) =>
+                setAttachments((prev) =>
+                    prev.map((a) => (a.localId === localId ? { ...a, status: 'done', uploaded: up, ctrl: undefined } : a)),
+                ),
+            )
+            .catch((e) => {
+                if (ctrl.signal.aborted) return // removed / retried by the user mid-flight
+                setAttachments((prev) =>
+                    prev.map((a) =>
+                        a.localId === localId
+                            ? { ...a, status: 'error', error: e instanceof Error ? e.message : 'Lỗi', ctrl: undefined }
+                            : a,
+                    ),
+                )
+            })
+    }
+
     const addFiles = (files: FileList | null) => {
-        if (!files || files.length === 0) return
+        if (submitting || !files || files.length === 0) return // no adds mid-send
         const room = MAX_ATTACHMENTS - attachments.length
         if (room <= 0) {
             alert(`Tối đa ${MAX_ATTACHMENTS} ảnh mỗi bình luận.`)
@@ -173,25 +197,14 @@ export function CommentComposer({
             }
             const localId = String(++localIdRef.current)
             const previewUrl = URL.createObjectURL(file)
-            const ctrl = new AbortController()
-            setAttachments((prev) => [...prev, { localId, previewUrl, status: 'uploading', ctrl }])
-            uploadCommentImage(file, ctrl.signal)
-                .then((up) =>
-                    setAttachments((prev) =>
-                        prev.map((a) => (a.localId === localId ? { ...a, status: 'done', uploaded: up, ctrl: undefined } : a)),
-                    ),
-                )
-                .catch((e) => {
-                    if (ctrl.signal.aborted) return // removed by the user mid-flight
-                    setAttachments((prev) =>
-                        prev.map((a) =>
-                            a.localId === localId
-                                ? { ...a, status: 'error', error: e instanceof Error ? e.message : 'Lỗi', ctrl: undefined }
-                                : a,
-                        ),
-                    )
-                })
+            setAttachments((prev) => [...prev, { localId, file, previewUrl, status: 'uploading' }])
+            startUpload(localId, file)
         }
+    }
+
+    const retryAttachment = (localId: string) => {
+        const a = attachments.find((x) => x.localId === localId)
+        if (a) startUpload(localId, a.file)
     }
 
     const removeAttachment = (localId: string) => {
@@ -220,10 +233,13 @@ export function CommentComposer({
         annotation?.begin(f)
     }
 
-    const uploading = attachments.some((a) => a.status === 'uploading')
     const doneAttachments = attachments.filter((a): a is PendingAttachment & { uploaded: UploadedAttachment } => a.status === 'done' && !!a.uploaded)
+    // Block send while ANY attachment is unresolved (uploading OR errored) — otherwise a
+    // failed image would be silently dropped from the payload and wiped on success. The
+    // user must retry or remove it first.
+    const pendingAttach = attachments.some((a) => a.status !== 'done')
     const canSend =
-        (!!body.trim() || (annoActive && annoCount > 0) || doneAttachments.length > 0) && !uploading
+        (!!body.trim() || (annoActive && annoCount > 0) || doneAttachments.length > 0) && !pendingAttach
 
     const submit = async () => {
         if (!canSend || submitting) return
@@ -247,7 +263,7 @@ export function CommentComposer({
             setBody('')
             setFrozenFrame(null)
             setRangeEnd(null)
-            attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl))
+            attachRef.current.forEach((a) => URL.revokeObjectURL(a.previewUrl)) // latest, not the stale closure
             setAttachments([])
             annotation?.reset()
             if (isReply) onCancel?.()
@@ -369,9 +385,14 @@ export function CommentComposer({
                                 </div>
                             )}
                             {a.status === 'error' && (
-                                <div className="absolute inset-0 grid place-items-center bg-red-900/60" title={a.error}>
-                                    <AlertTriangle className="h-4 w-4 text-red-200" />
-                                </div>
+                                <button
+                                    onClick={() => retryAttachment(a.localId)}
+                                    className="absolute inset-0 grid place-items-center bg-red-900/60 hover:bg-red-900/80"
+                                    title={`${a.error ?? 'Lỗi'} — bấm để thử lại`}
+                                    aria-label="Thử lại"
+                                >
+                                    <RotateCcw className="h-4 w-4 text-red-100" />
+                                </button>
                             )}
                             <button
                                 onClick={() => removeAttachment(a.localId)}
@@ -421,7 +442,7 @@ export function CommentComposer({
                 <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    disabled={attachments.length >= MAX_ATTACHMENTS}
+                    disabled={attachments.length >= MAX_ATTACHMENTS || submitting}
                     className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80 disabled:opacity-30"
                     aria-label="Đính kèm ảnh"
                     title={`Đính kèm ảnh (tối đa ${MAX_ATTACHMENTS}, mỗi ảnh ≤10MB)`}

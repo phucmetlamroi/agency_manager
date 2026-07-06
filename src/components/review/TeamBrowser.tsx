@@ -30,6 +30,7 @@ import {
 } from 'react'
 import { toast } from 'sonner'
 import * as Dialog from '@radix-ui/react-dialog'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
     Clapperboard,
     Folder as FolderIcon,
@@ -42,6 +43,7 @@ import {
     UploadCloud,
     FolderPlus,
     Trash2,
+    MoreHorizontal,
 } from 'lucide-react'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
 import {
@@ -64,6 +66,7 @@ import {
     apiDeleteItems,
     apiRenameFolder,
     apiRenameAsset,
+    apiRestoreItems,
     downloadVersion,
     downloadFolder,
     teamFolderUrl,
@@ -690,6 +693,23 @@ export function TeamBrowser({
         [folderById],
     )
 
+    // Restore just-deleted items (5s Undo affordance on the delete toast — TRS-01).
+    const undoDelete = useCallback(
+        async (items: ItemRef[]) => {
+            const tid = toast.loading('Đang hoàn tác…')
+            try {
+                await apiRestoreItems(items)
+                for (const it of items) removedRef.current.delete(it.id)
+                toast.success('Đã hoàn tác.', { id: tid })
+                silentReplace()
+                void refreshTree()
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Không hoàn tác được.', { id: tid })
+            }
+        },
+        [silentReplace, refreshTree],
+    )
+
     const doDeleteConfirmed = useCallback(async () => {
         if (!confirmState) return
         const items = confirmState.items
@@ -698,14 +718,18 @@ export function TeamBrowser({
         try {
             await apiDeleteItems(items)
             for (const it of items) removedRef.current.add(it.id) // suppress until silentReplace confirms
-            toast.success('Đã chuyển vào thùng rác.', { id: tid })
+            toast.success('Đã chuyển vào “Đã xóa gần đây”.', {
+                id: tid,
+                duration: 6000,
+                action: { label: 'Hoàn tác', onClick: () => void undoDelete(items) },
+            })
             clearSelection()
             silentReplace()
             void refreshTree()
         } catch (e) {
             toast.error(e instanceof Error ? e.message : 'Xóa thất bại.', { id: tid })
         }
-    }, [confirmState, clearSelection, silentReplace, refreshTree])
+    }, [confirmState, clearSelection, silentReplace, refreshTree, undoDelete])
 
     /* ---- rename ---- */
     const startRename = useCallback((id: string) => {
@@ -929,30 +953,7 @@ export function TeamBrowser({
                 <section className="flex min-w-0 flex-1 flex-col">
                     {/* breadcrumb header */}
                     <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
-                        <nav className="flex min-w-0 items-center gap-1 text-[13px]">
-                            {trail.map((c, i) => {
-                                const last = i === trail.length - 1
-                                return (
-                                    <span key={`${c.id ?? 'root'}-${i}`} className="flex min-w-0 items-center gap-1">
-                                        {i > 0 && <ChevronRight size={13} className="shrink-0 text-zinc-600" />}
-                                        {last ? (
-                                            <span className="truncate font-semibold text-zinc-100" title={c.name}>
-                                                {c.name}
-                                            </span>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => go(c.id)}
-                                                className="max-w-[180px] truncate text-zinc-400 transition-colors hover:text-violet-300"
-                                                title={c.name}
-                                            >
-                                                {c.name}
-                                            </button>
-                                        )}
-                                    </span>
-                                )
-                            })}
-                        </nav>
+                        <BreadcrumbTrail trail={trail} onNavigate={go} />
                         {currentFolder && (
                             <div className="hidden shrink-0 items-center gap-3 text-[11px] text-zinc-500 sm:flex">
                                 <span>{data?.summary.folderCount ?? 0} thư mục</span>
@@ -1194,6 +1195,90 @@ function ConfirmModal({
                 </Dialog.Content>
             </Dialog.Portal>
         </Dialog.Root>
+    )
+}
+
+/* ── breadcrumb (collapses the middle to a "…" dropdown for deep paths — FR-B02 AC1) ── */
+
+function BreadcrumbTrail({
+    trail,
+    onNavigate,
+}: {
+    trail: { id: string | null; name: string }[]
+    onNavigate: (id: string | null) => void
+}) {
+    const COLLAPSE_AFTER = 4
+    const Sep = () => <ChevronRight size={13} className="shrink-0 text-zinc-600" />
+    const Crumb = ({ c, last }: { c: { id: string | null; name: string }; last: boolean }) =>
+        last ? (
+            <span className="truncate font-semibold text-zinc-100" title={c.name}>
+                {c.name}
+            </span>
+        ) : (
+            <button
+                type="button"
+                onClick={() => onNavigate(c.id)}
+                className="max-w-[180px] truncate text-zinc-400 transition-colors hover:text-violet-300"
+                title={c.name}
+            >
+                {c.name}
+            </button>
+        )
+
+    if (trail.length <= COLLAPSE_AFTER) {
+        return (
+            <nav className="flex min-w-0 items-center gap-1 text-[13px]">
+                {trail.map((c, i) => (
+                    <span key={`${c.id ?? 'root'}-${i}`} className="flex min-w-0 items-center gap-1">
+                        {i > 0 && <Sep />}
+                        <Crumb c={c} last={i === trail.length - 1} />
+                    </span>
+                ))}
+            </nav>
+        )
+    }
+
+    // Deep path: first · "…" (hidden middle in a dropdown) · parent · current.
+    const first = trail[0]
+    const hidden = trail.slice(1, trail.length - 2)
+    const tail = trail.slice(trail.length - 2)
+    return (
+        <nav className="flex min-w-0 items-center gap-1 text-[13px]">
+            <Crumb c={first} last={false} />
+            <Sep />
+            <DropdownMenu.Root>
+                <DropdownMenu.Trigger
+                    className="flex h-6 items-center rounded px-1 text-zinc-400 outline-none transition-colors hover:bg-white/[0.06] hover:text-violet-300"
+                    aria-label="Các cấp thư mục ẩn"
+                >
+                    <MoreHorizontal size={15} />
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                        align="start"
+                        className="z-50 max-h-[320px] min-w-[180px] overflow-y-auto rounded-xl border border-white/10 bg-zinc-950/95 p-1 text-zinc-200 shadow-2xl shadow-black/60 backdrop-blur-xl"
+                    >
+                        {hidden.map((c, i) => (
+                            <DropdownMenu.Item
+                                key={`${c.id ?? 'h'}-${i}`}
+                                onSelect={() => onNavigate(c.id)}
+                                className="flex cursor-pointer items-center gap-2 truncate rounded-lg px-2.5 py-[7px] text-[12.5px] outline-none data-[highlighted]:bg-violet-500/15 data-[highlighted]:text-white"
+                                style={{ paddingLeft: 10 + i * 10 }}
+                            >
+                                <FolderIcon size={13} className="shrink-0 text-zinc-500" />
+                                <span className="truncate">{c.name}</span>
+                            </DropdownMenu.Item>
+                        ))}
+                    </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+            {tail.map((c, i) => (
+                <span key={`${c.id ?? 'root'}-t${i}`} className="flex min-w-0 items-center gap-1">
+                    <Sep />
+                    <Crumb c={c} last={i === tail.length - 1} />
+                </span>
+            ))}
+        </nav>
     )
 }
 

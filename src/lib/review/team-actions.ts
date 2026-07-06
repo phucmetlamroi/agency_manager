@@ -65,6 +65,14 @@ export async function apiDeleteItems(items: ItemRef[]): Promise<{ purgeAt: strin
     return postJson('/api/review/items/delete', { items: items.map((i) => ({ type: i.type, id: i.id })) })
 }
 
+export interface RestoreResult {
+    restored: { type: ItemKind; id: string; restoredToFolderId: string | null; movedToRoot: boolean }[]
+}
+
+export async function apiRestoreItems(items: ItemRef[]): Promise<RestoreResult> {
+    return postJson('/api/review/trash/restore', { items: items.map((i) => ({ type: i.type, id: i.id })) })
+}
+
 export async function apiRenameFolder(id: string, name: string, rowVersion: number): Promise<FolderDto> {
     const res = await fetch(`/api/review/folders/${encodeURIComponent(id)}`, {
         method: 'PATCH',

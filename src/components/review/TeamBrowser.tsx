@@ -971,6 +971,13 @@ export function TeamBrowser({
                             <SortMenu sortField={sortField} sortDir={sortDir} onChange={updatePrefs} />
                         </div>
                         <div className="flex items-center gap-1.5">
+                            <a
+                                href={`/${workspaceId}/admin/team/trash`}
+                                title="Thùng rác"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
+                            >
+                                <Trash2 size={15} />
+                            </a>
                             <button
                                 type="button"
                                 onClick={reload}

@@ -417,10 +417,15 @@ export function TeamBrowser({
         [sortField, sortDir, updatePrefs],
     )
 
-    const openAsset = useCallback((asset: AssetDto) => {
-        if (asset.mediaKind === 'image') toast('Trình xem ảnh sẽ có ở bản sau.')
-        else toast('Trình xem video sẽ có ở bản sau.')
-    }, [])
+    // Open the full-page review player (P4). Handles both video and image assets.
+    const openAsset = useCallback(
+        (asset: AssetDto) => {
+            if (typeof window !== 'undefined') {
+                window.location.assign(`/${workspaceId}/admin/team/asset/${asset.id}`)
+            }
+        },
+        [workspaceId],
+    )
 
     /* ---- P2.4: upload + new folder ---- */
     const filesInputRef = useRef<HTMLInputElement>(null)

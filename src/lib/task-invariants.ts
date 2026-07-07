@@ -10,6 +10,8 @@
  * invariant manually → không cần gọi helper này.
  */
 
+import { REVIEW_PHASE_STATUSES } from './task-statuses'
+
 const QUEUE_STATUS = 'Đang đợi giao'
 const DEFAULT_ASSIGNED_STATUS = 'Nhận task'
 
@@ -113,8 +115,14 @@ export function isAssigneeStatusConsistent(
 /*    - task-management-actions.ts updateTask (superadmin)                */
 /* ════════════════════════════════════════════════════════════════════════ */
 
-/** Status nào yêu cầu deadline=null (per Sprint A spec). */
-export const STATUS_REQUIRES_NULL_DEADLINE = ['Revision', 'Hoàn tất'] as const
+/**
+ * Status nào yêu cầu deadline=null. [Owner 2026-07-08] Mở rộng: MỌI status thuộc phase review
+ * (internal_review + client_review = 2 tab "Duyệt nội bộ" + "Khách duyệt" = Revision + A2..A7) phải
+ * clear deadline khi task bước vào — task đang chờ reviewer (admin/khách) thì không còn deadline để
+ * bị flag "quá hạn". Cộng 'Hoàn tất' (done). Vì task-sync.ts + updateTaskStatus + các bulk path đều
+ * dùng hằng này, việc mở rộng ở đây tự động clear deadline trên MỌI đường vào (thủ công + auto F7–F10).
+ */
+export const STATUS_REQUIRES_NULL_DEADLINE: string[] = [...REVIEW_PHASE_STATUSES, 'Hoàn tất']
 
 /**
  * Enforce status → deadline=null invariant.

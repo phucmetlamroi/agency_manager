@@ -7,6 +7,7 @@ import * as Popover from '@radix-ui/react-popover'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
 import { taskTypeLabel } from '@/lib/display-labels'
+import { isReviewPhaseStatus } from '@/lib/task-statuses'
 
 // ─── Status palette aligned với design-system ─────────────────
 // emerald=success, indigo=pending, amber=in-progress, red=urgent
@@ -59,6 +60,7 @@ export default function MobileTaskCard({
     const isOverdue = task.deadline
         && new Date() > new Date(task.deadline)
         && !['Hoàn tất', 'Đã hủy', 'Quá hạn', 'Tạm ngưng'].includes(task.status)
+        && !isReviewPhaseStatus(task.status) // [Owner 2026-07-08] review-phase (2 tab duyệt) không tính quá hạn
 
     const clientLabel = formatClientHierarchy(task.client)
 

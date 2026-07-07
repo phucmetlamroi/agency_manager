@@ -127,6 +127,23 @@ export const SALARY_COMPLETED_STATUS: TaskStatus = TASK_STATUS_META.find(m => m.
  */
 export const OVERDUE_ELIGIBLE_STATUSES: string[] = TASK_STATUS_META.filter(m => m.cronOverdueEligible).map(m => m.value)
 
+/**
+ * Statuses in the internal-review or client-review phase — i.e. exactly the tasks shown under the
+ * "Duyệt nội bộ" (A2/A3/A4 + Revision) and "Khách duyệt" (A5/A6/A7) board tabs. A task here is waiting
+ * on a reviewer (admin or client), so it has NO active deadline and must never be shown/counted as
+ * overdue. Owner rule (2026-07-08): the trigger is the TAB/phase, not any single status. DERIVED from
+ * the phase meta so it stays correct if statuses are added/removed. Consumed by STATUS_REQUIRES_NULL_DEADLINE
+ * (clears the deadline on entry) + the board overdue-badge suppression.
+ */
+export const REVIEW_PHASE_STATUSES: string[] = TASK_STATUS_META
+    .filter(m => m.phase === 'internal_review' || m.phase === 'client_review')
+    .map(m => m.value)
+
+/** True when a task's status sits in the internal/client review phase (the two review tabs). */
+export function isReviewPhaseStatus(status: string | null | undefined): boolean {
+    return !!status && REVIEW_PHASE_STATUSES.includes(status)
+}
+
 /** Lifecycle phase → the EN label a client sees for any internalOnly status in it. */
 export const PHASE_CLIENT_LABEL: Record<TaskStatusPhase, string> = {
     production: 'In progress',

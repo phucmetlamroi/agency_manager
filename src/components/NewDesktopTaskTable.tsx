@@ -16,6 +16,7 @@ import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { parseDuration, formatDuration } from '@/lib/duration-parser'
 import { returnTask } from '@/actions/claim-actions'
 import { taskTypeShort } from '@/lib/display-labels'
+import { isReviewPhaseStatus } from '@/lib/task-statuses'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -230,6 +231,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
     const getDeadlineColor = (deadline: Date | null, status: string) => {
         if (!deadline) return '#3F3F46'
         if (status === 'Hoàn tất') return '#A1A1AA'
+        if (isReviewPhaseStatus(status)) return '#A1A1AA' // [Owner 2026-07-08] review-phase → không tô đỏ
         const diff = (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60)
         if (diff <= 0) return '#EF4444'
         if (diff < 24) return '#EF4444'
@@ -497,7 +499,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                     const taskTags = (task as any).taskTags as { tagCategory: { id: string; name: string } }[] | undefined
                     const duration = (task as any).duration as string | null | undefined
                     const claimSource = (task as any).claimSource
-                    const isOverdue = task.deadline && task.status !== 'Hoàn tất' && new Date(task.deadline).getTime() < Date.now()
+                    const isOverdue = task.deadline && task.status !== 'Hoàn tất' && !isReviewPhaseStatus(task.status) && new Date(task.deadline).getTime() < Date.now()
 
                     return (
                         <div

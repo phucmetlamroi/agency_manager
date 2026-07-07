@@ -14,6 +14,7 @@
     "dev:electron": "cross-env ELECTRON_DESKTOP=1 next dev",
     "test:invite-security": "tsx scripts/test-invite-security.ts",
     "test:status-meta": "tsx scripts/test-status-meta-snapshot.ts",
+    "test:portal-derive": "tsx scripts/test-portal-derive.ts",
     "test:folder-scope": "tsx scripts/test-folder-scope.ts",
     "test:folder-scope-db": "tsx scripts/test-folder-scope-db.ts"
   },

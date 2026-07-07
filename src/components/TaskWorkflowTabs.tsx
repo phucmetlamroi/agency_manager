@@ -40,6 +40,13 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     // không bao gồm → task overdue bị "thất lạc" khỏi mọi tab.
     'Quá hạn':      { label: 'Quá hạn',      color: '#DC2626' },
     'Đã hủy':       { label: 'Đã hủy',       color: '#52525B' },
+    // [P3/F2] 6 video-lifecycle statuses (A2–A7).
+    'Đã nộp video (nội bộ)':      { label: 'Đã nộp video (nội bộ)',      color: '#6366F1' },
+    'Đang sửa feedback (nội bộ)': { label: 'Đang sửa feedback (nội bộ)', color: '#F59E0B' },
+    'Đã sửa feedback (nội bộ)':   { label: 'Đã sửa feedback (nội bộ)',   color: '#14B8A6' },
+    'Đã gửi video (khách)':       { label: 'Đã gửi video (khách)',       color: '#06B6D4' },
+    'Đã nhận feedback (khách)':   { label: 'Đã nhận feedback (khách)',   color: '#EF4444' },
+    'Đã sửa feedback (khách)':    { label: 'Đã sửa feedback (khách)',    color: '#8B5CF6' },
 }
 
 const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }> = {
@@ -50,7 +57,11 @@ const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }>
 const TYPE_DEFAULT = { bg: 'rgba(161,161,170,0.10)', color: '#A1A1AA', border: 'rgba(161,161,170,0.20)' }
 
 // ─── TAB CONFIG (Neon Purple Dark) ─────────────────────────
-type TabId = 'all' | 'progress' | 'review' | 'overdue' | 'done'
+// [P3/F2 §7 + E2 gộp-phase] "Chưa giao" → "Đã giao task" (đúng 1 chỗ label này; KHÔNG
+// blind-rename chuỗi "Chưa giao" 7 nơi khác nghĩa "chưa có assignee"). 6 status video mới
+// gộp theo phase: internal_review (A2/A3/A4) vào tab "Duyệt nội bộ"; client_review
+// (A5/A6/A7) vào tab "Khách duyệt" mới — task video không còn "thất lạc" khỏi board.
+type TabId = 'all' | 'progress' | 'internal' | 'client' | 'overdue' | 'done'
 
 interface TabConfig {
     id: TabId
@@ -62,13 +73,14 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-    { id: 'all',      label: 'Chưa giao',       statuses: ['Nhận task', 'Đã nhận task', 'Tạm ngưng'],                    color: '#8B5CF6', targetStatus: null },
+    { id: 'all',      label: 'Đã giao task',    statuses: ['Nhận task', 'Đã nhận task', 'Tạm ngưng'],             color: '#8B5CF6', targetStatus: null },
     { id: 'progress', label: 'Đang làm',        statuses: ['Đang thực hiện'],                                     color: '#EAB308', targetStatus: 'Đang thực hiện' },
-    { id: 'review',   label: 'Sửa lại',          statuses: ['Revision', 'Sửa frame', 'Gửi lại'],              color: '#F97316', targetStatus: 'Revision' },
-    // Tab "Quá hạn" mới: task bị cron tự động set status='Quá hạn' khi deadline
-    // qua. Trước đây không có tab này → task overdue bị "thất lạc" khỏi UI.
+    { id: 'internal', label: 'Duyệt nội bộ',    statuses: ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Revision', 'Sửa frame'], color: '#F97316', targetStatus: 'Revision' },
+    { id: 'client',   label: 'Khách duyệt',     statuses: ['Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)', 'Gửi lại'], color: '#06B6D4', targetStatus: null },
+    // Tab "Quá hạn": task bị cron set status='Quá hạn'. Task video (cronOverdueEligible=false)
+    // KHÔNG bị cron đè status — chúng vẫn hiện badge "QUÁ HẠN" derive ở tab phase của mình.
     { id: 'overdue',  label: 'Quá hạn',         statuses: ['Quá hạn'],                                            color: '#DC2626', targetStatus: 'Quá hạn' },
-    { id: 'done',     label: 'Hoàn tất',        statuses: ['Hoàn tất'],                                   color: '#10B981', targetStatus: 'Hoàn tất' },
+    { id: 'done',     label: 'Hoàn tất',        statuses: ['Hoàn tất'],                                           color: '#10B981', targetStatus: 'Hoàn tất' },
 ]
 
 const PER_PAGE = 8

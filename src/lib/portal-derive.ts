@@ -1,34 +1,35 @@
 /**
- * [Client Portal → extracted 2026-06] Pure status-derivation helpers shared
- * by the (removed) account portal and the public share-link portal. Moved
- * out of client-portal-actions.ts so share-portal-actions.ts keeps the exact
- * same client-facing status semantics after the account portal is deleted.
+ * [Client Portal → extracted 2026-06 · rewritten P3/F2] Pure status-derivation helpers
+ * shared by the public share-link portal. As of P3 these read the CENTRAL TASK_STATUS_META
+ * (an explicit value→label map with an `internalOnly` flag) instead of substring matching.
+ * The substring version broke on the 6 new video statuses — e.g. 'Đã nhận feedback (khách)'
+ * contains "nhận" → wrongly "Received"; 'Đã nộp video (nội bộ)' matched nothing → leaked the
+ * default. The 11 legacy labels are UNCHANGED (regression K3).
  */
+
+import { TASK_STATUS_META, PHASE_CLIENT_LABEL } from './task-statuses'
+
+const META_BY_VALUE = new Map(TASK_STATUS_META.map((m) => [m.value as string, m]))
 
 /**
- * [Redesign] Maps each REAL admin task status to a faithful client-facing
- * English label (mirroring the admin status vocabulary instead of the old
- * lossy 5-state abstraction). Purely-internal staffing states are folded:
- *   - 'Đang đợi giao' (not-yet-assigned)  → "In production"
- *   - 'Sửa frame' (internal frame fix)    → "In progress"
- *   - 'Quá hạn' (cron overdue flag)       → "In progress" (don't surface "Delayed")
- *   - 'Đã hủy' (cancelled)                → "Closed" (excluded from lists upstream)
- * Order matters — most-specific substrings first.
+ * The EN label a CLIENT sees for a given internal status. `internalOnly` statuses (every
+ * "(nội bộ)" step + the editor-only client fix) fall back to the PHASE label so the raw VI
+ * string never leaks. Unknown statuses default to a safe 'In progress' (never the VI value).
  */
-export function mapClientTaskStatus(internalStatus: string): string {
-    const s = (internalStatus || '').toLowerCase()
+export function clientLabelOf(status: string): string {
+    const m = META_BY_VALUE.get(status)
+    if (!m) return 'In progress'
+    return m.internalOnly ? PHASE_CLIENT_LABEL[m.phase] : m.clientLabel
+}
 
-    if (s.includes('hoàn tất') || s.includes('lưu trữ')) return 'Completed'
-    if (s.includes('hủy')) return 'Closed'
-    if (s.includes('revision')) return 'In revision'
-    if (s.includes('gửi lại')) return 'Revisions delivered'
-    if (s.includes('sửa')) return 'In progress'        // 'Sửa frame' (internal) folded
-    if (s.includes('tạm ng')) return 'On hold'          // 'Tạm ngưng'
-    if (s.includes('quá hạn')) return 'In progress'     // soften — don't show "Delayed"
-    if (s.includes('thực hiện')) return 'In progress'
-    if (s.includes('nhận')) return 'Received'           // 'Nhận task' / 'Đã nhận task'
-    if (s.includes('đợi')) return 'In production'       // 'Đang đợi giao' (pre-assignment)
-    return 'Received'
+/** Back-compat alias — same signature/name the portal actions already import. */
+export function mapClientTaskStatus(internalStatus: string): string {
+    return clientLabelOf(internalStatus || '')
+}
+
+/** Whether a status is one the client must NOT see the raw VI string for. */
+export function isInternalOnlyStatus(status: string): boolean {
+    return META_BY_VALUE.get(status)?.internalOnly ?? false
 }
 
 /**
@@ -51,7 +52,15 @@ export function deriveClientStatus(status: string, clientReview?: string | null)
 export function deriveNeedsYou(t: { status: string; productLink?: string | null; clientReview?: string | null }): boolean {
     if (t.clientReview === 'AWAITING') return true
     if (t.clientReview === 'APPROVED' || t.clientReview === 'CHANGES') return false
+    // [P3/F2] A5 = admin approved & sent to the client → client action needed even before
+    // the P4 portal bridge sets clientReview='AWAITING'.
+    if (needsClientAction(t.status)) return true
     const s = (t.status || '').toLowerCase()
     const done = s.includes('hoàn tất') || s.includes('lưu trữ') || s.includes('hủy')
     return !!t.productLink && !done
+}
+
+/** [P3/F2 §6.2] The status where the ball is in the CLIENT's court (drives "Approve"). */
+export function needsClientAction(status: string): boolean {
+    return status === 'Đã gửi video (khách)'
 }

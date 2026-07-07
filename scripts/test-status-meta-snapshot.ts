@@ -21,23 +21,36 @@
 import * as TaskStatuses from '../src/lib/task-statuses'
 import * as McpStatuses from '../mcp-server/src/services/statuses'
 
-/* ── FROZEN contract — hand-copied from the pre-refactor constants. If any value
- *    here must ever change, that is a DELIBERATE payroll decision that MUST be
- *    reviewed, never a silent side effect of adding statuses. ─────────────────── */
-const FROZEN_VALID_11 = [
+/* ── FROZEN contract. P3 added the 6 video statuses (A2–A7): VALID 11→17, salary-pending
+ *    6→12. The R1 money-safety invariant still holds — the 6 ORIGINAL pending are kept,
+ *    the 3 non-pending traps stay excluded, salaryCompleted stays exactly 'Hoàn tất'. Any
+ *    change here is a DELIBERATE payroll decision, never a silent side effect. ─────────── */
+const FROZEN_VIDEO_6 = [
+  'Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)',
+  'Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)',
+]
+const FROZEN_VALID_17 = [
   'Đang đợi giao', 'Nhận task', 'Đã nhận task', 'Đang thực hiện', 'Revision',
   'Sửa frame', 'Gửi lại', 'Tạm ngưng', 'Quá hạn', 'Hoàn tất', 'Đã hủy',
+  ...FROZEN_VIDEO_6,
 ]
-const FROZEN_PENDING_6 = [
+// The 6 ORIGINAL salary-pending (R1 anchor) — must remain a SUBSET of pending forever.
+const FROZEN_PENDING_ORIGINAL_6 = [
   'Nhận task', 'Đang đợi giao', 'Đang thực hiện', 'Revision', 'Gửi lại', 'Sửa frame',
 ]
+// The full P3 pending set = the original 6 + all 6 video statuses.
+const FROZEN_PENDING_12 = [...FROZEN_PENDING_ORIGINAL_6, ...FROZEN_VIDEO_6]
 const FROZEN_COMPLETED = 'Hoàn tất'
 const FROZEN_TERMINAL = ['Hoàn tất', 'Đã hủy']
 // Non-terminal-ish statuses that are deliberately NOT salary-pending. A naive
 // "non-terminal ⇒ pending" derivation would wrongly include these → underpay guard.
 const FROZEN_NOT_PENDING_TRAPS = ['Đã nhận task', 'Tạm ngưng', 'Quá hạn']
-// Statuses the cron (check-deadline) must NOT flip to 'Quá hạn' — today's deny-list.
-const FROZEN_OVERDUE_INELIGIBLE = ['Hoàn tất', 'Đã hủy', 'Quá hạn']
+// Statuses the cron (check-deadline) must NOT flip to 'Quá hạn'. P3: the 3 legacy
+// terminal/overdue values PLUS the 6 video statuses (excluded so the cron can't wipe the
+// video lifecycle context — schema is frozen, so no overdueAt column; badge is derived).
+const FROZEN_OVERDUE_INELIGIBLE = ['Hoàn tất', 'Đã hủy', 'Quá hạn', ...FROZEN_VIDEO_6]
+// The 6 video statuses are the ONLY auto-transition targets (F7–F10).
+const FROZEN_TRANSITION_TARGETS = [...FROZEN_VIDEO_6]
 
 type MetaRow = {
   value: string
@@ -48,12 +61,16 @@ type MetaRow = {
   cronOverdueEligible: boolean
   phase: string
   order: number
+  clientLabel: string
 }
 
 const VALID = [...TaskStatuses.VALID_TASK_STATUSES] as string[]
 const PENDING = TaskStatuses.SALARY_PENDING_STATUSES as string[]
 const COMPLETED = TaskStatuses.SALARY_COMPLETED_STATUS as string
 const META = (TaskStatuses as { TASK_STATUS_META?: readonly MetaRow[] }).TASK_STATUS_META
+
+const OVERDUE_ELIGIBLE = (TaskStatuses as { OVERDUE_ELIGIBLE_STATUSES?: string[] }).OVERDUE_ELIGIBLE_STATUSES
+const TRANSITIONS = (TaskStatuses as { STATUS_TRANSITIONS?: Record<string, string[]> }).STATUS_TRANSITIONS
 
 const MCP_VALID = [...McpStatuses.VALID_TASK_STATUSES] as string[]
 const MCP_PENDING = McpStatuses.SALARY_PENDING_STATUSES as string[]
@@ -74,11 +91,18 @@ function setEq(a: readonly string[], b: readonly string[]): boolean {
   return true
 }
 
-console.log('\n[1] Money constants pinned to frozen contract (runs pre- AND post-refactor)')
-check('VALID_TASK_STATUSES length === 11', VALID.length === 11, `got ${VALID.length}`)
-check('VALID_TASK_STATUSES === frozen 11 (set)', setEq(VALID, FROZEN_VALID_11))
-check('SALARY_PENDING_STATUSES length === 6', PENDING.length === 6, `got ${PENDING.length}`)
-check('SALARY_PENDING_STATUSES === frozen 6 (set)', setEq(PENDING, FROZEN_PENDING_6))
+console.log('\n[1] Money constants pinned to frozen contract (P3: 17 values, 12 pending)')
+check('VALID_TASK_STATUSES length === 17', VALID.length === 17, `got ${VALID.length}`)
+check('VALID_TASK_STATUSES === frozen 17 (set)', setEq(VALID, FROZEN_VALID_17))
+check('SALARY_PENDING_STATUSES length === 12', PENDING.length === 12, `got ${PENDING.length}`)
+check('SALARY_PENDING_STATUSES === frozen 12 (set)', setEq(PENDING, FROZEN_PENDING_12))
+// R1 anchor: the ORIGINAL 6 pending must survive as a subset (no editor underpaid).
+for (const p of FROZEN_PENDING_ORIGINAL_6) {
+  check(`original pending "${p}" still salary-pending`, PENDING.includes(p))
+}
+for (const v of FROZEN_VIDEO_6) {
+  check(`video "${v}" is salary-pending`, PENDING.includes(v))
+}
 for (const t of FROZEN_NOT_PENDING_TRAPS) {
   check(`trap "${t}" is NOT salary-pending`, !PENDING.includes(t))
 }
@@ -96,17 +120,36 @@ if (!META) {
   const values = META.map(m => m.value)
   check('meta covers exactly VALID_TASK_STATUSES', setEq(values, VALID))
   check('meta has no duplicate values', new Set(values).size === META.length)
-  check('meta.salaryPending derives frozen 6', setEq(META.filter(m => m.salaryPending).map(m => m.value), FROZEN_PENDING_6))
+  check('meta.salaryPending derives frozen 12', setEq(META.filter(m => m.salaryPending).map(m => m.value), FROZEN_PENDING_12))
   check('exported PENDING === meta-derived pending', setEq(PENDING, META.filter(m => m.salaryPending).map(m => m.value)))
   check('meta.terminal === {Hoàn tất, Đã hủy}', setEq(META.filter(m => m.terminal).map(m => m.value), FROZEN_TERMINAL))
   const salaryCompleted = META.filter(m => m.salaryCompleted).map(m => m.value)
   check('exactly one salaryCompleted === Hoàn tất', salaryCompleted.length === 1 && salaryCompleted[0] === FROZEN_COMPLETED, `got [${salaryCompleted.join(', ')}]`)
   check('exported COMPLETED === meta salaryCompleted', COMPLETED === salaryCompleted[0])
-  // Pin the P3 cron whitelist: overdue-INELIGIBLE must equal today's deny-list exactly.
-  check('cronOverdueEligible=false === today deny-list {Hoàn tất, Đã hủy, Quá hạn}',
+  // Pin the P3 cron whitelist: overdue-INELIGIBLE = legacy deny-list + 6 video statuses.
+  check('cronOverdueEligible=false === {Hoàn tất, Đã hủy, Quá hạn} + 6 video',
     setEq(META.filter(m => !m.cronOverdueEligible).map(m => m.value), FROZEN_OVERDUE_INELIGIBLE))
+  check('OVERDUE_ELIGIBLE_STATUSES === meta-derived eligible',
+    !!OVERDUE_ELIGIBLE && setEq(OVERDUE_ELIGIBLE, META.filter(m => m.cronOverdueEligible).map(m => m.value)))
   const phases = ['production', 'internal_review', 'client_review', 'closed']
   check('every status has a valid phase', META.every(m => phases.includes(m.phase)))
+  check('every status has a non-empty clientLabel', META.every(m => typeof m.clientLabel === 'string' && m.clientLabel.length > 0))
+  // internalOnly is exactly the 4 "(nội bộ)" / editor-only client-review video steps.
+  check('internalOnly === {A2,A3,A4,A7}', setEq(
+    META.filter(m => m.internalOnly).map(m => m.value),
+    ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Đã sửa feedback (khách)'],
+  ))
+}
+
+console.log('\n[4] STATUS_TRANSITIONS (auto-transition guard, target → predecessors)')
+if (!TRANSITIONS) {
+  skip('transition assertions', 'STATUS_TRANSITIONS not exported yet')
+} else {
+  check('targets === the 6 video statuses', setEq(Object.keys(TRANSITIONS), FROZEN_TRANSITION_TARGETS))
+  const allEndpoints = [...Object.keys(TRANSITIONS), ...Object.values(TRANSITIONS).flat()]
+  check('every transition endpoint is a VALID status', allEndpoints.every(s => VALID.includes(s)),
+    allEndpoints.filter(s => !VALID.includes(s)).join(', '))
+  check('no target lists itself as a predecessor', Object.entries(TRANSITIONS).every(([t, preds]) => !preds.includes(t)))
 }
 
 console.log(`\nRESULT: ${failCount === 0 ? 'PASS' : 'FAIL'} — ${failCount} failed check(s)\n`)

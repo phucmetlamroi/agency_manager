@@ -37,6 +37,13 @@ const statusColors: Record<string, string> = {
     // Bug fix: status="Quá hạn" set by cron when deadline passes — needed for visibility.
     "Quá hạn": "bg-red-600/15 text-red-600 border-red-600/30 font-bold",
     "Đã hủy": "bg-zinc-500/10 text-zinc-500 border-zinc-500/20",
+    // [P3/F2] 6 video-lifecycle statuses (A2–A7).
+    "Đã nộp video (nội bộ)": "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+    "Đang sửa feedback (nội bộ)": "bg-amber-500/10 text-amber-500 border-amber-500/20",
+    "Đã sửa feedback (nội bộ)": "bg-teal-500/10 text-teal-400 border-teal-500/20",
+    "Đã gửi video (khách)": "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+    "Đã nhận feedback (khách)": "bg-red-500/10 text-red-500 border-red-500/20",
+    "Đã sửa feedback (khách)": "bg-violet-500/10 text-violet-400 border-violet-500/20",
 }
 
 interface StatusCellProps {
@@ -128,7 +135,9 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                     <SelectContent>
                         {/* [Sprint A] 'Review' đã bỏ — submit → Revision */}
                         {/* [QA R1 fix] 'Tạm ngừng' (ừ) sai chính tả → 'Tạm ngưng' (ư) để khớp VALID_TASK_STATUSES; trước đây chọn Pause bị server từ chối, status không lưu. */}
-                        {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Revision", "Gửi lại", "Sửa frame", "Tạm ngưng", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
+                        {/* [P3/F2] video statuses (A2–A7) included so admin can see/correct
+                            them by hand; normally they flip via the review module (F7–F10). */}
+                        {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Đã nộp video (nội bộ)", "Đang sửa feedback (nội bộ)", "Đã sửa feedback (nội bộ)", "Đã gửi video (khách)", "Đã nhận feedback (khách)", "Đã sửa feedback (khách)", "Revision", "Gửi lại", "Sửa frame", "Tạm ngưng", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                         ))}
                     </SelectContent>

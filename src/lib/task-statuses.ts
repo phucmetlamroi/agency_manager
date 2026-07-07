@@ -20,6 +20,15 @@ export const VALID_TASK_STATUSES = [
     'Nhận task',                  // Nhận task — assigned, not started
     'Đã nhận task',    // Đã nhận task — variant
     'Đang thực hiện',   // Đang thực hiện — in progress
+    // [P3/F2] 6 video-lifecycle statuses (A2–A7). Task.status is a free String
+    // (schema.prisma) → adding values needs NO migration. Auto-set by the review
+    // module (F7–F10); admin may also set them by hand (no FSM enforcement, R10).
+    'Đã nộp video (nội bộ)',      // A2 — Mux READY (F7)
+    'Đang sửa feedback (nội bộ)', // A3 — admin closed the feedback session (F8)
+    'Đã sửa feedback (nội bộ)',   // A4 — editor confirmed the fix (F9)
+    'Đã gửi video (khách)',       // A5 — admin approved & sent to the client (F10)
+    'Đã nhận feedback (khách)',   // A6 — guest requested changes
+    'Đã sửa feedback (khách)',    // A7 — editor confirmed the client fix
     'Revision',                         // user delivery / admin reject → review
     'Sửa frame',                  // Sửa frame — frame fix
     'Gửi lại',               // Gửi lại — resubmit
@@ -59,6 +68,9 @@ export interface TaskStatusMeta {
     phase: TaskStatusPhase
     /** Stable sort key along the lifecycle axis. */
     order: number
+    /** Client-facing EN label when NOT internalOnly. internalOnly rows fall back to
+     *  PHASE_CLIENT_LABEL[phase] in portal-derive, so their clientLabel is illustrative. */
+    clientLabel: string
 }
 
 /**
@@ -70,17 +82,30 @@ export interface TaskStatusMeta {
  * listed in VALID_TASK_STATUSES order for easy diffing; `order` is the sort key.
  */
 export const TASK_STATUS_META = [
-    { value: 'Đang đợi giao',  salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 10 },
-    { value: 'Nhận task',      salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 12 },
-    { value: 'Đã nhận task',   salaryPending: false, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 14 },
-    { value: 'Đang thực hiện', salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 20 },
-    { value: 'Revision',       salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'internal_review', order: 44 },
-    { value: 'Sửa frame',      salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'internal_review', order: 46 },
-    { value: 'Gửi lại',        salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'client_review',   order: 48 },
-    { value: 'Tạm ngưng',      salaryPending: false, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 16 },
-    { value: 'Quá hạn',        salaryPending: false, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: false, phase: 'production',      order: 18 },
-    { value: 'Hoàn tất',       salaryPending: false, salaryCompleted: true,  terminal: true,  internalOnly: false, cronOverdueEligible: false, phase: 'closed',          order: 90 },
-    { value: 'Đã hủy',         salaryPending: false, salaryCompleted: false, terminal: true,  internalOnly: false, cronOverdueEligible: false, phase: 'closed',          order: 99 },
+    // ── Group B: 9 legacy system statuses (value + behaviour UNCHANGED) ──
+    { value: 'Đang đợi giao',  salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 10, clientLabel: 'In production' },
+    { value: 'Nhận task',      salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 12, clientLabel: 'Received' },
+    { value: 'Đã nhận task',   salaryPending: false, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 14, clientLabel: 'Received' },
+    { value: 'Đang thực hiện', salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 20, clientLabel: 'In progress' },
+    { value: 'Revision',       salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'internal_review', order: 44, clientLabel: 'In revision' },
+    { value: 'Sửa frame',      salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'internal_review', order: 46, clientLabel: 'In progress' },
+    { value: 'Gửi lại',        salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'client_review',   order: 48, clientLabel: 'Revisions delivered' },
+    { value: 'Tạm ngưng',      salaryPending: false, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 16, clientLabel: 'On hold' },
+    { value: 'Quá hạn',        salaryPending: false, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: false, phase: 'production',      order: 18, clientLabel: 'In progress' },
+    { value: 'Hoàn tất',       salaryPending: false, salaryCompleted: true,  terminal: true,  internalOnly: false, cronOverdueEligible: false, phase: 'closed',          order: 90, clientLabel: 'Completed' },
+    { value: 'Đã hủy',         salaryPending: false, salaryCompleted: false, terminal: true,  internalOnly: false, cronOverdueEligible: false, phase: 'closed',          order: 99, clientLabel: 'Closed' },
+    // ── Group A: 6 NEW video-lifecycle statuses (A2–A7). All salaryPending:true (R1:
+    //    payroll must count editor work in flight). cronOverdueEligible:FALSE — the cron
+    //    still OVERWRITES status='Quá hạn' (giai đoạn 1), so excluding the video statuses
+    //    from its whitelist is what stops it wiping the video lifecycle context (R3). The
+    //    board still shows the derived "QUÁ HẠN" badge (deadline<now), i.e. the giai-đoạn-2
+    //    goal without an overdueAt schema column (schema is frozen for this project). ──
+    { value: 'Đã nộp video (nội bộ)',      salaryPending: true, salaryCompleted: false, terminal: false, internalOnly: true,  cronOverdueEligible: false, phase: 'internal_review', order: 30, clientLabel: 'In progress' },
+    { value: 'Đang sửa feedback (nội bộ)', salaryPending: true, salaryCompleted: false, terminal: false, internalOnly: true,  cronOverdueEligible: false, phase: 'internal_review', order: 40, clientLabel: 'In progress' },
+    { value: 'Đã sửa feedback (nội bộ)',   salaryPending: true, salaryCompleted: false, terminal: false, internalOnly: true,  cronOverdueEligible: false, phase: 'internal_review', order: 50, clientLabel: 'In progress' },
+    { value: 'Đã gửi video (khách)',       salaryPending: true, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: false, phase: 'client_review',   order: 60, clientLabel: 'Ready for your review' },
+    { value: 'Đã nhận feedback (khách)',   salaryPending: true, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: false, phase: 'client_review',   order: 70, clientLabel: 'Revising' },
+    { value: 'Đã sửa feedback (khách)',    salaryPending: true, salaryCompleted: false, terminal: false, internalOnly: true,  cronOverdueEligible: false, phase: 'client_review',   order: 80, clientLabel: 'In review' },
 ] as const satisfies readonly TaskStatusMeta[]
 
 /**
@@ -92,3 +117,43 @@ export const SALARY_PENDING_STATUSES: string[] = TASK_STATUS_META.filter(m => m.
 
 /** [F2] The single completed status used by payroll — DERIVED from meta. */
 export const SALARY_COMPLETED_STATUS: TaskStatus = TASK_STATUS_META.find(m => m.salaryCompleted)!.value
+
+/**
+ * [P3/F2 bước 3] Statuses the cron (check-deadline) MAY flip to 'Quá hạn' — the
+ * WHITELIST replacing the old blacklist `notIn ['Hoàn tất','Đã hủy','Quá hạn']`.
+ * DERIVED from meta so new statuses are covered by decision, not omission. The 6 video
+ * statuses are `cronOverdueEligible:false` → excluded here → the cron never overwrites
+ * their lifecycle value.
+ */
+export const OVERDUE_ELIGIBLE_STATUSES: string[] = TASK_STATUS_META.filter(m => m.cronOverdueEligible).map(m => m.value)
+
+/** Lifecycle phase → the EN label a client sees for any internalOnly status in it. */
+export const PHASE_CLIENT_LABEL: Record<TaskStatusPhase, string> = {
+    production: 'In progress',
+    internal_review: 'In progress',
+    client_review: 'In review',
+    closed: 'Completed',
+}
+
+/**
+ * [P3/F2 §3.2] AUTO-transition guard map — KEY = target status, VALUE = allowed
+ * predecessors. Only the 6 video statuses are auto-transition targets (F7–F10). A guard
+ * flips only when `current ∈ STATUS_TRANSITIONS[target]`, so a late Mux webhook can't drag
+ * an already-approved task back a step. ⚠️ This is ONLY for auto-transition (Inngest /
+ * webhook / guest). It is NOT enforcement on manual status changes (R10 — validateTransition
+ * stays disabled by explicit project decision).
+ */
+export const STATUS_TRANSITIONS: Record<string, string[]> = {
+    'Đã nộp video (nội bộ)':      ['Đang thực hiện', 'Sửa frame', 'Gửi lại', 'Revision'],           // F7
+    'Đang sửa feedback (nội bộ)': ['Đã nộp video (nội bộ)'],                                        // F8
+    'Đã sửa feedback (nội bộ)':   ['Đang sửa feedback (nội bộ)'],                                   // F9
+    'Đã gửi video (khách)':       ['Đã sửa feedback (nội bộ)', 'Đã nộp video (nội bộ)', 'Đã sửa feedback (khách)'], // F10
+    'Đã nhận feedback (khách)':   ['Đã gửi video (khách)'],                                         // guest request changes
+    'Đã sửa feedback (khách)':    ['Đã nhận feedback (khách)'],                                     // editor confirmed client fix
+}
+
+/** True when `current` is an allowed predecessor of `target` (auto-transition guard). */
+export function canAutoTransition(current: string, target: string): boolean {
+    const preds = STATUS_TRANSITIONS[target]
+    return !!preds && preds.includes(current)
+}

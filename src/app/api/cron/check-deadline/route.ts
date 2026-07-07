@@ -2,6 +2,10 @@ import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { createNotificationInternal } from '@/actions/notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
+// [P3/F2 bước 3] Whitelist replaces the old `notIn ['Hoàn tất','Đã hủy','Quá hạn']`
+// blacklist. Derived from TASK_STATUS_META.cronOverdueEligible, so the 6 video statuses
+// (eligible:false) are excluded → the cron never overwrites their lifecycle value (R3).
+import { OVERDUE_ELIGIBLE_STATUSES } from '@/lib/task-statuses'
 
 // Call this route via Cron Job (e.g. Vercel Cron) every hour
 export async function GET(request: Request) {
@@ -31,7 +35,7 @@ export async function GET(request: Request) {
         const urgentTasks = await prisma.task.findMany({
             where: {
                 deadline: { gte: now, lte: oneHourFromNow },
-                status: { notIn: ['Hoàn tất', 'Đã hủy', 'Quá hạn'] },
+                status: { in: OVERDUE_ELIGIBLE_STATUSES },
                 assigneeId: { not: null },
             },
             include: {
@@ -82,7 +86,7 @@ export async function GET(request: Request) {
             where: {
                 // Skip the 0-1h window — it's already handled by the urgent pass above
                 deadline: { gt: oneHourFromNow, lte: twentyFourHoursFromNow },
-                status: { notIn: ['Hoàn tất', 'Đã hủy', 'Quá hạn'] },
+                status: { in: OVERDUE_ELIGIBLE_STATUSES },
                 assigneeId: { not: null },
             },
             include: {
@@ -132,7 +136,7 @@ export async function GET(request: Request) {
         const overdueTasks = await prisma.task.findMany({
             where: {
                 deadline: { lt: now },
-                status: { notIn: ['Hoàn tất', 'Đã hủy', 'Quá hạn'] },
+                status: { in: OVERDUE_ELIGIBLE_STATUSES },
                 assigneeId: { not: null },
             },
             include: {

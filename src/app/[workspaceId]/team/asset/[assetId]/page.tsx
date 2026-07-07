@@ -21,7 +21,7 @@ export default async function ReviewPlayerPage({
     searchParams,
 }: {
     params: Promise<{ workspaceId: string; assetId: string }>
-    searchParams: Promise<{ v?: string; comment?: string }>
+    searchParams: Promise<{ v?: string; comment?: string; cmp?: string }>
 }) {
     const { workspaceId, assetId } = await params
     const sp = await searchParams
@@ -37,6 +37,7 @@ export default async function ReviewPlayerPage({
             isAdmin={admin}
             initialVersionId={sp.v ?? null}
             initialCommentId={sp.comment ?? null}
+            compareParam={sp.cmp ?? null}
         />
     )
 }

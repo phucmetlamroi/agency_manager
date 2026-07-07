@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock, UploadCloud } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock, UploadCloud, Columns2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { listAssetVersions, apiMarkFeedbackDone, type AssetVersions, type VersionRow } from '@/lib/review/team-actions'
 import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
@@ -28,6 +28,7 @@ import { TimelineMarkers } from './TimelineMarkers'
 import { PendingRangeOverlay } from './PendingRangeOverlay'
 import { useRangeSelection, useRangePlayback } from './useRangeSelection'
 import { internalPlayerEnv, PlayerEnvProvider } from './player-env'
+import { CompareView } from './CompareView'
 
 type Tab = 'comments' | 'info'
 
@@ -58,6 +59,9 @@ interface ReviewPlayerShellProps {
     isAdmin: boolean
     initialVersionId: string | null
     initialCommentId: string | null
+    /** [F6/P5] LIVE ?cmp=<left>.<right> from the URL (NOT a seed) — drives Compare mode.
+     *  Live so browser Back (which drops cmp + re-runs this force-dynamic page) exits compare. */
+    compareParam: string | null
 }
 
 /** P5.3: the internal shell provides the INTERNAL PlayerEnv (VN copy, /api/review/*,
@@ -82,6 +86,7 @@ function ReviewPlayerShellInner({
     isAdmin,
     initialVersionId,
     initialCommentId,
+    compareParam,
 }: ReviewPlayerShellProps) {
     const router = useRouter()
     const [data, setData] = useState<AssetVersions | null>(null)
@@ -123,12 +128,58 @@ function ReviewPlayerShellInner({
     )
     const isVideo = asset?.mediaKind === 'video'
     const ready = version?.uploadStatus === 'ready'
-    const enabled = !!isVideo && ready
+
+    // [F6/P5] Compare mode. Parse ?cmp=<left>.<right> against the loaded stack; a stale/garbage
+    // cmp (or <2 versions) degrades gracefully to single view. Derived from the LIVE prop so
+    // browser Back (drops cmp → re-runs the page → compare=null) collapses back to single.
+    // Computed BEFORE `enabled` so the single player is DISABLED while CompareView renders: otherwise
+    // its hls instance leaks a 3rd stream for the whole session AND never re-attaches on exit (exit
+    // re-mounts the <video> but versionId/enabled are unchanged, so useHlsPlayer's attach effect
+    // never re-runs → the primary player is left permanently blank).
+    const compare = useMemo(() => {
+        if (!compareParam || !data) return null
+        const [l, r] = compareParam.split('.')
+        if (!l || !r || l === r) return null
+        const has = (id: string) => data.versions.some((v) => v.id === id)
+        return has(l) && has(r) ? { left: l, right: r } : null
+    }, [compareParam, data])
+    const renderingCompare = compare != null && isVideo
+
+    const enabled = !!isVideo && ready && !renderingCompare
     const fps: Fps | null = version?.fps ? { num: version.fps.num, den: version.fps.den } : null
     const posterUrl = version?.media?.posterUrl ?? null
 
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.id : null, fps, enabled })
     const feed = useComments(version?.id ?? null)
+
+    const compareBase = `/${workspaceId}/team/asset/${assetId}`
+    // Enter: default pairing = left is the version adjacent to current (older neighbor, else newer),
+    // right is the current version. push() = new history entry so Back exits compare.
+    const enterCompare = useCallback(() => {
+        if (!data || data.versions.length < 2) return
+        const curId = currentVersionId ?? data.versions[0]?.id ?? null
+        const idx = data.versions.findIndex((v) => v.id === curId)
+        const leftId = data.versions[idx + 1]?.id ?? data.versions[idx - 1]?.id ?? null
+        if (!leftId || !curId || leftId === curId) return
+        router.push(`${compareBase}?cmp=${leftId}.${curId}`)
+    }, [data, currentVersionId, router, compareBase])
+    const exitCompare = useCallback(
+        (rightId: string) => {
+            setCurrentVersionId(rightId) // single view resumes on the right/current version
+            // replace() (not push): enterCompare already pushed the compare entry, so the browser
+            // Back from single-view lands on the pre-compare state — not back INTO compare.
+            router.replace(`${compareBase}?v=${rightId}`)
+        },
+        [router, compareBase],
+    )
+    // Version swap on a side rewrites ?cmp with replace() (no history spam) — the shell is the
+    // SOLE ?cmp writer; the new prop flows back through page.tsx and re-renders CompareView.
+    const changeCompareSides = useCallback(
+        (l: string, r: string) => {
+            router.replace(`${compareBase}?cmp=${l}.${r}`)
+        },
+        [router, compareBase],
+    )
 
     // [P3-B] Derived task/role context for the F8/F9/F10 staff actions (server re-checks all).
     const isAssignee = !!asset?.assigneeId && asset.assigneeId === currentUserId
@@ -223,6 +274,8 @@ function ReviewPlayerShellInner({
     }, [currentVersionId, annoReset])
 
     // Keyboard: Space toggles, ←/→ frame-step — when focus is not in a text field.
+    // [F6] Also off while Compare renders: `enabled` is false there (single controller disabled),
+    // so this returns early and CompareView owns the sole keydown handler (no two Space handlers).
     useEffect(() => {
         if (!enabled) return
         const onKey = (e: KeyboardEvent) => {
@@ -352,6 +405,24 @@ function ReviewPlayerShellInner({
         )
     }
 
+    // [F6/P5] Compare mode replaces the single-player body (video assets only — the shared
+    // transport is video-specific; a stale ?cmp on an image degrades to single view).
+    if (renderingCompare && compare) {
+        return (
+            <CompareView
+                versions={data.versions}
+                left={compare.left}
+                right={compare.right}
+                currentUserId={currentUserId}
+                isAdmin={isAdmin}
+                assetName={asset.name}
+                onExit={() => exitCompare(compare.right)}
+                onBack={goBack}
+                onChangeSides={changeCompareSides}
+            />
+        )
+    }
+
     const annotationOverlay =
         canAnnotate && annotation.active ? (
             <>
@@ -469,6 +540,26 @@ function ReviewPlayerShellInner({
                                         )}
                                     </button>
                                 ))}
+
+                                {/* [F6/P5] Compare entry — disabled with <2 versions; desktop-only
+                                    (mobile compare is deferred from v1). */}
+                                <button
+                                    onClick={() => {
+                                        if (data.versions.length >= 2) {
+                                            enterCompare()
+                                            setSelectorOpen(false)
+                                        }
+                                    }}
+                                    disabled={data.versions.length < 2}
+                                    title={data.versions.length < 2 ? 'Cần ≥ 2 phiên bản để so sánh' : undefined}
+                                    className={`mt-1 hidden w-full items-center gap-2 border-t border-white/10 px-2.5 py-2.5 text-left text-sm md:flex ${
+                                        data.versions.length < 2
+                                            ? 'cursor-not-allowed text-white/25'
+                                            : 'text-indigo-300 hover:bg-white/10'
+                                    }`}
+                                >
+                                    <Columns2 className="h-4 w-4 shrink-0" /> So sánh phiên bản
+                                </button>
                             </div>
                         </>
                     )}

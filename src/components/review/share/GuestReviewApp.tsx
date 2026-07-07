@@ -29,6 +29,7 @@ import { TimelineMarkers } from '../player/TimelineMarkers'
 import { PendingRangeOverlay } from '../player/PendingRangeOverlay'
 import { useRangeSelection, useRangePlayback } from '../player/useRangeSelection'
 import { PlayerEnvProvider, type PlayerEnv } from '../player/player-env'
+import { GuestNotifyControl } from './GuestNotifyControl'
 
 type ReviewStateDto = GuestVersionView['reviewState']
 
@@ -151,6 +152,7 @@ export function GuestReviewApp({
         <PlayerEnvProvider value={env}>
             <GuestStage
                 key={asset?.assetId ?? 'empty'}
+                slug={slug}
                 api={api}
                 share={share}
                 asset={asset}
@@ -190,6 +192,7 @@ export function GuestReviewApp({
 // ─────────────────────────── stage + header + panel ───────────────────────────
 
 function GuestStage({
+    slug,
     api,
     share,
     asset,
@@ -202,6 +205,7 @@ function GuestStage({
     onAdoptNewHead,
     refreshContent,
 }: {
+    slug: string
     api: ReturnType<typeof guestShareApi>
     share: GuestShareContent['share']
     asset: GuestShareContent['items'][number] | null
@@ -428,6 +432,9 @@ function GuestStage({
                         </button>
                     </div>
                 )}
+
+                {/* [P4/FR-11] Guest email-updates opt-in (double-opt-in PIN). */}
+                {asset && <GuestNotifyControl slug={slug} assetId={asset.assetId} />}
 
                 {share.allowDownload && (
                     <button

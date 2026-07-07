@@ -7,8 +7,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock, UploadCloud } from 'lucide-react'
+import { toast } from 'sonner'
 import { listAssetVersions, type AssetVersions, type VersionRow } from '@/lib/review/team-actions'
+import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
 import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 import type { Fps } from '@/lib/review/timecode'
 import type { AnnotationShape, CommentDto } from '@/lib/review/comment-client'
@@ -20,6 +22,8 @@ import { AnnotationCanvas } from './AnnotationCanvas'
 import { AnnotationToolbar } from './AnnotationToolbar'
 import { CommentsPanel } from './CommentsPanel'
 import { TimelineMarkers } from './TimelineMarkers'
+import { PendingRangeOverlay } from './PendingRangeOverlay'
+import { useRangeSelection, useRangePlayback } from './useRangeSelection'
 import { internalPlayerEnv, PlayerEnvProvider } from './player-env'
 
 type Tab = 'comments' | 'info'
@@ -85,6 +89,11 @@ function ReviewPlayerShellInner({
     const [highlightId, setHighlightId] = useState<string | null>(initialCommentId)
     const videoRef = useRef<HTMLVideoElement>(null)
     const didDeepLink = useRef(false)
+    // [B10] "Tải version mới" — the player had no upload affordance; a new version is a
+    // single video enqueued onto THIS asset ({kind:'asset'}), which the engine + server
+    // already support (write scope re-checked server-side). Drop OR file-picker.
+    const versionInputRef = useRef<HTMLInputElement>(null)
+    const [uploadDragOver, setUploadDragOver] = useState(false)
 
     // load the stack
     useEffect(() => {
@@ -117,6 +126,11 @@ function ReviewPlayerShellInner({
 
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.id : null, fps, enabled })
     const feed = useComments(version?.id ?? null)
+
+    // [FR-04] Pending timecode/range shared between the composer (right) and the timeline
+    // (left). range-playback loops [in,out] once, pausing at the out-point.
+    const range = useRangeSelection()
+    const playRange = useRangePlayback(controller.frame, controller.seekToFrame, controller.play, controller.pause)
 
     // Annotation draw state (P4.4). Owned here because BOTH the overlay and the
     // composer read it. `viewAnno` is the read-only "show this comment's drawing"
@@ -227,6 +241,45 @@ function ReviewPlayerShellInner({
         router.push(folderId ? `/${workspaceId}/team/folder/${folderId}` : `/${workspaceId}/team`)
     }, [router, workspaceId, asset?.folderId])
 
+    // [B10] Enqueue a new version onto this asset. Video-only (same rule as the drawer
+    // BÀN GIAO strip); the ready card refresh comes from listAssetVersions on the next poll.
+    const uploadNewVersion = useCallback(
+        (file: File | null | undefined) => {
+            if (!file) return
+            const meta = validateFileMeta(file.name, file.size, file.type || 'application/octet-stream')
+            if (!meta.ok) {
+                toast.error(meta.message)
+                return
+            }
+            if (meta.kind !== 'VIDEO') {
+                toast.error('Chỉ tải lên video cho phiên bản mới.')
+                return
+            }
+            uploadEngine.enqueue(file, { kind: 'asset', assetId }, { targetLabel: asset?.name ?? 'Phiên bản mới' })
+            toast.success('Đang tải phiên bản mới…')
+        },
+        [assetId, asset?.name],
+    )
+
+    // [B10] Window guard: a file dropped ANYWHERE on the player page must not make the
+    // browser navigate away to open the file; also reset the drop overlay after any drop.
+    useEffect(() => {
+        const hasFiles = (dt: DataTransfer | null) => !!dt && Array.from(dt.types).includes('Files')
+        const onWinDragOver = (e: DragEvent) => {
+            if (hasFiles(e.dataTransfer)) e.preventDefault()
+        }
+        const onWinDrop = (e: DragEvent) => {
+            if (hasFiles(e.dataTransfer)) e.preventDefault()
+            setUploadDragOver(false)
+        }
+        window.addEventListener('dragover', onWinDragOver)
+        window.addEventListener('drop', onWinDrop)
+        return () => {
+            window.removeEventListener('dragover', onWinDragOver)
+            window.removeEventListener('drop', onWinDrop)
+        }
+    }, [])
+
     if (loadError) {
         return (
             <div className="grid h-[100dvh] place-items-center bg-zinc-950 text-white/70">
@@ -290,6 +343,26 @@ function ReviewPlayerShellInner({
                     <h1 className="truncate text-sm font-semibold">{asset.name}</h1>
                 </div>
 
+                {/* [B10] Tải version mới */}
+                <input
+                    ref={versionInputRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                        uploadNewVersion(e.target.files?.[0])
+                        e.target.value = ''
+                    }}
+                />
+                <button
+                    onClick={() => versionInputRef.current?.click()}
+                    className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10"
+                    title="Tải phiên bản mới cho video này"
+                >
+                    <UploadCloud className="h-4 w-4 text-indigo-400" />
+                    <span className="hidden font-medium sm:inline">Tải version mới</span>
+                </button>
+
                 {/* Version selector */}
                 <div className="relative">
                     <button
@@ -341,7 +414,42 @@ function ReviewPlayerShellInner({
             {/* Body */}
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
                 {/* Stage */}
-                <div className="relative min-h-0 flex-1 bg-black">
+                <div
+                    className="relative min-h-0 flex-1 bg-black"
+                    onDragEnter={(e) => {
+                        if (Array.from(e.dataTransfer.types).includes('Files')) {
+                            e.preventDefault()
+                            setUploadDragOver(true)
+                        }
+                    }}
+                    onDragOver={(e) => {
+                        if (Array.from(e.dataTransfer.types).includes('Files')) {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'copy'
+                        }
+                    }}
+                    onDragLeave={(e) => {
+                        // Only clear when the pointer actually leaves the stage (not a child).
+                        if (!e.currentTarget.contains(e.relatedTarget as Node)) setUploadDragOver(false)
+                    }}
+                    onDrop={(e) => {
+                        if (Array.from(e.dataTransfer.types).includes('Files')) {
+                            e.preventDefault()
+                            setUploadDragOver(false)
+                            uploadNewVersion(e.dataTransfer.files?.[0])
+                        }
+                    }}
+                >
+                    {uploadDragOver && (
+                        <div className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm">
+                            <div className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-indigo-400 px-8 py-6 text-center">
+                                <UploadCloud className="h-9 w-9 text-indigo-200" />
+                                <p className="text-sm font-medium text-indigo-100">
+                                    Thả để tạo v{data.versions.reduce((m, v) => Math.max(m, v.versionNumber), 0) + 1}
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     {version && ready ? (
                         <VideoStage
                             videoRef={videoRef}
@@ -353,13 +461,22 @@ function ReviewPlayerShellInner({
                             overlay={annotationOverlay}
                             clickToggleDisabled={annotation.active}
                             timelineChildren={
-                                <TimelineMarkers
-                                    comments={feed.comments}
-                                    fps={fps}
-                                    durationSec={controller.durationSec}
-                                    onSeek={handleSeek}
-                                    onHighlight={setHighlightId}
-                                />
+                                <>
+                                    <TimelineMarkers
+                                        comments={feed.comments}
+                                        fps={fps}
+                                        durationSec={controller.durationSec}
+                                        onSeek={handleSeek}
+                                        onHighlight={setHighlightId}
+                                    />
+                                    <PendingRangeOverlay
+                                        range={range}
+                                        fps={fps}
+                                        durationSec={controller.durationSec}
+                                        playheadFrame={controller.frame}
+                                        onPlayRange={playRange}
+                                    />
+                                </>
                             }
                         />
                     ) : (
@@ -401,6 +518,7 @@ function ReviewPlayerShellInner({
                                     playheadFrame={controller.frame}
                                     durationMs={version.durationMs}
                                     annotation={canAnnotate ? annotation : null}
+                                    range={range}
                                     onSeekToFrame={handleSeek}
                                     onPauseVideo={onPauseVideo}
                                     onFocusPlayer={onFocusPlayer}

@@ -27,11 +27,19 @@ function signingKey(): { kid: string; pem: string } {
     return { kid, pem }
 }
 
-/** Sign one Mux playback JWT for `playbackId` + `aud`, expiring at absolute `expUnix`. */
-export function signMuxToken(playbackId: string, aud: MuxAudience, expUnix: number): string {
+/** Sign one Mux playback JWT for `playbackId` + `aud`, expiring at absolute `expUnix`.
+ *  `extraClaims` are baked into the token → Mux applies them as default playback
+ *  params. For signed playback the params MUST be signed in (unsigned query params on
+ *  a signed URL are ignored), which is why they live here rather than on the URL. */
+export function signMuxToken(
+    playbackId: string,
+    aud: MuxAudience,
+    expUnix: number,
+    extraClaims?: Record<string, string>,
+): string {
     const { kid, pem } = signingKey()
     const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid }))
-    const payload = base64url(JSON.stringify({ sub: playbackId, aud, exp: expUnix }))
+    const payload = base64url(JSON.stringify({ sub: playbackId, aud, exp: expUnix, ...extraClaims }))
     const signingInput = `${header}.${payload}`
     const signature = createSign('RSA-SHA256').update(signingInput).sign(pem)
     return `${signingInput}.${base64url(signature)}`
@@ -51,7 +59,11 @@ export function mintPlaybackTokens(
     const expUnix = Math.floor(Date.now() / 1000) + ttlSec
     return {
         tokens: {
-            playback: signMuxToken(playbackId, 'v', expUnix),
+            // [BR-06] rendition_order:'desc' → Mux lists the highest rendition FIRST in the
+            // manifest. This is the ONLY sharp-from-00:00 lever on the iPhone Safari native-HLS
+            // path (where hls.js — and thus startLevel pinning — is bypassed); on hls.js it
+            // reinforces the client-side startLevel=top. Only the video ('v') token takes it.
+            playback: signMuxToken(playbackId, 'v', expUnix, { rendition_order: 'desc' }),
             thumbnail: signMuxToken(playbackId, 't', expUnix),
             storyboard: signMuxToken(playbackId, 's', expUnix),
         },

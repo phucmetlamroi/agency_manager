@@ -67,7 +67,12 @@ export interface MuxAsset {
 
 /**
  * Create a Mux asset that PULLS the original from a presigned R2 GET URL.
- * Locked params: video_quality=basic, signed playback, passthrough=versionId.
+ * Locked params: signed playback, passthrough=versionId.
+ * [BR-06 tier 3 — E1 approved 2026-07-07] video_quality='plus' (was 'basic'). 'basic'
+ * caps the ladder at 720p, so even after the ABR/rendition_order fixes 1080p sources
+ * stayed a touch soft on 1080p displays. 'plus' unlocks up to the source resolution +
+ * a better encode (~$0.03/min extra, MUX_ENCODING). Applies to NEW assets only —
+ * existing 'basic' assets are unaffected (no re-encode, no migration).
  */
 export async function createMuxAsset(opts: {
     inputUrl: string
@@ -76,7 +81,7 @@ export async function createMuxAsset(opts: {
     return muxFetch<MuxAsset>('POST', '/video/v1/assets', {
         input: [{ url: opts.inputUrl }],
         playback_policy: ['signed'],
-        video_quality: 'basic',
+        video_quality: 'plus',
         passthrough: opts.passthrough,
     })
 }

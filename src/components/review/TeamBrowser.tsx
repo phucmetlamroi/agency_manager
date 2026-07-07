@@ -527,7 +527,18 @@ export function TeamBrowser({
     const busyAssetIds = useMemo(() => {
         const s = new Set<string>()
         for (const it of allUploads) {
-            if (it.target.kind === 'asset' && it.status !== 'done' && it.status !== 'canceled') {
+            // [B10 defect 1] Only a GENUINELY in-flight upload blocks the card. The old
+            // `status !== 'done' && !== 'canceled'` also counted failed / interrupted /
+            // paused rows, so a failed drop (or a reload that orphaned the File handle) left
+            // the card busy forever — the "kéo-thả lần 2 không nhận file" report. A stuck
+            // row can now be retried/removed and the next drop is accepted.
+            if (
+                it.target.kind === 'asset' &&
+                (it.status === 'queued' ||
+                    it.status === 'uploading' ||
+                    it.status === 'completing' ||
+                    it.status === 'processing')
+            ) {
                 s.add(it.target.assetId)
             }
         }
@@ -1040,6 +1051,35 @@ export function TeamBrowser({
         setDragOver(false)
         void collectDropFiles(e.dataTransfer).then(ingest)
     }
+
+    // [B10 defect 2] A drop that lands on a CARD stops propagation (so files don't ALSO
+    // upload to the folder), which means the browser-level onDrop above never runs and the
+    // "Thả để tải lên" overlay stays stuck — the reload-to-recover symptom. A window-level
+    // drop/dragend listener always resets the overlay counter regardless of what consumed
+    // the drop. It also preventDefaults file drags at the window so a near-miss doesn't make
+    // the browser navigate away to open the file.
+    useEffect(() => {
+        const hasFiles = (dt: DataTransfer | null) => !!dt && Array.from(dt.types).includes('Files')
+        const resetOverlay = () => {
+            dragDepth.current = 0
+            setDragOver(false)
+        }
+        const onWinDragOver = (e: DragEvent) => {
+            if (hasFiles(e.dataTransfer)) e.preventDefault()
+        }
+        const onWinDrop = (e: DragEvent) => {
+            if (hasFiles(e.dataTransfer)) e.preventDefault()
+            resetOverlay()
+        }
+        window.addEventListener('dragover', onWinDragOver)
+        window.addEventListener('drop', onWinDrop)
+        window.addEventListener('dragend', resetOverlay)
+        return () => {
+            window.removeEventListener('dragover', onWinDragOver)
+            window.removeEventListener('drop', onWinDrop)
+            window.removeEventListener('dragend', resetOverlay)
+        }
+    }, [])
 
     /* ---- breadcrumb trail ---- */
     const trail = useMemo<{ id: string | null; name: string }[]>(() => {

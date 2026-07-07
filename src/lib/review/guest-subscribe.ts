@@ -17,8 +17,6 @@ const MAX_ATTEMPTS = 5
 
 export type ShareWithItems = ShareLink & { items: { assetId: string | null }[] }
 
-export type RequestPinStatus = 'pin_sent' | 'already_subscribed' | 'already_verified'
-
 /** True when `assetId` is actually one of the share's items (scope guard). */
 function assetInShare(share: ShareWithItems, assetId: string): boolean {
     return share.items.some((i) => i.assetId === assetId)
@@ -62,41 +60,49 @@ async function emailAlreadyVerified(email: string): Promise<boolean> {
 }
 
 /**
- * request-pin: issue a fresh code (or skip if the email is already verified / already subscribed).
- * The CALLER (route) owns rate-limiting + the neutral-200 envelope. `email` is the guest's own —
- * from their session, else typed into the form. Returns the status the guest's UI should reflect.
+ * request-pin: issue a fresh code, OR — ONLY for the guest's own session email — skip straight to a
+ * subscription when ownership is already proven. The route ALWAYS answers a neutral `pin_sent`, so
+ * this returns nothing: it must never let its outcome branch the client-visible body (that would be
+ * an email/subscription enumeration oracle — see request-pin route). Skip-PIN is gated on
+ * `isOwnEmail` because a body-supplied FOREIGN email must earn a fresh PIN it can only clear from its
+ * OWN inbox; otherwise any share visitor could force-subscribe / probe an arbitrary address.
  */
 export async function requestGuestPin(input: {
     share: ShareWithItems
     assetId: string
     email: string
+    /** True ONLY when `email` equals the authenticated guest session's own email. */
+    isOwnEmail: boolean
     guestSessionId: string | null
     ip: string | null
-}): Promise<RequestPinStatus> {
+}): Promise<void> {
     const email = normEmail(input.email)
-    // Out-of-scope asset → behave EXACTLY like a sent PIN (anti-enumeration) without doing anything.
-    if (!assetInShare(input.share, input.assetId)) return 'pin_sent'
+    // Out-of-scope asset → do nothing (the route still answers a neutral pin_sent).
+    if (!assetInShare(input.share, input.assetId)) return
 
-    // Already subscribed to THIS asset → nothing to do.
-    const existing = await prisma.guestSubscription.findUnique({
-        where: { email_assetId: { email, assetId: input.assetId } },
-        select: { unsubscribedAt: true },
-    })
-    if (existing && !existing.unsubscribedAt) return 'already_subscribed'
-
-    // Verified elsewhere (double-opt-in already proven) → subscribe straight to the new asset.
-    if (await emailAlreadyVerified(email)) {
-        await ensureSubscription({
-            email,
-            assetId: input.assetId,
-            shareLinkId: input.share.id,
-            guestSessionId: input.guestSessionId,
-            ip: input.ip,
+    // Skip-PIN / auto-subscribe is safe ONLY for the guest's own session email.
+    if (input.isOwnEmail) {
+        // Already subscribed to THIS asset → nothing to do.
+        const existing = await prisma.guestSubscription.findUnique({
+            where: { email_assetId: { email, assetId: input.assetId } },
+            select: { unsubscribedAt: true },
         })
-        return 'already_verified'
+        if (existing && !existing.unsubscribedAt) return
+
+        // Verified elsewhere (ownership already proven) → subscribe straight to this asset.
+        if (await emailAlreadyVerified(email)) {
+            await ensureSubscription({
+                email,
+                assetId: input.assetId,
+                shareLinkId: input.share.id,
+                guestSessionId: input.guestSessionId,
+                ip: input.ip,
+            })
+            return
+        }
     }
 
-    // Fresh code.
+    // Fresh code — foreign email, or the guest's own-but-unverified email.
     const pin = generateOtp()
     await prisma.guestEmailVerification.create({
         data: {
@@ -112,7 +118,6 @@ export async function requestGuestPin(input: {
     void sendEmail({ to: email, ...renderVerifyPinEmail({ pin, projectName: asset?.name ?? null }) }).catch((e) =>
         reviewLog('error', 'guest.pin_email_failed', { assetId: input.assetId, error: String(e) }),
     )
-    return 'pin_sent'
 }
 
 export type VerifyPinResult =
@@ -152,24 +157,34 @@ export async function verifyGuestPin(input: {
     }
 
     // Correct: consume the code, create/reactivate the subscription, stamp the session verified.
-    await prisma.$transaction(async (tx) => {
-        await tx.guestEmailVerification.update({ where: { id: row.id }, data: { consumedAt: new Date() } })
-        await tx.guestSubscription.upsert({
-            where: { email_assetId: { email, assetId: input.assetId } },
-            create: {
-                email,
-                assetId: input.assetId,
-                shareLinkId: input.share.id,
-                guestSessionId: input.guest?.id ?? null,
-                verifiedAt: new Date(),
-                verifyIp: input.ip,
-            },
-            update: { shareLinkId: input.share.id, unsubscribedAt: null, guestSessionId: input.guest?.id ?? null },
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.guestEmailVerification.update({ where: { id: row.id }, data: { consumedAt: new Date() } })
+            await tx.guestSubscription.upsert({
+                where: { email_assetId: { email, assetId: input.assetId } },
+                create: {
+                    email,
+                    assetId: input.assetId,
+                    shareLinkId: input.share.id,
+                    guestSessionId: input.guest?.id ?? null,
+                    verifiedAt: new Date(),
+                    verifyIp: input.ip,
+                },
+                update: { shareLinkId: input.share.id, unsubscribedAt: null, guestSessionId: input.guest?.id ?? null },
+            })
+            if (input.guest && !input.guest.emailVerifiedAt) {
+                await tx.guestSession.update({ where: { id: input.guest.id }, data: { emailVerifiedAt: new Date() } })
+            }
         })
-        if (input.guest && !input.guest.emailVerifiedAt) {
-            await tx.guestSession.update({ where: { id: input.guest.id }, data: { emailVerifiedAt: new Date() } })
+    } catch (e) {
+        // Prisma upsert isn't atomic: a concurrent double-submit of the same valid PIN can both take
+        // the create branch, so the loser hits P2002 (unique email_assetId). The winner already
+        // subscribed the guest, so treat the duplicate as an idempotent success rather than a 500.
+        if (e && typeof e === 'object' && 'code' in e && (e as { code?: unknown }).code === 'P2002') {
+            return { ok: true }
         }
-    })
+        throw e
+    }
     return { ok: true }
 }
 

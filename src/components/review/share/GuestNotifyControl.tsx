@@ -34,15 +34,16 @@ export function GuestNotifyControl({ slug, assetId }: Props) {
 
     const base = `/api/r/${encodeURIComponent(slug)}/notifications`
 
-    const loadStatus = useCallback(async () => {
+    const loadStatus = useCallback(async (): Promise<boolean> => {
         try {
             const res = await fetch(`${base}?assetId=${encodeURIComponent(assetId)}`, { credentials: 'same-origin', cache: 'no-store' })
-            if (!res.ok) return
+            if (!res.ok) return false
             const d = (await res.json()) as { subscribed: boolean; email: string | null }
             setSubscribed(d.subscribed)
             if (d.email) setEmail((e) => e || d.email!)
+            return d.subscribed
         } catch {
-            /* leave as null */
+            return false
         }
     }, [base, assetId])
 
@@ -62,21 +63,20 @@ export function GuestNotifyControl({ slug, assetId }: Props) {
         setError(null)
         setInfo(null)
         try {
-            const res = await fetch(`${base}/request-pin`, {
+            await fetch(`${base}/request-pin`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ assetId, ...(email.trim() ? { email: email.trim() } : {}) }),
             })
-            const d = (await res.json().catch(() => ({}))) as { status?: string }
-            if (d.status === 'already_subscribed' || d.status === 'already_verified') {
-                setSubscribed(true)
+            // request-pin is intentionally neutral (no status oracle). If this was the guest's OWN
+            // already-verified email, the server subscribed them straight away — the session-gated
+            // status endpoint is the only trustworthy signal, so re-check it before showing the PIN.
+            const nowSubscribed = await loadStatus()
+            if (nowSubscribed) {
                 setOpen(false)
-            } else if (d.status === 'cooldown') {
-                setInfo('A code was just sent — check your inbox, or wait a moment before retrying.')
-                setStep('pin')
             } else {
-                setInfo(`We sent a 6-digit code to ${email.trim() || 'your email'}.`)
+                setInfo(`If that email can receive updates, we've sent it a 6-digit code.`)
                 setStep('pin')
             }
         } catch {
@@ -84,7 +84,7 @@ export function GuestNotifyControl({ slug, assetId }: Props) {
         } finally {
             setBusy(false)
         }
-    }, [busy, base, assetId, email])
+    }, [busy, base, assetId, email, loadStatus])
 
     const verify = useCallback(async () => {
         if (busy) return

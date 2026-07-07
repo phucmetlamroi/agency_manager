@@ -27,25 +27,36 @@ export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => 
     const parsed = await parseBody(req, schema, 'en')
     if (!parsed.ok) return parsed.res
 
-    const email = (parsed.data.email ?? guest?.email ?? '').trim().toLowerCase()
-    // No email to send to → uniform 200 (can't reveal that we did nothing).
-    if (!email) return apiJson({ status: 'pin_sent' })
+    // NEUTRAL envelope: EVERY in-scope request returns exactly this, so the body can never reveal
+    // whether the email is already subscribed/verified, rate-limited, or brand-new (enumeration
+    // oracle). The guest's own "already on" UI is driven by the session-gated GET status endpoint,
+    // never by this response.
+    const neutral = () => apiJson({ status: 'pin_sent' })
+
+    const bodyEmail = (parsed.data.email ?? '').trim().toLowerCase()
+    const sessionEmail = (guest?.email ?? '').trim().toLowerCase()
+    const email = bodyEmail || sessionEmail
+    if (!email) return neutral()
+
+    // Skip-PIN / auto-subscribe is allowed ONLY for the guest's OWN session email; a body-supplied
+    // foreign email must always earn a fresh PIN (no force-subscribe of arbitrary addresses).
+    const isOwnEmail = !!sessionEmail && email === sessionEmail
 
     const ip = getClientIp(req)
-    // Cooldown (60s) + burst (3/10min per email+share) + IP/day — all fold into a neutral 200.
+    // Cooldown (60s) + burst (3/10min per email+share) + IP/day. On limit we silently skip the send
+    // but keep the envelope identical — the rate-limit state must not leak either.
     const cooldown = await limitDb(`r:notif:cd:${email}:${share.id}`, 1, 60)
     const burst = await limitDb(`r:notif:pin:${email}:${share.id}`, 3, 600)
     const perIp = await limitDb(`r:notif:ip:${ip}`, 10, 86_400)
-    if (!cooldown.success || !burst.success || !perIp.success) {
-        return apiJson({ status: 'cooldown', retryAfterSec: cooldown.retryAfterSec })
-    }
+    if (!cooldown.success || !burst.success || !perIp.success) return neutral()
 
-    const status = await requestGuestPin({
+    await requestGuestPin({
         share,
         assetId: parsed.data.assetId,
         email,
+        isOwnEmail,
         guestSessionId: guest?.id ?? null,
         ip,
     })
-    return apiJson({ status })
+    return neutral()
 })

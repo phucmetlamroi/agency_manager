@@ -13,7 +13,7 @@ import { recordActivity, REVIEW_ACTIVITY } from './activity'
 // P1.6 janitor reconcile helpers (call-time-only cycle — see upload-service.ts note).
 import { expireInflightUpload, reconcileStuckUploadedVersion } from './upload-service'
 // P5.4 decision side-effects. P3-B: F7 auto-flip + manager notify.
-import { syncTaskOnChangesRequested, syncTaskFromReviewEvent } from './task-sync'
+import { syncTaskOnChangesRequested, syncTaskFromReviewEvent, revokeClientExposureOnNewVersion } from './task-sync'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { audit } from '@/lib/audit-log'
 import { createAndBroadcastNotifications } from '@/actions/notification-actions'
@@ -137,6 +137,12 @@ async function applyMuxReady(
         // so the manager is emailed exactly once — no double-notify on webhook re-delivery / reconcile.
         // Best-effort: the version is already READY; a task-flip failure must NOT fail the pipeline.
         if (version.asset.taskId) {
+            // [P4/R5 — BLOCKER] Close the client-exposure leak BEFORE anything else: this new version
+            // is now the stack HEAD, and the /r/ share serves HEAD. If the task was already sent to the
+            // client, revoke the active shares + clear the client signal so this un-re-approved cut is
+            // invisible until the admin re-Duyệt. Self-guarding (no-op unless clientReview='AWAITING'),
+            // never throws — an internal-round or first-cut ready is untouched.
+            await revokeClientExposureOnNewVersion(version.asset.taskId, version.assetId, version.workspaceId)
             try {
                 const flip = await syncTaskFromReviewEvent(
                     version.asset.taskId,

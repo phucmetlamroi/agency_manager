@@ -12,7 +12,8 @@
     "build:electron": "cd electron && npm run build",
     "build:desktop": "cross-env ELECTRON_DESKTOP=1 next build && cd mcp-server && npm run build && cd ../electron && npm run build",
     "dev:electron": "cross-env ELECTRON_DESKTOP=1 next dev",
-    "test:invite-security": "tsx scripts/test-invite-security.ts"
+    "test:invite-security": "tsx scripts/test-invite-security.ts",
+    "test:status-meta": "tsx scripts/test-status-meta-snapshot.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

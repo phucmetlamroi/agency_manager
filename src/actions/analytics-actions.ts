@@ -37,9 +37,13 @@ export async function getAnalyticsData(workspaceId: string) {
 
     const users = await workspacePrisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { 
+        // [L17] Fetch the nice-name fields so the analytics table doesn't fall back to a raw
+        // username handle (g_…) for accounts whose real name lives in displayName/nickname.
+        select: {
             id: true,
-            username: true
+            username: true,
+            displayName: true,
+            nickname: true,
         }
     })
 
@@ -75,7 +79,8 @@ export async function getAnalyticsData(workspaceId: string) {
 
         return {
             id: u.id,
-            username: u.username,
+            // [L17] displayName → nickname → username handle (never the raw g_… id when a name exists).
+            username: (u as any).displayName?.trim() || (u as any).nickname?.trim() || u.username,
             completedTasks: taskCount,
             totalPenalty: totalPenalty,
             errorRate,

@@ -31,10 +31,9 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     'Đang đợi giao':   { label: 'Đang đợi giao',   color: '#A855F7' },
     'Đang thực hiện':  { label: 'Đang thực hiện',  color: '#EAB308' },
     // [Sprint A removed] 'Review' status — submit giờ đi thẳng Revision
-    'Revision':            { label: 'Revision',            color: '#EF4444' },
-    'Sửa frame':       { label: 'Sửa frame',       color: '#EC4899' },
-    'Gửi lại':       { label: 'Gửi lại',       color: '#F97316' },
-    'Tạm ngưng':    { label: 'Tạm ngưng',    color: '#71717A' },
+    // [L18a] value stays 'Revision' (load-bearing); only the VN display label changes.
+    // [bug-report #2] 'Sửa frame' / 'Gửi lại' / 'Tạm ngưng' removed.
+    'Revision':            { label: 'Sửa lại',             color: '#EF4444' },
     'Hoàn tất':     { label: 'Hoàn tất',     color: '#10B981' },
     // Bug fix: Cron auto-set status='Quá hạn' khi deadline qua nhưng tab list
     // không bao gồm → task overdue bị "thất lạc" khỏi mọi tab.
@@ -72,11 +71,15 @@ interface TabConfig {
     targetStatus: string | null
 }
 
+// [bug-report #2] removed 'Sửa frame' (from internal), 'Gửi lại' (from client), 'Tạm ngưng' (from all).
+// [bug-report #3] internal-drop target 'Revision' → 'Đã nộp video (nội bộ)' (A2 = the entry state of the
+// internal-review phase in the video workflow). The 'client' tab drop is handled specially in
+// handleTabDrop (real send-to-client), so its targetStatus stays null here.
 const TABS: TabConfig[] = [
-    { id: 'all',      label: 'Đã giao task',    statuses: ['Nhận task', 'Đã nhận task', 'Tạm ngưng'],             color: '#8B5CF6', targetStatus: null },
+    { id: 'all',      label: 'Đã giao task',    statuses: ['Nhận task', 'Đã nhận task'],                          color: '#8B5CF6', targetStatus: null },
     { id: 'progress', label: 'Đang làm',        statuses: ['Đang thực hiện'],                                     color: '#EAB308', targetStatus: 'Đang thực hiện' },
-    { id: 'internal', label: 'Duyệt nội bộ',    statuses: ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Revision', 'Sửa frame'], color: '#F97316', targetStatus: 'Revision' },
-    { id: 'client',   label: 'Khách duyệt',     statuses: ['Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)', 'Gửi lại'], color: '#06B6D4', targetStatus: null },
+    { id: 'internal', label: 'Duyệt nội bộ',    statuses: ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Revision'], color: '#F97316', targetStatus: 'Đã nộp video (nội bộ)' },
+    { id: 'client',   label: 'Khách duyệt',     statuses: ['Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)'], color: '#06B6D4', targetStatus: null },
     // Tab "Quá hạn": task bị cron set status='Quá hạn'. Task video (cronOverdueEligible=false)
     // KHÔNG bị cron đè status — chúng vẫn hiện badge "QUÁ HẠN" derive ở tab phase của mình.
     { id: 'overdue',  label: 'Quá hạn',         statuses: ['Quá hạn'],                                            color: '#DC2626', targetStatus: 'Quá hạn' },

@@ -22,17 +22,24 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     "Đã nhận task":   { label: "Đã nhận task",   color: "#3B82F6" },
     "Đang đợi giao":   { label: "Đang đợi giao",   color: "#A855F7" },
     "Đang thực hiện":  { label: "Đang thực hiện",  color: "#EAB308" },
-    "Revision":            { label: "Revision",            color: "#EF4444" },
-    "Sửa frame":       { label: "Sửa frame",       color: "#EC4899" },
-    "Gửi lại":       { label: "Gửi lại",       color: "#F97316" },
-    "Tạm ngưng":    { label: "Tạm ngưng",    color: "#71717A" },
+    // [Bug#1] 6 video-lifecycle statuses (A2–A7) — same colors as the admin board, short labels
+    // for the compact editor pill. Without these entries the editor pill fell to a gray default
+    // AND (the real blocker) these statuses matched NO tab → tasks auto-moved to A2/A3 vanished.
+    "Đã nộp video (nội bộ)":      { label: "Đã nộp (nội bộ)",       color: "#6366F1" },
+    "Đang sửa feedback (nội bộ)": { label: "Đang sửa (nội bộ)",     color: "#F59E0B" },
+    "Đã sửa feedback (nội bộ)":   { label: "Đã sửa (nội bộ)",       color: "#14B8A6" },
+    "Đã gửi video (khách)":       { label: "Đã gửi (khách)",        color: "#06B6D4" },
+    "Đã nhận feedback (khách)":   { label: "Nhận feedback (khách)", color: "#EF4444" },
+    "Đã sửa feedback (khách)":    { label: "Đã sửa (khách)",        color: "#8B5CF6" },
+    // [L18a] value stays 'Revision' (load-bearing); only the VN display label changes.
+    "Revision":            { label: "Sửa lại",             color: "#EF4444" },
     "Hoàn tất":     { label: "Hoàn tất",     color: "#10B981" },
     "Quá hạn":      { label: "Quá hạn",      color: "#DC2626" },
     "Đã hủy":       { label: "Đã hủy",       color: "#52525B" },
 }
 
-// ─── Tabs config — matches Figma HOME-USER-VER-1.0 ─
-type TabId = "assignee" | "progress" | "overdue" | "revise" | "complete"
+// ─── Tabs config — mirrors the admin board (TaskWorkflowTabs) ─
+type TabId = "assignee" | "progress" | "internal" | "client" | "overdue" | "complete"
 
 interface TabConfig {
     id: TabId
@@ -41,15 +48,19 @@ interface TabConfig {
     color: string
 }
 
-// [QA R1 — user decision] Editor now gets a dedicated "Quá hạn" tab (mirrors the
-// admin board) so overdue tasks are clearly surfaced instead of being folded into
-// Progress. 'Đã hủy' intentionally has NO tab (cancelled tasks stay hidden).
+// [Bug#1 — task biến mất] The editor board now carries the SAME review-lifecycle tabs as the
+// admin board: "Duyệt nội bộ" (A2/A3/A4) + "Khách duyệt" (A5/A6/A7). Before this, a task the
+// review module auto-moved to A2 'Đã nộp video (nội bộ)' / A3 'Đang sửa feedback (nội bộ)'
+// matched NO editor tab and disappeared from the editor's home — so the editor got the feedback
+// email but had no way to open the task and fix it. Legacy 'Revision' folds into "Duyệt nội bộ".
+// ([bug-report #2] 'Sửa frame'/'Gửi lại'/'Tạm ngưng' removed. 'Đã hủy' has NO tab — stays hidden.)
 const TABS: TabConfig[] = [
-    { id: "assignee", label: "Được giao", statuses: ["Nhận task", "Đã nhận task", "Đang đợi giao", "Tạm ngưng"], color: "#8B5CF6" },
-    { id: "progress", label: "Đang làm", statuses: ["Đang thực hiện"],                                          color: "#EAB308" },
-    { id: "overdue",  label: "Quá hạn",  statuses: ["Quá hạn"],                                                 color: "#DC2626" },
-    { id: "revise",   label: "Cần sửa",   statuses: ["Revision", "Sửa frame", "Gửi lại"],                  color: "#F97316" },
-    { id: "complete", label: "Hoàn tất", statuses: ["Hoàn tất"],                                                color: "#10B981" },
+    { id: "assignee", label: "Được giao",    statuses: ["Nhận task", "Đã nhận task", "Đang đợi giao"],             color: "#8B5CF6" },
+    { id: "progress", label: "Đang làm",     statuses: ["Đang thực hiện"],                                          color: "#EAB308" },
+    { id: "internal", label: "Duyệt nội bộ", statuses: ["Đã nộp video (nội bộ)", "Đang sửa feedback (nội bộ)", "Đã sửa feedback (nội bộ)", "Revision"], color: "#F97316" },
+    { id: "client",   label: "Khách duyệt",  statuses: ["Đã gửi video (khách)", "Đã nhận feedback (khách)", "Đã sửa feedback (khách)"],                  color: "#06B6D4" },
+    { id: "overdue",  label: "Quá hạn",      statuses: ["Quá hạn"],                                                 color: "#DC2626" },
+    { id: "complete", label: "Hoàn tất",     statuses: ["Hoàn tất"],                                                color: "#10B981" },
 ]
 
 const PER_PAGE = 8
@@ -82,9 +93,10 @@ interface Props {
 }
 
 /**
- * UserWorkflowTabs — user-scoped task tabs + table per Figma.
+ * UserWorkflowTabs — user-scoped task tabs + table.
  *
- * - 4 tabs (no admin "Quá hạn" tab — overdue tasks roll into Progress).
+ * - 6 tabs mirroring the admin board (incl. "Duyệt nội bộ" + "Khách duyệt" review tabs) so no
+ *   review-lifecycle task falls out of every tab and disappears from the editor's home.
  * - Search input listens to global event 'user-home-search' from UserHomeTopBar
  *   so the top-bar search field controls this table.
  * - Pagination: Back / numbered pages / Next.

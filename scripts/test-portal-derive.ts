@@ -28,9 +28,7 @@ const EXPECTED: Record<string, string> = {
   'Đã nhận task': 'Received',
   'Đang thực hiện': 'In progress',
   'Revision': 'In revision',
-  'Sửa frame': 'In progress',
-  'Gửi lại': 'Revisions delivered',
-  'Tạm ngưng': 'On hold',
+  // [bug-report #2] 'Sửa frame' / 'Gửi lại' / 'Tạm ngưng' removed.
   'Quá hạn': 'In progress',
   'Hoàn tất': 'Completed',
   'Đã hủy': 'Closed',
@@ -42,8 +40,8 @@ const EXPECTED: Record<string, string> = {
   'Đã sửa feedback (khách)': 'In review',       // internalOnly → client_review phase
 }
 
-console.log('\n[1] Every VALID status has a frozen EN label (17 values)')
-check('EXPECTED covers all 17 valid statuses', Object.keys(EXPECTED).length === VALID_TASK_STATUSES.length,
+console.log('\n[1] Every VALID status has a frozen EN label (14 values)')
+check('EXPECTED covers all 14 valid statuses', Object.keys(EXPECTED).length === VALID_TASK_STATUSES.length,
   `expected ${VALID_TASK_STATUSES.length}, got ${Object.keys(EXPECTED).length}`)
 for (const value of VALID_TASK_STATUSES) {
   const got = clientLabelOf(value)

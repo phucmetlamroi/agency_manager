@@ -21,30 +21,31 @@
 import * as TaskStatuses from '../src/lib/task-statuses'
 import * as McpStatuses from '../mcp-server/src/services/statuses'
 
-/* ── FROZEN contract. P3 added the 6 video statuses (A2–A7): VALID 11→17, salary-pending
- *    6→12. The R1 money-safety invariant still holds — the 6 ORIGINAL pending are kept,
- *    the 3 non-pending traps stay excluded, salaryCompleted stays exactly 'Hoàn tất'. Any
- *    change here is a DELIBERATE payroll decision, never a silent side effect. ─────────── */
+/* ── FROZEN contract. P3 added the 6 video statuses (A2–A7). Bug-report #2 (owner 2026-07-07)
+ *    REMOVED 'Sửa frame' / 'Gửi lại' / 'Tạm ngưng': VALID 17→14, salary-pending 12→10. Sửa frame +
+ *    Gửi lại were salaryPending:true — existing rows migrate to 'Revision' (also pending) so NO editor
+ *    is under-counted (R1 preserved); 'Tạm ngưng' leaves the non-pending traps. 'Revision' + 'Đã hủy'
+ *    stay. salaryCompleted stays exactly 'Hoàn tất'. Any change here is a DELIBERATE payroll decision. ── */
 const FROZEN_VIDEO_6 = [
   'Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)',
   'Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)',
 ]
-const FROZEN_VALID_17 = [
+const FROZEN_VALID_14 = [
   'Đang đợi giao', 'Nhận task', 'Đã nhận task', 'Đang thực hiện', 'Revision',
-  'Sửa frame', 'Gửi lại', 'Tạm ngưng', 'Quá hạn', 'Hoàn tất', 'Đã hủy',
+  'Quá hạn', 'Hoàn tất', 'Đã hủy',
   ...FROZEN_VIDEO_6,
 ]
-// The 6 ORIGINAL salary-pending (R1 anchor) — must remain a SUBSET of pending forever.
-const FROZEN_PENDING_ORIGINAL_6 = [
-  'Nhận task', 'Đang đợi giao', 'Đang thực hiện', 'Revision', 'Gửi lại', 'Sửa frame',
+// The ORIGINAL salary-pending kept after #2 (R1 anchor) — must remain a SUBSET of pending forever.
+const FROZEN_PENDING_ORIGINAL_4 = [
+  'Nhận task', 'Đang đợi giao', 'Đang thực hiện', 'Revision',
 ]
-// The full P3 pending set = the original 6 + all 6 video statuses.
-const FROZEN_PENDING_12 = [...FROZEN_PENDING_ORIGINAL_6, ...FROZEN_VIDEO_6]
+// The full pending set = the kept original 4 + all 6 video statuses.
+const FROZEN_PENDING_10 = [...FROZEN_PENDING_ORIGINAL_4, ...FROZEN_VIDEO_6]
 const FROZEN_COMPLETED = 'Hoàn tất'
 const FROZEN_TERMINAL = ['Hoàn tất', 'Đã hủy']
 // Non-terminal-ish statuses that are deliberately NOT salary-pending. A naive
 // "non-terminal ⇒ pending" derivation would wrongly include these → underpay guard.
-const FROZEN_NOT_PENDING_TRAPS = ['Đã nhận task', 'Tạm ngưng', 'Quá hạn']
+const FROZEN_NOT_PENDING_TRAPS = ['Đã nhận task', 'Quá hạn']
 // Statuses the cron (check-deadline) must NOT flip to 'Quá hạn'. P3: the 3 legacy
 // terminal/overdue values PLUS the 6 video statuses (excluded so the cron can't wipe the
 // video lifecycle context — schema is frozen, so no overdueAt column; badge is derived).
@@ -91,13 +92,13 @@ function setEq(a: readonly string[], b: readonly string[]): boolean {
   return true
 }
 
-console.log('\n[1] Money constants pinned to frozen contract (P3: 17 values, 12 pending)')
-check('VALID_TASK_STATUSES length === 17', VALID.length === 17, `got ${VALID.length}`)
-check('VALID_TASK_STATUSES === frozen 17 (set)', setEq(VALID, FROZEN_VALID_17))
-check('SALARY_PENDING_STATUSES length === 12', PENDING.length === 12, `got ${PENDING.length}`)
-check('SALARY_PENDING_STATUSES === frozen 12 (set)', setEq(PENDING, FROZEN_PENDING_12))
-// R1 anchor: the ORIGINAL 6 pending must survive as a subset (no editor underpaid).
-for (const p of FROZEN_PENDING_ORIGINAL_6) {
+console.log('\n[1] Money constants pinned to frozen contract (#2: 14 values, 10 pending)')
+check('VALID_TASK_STATUSES length === 14', VALID.length === 14, `got ${VALID.length}`)
+check('VALID_TASK_STATUSES === frozen 14 (set)', setEq(VALID, FROZEN_VALID_14))
+check('SALARY_PENDING_STATUSES length === 10', PENDING.length === 10, `got ${PENDING.length}`)
+check('SALARY_PENDING_STATUSES === frozen 10 (set)', setEq(PENDING, FROZEN_PENDING_10))
+// R1 anchor: the kept ORIGINAL pending must survive as a subset (no editor underpaid).
+for (const p of FROZEN_PENDING_ORIGINAL_4) {
   check(`original pending "${p}" still salary-pending`, PENDING.includes(p))
 }
 for (const v of FROZEN_VIDEO_6) {
@@ -120,7 +121,7 @@ if (!META) {
   const values = META.map(m => m.value)
   check('meta covers exactly VALID_TASK_STATUSES', setEq(values, VALID))
   check('meta has no duplicate values', new Set(values).size === META.length)
-  check('meta.salaryPending derives frozen 12', setEq(META.filter(m => m.salaryPending).map(m => m.value), FROZEN_PENDING_12))
+  check('meta.salaryPending derives frozen 10', setEq(META.filter(m => m.salaryPending).map(m => m.value), FROZEN_PENDING_10))
   check('exported PENDING === meta-derived pending', setEq(PENDING, META.filter(m => m.salaryPending).map(m => m.value)))
   check('meta.terminal === {Hoàn tất, Đã hủy}', setEq(META.filter(m => m.terminal).map(m => m.value), FROZEN_TERMINAL))
   const salaryCompleted = META.filter(m => m.salaryCompleted).map(m => m.value)

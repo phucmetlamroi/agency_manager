@@ -16,9 +16,7 @@ export const VALID_TASK_STATUSES = [
     'Đã nhận feedback (khách)',
     'Đã sửa feedback (khách)',
     'Revision',
-    'Sửa frame',
-    'Gửi lại',
-    'Tạm ngưng',
+    // [bug-report #2] 'Sửa frame' / 'Gửi lại' / 'Tạm ngưng' removed (mirror src/lib/task-statuses.ts).
     'Quá hạn',
     'Hoàn tất',
     'Đã hủy',
@@ -35,8 +33,7 @@ export const SALARY_PENDING_STATUSES = [
     'Đang đợi giao',
     'Đang thực hiện',
     'Revision',
-    'Gửi lại',
-    'Sửa frame',
+    // [bug-report #2] 'Gửi lại' / 'Sửa frame' removed — existing rows migrate to 'Revision' (kept, also pending).
     // [P3/F2] the 6 video statuses all count as salary-pending (editor work in flight).
     'Đã nộp video (nội bộ)',
     'Đang sửa feedback (nội bộ)',

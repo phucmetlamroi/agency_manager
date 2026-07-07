@@ -29,13 +29,13 @@ export const VALID_TASK_STATUSES = [
     'Đã gửi video (khách)',       // A5 — admin approved & sent to the client (F10)
     'Đã nhận feedback (khách)',   // A6 — guest requested changes
     'Đã sửa feedback (khách)',    // A7 — editor confirmed the client fix
-    'Revision',                         // user delivery / admin reject → review
-    'Sửa frame',                  // Sửa frame — frame fix
-    'Gửi lại',               // Gửi lại — resubmit
-    'Tạm ngưng',             // Tạm ngưng — paused
+    'Revision',                         // user delivery / admin reject → review (KEPT — load-bearing)
+    // [bug-report #2] 'Sửa frame' / 'Gửi lại' / 'Tạm ngưng' REMOVED per owner (2026-07-07). Existing
+    // rows are remapped by scripts/migrate-drop-legacy-statuses.ts BEFORE deploy: Sửa frame→Revision,
+    // Gửi lại→Revision, Tạm ngưng→Đang thực hiện. 'Revision' + 'Đã hủy' stay valid.
     'Quá hạn',               // Quá hạn — overdue (cron-set)
     'Hoàn tất',              // Hoàn tất — completed
-    'Đã hủy',           // Đã hủy — cancelled
+    'Đã hủy',           // Đã hủy — cancelled (cancel/archive mechanism — kept, hidden from board via isArchived)
 ] as const
 
 export type TaskStatus = typeof VALID_TASK_STATUSES[number]
@@ -77,7 +77,7 @@ export interface TaskStatusMeta {
  * [F2] Attribute table for every task status. P0: the 11 legacy values ONLY (the 6
  * video statuses land in P3). salaryPending/terminal are assigned PER VALUE to
  * reproduce the pre-refactor constants EXACTLY — NOT derived from terminal-ness:
- * 'Đã nhận task', 'Tạm ngưng', 'Quá hạn' are non-terminal yet salaryPending=false.
+ * 'Đã nhận task', 'Quá hạn' are non-terminal yet salaryPending=false.
  * The snapshot-test (scripts/test-status-meta-snapshot.ts) is the hard gate. Rows are
  * listed in VALID_TASK_STATUSES order for easy diffing; `order` is the sort key.
  */
@@ -88,9 +88,9 @@ export const TASK_STATUS_META = [
     { value: 'Đã nhận task',   salaryPending: false, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 14, clientLabel: 'Received' },
     { value: 'Đang thực hiện', salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 20, clientLabel: 'In progress' },
     { value: 'Revision',       salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'internal_review', order: 44, clientLabel: 'In revision' },
-    { value: 'Sửa frame',      salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'internal_review', order: 46, clientLabel: 'In progress' },
-    { value: 'Gửi lại',        salaryPending: true,  salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'client_review',   order: 48, clientLabel: 'Revisions delivered' },
-    { value: 'Tạm ngưng',      salaryPending: false, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: true,  phase: 'production',      order: 16, clientLabel: 'On hold' },
+    // [bug-report #2] 'Sửa frame', 'Gửi lại', 'Tạm ngưng' rows REMOVED (owner 2026-07-07). SALARY_PENDING
+    // now derives to 10 (drops Sửa frame + Gửi lại — both salaryPending:true; existing rows migrate to
+    // 'Revision' which is also salaryPending, so no editor is under-counted). 'Tạm ngưng' was a non-pending trap.
     { value: 'Quá hạn',        salaryPending: false, salaryCompleted: false, terminal: false, internalOnly: false, cronOverdueEligible: false, phase: 'production',      order: 18, clientLabel: 'In progress' },
     { value: 'Hoàn tất',       salaryPending: false, salaryCompleted: true,  terminal: true,  internalOnly: false, cronOverdueEligible: false, phase: 'closed',          order: 90, clientLabel: 'Completed' },
     { value: 'Đã hủy',         salaryPending: false, salaryCompleted: false, terminal: true,  internalOnly: false, cronOverdueEligible: false, phase: 'closed',          order: 99, clientLabel: 'Closed' },
@@ -148,7 +148,7 @@ export const STATUS_TRANSITIONS: Record<string, string[]> = {
     // the internal round loops BACK into review (STATUS-MACHINE §3.1 diagram "A4 → …READY→ về A2" +
     // §3.3 predecessor "A1 lần đầu HOẶC A4 vòng lặp"). Without it a re-upload at A4 would strand the
     // task at A4 with the only forward auto-path being F10→client, pushing an un-reviewed cut out.
-    'Đã nộp video (nội bộ)':      ['Đang thực hiện', 'Sửa frame', 'Gửi lại', 'Revision', 'Đã sửa feedback (nội bộ)'], // F7
+    'Đã nộp video (nội bộ)':      ['Đang thực hiện', 'Revision', 'Đã sửa feedback (nội bộ)'], // F7
     'Đang sửa feedback (nội bộ)': ['Đã nộp video (nội bộ)'],                                        // F8
     'Đã sửa feedback (nội bộ)':   ['Đang sửa feedback (nội bộ)'],                                   // F9
     'Đã gửi video (khách)':       ['Đã sửa feedback (nội bộ)', 'Đã nộp video (nội bộ)', 'Đã sửa feedback (khách)'], // F10

@@ -48,7 +48,10 @@ export const getLeaderboardData = unstable_cache(
 
         const users = await workspacePrisma.user.findMany({
             where: { id: { in: userIds }, role: 'USER' },
-            select: { id: true, username: true, avatarUrl: true }
+            // [L17] displayName/nickname were NOT selected → the nice-name fallback below was dead
+            // code and every podium entry collapsed to the raw `username` (a legacy g_… handle for
+            // some accounts). Fetch them so real names resolve.
+            select: { id: true, username: true, displayName: true, nickname: true, avatarUrl: true }
         })
 
         // Combine data and calculate Error Rate & Rank
@@ -91,8 +94,8 @@ export const getLeaderboardData = unstable_cache(
 
             return {
                 id: u.id,
-                // [Username Handle] displayName for nice Vietnamese name, fallback to username handle — never email
-                username: (u as any).displayName?.trim() || u.username,
+                // [L17] Nice display name (never email): displayName → nickname → username handle.
+                username: (u as any).displayName?.trim() || (u as any).nickname?.trim() || u.username,
                 taskCount,
                 errorRate,
                 revenue,

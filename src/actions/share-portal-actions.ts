@@ -494,29 +494,31 @@ export async function createTaskViaToken(
 
     // Per-link burst guard (best-effort; the 256-bit token is the real wall).
     const rl = await rateLimit(`client-create-task:${scope.shareLinkId}`, 20, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Bạn gửi quá nhiều yêu cầu. Vui lòng thử lại sau.' }
+    // [L18a] These errors surface to the (English) client portal via CreateTaskPanel → keep them EN
+    // to match line 493; only the internal staff UI is Vietnamese.
+    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
 
     // Fail-closed scope checks — client cannot inject another profile's/client's id.
     if (!input || typeof input.workspaceId !== 'string' || typeof input.clientId !== 'number') {
-        return { success: false, error: 'Thiếu thông tin.' }
+        return { success: false, error: 'Missing information.' }
     }
-    if (!scope.workspaceIds.includes(input.workspaceId)) return { success: false, error: 'Tháng không hợp lệ.' }
-    if (!scope.clientIds.includes(input.clientId)) return { success: false, error: 'Brand không hợp lệ.' }
+    if (!scope.workspaceIds.includes(input.workspaceId)) return { success: false, error: 'Invalid month.' }
+    if (!scope.clientIds.includes(input.clientId)) return { success: false, error: 'Invalid brand.' }
 
     // The chosen month must still be ACTIVE.
     const ws = await prisma.workspace.findFirst({
         where: { id: input.workspaceId, status: 'ACTIVE' },
         select: { id: true },
     })
-    if (!ws) return { success: false, error: 'Tháng này không còn hoạt động.' }
+    if (!ws) return { success: false, error: 'This month is no longer active.' }
 
     // Validate + sanitize.
     const title = sanitizeClientText(input.title || '', TITLE_MAX_LEN)
-    if (!title) return { success: false, error: 'Vui lòng nhập tên dự án/video.' }
+    if (!title) return { success: false, error: 'Please enter a project / video name.' }
     const rawLink = cleanLink(input.rawLink)
-    if (!looksLikeUrl(rawLink)) return { success: false, error: 'Link raw không hợp lệ (phải bắt đầu bằng http/https).' }
+    if (!looksLikeUrl(rawLink)) return { success: false, error: 'Invalid raw link (must start with http/https).' }
     const brollLink = input.brollLink ? cleanLink(input.brollLink) : ''
-    if (brollLink && !looksLikeUrl(brollLink)) return { success: false, error: 'Link b-roll không hợp lệ.' }
+    if (brollLink && !looksLikeUrl(brollLink)) return { success: false, error: 'Invalid b-roll link.' }
     const notes = input.notes ? sanitizeClientText(input.notes, FEEDBACK_MAX_LEN) : ''
 
     // Encode to the format the admin TaskDetailModal parses (split('|') → RAW:/BROLL:).

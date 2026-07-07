@@ -11,6 +11,7 @@ import { getFolderScope, assertAssetInScope } from './folder-scope'
 import { apiError } from './errors'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { VALID_TASK_STATUSES, isValidStatus } from '@/lib/task-statuses'
+import { statusLabel } from '@/lib/display-labels'
 
 export interface ReviewStatusOption {
     value: string
@@ -20,7 +21,9 @@ export interface ReviewStatusOption {
 /** The dropdown's options — the app's task-status list, verbatim + in order (FR-D01 AC1). */
 export async function getReviewStatusOptions(): Promise<{ options: ReviewStatusOption[] }> {
     await requireReviewAccess() // logged-in internal member (blocks LOCKED/CLIENT/guest)
-    return { options: VALID_TASK_STATUSES.map((s) => ({ value: s, label: s })) }
+    // [L18a] value = raw stored status (verbatim, load-bearing); label = VN display (only the
+    // English 'Revision' is remapped by statusLabel; every other status passes through unchanged).
+    return { options: VALID_TASK_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })) }
 }
 
 /**

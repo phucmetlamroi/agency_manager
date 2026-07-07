@@ -16,6 +16,7 @@ import {
     type DragEvent as ReactDragEvent,
 } from 'react'
 import { Folder as FolderIcon, Film, Image as ImageIcon, MessageSquare, Loader2, AlertTriangle, X, Check, Layers, UploadCloud } from 'lucide-react'
+import { statusLabel } from '@/lib/display-labels'
 import { formatBytes } from '@/lib/review/upload-store'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
 import type { ItemRef } from '@/lib/review/team-actions'
@@ -87,7 +88,7 @@ export function StatusChip({ status }: { status: string | null }) {
             title={status}
         >
             <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: c }} />
-            <span className="truncate">{status}</span>
+            <span className="truncate">{statusLabel(status)}</span>
         </span>
     )
 }

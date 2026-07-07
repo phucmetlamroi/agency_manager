@@ -59,8 +59,10 @@ export async function GET(
             agencyName: (invoice.billingSnapshot as any).agencyName || 'Agency Manager',
             clientName: invoice.client.name,
             clientAddress: (invoice as any).clientAddress || '',
-            issueDate: invoice.issueDate.toLocaleDateString(),
-            dueDate: invoice.dueDate ? invoice.dueDate.toLocaleDateString() : 'On Receipt',
+            // [L18b] The invoice is client-facing for a UK client → en-GB (dd/mm/yyyy, stays English).
+            // A bare toLocaleDateString() ran under the server's en-US locale → US mm/dd/yyyy.
+            issueDate: invoice.issueDate.toLocaleDateString('en-GB'),
+            dueDate: invoice.dueDate ? invoice.dueDate.toLocaleDateString('en-GB') : 'On Receipt',
             subtotal: invoice.subtotalAmount.toString(),
             taxPercent: Number(invoice.taxPercent),
             taxAmount: invoice.taxAmount.toString(),

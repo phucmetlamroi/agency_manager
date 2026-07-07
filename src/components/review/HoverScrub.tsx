@@ -15,7 +15,7 @@
 // Not used for images, folders, or non-ready versions (parent gates that); mouse-only
 // so touch devices never trigger it (accepted per spec).
 
-import { useCallback, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent } from 'react'
 import { msToClock } from '@/lib/review/view-prefs'
 
 interface Cue {
@@ -95,6 +95,18 @@ export function HoverScrub({
     const loadingRef = useRef(false)
     const failedRef = useRef(false)
     const [active, setActive] = useState<ActiveFrame | null>(null)
+
+    // Invalidate the parsed-cue cache when the source version changes. Cards are keyed by
+    // asset id (stable across a version delete/detach), so this same HoverScrub instance is
+    // reused after the head version changes — without this reset it keeps serving the DELETED
+    // version's sprite frames on hover. Clearing the refs + active frame forces a re-fetch of
+    // the new head's storyboard (or a clean fall back to the poster).
+    useEffect(() => {
+        cuesRef.current = null
+        loadingRef.current = false
+        failedRef.current = false
+        setActive(null)
+    }, [storyboardVttUrl])
 
     const durationSec = durationMs && durationMs > 0 ? durationMs / 1000 : null
 

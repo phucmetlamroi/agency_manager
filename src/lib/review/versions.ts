@@ -227,13 +227,18 @@ export async function removeFromStack(versionId: string): Promise<{ newAssetId: 
             },
         })
         await tx.reviewVersion.update({ where: { id: versionId }, data: { assetId: newAssetId } })
-        await tx.reviewAsset.update({ where: { id: newAssetId }, data: { currentVersionId: versionId } })
 
-        // Old stack: re-point head if we removed the current version.
+        // Old stack: RELEASE/re-point its head FIRST if we removed the current version, so the
+        // @unique currentVersionId slot is freed BEFORE the new asset claims `versionId`. If we
+        // claimed on the new asset first, the old row would momentarily still hold `versionId`
+        // → two rows share the same non-null currentVersionId → Postgres P2002 → the generic
+        // "Lỗi hệ thống" the user hit when detaching the TOP/current version. versionId has
+        // already moved out (above), so highestLiveVersion(old) returns the next head (liveCount>1).
         if (asset.currentVersionId === versionId) {
-            const head = await highestLiveVersion(tx, asset.id) // versionId already moved out
+            const head = await highestLiveVersion(tx, asset.id)
             await tx.reviewAsset.update({ where: { id: asset.id }, data: { currentVersionId: head?.id ?? null } })
         }
+        await tx.reviewAsset.update({ where: { id: newAssetId }, data: { currentVersionId: versionId } })
         // Same folder → bytes unchanged; the folder just gained one asset.
         await tx.reviewFolder.update({ where: { id: asset.folderId }, data: { itemCount: { increment: 1 } } })
 
@@ -308,15 +313,17 @@ export async function mergeStacks(
             headId = v.id
             next += 1
         }
-        // Target head = the last (highest-numbered) moved version.
-        await tx.reviewAsset.update({ where: { id: targetAssetId }, data: { currentVersionId: headId, rowVersion: { increment: 1 } } })
-
-        // Source is consumed → soft-delete it (own batch), drop its head pointer.
+        // Source is consumed → soft-delete it (own batch) and DROP its head pointer FIRST, so the
+        // @unique currentVersionId slot is released BEFORE the target claims the same version id as
+        // its new head. source.currentVersionId still points at a moved version (often === headId),
+        // so setting target.currentVersionId = headId while source also holds it → P2002. Release, then claim.
         const batchId = randomUUID()
         await tx.reviewAsset.update({
             where: { id: sourceAssetId },
             data: { currentVersionId: null, deletedAt: new Date(), deletedById: access.userId, deleteBatchId: batchId },
         })
+        // Target head = the last (highest-numbered) moved version.
+        await tx.reviewAsset.update({ where: { id: targetAssetId }, data: { currentVersionId: headId, rowVersion: { increment: 1 } } })
 
         // Counters: bytes leave the source folder chain, join the target folder chain;
         // source folder loses one asset. (Same folder → the byte deltas net to zero.)

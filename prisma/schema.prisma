@@ -1658,8 +1658,9 @@ model ReviewAsset {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  versions   ReviewVersion[] @relation("ReviewStackVersions")
-  shareItems ShareLinkItem[]
+  versions      ReviewVersion[]     @relation("ReviewStackVersions")
+  shareItems    ShareLinkItem[]
+  subscriptions GuestSubscription[] // [P4/FR-11] guest email subs, keyed by (email, assetId)
 
   @@index([folderId, deletedAt])
   @@index([taskId])
@@ -1883,6 +1884,9 @@ model GuestSession {
   name  String // required before first comment (Frame.io-style prompt)
   email String // required with name; identity + notifications (P2); UK GDPR notice at UI
 
+  // [review-fixes P4/FR-11] set when this guest completed the 6-digit PIN double-opt-in.
+  emailVerifiedAt DateTime?
+
   userAgent   String?
   firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @default(now()) // updated per request, throttled 1/min
@@ -1891,6 +1895,44 @@ model GuestSession {
   reactions CommentReaction[]
 
   @@index([shareLinkId])
+}
+
+/// [review-fixes P4/FR-11] One in-flight 6-digit PIN for a guest email double-opt-in.
+/// Additive-only. codeHash reuses src/lib/otp.ts (SHA-256, constant-time compare).
+model GuestEmailVerification {
+  id          String    @id @default(cuid())
+  email       String // lowercase-normalized
+  codeHash    String // SHA-256 of the 6-digit code
+  shareLinkId String // the /r/{slug} link this request came through (URL context)
+  attempts    Int       @default(0) // wrong-PIN tries; locked at 5
+  expiresAt   DateTime // now()+10m
+  consumedAt  DateTime? // set once verified — a used code can't be replayed
+  requestIp   String? // consent log + rate-limit forensics
+  createdAt   DateTime  @default(now())
+
+  @@index([email, shareLinkId, createdAt])
+}
+
+/// [review-fixes P4/FR-11] A verified guest's email subscription to ONE review asset.
+/// Keyed by (email, assetId) — survives share-link (slug) rotation; shareLinkId keeps the
+/// newest slug for building email URLs. Additive-only; asset cascade-deletes its subs.
+model GuestSubscription {
+  id               String    @id @default(cuid())
+  email            String
+  assetId          String // primary key axis — outlives slug rotation
+  shareLinkId      String // newest /r/{slug} link for email deep-links
+  guestSessionId   String? // best-effort link back to the browser session
+  verifiedAt       DateTime // double-opt-in proof (UK GDPR)
+  verifyIp         String?
+  unsubscribedAt   DateTime? // soft — keep the row for audit
+  unsubscribeToken String    @unique @default(cuid())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  asset ReviewAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([email, assetId])
+  @@index([assetId, unsubscribedAt])
 }
 
 /// Append-only event log (feeds task activity + admin audit surfaces).

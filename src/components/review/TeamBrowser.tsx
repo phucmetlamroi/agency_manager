@@ -118,7 +118,7 @@ const SEL_CAP = 200 // FR-B11 multi-select cap
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
 function teamPath(workspaceId: string, folderId: string | null): string {
-    return folderId ? `/${workspaceId}/admin/team/folder/${folderId}` : `/${workspaceId}/admin/team`
+    return folderId ? `/${workspaceId}/team/folder/${folderId}` : `/${workspaceId}/team`
 }
 
 function parseFolderId(pathname: string): string | null {
@@ -424,7 +424,7 @@ export function TeamBrowser({
     const openAsset = useCallback(
         (asset: AssetDto) => {
             if (typeof window !== 'undefined') {
-                window.location.assign(`/${workspaceId}/admin/team/asset/${asset.id}`)
+                window.location.assign(`/${workspaceId}/team/asset/${asset.id}`)
             }
         },
         [workspaceId],
@@ -1193,14 +1193,14 @@ export function TeamBrowser({
                         </div>
                         <div className="flex items-center gap-1.5">
                             <a
-                                href={`/${workspaceId}/admin/team/shares`}
+                                href={`/${workspaceId}/team/shares`}
                                 title="Link chia sẻ"
                                 className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
                             >
                                 <Share2 size={15} />
                             </a>
                             <a
-                                href={`/${workspaceId}/admin/team/trash`}
+                                href={`/${workspaceId}/team/trash`}
                                 title="Thùng rác"
                                 className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
                             >

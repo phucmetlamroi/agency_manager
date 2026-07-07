@@ -250,8 +250,8 @@ function sleep(ms: number): Promise<void> {
 
 export function teamFolderUrl(workspaceId: string, folderId: string | null): string {
     const path = folderId
-        ? `/${workspaceId}/admin/team/folder/${encodeURIComponent(folderId)}`
-        : `/${workspaceId}/admin/team`
+        ? `/${workspaceId}/team/folder/${encodeURIComponent(folderId)}`
+        : `/${workspaceId}/team`
     const origin = typeof window !== 'undefined' ? window.location.origin : ''
     return `${origin}${path}`
 }

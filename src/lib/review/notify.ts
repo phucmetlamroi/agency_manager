@@ -27,7 +27,7 @@ export function reviewPlayerUrl(input: {
     if (input.versionId) qs.set('v', input.versionId)
     if (input.commentId) qs.set('comment', input.commentId)
     const suffix = qs.toString()
-    return `${base}/${input.workspaceId}/admin/team/asset/${input.assetId}${suffix ? `?${suffix}` : ''}`
+    return `${base}/${input.workspaceId}/team/asset/${input.assetId}${suffix ? `?${suffix}` : ''}`
 }
 
 /** Assignee + the task's profile OWNER/ADMIN (deduped). Empty when no task. */

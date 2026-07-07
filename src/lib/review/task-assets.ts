@@ -35,7 +35,7 @@ export interface TaskUploadContextDto {
 }
 
 export interface TaskAssetsResult {
-    /** The task's workspace — the client builds the player link `/{workspaceId}/admin/team/asset/{id}`. */
+    /** The task's workspace — the client builds the player link `/{workspaceId}/team/asset/{id}`. */
     workspaceId: string
     assets: TaskDeliverableDto[]
     uploadContext: TaskUploadContextDto

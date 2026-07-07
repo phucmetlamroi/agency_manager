@@ -440,7 +440,7 @@ function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; wo
     const v = asset.currentVersion
     const status = v?.uploadStatus
     const openReview = () => {
-        if (workspaceId) window.location.assign(`/${workspaceId}/admin/team/asset/${asset.assetId}`)
+        if (workspaceId) window.location.assign(`/${workspaceId}/team/asset/${asset.assetId}`)
     }
 
     // processing / uploaded (from another session) → transient

@@ -1,5 +1,5 @@
 // [Review module P2.6 + P6.2] Team → Recently Deleted (FR-B13 view + restore +
-// Delete-forever). The /admin layout gates entry; this page mounts the client trash
+// Delete-forever). The /team layout gates entry (membership-only); this page mounts the client trash
 // browser. Data comes from /api/review/trash + /trash/restore + /trash/purge (each
 // re-verifies membership; purge re-verifies workspace ADMIN).
 import { TeamTrash } from '@/components/review/TeamTrash'

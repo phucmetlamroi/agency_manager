@@ -223,7 +223,7 @@ function ReviewPlayerShellInner({
 
     const goBack = useCallback(() => {
         const folderId = asset?.folderId
-        router.push(folderId ? `/${workspaceId}/admin/team/folder/${folderId}` : `/${workspaceId}/admin/team`)
+        router.push(folderId ? `/${workspaceId}/team/folder/${folderId}` : `/${workspaceId}/team`)
     }, [router, workspaceId, asset?.folderId])
 
     if (loadError) {

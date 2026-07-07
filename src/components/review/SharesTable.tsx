@@ -79,7 +79,7 @@ export function SharesTable({ workspaceId }: { workspaceId: string }) {
             <div className="mx-auto max-w-5xl">
                 <div className="flex flex-wrap items-center gap-3">
                     <a
-                        href={`/${workspaceId}/admin/team`}
+                        href={`/${workspaceId}/team`}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
                         aria-label="Quay lại Team"
                     >

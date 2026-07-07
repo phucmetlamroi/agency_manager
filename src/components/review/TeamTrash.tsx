@@ -104,7 +104,7 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
     const [purgingKey, setPurgingKey] = useState<string | null>(null) // item id | PURGE_BULK_KEY | null
     const [purgeConfirm, setPurgeConfirm] = useState<{ refs: ItemRef[]; label: string; key: string } | null>(null)
 
-    const teamHref = `/${workspaceId}/admin/team`
+    const teamHref = `/${workspaceId}/team`
 
     // initial load (+ manual reload) — replaces the accumulated list with page 1.
     useEffect(() => {

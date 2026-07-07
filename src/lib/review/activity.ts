@@ -18,6 +18,10 @@ export const REVIEW_ACTIVITY = {
     STACK_MERGED: 'stack.merged', // drag asset onto asset → merged as newest version (FR-C01 path 2)
     STATUS_CHANGED: 'asset.status_changed', // member set the card status (FR-D01/D02; meta {old,new})
     TASK_COMPLETED_FROM_ASSET: 'task.completed_from_asset', // confirmTaskHoanTat (FR-D02/A05)
+    // ── P3-B: staff auto-transitions on the video lifecycle (F8/F9/F10; meta {from,to}) ──
+    TASK_FEEDBACK_CLOSED: 'task.feedback_closed', // F8 — admin closed the feedback session → A3
+    TASK_FIX_CONFIRMED: 'task.fix_confirmed', // F9 — editor confirmed the fix → A4 (internal) / A7 (client)
+    TASK_SENT_TO_CLIENT: 'task.sent_to_client', // F10 — admin approved & sent to client → A5
     // ── P4: player comments (FR-E03–E08) ──
     COMMENT_CREATED: 'comment.created', // new comment/reply on a version (meta {timecodeMs, isInternal, parentId})
     COMMENT_RESOLVED: 'comment.resolved', // Mark as Complete

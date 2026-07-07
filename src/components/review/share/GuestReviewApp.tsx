@@ -26,6 +26,8 @@ import { AnnotationCanvas } from '../player/AnnotationCanvas'
 import { AnnotationToolbar } from '../player/AnnotationToolbar'
 import { CommentsPanel } from '../player/CommentsPanel'
 import { TimelineMarkers } from '../player/TimelineMarkers'
+import { PendingRangeOverlay } from '../player/PendingRangeOverlay'
+import { useRangeSelection, useRangePlayback } from '../player/useRangeSelection'
 import { PlayerEnvProvider, type PlayerEnv } from '../player/player-env'
 
 type ReviewStateDto = GuestVersionView['reviewState']
@@ -221,6 +223,10 @@ function GuestStage({
 
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.versionId : null, fps, enabled })
     const feed = useComments(version?.versionId ?? null)
+
+    // [FR-04] Pending timecode/range shared with the timeline; range-playback loops [in,out].
+    const range = useRangeSelection()
+    const playRange = useRangePlayback(controller.frame, controller.seekToFrame, controller.play, controller.pause)
 
     // Annotation (guest can draw — public comments carry drawings too).
     const annotation = useAnnotation()
@@ -484,13 +490,22 @@ function GuestStage({
                             overlay={annotationOverlay}
                             clickToggleDisabled={annotation.active}
                             timelineChildren={
-                                <TimelineMarkers
-                                    comments={feed.comments}
-                                    fps={fps}
-                                    durationSec={controller.durationSec}
-                                    onSeek={ctlSeek}
-                                    onHighlight={setHighlightId}
-                                />
+                                <>
+                                    <TimelineMarkers
+                                        comments={feed.comments}
+                                        fps={fps}
+                                        durationSec={controller.durationSec}
+                                        onSeek={ctlSeek}
+                                        onHighlight={setHighlightId}
+                                    />
+                                    <PendingRangeOverlay
+                                        range={range}
+                                        fps={fps}
+                                        durationSec={controller.durationSec}
+                                        playheadFrame={controller.frame}
+                                        onPlayRange={playRange}
+                                    />
+                                </>
                             }
                         />
                     ) : (
@@ -522,6 +537,7 @@ function GuestStage({
                                 playheadFrame={controller.frame}
                                 durationMs={version.durationMs}
                                 annotation={canAnnotate && share.allowComments ? annotation : null}
+                                range={range}
                                 onSeekToFrame={ctlSeek}
                                 onPauseVideo={ctlPause}
                                 onFocusPlayer={onFocusPlayer}

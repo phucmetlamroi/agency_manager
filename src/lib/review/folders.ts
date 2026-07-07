@@ -14,6 +14,14 @@ import { prisma } from '@/lib/db'
 import { Prisma, ReviewState } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { requireReviewAccess } from './access'
+import {
+    getFolderScope,
+    isPathVisible,
+    isPathMutable,
+    assertFolderPathMutable,
+    assertFolderPathsMutable,
+    assertAssetInScope,
+} from './folder-scope'
 import { apiError } from './errors'
 import {
     serializeFolder,
@@ -349,7 +357,10 @@ export async function createFolderTree(input: {
 export async function getFolder(folderId: string): Promise<{ folder: FolderDto; breadcrumb: BreadcrumbItem[] }> {
     const folder = await prisma.reviewFolder.findFirst({ where: { id: folderId, deletedAt: null } })
     if (!folder) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
-    await requireReviewAccess({ workspaceId: folder.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: folder.workspaceId })
+    // [FR-03] editor chỉ xem folder trong phạm vi được giao (tổ tiên / self / con).
+    const scope = await getFolderScope({ userId: access.userId, workspaceId: folder.workspaceId, isAdmin: access.isAdmin })
+    if (!isPathVisible(scope, folder.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem thư mục này.')
 
     const ancestorIds = ancestorIdsAbove(folder)
     let breadcrumb: BreadcrumbItem[] = []
@@ -403,27 +414,37 @@ export async function listChildren(input: {
     const limit = Math.min(Math.max(input.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT)
 
     // Resolve the container folder + its workspace, THEN re-check access from it.
-    let container: { id: string; totalSizeBytes: bigint }
+    let container: { id: string; totalSizeBytes: bigint; path: string; workspaceId: string }
+    let access
     if (input.folderId == null) {
         if (!input.workspaceId) throw apiError(400, 'VALIDATION_ERROR', 'Thiếu workspaceId cho thư mục gốc.')
-        await requireReviewAccess({ workspaceId: input.workspaceId })
+        access = await requireReviewAccess({ workspaceId: input.workspaceId })
         const root = await readRoot(input.workspaceId)
         if (!root) {
             return { folders: [], assets: [], summary: { folderCount: 0, assetCount: 0, totalBytes: '0' }, nextCursor: null }
         }
-        const row = await prisma.reviewFolder.findUnique({ where: { id: root.id }, select: { id: true, totalSizeBytes: true } })
+        const row = await prisma.reviewFolder.findUnique({ where: { id: root.id }, select: { id: true, totalSizeBytes: true, path: true, workspaceId: true } })
         if (!row) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục gốc.')
         container = row
     } else {
         const row = await prisma.reviewFolder.findFirst({
             where: { id: input.folderId, deletedAt: null },
-            select: { id: true, workspaceId: true, totalSizeBytes: true },
+            select: { id: true, workspaceId: true, totalSizeBytes: true, path: true },
         })
         if (!row) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
-        await requireReviewAccess({ workspaceId: row.workspaceId })
-        container = { id: row.id, totalSizeBytes: row.totalSizeBytes }
+        access = await requireReviewAccess({ workspaceId: row.workspaceId })
+        container = row
     }
     const parentId = container.id
+
+    // [FR-03] editor folder-scope: ẩn folder/asset ngoài phạm vi được giao (UI TeamBrowser
+    // không đổi). Container không xem được → trả rỗng. Container là tổ tiên (visible-nhưng-
+    // -không-mutable) → chỉ hiện folder-con-on-path, KHÔNG hiện asset (asset chỉ ở folder được giao).
+    const scope = await getFolderScope({ userId: access.userId, workspaceId: container.workspaceId, isAdmin: access.isAdmin })
+    if (!isPathVisible(scope, container.path)) {
+        return { folders: [], assets: [], summary: { folderCount: 0, assetCount: 0, totalBytes: '0' }, nextCursor: null }
+    }
+    const showAssets = isPathMutable(scope, container.path)
 
     // Folders only on the first page (cursor paginates assets). Folders sort by name
     // (dir applied when the user sorts by name; else always ascending — §1.3).
@@ -437,19 +458,24 @@ export async function listChildren(input: {
         prisma.reviewAsset.count({ where: { folderId: parentId, deletedAt: null } }),
     ])
 
-    const assetRows = await prisma.reviewAsset.findMany({
-        where: { folderId: parentId, deletedAt: null },
-        include: { currentVersion: true },
-        orderBy: assetOrderBy(sort, dir),
-        take: limit + 1,
-        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
-    })
+    // [FR-03] con chỉ giữ folder xem được (tổ tiên on-path + self + con); asset chỉ khi mutable.
+    const visibleFolderRows = scope.unrestricted ? folderRows : folderRows.filter((f) => isPathVisible(scope, f.path))
+
+    const assetRows = showAssets
+        ? await prisma.reviewAsset.findMany({
+              where: { folderId: parentId, deletedAt: null },
+              include: { currentVersion: true },
+              orderBy: assetOrderBy(sort, dir),
+              take: limit + 1,
+              ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+          })
+        : []
     const hasMore = assetRows.length > limit
     const pageAssets = hasMore ? assetRows.slice(0, limit) : assetRows
     const nextCursor = hasMore ? pageAssets[pageAssets.length - 1].id : null
 
     const userRefs = await loadUserRefs([
-        ...folderRows.map((f) => f.createdById),
+        ...visibleFolderRows.map((f) => f.createdById),
         ...pageAssets.map((a) => a.createdById),
         ...pageAssets.map((a) => a.currentVersion?.uploaderId),
     ])
@@ -466,7 +492,7 @@ export async function listChildren(input: {
     const vCount = new Map(versionCounts.map((r) => [r.assetId, r._count._all]))
     const cSum = new Map(commentSums.map((r) => [r.assetId, r._sum.commentCount ?? 0]))
 
-    const folders = folderRows.map((f) =>
+    const folders = visibleFolderRows.map((f) =>
         serializeFolder(f, { createdBy: f.createdById ? userRefs.get(f.createdById) ?? null : null }),
     )
     const assets = pageAssets.map((a) => {
@@ -488,7 +514,12 @@ export async function listChildren(input: {
     return {
         folders,
         assets,
-        summary: { folderCount, assetCount, totalBytes: container.totalSizeBytes.toString() },
+        summary: {
+            // [FR-03] không lộ số lượng anh-chị-em ngoài phạm vi cho editor.
+            folderCount: scope.unrestricted ? folderCount : visibleFolderRows.length,
+            assetCount: showAssets ? assetCount : 0,
+            totalBytes: scope.unrestricted || showAssets ? container.totalSizeBytes.toString() : '0',
+        },
         nextCursor,
     }
 }
@@ -498,18 +529,21 @@ export async function listChildren(input: {
 export async function getFolderTree(
     workspaceId: string,
 ): Promise<{ folders: { id: string; parentId: string | null; name: string; hasChildren: boolean }[] }> {
-    await requireReviewAccess({ workspaceId })
+    const access = await requireReviewAccess({ workspaceId })
+    const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
     const rows = await prisma.reviewFolder.findMany({
         where: { workspaceId, deletedAt: null },
-        select: { id: true, parentId: true, name: true },
+        select: { id: true, parentId: true, name: true, path: true },
         orderBy: { name: 'asc' },
         take: TREE_CAP + 1,
     })
     if (rows.length > TREE_CAP) {
         throw apiError(400, 'VALIDATION_ERROR', 'Workspace vượt quá giới hạn số thư mục.', { reason: 'tree_cap' })
     }
-    const hasChild = new Set(rows.map((r) => r.parentId).filter((x): x is string => !!x))
-    return { folders: rows.map((r) => ({ id: r.id, parentId: r.parentId, name: r.name, hasChildren: hasChild.has(r.id) })) }
+    // [FR-03] editor chỉ thấy folder trong phạm vi được giao (tổ tiên on-path + self + con).
+    const visible = scope.unrestricted ? rows : rows.filter((r) => isPathVisible(scope, r.path))
+    const hasChild = new Set(visible.map((r) => r.parentId).filter((x): x is string => !!x))
+    return { folders: visible.map((r) => ({ id: r.id, parentId: r.parentId, name: r.name, hasChildren: hasChild.has(r.id) })) }
 }
 
 // ─────────────────────────── rename ───────────────────────────
@@ -521,7 +555,12 @@ export async function renameFolder(
     const name = validateName(input.name)
     const existing = await prisma.reviewFolder.findFirst({ where: { id: folderId, deletedAt: null } })
     if (!existing) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
-    await requireReviewAccess({ workspaceId: existing.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: existing.workspaceId })
+    // [FR-03] editor chỉ đổi tên folder trong phạm vi được giao.
+    assertFolderPathMutable(
+        await getFolderScope({ userId: access.userId, workspaceId: existing.workspaceId, isAdmin: access.isAdmin }),
+        existing.path,
+    )
 
     if (existing.rowVersion !== input.expectedRowVersion) {
         throw apiError(409, 'ROW_VERSION_MISMATCH', 'Thư mục đã bị thay đổi bởi người khác. Tải lại rồi thử lại.', {
@@ -550,7 +589,7 @@ export async function moveItems(input: {
 
     const [folderRows, assetRows] = await Promise.all([
         prisma.reviewFolder.findMany({ where: { id: { in: folderIds }, deletedAt: null } }),
-        prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: null } }),
+        prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: null }, include: { folder: { select: { path: true } } } }),
     ])
     if (folderRows.length !== folderIds.length || assetRows.length !== assetIds.length) {
         throw apiError(404, 'NOT_FOUND', 'Một hoặc nhiều mục không tồn tại.')
@@ -558,7 +597,10 @@ export async function moveItems(input: {
     const workspaces = new Set([...folderRows.map((f) => f.workspaceId), ...assetRows.map((a) => a.workspaceId)])
     if (workspaces.size !== 1) throw apiError(400, 'CROSS_WORKSPACE', 'Các mục không cùng workspace.')
     const workspaceId = [...workspaces][0]
-    await requireReviewAccess({ workspaceId })
+    const access = await requireReviewAccess({ workspaceId })
+    // [FR-03] editor chỉ di chuyển mục TRONG phạm vi được giao (nguồn); đích check trong tx.
+    const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
+    assertFolderPathsMutable(scope, [...folderRows.map((f) => f.path), ...assetRows.map((a) => a.folder.path)])
 
     // Ensure root (if target = root) BEFORE the mutation tx to avoid create-in-tx aborts.
     let resolvedTargetId = input.targetFolderId
@@ -571,6 +613,8 @@ export async function moveItems(input: {
         })
         if (!target) throw apiError(409, 'STATE_INVALID', 'Thư mục đích không hợp lệ hoặc đã bị xóa.')
         if (target.workspaceId !== workspaceId) throw apiError(400, 'CROSS_WORKSPACE', 'Thư mục đích khác workspace.')
+        // [FR-03] đích cũng phải nằm trong phạm vi được giao.
+        assertFolderPathMutable(scope, target.path)
 
         const moved: { type: ItemType; id: string; rowVersion: number }[] = []
 
@@ -645,7 +689,7 @@ export async function deleteItems(input: {
     const assetIds = input.items.filter((i) => i.type === 'asset').map((i) => i.id)
     const [folderRows, assetRows] = await Promise.all([
         prisma.reviewFolder.findMany({ where: { id: { in: folderIds }, deletedAt: null } }),
-        prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: null } }),
+        prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: null }, include: { folder: { select: { path: true } } } }),
     ])
     if (folderRows.length !== folderIds.length || assetRows.length !== assetIds.length) {
         throw apiError(404, 'NOT_FOUND', 'Một hoặc nhiều mục không tồn tại hoặc đã ở trong thùng rác.')
@@ -663,6 +707,9 @@ export async function deleteItems(input: {
             throw apiError(403, 'FORBIDDEN', 'Chỉ người tạo hoặc quản trị được xóa thư mục này.', { failedItemId: forbidden.id })
         }
     }
+    // [FR-03] editor chỉ xóa mục TRONG phạm vi được giao (cộng FR-B07 creator-only ở trên).
+    const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
+    assertFolderPathsMutable(scope, [...folderRows.map((f) => f.path), ...assetRows.map((a) => a.folder.path)])
 
     const now = new Date()
     await prisma.$transaction(async (tx) => {
@@ -929,7 +976,13 @@ export async function renameAsset(
     const name = validateAssetName(input.name)
     const existing = await prisma.reviewAsset.findFirst({ where: { id: assetId, deletedAt: null } })
     if (!existing) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
-    await requireReviewAccess({ workspaceId: existing.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: existing.workspaceId })
+    // [FR-03] editor chỉ đổi tên asset trong phạm vi được giao.
+    await assertAssetInScope(
+        await getFolderScope({ userId: access.userId, workspaceId: existing.workspaceId, isAdmin: access.isAdmin }),
+        assetId,
+        'write',
+    )
 
     if (existing.rowVersion !== input.expectedRowVersion) {
         throw apiError(409, 'ROW_VERSION_MISMATCH', 'Asset đã bị thay đổi bởi người khác. Tải lại rồi thử lại.', {
@@ -1013,7 +1066,7 @@ export async function copyItems(input: {
     const assetIds = input.items.filter((i) => i.type === 'asset').map((i) => i.id)
     const [srcFolders, srcAssets] = await Promise.all([
         prisma.reviewFolder.findMany({ where: { id: { in: folderIds }, deletedAt: null } }),
-        prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: null }, include: { currentVersion: true } }),
+        prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: null }, include: { currentVersion: true, folder: { select: { path: true } } } }),
     ])
     if (srcFolders.length !== folderIds.length || srcAssets.length !== assetIds.length) {
         throw apiError(404, 'NOT_FOUND', 'Một hoặc nhiều mục không tồn tại.')
@@ -1031,6 +1084,13 @@ export async function copyItems(input: {
     })
     if (!target) throw apiError(404, 'NOT_FOUND', 'Thư mục đích không hợp lệ hoặc đã bị xóa.')
     if (target.workspaceId !== workspaceId) throw apiError(400, 'CROSS_WORKSPACE', 'Thư mục đích khác workspace.')
+    // [FR-03] editor chỉ copy TỪ mục xem được (nguồn) VÀO đích trong phạm vi được giao.
+    const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
+    if (!scope.unrestricted) {
+        for (const f of srcFolders) if (!isPathVisible(scope, f.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền trên mục ngoài phạm vi được giao.')
+        for (const a of srcAssets) if (!isPathVisible(scope, a.folder.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền trên mục ngoài phạm vi được giao.')
+        assertFolderPathMutable(scope, target.path)
+    }
 
     // ---- plan phase (in memory) ----
     const plannedFolders: PlannedFolder[] = []
@@ -1331,12 +1391,20 @@ export async function getFolderManifest(
 ): Promise<{ folderName: string; files: { versionId: string; fileName: string; relPath: string }[]; truncated: boolean }> {
     const folder = await prisma.reviewFolder.findFirst({ where: { id: folderId, deletedAt: null } })
     if (!folder) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
-    await requireReviewAccess({ workspaceId: folder.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: folder.workspaceId })
+    // [FR-03] editor chỉ tải subtree trong phạm vi được giao; folder ngoài phạm vi → 403.
+    const scope = await getFolderScope({ userId: access.userId, workspaceId: folder.workspaceId, isAdmin: access.isAdmin })
+    if (!isPathVisible(scope, folder.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem thư mục này.')
 
     const subFolders = await prisma.reviewFolder.findMany({
         where: { path: { startsWith: folder.path }, deletedAt: null },
         select: { id: true, name: true, path: true },
     })
+    // [FR-03] chỉ liệt kê asset trong folder được giao (mutable) — folder tổ tiên xem-được
+    // nhưng KHÔNG lộ filename asset của người khác.
+    const includableFolderIds = scope.unrestricted
+        ? new Set(subFolders.map((f) => f.id))
+        : new Set(subFolders.filter((f) => isPathMutable(scope, f.path)).map((f) => f.id))
     // relative dir for a subfolder = names of the folders BELOW `folder` on its path.
     const nameById = new Map(subFolders.map((f) => [f.id, f.name]))
     const relDirOf = (f: { path: string }): string => {
@@ -1348,7 +1416,7 @@ export async function getFolderManifest(
     const relDirByFolderId = new Map(subFolders.map((f) => [f.id, relDirOf(f)]))
 
     const assets = await prisma.reviewAsset.findMany({
-        where: { folderId: { in: subFolders.map((f) => f.id) }, deletedAt: null },
+        where: { folderId: { in: [...includableFolderIds] }, deletedAt: null },
         include: { currentVersion: { select: { id: true, fileName: true, pipelineStatus: true, r2Key: true } } },
         orderBy: [{ folderId: 'asc' }, { name: 'asc' }],
     })

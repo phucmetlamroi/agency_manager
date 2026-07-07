@@ -52,8 +52,13 @@ export function useHlsPlayer(opts: {
     versionId: string | null
     fps: Fps | null
     enabled: boolean
+    // [BR-06/P5] `compact` = this player shares the viewport with another (Compare, F6).
+    // Compact players cap quality to their (smaller) box and DON'T pin the start level to
+    // the top rendition — that pinning is the single-player sharp-from-00:00 behaviour and
+    // would waste bandwidth × the number of streams. Single player (default) = false.
+    compact?: boolean
 }): PlayerController {
-    const { videoRef, versionId, fps, enabled } = opts
+    const { videoRef, versionId, fps, enabled, compact = false } = opts
     // P5.3: token minting + error copy come from the environment (internal VN
     // /api/review/* vs guest EN /api/r/{slug}/*). Ref'd so the big attach effect
     // does not re-run when the env object identity changes.
@@ -139,12 +144,31 @@ export function useHlsPlayer(opts: {
                     setReady(true)
                     return
                 }
-                // autoStartLoad:false so we can pin the START level to the TOP rendition
-                // before any media loads. hls.js otherwise starts on the lowest rendition
-                // and ABR climbs — a review tool must be sharp from 00:00 (the first
-                // seconds are exactly what reviewers scrutinize). ABR stays enabled
-                // afterwards; the quality menu can still pin a level or return to Auto.
-                const hls = new Hls({ enableWorker: true, lowLatencyMode: false, maxBufferLength: 30, autoStartLoad: false })
+                // [BR-06] Kill the "blurry first 4–5s". Root cause: hls.js defaults to the
+                // LOWEST rendition and runs a bandwidth probe before ABR climbs — a review
+                // tool must be sharp from 00:00 (the first seconds are exactly what reviewers
+                // scrutinize). Countermeasures, in order:
+                //   • autoStartLoad:false + pin startLevel to the TOP rendition (below) before
+                //     any media loads — the single-player sharp-from-frame-0 guarantee.
+                //   • testBandwidth:false — don't drop to a low level to probe the pipe; honour
+                //     the pinned startLevel instead.
+                //   • abrEwmaDefaultEstimate high — assume a fast connection until real
+                //     throughput data arrives, so ABR never *falls back* to a soft level early.
+                //   • startFragPrefetch — fetch the first fragment ASAP.
+                // ABR stays enabled afterwards; the quality menu can still pin a level or Auto.
+                // `capLevelToPlayerSize`: single player = false (allow top quality even when the
+                // element is small / before fullscreen); compact/Compare = true (cap to the box
+                // to keep 2 streams affordable). See {compact} in the hook opts.
+                const hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: false,
+                    maxBufferLength: compact ? 12 : 30,
+                    autoStartLoad: false,
+                    testBandwidth: false,
+                    abrEwmaDefaultEstimate: 5_000_000,
+                    startFragPrefetch: true,
+                    capLevelToPlayerSize: compact,
+                })
                 hlsRef.current = hls
                 hls.loadSource(url)
                 hls.attachMedia(video)
@@ -155,7 +179,10 @@ export function useHlsPlayer(opts: {
                         label: l.height ? `${l.height}p` : `#${i + 1}`,
                     }))
                     setLevels(lv)
-                    hls.startLevel = Math.max(0, hls.levels.length - 1) // begin at highest quality
+                    // Single player begins at the highest rendition (B6). A compact player lets
+                    // ABR choose within the player-size cap so a side-by-side Compare doesn't pull
+                    // 2× top-bitrate streams at once.
+                    if (!compact) hls.startLevel = Math.max(0, hls.levels.length - 1)
                     hls.startLoad()
                     setReady(true)
                 })

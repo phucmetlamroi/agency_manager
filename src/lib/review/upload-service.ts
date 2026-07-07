@@ -12,6 +12,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma, ReviewMediaKind, ReviewPipelineStatus, ReviewState } from '@prisma/client'
 import { requireReviewAccess, type ReviewAccessContext } from './access'
+import { getFolderScope, assertVersionInScope, assertAssetInScope, assertFolderPathMutable } from './folder-scope'
 import { apiError } from './errors'
 import { inngest, REVIEW_EVENTS } from './inngest'
 import { reviewLog } from './logger'
@@ -160,6 +161,9 @@ export async function initiateUpload(input: InitiateInput): Promise<InitiateResu
                 where: { id: input.target.folderId, workspaceId, deletedAt: null },
             })
             if (!folder) fail(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
+            // [FR-03] editor chỉ tạo asset trong folder được giao (mutable). Root free-upload
+            // (không folderId) tạo asset của chính editor nên nhánh else không chặn.
+            assertFolderPathMutable(await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin }), folder.path)
             folderId = folder.id
             const asset = await prisma.reviewAsset.create({
                 data: {
@@ -194,6 +198,8 @@ export async function initiateUpload(input: InitiateInput): Promise<InitiateResu
         })
         if (!asset) fail(404, 'NOT_FOUND', 'Không tìm thấy asset.')
         access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+        // [FR-03] editor chỉ chồng version lên asset trong phạm vi được giao.
+        await assertAssetInScope(await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }), asset.id, 'write')
         if (asset.mediaKind !== toPrismaKind(kind)) {
             fail(409, 'STATE_INVALID', 'Loại media không khớp với stack hiện có (không thể chồng ảnh lên video).')
         }
@@ -640,7 +646,7 @@ export async function initiateTaskUpload(input: {
     const task = await prisma.task.findFirst({
         where: { id: input.taskId },
         select: {
-            id: true, title: true, clientId: true, workspaceId: true, isArchived: true,
+            id: true, title: true, clientId: true, workspaceId: true, isArchived: true, assigneeId: true,
             client: { select: { name: true } },
             workspace: { select: { name: true } },
         },
@@ -650,6 +656,11 @@ export async function initiateTaskUpload(input: {
     if (task.isArchived) fail(409, 'STATE_INVALID', 'Task đã lưu trữ — không thể tải bản dựng lên.')
     const workspaceId = task.workspaceId // narrowed to string for the closures below
     const access = await requireReviewAccess({ workspaceId })
+    // [FR-03] editor chỉ bàn giao bản dựng cho task ĐƯỢC GIAO cho mình (folder-scope suy ra
+    // từ assigneeId); admin/owner workspace không giới hạn.
+    if (!access.isAdmin && task.assigneeId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền bàn giao bản dựng cho task ngoài phạm vi được giao.')
+    }
 
     const parsed = parseVideoTitle(task.title, task.client?.name ?? '')
     const clientIdStr = task.clientId != null ? String(task.clientId) : null
@@ -847,7 +858,13 @@ export async function getVersionPlaybackTokens(versionId: string): Promise<Playb
         select: { id: true, workspaceId: true, pipelineStatus: true, mediaKind: true, muxPlaybackId: true },
     })
     if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [FR-03] editor chỉ mint playback token cho version trong phạm vi được giao.
+    await assertVersionInScope(
+        await getFolderScope({ userId: access.userId, workspaceId: version.workspaceId, isAdmin: access.isAdmin }),
+        versionId,
+        'read',
+    )
     if (version.mediaKind !== ReviewMediaKind.VIDEO) {
         fail(409, 'STATE_INVALID', 'Chỉ video mới có playback token.')
     }
@@ -875,7 +892,13 @@ export async function getVersionDownloadUrl(versionId: string): Promise<Download
         select: { id: true, workspaceId: true, pipelineStatus: true, r2Key: true, fileName: true },
     })
     if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [FR-03] editor chỉ tải version trong phạm vi được giao.
+    await assertVersionInScope(
+        await getFolderScope({ userId: access.userId, workspaceId: version.workspaceId, isAdmin: access.isAdmin }),
+        versionId,
+        'read',
+    )
     if (version.pipelineStatus !== ReviewPipelineStatus.READY || !version.r2Key) {
         fail(409, 'STATE_INVALID', 'Phiên bản chưa sẵn sàng để tải xuống.')
     }

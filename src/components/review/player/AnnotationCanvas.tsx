@@ -86,20 +86,45 @@ export function AnnotationCanvas({
     const drawingRef = useRef(false)
 
     // Track the stage size so the content box recomputes on resize / fullscreen.
+    // [B7] Measure via getBoundingClientRect (sub-pixel, layout-accurate even during the
+    // first paint) with a clientWidth/Height fallback — the old clientWidth/Height-only
+    // read could return 0 on the frame the overlay mounts, leaving `box` null so the
+    // toolbar showed but pointerdown early-returned and NO stroke ever registered (the
+    // exact B7 symptom). A one-shot rAF re-measure catches a stage that finishes laying
+    // out a frame after mount; the ResizeObserver keeps it live afterwards.
     useLayoutEffect(() => {
         const el = rootRef.current
         if (!el) return
-        const update = () => setRootSize({ w: el.clientWidth, h: el.clientHeight })
+        const update = () => {
+            const r = el.getBoundingClientRect()
+            const w = r.width || el.clientWidth
+            const h = r.height || el.clientHeight
+            setRootSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }))
+        }
         update()
+        const raf = requestAnimationFrame(update)
         const ro = new ResizeObserver(update)
         ro.observe(el)
-        return () => ro.disconnect()
+        return () => {
+            cancelAnimationFrame(raf)
+            ro.disconnect()
+        }
     }, [])
 
     const box: ContentBox | null =
         intrinsicWidth && intrinsicHeight
             ? containedBox(rootSize.w, rootSize.h, intrinsicWidth, intrinsicHeight)
             : null
+
+    // [B7] Instrument the measurement so a "can't draw" report can be confirmed on real
+    // hardware without a code change: `localStorage['review:debug']='1'` in the console.
+    // Logs rootSize/intrinsics/box → if box is non-null but strokes still don't appear,
+    // the cause is elsewhere (not the measurement race this fix targets).
+    useEffect(() => {
+        if (typeof window === 'undefined' || window.localStorage?.getItem('review:debug') !== '1') return
+        // eslint-disable-next-line no-console
+        console.debug('[annotation] box', { editable, rootSize, intrinsicWidth, intrinsicHeight, box })
+    }, [editable, rootSize, intrinsicWidth, intrinsicHeight, box])
 
     // Abandon any half-drawn stroke if we leave edit mode.
     useEffect(() => {

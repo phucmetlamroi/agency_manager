@@ -12,13 +12,13 @@ import { looksLikeMedia } from './upload-helpers'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 // P1.6 janitor reconcile helpers (call-time-only cycle — see upload-service.ts note).
 import { expireInflightUpload, reconcileStuckUploadedVersion } from './upload-service'
-// P5.4 decision side-effects.
-import { syncTaskOnChangesRequested } from './task-sync'
+// P5.4 decision side-effects. P3-B: F7 auto-flip + manager notify.
+import { syncTaskOnChangesRequested, syncTaskFromReviewEvent } from './task-sync'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { audit } from '@/lib/audit-log'
 import { createAndBroadcastNotifications } from '@/actions/notification-actions'
-// P6.1 notifications.
-import { notifyReview, reviewPlayerUrl } from './notify'
+// P6.1 notifications. P3-B: manager status-flip notify.
+import { notifyReview, reviewPlayerUrl, notifyManagerOfReviewFlip } from './notify'
 // P6.2 trash purge.
 import { purgeExpiredTrash } from './purge'
 // P6.3 activity feed bridge.
@@ -130,6 +130,40 @@ async function applyMuxReady(
             actorUserId: version.uploaderId,
             meta: { versionNumber: version.versionNumber },
         })
+        // [P3-B / FR-07] Auto-flip the task → "Đã nộp video (nội bộ)" (A2) + email the manager.
+        // Direct write (Inngest has no session), predecessor-guarded so a late webhook can't drag
+        // an already-approved task back a step. Idempotent by construction: this whole applied-true
+        // branch runs at most once per version becoming ready (the atomic PROCESSING→READY flip),
+        // so the manager is emailed exactly once — no double-notify on webhook re-delivery / reconcile.
+        // Best-effort: the version is already READY; a task-flip failure must NOT fail the pipeline.
+        if (version.asset.taskId) {
+            try {
+                const flip = await syncTaskFromReviewEvent(
+                    version.asset.taskId,
+                    version.workspaceId,
+                    REVIEW_STATUS_MAP.submitted,
+                )
+                if (flip.applied) {
+                    void notifyManagerOfReviewFlip({
+                        taskId: version.asset.taskId,
+                        workspaceId: version.workspaceId,
+                        assetId: version.assetId,
+                        fromStatus: flip.from ?? '',
+                        toStatus: flip.to ?? REVIEW_STATUS_MAP.submitted,
+                        actorId: null, // system
+                        versionId,
+                        // uploader already gets the VIDEO_VERSION_UPLOADED in-app confirm above.
+                        alsoExcludeIds: [version.uploaderId],
+                    })
+                }
+            } catch (e) {
+                reviewLog('error', 'inngest.mux_ready.task_flip_failed', {
+                    versionId,
+                    taskId: version.asset.taskId,
+                    error: String(e),
+                })
+            }
+        }
         return 'applied'
     }
     // flip missed → classify the current state:
@@ -621,11 +655,16 @@ export const reviewShareDecision = inngest.createFunction(
         // FR-A05: request_changes AUTO-flips the task; approve only proposes (banner
         // comes from asset.statusId = "Hoàn tất", set by the decision route).
         let syncApplied = true
+        // [P3-B] The guest-change sync now retargets A5 → A6 ('Đã nhận feedback (khách)') when the
+        // task was already sent to the client, else keeps legacy 'Revision'. Capture the ACTUAL
+        // written status so the staff notification below states the real target, not an assumed one.
+        let syncTarget: string | undefined
         if (data.decision === 'request_changes') {
             const res = await step.run('sync-task-revision', () =>
                 syncTaskOnChangesRequested(data.taskId!, data.workspaceId),
             )
             syncApplied = !!res?.applied
+            syncTarget = res?.to
         }
 
         // Task feed event — the drawer's "Bình luận & hoạt động" merges AuditLog rows;
@@ -672,10 +711,10 @@ export const reviewShareDecision = inngest.createFunction(
                           title: `✏️ ${who} yêu cầu chỉnh sửa bản v${data.versionNumber}`,
                           // Only claim the task auto-flipped when it actually did — a
                           // race-lost / archived / bad-map sync returns applied:false and
-                          // the task kept its status; a false "đã chuyển Revision" would
-                          // mislead staff (finding P5-R#16).
+                          // the task kept its status; a false "đã chuyển …" would mislead
+                          // staff (finding P5-R#16). State the REAL target (A6 or Revision).
                           body: syncApplied
-                              ? `Task "${task.title}" đã tự chuyển sang "${REVIEW_STATUS_MAP.changesRequested}".`
+                              ? `Task "${task.title}" đã tự chuyển sang "${syncTarget ?? REVIEW_STATUS_MAP.changesRequested}".`
                               : `Task "${task.title}" — khách yêu cầu chỉnh sửa, kiểm tra trạng thái task.`,
                           taskId: data.taskId,
                       },

@@ -37,13 +37,26 @@ export function UploadTray() {
     if (items.length === 0) return null
 
     const agg = aggregateProgress(items)
-    const inFlight = agg.active + agg.queued
+    // [L15] Separate the TWO phases so the header/pill never show "100%" (processing) or a
+    // spurious "0%". The upload % is computed over ONLY the files still transferring — a file
+    // that finished uploading and is now transcoding on Mux no longer counts toward the bar
+    // (which is why the old aggregate flashed 100% / walked backwards as files changed phase).
+    const uploading = items.filter(
+        (it) => it.status === 'uploading' || it.status === 'queued' || it.status === 'paused',
+    )
+    const processing = items.filter((it) => it.status === 'completing' || it.status === 'processing')
+    const upBytes = uploading.reduce((s, it) => s + it.sizeBytes, 0)
+    const upDone = uploading.reduce((s, it) => s + Math.min(it.bytesUploaded, it.sizeBytes), 0)
+    const upPercent = upBytes > 0 ? Math.floor((upDone / upBytes) * 100) : 0
+    const inFlight = uploading.length + processing.length
     const headline =
-        inFlight > 0
-            ? `Đang tải lên ${inFlight} file — ${agg.percent}%`
-            : agg.failed > 0
-              ? `${agg.failed} file lỗi • ${agg.done} hoàn tất`
-              : `${agg.done} file hoàn tất`
+        uploading.length > 0
+            ? `Đang tải lên ${uploading.length} file — ${upPercent}%`
+            : processing.length > 0
+              ? `Đang xử lý ${processing.length} file…`
+              : agg.failed > 0
+                ? `${agg.failed} file lỗi • ${agg.done} hoàn tất`
+                : `${agg.done} file hoàn tất`
 
     return (
         <div className="fixed bottom-4 right-4 z-[9998] w-[360px] max-w-[calc(100vw-2rem)]">
@@ -54,8 +67,14 @@ export function UploadTray() {
                     className="ml-auto flex items-center gap-2 rounded-full border border-[rgba(139,92,246,0.3)] bg-zinc-950/90 px-4 py-2.5 text-[12px] font-medium text-zinc-200 shadow-2xl shadow-black/60 backdrop-blur-xl transition-colors hover:bg-zinc-900"
                 >
                     <UploadCloud size={15} className="text-violet-400" />
+                    {/* [L15] pill mirrors the header phases: upload % while transferring,
+                        "Đang xử lý…" while transcoding (no misleading 0%/100%). */}
                     <span>
-                        {inFlight > 0 ? `${inFlight} file` : `${agg.done} xong`} • {agg.percent}%
+                        {uploading.length > 0
+                            ? `${uploading.length} file • ${upPercent}%`
+                            : processing.length > 0
+                              ? 'Đang xử lý…'
+                              : `${agg.done} xong`}
                     </span>
                     <ChevronUp size={14} className="text-zinc-500" />
                 </button>

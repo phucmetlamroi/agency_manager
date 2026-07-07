@@ -7,8 +7,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock } from 'lucide-react'
-import { listAssetVersions, type AssetVersions, type VersionRow } from '@/lib/review/team-actions'
+import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock, UploadCloud } from 'lucide-react'
+import { toast } from 'sonner'
+import { listAssetVersions, apiMarkFeedbackDone, type AssetVersions, type VersionRow } from '@/lib/review/team-actions'
+import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
+import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
+import { canAutoTransition } from '@/lib/task-statuses'
+import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
+import { ReviewFlowActions } from './ReviewFlowActions'
 import type { Fps } from '@/lib/review/timecode'
 import type { AnnotationShape, CommentDto } from '@/lib/review/comment-client'
 import { useHlsPlayer } from './useHlsPlayer'
@@ -19,6 +25,8 @@ import { AnnotationCanvas } from './AnnotationCanvas'
 import { AnnotationToolbar } from './AnnotationToolbar'
 import { CommentsPanel } from './CommentsPanel'
 import { TimelineMarkers } from './TimelineMarkers'
+import { PendingRangeOverlay } from './PendingRangeOverlay'
+import { useRangeSelection, useRangePlayback } from './useRangeSelection'
 import { internalPlayerEnv, PlayerEnvProvider } from './player-env'
 
 type Tab = 'comments' | 'info'
@@ -84,6 +92,11 @@ function ReviewPlayerShellInner({
     const [highlightId, setHighlightId] = useState<string | null>(initialCommentId)
     const videoRef = useRef<HTMLVideoElement>(null)
     const didDeepLink = useRef(false)
+    // [B10] "Tải version mới" — the player had no upload affordance; a new version is a
+    // single video enqueued onto THIS asset ({kind:'asset'}), which the engine + server
+    // already support (write scope re-checked server-side). Drop OR file-picker.
+    const versionInputRef = useRef<HTMLInputElement>(null)
+    const [uploadDragOver, setUploadDragOver] = useState(false)
 
     // load the stack
     useEffect(() => {
@@ -116,6 +129,30 @@ function ReviewPlayerShellInner({
 
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.id : null, fps, enabled })
     const feed = useComments(version?.id ?? null)
+
+    // [P3-B] Derived task/role context for the F8/F9/F10 staff actions (server re-checks all).
+    const isAssignee = !!asset?.assigneeId && asset.assigneeId === currentUserId
+    // F9 gate: parent comments on the CURRENT version still open. F8 gate: any comment exists.
+    const unresolvedCount = useMemo(
+        () => feed.comments.filter((c) => c.parentId == null && c.completedAt == null).length,
+        [feed.comments],
+    )
+    const hasComments = feed.comments.length > 0
+    // A feedback session is "open" when an admin has feedback on a just-submitted (A2) cut.
+    const feedbackSessionOpen =
+        isAdmin && hasComments && canAutoTransition(asset?.taskStatus ?? '', REVIEW_STATUS_MAP.internalFeedbackOpen)
+
+    // Re-fetch the stack so the staff-action buttons reflect the new task status after a flip.
+    const reloadAsset = useCallback(() => {
+        listAssetVersions(assetId)
+            .then((res) => setData(res))
+            .catch(() => {/* keep last good data */})
+    }, [assetId])
+
+    // [FR-04] Pending timecode/range shared between the composer (right) and the timeline
+    // (left). range-playback loops [in,out] once, pausing at the out-point.
+    const range = useRangeSelection()
+    const playRange = useRangePlayback(controller.frame, controller.seekToFrame, controller.play, controller.pause)
 
     // Annotation draw state (P4.4). Owned here because BOTH the overlay and the
     // composer read it. `viewAnno` is the read-only "show this comment's drawing"
@@ -221,10 +258,79 @@ function ReviewPlayerShellInner({
         requestAnimationFrame(() => document.getElementById(`comment-${c.id}`)?.scrollIntoView({ block: 'center' }))
     }, [feed.comments, initialCommentId, ctlSeek])
 
-    const goBack = useCallback(() => {
+    const goBack = useCallback(async () => {
         const folderId = asset?.folderId
-        router.push(folderId ? `/${workspaceId}/admin/team/folder/${folderId}` : `/${workspaceId}/admin/team`)
-    }, [router, workspaceId, asset?.folderId])
+        const dest = folderId ? `/${workspaceId}/team/folder/${folderId}` : `/${workspaceId}/team`
+        // [FR-08] Leaving an OPEN feedback session (admin · task "Đã nộp video (nội bộ)" · ≥1 comment):
+        // offer to close it on the way out. OK = chốt phiên (flip → A3 + notify editor) rồi thoát;
+        // Cancel = thoát mà chưa chốt. Comments are already persisted on Enter — this only flips state.
+        if (feedbackSessionOpen) {
+            const ok = window.confirm(
+                'Đã gửi xong feedback cho editor?\n\nOK = chốt phiên (editor được thông báo cần sửa) rồi thoát.\nCancel = thoát, chưa chốt.',
+            )
+            if (ok) {
+                try {
+                    await apiMarkFeedbackDone(assetId)
+                } catch {
+                    /* best-effort — still leave */
+                }
+            }
+        }
+        router.push(dest)
+    }, [router, workspaceId, asset?.folderId, feedbackSessionOpen, assetId])
+
+    // [FR-08] Best-effort tab-close warning while a feedback session is open. The browser will
+    // NOT run the async flip on unload (fetches are killed) — this only surfaces the native
+    // "leave site?" prompt so an admin doesn't lose an in-progress session by accident. The
+    // reliable triggers are the "Kết thúc feedback" button + the goBack confirm above.
+    useEffect(() => {
+        if (!feedbackSessionOpen) return
+        const onBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault()
+            e.returnValue = ''
+        }
+        window.addEventListener('beforeunload', onBeforeUnload)
+        return () => window.removeEventListener('beforeunload', onBeforeUnload)
+    }, [feedbackSessionOpen])
+
+    // [B10] Enqueue a new version onto this asset. Video-only (same rule as the drawer
+    // BÀN GIAO strip); the ready card refresh comes from listAssetVersions on the next poll.
+    const uploadNewVersion = useCallback(
+        (file: File | null | undefined) => {
+            if (!file) return
+            const meta = validateFileMeta(file.name, file.size, file.type || 'application/octet-stream')
+            if (!meta.ok) {
+                toast.error(meta.message)
+                return
+            }
+            if (meta.kind !== 'VIDEO') {
+                toast.error('Chỉ tải lên video cho phiên bản mới.')
+                return
+            }
+            uploadEngine.enqueue(file, { kind: 'asset', assetId }, { targetLabel: asset?.name ?? 'Phiên bản mới' })
+            toast.success('Đang tải phiên bản mới…')
+        },
+        [assetId, asset?.name],
+    )
+
+    // [B10] Window guard: a file dropped ANYWHERE on the player page must not make the
+    // browser navigate away to open the file; also reset the drop overlay after any drop.
+    useEffect(() => {
+        const hasFiles = (dt: DataTransfer | null) => !!dt && Array.from(dt.types).includes('Files')
+        const onWinDragOver = (e: DragEvent) => {
+            if (hasFiles(e.dataTransfer)) e.preventDefault()
+        }
+        const onWinDrop = (e: DragEvent) => {
+            if (hasFiles(e.dataTransfer)) e.preventDefault()
+            setUploadDragOver(false)
+        }
+        window.addEventListener('dragover', onWinDragOver)
+        window.addEventListener('drop', onWinDrop)
+        return () => {
+            window.removeEventListener('dragover', onWinDragOver)
+            window.removeEventListener('drop', onWinDrop)
+        }
+    }, [])
 
     if (loadError) {
         return (
@@ -232,7 +338,7 @@ function ReviewPlayerShellInner({
                 <div className="text-center">
                     <p className="mb-3 text-sm">{loadError}</p>
                     <button onClick={goBack} className="rounded-lg bg-white/10 px-4 py-2 text-sm hover:bg-white/15">
-                        Quay lại Team
+                        Quay lại {REVIEW_MODULE_LABEL}
                     </button>
                 </div>
             </div>
@@ -289,6 +395,38 @@ function ReviewPlayerShellInner({
                     <h1 className="truncate text-sm font-semibold">{asset.name}</h1>
                 </div>
 
+                {/* [P3-B / FR-08·09·10] Staff auto-transition actions — visibility derived from
+                    task status + role; the server re-guards every flip. */}
+                <ReviewFlowActions
+                    assetId={assetId}
+                    taskStatus={asset.taskStatus}
+                    isAdmin={isAdmin}
+                    isAssignee={isAssignee}
+                    unresolvedCount={unresolvedCount}
+                    hasComments={hasComments}
+                    onDone={reloadAsset}
+                />
+
+                {/* [B10] Tải version mới */}
+                <input
+                    ref={versionInputRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                        uploadNewVersion(e.target.files?.[0])
+                        e.target.value = ''
+                    }}
+                />
+                <button
+                    onClick={() => versionInputRef.current?.click()}
+                    className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10"
+                    title="Tải phiên bản mới cho video này"
+                >
+                    <UploadCloud className="h-4 w-4 text-indigo-400" />
+                    <span className="hidden font-medium sm:inline">Tải version mới</span>
+                </button>
+
                 {/* Version selector */}
                 <div className="relative">
                     <button
@@ -340,7 +478,42 @@ function ReviewPlayerShellInner({
             {/* Body */}
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
                 {/* Stage */}
-                <div className="relative min-h-0 flex-1 bg-black">
+                <div
+                    className="relative min-h-0 flex-1 bg-black"
+                    onDragEnter={(e) => {
+                        if (Array.from(e.dataTransfer.types).includes('Files')) {
+                            e.preventDefault()
+                            setUploadDragOver(true)
+                        }
+                    }}
+                    onDragOver={(e) => {
+                        if (Array.from(e.dataTransfer.types).includes('Files')) {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'copy'
+                        }
+                    }}
+                    onDragLeave={(e) => {
+                        // Only clear when the pointer actually leaves the stage (not a child).
+                        if (!e.currentTarget.contains(e.relatedTarget as Node)) setUploadDragOver(false)
+                    }}
+                    onDrop={(e) => {
+                        if (Array.from(e.dataTransfer.types).includes('Files')) {
+                            e.preventDefault()
+                            setUploadDragOver(false)
+                            uploadNewVersion(e.dataTransfer.files?.[0])
+                        }
+                    }}
+                >
+                    {uploadDragOver && (
+                        <div className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm">
+                            <div className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-indigo-400 px-8 py-6 text-center">
+                                <UploadCloud className="h-9 w-9 text-indigo-200" />
+                                <p className="text-sm font-medium text-indigo-100">
+                                    Thả để tạo v{data.versions.reduce((m, v) => Math.max(m, v.versionNumber), 0) + 1}
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     {version && ready ? (
                         <VideoStage
                             videoRef={videoRef}
@@ -352,13 +525,22 @@ function ReviewPlayerShellInner({
                             overlay={annotationOverlay}
                             clickToggleDisabled={annotation.active}
                             timelineChildren={
-                                <TimelineMarkers
-                                    comments={feed.comments}
-                                    fps={fps}
-                                    durationSec={controller.durationSec}
-                                    onSeek={handleSeek}
-                                    onHighlight={setHighlightId}
-                                />
+                                <>
+                                    <TimelineMarkers
+                                        comments={feed.comments}
+                                        fps={fps}
+                                        durationSec={controller.durationSec}
+                                        onSeek={handleSeek}
+                                        onHighlight={setHighlightId}
+                                    />
+                                    <PendingRangeOverlay
+                                        range={range}
+                                        fps={fps}
+                                        durationSec={controller.durationSec}
+                                        playheadFrame={controller.frame}
+                                        onPlayRange={playRange}
+                                    />
+                                </>
                             }
                         />
                     ) : (
@@ -400,6 +582,7 @@ function ReviewPlayerShellInner({
                                     playheadFrame={controller.frame}
                                     durationMs={version.durationMs}
                                     annotation={canAnnotate ? annotation : null}
+                                    range={range}
                                     onSeekToFrame={handleSeek}
                                     onPauseVideo={onPauseVideo}
                                     onFocusPlayer={onFocusPlayer}

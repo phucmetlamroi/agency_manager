@@ -11,6 +11,7 @@ import type { Fps } from '@/lib/review/timecode'
 import type { CommentDto } from '@/lib/review/comment-client'
 import type { CommentsFeed } from './useComments'
 import type { AnnotationController } from './useAnnotation'
+import type { RangeController } from './useRangeSelection'
 import { CommentThread, type CommentActions } from './CommentItem'
 import { CommentComposer } from './CommentComposer'
 import { usePlayerEnv } from './player-env'
@@ -48,6 +49,7 @@ export function CommentsPanel({
     playheadFrame,
     durationMs,
     annotation,
+    range = null,
     onSeekToFrame,
     onPauseVideo,
     onFocusPlayer,
@@ -65,6 +67,8 @@ export function CommentsPanel({
     playheadFrame: number
     durationMs: number | null
     annotation: AnnotationController | null
+    /** [FR-04] shell-owned pending timecode/range for the top-level composer (null for guests-off). */
+    range?: RangeController | null
     onSeekToFrame: (frame: number) => void
     onPauseVideo: () => void
     onFocusPlayer: () => void
@@ -202,6 +206,7 @@ export function CommentsPanel({
                     playheadFrame={playheadFrame}
                     durationMs={durationMs}
                     annotation={annotation}
+                    range={range}
                     onPauseVideo={onPauseVideo}
                     onPosted={onPosted}
                     onFocusPlayer={onFocusPlayer}

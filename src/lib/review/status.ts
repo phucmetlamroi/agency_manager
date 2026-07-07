@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/db'
 import { requireReviewAccess } from './access'
+import { getFolderScope, assertAssetInScope } from './folder-scope'
 import { apiError } from './errors'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { VALID_TASK_STATUSES, isValidStatus } from '@/lib/task-statuses'
@@ -38,6 +39,9 @@ export async function setAssetStatus(
     const asset = await prisma.reviewAsset.findFirst({ where: { id: assetId, deletedAt: null } })
     if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
     const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    // [FR-03] editor chỉ đổi trạng thái asset trong phạm vi được giao (defense-in-depth —
+    // BR-04 đã bỏ UI StatusControl nhưng route vẫn tồn tại).
+    await assertAssetInScope(await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }), asset.id, 'write')
 
     if (input.expectedRowVersion !== undefined && asset.rowVersion !== input.expectedRowVersion) {
         throw apiError(409, 'ROW_VERSION_MISMATCH', 'Asset đã bị thay đổi. Tải lại rồi thử lại.', {

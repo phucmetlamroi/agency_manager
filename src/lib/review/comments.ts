@@ -10,6 +10,7 @@ import { Prisma, ReviewPipelineStatus, type ReviewVersion, type ReviewAsset } fr
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { requireReviewAccess } from './access'
+import { getFolderScope, assertVersionInScope } from './folder-scope'
 import { apiError } from './errors'
 import { presignPutObject, presignGetObject, headObject } from './r2'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
@@ -107,6 +108,14 @@ async function resolveVersionCtx(versionId: string): Promise<VersionCtx> {
     const asset = await prisma.reviewAsset.findFirst({ where: { id: version.assetId, deletedAt: null } })
     if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
     const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    // [FR-03] editor chỉ đọc/ghi comment trên version trong phạm vi được giao — funnel này
+    // gác MỌI entry point (list/create/edit/delete/resolve/reaction/attachment-raw). Out-of-scope
+    // = không xem được → chặn cả đọc lẫn ghi + rò ảnh đính kèm R2.
+    await assertVersionInScope(
+        await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }),
+        version.id,
+        'read',
+    )
     return { version, asset, access, isImage: asset.mediaKind === 'IMAGE' }
 }
 

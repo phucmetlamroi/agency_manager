@@ -13,6 +13,7 @@ import { prisma } from '@/lib/db'
 import { Prisma, ReviewPipelineStatus } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { requireReviewAccess } from './access'
+import { getFolderScope, assertAssetInScope } from './folder-scope'
 import { apiError } from './errors'
 import { pathIds, addBytesToAncestors } from './folders'
 import { serializeVersion, toUserRef, type VersionDto, type UserRef } from './dto'
@@ -53,20 +54,40 @@ export interface VersionRowDto extends VersionDto {
     isCurrent: boolean
 }
 export interface ListVersionsResult {
-    asset: { id: string; name: string; mediaKind: 'video' | 'image'; currentVersionId: string | null; folderId: string }
+    asset: {
+        id: string
+        name: string
+        mediaKind: 'video' | 'image'
+        currentVersionId: string | null
+        folderId: string
+        // [P3-B] task context so the player can gate the F8/F9/F10 staff actions by
+        // status + role. Null when the asset isn't attached to a task (Team-only).
+        taskId: string | null
+        taskStatus: string | null
+        assigneeId: string | null
+    }
     versions: VersionRowDto[]
 }
 
 export async function listVersions(assetId: string): Promise<ListVersionsResult> {
     const asset = await prisma.reviewAsset.findFirst({ where: { id: assetId, deletedAt: null } })
     if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
-    await requireReviewAccess({ workspaceId: asset.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    // [FR-03] editor chỉ xem version của asset trong phạm vi được giao.
+    await assertAssetInScope(await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }), asset.id, 'read')
 
     const versions = await prisma.reviewVersion.findMany({
         where: { assetId, deletedAt: null },
         orderBy: { versionNumber: 'desc' }, // newest → oldest (FR-C02)
     })
     const refs = await loadUserRefs(versions.map((v) => v.uploaderId))
+    // [P3-B] Task context for the player's F8/F9/F10 gating. Same-workspace scope for defense.
+    const task = asset.taskId
+        ? await prisma.task.findFirst({
+              where: { id: asset.taskId, workspaceId: asset.workspaceId },
+              select: { status: true, assigneeId: true },
+          })
+        : null
     return {
         asset: {
             id: asset.id,
@@ -74,6 +95,9 @@ export async function listVersions(assetId: string): Promise<ListVersionsResult>
             mediaKind: asset.mediaKind === 'VIDEO' ? 'video' : 'image',
             currentVersionId: asset.currentVersionId,
             folderId: asset.folderId,
+            taskId: asset.taskId,
+            taskStatus: task?.status ?? null,
+            assigneeId: task?.assigneeId ?? null,
         },
         versions: versions.map((v) => ({
             ...serializeVersion(v, {
@@ -116,6 +140,8 @@ export async function deleteVersion(
     const asset = await prisma.reviewAsset.findFirst({ where: { id: version.assetId, deletedAt: null } })
     if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
     const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    // [FR-03] editor chỉ xóa version của asset trong phạm vi được giao.
+    await assertAssetInScope(await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }), asset.id, 'write')
 
     const liveCount = await prisma.reviewVersion.count({ where: { assetId: asset.id, deletedAt: null } })
     const now = new Date()
@@ -178,6 +204,8 @@ export async function removeFromStack(versionId: string): Promise<{ newAssetId: 
     const asset = await prisma.reviewAsset.findFirst({ where: { id: version.assetId, deletedAt: null } })
     if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
     const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    // [FR-03] editor chỉ tách version của asset trong phạm vi được giao.
+    await assertAssetInScope(await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }), asset.id, 'write')
 
     const liveCount = await prisma.reviewVersion.count({ where: { assetId: asset.id, deletedAt: null } })
     if (liveCount <= 1) {
@@ -243,6 +271,12 @@ export async function mergeStacks(
     if (!source || !target) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset nguồn hoặc đích.')
     if (source.workspaceId !== target.workspaceId) throw apiError(400, 'CROSS_WORKSPACE', 'Hai asset khác workspace.')
     const access = await requireReviewAccess({ workspaceId: target.workspaceId })
+    // [FR-03] editor chỉ gộp khi CẢ nguồn + đích trong phạm vi được giao.
+    {
+        const scope = await getFolderScope({ userId: access.userId, workspaceId: target.workspaceId, isAdmin: access.isAdmin })
+        await assertAssetInScope(scope, sourceAssetId, 'write')
+        await assertAssetInScope(scope, targetAssetId, 'write')
+    }
     if (source.mediaKind !== target.mediaKind) {
         throw apiError(400, 'VALIDATION_ERROR', 'Không thể gộp ảnh và video vào cùng một stack.', { reason: 'media_kind' })
     }

@@ -1,5 +1,5 @@
 // [Review module P4.2] Full-page review player route: team/asset/[assetId]?v=&comment=.
-// The /admin layout already gates entry; the shell fetches the stack client-side via
+// The /team layout gates entry (membership-only); the shell fetches the stack client-side via
 // /api/review/* (each re-verifies workspace membership — defense in depth).
 import { ReviewPlayerShell } from '@/components/review/player/ReviewPlayerShell'
 import { getSession } from '@/lib/auth'

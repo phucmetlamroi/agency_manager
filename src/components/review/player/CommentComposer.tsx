@@ -10,11 +10,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Lock, Globe, Clock, X, Loader2, Send, PenLine, Brackets, Smile, ImagePlus, RotateCcw } from 'lucide-react'
+import { Lock, Globe, Clock, X, Loader2, Send, PenLine, Smile, ImagePlus, RotateCcw } from 'lucide-react'
 import { frameToSmpte, frameCount, type Fps } from '@/lib/review/timecode'
 import type { CommentDto } from '@/lib/review/comment-client'
 import { uploadCommentImage, validateImageFile, MAX_ATTACHMENTS, type UploadedAttachment } from '@/lib/review/comment-attachments'
 import type { AnnotationController } from './useAnnotation'
+import type { RangeController } from './useRangeSelection'
 import { EmojiPicker } from './EmojiPicker'
 import { usePlayerEnv } from './player-env'
 import { PLAYER_L10N } from './player-l10n'
@@ -41,6 +42,7 @@ export function CommentComposer({
     onPosted,
     onFocusPlayer,
     annotation = null,
+    range = null,
     parentId = null,
     parentIsInternal,
     autoFocus = false,
@@ -55,6 +57,10 @@ export function CommentComposer({
     onPosted: (c: CommentDto) => void
     onFocusPlayer: () => void
     annotation?: AnnotationController | null
+    /** [FR-04] Shell-owned pending timecode/range (top-level video comments only). The
+     *  timeline (left) and this composer (right) both read/write it. Absent for replies
+     *  / images → no timecode UI. */
+    range?: RangeController | null
     parentId?: string | null
     parentIsInternal?: boolean
     autoFocus?: boolean
@@ -65,12 +71,12 @@ export function CommentComposer({
     const isReply = parentId != null
     const isVideo = mediaKind === 'video'
     const canAnnotate = !isReply && isVideo && annotation != null
+    // [FR-04] The timecode/range lives in the shell (so the timeline can edit it too).
+    // Only top-level video comments get it; replies / images have no timecode UI.
+    const hasRange = !isReply && isVideo && range != null
     const [body, setBody] = useState('')
-    const [attachTime, setAttachTime] = useState(isVideo && !isReply)
     const [isInternal, setIsInternal] = useState(true)
     const [submitting, setSubmitting] = useState(false)
-    const [frozenFrame, setFrozenFrame] = useState<number | null>(null)
-    const [rangeEnd, setRangeEnd] = useState<number | null>(null)
     const [pickerOpen, setPickerOpen] = useState(false)
     const [attachments, setAttachments] = useState<PendingAttachment[]>([])
     const taRef = useRef<HTMLTextAreaElement>(null)
@@ -80,7 +86,20 @@ export function CommentComposer({
     const annoActive = canAnnotate && annotation!.active
     const annoCount = annotation?.shapes.length ?? 0
     // Annotation is pinned to a frame → force the timecode on while drawing.
-    const timeAttached = isVideo && !isReply && (attachTime || annoActive)
+    const timeAttached = hasRange && (range!.active || annoActive)
+    const rangeOut = range?.outFrame ?? null
+
+    // [FR-04] A fresh top-level video comment starts with the timecode attached (following
+    // the live playhead); switching version resets it. Non-video / replies get no timecode.
+    // Cleanup clears the pending marker when the composer unmounts (e.g. switching to the
+    // Info tab) so a stale range bar can't linger on the always-visible timeline.
+    useEffect(() => {
+        if (isReply) return
+        if (hasRange && isVideo) range!.activate()
+        else range?.clear()
+        return () => range?.clear()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [versionId])
 
     useEffect(() => {
         if (isReply) {
@@ -114,9 +133,9 @@ export function CommentComposer({
         return maxFrame != null ? Math.min(v, maxFrame) : v
     }
 
-    // The chip tracks the live playhead until the user starts typing / drawing (which
-    // pauses), then freezes at that frame.
-    const shownFrame = clampFrame(frozenFrame ?? playheadFrame)
+    // The chip tracks the live playhead until the user starts typing / drawing / drags a
+    // range handle (which freezes the in-point). State lives in the shell (`range`).
+    const shownFrame = clampFrame(range?.inFrame ?? playheadFrame)
 
     const setInternalPersist = (v: boolean) => {
         setIsInternal(v)
@@ -129,20 +148,13 @@ export function CommentComposer({
         }
     }
 
-    const freezeHere = (): number => {
-        const f = playheadFrame
-        setFrozenFrame(f)
-        return f
-    }
-
     // Apply a new body value + the "first character pauses + freezes the frame" side
     // effect (shared by typing and emoji-insert).
     const applyBody = (next: string) => {
         if (body.length === 0 && next.length > 0 && isVideo) {
             onPauseVideo()
-            if (!annoActive) setFrozenFrame(playheadFrame) // keep the draw frame if drawing
+            if (hasRange && !annoActive) range!.freezeIn(playheadFrame) // keep the draw frame if drawing
         }
-        if (next.length === 0 && !annoActive) setFrozenFrame(null)
         setBody(next)
     }
 
@@ -222,18 +234,12 @@ export function CommentComposer({
         })
     }
 
-    const enableRange = () => {
-        onPauseVideo()
-        setAttachTime(true)
-        const inF = frozenFrame ?? freezeHere()
-        setRangeEnd(clampFrame(Math.max(inF + 1, playheadFrame)))
-    }
-    const captureOut = () => setRangeEnd(clampFrame(Math.max(shownFrame + 1, playheadFrame)))
-
+    // [FR-04] The In–Out range is now dragged directly on the timeline (PendingRangeOverlay)
+    // — no more "Khoảng"/"Đặt cuối" chips. The composer only freezes the in-point + shows it.
     const beginDraw = () => {
         onPauseVideo()
-        setAttachTime(true)
-        const f = frozenFrame ?? freezeHere()
+        const f = range?.inFrame ?? playheadFrame
+        range?.freezeIn(f)
         annotation?.begin(f)
     }
 
@@ -252,7 +258,7 @@ export function CommentComposer({
         try {
             const startFrame = timeAttached ? shownFrame : null
             const endFrame =
-                startFrame != null && rangeEnd != null && rangeEnd > startFrame ? rangeEnd : null
+                startFrame != null && rangeOut != null && rangeOut > startFrame ? clampFrame(rangeOut) : null
             const shapes = annoActive && annoCount > 0 ? annotation!.shapes : undefined
             const { comment } = await env.api.createComment(versionId, {
                 body: text || undefined,
@@ -267,8 +273,10 @@ export function CommentComposer({
             })
             onPosted(comment)
             setBody('')
-            setFrozenFrame(null)
-            setRangeEnd(null)
+            // Reset the pending range but KEEP whether a timecode is attached (the old
+            // attachTime persisted across posts): re-arm following the playhead if it was on.
+            if (range?.active) range.activate()
+            else range?.clear()
             attachRef.current.forEach((a) => URL.revokeObjectURL(a.previewUrl)) // latest, not the stale closure
             setAttachments([])
             annotation?.reset()
@@ -295,24 +303,26 @@ export function CommentComposer({
 
     return (
         <div className={isReply ? 'pl-9 pr-1 pt-1' : 'border-t border-white/5 bg-zinc-950/80 p-2.5'}>
-            {/* timestamp + range + draw + visibility row (top-level only) */}
-            {!isReply && (
-                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+            {/* [B8/FR-05] meta row: timecode chip (left) + visibility toggle (anchored right).
+                NO flex-wrap + the toggle's ml-auto slot is FIXED, so the toggle can't hop
+                lines when the chip appears/disappears. The In–Out range chips are gone —
+                the range is dragged straight on the timeline (FR-04); the draw button moved
+                down to the action row so this row's width never changes the toggle position. */}
+            {!isReply && ((isVideo && hasRange) || env.can.internalToggle) && (
+                <div className="mb-1.5 flex items-center gap-1.5">
                     {isVideo &&
+                        hasRange &&
                         (timeAttached ? (
-                            <span className="flex items-center gap-1 rounded-md bg-indigo-500/15 px-2 py-1 text-xs font-medium text-indigo-300">
-                                <Clock className="h-3 w-3" />
+                            <span className="flex min-w-0 items-center gap-1 rounded-md bg-indigo-500/15 px-2 py-1 text-xs font-medium text-indigo-300">
+                                <Clock className="h-3 w-3 shrink-0" />
                                 <span className="font-mono tabular-nums">{smpte(shownFrame)}</span>
-                                {rangeEnd != null && rangeEnd > shownFrame && (
-                                    <span className="font-mono tabular-nums text-indigo-200/80"> – {smpte(rangeEnd)}</span>
+                                {rangeOut != null && rangeOut > shownFrame && (
+                                    <span className="font-mono tabular-nums text-indigo-200/80"> – {smpte(clampFrame(rangeOut))}</span>
                                 )}
                                 {!annoActive && (
                                     <button
-                                        onClick={() => {
-                                            setAttachTime(false)
-                                            setRangeEnd(null)
-                                        }}
-                                        className="opacity-50 hover:opacity-100"
+                                        onClick={() => range!.clear()}
+                                        className="shrink-0 opacity-50 hover:opacity-100"
                                         title={L.dropTime}
                                         aria-label={L.dropTime}
                                     >
@@ -322,53 +332,17 @@ export function CommentComposer({
                             </span>
                         ) : (
                             <button
-                                onClick={() => setAttachTime(true)}
+                                onClick={() => range!.activate()}
                                 className="flex items-center gap-1 rounded-md border border-dashed border-white/15 px-2 py-1 text-xs text-white/50 hover:text-white/80"
                             >
                                 <Clock className="h-3 w-3" /> {L.attachTime}
                             </button>
                         ))}
 
-                    {/* range In–Out */}
-                    {isVideo &&
-                        timeAttached &&
-                        (rangeEnd != null && rangeEnd > shownFrame ? (
-                            <button
-                                onClick={captureOut}
-                                className="flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/15"
-                                title={L.setOutTitle}
-                            >
-                                <Brackets className="h-3 w-3" /> {L.setOut}
-                            </button>
-                        ) : (
-                            <button
-                                onClick={enableRange}
-                                className="flex items-center gap-1 rounded-md border border-dashed border-white/15 px-2 py-1 text-xs text-white/50 hover:text-white/80"
-                                title={L.rangeTitle}
-                            >
-                                <Brackets className="h-3 w-3" /> {L.range}
-                            </button>
-                        ))}
-
-                    {/* draw / annotation */}
-                    {canAnnotate && (
-                        <button
-                            onClick={annoActive ? () => annotation!.reset() : beginDraw}
-                            className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
-                                annoActive ? 'bg-indigo-500 text-white' : 'border border-dashed border-white/15 text-white/50 hover:text-white/80'
-                            }`}
-                            title={annoActive ? L.drawExitTitle : L.drawTitle}
-                        >
-                            <PenLine className="h-3 w-3" />
-                            {annoActive ? L.drawing(annoCount) : L.draw}
-                        </button>
-                    )}
-
-                    <div className="flex-1" />
                     {env.can.internalToggle && (
                         <button
                             onClick={() => setInternalPersist(!isInternal)}
-                            className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
+                            className={`ml-auto flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
                                 isInternal ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'
                             }`}
                             title={isInternal ? L.internalOnTitle : L.internalOffTitle}
@@ -424,6 +398,27 @@ export function CommentComposer({
                     placeholder={isReply ? L.placeholderReply : annoActive ? L.placeholderDrawing : L.placeholder}
                     className="min-h-[38px] flex-1 resize-none rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-indigo-400/50 focus:outline-none"
                 />
+
+                {/* [FR-05] draw button lives in the action row now (kept out of the meta row
+                    so it never nudges the visibility toggle) */}
+                {canAnnotate && (
+                    <button
+                        type="button"
+                        onClick={annoActive ? () => annotation!.reset() : beginDraw}
+                        className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-lg transition ${
+                            annoActive ? 'bg-indigo-500 text-white' : 'text-white/50 hover:bg-white/10 hover:text-white/80'
+                        }`}
+                        title={annoActive ? L.drawExitTitle : L.drawTitle}
+                        aria-label={L.draw}
+                    >
+                        <PenLine className="h-4 w-4" />
+                        {annoActive && annoCount > 0 && (
+                            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-white px-1 text-[10px] font-bold text-indigo-600">
+                                {annoCount}
+                            </span>
+                        )}
+                    </button>
+                )}
 
                 {/* emoji */}
                 <div className="relative">

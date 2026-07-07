@@ -12,6 +12,7 @@
 // share (P5); they are intentionally absent here, not stubbed with dead buttons.
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
+import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 import { toast } from 'sonner'
 import {
     Film,
@@ -26,14 +27,12 @@ import {
     RotateCcw,
     Clapperboard,
     CheckCircle2,
-    Link2,
 } from 'lucide-react'
 import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
 import { useTaskUploads } from '@/lib/review/use-upload-store'
 import { formatBytes, type UploadItem } from '@/lib/review/upload-store'
 import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
 import { apiConfirmTaskComplete } from '@/lib/review/team-actions'
-import { apiGetOrCreateAssetShare } from '@/lib/review/share-admin-client'
 import type { TaskAssetsResult, TaskDeliverableDto } from '@/lib/review/task-assets'
 import type { ReviewStateDto } from '@/lib/review/dto'
 
@@ -115,7 +114,7 @@ export function TaskReviewUploadSection({
             return
         }
         if (meta.kind !== 'VIDEO') {
-            toast.error('Mục bàn giao chỉ nhận video. Ảnh sẽ hỗ trợ ở trình duyệt Team.')
+            toast.error(`Mục bàn giao chỉ nhận video. Ảnh sẽ hỗ trợ ở trình duyệt ${REVIEW_MODULE_LABEL}.`)
             return
         }
         setPendingFile(file)
@@ -440,7 +439,7 @@ function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; wo
     const v = asset.currentVersion
     const status = v?.uploadStatus
     const openReview = () => {
-        if (workspaceId) window.location.assign(`/${workspaceId}/admin/team/asset/${asset.assetId}`)
+        if (workspaceId) window.location.assign(`/${workspaceId}/team/asset/${asset.assetId}`)
     }
 
     // processing / uploaded (from another session) → transient
@@ -524,23 +523,23 @@ function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; wo
                         </span>
                     )}
                 </div>
-                <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
-                    <span className="min-w-0 truncate text-[10.5px] text-zinc-500">
+                {/* [B1+FR-12] flex-wrap so the meta text + button never overflow the narrow
+                    drawer column; the "Copy link khách" button was removed (FR-12 — editors
+                    open review directly), which alone makes this row airy. */}
+                <div className="mt-auto flex flex-wrap items-end justify-between gap-2 pt-1.5">
+                    <span className="min-w-0 flex-1 truncate text-[10.5px] text-zinc-500">
                         {v.uploadedBy?.name ? `${v.uploadedBy.name} • ` : ''}
                         {formatClock(v.createdAt)}
                         {v.commentCount > 0 ? ` • ${v.commentCount} bình luận` : ''}
                     </span>
-                    <span className="flex shrink-0 items-center gap-1.5">
-                        <CopyGuestLinkButton assetId={asset.assetId} />
-                        <button
-                            type="button"
-                            onClick={openReview}
-                            disabled={!workspaceId}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#A855F7] disabled:opacity-50"
-                        >
-                            <PlayCircle size={13} /> Mở review
-                        </button>
-                    </span>
+                    <button
+                        type="button"
+                        onClick={openReview}
+                        disabled={!workspaceId}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#A855F7] disabled:opacity-50"
+                    >
+                        <PlayCircle size={13} /> Mở review
+                    </button>
                 </div>
             </div>
         </div>
@@ -555,34 +554,4 @@ function formatClock(iso: string): string {
     const dd = String(d.getDate()).padStart(2, '0')
     const mo = String(d.getMonth() + 1).padStart(2, '0')
     return `${hh}:${mm} ${dd}/${mo}`
-}
-
-/** [P5.5] "Copy link khách" (FR-A06 AC3): first click creates the asset's default
- *  share link, every click copies its URL to the clipboard. One click, one toast. */
-function CopyGuestLinkButton({ assetId }: { assetId: string }) {
-    const [busy, setBusy] = useState(false)
-    const onClick = async () => {
-        if (busy) return
-        setBusy(true)
-        try {
-            const { share } = await apiGetOrCreateAssetShare(assetId)
-            await navigator.clipboard.writeText(share.url)
-            toast.success('Đã sao chép link cho khách.')
-        } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Không tạo được link cho khách.')
-        } finally {
-            setBusy(false)
-        }
-    }
-    return (
-        <button
-            type="button"
-            onClick={() => void onClick()}
-            disabled={busy}
-            title="Tạo/copy link review cho khách (không cần tài khoản)"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1.5 text-[11px] font-semibold text-zinc-200 transition-colors hover:bg-white/[0.1] disabled:opacity-50"
-        >
-            {busy ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Copy link khách
-        </button>
-    )
 }

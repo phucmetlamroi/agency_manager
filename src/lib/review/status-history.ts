@@ -6,6 +6,7 @@
 
 import { prisma } from '@/lib/db'
 import { requireReviewAccess } from './access'
+import { getFolderScope, assertAssetInScope } from './folder-scope'
 import { apiError } from './errors'
 import { REVIEW_ACTIVITY } from './activity'
 
@@ -38,7 +39,9 @@ const LABELS: Record<string, string> = {
 export async function getAssetStatusHistory(assetId: string): Promise<{ entries: StatusHistoryEntry[] }> {
     const asset = await prisma.reviewAsset.findFirst({ where: { id: assetId }, select: { id: true, workspaceId: true } })
     if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
-    await requireReviewAccess({ workspaceId: asset.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    // [FR-03] editor chỉ xem lịch sử trạng thái asset trong phạm vi được giao.
+    await assertAssetInScope(await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }), asset.id, 'read')
 
     const rows = await prisma.reviewActivity.findMany({
         where: { assetId, type: { in: HISTORY_TYPES } },

@@ -8,6 +8,7 @@
 
 import { prisma } from '@/lib/db'
 import { requireReviewAccess } from './access'
+import { getFolderScope, isPathVisible } from './folder-scope'
 import { apiError } from './errors'
 import { serializeVersion, toUserRef, type VersionDto } from './dto'
 import { buildMediaLinks } from './media-links'
@@ -62,13 +63,17 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
     if (!task.workspaceId) throw apiError(409, 'STATE_INVALID', 'Task chưa thuộc workspace nào.')
     const workspaceId = task.workspaceId
     // Defense in depth: re-verify workspace membership from the resolved scope.
-    await requireReviewAccess({ workspaceId })
+    const access = await requireReviewAccess({ workspaceId })
+    // [FR-03] editor chỉ thấy deliverable trong folder được giao — ẩn asset ngoài phạm vi
+    // TRƯỚC serialize để không mint token thumbnail/storyboard Mux cho chúng.
+    const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
 
-    const assetRows = await prisma.reviewAsset.findMany({
+    const allAssetRows = await prisma.reviewAsset.findMany({
         where: { taskId: task.id, workspaceId, deletedAt: null },
         orderBy: { createdAt: 'asc' },
-        include: { currentVersion: true },
+        include: { currentVersion: true, folder: { select: { path: true } } },
     })
+    const assetRows = scope.unrestricted ? allAssetRows : allAssetRows.filter((a) => isPathVisible(scope, a.folder.path))
 
     // Resolve uploader display for each head version in one round-trip.
     const uploaderIds = Array.from(

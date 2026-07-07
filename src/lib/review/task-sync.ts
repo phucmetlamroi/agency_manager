@@ -18,6 +18,10 @@ import { reviewLog } from './logger'
 import { isValidStatus, canAutoTransition, STATUS_TRANSITIONS } from '@/lib/task-statuses'
 import { STATUS_REQUIRES_NULL_DEADLINE } from '@/lib/task-invariants'
 import { notifyManagerOfReviewFlip } from './notify'
+// [P4/BR-05 bridge] portal link-up + guest E1 — imported lazily-safe (all server libs).
+import { getOrCreatePrimaryShareForAsset } from './shares'
+import { notifyGuestsOfAsset } from './guest-notify'
+import { guestAppBaseUrl } from './guest-emails/wrap'
 
 export async function confirmTaskHoanTat(taskId: string): Promise<{ ok: true; taskId: string; status: string }> {
     // Guard: at least one LIVE review asset for this task must be at the approved status.
@@ -40,6 +44,14 @@ export async function confirmTaskHoanTat(taskId: string): Promise<{ ok: true; ta
     }
 
     await prisma.$transaction(async (tx) => {
+        // [P4/R3] Settle the portal VIEW: a task completed out of the client-review phase must not
+        // stay stuck on Task.clientReview='AWAITING' (→ deriveClientStatus "Awaiting your review" +
+        // needsYou=true forever). Only settle tasks that were actually in the client flow
+        // (clientReview not null); a purely-internal completion keeps clientReview null.
+        await tx.task.updateMany({
+            where: { id: taskId, workspaceId: asset.workspaceId, clientReview: { not: null } },
+            data: { clientReview: 'APPROVED', clientReviewedAt: new Date() },
+        })
         await recordActivity(tx, {
             type: REVIEW_ACTIVITY.TASK_COMPLETED_FROM_ASSET,
             workspaceId: asset.workspaceId,
@@ -149,7 +161,16 @@ export async function syncTaskOnChangesRequested(
         return { applied: false, from: task.status, to: task.status }
     }
     const target = canAutoTransition(task.status, client) ? client : legacy
-    return syncTaskFromReviewEvent(taskId, workspaceId, target)
+    const result = await syncTaskFromReviewEvent(taskId, workspaceId, target)
+    // [P4/R3] Reflect the guest's decision on the portal VIEW so it doesn't stay stuck on "Awaiting
+    // your review". Only when we actually entered the CLIENT-review round (A6); the legacy internal
+    // 'Revision' target is not a client-facing decision. Best-effort (the flip already committed).
+    if (result.applied && target === client) {
+        await prisma.task
+            .updateMany({ where: { id: taskId, workspaceId }, data: { clientReview: 'CHANGES', clientReviewedAt: new Date() } })
+            .catch((e) => reviewLog('error', 'task_sync.client_review_write_failed', { taskId, error: String(e) }))
+    }
+    return result
 }
 
 // ─────────────────────── [P3-B] Staff auto-transition actions (F8 / F9 / F10) ───────────────
@@ -305,5 +326,75 @@ export async function approveInternalAndSendToClient(
         actorUserId: access.userId,
         meta: { from: task.status, to: target },
     })
+
+    // [P4 / BR-05 + FR-10-portal] Bridge review → client portal — runs ONLY here (admin Duyệt),
+    // NEVER on Mux READY (R5: an unapproved internal cut must never reach the client). Best-effort:
+    // the A5 flip already committed, so a bridge failure must not 500 the approve.
+    //   1. get-or-create the ACTIVE share for this asset (the /r/{slug} the client watches on);
+    //   2. light the portal: Task.clientReview='AWAITING' (→ deriveClientStatus "Awaiting your
+    //      review" + the portal Approve/Request-changes buttons) + point productLink at the review;
+    //   3. E1 VERSION_SENT → email any guests already subscribed to this asset (round ≥ 2).
+    try {
+        const { share } = await getOrCreatePrimaryShareForAsset(asset.id)
+        const reviewUrl = `${guestAppBaseUrl()}/r/${share.slug}`
+        // Don't clobber a real staff-entered delivery URL: productLink is a first-class, staff-editable
+        // field surfaced to the client (portal "Open review" + the taskDelivered email). Only (re)write
+        // it when it's empty or already a /r/ review link (safe to repoint at the current slug).
+        const current = await prisma.task.findFirst({
+            where: { id: asset.taskId, workspaceId: asset.workspaceId },
+            select: { productLink: true },
+        })
+        const setReviewLink = !current?.productLink || current.productLink.includes('/r/')
+        await prisma.task.updateMany({
+            where: { id: asset.taskId, workspaceId: asset.workspaceId },
+            data: { clientReview: 'AWAITING', clientReviewedAt: null, ...(setReviewLink ? { productLink: reviewUrl } : {}) },
+        })
+        void notifyGuestsOfAsset({ assetId: asset.id, event: 'version_sent' })
+    } catch (e) {
+        reviewLog('error', 'task_sync.bridge_failed', { taskId: asset.taskId, assetId: asset.id, error: String(e) })
+    }
     return { ok: true, taskId: asset.taskId, status: target }
+}
+
+/**
+ * [P4/R5 — BLOCKER fix] A NEW version just became the head of `assetId`. If that asset's task was
+ * already SENT to the client (Task.clientReview='AWAITING'), the client's /r/{slug} share — which
+ * serves the stack HEAD, not a pinned version — would immediately expose this new, un-re-approved
+ * internal cut. That breaks R5 ("an unapproved internal cut must never reach the client"): the
+ * approve→client bridge gates the EMAIL + the clientReview signal, but NOT video visibility, and
+ * a ShareLink can only ever track HEAD (it references the asset/stack, never a versionId).
+ *
+ * So when a fresh head lands on a client-sent task, REVOKE the asset's active shares and clear the
+ * client signal. The client's link goes dead until the admin re-Duyệt (approveInternalAndSendToClient),
+ * which get-or-creates a FRESH active share + re-emails the guest — i.e. the client only ever sees
+ * an ADMIN-approved cut. No-op when the task was never sent (clientReview not 'AWAITING'), so the
+ * first-cut A1→A2 path and internal-only rounds are untouched. Best-effort: never throws.
+ */
+export async function revokeClientExposureOnNewVersion(
+    taskId: string,
+    assetId: string,
+    workspaceId: string,
+): Promise<void> {
+    try {
+        const task = await prisma.task.findFirst({
+            where: { id: taskId, workspaceId },
+            select: { clientReview: true },
+        })
+        // Only act when the client currently holds a live link (was sent + not yet decided-terminal).
+        if (task?.clientReview !== 'AWAITING') return
+        const sharesRevoked = await prisma.$transaction(async (tx) => {
+            const r = await tx.shareLink.updateMany({
+                where: { items: { some: { assetId } }, revokedAt: null },
+                data: { revokedAt: new Date() },
+            })
+            await tx.task.updateMany({
+                where: { id: taskId, workspaceId, clientReview: 'AWAITING' },
+                data: { clientReview: null, clientReviewedAt: null },
+            })
+            return r.count
+        })
+        reviewLog('info', 'task_sync.client_exposure_revoked', { taskId, assetId, sharesRevoked })
+    } catch (e) {
+        reviewLog('error', 'task_sync.revoke_exposure_failed', { taskId, assetId, error: String(e) })
+    }
 }

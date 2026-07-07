@@ -492,9 +492,44 @@ export async function listChildren(input: {
     const vCount = new Map(versionCounts.map((r) => [r.assetId, r._count._all]))
     const cSum = new Map(commentSums.map((r) => [r.assetId, r._sum.commentCount ?? 0]))
 
-    const folders = visibleFolderRows.map((f) =>
-        serializeFolder(f, { createdBy: f.createdById ? userRefs.get(f.createdById) ?? null : null }),
-    )
+    // [L11] Self-heal the folder counters (the task-upload path never maintains itemCount /
+    // totalSizeBytes, so they read 0 → "X mục • 0 B dù có video 10MB"). Per folder, compute:
+    //   • cnt   = DIRECT-children count (subfolders + direct assets) — this is the DTO's documented
+    //             "N mục" semantic AND the input to the delete-confirmation warning, so it must stay
+    //             direct-children, not recursive (else deleting a folder of empty subfolders drops
+    //             its "và N mục bên trong" warning).
+    //   • bytes = RECURSIVE subtree bytes over ALL live versions (matches liveStackBytes, the metric
+    //             the denormalized rollup accumulates — not just the head version).
+    // Materialized path "/{rootId}/…/{id}/" → `d.path LIKE pf.path || '%'` = self + descendants;
+    // the trailing slash blocks sibling-prefix false matches (/a/ vs /ab/). Gated to unrestricted
+    // (admin): a folder-scoped editor must not get a recursive total spanning out-of-scope
+    // descendants (FR-03). Every pf.id yields exactly one row (subquery form, no INNER-JOIN drop).
+    const recAgg = new Map<string, { cnt: number; bytes: string }>()
+    if (scope.unrestricted) {
+        const aggIds = [...visibleFolderRows.map((f) => f.id), container.id]
+        const rows = await prisma.$queryRaw<{ folderId: string; cnt: number; bytes: string }[]>`
+            SELECT pf.id AS "folderId",
+                ((SELECT COUNT(*) FROM "ReviewFolder" cf WHERE cf."parentId" = pf.id AND cf."deletedAt" IS NULL)
+                 + (SELECT COUNT(*) FROM "ReviewAsset" ca WHERE ca."folderId" = pf.id AND ca."deletedAt" IS NULL))::int AS cnt,
+                COALESCE((
+                    SELECT SUM(v."sizeBytes")
+                    FROM "ReviewFolder" d
+                    JOIN "ReviewAsset" a ON a."folderId" = d.id AND a."deletedAt" IS NULL
+                    JOIN "ReviewVersion" v ON v."assetId" = a.id AND v."deletedAt" IS NULL
+                    WHERE d.path LIKE pf.path || '%' AND d."deletedAt" IS NULL
+                ), 0)::text AS bytes
+            FROM "ReviewFolder" pf
+            WHERE pf.id IN (${Prisma.join(aggIds)})
+        `
+        for (const r of rows) recAgg.set(r.folderId, { cnt: Number(r.cnt), bytes: r.bytes })
+    }
+
+    const folders = visibleFolderRows.map((f) => {
+        const dto = serializeFolder(f, { createdBy: f.createdById ? userRefs.get(f.createdById) ?? null : null })
+        // Unrestricted → live-recomputed counters (direct-child count + recursive bytes);
+        // restricted → keep the denormalized/gated value untouched.
+        return scope.unrestricted ? { ...dto, itemCount: recAgg.get(f.id)?.cnt ?? 0, totalBytes: recAgg.get(f.id)?.bytes ?? '0' } : dto
+    })
     const assets = pageAssets.map((a) => {
         const v = a.currentVersion
         const currentVersion = v
@@ -518,7 +553,13 @@ export async function listChildren(input: {
             // [FR-03] không lộ số lượng anh-chị-em ngoài phạm vi cho editor.
             folderCount: scope.unrestricted ? folderCount : visibleFolderRows.length,
             assetCount: showAssets ? assetCount : 0,
-            totalBytes: scope.unrestricted || showAssets ? container.totalSizeBytes.toString() : '0',
+            // [L11] Meta-header bytes = recursive subtree total of the current folder (unrestricted);
+            // restricted keeps the existing gated denormalized value.
+            totalBytes: scope.unrestricted
+                ? recAgg.get(container.id)?.bytes ?? '0'
+                : showAssets
+                  ? container.totalSizeBytes.toString()
+                  : '0',
         },
         nextCursor,
     }

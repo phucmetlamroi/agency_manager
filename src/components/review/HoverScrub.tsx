@@ -181,10 +181,11 @@ export function HoverScrub({
                         style={{ left: `${active.xFrac * 100}%` }}
                         aria-hidden
                     />
-                    {/* timecode tooltip */}
+                    {/* timecode tooltip — [L19] clamp x so the center-translated label can't be
+                        clipped by the container's overflow-hidden at the far-left / far-right edge. */}
                     <div
                         className="pointer-events-none absolute bottom-1 -translate-x-1/2 rounded bg-black/80 px-1 py-px text-[10px] font-medium tabular-nums text-white"
-                        style={{ left: `${active.xFrac * 100}%` }}
+                        style={{ left: `clamp(1.75rem, ${active.xFrac * 100}%, calc(100% - 1.75rem))` }}
                         aria-hidden
                     >
                         {msToClock(active.time * 1000) ?? '0:00'}

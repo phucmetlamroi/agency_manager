@@ -57,6 +57,7 @@ export function CommentsPanel({
     highlightId,
     onJumpToVersion,
     readOnly = false,
+    textOnly = false,
 }: {
     versionId: string
     fps: Fps | null
@@ -77,6 +78,8 @@ export function CommentsPanel({
     onJumpToVersion: (versionId: string) => void
     /** P5.3 guest comments-off: render existing public comments but no composer/reply. */
     readOnly?: boolean
+    /** [F6/P5 Compare] force the composer text-only (no draw/range/emoji/attach), keep playhead timecode. */
+    textOnly?: boolean
 }) {
     const env = usePlayerEnv()
     const L = PLAYER_L10N[env.lang]
@@ -210,6 +213,7 @@ export function CommentsPanel({
                     onPauseVideo={onPauseVideo}
                     onPosted={onPosted}
                     onFocusPlayer={onFocusPlayer}
+                    textOnly={textOnly}
                 />
             )}
         </div>

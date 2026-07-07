@@ -47,6 +47,7 @@ export function CommentComposer({
     parentIsInternal,
     autoFocus = false,
     onCancel,
+    textOnly = false,
 }: {
     versionId: string
     fps: Fps | null
@@ -65,15 +66,19 @@ export function CommentComposer({
     parentIsInternal?: boolean
     autoFocus?: boolean
     onCancel?: () => void
+    /** [F6/P5 Compare] Text-only mode: no draw/range/emoji/attachment UI, but the comment
+     *  STILL attaches to the current playhead so it stays click-to-seek. Used by CompareView. */
+    textOnly?: boolean
 }) {
     const env = usePlayerEnv()
     const L = PLAYER_L10N[env.lang]
     const isReply = parentId != null
     const isVideo = mediaKind === 'video'
-    const canAnnotate = !isReply && isVideo && annotation != null
+    const canAnnotate = !isReply && isVideo && annotation != null && !textOnly
     // [FR-04] The timecode/range lives in the shell (so the timeline can edit it too).
     // Only top-level video comments get it; replies / images have no timecode UI.
-    const hasRange = !isReply && isVideo && range != null
+    // [F6] textOnly suppresses the range UI but keeps the playhead-attached timecode.
+    const hasRange = !isReply && isVideo && range != null && !textOnly
     const [body, setBody] = useState('')
     const [isInternal, setIsInternal] = useState(true)
     const [submitting, setSubmitting] = useState(false)
@@ -86,7 +91,8 @@ export function CommentComposer({
     const annoActive = canAnnotate && annotation!.active
     const annoCount = annotation?.shapes.length ?? 0
     // Annotation is pinned to a frame → force the timecode on while drawing.
-    const timeAttached = hasRange && (range!.active || annoActive)
+    // [F6] textOnly always attaches to the playhead (so compare comments stay seekable).
+    const timeAttached = textOnly ? isVideo && !isReply : hasRange && (range!.active || annoActive)
     const rangeOut = range?.outFrame ?? null
 
     // [FR-04] A fresh top-level video comment starts with the timecode attached (following
@@ -308,8 +314,15 @@ export function CommentComposer({
                 lines when the chip appears/disappears. The In–Out range chips are gone —
                 the range is dragged straight on the timeline (FR-04); the draw button moved
                 down to the action row so this row's width never changes the toggle position. */}
-            {!isReply && ((isVideo && hasRange) || env.can.internalToggle) && (
+            {!isReply && ((isVideo && (hasRange || textOnly)) || env.can.internalToggle) && (
                 <div className="mb-1.5 flex items-center gap-1.5">
+                    {/* [F6] text-only comments carry the current playhead as a read-only timecode. */}
+                    {isVideo && textOnly && (
+                        <span className="flex min-w-0 items-center gap-1 rounded-md bg-indigo-500/15 px-2 py-1 text-xs font-medium text-indigo-300">
+                            <Clock className="h-3 w-3 shrink-0" />
+                            <span className="font-mono tabular-nums">{smpte(shownFrame)}</span>
+                        </span>
+                    )}
                     {isVideo &&
                         hasRange &&
                         (timeAttached ? (
@@ -420,38 +433,41 @@ export function CommentComposer({
                     </button>
                 )}
 
-                {/* emoji */}
-                <div className="relative">
-                    <button
-                        type="button"
-                        onClick={() => setPickerOpen((v) => !v)}
-                        className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80"
-                        aria-label={L.insertEmoji}
-                    >
-                        <Smile className="h-4 w-4" />
-                    </button>
-                    {pickerOpen && (
-                        <EmojiPicker
-                            onPick={(e) => {
-                                insertEmoji(e)
-                                setPickerOpen(false)
-                            }}
-                            onClose={() => setPickerOpen(false)}
-                        />
-                    )}
-                </div>
+                {/* emoji + attach image — hidden in [F6] text-only compare mode */}
+                {!textOnly && (
+                    <>
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setPickerOpen((v) => !v)}
+                                className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80"
+                                aria-label={L.insertEmoji}
+                            >
+                                <Smile className="h-4 w-4" />
+                            </button>
+                            {pickerOpen && (
+                                <EmojiPicker
+                                    onPick={(e) => {
+                                        insertEmoji(e)
+                                        setPickerOpen(false)
+                                    }}
+                                    onClose={() => setPickerOpen(false)}
+                                />
+                            )}
+                        </div>
 
-                {/* attach image */}
-                <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={attachments.length >= MAX_ATTACHMENTS || submitting}
-                    className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80 disabled:opacity-30"
-                    aria-label={L.attachImage}
-                    title={L.attachImageTitle(MAX_ATTACHMENTS)}
-                >
-                    <ImagePlus className="h-4 w-4" />
-                </button>
+                        <button
+                            type="button"
+                            onClick={() => fileRef.current?.click()}
+                            disabled={attachments.length >= MAX_ATTACHMENTS || submitting}
+                            className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80 disabled:opacity-30"
+                            aria-label={L.attachImage}
+                            title={L.attachImageTitle(MAX_ATTACHMENTS)}
+                        >
+                            <ImagePlus className="h-4 w-4" />
+                        </button>
+                    </>
+                )}
 
                 {/* send */}
                 <button

@@ -16,6 +16,7 @@ import { statusLabel } from "@/lib/display-labels"
 import { formatClientHierarchy } from "@/lib/client-hierarchy"
 import { getValidNextStatuses, type ActorRole } from "@/lib/task-state-machine"
 import { taskTypeLabel } from "@/lib/display-labels"
+import { isReviewPhaseStatus } from "@/lib/task-statuses"
 import { assignTask } from "@/actions/task-management-actions"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
@@ -83,6 +84,7 @@ export function TaskDrawer({
     const isOverdue = task.deadline
         && new Date() > new Date(task.deadline)
         && !['Hoàn tất', 'Đã hủy', 'Quá hạn', 'Tạm ngưng'].includes(task.status)
+        && !isReviewPhaseStatus(task.status) // [Owner 2026-07-08] review-phase (2 tab duyệt) không tính quá hạn
 
     // Admin can assign if task is unassigned & we have users list & workspaceId
     const canAssign = isAdmin && !task.assigneeId && !!users?.length && !!workspaceId

@@ -15,6 +15,7 @@ import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { parseDuration, formatDuration } from '@/lib/duration-parser'
 import { returnTask } from '@/actions/claim-actions'
 import { taskTypeLabel } from '@/lib/display-labels'
+import { isReviewPhaseStatus } from '@/lib/task-statuses'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -326,6 +327,8 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
     const getDeadlineColor = (deadline: Date | null, status: string) => {
         if (!deadline) return NP.textMuted
         if (status === 'Hoàn tất') return NP.textSecondary
+        // [Owner 2026-07-08] Task ở tab "Duyệt nội bộ"/"Khách duyệt" (phase review) → không tô đỏ quá hạn.
+        if (isReviewPhaseStatus(status)) return NP.textSecondary
         const diff = (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60)
         if (diff <= 0) return '#EF4444'
         if (diff < 24) return '#EF4444'
@@ -632,7 +635,8 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                     const taskTags = (task as any).taskTags as { tagCategory: { id: string; name: string } }[] | undefined
                     const duration = (task as any).duration as string | null | undefined
                     const claimSource = (task as any).claimSource
-                    const isOverdue = task.deadline && task.status !== 'Hoàn tất' && new Date(task.deadline).getTime() < Date.now()
+                    // [Owner 2026-07-08] Task ở phase review (2 tab Duyệt nội bộ/Khách duyệt) không tính quá hạn.
+                    const isOverdue = task.deadline && task.status !== 'Hoàn tất' && !isReviewPhaseStatus(task.status) && new Date(task.deadline).getTime() < Date.now()
                     const isOddRow = idx % 2 === 1
 
                     return (

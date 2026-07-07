@@ -230,16 +230,18 @@ async function safeRecordActivity(input: RecordActivityInput): Promise<void> {
 }
 
 /**
- * [F8] Admin closed the internal feedback session → flip A2 → A3 ('Đang sửa feedback (nội bộ)')
+ * [F8] Admin closed/opened an internal feedback session → flip → A3 ('Đang sửa feedback (nội bộ)')
  * + email the editor (the generic status-change email, keyed by updateTaskStatus). Admin-only.
- * "Confirm" here = close the session; comments are already persisted on Enter (no draft-mode).
+ * "Confirm" here = open the session; comments are already persisted on Enter (no draft-mode).
+ * Reachable from A2 (round 1, right after upload) OR A4 (RE-OPEN a new round after the editor
+ * already confirmed a prior fix — multi-round feedback loop, spec §Giai đoạn 4).
  */
 export async function markFeedbackDone(assetId: string): Promise<{ ok: true; taskId: string; status: string }> {
     const { asset, access, task } = await loadAssetTaskContext(assetId)
     if (!access.isAdmin) throw apiError(403, 'FORBIDDEN', 'Chỉ người quản lý mới chốt được phiên feedback.')
     const target = REVIEW_STATUS_MAP.internalFeedbackOpen // A3
     if (!canAutoTransition(task.status, target)) {
-        throw apiError(409, 'STATE_INVALID', 'Task không ở trạng thái "Đã nộp video (nội bộ)".', { from: task.status })
+        throw apiError(409, 'STATE_INVALID', 'Chỉ mở được phiên feedback khi task ở "Đã nộp video (nội bộ)" hoặc "Đã sửa feedback (nội bộ)".', { from: task.status })
     }
     await delegateFlip(asset.taskId, target, asset.workspaceId, task.version)
     await safeRecordActivity({
@@ -277,6 +279,25 @@ export async function confirmFixDone(assetId: string): Promise<{ ok: true; taskI
         throw apiError(409, 'STATE_INVALID', 'Task không ở trạng thái đang sửa feedback.', { from: task.status })
     }
     await delegateFlip(asset.taskId, target, asset.workspaceId, task.version)
+    // [feedback-flow spec §4.2] The editor's confirmation CLOSES the current feedback round: mark
+    // every still-open parent comment on this asset as resolved. This is what makes the next round's
+    // fresh comments (open) stand out from the round just addressed (dimmed + green tick — CommentItem
+    // renders `resolvedAt != null` that way). It also means the editor no longer has to hand-tick each
+    // comment before confirming (the button's confirm dialog is the safety instead). Best-effort: the
+    // status flip already committed, so a resolve failure must NOT 500 the confirm.
+    try {
+        const versions = await prisma.reviewVersion.findMany({ where: { assetId: asset.id }, select: { id: true } })
+        const versionIds = versions.map((v) => v.id)
+        if (versionIds.length > 0) {
+            const r = await prisma.reviewComment.updateMany({
+                where: { versionId: { in: versionIds }, parentId: null, resolvedAt: null, deletedAt: null },
+                data: { resolvedAt: new Date(), resolvedById: access.userId },
+            })
+            reviewLog('info', 'task_sync.round_resolved', { taskId: asset.taskId, assetId: asset.id, resolved: r.count })
+        }
+    } catch (e) {
+        reviewLog('error', 'task_sync.resolve_round_failed', { taskId: asset.taskId, assetId: asset.id, error: String(e) })
+    }
     // Tell the manager the editor is done (in-app + email) BEFORE the best-effort audit row, so
     // an audit failure can never suppress the notify. When the editor confirms their OWN fix
     // (actor === assignee) updateTaskStatus's generic notify self-skips — the manager would

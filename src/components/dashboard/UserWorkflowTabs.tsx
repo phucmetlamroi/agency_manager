@@ -7,6 +7,7 @@ import { PreStartBlockModal } from "@/components/tasks/PreStartBlockModal"
 import { Search, Filter, ChevronLeft, ChevronRight, CalendarDays, MoreHorizontal } from "lucide-react"
 import { formatClientHierarchy } from "@/lib/client-hierarchy"
 import { taskTypeLabel } from "@/lib/display-labels"
+import { isReviewPhaseStatus } from "@/lib/task-statuses"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -198,6 +199,8 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
     const getDeadlineColor = (deadline: Date | string | null, status: string) => {
         if (!deadline) return NP.textMuted
         if (status === "Hoàn tất") return NP.textSecondary
+        // [Owner 2026-07-08] Task ở tab "Duyệt nội bộ"/"Khách duyệt" (phase review) → không tô đỏ quá hạn.
+        if (isReviewPhaseStatus(status)) return NP.textSecondary
         const diff = (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60)
         if (diff <= 0) return "#EF4444"
         if (diff < 24) return "#EF4444"

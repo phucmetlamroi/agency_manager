@@ -127,6 +127,23 @@ export const SALARY_COMPLETED_STATUS: TaskStatus = TASK_STATUS_META.find(m => m.
  */
 export const OVERDUE_ELIGIBLE_STATUSES: string[] = TASK_STATUS_META.filter(m => m.cronOverdueEligible).map(m => m.value)
 
+/**
+ * Statuses in the internal-review or client-review phase — i.e. exactly the tasks shown under the
+ * "Duyệt nội bộ" (A2/A3/A4 + Revision) and "Khách duyệt" (A5/A6/A7) board tabs. A task here is waiting
+ * on a reviewer (admin or client), so it has NO active deadline and must never be shown/counted as
+ * overdue. Owner rule (2026-07-08): the trigger is the TAB/phase, not any single status. DERIVED from
+ * the phase meta so it stays correct if statuses are added/removed. Consumed by STATUS_REQUIRES_NULL_DEADLINE
+ * (clears the deadline on entry) + the board overdue-badge suppression.
+ */
+export const REVIEW_PHASE_STATUSES: string[] = TASK_STATUS_META
+    .filter(m => m.phase === 'internal_review' || m.phase === 'client_review')
+    .map(m => m.value)
+
+/** True when a task's status sits in the internal/client review phase (the two review tabs). */
+export function isReviewPhaseStatus(status: string | null | undefined): boolean {
+    return !!status && REVIEW_PHASE_STATUSES.includes(status)
+}
+
 /** Lifecycle phase → the EN label a client sees for any internalOnly status in it. */
 export const PHASE_CLIENT_LABEL: Record<TaskStatusPhase, string> = {
     production: 'In progress',
@@ -149,7 +166,11 @@ export const STATUS_TRANSITIONS: Record<string, string[]> = {
     // §3.3 predecessor "A1 lần đầu HOẶC A4 vòng lặp"). Without it a re-upload at A4 would strand the
     // task at A4 with the only forward auto-path being F10→client, pushing an un-reviewed cut out.
     'Đã nộp video (nội bộ)':      ['Đang thực hiện', 'Revision', 'Đã sửa feedback (nội bộ)'], // F7
-    'Đang sửa feedback (nội bộ)': ['Đã nộp video (nội bộ)'],                                        // F8
+    // F8 — admin closes/opens an internal feedback session. A2 = round 1 (right after upload);
+    // A4 = RE-OPEN a NEW round after the editor already confirmed a prior fix (multi-round loop —
+    // feedback-flow spec §Giai đoạn 4). The prior round's comments are already resolved, so the
+    // new round's comments stand out as the only open ones. Manual admin action only (not auto).
+    'Đang sửa feedback (nội bộ)': ['Đã nộp video (nội bộ)', 'Đã sửa feedback (nội bộ)'],           // F8
     'Đã sửa feedback (nội bộ)':   ['Đang sửa feedback (nội bộ)'],                                   // F9
     'Đã gửi video (khách)':       ['Đã sửa feedback (nội bộ)', 'Đã nộp video (nội bộ)', 'Đã sửa feedback (khách)'], // F10
     'Đã nhận feedback (khách)':   ['Đã gửi video (khách)'],                                         // guest request changes

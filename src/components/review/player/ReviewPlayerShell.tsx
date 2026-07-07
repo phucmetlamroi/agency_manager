@@ -152,6 +152,24 @@ function ReviewPlayerShellInner({
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.id : null, fps, enabled })
     const feed = useComments(version?.id ?? null)
 
+    // [L14] Live per-version comment count for the selector. VersionDto.commentCount from
+    // listAssetVersions is a snapshot frozen at page-load, so a comment added THIS session leaves
+    // it stale (dropdown shows "v1 · 0 bình luận" when 1 exists). The active feed already polls the
+    // current version's live total + every sibling's live count every 5s — overlay those, falling
+    // back to the frozen snapshot only when no live data has arrived yet.
+    const liveCommentCount = useCallback(
+        (v: VersionRow): number => {
+            if (v.id === version?.id) {
+                // During the very first load (no data yet) fall back to the frozen snapshot so an
+                // active version with comments doesn't flash "· 0" before the first fetch lands.
+                return feed.isLoading && feed.comments.length === 0 ? v.commentCount : feed.total
+            }
+            const sib = feed.otherVersions.find((o) => o.versionId === v.id)
+            return sib ? sib.commentCount : v.commentCount
+        },
+        [version?.id, feed.total, feed.isLoading, feed.comments.length, feed.otherVersions],
+    )
+
     const compareBase = `/${workspaceId}/team/asset/${assetId}`
     // Enter: default pairing = left is the version adjacent to current (older neighbor, else newer),
     // right is the current version. push() = new history entry so Back exits compare.
@@ -506,7 +524,7 @@ function ReviewPlayerShellInner({
                     >
                         <Layers className="h-4 w-4 text-indigo-400" />
                         <span className="font-medium">v{version?.versionNumber ?? '—'}</span>
-                        {version && <span className="text-white/40">· {version.commentCount} bình luận</span>}
+                        {version && <span className="text-white/40">· {liveCommentCount(version)} bình luận</span>}
                         <ChevronDown className="h-4 w-4 text-white/40" />
                     </button>
                     {selectorOpen && (
@@ -530,7 +548,7 @@ function ReviewPlayerShellInner({
                                         <span className="min-w-0 flex-1">
                                             <span className="block truncate text-white/90">{v.originalName}</span>
                                             <span className="block text-xs text-white/40">
-                                                {fmtDate(v.createdAt)} · {v.commentCount} bình luận
+                                                {fmtDate(v.createdAt)} · {liveCommentCount(v)} bình luận
                                             </span>
                                         </span>
                                         {v.id === asset.currentVersionId && (

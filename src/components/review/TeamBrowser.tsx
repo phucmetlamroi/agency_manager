@@ -123,7 +123,11 @@ function teamPath(workspaceId: string, folderId: string | null): string {
 }
 
 function parseFolderId(pathname: string): string | null {
-    const m = pathname.match(/\/admin\/team\/folder\/([^/?#]+)/)
+    // [L12] The route moved from /admin/team/** to /{workspaceId}/team/** in P1 (BR-02), but this
+    // parser still matched the OLD /admin/team/folder/ prefix → it NEVER matched → the breadcrumb /
+    // deep-link folder id was never recovered from the URL (tree↔grid↔URL drift). Match the current
+    // shape built by teamPath() above, workspace-prefix-agnostic.
+    const m = pathname.match(/\/team\/folder\/([^/?#]+)/)
     return m ? decodeURIComponent(m[1]) : null
 }
 
@@ -552,6 +556,28 @@ export function TeamBrowser({
     useEffect(() => {
         if (assetUploadSig) silentRef.current()
     }, [assetUploadSig])
+
+    // [L13] The Mux poster is minted async on READY (applyMuxReady). The upload-store signatures
+    // above stop changing once the local upload settles/abandons, and a viewer who did NOT perform
+    // the upload has no store item at all — so a PROCESSING card never refreshes in place and its
+    // thumbnail stays black until re-navigation ("thumbnail đen, chỉ hiện sau khi đóng/mở lại").
+    // Poll the children list while ANY fetched asset is still in the server pipeline; self-terminates
+    // when nothing is processing (same proven pattern as TaskReviewUploadSection.tsx).
+    const anyProcessing = assets.some(
+        (a) => a.currentVersion && ['uploading', 'uploaded', 'processing'].includes(a.currentVersion.uploadStatus),
+    )
+    useEffect(() => {
+        if (!anyProcessing) return
+        // Bounded: normally clears the moment nothing is processing. The cap stops a runaway poll if
+        // an asset is genuinely stuck (Mux never READY) OR sits on a deeper "load more" page that
+        // silentRefresh (page 1 only) can't heal — after ~3 min the user can re-navigate to refresh.
+        let n = 0
+        const t = setInterval(() => {
+            silentRef.current()
+            if (++n >= 45) clearInterval(t)
+        }, 4000)
+        return () => clearInterval(t)
+    }, [anyProcessing])
 
     /* ---- lookups + selection helpers ---- */
     const visibleAssets = useMemo(() => assets.filter((a) => !liveAssetIds.has(a.id)), [assets, liveAssetIds])
@@ -1274,7 +1300,7 @@ export function TeamBrowser({
                         >
                             {dragOver && !assetFileHover && <DropOverlay folderName={currentName} />}
                             {loading ? (
-                                <LoadingState prefs={prefs} gridStyle={gridStyle} />
+                                <LoadingState prefs={prefs} gridStyle={gridStyle} expected={currentFolder?.itemCount} />
                             ) : error ? (
                                 <ErrorState message={error} onRetry={reload} />
                             ) : isEmpty ? (
@@ -1748,11 +1774,16 @@ function PendingFolderTile({ name }: { name: string }) {
 
 /* ── states ──────────────────────────────────────────────────────────────── */
 
-function LoadingState({ prefs, gridStyle }: { prefs: ViewPrefs; gridStyle: React.CSSProperties }) {
+function LoadingState({ prefs, gridStyle, expected }: { prefs: ViewPrefs; gridStyle: React.CSSProperties; expected?: number }) {
+    // [L12] Skeleton count was hardcoded (8 grid / 6 list) → ~9 ghost cards for a 1-item folder.
+    // Derive from the known item count when available (exact on a same-folder reload), clamped to
+    // [1, cap] so the fallback (fresh cross-folder nav, currentFolder still null) equals the old cap.
+    const cap = prefs.layout === 'list' ? 6 : 8
+    const n = Math.min(Math.max(expected ?? cap, 1), cap)
     if (prefs.layout === 'list') {
         return (
             <div className="flex flex-col gap-1.5">
-                {Array.from({ length: 6 }).map((_, i) => (
+                {Array.from({ length: n }).map((_, i) => (
                     <div key={i} className="h-12 animate-pulse rounded-lg border border-white/5 bg-white/[0.03]" />
                 ))}
             </div>
@@ -1760,7 +1791,7 @@ function LoadingState({ prefs, gridStyle }: { prefs: ViewPrefs; gridStyle: React
     }
     return (
         <div className="grid gap-3" style={gridStyle}>
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: n }).map((_, i) => (
                 <div key={i} className="animate-pulse overflow-hidden rounded-xl border border-white/5 bg-white/[0.03]">
                     <div className="w-full bg-white/[0.04]" style={{ aspectRatio: aspectCss(prefs.aspect) }} />
                     {prefs.showInfo && <div className="h-12" />}

@@ -241,3 +241,33 @@ Review 4 lens (sync-correctness / react-lifecycle / url-entry-exit / comments-te
 - **[LOW] Post xong focus kẹt trong textarea** → Space không toggle. **VÁ:** `onFocusPlayer` blur activeElement.
 - **[LOW] Draft nửa chừng mang sang version khác** (cùng gốc với MEDIUM draft) — key remount đã xử.
 - **2 tiền-VÁ trước review**: (a) no-op seek fire không 'seeked' → seekingRef kẹt → drift đơ: chỉ set flag khi `video.seeking`; (b) keydown deps [positionSec/maxDur] re-bind listener mỗi frame → dùng ref + method stable.
+
+## P6 — Lỗi ứng viên L11-L19 + polish + acceptance (review-fixes, 2026-07-07) — ĐÓNG v1
+
+Phase cuối: vá 4 lỗi ứng viên v1 (L11/L12/L13/L14) + 1 polish (L19), acceptance TC1-TC7, regression. **KHÔNG schema/salary/cron/mobile/FSM.** 1 commit.
+- **L11 — bộ đếm folder "X mục • Y B" luôn 0** (`folders.ts` `listChildren`): nguyên nhân gốc — `ReviewFolder.itemCount`/`totalSizeBytes` (denormalized) KHÔNG được duy trì trên luồng task-upload (`upload-service.ts` không tăng), nên video upload xong → 0. **VÁ self-heal ở list-time** (không backfill, không schema): 1 `$queryRaw` theo materialized path (`/{rootId}/…/{id}/`, index `varchar_pattern_ops`, `d.path LIKE pf.path||'%'`=self+descendants, trailing-slash chặn sibling-prefix): **cnt = con TRỰC TIẾP** (subfolder + asset trực tiếp — đúng contract DTO "N mục" + nuôi cảnh báo xóa), **bytes = tổng ĐỆ QUY mọi version còn sống** (khớp `liveStackBytes` của rollup). **Gated `scope.unrestricted`** (admin) để editor folder-scope không nhận tổng đệ quy chạm descendant ngoài phạm vi (FR-03). Sửa card + selection-bar + meta-header (cùng đọc DTO).
+- **L12 — skeleton kẹt + tree↔grid↔URL lệch:** (A) `LoadingState` nhận `expected={currentFolder?.itemCount}` → `n=clamp(expected,1,cap)` (hết "9 ghost cho folder 1 mục"; fallback = cap cũ). (B) **bug thật sót từ P1**: `parseFolderId` còn regex `/admin/team/folder/` (route cũ) → KHÔNG BAO GIỜ khớp route mới `/{ws}/team/folder/` → breadcrumb/deep-link folder không parse được từ URL → sửa regex.
+- **L13 — thumbnail đen tới khi mở lại panel:** poster Mux mint async lúc READY; upload-store signature ngừng đổi khi upload settle + viewer-khác-không-upload không có store item → card PROCESSING không refresh. **VÁ:** `TeamBrowser` poll `silentRefresh` mỗi 4s khi `anyProcessing` (self-terminate + **cap 45 lần ~3′** chống poll vô hạn nếu asset kẹt/ở trang sâu silentRefresh page-1 không chữa được).
+- **L14 — đếm comment/version trên dropdown sai/trễ:** `VersionDto.commentCount` là snapshot đông cứng lúc load. **VÁ:** `liveCommentCount(v)` đọc feed đang poll — active=`feed.total`, sibling=`feed.otherVersions[].commentCount`, fallback snapshot lúc `feed.isLoading && comments rỗng` (không nháy "· 0").
+- **L19 — filmstrip preview đè mép:** clamp `left: clamp(1.75rem, x%, calc(100%-1.75rem))` cho tooltip timecode (HoverScrub). **HOÃN có lý do:** "2 khung dính" = độ hạt storyboard.vtt của Mux (không sửa an toàn được không re-encode); panel hoạt động re-fetch = `no-store` CHỦ ĐÍCH (cache = rủi ro lệch timeline status sau F7-F10). **L17/L18 = ngoài phạm vi** (chờ chủ dự án).
+- Cổng: `tsc` + `next build` xanh + regression K1 salary snapshot / K3 portal-derive / auto-transition PASS (P6 không chạm status/salary → xanh mặc định).
+
+### P6 — Review đối kháng (3 lens) + VÁ (2026-07-07)
+Review 3 lens (L11-sql+FR-03 / L13-poll+L12 / L14) × find→verify: **4 LOW confirm** (0 blocker/high — an toàn) — sửa hết:
+- **[LOW] L11 override itemCount làm hỏng cảnh báo xóa + admin/editor lệch số:** đổi `itemCount` (con trực tiếp) → đếm-đệ-quy-asset phá contract + cảnh báo "và N mục bên trong" mất khi folder chỉ chứa subfolder rỗng. **VÁ:** cnt = **con trực tiếp** (subfolder + asset trực tiếp), giữ đúng semantic.
+- **[LOW] L11 bytes chỉ tính head-version:** lệch `liveStackBytes` (mọi version). **VÁ:** JOIN `v.assetId=a.id AND v.deletedAt IS NULL` (mọi version còn sống).
+- **[LOW] L13 poll không dừng cho asset kẹt/trang sâu:** thêm **cap 45 lần**.
+- **[LOW] L14 nháy "· 0" trong cửa sổ load đầu:** fallback snapshot khi `feed.isLoading && comments rỗng`.
+
+### Acceptance tổng — TC1-TC7 (PRD §1.2) → phase phủ
+| TC | Tiêu chí | Phủ bởi |
+|---|---|---|
+| TC1 | BR-01…BR-10 (B1-B10) đã PASS | P1 (BR-02/03/04/09) · P2 (BR-01/06/07/08/10) · P4 (BR-05 bridge) |
+| TC2 | Editor "Mở review" vào player + menu "Tệp" folder-scope; admin thấy hết | P1 (route move + FR-03 folder-scope + 35/35 DB harness) |
+| TC3 | State machine đúng vòng đời, chip không vỡ, client nhãn EN | P3 (17 status meta + tab + portal-derive) |
+| TC4 | F4/F5/F6 như frame.io + annotation + nét từ giây đầu | P2 (annotation SVG, BR-06 3-tầng) · P5 (F6 Compare) |
+| TC5 | Khách email+PIN → thông báo + portal video duyệt + duyệt được | P4 (FR-11 double-opt-in + BR-05 bridge) |
+| TC6 | Không hồi quy: salary/cron/portal EN/mobile/task-flow | K1/K3/auto-transition PASS mọi phase + tsc/build |
+| TC7 | 1 nguồn sự thật approve (review module), bỏ Copy link | P4 (bridge chỉ khi admin Duyệt) · BR-01 (bỏ Copy link) |
+
+**v1 ĐÓNG:** 7 phase P0→P6 xong; L11/L13/L14 xong; L12+L19 xong (phần polish hoãn ghi rõ lý do); L17/L18 chờ chủ dự án. Regression xanh. **CHƯA push + CHƯA db-push FR-11** (chờ chủ dự án + deploy main).

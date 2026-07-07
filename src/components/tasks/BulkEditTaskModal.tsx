@@ -39,14 +39,12 @@ interface Props {
     users: UserOption[]
 }
 
+// [bug-report #2] 'Sửa frame' / 'Gửi lại' / 'Tạm ngưng' removed. 'Revision' + 'Đã hủy' kept.
 const STATUS_OPTIONS = [
     'Đang đợi giao',
     'Nhận task',
     'Đang thực hiện',
     'Revision',
-    'Sửa frame',
-    'Gửi lại',
-    'Tạm ngưng',
     'Hoàn tất',
     'Đã hủy',
 ] as const

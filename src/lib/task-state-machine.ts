@@ -30,29 +30,27 @@
  *   'Review' bị set lại từ bất kỳ code path nào.
  */
 
+// [bug-report #2] 'Gửi lại' + 'Tạm ngưng' removed (owner 2026-07-07). 'Revision' kept.
 export type TaskStatus =
     | 'Đang đợi giao'
     | 'Nhận task'
     | 'Đang thực hiện'
     | 'Revision'
-    | 'Gửi lại'
     | 'Hoàn tất'
-    | 'Tạm ngưng'
     | 'Quá hạn'
     | 'Hủy'
 
 /**
  * Valid transitions cho USER (assignee) role.
  * [Sprint A] Bỏ 'Review' state — submit đi thẳng Revision.
+ * [bug-report #2] Bỏ pause ('Tạm ngưng') + resubmit ('Gửi lại').
  */
 const USER_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
     'Đang đợi giao': ['Nhận task'],                     // user claim task
     'Nhận task': ['Đang thực hiện', 'Đang đợi giao'],   // user start hoặc trả task (within 10 min via returnTask)
-    'Đang thực hiện': ['Revision', 'Tạm ngưng'],        // user submit (→ Revision) hoặc pause
-    'Revision': ['Gửi lại'],                            // user fix → resubmit
-    'Gửi lại': [],                                       // chỉ admin được approve
+    'Đang thực hiện': ['Revision'],                     // user submit (→ Revision)
+    'Revision': [],                                      // fix loop is now handled by the review module (F9)
     'Hoàn tất': [],                                      // TERMINAL cho user
-    'Tạm ngưng': ['Đang thực hiện'],                    // user resume
     'Quá hạn': [],                                       // TERMINAL — admin cần extend deadline để unlock
     'Hủy': [],                                           // TERMINAL
 }
@@ -63,11 +61,9 @@ const USER_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
 const ADMIN_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
     'Đang đợi giao': ['Nhận task', 'Hủy'],
     'Nhận task': ['Đang thực hiện', 'Đang đợi giao', 'Hủy'],
-    'Đang thực hiện': ['Revision', 'Tạm ngưng', 'Hủy', 'Hoàn tất'],
-    'Revision': ['Gửi lại', 'Hoàn tất', 'Đang thực hiện', 'Hủy'],
-    'Gửi lại': ['Hoàn tất', 'Revision', 'Hủy'],
+    'Đang thực hiện': ['Revision', 'Hủy', 'Hoàn tất'],
+    'Revision': ['Hoàn tất', 'Đang thực hiện', 'Hủy'],
     'Hoàn tất': ['Đang thực hiện', 'Hủy'],              // admin có quyền unlock (audit log!)
-    'Tạm ngưng': ['Đang thực hiện', 'Đang đợi giao', 'Hủy'],
     'Quá hạn': ['Đang thực hiện', 'Hoàn tất', 'Hủy'],   // admin extend deadline → resume
     'Hủy': ['Đang đợi giao'],                            // admin re-open hủy task
 }

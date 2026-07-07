@@ -59,13 +59,6 @@ function buildSwipeActions(
             color: 'bg-amber-600 text-white',
             onAction: () => onChange('Revision'),
         }
-    } else if (valid.includes('Gửi lại') && task.status === 'Revision') {
-        right = {
-            label: 'Gửi lại',
-            icon: Send,
-            color: 'bg-indigo-600 text-white',
-            onAction: () => onChange('Gửi lại'),
-        }
     } else if (valid.includes('Hoàn tất') && isAdmin) {
         right = {
             label: 'Hoàn tất',
@@ -75,15 +68,9 @@ function buildSwipeActions(
         }
     }
 
+    // [bug-report #2] pause ('Tạm ngưng') removed. Left-swipe = return-to-pool only.
     let left: SwipeAction | undefined
-    if (valid.includes('Tạm ngưng')) {
-        left = {
-            label: 'Tạm ngưng',
-            icon: Pause,
-            color: 'bg-zinc-700 text-zinc-100',
-            onAction: () => onChange('Tạm ngưng'),
-        }
-    } else if (valid.includes('Đang đợi giao')) {
+    if (valid.includes('Đang đợi giao')) {
         left = {
             label: 'Trả lại',
             icon: Pause,
@@ -127,7 +114,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
         let res = tasks
         if (activeTab === 'ASSIGNED') res = tasks.filter(t => t.status === 'Nhận task')
         if (activeTab === 'DOING') res = tasks.filter(t => t.status === 'Đang thực hiện')
-        if (activeTab === 'REVISE') res = tasks.filter(t => ['Revision', 'Sửa frame', 'Gửi lại'].includes(t.status))
+        if (activeTab === 'REVISE') res = tasks.filter(t => t.status === 'Revision')
         if (activeTab === 'OVERDUE') res = tasks.filter(t => t.status === 'Quá hạn')
         setFilteredTasks(res)
     }, [tasks, activeTab])
@@ -135,7 +122,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
     const tabCount = (tab: TabKey): number => {
         if (tab === 'ASSIGNED') return tasks.filter(t => t.status === 'Nhận task').length
         if (tab === 'DOING') return tasks.filter(t => t.status === 'Đang thực hiện').length
-        if (tab === 'REVISE') return tasks.filter(t => ['Revision', 'Sửa frame', 'Gửi lại'].includes(t.status)).length
+        if (tab === 'REVISE') return tasks.filter(t => t.status === 'Revision').length
         if (tab === 'OVERDUE') return tasks.filter(t => t.status === 'Quá hạn').length
         return tasks.length
     }

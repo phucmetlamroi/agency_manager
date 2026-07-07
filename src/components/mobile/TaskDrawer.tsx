@@ -42,14 +42,12 @@ const STATUS_BUTTON_CONFIG: Record<string, {
     icon: React.ComponentType<{ className?: string }>
     variant: 'primary' | 'success' | 'warning' | 'neutral' | 'danger'
 }> = {
+    // [bug-report #2] 'Gửi lại' / 'Tạm ngưng' / 'Sửa frame' action buttons removed.
     'Đang thực hiện': { label: 'Bắt đầu / Tiếp tục', icon: Play, variant: 'primary' },
     'Revision': { label: 'Nộp bài (→ Revision)', icon: Send, variant: 'warning' },
-    'Gửi lại': { label: 'Gửi lại', icon: Send, variant: 'primary' },
     'Hoàn tất': { label: 'Hoàn tất', icon: CheckCircle2, variant: 'success' },
-    'Tạm ngưng': { label: 'Tạm ngưng', icon: Pause, variant: 'neutral' },
     'Đang đợi giao': { label: 'Trả về hàng chờ', icon: AlertTriangle, variant: 'neutral' },
     'Nhận task': { label: 'Nhận task', icon: Play, variant: 'primary' },
-    'Sửa frame': { label: 'Sửa frame', icon: AlertTriangle, variant: 'warning' },
     'Hủy': { label: 'Huỷ task', icon: Trash2, variant: 'danger' },
 }
 

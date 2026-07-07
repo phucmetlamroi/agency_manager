@@ -17,11 +17,12 @@ import { isValidStatus, VALID_TASK_STATUSES, type TaskStatus } from './statuses.
 
 const BLOCKED_TRANSITIONS: Record<string, string[]> = {
     'Hoàn tất': ['Đang thực hiện', 'Nhận task', 'Đang đợi giao'],
-    'Đã hủy': ['Đang thực hiện', 'Nhận task', 'Đang đợi giao', 'Revision', 'Sửa frame', 'Gửi lại'],
+    // [bug-report #2] 'Sửa frame' / 'Gửi lại' removed from the predecessor list (no longer valid statuses).
+    'Đã hủy': ['Đang thực hiện', 'Nhận task', 'Đang đợi giao', 'Revision'],
 }
 
-// Statuses where deadline should be cleared automatically
-const DEADLINE_CLEAR_STATUSES: readonly string[] = ['Tạm ngưng', 'Revision'] as const
+// Statuses where deadline should be cleared automatically ('Tạm ngưng' removed — bug-report #2).
+const DEADLINE_CLEAR_STATUSES: readonly string[] = ['Revision'] as const
 
 // ---------------------------------------------------------------------------
 // updateTaskStatus

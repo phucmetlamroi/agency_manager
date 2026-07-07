@@ -140,7 +140,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                         {/* [QA R1 fix] 'Tạm ngừng' (ừ) sai chính tả → 'Tạm ngưng' (ư) để khớp VALID_TASK_STATUSES; trước đây chọn Pause bị server từ chối, status không lưu. */}
                         {/* [P3/F2] video statuses (A2–A7) included so admin can see/correct
                             them by hand; normally they flip via the review module (F7–F10). */}
-                        {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Đã nộp video (nội bộ)", "Đang sửa feedback (nội bộ)", "Đã sửa feedback (nội bộ)", "Đã gửi video (khách)", "Đã nhận feedback (khách)", "Đã sửa feedback (khách)", "Revision", "Gửi lại", "Sửa frame", "Tạm ngưng", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
+                        {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Đã nộp video (nội bộ)", "Đang sửa feedback (nội bộ)", "Đã sửa feedback (nội bộ)", "Đã gửi video (khách)", "Đã nhận feedback (khách)", "Đã sửa feedback (khách)", "Revision", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
                             <SelectItem key={opt} value={opt}>{statusLabel(opt)}</SelectItem>
                         ))}
                     </SelectContent>

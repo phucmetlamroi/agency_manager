@@ -33,9 +33,6 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     "Đã sửa feedback (khách)":    { label: "Đã sửa (khách)",        color: "#8B5CF6" },
     // [L18a] value stays 'Revision' (load-bearing); only the VN display label changes.
     "Revision":            { label: "Sửa lại",             color: "#EF4444" },
-    "Sửa frame":       { label: "Sửa frame",       color: "#EC4899" },
-    "Gửi lại":       { label: "Gửi lại",       color: "#F97316" },
-    "Tạm ngưng":    { label: "Tạm ngưng",    color: "#71717A" },
     "Hoàn tất":     { label: "Hoàn tất",     color: "#10B981" },
     "Quá hạn":      { label: "Quá hạn",      color: "#DC2626" },
     "Đã hủy":       { label: "Đã hủy",       color: "#52525B" },
@@ -55,13 +52,13 @@ interface TabConfig {
 // admin board: "Duyệt nội bộ" (A2/A3/A4) + "Khách duyệt" (A5/A6/A7). Before this, a task the
 // review module auto-moved to A2 'Đã nộp video (nội bộ)' / A3 'Đang sửa feedback (nội bộ)'
 // matched NO editor tab and disappeared from the editor's home — so the editor got the feedback
-// email but had no way to open the task and fix it. The legacy Revision/Sửa frame/Gửi lại fold
-// into these two tabs (same as admin) so nothing falls out. 'Đã hủy' has NO tab (stays hidden).
+// email but had no way to open the task and fix it. Legacy 'Revision' folds into "Duyệt nội bộ".
+// ([bug-report #2] 'Sửa frame'/'Gửi lại'/'Tạm ngưng' removed. 'Đã hủy' has NO tab — stays hidden.)
 const TABS: TabConfig[] = [
-    { id: "assignee", label: "Được giao",    statuses: ["Nhận task", "Đã nhận task", "Đang đợi giao", "Tạm ngưng"], color: "#8B5CF6" },
+    { id: "assignee", label: "Được giao",    statuses: ["Nhận task", "Đã nhận task", "Đang đợi giao"],             color: "#8B5CF6" },
     { id: "progress", label: "Đang làm",     statuses: ["Đang thực hiện"],                                          color: "#EAB308" },
-    { id: "internal", label: "Duyệt nội bộ", statuses: ["Đã nộp video (nội bộ)", "Đang sửa feedback (nội bộ)", "Đã sửa feedback (nội bộ)", "Revision", "Sửa frame"], color: "#F97316" },
-    { id: "client",   label: "Khách duyệt",  statuses: ["Đã gửi video (khách)", "Đã nhận feedback (khách)", "Đã sửa feedback (khách)", "Gửi lại"],                    color: "#06B6D4" },
+    { id: "internal", label: "Duyệt nội bộ", statuses: ["Đã nộp video (nội bộ)", "Đang sửa feedback (nội bộ)", "Đã sửa feedback (nội bộ)", "Revision"], color: "#F97316" },
+    { id: "client",   label: "Khách duyệt",  statuses: ["Đã gửi video (khách)", "Đã nhận feedback (khách)", "Đã sửa feedback (khách)"],                  color: "#06B6D4" },
     { id: "overdue",  label: "Quá hạn",      statuses: ["Quá hạn"],                                                 color: "#DC2626" },
     { id: "complete", label: "Hoàn tất",     statuses: ["Hoàn tất"],                                                color: "#10B981" },
 ]

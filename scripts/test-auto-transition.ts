@@ -53,7 +53,8 @@ for (const [k, v] of Object.entries(REVIEW_STATUS_MAP)) {
 }
 
 console.log('\n[2] F7 — Mux READY → A2: allowed predecessors ONLY (incl. A4 internal re-upload loop)')
-for (const from of [A1, 'Sửa frame', 'Gửi lại', REVISION, A4]) {
+// [bug-report #2] 'Sửa frame' / 'Gửi lại' removed as F7 predecessors (statuses no longer exist).
+for (const from of [A1, REVISION, A4]) {
     check(`${from} → A2 allowed`, canAutoTransition(from, A2))
 }
 for (const from of [A2, A3, A5, A6, A7, DONE, 'Đã hủy']) {
@@ -76,7 +77,7 @@ for (const from of [A1, A3, A5, A6, DONE, 'Đã hủy']) check(`${from} → A5 B
 
 console.log('\n[6] Guest "request changes" → A6: reachable ONLY from A5 (asymmetric, K6)')
 check('A5 → A6 allowed', canAutoTransition(A5, A6))
-for (const from of [A1, A2, A3, A4, A6, A7, DONE, 'Gửi lại', REVISION]) {
+for (const from of [A1, A2, A3, A4, A6, A7, DONE, REVISION]) {
     check(`${from} → A6 BLOCKED (falls back to legacy Revision)`, !canAutoTransition(from, A6))
 }
 // The load-bearing reason for the explicit already-A6 no-op guard in syncTaskOnChangesRequested:
@@ -97,7 +98,6 @@ check('at A5 → A6', pickGuestChangeTarget(A5) === A6)
 check('at A6 → noop (no demotion to Revision)', pickGuestChangeTarget(A6) === 'noop')
 check('at A7 → noop (no demotion to Revision — the review-flagged one-node-later bug)', pickGuestChangeTarget(A7) === 'noop')
 check('at A1 (never sent) → legacy Revision', pickGuestChangeTarget(A1) === REVISION)
-check('at "Gửi lại" → legacy Revision', pickGuestChangeTarget('Gửi lại') === REVISION)
 check('at A4 (internal, never sent) → legacy Revision', pickGuestChangeTarget(A4) === REVISION)
 
 console.log('\n[8] Money-safety (R1): every auto-transition TARGET is salaryPending')

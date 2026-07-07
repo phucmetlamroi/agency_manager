@@ -229,7 +229,11 @@ function ReviewPlayerShellInner({
     const annotation = useAnnotation()
     const { reset: annoReset } = annotation
     const [viewAnno, setViewAnno] = useState<{ shapes: AnnotationShape[]; frame: number } | null>(null)
-    const canAnnotate = isVideo && !!version?.width && !!version?.height
+    // [annotation fix] Do NOT gate on version.width/height. Those come from Mux metadata and are null
+    // for older versions / when Mux never reported dimensions — that quietly disabled the ENTIRE draw
+    // feature (no toolbar, no canvas, composer got annotation=null → the "can't draw" report). The
+    // AnnotationCanvas now derives the media box from the LIVE <video> element, so only isVideo matters.
+    const canAnnotate = isVideo
     // Latest draw-mode flag for the keydown handler without re-subscribing the listener.
     const annoActiveRef = useRef(false)
     annoActiveRef.current = annotation.active
@@ -452,6 +456,7 @@ function ReviewPlayerShellInner({
                     size={annotation.size}
                     intrinsicWidth={version?.width ?? null}
                     intrinsicHeight={version?.height ?? null}
+                    videoRef={videoRef}
                     onCommitShape={annotation.addShape}
                 />
                 <AnnotationToolbar ctl={annotation} />
@@ -465,6 +470,7 @@ function ReviewPlayerShellInner({
                 size={annotation.size}
                 intrinsicWidth={version?.width ?? null}
                 intrinsicHeight={version?.height ?? null}
+                videoRef={videoRef}
                 onCommitShape={annotation.addShape}
             />
         ) : null

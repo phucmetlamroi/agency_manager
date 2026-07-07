@@ -236,7 +236,10 @@ function GuestStage({
     const annotation = useAnnotation()
     const { reset: annoReset } = annotation
     const [viewAnno, setViewAnno] = useState<{ shapes: AnnotationShape[]; frame: number } | null>(null)
-    const canAnnotate = !!isVideo && !!version?.width && !!version?.height
+    // [annotation fix] Same as the internal shell — do NOT gate on version.width/height (null for
+    // older versions / missing Mux metadata → the whole draw feature silently dies). The canvas
+    // derives its box from the LIVE <video> element, so only isVideo is required here.
+    const canAnnotate = !!isVideo
     const annoActiveRef = useRef(false)
     annoActiveRef.current = annotation.active
 
@@ -368,6 +371,7 @@ function GuestStage({
                     size={annotation.size}
                     intrinsicWidth={version?.width ?? null}
                     intrinsicHeight={version?.height ?? null}
+                    videoRef={videoRef}
                     onCommitShape={annotation.addShape}
                 />
                 <AnnotationToolbar ctl={annotation} />
@@ -381,6 +385,7 @@ function GuestStage({
                 size={annotation.size}
                 intrinsicWidth={version?.width ?? null}
                 intrinsicHeight={version?.height ?? null}
+                videoRef={videoRef}
                 onCommitShape={annotation.addShape}
             />
         ) : null

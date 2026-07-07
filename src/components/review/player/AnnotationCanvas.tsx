@@ -69,6 +69,7 @@ export function AnnotationCanvas({
     size,
     intrinsicWidth,
     intrinsicHeight,
+    videoRef,
     onCommitShape,
 }: {
     editable: boolean
@@ -78,6 +79,10 @@ export function AnnotationCanvas({
     size: number
     intrinsicWidth: number | null
     intrinsicHeight: number | null
+    /** The live <video> element — its videoWidth/videoHeight are the TRUE source of the media
+     *  aspect and are always available once metadata loads, unlike the DB-stored dims which are
+     *  null for older versions / missing Mux metadata (that used to disable the whole feature). */
+    videoRef?: React.RefObject<HTMLVideoElement | null>
     onCommitShape: (s: AnnotationShape) => void
 }) {
     const rootRef = useRef<HTMLDivElement>(null)
@@ -111,10 +116,41 @@ export function AnnotationCanvas({
         }
     }, [])
 
+    // [annotation fix] Prefer the LIVE <video> element's true dimensions. The `intrinsic*` props come
+    // from version.width/height (Mux metadata) which are null for older versions / when Mux didn't
+    // report them — that used to leave `box` null so the toolbar showed but NOTHING was drawable.
+    // videoWidth/videoHeight are 0 until metadata loads, so we re-read on loadedmetadata/resize.
+    const [liveDims, setLiveDims] = useState<{ w: number; h: number } | null>(null)
+    useEffect(() => {
+        const v = videoRef?.current
+        if (!v) return
+        const read = () => {
+            const w = v.videoWidth
+            const h = v.videoHeight
+            if (w > 0 && h > 0) setLiveDims((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }))
+        }
+        read()
+        v.addEventListener('loadedmetadata', read)
+        v.addEventListener('resize', read)
+        return () => {
+            v.removeEventListener('loadedmetadata', read)
+            v.removeEventListener('resize', read)
+        }
+    }, [videoRef])
+
+    const iw = liveDims?.w ?? intrinsicWidth ?? null
+    const ih = liveDims?.h ?? intrinsicHeight ?? null
+
+    // Never leave the surface un-drawable: with a known media aspect use the letterboxed content box;
+    // if the aspect is still unknown (no live dims AND no stored dims) fall back to filling the whole
+    // stage so drawing ALWAYS works. Exact for a video that fills the stage; slightly loose for a
+    // letterboxed one — but infinitely better than the old hard-null (feature completely dead).
     const box: ContentBox | null =
-        intrinsicWidth && intrinsicHeight
-            ? containedBox(rootSize.w, rootSize.h, intrinsicWidth, intrinsicHeight)
-            : null
+        iw && ih
+            ? containedBox(rootSize.w, rootSize.h, iw, ih)
+            : rootSize.w > 0 && rootSize.h > 0
+                ? { left: 0, top: 0, width: rootSize.w, height: rootSize.h }
+                : null
 
     // [B7] Instrument the measurement so a "can't draw" report can be confirmed on real
     // hardware without a code change: `localStorage['review:debug']='1'` in the console.
@@ -123,8 +159,8 @@ export function AnnotationCanvas({
     useEffect(() => {
         if (typeof window === 'undefined' || window.localStorage?.getItem('review:debug') !== '1') return
         // eslint-disable-next-line no-console
-        console.debug('[annotation] box', { editable, rootSize, intrinsicWidth, intrinsicHeight, box })
-    }, [editable, rootSize, intrinsicWidth, intrinsicHeight, box])
+        console.debug('[annotation] box', { editable, rootSize, liveDims, intrinsicWidth, intrinsicHeight, box })
+    }, [editable, rootSize, liveDims, intrinsicWidth, intrinsicHeight, box])
 
     // Abandon any half-drawn stroke if we leave edit mode.
     useEffect(() => {

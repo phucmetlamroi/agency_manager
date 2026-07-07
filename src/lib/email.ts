@@ -13,6 +13,9 @@ interface EmailPayload {
     to: string
     subject: string
     html: string
+    /** Optional extra SMTP headers (e.g. List-Unsubscribe / List-Unsubscribe-Post for
+     *  RFC 8058 one-click). Additive — existing callers are unaffected. */
+    headers?: Record<string, string>
 }
 
 /**
@@ -20,7 +23,7 @@ interface EmailPayload {
  * Designed to be "Fire-and-Forget" (non-blocking) if awaited without return value,
  * but for reliability we will log errors.
  */
-export async function sendEmail({ to, subject, html }: EmailPayload) {
+export async function sendEmail({ to, subject, html, headers }: EmailPayload) {
     if (!resend || !API_KEY) {
         console.warn(`⚠️ RESEND_API_KEY is missing. Email NOT sent to ${to}. Subject: ${subject}`)
         return
@@ -33,6 +36,7 @@ export async function sendEmail({ to, subject, html }: EmailPayload) {
             to,
             subject,
             html,
+            ...(headers ? { headers } : {}),
         })
 
         if (error) {

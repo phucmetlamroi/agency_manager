@@ -9,9 +9,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock, UploadCloud } from 'lucide-react'
 import { toast } from 'sonner'
-import { listAssetVersions, type AssetVersions, type VersionRow } from '@/lib/review/team-actions'
+import { listAssetVersions, apiMarkFeedbackDone, type AssetVersions, type VersionRow } from '@/lib/review/team-actions'
 import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
 import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
+import { canAutoTransition } from '@/lib/task-statuses'
+import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
+import { ReviewFlowActions } from './ReviewFlowActions'
 import type { Fps } from '@/lib/review/timecode'
 import type { AnnotationShape, CommentDto } from '@/lib/review/comment-client'
 import { useHlsPlayer } from './useHlsPlayer'
@@ -127,6 +130,25 @@ function ReviewPlayerShellInner({
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.id : null, fps, enabled })
     const feed = useComments(version?.id ?? null)
 
+    // [P3-B] Derived task/role context for the F8/F9/F10 staff actions (server re-checks all).
+    const isAssignee = !!asset?.assigneeId && asset.assigneeId === currentUserId
+    // F9 gate: parent comments on the CURRENT version still open. F8 gate: any comment exists.
+    const unresolvedCount = useMemo(
+        () => feed.comments.filter((c) => c.parentId == null && c.completedAt == null).length,
+        [feed.comments],
+    )
+    const hasComments = feed.comments.length > 0
+    // A feedback session is "open" when an admin has feedback on a just-submitted (A2) cut.
+    const feedbackSessionOpen =
+        isAdmin && hasComments && canAutoTransition(asset?.taskStatus ?? '', REVIEW_STATUS_MAP.internalFeedbackOpen)
+
+    // Re-fetch the stack so the staff-action buttons reflect the new task status after a flip.
+    const reloadAsset = useCallback(() => {
+        listAssetVersions(assetId)
+            .then((res) => setData(res))
+            .catch(() => {/* keep last good data */})
+    }, [assetId])
+
     // [FR-04] Pending timecode/range shared between the composer (right) and the timeline
     // (left). range-playback loops [in,out] once, pausing at the out-point.
     const range = useRangeSelection()
@@ -236,10 +258,40 @@ function ReviewPlayerShellInner({
         requestAnimationFrame(() => document.getElementById(`comment-${c.id}`)?.scrollIntoView({ block: 'center' }))
     }, [feed.comments, initialCommentId, ctlSeek])
 
-    const goBack = useCallback(() => {
+    const goBack = useCallback(async () => {
         const folderId = asset?.folderId
-        router.push(folderId ? `/${workspaceId}/team/folder/${folderId}` : `/${workspaceId}/team`)
-    }, [router, workspaceId, asset?.folderId])
+        const dest = folderId ? `/${workspaceId}/team/folder/${folderId}` : `/${workspaceId}/team`
+        // [FR-08] Leaving an OPEN feedback session (admin · task "Đã nộp video (nội bộ)" · ≥1 comment):
+        // offer to close it on the way out. OK = chốt phiên (flip → A3 + notify editor) rồi thoát;
+        // Cancel = thoát mà chưa chốt. Comments are already persisted on Enter — this only flips state.
+        if (feedbackSessionOpen) {
+            const ok = window.confirm(
+                'Đã gửi xong feedback cho editor?\n\nOK = chốt phiên (editor được thông báo cần sửa) rồi thoát.\nCancel = thoát, chưa chốt.',
+            )
+            if (ok) {
+                try {
+                    await apiMarkFeedbackDone(assetId)
+                } catch {
+                    /* best-effort — still leave */
+                }
+            }
+        }
+        router.push(dest)
+    }, [router, workspaceId, asset?.folderId, feedbackSessionOpen, assetId])
+
+    // [FR-08] Best-effort tab-close warning while a feedback session is open. The browser will
+    // NOT run the async flip on unload (fetches are killed) — this only surfaces the native
+    // "leave site?" prompt so an admin doesn't lose an in-progress session by accident. The
+    // reliable triggers are the "Kết thúc feedback" button + the goBack confirm above.
+    useEffect(() => {
+        if (!feedbackSessionOpen) return
+        const onBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault()
+            e.returnValue = ''
+        }
+        window.addEventListener('beforeunload', onBeforeUnload)
+        return () => window.removeEventListener('beforeunload', onBeforeUnload)
+    }, [feedbackSessionOpen])
 
     // [B10] Enqueue a new version onto this asset. Video-only (same rule as the drawer
     // BÀN GIAO strip); the ready card refresh comes from listAssetVersions on the next poll.
@@ -342,6 +394,18 @@ function ReviewPlayerShellInner({
                 <div className="min-w-0 flex-1">
                     <h1 className="truncate text-sm font-semibold">{asset.name}</h1>
                 </div>
+
+                {/* [P3-B / FR-08·09·10] Staff auto-transition actions — visibility derived from
+                    task status + role; the server re-guards every flip. */}
+                <ReviewFlowActions
+                    assetId={assetId}
+                    taskStatus={asset.taskStatus}
+                    isAdmin={isAdmin}
+                    isAssignee={isAssignee}
+                    unresolvedCount={unresolvedCount}
+                    hasComments={hasComments}
+                    onDone={reloadAsset}
+                />
 
                 {/* [B10] Tải version mới */}
                 <input

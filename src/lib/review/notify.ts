@@ -49,6 +49,80 @@ export async function resolveTaskRecipients(
     return { assigneeId: task.assigneeId, adminUserIds: admins.map((a) => a.userId), title: task.title }
 }
 
+/**
+ * [P3-B / FR-07 · E2b=workspace-level] The task's MANAGER for status-flip notifications:
+ * the explicitly-set `Task.assignedById`; if unset, the fallback is every OWNER/ADMIN of the
+ * WORKSPACE (per the resolved E2b decision — workspace-level, not profile-level). Returns the
+ * recipients + the task title so the caller can render the notification without a second read.
+ */
+export async function resolveManagerRecipients(
+    taskId: string,
+    workspaceId: string,
+): Promise<{ managerIds: string[]; title: string }> {
+    const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { title: true, assignedById: true },
+    })
+    if (!task) return { managerIds: [], title: '' }
+    if (task.assignedById) return { managerIds: [task.assignedById], title: task.title }
+    // Fallback (no manager set): every workspace OWNER/ADMIN (WorkspaceMember.role).
+    const members = await prisma.workspaceMember.findMany({
+        where: { workspaceId, role: { in: ['OWNER', 'ADMIN'] } },
+        select: { userId: true },
+    })
+    return { managerIds: members.map((m) => m.userId), title: task.title }
+}
+
+/**
+ * [P3-B / N1·N3] Notify the task MANAGER of an auto/staff status flip on the video lifecycle.
+ * Sends via the app's `TASK_STATUS_CHANGED` type so it rides the EXISTING email template
+ * (`taskStatusChanged`, rendered from `meta.oldStatus`/`newStatus`) + bell + web-push — no new
+ * template, so it can't accidentally turn on emails for the other VIDEO_* uses. The actor is
+ * excluded (never self-notify). Fire-and-forget: notifyReview swallows + logs its own errors.
+ */
+export async function notifyManagerOfReviewFlip(input: {
+    taskId: string
+    workspaceId: string
+    assetId: string
+    fromStatus: string
+    toStatus: string
+    actorId?: string | null
+    versionId?: string | null
+    /** Recipients who already hear about this flip on another channel — the task ASSIGNEE
+     *  (gets updateTaskStatus's generic TASK_STATUS_CHANGED) or the uploader (gets
+     *  VIDEO_VERSION_UPLOADED). Excluded so no one is double-notified for one flip. */
+    alsoExcludeIds?: (string | null | undefined)[]
+}): Promise<void> {
+    // Whole body swallows: resolveManagerRecipients does DB reads OUTSIDE notifyReview's
+    // try/catch, and both call sites `void` this — an unguarded reject would surface as a
+    // detached unhandledRejection after the request/step already returned.
+    try {
+        const { managerIds, title } = await resolveManagerRecipients(input.taskId, input.workspaceId)
+        const exclude = new Set(
+            [input.actorId, ...(input.alsoExcludeIds ?? [])].filter((x): x is string => !!x),
+        )
+        const recipients = managerIds.filter((id) => !exclude.has(id))
+        if (!recipients.length) return
+        await notifyReview({
+            recipientIds: recipients,
+            excludeUserId: input.actorId ?? null,
+            type: 'TASK_STATUS_CHANGED',
+            title: `Task cập nhật: ${input.toStatus}`,
+            body: `"${title || 'Task'}" chuyển "${input.fromStatus}" → "${input.toStatus}".`,
+            taskId: input.taskId,
+            actorId: input.actorId ?? null,
+            deepLinkUrl: reviewPlayerUrl({
+                workspaceId: input.workspaceId,
+                assetId: input.assetId,
+                versionId: input.versionId ?? null,
+            }),
+            meta: { oldStatus: input.fromStatus, newStatus: input.toStatus, taskTitle: title },
+        })
+    } catch (e) {
+        reviewLog('error', 'notify.manager_flip_failed', { taskId: input.taskId, error: String(e) })
+    }
+}
+
 export interface ReviewNotifyInput {
     recipientIds: (string | null | undefined)[]
     /** the actor — never notify them of their own action */

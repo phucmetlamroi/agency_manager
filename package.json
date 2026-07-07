@@ -15,6 +15,7 @@
     "test:invite-security": "tsx scripts/test-invite-security.ts",
     "test:status-meta": "tsx scripts/test-status-meta-snapshot.ts",
     "test:portal-derive": "tsx scripts/test-portal-derive.ts",
+    "test:auto-transition": "tsx scripts/test-auto-transition.ts",
     "test:folder-scope": "tsx scripts/test-folder-scope.ts",
     "test:folder-scope-db": "tsx scripts/test-folder-scope-db.ts"
   },

@@ -11,12 +11,13 @@
 import { prisma } from '@/lib/db'
 import { requireReviewAccess } from './access'
 import { apiError } from './errors'
-import { recordActivity, REVIEW_ACTIVITY } from './activity'
+import { recordActivity, REVIEW_ACTIVITY, type RecordActivityInput } from './activity'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { reviewLog } from './logger'
-import { isValidStatus } from '@/lib/task-statuses'
+import { isValidStatus, canAutoTransition, STATUS_TRANSITIONS } from '@/lib/task-statuses'
 import { STATUS_REQUIRES_NULL_DEADLINE } from '@/lib/task-invariants'
+import { notifyManagerOfReviewFlip } from './notify'
 
 export async function confirmTaskHoanTat(taskId: string): Promise<{ ok: true; taskId: string; status: string }> {
     // Guard: at least one LIVE review asset for this task must be at the approved status.
@@ -52,22 +53,24 @@ export async function confirmTaskHoanTat(taskId: string): Promise<{ ok: true; ta
 }
 
 /**
- * [P5.4] Guest "Request changes" → task AUTO-flips to the mapped status
- * (FR-A05 AC1 — "Sửa lại", mapped to this repo's real "Revision" value).
+ * [P3-B / F7 + guest] Generalized auto-transition writer for the paths that have NO
+ * session (Inngest webhook, guest decision) and therefore CANNOT use `updateTaskStatus`.
+ * A direct scoped write that replicates exactly what that service does for a plain status
+ * change: status + deadline-null invariant (STATUS_REQUIRES_NULL_DEADLINE) + optimistic
+ * `version` increment. No assignee reset / archive — those only apply to other targets.
  *
- * updateTaskStatus CANNOT be delegated to here: it requires a logged-in session
- * (getCurrentUser) and a guest has none — this runs inside an Inngest function.
- * So this is a direct scoped write that replicates exactly what that service
- * does for a plain status change to "Revision": status + deadline-null
- * invariant (STATUS_REQUIRES_NULL_DEADLINE) + optimistic `version` increment.
- * No assignee reset, no archive — those only apply to other target statuses.
- * Spec explicitly includes pulling a task BACK from "Hoàn tất" (API-SPEC §6.4).
+ * Guard (STATUS-MACHINE §3.2, R6): when `target` is a video-lifecycle status (i.e. it is a
+ * key of STATUS_TRANSITIONS), the flip is applied ONLY when the CURRENT status is an allowed
+ * predecessor — so a late Mux webhook can't drag an already-approved task back a step. For a
+ * legacy target NOT in STATUS_TRANSITIONS (e.g. 'Revision'), there is no predecessor guard —
+ * that path keeps its historical "flip from anywhere" behavior (K6). Cancelled/archived tasks
+ * are never touched (finding P5-R#15). Returns `to` = the value actually written.
  */
-export async function syncTaskOnChangesRequested(
+export async function syncTaskFromReviewEvent(
     taskId: string,
     workspaceId: string,
-): Promise<{ applied: boolean; from?: string }> {
-    const target = REVIEW_STATUS_MAP.changesRequested
+    target: string,
+): Promise<{ applied: boolean; from?: string; to?: string }> {
     if (!isValidStatus(target)) {
         // Mapping points at a status this app no longer has — record-only fallback (FR-D02).
         reviewLog('error', 'task_sync.bad_status_map', { taskId, target })
@@ -81,15 +84,16 @@ export async function syncTaskOnChangesRequested(
         reviewLog('warn', 'task_sync.task_missing', { taskId, workspaceId })
         return { applied: false }
     }
-    // Never flip a cancelled/archived task to Revision — it would leave an impossible
-    // state (Revision + isArchived, hidden from every working board yet listed on the
-    // cancelled page as "Revision"). Staff must restore it first (finding P5-R#15).
     if (task.isArchived || task.status === 'Đã hủy') {
         reviewLog('info', 'task_sync.skipped_archived', { taskId, from: task.status })
         return { applied: false, from: task.status }
     }
-    if (task.status === target) return { applied: false, from: task.status } // already there
-
+    if (task.status === target) return { applied: false, from: task.status, to: target } // already there
+    // Predecessor guard — ONLY for video-lifecycle targets (keys of STATUS_TRANSITIONS).
+    if (target in STATUS_TRANSITIONS && !canAutoTransition(task.status, target)) {
+        reviewLog('info', 'task_sync.predecessor_guard_skip', { taskId, from: task.status, to: target })
+        return { applied: false, from: task.status }
+    }
     const res = await prisma.task.updateMany({
         where: { id: taskId, workspaceId, status: task.status, isArchived: false }, // lose races cleanly
         data: {
@@ -104,6 +108,202 @@ export async function syncTaskOnChangesRequested(
         reviewLog('warn', 'task_sync.race_lost', { taskId, from: task.status })
         return { applied: false, from: task.status }
     }
-    reviewLog('info', 'task_sync.changes_requested', { taskId, from: task.status, to: target })
-    return { applied: true, from: task.status }
+    reviewLog('info', 'task_sync.event_flip', { taskId, from: task.status, to: target })
+    return { applied: true, from: task.status, to: target }
+}
+
+/**
+ * [P5.4 + P3-B/F10-A6] Guest "Request changes" → task AUTO-flips (Inngest, no session).
+ *
+ * Conditional retarget (STATUS-MACHINE §3.6, K6): a change requested on a task that was
+ * SENT to the client (current === A5 'Đã gửi video (khách)') advances the CLIENT-review
+ * lifecycle to A6 ('Đã nhận feedback (khách)'); any other current status keeps the legacy
+ * internal-reject target 'Revision' so the guest-rejected task stays in the "Sửa lại" tab
+ * and payroll includes. `clientChangesRequested` (A6) is reachable ONLY from A5 via
+ * STATUS_TRANSITIONS, so canAutoTransition IS the A5 test.
+ *
+ * ⚠️ already-A6 guard: if the task is ALREADY at A6, canAutoTransition(A6,A6)=false would
+ * pick 'Revision' and the generic writer would DEMOTE A6→'Revision'. Short-circuit first.
+ */
+export async function syncTaskOnChangesRequested(
+    taskId: string,
+    workspaceId: string,
+): Promise<{ applied: boolean; from?: string; to?: string }> {
+    const client = REVIEW_STATUS_MAP.clientChangesRequested
+    const legacy = REVIEW_STATUS_MAP.changesRequested
+    const task = await prisma.task.findFirst({
+        where: { id: taskId, workspaceId },
+        select: { status: true, isArchived: true },
+    })
+    if (!task) {
+        reviewLog('warn', 'task_sync.task_missing', { taskId, workspaceId })
+        return { applied: false }
+    }
+    // Already INSIDE the post-send client-review lifecycle — A6 (awaiting the client-fix) OR
+    // A7 (editor fixed, awaiting admin re-send). A repeat guest "request changes" here is a
+    // no-op, NOT a demotion back to 'Revision': A6/A7 are NOT predecessors of A6 (only A5 is),
+    // so without this guard canAutoTransition would fall through to legacy 'Revision' and DROP
+    // the task out of the client-review phase (regressing the editor's confirmed fix + nulling
+    // the deadline). The guest's new note is still captured as a comment by the decision route.
+    if (task.status === client || task.status === REVIEW_STATUS_MAP.clientFixDone) {
+        return { applied: false, from: task.status, to: task.status }
+    }
+    const target = canAutoTransition(task.status, client) ? client : legacy
+    return syncTaskFromReviewEvent(taskId, workspaceId, target)
+}
+
+// ─────────────────────── [P3-B] Staff auto-transition actions (F8 / F9 / F10) ───────────────
+// These run inside /api/review/* route handlers → a staff SESSION exists, so unlike the
+// Inngest/guest paths they DELEGATE the task write to `updateTaskStatus` (reuses its
+// workspace-admin-OR-assignee RBAC + optimistic lock + StatusHistory + revalidatePath).
+// They add: (1) the review-side access guard, (2) a role check tighter than updateTaskStatus's
+// (F8/F10 admin-only; F9 admin-or-assignee), (3) the predecessor guard (canAutoTransition —
+// updateTaskStatus does NOT enforce the FSM, R10). The editor's status-change email/in-app is
+// emitted by updateTaskStatus's generic notifyTaskStatusChanged; the MANAGER-directed notify
+// (F9, whose actor === assignee → generic self-skips) is added explicitly.
+
+/** Resolve the LIVE asset + its task context, or throw the standard review error envelope. */
+async function loadAssetTaskContext(assetId: string): Promise<{
+    asset: { id: string; workspaceId: string; taskId: string }
+    access: Awaited<ReturnType<typeof requireReviewAccess>>
+    task: { status: string; assigneeId: string | null; version: number }
+}> {
+    const asset = await prisma.reviewAsset.findFirst({
+        where: { id: assetId, deletedAt: null },
+        select: { id: true, workspaceId: true, taskId: true },
+    })
+    if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy bản dựng.')
+    if (!asset.taskId) throw apiError(409, 'STATE_INVALID', 'Bản dựng này chưa gắn với task nào.', { reason: 'no_task' })
+    const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    const task = await prisma.task.findFirst({
+        where: { id: asset.taskId, workspaceId: asset.workspaceId },
+        select: { status: true, assigneeId: true, version: true },
+    })
+    if (!task) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy task của bản dựng.')
+    return { asset: { id: asset.id, workspaceId: asset.workspaceId, taskId: asset.taskId }, access, task }
+}
+
+/** Delegate a guarded flip to updateTaskStatus (session path) + map its {error} to the envelope. */
+async function delegateFlip(
+    taskId: string,
+    target: string,
+    workspaceId: string,
+    currentVersion: number,
+): Promise<void> {
+    const res = await updateTaskStatus(taskId, target, workspaceId, undefined, undefined, currentVersion)
+    if (res && typeof res === 'object' && 'error' in res && res.error) {
+        const msg = String(res.error)
+        const forbidden = /forbidden|quyền/i.test(msg)
+        throw apiError(forbidden ? 403 : 409, forbidden ? 'FORBIDDEN' : 'STATE_INVALID', msg)
+    }
+}
+
+/** The audit row after a committed flip is BEST-EFFORT: a logging failure must NOT surface as
+ *  a 500 on an action whose status change already succeeded, nor suppress a follow-up notify. */
+async function safeRecordActivity(input: RecordActivityInput): Promise<void> {
+    try {
+        await recordActivity(prisma, input)
+    } catch (e) {
+        reviewLog('error', 'task_sync.activity_failed', { type: input.type, taskId: input.taskId, error: String(e) })
+    }
+}
+
+/**
+ * [F8] Admin closed the internal feedback session → flip A2 → A3 ('Đang sửa feedback (nội bộ)')
+ * + email the editor (the generic status-change email, keyed by updateTaskStatus). Admin-only.
+ * "Confirm" here = close the session; comments are already persisted on Enter (no draft-mode).
+ */
+export async function markFeedbackDone(assetId: string): Promise<{ ok: true; taskId: string; status: string }> {
+    const { asset, access, task } = await loadAssetTaskContext(assetId)
+    if (!access.isAdmin) throw apiError(403, 'FORBIDDEN', 'Chỉ người quản lý mới chốt được phiên feedback.')
+    const target = REVIEW_STATUS_MAP.internalFeedbackOpen // A3
+    if (!canAutoTransition(task.status, target)) {
+        throw apiError(409, 'STATE_INVALID', 'Task không ở trạng thái "Đã nộp video (nội bộ)".', { from: task.status })
+    }
+    await delegateFlip(asset.taskId, target, asset.workspaceId, task.version)
+    await safeRecordActivity({
+        type: REVIEW_ACTIVITY.TASK_FEEDBACK_CLOSED,
+        workspaceId: asset.workspaceId,
+        taskId: asset.taskId,
+        assetId: asset.id,
+        actorUserId: access.userId,
+        meta: { from: task.status, to: target },
+    })
+    return { ok: true, taskId: asset.taskId, status: target }
+}
+
+/**
+ * [F9] Editor confirmed the fix → flip A3 → A4 ('Đã sửa feedback (nội bộ)') on the internal
+ * round, OR A6 → A7 ('Đã sửa feedback (khách)') on the client round (same button, target chosen
+ * from the current status). Admin OR the task's assignee. Notifies the manager it's ready to
+ * review/re-approve. The caller (route) enforces the resolved-comment gate in the UI; the server
+ * guards the predecessor.
+ */
+export async function confirmFixDone(assetId: string): Promise<{ ok: true; taskId: string; status: string }> {
+    const { asset, access, task } = await loadAssetTaskContext(assetId)
+    const isAssignee = task.assigneeId != null && task.assigneeId === access.userId
+    if (!access.isAdmin && !isAssignee) {
+        throw apiError(403, 'FORBIDDEN', 'Chỉ người được giao task mới xác nhận đã sửa.')
+    }
+    // Internal round A3→A4, or client round A6→A7 — pick the target reachable from the current status.
+    const target =
+        canAutoTransition(task.status, REVIEW_STATUS_MAP.internalFixDone)
+            ? REVIEW_STATUS_MAP.internalFixDone
+            : canAutoTransition(task.status, REVIEW_STATUS_MAP.clientFixDone)
+              ? REVIEW_STATUS_MAP.clientFixDone
+              : null
+    if (!target) {
+        throw apiError(409, 'STATE_INVALID', 'Task không ở trạng thái đang sửa feedback.', { from: task.status })
+    }
+    await delegateFlip(asset.taskId, target, asset.workspaceId, task.version)
+    // Tell the manager the editor is done (in-app + email) BEFORE the best-effort audit row, so
+    // an audit failure can never suppress the notify. When the editor confirms their OWN fix
+    // (actor === assignee) updateTaskStatus's generic notify self-skips — the manager would
+    // otherwise hear nothing. Exclude the assignee: if an ADMIN confirms and the assignee is a
+    // manager recipient, the assignee already got the generic notify (no double — R6).
+    void notifyManagerOfReviewFlip({
+        taskId: asset.taskId,
+        workspaceId: asset.workspaceId,
+        assetId: asset.id,
+        fromStatus: task.status,
+        toStatus: target,
+        actorId: access.userId,
+        alsoExcludeIds: [task.assigneeId],
+    })
+    await safeRecordActivity({
+        type: REVIEW_ACTIVITY.TASK_FIX_CONFIRMED,
+        workspaceId: asset.workspaceId,
+        taskId: asset.taskId,
+        assetId: asset.id,
+        actorUserId: access.userId,
+        meta: { from: task.status, to: target },
+    })
+    return { ok: true, taskId: asset.taskId, status: target }
+}
+
+/**
+ * [F10-flip] Admin approved internally → flip → A5 ('Đã gửi video (khách)') from A2/A4/A7.
+ * Admin-only. The editor's in-app notice comes from updateTaskStatus's generic notify.
+ * ⚠️ The portal bridge (create ShareLink + Task.clientReview='AWAITING' + guest email) is P4
+ * (BR-05 / FR-10-portal) — it must run ONLY here (admin approve), never on Mux READY.
+ */
+export async function approveInternalAndSendToClient(
+    assetId: string,
+): Promise<{ ok: true; taskId: string; status: string }> {
+    const { asset, access, task } = await loadAssetTaskContext(assetId)
+    if (!access.isAdmin) throw apiError(403, 'FORBIDDEN', 'Chỉ người quản lý mới duyệt gửi khách.')
+    const target = REVIEW_STATUS_MAP.sentToClient // A5
+    if (!canAutoTransition(task.status, target)) {
+        throw apiError(409, 'STATE_INVALID', 'Task chưa sẵn sàng để duyệt gửi khách.', { from: task.status })
+    }
+    await delegateFlip(asset.taskId, target, asset.workspaceId, task.version)
+    await safeRecordActivity({
+        type: REVIEW_ACTIVITY.TASK_SENT_TO_CLIENT,
+        workspaceId: asset.workspaceId,
+        taskId: asset.taskId,
+        assetId: asset.id,
+        actorUserId: access.userId,
+        meta: { from: task.status, to: target },
+    })
+    return { ok: true, taskId: asset.taskId, status: target }
 }

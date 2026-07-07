@@ -113,6 +113,10 @@ export interface AssetVersions {
         mediaKind: 'video' | 'image'
         currentVersionId: string | null
         folderId: string
+        // [P3-B] task context so the player can gate F8/F9/F10 by status + role.
+        taskId: string | null
+        taskStatus: string | null
+        assigneeId: string | null
     }
     versions: VersionRow[]
 }
@@ -178,6 +182,23 @@ export async function apiSetAssetStatus(
 /** Confirm "Chuyển task sang Hoàn tất" from the drawer banner (FR-D02). */
 export async function apiConfirmTaskComplete(taskId: string): Promise<{ ok: true; taskId: string; status: string }> {
     return postJson(`/api/review/tasks/${encodeURIComponent(taskId)}/confirm-complete`, {})
+}
+
+/* ── [P3-B] staff auto-transition actions (F8 / F9 / F10), asset-scoped ──────────── */
+
+/** [F8] Admin closed the feedback session → task "Đã nộp video (nội bộ)" → "Đang sửa feedback (nội bộ)". */
+export async function apiMarkFeedbackDone(assetId: string): Promise<{ ok: true; taskId: string; status: string }> {
+    return postJson(`/api/review/assets/${encodeURIComponent(assetId)}/feedback-done`, {})
+}
+
+/** [F9] Editor confirmed the fix → "Đã sửa feedback (nội bộ)" (internal) or "…(khách)" (client round). */
+export async function apiConfirmFix(assetId: string): Promise<{ ok: true; taskId: string; status: string }> {
+    return postJson(`/api/review/assets/${encodeURIComponent(assetId)}/confirm-fix`, {})
+}
+
+/** [F10] Admin approved internally → task "Đã gửi video (khách)". Portal bridge + guest email = P4. */
+export async function apiApproveAndSend(assetId: string): Promise<{ ok: true; taskId: string; status: string }> {
+    return postJson(`/api/review/assets/${encodeURIComponent(assetId)}/approve-send`, {})
 }
 
 /* ── download ──────────────────────────────────────────────────────────────── */

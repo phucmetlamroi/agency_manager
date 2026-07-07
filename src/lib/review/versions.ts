@@ -54,7 +54,18 @@ export interface VersionRowDto extends VersionDto {
     isCurrent: boolean
 }
 export interface ListVersionsResult {
-    asset: { id: string; name: string; mediaKind: 'video' | 'image'; currentVersionId: string | null; folderId: string }
+    asset: {
+        id: string
+        name: string
+        mediaKind: 'video' | 'image'
+        currentVersionId: string | null
+        folderId: string
+        // [P3-B] task context so the player can gate the F8/F9/F10 staff actions by
+        // status + role. Null when the asset isn't attached to a task (Team-only).
+        taskId: string | null
+        taskStatus: string | null
+        assigneeId: string | null
+    }
     versions: VersionRowDto[]
 }
 
@@ -70,6 +81,13 @@ export async function listVersions(assetId: string): Promise<ListVersionsResult>
         orderBy: { versionNumber: 'desc' }, // newest → oldest (FR-C02)
     })
     const refs = await loadUserRefs(versions.map((v) => v.uploaderId))
+    // [P3-B] Task context for the player's F8/F9/F10 gating. Same-workspace scope for defense.
+    const task = asset.taskId
+        ? await prisma.task.findFirst({
+              where: { id: asset.taskId, workspaceId: asset.workspaceId },
+              select: { status: true, assigneeId: true },
+          })
+        : null
     return {
         asset: {
             id: asset.id,
@@ -77,6 +95,9 @@ export async function listVersions(assetId: string): Promise<ListVersionsResult>
             mediaKind: asset.mediaKind === 'VIDEO' ? 'video' : 'image',
             currentVersionId: asset.currentVersionId,
             folderId: asset.folderId,
+            taskId: asset.taskId,
+            taskStatus: task?.status ?? null,
+            assigneeId: task?.assigneeId ?? null,
         },
         versions: versions.map((v) => ({
             ...serializeVersion(v, {

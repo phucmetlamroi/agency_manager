@@ -144,7 +144,11 @@ export const PHASE_CLIENT_LABEL: Record<TaskStatusPhase, string> = {
  * stays disabled by explicit project decision).
  */
 export const STATUS_TRANSITIONS: Record<string, string[]> = {
-    'Đã nộp video (nội bộ)':      ['Đang thực hiện', 'Sửa frame', 'Gửi lại', 'Revision'],           // F7
+    // F7 — Mux READY. Includes A4 'Đã sửa feedback (nội bộ)' so a CORRECTED cut re-uploaded during
+    // the internal round loops BACK into review (STATUS-MACHINE §3.1 diagram "A4 → …READY→ về A2" +
+    // §3.3 predecessor "A1 lần đầu HOẶC A4 vòng lặp"). Without it a re-upload at A4 would strand the
+    // task at A4 with the only forward auto-path being F10→client, pushing an un-reviewed cut out.
+    'Đã nộp video (nội bộ)':      ['Đang thực hiện', 'Sửa frame', 'Gửi lại', 'Revision', 'Đã sửa feedback (nội bộ)'], // F7
     'Đang sửa feedback (nội bộ)': ['Đã nộp video (nội bộ)'],                                        // F8
     'Đã sửa feedback (nội bộ)':   ['Đang sửa feedback (nội bộ)'],                                   // F9
     'Đã gửi video (khách)':       ['Đã sửa feedback (nội bộ)', 'Đã nộp video (nội bộ)', 'Đã sửa feedback (khách)'], // F10

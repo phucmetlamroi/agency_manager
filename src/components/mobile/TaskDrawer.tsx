@@ -12,6 +12,7 @@ import {
 // [Hotfix 2026-06-13] browser-only dompurify — see TaskDetailModal.tsx note.
 import DOMPurify from "dompurify"
 import { ensureExternalLinks } from "@/lib/utils"
+import { statusLabel } from "@/lib/display-labels"
 import { formatClientHierarchy } from "@/lib/client-hierarchy"
 import { getValidNextStatuses, type ActorRole } from "@/lib/task-state-machine"
 import { taskTypeLabel } from "@/lib/display-labels"
@@ -120,7 +121,7 @@ export function TaskDrawer({
                             </Drawer.Title>
 
                             <div className="flex flex-wrap items-center gap-2 mb-6">
-                                <Badge variant="outline" className="border-white/15 text-zinc-200">{task.status}</Badge>
+                                <Badge variant="outline" className="border-white/15 text-zinc-200">{statusLabel(task.status)}</Badge>
                                 {task.type && (
                                     <Badge variant="secondary" className="bg-zinc-800 text-zinc-200">{taskTypeLabel(task.type)}</Badge>
                                 )}

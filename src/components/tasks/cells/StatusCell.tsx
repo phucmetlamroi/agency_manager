@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { statusLabel } from "@/lib/display-labels"
 import {
     Select,
     SelectContent,
@@ -119,7 +120,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
         }
         return (
             <Badge variant="outline" className={statusColors[task.status] || "bg-secondary"}>
-                {task.status}
+                {statusLabel(task.status)}
             </Badge>
         )
     }
@@ -138,7 +139,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
                         {/* [P3/F2] video statuses (A2–A7) included so admin can see/correct
                             them by hand; normally they flip via the review module (F7–F10). */}
                         {["Đang đợi giao", "Nhận task", "Đang thực hiện", "Đã nộp video (nội bộ)", "Đang sửa feedback (nội bộ)", "Đã sửa feedback (nội bộ)", "Đã gửi video (khách)", "Đã nhận feedback (khách)", "Đã sửa feedback (khách)", "Revision", "Gửi lại", "Sửa frame", "Tạm ngưng", "Quá hạn", "Hoàn tất", "Đã hủy"].map(opt => (
-                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            <SelectItem key={opt} value={opt}>{statusLabel(opt)}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>

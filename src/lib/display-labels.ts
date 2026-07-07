@@ -7,8 +7,25 @@
  *
  * NOTE: task STATUS values are already stored in Vietnamese (see task-statuses.ts)
  * and are load-bearing in comparisons (`=== 'Hoàn tất'`), so they are NOT mapped
- * here — render them verbatim.
+ * here — render them verbatim. The ONE exception is 'Revision' (Sprint A merged
+ * 'Review'→'Revision'), the single English status value; `statusLabel` below remaps
+ * only its DISPLAY — the stored value + every `=== 'Revision'` comparison stay 'Revision'.
  */
+
+/* ── Task status (display only — value never changes) ── */
+
+const STATUS_LABEL: Record<string, string> = {
+  // [L18a] Only the English 'Revision' leaks into the Vietnamese staff UI; give it the same
+  // wording the workflow tabs already use ('Sửa lại'). All Vietnamese statuses pass through.
+  Revision: 'Sửa lại',
+}
+
+/** Vietnamese display label for a stored task status. Only 'Revision' is remapped; every
+ *  other (already-Vietnamese) status passes through verbatim. NEVER changes the stored value. */
+export function statusLabel(status: string | null | undefined): string {
+  if (!status) return ''
+  return STATUS_LABEL[status] ?? status
+}
 
 /* ── Task type (stored 'Short form' | 'Long form' | 'Trial') ── */
 

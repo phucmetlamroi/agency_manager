@@ -9,6 +9,7 @@ import { validateTransition } from '@/lib/fsm-config'
 import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { updateTaskDetails } from '@/actions/update-task-details'
+import { statusLabel } from '@/lib/display-labels'
 import DeleteTaskButton from './DeleteTaskButton'
 // [Sprint A removed] ManagerReviewChecklist import — bảng đánh giá đã bỏ.
 
@@ -237,7 +238,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
 
                                     <option value="">-- Ch\u1ecdn tr\u1ea1ng th\u00e1i --</option>
                                     {['Nh\u1eadn task', '\u0110ang th\u1ef1c hi\u1ec7n', 'Revision', 'Ho\u00e0n t\u1ea5t', 'T\u1ea1m ng\u01b0ng', 'S\u1eeda frame', 'Qu\u00e1 h\u1ea1n'].map(opt => (
-                                        <option key={opt} value={opt}>{opt}</option>
+                                        <option key={opt} value={opt}>{statusLabel(opt)}</option>
                                     ))}
                                 </select>
                             </div>
@@ -457,7 +458,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             {getStatusOptions(task.status).map(opt => (
-                                                <option key={opt} value={opt}>{opt}</option>
+                                                <option key={opt} value={opt}>{statusLabel(opt)}</option>
                                             ))}
                                         </select>
 

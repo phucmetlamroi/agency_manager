@@ -13,6 +13,7 @@ import * as Popover from '@radix-ui/react-popover'
 import { Check, ChevronDown, Loader2, Plus, Search, X } from 'lucide-react'
 import { statusColor } from '@/lib/review/view-prefs'
 import { fetchStatusOptions } from '@/lib/review/team-actions'
+import { statusLabel } from '@/lib/display-labels'
 
 interface StatusOption {
     value: string
@@ -42,7 +43,7 @@ export function StatusPillView({ status, trailing }: { status: string | null; tr
             title={status}
         >
             <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: c }} />
-            <span className="truncate">{status}</span>
+            <span className="truncate">{statusLabel(status)}</span>
             {trailing}
         </span>
     )

@@ -32,7 +32,8 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     'Đang đợi giao':   { label: 'Đang đợi giao',   color: '#A855F7' },
     'Đang thực hiện':  { label: 'Đang thực hiện',  color: '#EAB308' },
     // [Sprint A removed] 'Review' status — submit giờ đi thẳng Revision
-    'Revision':            { label: 'Revision',            color: '#EF4444' },
+    // [L18a] value stays 'Revision' (load-bearing); only the VN display label changes.
+    'Revision':            { label: 'Sửa lại',             color: '#EF4444' },
     'Sửa frame':       { label: 'Sửa frame',       color: '#EC4899' },
     'Gửi lại':       { label: 'Gửi lại',       color: '#F97316' },
     'Tạm ngưng':    { label: 'Tạm ngưng',    color: '#71717A' },

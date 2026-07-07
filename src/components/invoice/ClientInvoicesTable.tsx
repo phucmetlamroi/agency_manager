@@ -89,7 +89,8 @@ export function ClientInvoicesTable({ invoices, clientId, workspaceId }: { invoi
                         <tr key={inv.id} className="border-b border-gray-800 hover:bg-white/5">
                             <td className="py-3 font-medium text-white">{inv.invoiceNumber}</td>
                             <td className="py-3 text-gray-500">
-                                {new Date(inv.issueDate).toLocaleDateString()}
+                                {/* [L18b] VN staff UI → dd/mm/yyyy; a bare toLocaleDateString() showed US mm/dd on en-US browsers. */}
+                                {new Date(inv.issueDate).toLocaleDateString('vi-VN')}
                             </td>
                             <td className="py-3 font-mono text-emerald-400">
                                 {formatCurrency(Number(inv.totalDue))}

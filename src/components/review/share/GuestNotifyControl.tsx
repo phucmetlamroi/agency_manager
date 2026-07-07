@@ -4,6 +4,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Bell, BellRing, Loader2, X } from 'lucide-react'
 
 interface Props {
@@ -31,8 +32,27 @@ export function GuestNotifyControl({ slug, assetId }: Props) {
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [info, setInfo] = useState<string | null>(null)
+    // [Bug#5] The popover was rendered INSIDE the /r/ header, whose `backdrop-blur` creates a
+    // stacking context — so its z-30/z-40 were local and the opaque panel parked ON TOP of the
+    // update-log/comments surface with no reliable outside-click dismiss. We portal it to
+    // <body> and position it `fixed` (anchored to the bell) at app-level z, ABOVE the log but
+    // BELOW the decision/identity modals (z-[95]/z-[96]).
+    const triggerRef = useRef<HTMLButtonElement>(null)
+    const [mounted, setMounted] = useState(false)
+    const [pos, setPos] = useState<{ top: number; right: number }>({ top: 56, right: 12 })
+    useEffect(() => setMounted(true), [])
 
     const base = `/api/r/${encodeURIComponent(slug)}/notifications`
+
+    const togglePanel = useCallback(() => {
+        if (open) {
+            setOpen(false)
+            return
+        }
+        const r = triggerRef.current?.getBoundingClientRect()
+        if (r) setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) })
+        setOpen(true)
+    }, [open])
 
     const loadStatus = useCallback(async (): Promise<boolean> => {
         try {
@@ -126,17 +146,21 @@ export function GuestNotifyControl({ slug, assetId }: Props) {
     return (
         <div className="relative">
             <button
-                onClick={() => setOpen((v) => !v)}
+                ref={triggerRef}
+                onClick={togglePanel}
                 className="flex h-9 items-center gap-1.5 rounded-lg border border-white/10 px-3 text-sm text-white/80 hover:bg-white/10"
                 title="Get email updates for this review"
             >
                 <Bell className="h-4 w-4" />
                 <span className="hidden sm:inline">Get updates</span>
             </button>
-            {open && (
+            {open && mounted && createPortal(
                 <>
-                    <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-                    <div className="absolute right-0 top-11 z-40 w-72 rounded-xl border border-white/10 bg-zinc-900/95 p-3 shadow-2xl backdrop-blur">
+                    <div className="fixed inset-0 z-[85]" onClick={() => setOpen(false)} />
+                    <div
+                        className="fixed z-[86] w-72 rounded-xl border border-white/10 bg-zinc-900/95 p-3 shadow-2xl backdrop-blur"
+                        style={{ top: pos.top, right: pos.right }}
+                    >
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm font-semibold text-white/90">Email updates</span>
                             <button onClick={() => setOpen(false)} className="grid h-6 w-6 place-items-center rounded text-white/50 hover:bg-white/10">
@@ -191,7 +215,8 @@ export function GuestNotifyControl({ slug, assetId }: Props) {
                         )}
                         {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
                     </div>
-                </>
+                </>,
+                document.body,
             )}
         </div>
     )

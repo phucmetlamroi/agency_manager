@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { updateTaskStatus } from "@/actions/task-actions"
-import { statusLabel } from "@/lib/display-labels"
+import { statusLabel, statusShort } from "@/lib/display-labels"
 import {
     Select,
     SelectContent,
@@ -130,8 +130,10 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
         <>
             <div className="flex items-center gap-2">
                 <Select value={task.status} onValueChange={handleStatusChange}>
-                    <SelectTrigger className={`h-8 border-0 font-bold ${statusColors[task.status]}`}>
-                        <SelectValue />
+                    {/* [Bug#2b] Short label on the narrow board trigger + full label as a hover
+                        tooltip; the dropdown list keeps the full labels. Stored value untouched. */}
+                    <SelectTrigger title={statusLabel(task.status)} className={`h-8 border-0 font-bold ${statusColors[task.status]}`}>
+                        <SelectValue>{statusShort(task.status)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                         {/* [Sprint A] 'Review' đã bỏ — submit → Revision */}

@@ -27,6 +27,29 @@ export function statusLabel(status: string | null | undefined): string {
   return STATUS_LABEL[status] ?? status
 }
 
+/**
+ * [Bug#2b] Shortened display label for the 6 long video-lifecycle statuses so the fixed-width
+ * board status pill (a Radix Select trigger, ~1 line) doesn't clip them mid-word. Render-only:
+ * the stored value is untouched, and the full label is still shown as a `title` tooltip + in the
+ * dropdown list. The '(nội bộ)' / '(khách)' scope suffix is KEPT so who-did-what stays clear.
+ * Non-video statuses fall through to statusLabel() unchanged.
+ */
+const SHORT_STATUS_LABEL: Record<string, string> = {
+  'Đã nộp video (nội bộ)': 'Đã nộp (nội bộ)',
+  'Đang sửa feedback (nội bộ)': 'Đang sửa (nội bộ)',
+  'Đã sửa feedback (nội bộ)': 'Đã sửa (nội bộ)',
+  'Đã gửi video (khách)': 'Đã gửi (khách)',
+  'Đã nhận feedback (khách)': 'Nhận feedback (khách)',
+  'Đã sửa feedback (khách)': 'Đã sửa (khách)',
+}
+
+/** Compact status label for narrow board pills. Falls through to statusLabel() for every
+ *  status without a short form. NEVER changes the stored value. */
+export function statusShort(status: string | null | undefined): string {
+  if (!status) return ''
+  return SHORT_STATUS_LABEL[status] ?? statusLabel(status)
+}
+
 /* ── Task type (stored 'Short form' | 'Long form' | 'Trial') ── */
 
 const TASK_TYPE_LABEL: Record<string, string> = {

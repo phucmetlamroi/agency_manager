@@ -18,6 +18,10 @@ import { reviewLog } from './logger'
 import { isValidStatus, canAutoTransition, STATUS_TRANSITIONS } from '@/lib/task-statuses'
 import { STATUS_REQUIRES_NULL_DEADLINE } from '@/lib/task-invariants'
 import { notifyManagerOfReviewFlip } from './notify'
+// [P4/BR-05 bridge] portal link-up + guest E1 — imported lazily-safe (all server libs).
+import { getOrCreatePrimaryShareForAsset } from './shares'
+import { notifyGuestsOfAsset } from './guest-notify'
+import { guestAppBaseUrl } from './guest-emails/wrap'
 
 export async function confirmTaskHoanTat(taskId: string): Promise<{ ok: true; taskId: string; status: string }> {
     // Guard: at least one LIVE review asset for this task must be at the approved status.
@@ -305,5 +309,24 @@ export async function approveInternalAndSendToClient(
         actorUserId: access.userId,
         meta: { from: task.status, to: target },
     })
+
+    // [P4 / BR-05 + FR-10-portal] Bridge review → client portal — runs ONLY here (admin Duyệt),
+    // NEVER on Mux READY (R5: an unapproved internal cut must never reach the client). Best-effort:
+    // the A5 flip already committed, so a bridge failure must not 500 the approve.
+    //   1. get-or-create the ACTIVE share for this asset (the /r/{slug} the client watches on);
+    //   2. light the portal: Task.clientReview='AWAITING' (→ deriveClientStatus "Awaiting your
+    //      review" + the portal Approve/Request-changes buttons) + point productLink at the review;
+    //   3. E1 VERSION_SENT → email any guests already subscribed to this asset (round ≥ 2).
+    try {
+        const { share } = await getOrCreatePrimaryShareForAsset(asset.id)
+        const reviewUrl = `${guestAppBaseUrl()}/r/${share.slug}`
+        await prisma.task.updateMany({
+            where: { id: asset.taskId, workspaceId: asset.workspaceId },
+            data: { clientReview: 'AWAITING', clientReviewedAt: null, productLink: reviewUrl },
+        })
+        void notifyGuestsOfAsset({ assetId: asset.id, event: 'version_sent' })
+    } catch (e) {
+        reviewLog('error', 'task_sync.bridge_failed', { taskId: asset.taskId, assetId: asset.id, error: String(e) })
+    }
     return { ok: true, taskId: asset.taskId, status: target }
 }

@@ -29,6 +29,7 @@ import {
 import { X } from 'lucide-react'
 import { bytesLabel } from './TeamCards'
 import { apiPurgeItems, apiRestoreItems, type ItemKind, type ItemRef } from '@/lib/review/team-actions'
+import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 
 const RESTORE_CAP = 200 // restore route caps items at 200
 const BULK_KEY = '__bulk__'
@@ -191,7 +192,7 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
                 const toRoot = restored.filter((r) => r.movedToRoot).length
                 const msg =
                     `Đã khôi phục ${restored.length} mục.` +
-                    (toRoot > 0 ? ` (${toRoot} mục về gốc Team vì thư mục gốc đã bị xóa)` : '')
+                    (toRoot > 0 ? ` (${toRoot} mục về gốc ${REVIEW_MODULE_LABEL} vì thư mục gốc đã bị xóa)` : '')
                 toast.success(msg, { id: tid })
                 setSelectedIds(new Set())
                 setRefreshKey((k) => k + 1)
@@ -269,7 +270,7 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
                             href={teamHref}
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[12.5px] text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
                         >
-                            <ChevronLeft size={15} /> Team
+                            <ChevronLeft size={15} /> {REVIEW_MODULE_LABEL}
                         </a>
                         {data && (
                             <span className="text-[11px] text-zinc-500">
@@ -367,14 +368,14 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
                             <div>
                                 <p className="text-[14px] font-medium text-zinc-200">Thùng rác trống</p>
                                 <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
-                                    Mục bạn xóa trong Team sẽ xuất hiện ở đây và có thể khôi phục trong 30 ngày.
+                                    Mục bạn xóa trong {REVIEW_MODULE_LABEL} sẽ xuất hiện ở đây và có thể khôi phục trong 30 ngày.
                                 </p>
                             </div>
                             <a
                                 href={teamHref}
                                 className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-4 py-2 text-[12.5px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.12]"
                             >
-                                <ChevronLeft size={14} /> Về Team
+                                <ChevronLeft size={14} /> Về {REVIEW_MODULE_LABEL}
                             </a>
                         </div>
                     ) : (

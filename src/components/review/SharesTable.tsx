@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { ArrowLeft, Copy, Eye, Link2, Loader2, MoreHorizontal, Pencil, Power, RefreshCw, Trash2 } from 'lucide-react'
+import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 import {
     apiDeleteShare,
     apiListShares,
@@ -81,7 +82,7 @@ export function SharesTable({ workspaceId }: { workspaceId: string }) {
                     <a
                         href={`/${workspaceId}/team`}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
-                        aria-label="Quay lại Team"
+                        aria-label={`Quay lại ${REVIEW_MODULE_LABEL}`}
                     >
                         <ArrowLeft size={16} />
                     </a>

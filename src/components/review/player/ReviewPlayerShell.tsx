@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock } from 'lucide-react'
 import { listAssetVersions, type AssetVersions, type VersionRow } from '@/lib/review/team-actions'
+import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 import type { Fps } from '@/lib/review/timecode'
 import type { AnnotationShape, CommentDto } from '@/lib/review/comment-client'
 import { useHlsPlayer } from './useHlsPlayer'
@@ -232,7 +233,7 @@ function ReviewPlayerShellInner({
                 <div className="text-center">
                     <p className="mb-3 text-sm">{loadError}</p>
                     <button onClick={goBack} className="rounded-lg bg-white/10 px-4 py-2 text-sm hover:bg-white/15">
-                        Quay lại Team
+                        Quay lại {REVIEW_MODULE_LABEL}
                     </button>
                 </div>
             </div>

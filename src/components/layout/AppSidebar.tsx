@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { roleLabel } from "@/lib/display-labels"
+import { REVIEW_MODULE_LABEL } from "@/lib/review/labels"
 import { Button } from "@/components/ui/button"
 import {
     LayoutDashboard,
@@ -87,7 +88,7 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
         // [Review module P2] Team asset browser (video review). Admin-only in P2 —
         // the /admin layout guard gates entry; shown in both views per the unified-nav
         // convention above (non-admin click → layout redirects to /dashboard).
-        { label: "Team", href: `/${workspaceId}/team`, icon: Clapperboard, roles: ['ADMIN', 'USER'] },
+        { label: REVIEW_MODULE_LABEL, href: `/${workspaceId}/team`, icon: Clapperboard, roles: ['ADMIN', 'USER'] },
         // [CM merge] "Clients Manager" đã gộp vào Dashboard → bỏ khỏi sidebar.
         { label: "Lịch", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
         { label: "Lỗi của tôi", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },

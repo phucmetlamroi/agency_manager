@@ -12,6 +12,7 @@
 // share (P5); they are intentionally absent here, not stubbed with dead buttons.
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
+import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 import { toast } from 'sonner'
 import {
     Film,
@@ -115,7 +116,7 @@ export function TaskReviewUploadSection({
             return
         }
         if (meta.kind !== 'VIDEO') {
-            toast.error('Mục bàn giao chỉ nhận video. Ảnh sẽ hỗ trợ ở trình duyệt Team.')
+            toast.error(`Mục bàn giao chỉ nhận video. Ảnh sẽ hỗ trợ ở trình duyệt ${REVIEW_MODULE_LABEL}.`)
             return
         }
         setPendingFile(file)

@@ -78,6 +78,7 @@ import {
     copyToClipboard,
 } from '@/lib/review/team-actions'
 import { bytesLabel, REVIEW_ITEMS_MIME, type ItemDnd } from './TeamCards'
+import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 import { FolderCardGrid, AssetCardGrid, InfoPanel } from './TeamCards'
 import { ManageVersionsModal } from './ManageVersionsModal'
 import { ShareLinkModal, type ShareModalTarget } from './ShareLinkModal'
@@ -159,7 +160,7 @@ export function TeamBrowser({
     const [folderId, setFolderId] = useState<string | null>(initialFolderId)
     const [data, setData] = useState<ChildrenResult | null>(null)
     const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([])
-    const [currentName, setCurrentName] = useState<string>('Team')
+    const [currentName, setCurrentName] = useState<string>(REVIEW_MODULE_LABEL)
     const [currentFolder, setCurrentFolder] = useState<FolderDto | null>(null)
     const [nextCursor, setNextCursor] = useState<string | null>(null)
     const [tree, setTree] = useState<TreeNode[]>([])
@@ -322,7 +323,7 @@ export function TeamBrowser({
         setMenuTarget(null)
         if (!folderId) {
             setBreadcrumb([])
-            setCurrentName('Team')
+            setCurrentName(REVIEW_MODULE_LABEL)
             setCurrentFolder(null)
             return
         }
@@ -1043,8 +1044,8 @@ export function TeamBrowser({
     /* ---- breadcrumb trail ---- */
     const trail = useMemo<{ id: string | null; name: string }[]>(() => {
         const crumbs: { id: string | null; name: string }[] = breadcrumb.map((b) => ({ id: b.id, name: b.name }))
-        if (crumbs.length === 0) return [{ id: null, name: 'Team' }]
-        crumbs[0] = { id: null, name: 'Team' }
+        if (crumbs.length === 0) return [{ id: null, name: REVIEW_MODULE_LABEL }]
+        crumbs[0] = { id: null, name: REVIEW_MODULE_LABEL }
         return [...crumbs, { id: folderId, name: currentName }]
     }, [breadcrumb, currentName, folderId])
 
@@ -1135,7 +1136,7 @@ export function TeamBrowser({
                 </div>
                 <div>
                     <h1 className="font-extrabold tracking-tight text-white" style={{ fontSize: 20 }}>
-                        Team
+                        {REVIEW_MODULE_LABEL}
                     </h1>
                     <p className="mt-px text-zinc-500" style={{ fontSize: 12 }}>
                         Trình duyệt bản dựng video — khách duyệt qua link, đồng bộ trạng thái task.
@@ -1636,10 +1637,10 @@ function TreeSidebar({
                         type="button"
                         onClick={() => onNavigate(targetId)}
                         className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left"
-                        title={isRoot ? 'Team' : node.name}
+                        title={isRoot ? REVIEW_MODULE_LABEL : node.name}
                     >
                         <FolderIcon size={14} className={selected ? 'shrink-0 text-violet-300' : 'shrink-0 text-zinc-500'} />
-                        <span className="truncate text-[12.5px]">{isRoot ? 'Team' : node.name}</span>
+                        <span className="truncate text-[12.5px]">{isRoot ? REVIEW_MODULE_LABEL : node.name}</span>
                     </button>
                 </div>
                 {isOpen && kids.length > 0 && <div>{kids.map((k) => render(k, depth + 1))}</div>}

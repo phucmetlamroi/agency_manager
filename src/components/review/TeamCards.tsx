@@ -22,7 +22,7 @@ import type { ItemRef } from '@/lib/review/team-actions'
 import type { Aspect, ThumbScale } from '@/lib/review/view-prefs'
 import { aspectCss, msToClock, formatDate, formatDateTime, statusColor } from '@/lib/review/view-prefs'
 import { HoverScrub } from './HoverScrub'
-import { StatusControl } from './StatusControl'
+// [review-fixes BR-04] StatusControl không còn render trên card/InfoPanel (deprecate lib ở follow-up).
 
 /* ── P3.6 drag-and-drop wiring (shared by grid + list) ───────────────────────
    Internal item drags carry an ItemRef[] on this MIME. Dropping an asset onto an
@@ -460,19 +460,16 @@ export function AssetCardGrid({
                             {v.uploadedBy.name} • {formatDate(v.createdAt)}
                         </div>
                     )}
-                    {showInfo && (
-                        <div className="mt-0.5 flex items-center justify-between gap-2">
-                            {onSetStatus ? (
-                                <StatusControl status={asset.statusKey} onPick={onSetStatus} align="start" />
-                            ) : (
-                                <StatusChip status={asset.statusKey} />
-                            )}
-                            {commentCount > 0 && (
-                                <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-zinc-500">
-                                    <MessageSquare size={11} />
-                                    {commentCount}
-                                </span>
-                            )}
+                    {/* [review-fixes BR-04] Bỏ overlay/điều khiển trạng thái trên card
+                        (StatusControl popover z-50 + StatusChip) — user muốn không tồn tại dù bật
+                        toggle "Hiện thông tin thẻ". Trạng thái task xem ở board/drawer; F2 (P3)
+                        auto-đổi qua state machine, không sửa tay trên card asset. Giữ lại 💬n. */}
+                    {showInfo && commentCount > 0 && (
+                        <div className="mt-0.5 flex items-center justify-end">
+                            <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-zinc-500">
+                                <MessageSquare size={11} />
+                                {commentCount}
+                            </span>
                         </div>
                     )}
                 </div>
@@ -513,11 +510,8 @@ export function InfoPanel({
                     <span className="truncate text-[12.5px] font-semibold text-zinc-100" title={asset.title}>
                         {asset.title}
                     </span>
-                    {onSetStatus ? (
-                        <StatusControl status={asset.statusKey} onPick={onSetStatus} align="start" />
-                    ) : (
-                        <StatusChip status={asset.statusKey} />
-                    )}
+                    {/* [review-fixes BR-04] Bỏ StatusControl/StatusChip khỏi InfoPanel — trạng thái
+                        xem ở board/drawer, không sửa tay trên card asset (F2 auto qua state machine). */}
                     {asset.versionCount >= 2 && (
                         <span className="shrink-0 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
                             {asset.versionCount} phiên bản

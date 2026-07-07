@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Folder as FolderIcon, ChevronRight, ChevronDown, Loader2, X, FolderInput, CopyPlus } from 'lucide-react'
+import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 
 interface TreeNode {
     id: string
@@ -135,10 +136,10 @@ export function MoveCopyDialog({
                         disabled={isDisabled}
                         onClick={() => setSelectedId(node.id)}
                         className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left disabled:cursor-not-allowed"
-                        title={isDisabled ? 'Không thể chọn thư mục này' : isRoot ? 'Team' : node.name}
+                        title={isDisabled ? 'Không thể chọn thư mục này' : isRoot ? REVIEW_MODULE_LABEL : node.name}
                     >
                         <FolderIcon size={14} className={`shrink-0 ${isSelected ? 'text-violet-300' : 'text-zinc-500'}`} />
-                        <span className="truncate text-[12.5px]">{isRoot ? 'Team' : node.name}</span>
+                        <span className="truncate text-[12.5px]">{isRoot ? REVIEW_MODULE_LABEL : node.name}</span>
                     </button>
                 </div>
                 {isOpen && kids.length > 0 && <div>{kids.map((k) => renderNode(k, depth + 1))}</div>}

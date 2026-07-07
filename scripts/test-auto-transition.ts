@@ -61,9 +61,10 @@ for (const from of [A2, A3, A5, A6, A7, DONE, 'Đã hủy']) {
     check(`${from} → A2 BLOCKED`, !canAutoTransition(from, A2))
 }
 
-console.log('\n[3] F8 — admin closes feedback → A3: only from A2')
-check('A2 → A3 allowed', canAutoTransition(A2, A3))
-for (const from of [A1, A3, A4, A5, A6, DONE]) check(`${from} → A3 BLOCKED`, !canAutoTransition(from, A3))
+console.log('\n[3] F8 — admin opens feedback → A3: from A2 (round 1) OR A4 (re-open round 2+)')
+check('A2 → A3 allowed (round 1)', canAutoTransition(A2, A3))
+check('A4 → A3 allowed (re-open a new feedback round after editor confirmed)', canAutoTransition(A4, A3))
+for (const from of [A1, A3, A5, A6, DONE]) check(`${from} → A3 BLOCKED`, !canAutoTransition(from, A3))
 
 console.log('\n[4] F9 — editor confirms fix → A4 (internal) / A7 (client)')
 check('A3 → A4 allowed', canAutoTransition(A3, A4))

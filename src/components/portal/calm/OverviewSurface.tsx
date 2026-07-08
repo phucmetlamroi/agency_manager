@@ -91,7 +91,9 @@ export default function OverviewSurface({ deliverables, invoices, scope, brands,
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                         {awaiting.map(d => (
-                            <button key={d.id} onClick={() => openDeliverable(d.id)}
+                            // [B5/P4] Straight to the review board (/r/{slug}) when we have one — that's
+                            // the "bảng để khách feedback": watch + timecode comments + annotate + approve.
+                            <button key={d.id} onClick={() => d.reviewUrl ? window.open(d.reviewUrl, '_blank', 'noopener,noreferrer') : openDeliverable(d.id)}
                                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.background = 'var(--accent-soft)' }}
                                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.background = 'var(--surface)' }}
                                 style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px', borderRadius: 14, background: 'var(--surface)', border: '1px solid var(--line-2)', cursor: 'pointer', textAlign: 'left', width: '100%', transition: 'border-color .15s, background .15s', boxShadow: 'var(--shadow-1)' }}>

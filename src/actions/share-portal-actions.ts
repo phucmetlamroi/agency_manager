@@ -19,7 +19,8 @@ import { prisma } from '@/lib/db'
 import { serializeDecimal } from '@/lib/serialization'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { deriveClientStatus, deriveNeedsYou, isClientFacingPhase } from '@/lib/portal-derive'
-import { mintPlaybackTokens } from '@/lib/review/mux-jwt'
+import { getOrCreateClientReviewSlug } from '@/lib/review/shares'
+import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
@@ -149,15 +150,17 @@ export async function getShareSnapshot(token: string) {
     // mirroring how the old getClientInvoices did `.toISOString()`.
     const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
 
-    // ── [B5/P4] Surface the READY review cut IN the portal (no DB write) ──────
+    // ── [B5/P4] Give the client the FULL review board (source of truth) ──────────
     // Root cause of "Not uploaded yet": the portal only read the flat task.productLink /
     // task.clientReview, which only the admin-Duyệt bridge fills. When a task reaches the
     // client phase WITHOUT the bridge committing (admin set A5 by hand/bulk, or the bridge
-    // threw after the status flip), those stay null → no video, wrong badge. Fix: read the
-    // review module directly — the source of truth — join ReviewAsset by taskId and, for
-    // client-phase tasks only (R5 gate below), mint short-lived Mux playback tokens so the
-    // client can watch the cut embedded in their own token-gated portal. Tokens are signed
-    // JWTs (node:crypto) — NO DB write, no guest ShareLink minted, no activity recorded.
+    // threw after the status flip), those stay null → no review link, wrong badge. Fix: read
+    // the review module directly — join ReviewAsset by taskId and, for CLIENT-PHASE tasks
+    // only (R5 gate below), materialize the `/r/{slug}` guest review board the client uses to
+    // WATCH + leave timecode comments + annotate + approve (their feedback syncs back to the
+    // task via the guest decision route). getOrCreateClientReviewSlug reuses an existing live
+    // share (incl. a bridge-created one) or mints a default open share — the link the bridge
+    // would have made.
     const taskIds = tasks.map((t) => t.id)
     const reviewAssets = taskIds.length
         ? await prisma.reviewAsset.findMany({
@@ -166,41 +169,34 @@ export async function getShareSnapshot(token: string) {
                 deletedAt: null,
                 currentVersion: { is: { pipelineStatus: 'READY', muxPlaybackId: { not: null }, deletedAt: null } },
             },
-            select: {
-                taskId: true,
-                currentVersion: { select: { id: true, muxPlaybackId: true, durationMs: true } },
-            },
+            select: { id: true, taskId: true, workspaceId: true, createdById: true },
             orderBy: { createdAt: 'desc' }, // newest live stack per task wins
         })
         : []
-    // taskId → the ready cut. First (newest) live asset per task.
-    const readyCutByTask = new Map<string, { playbackId: string; versionId: string; durationMs: number | null }>()
+    // taskId → the live READY asset (the deliverable to review). First (newest) per task.
+    const readyAssetByTask = new Map<string, { id: string; taskId: string | null; workspaceId: string; createdById: string }>()
     for (const a of reviewAssets) {
-        const pid = a.currentVersion?.muxPlaybackId
-        if (a.taskId && pid && !readyCutByTask.has(a.taskId)) {
-            readyCutByTask.set(a.taskId, { playbackId: pid, versionId: a.currentVersion!.id, durationMs: a.currentVersion!.durationMs })
-        }
+        if (a.taskId && !readyAssetByTask.has(a.taskId)) readyAssetByTask.set(a.taskId, a)
     }
 
-    const mappedTasks = tasks.map(({ assignedBy, ...task }) => {
-        // R5 gate: only surface a cut when the task is in a CLIENT-facing phase.
-        const cut = readyCutByTask.get(task.id)
-        let reviewVideo:
-            | { playbackId: string; versionId: string; durationMs: number | null; tokens: ReturnType<typeof mintPlaybackTokens>['tokens']; expiresAt: string }
-            | null = null
-        if (cut && isClientFacingPhase(task.status, task.clientReview)) {
+    const guestBase = guestAppBaseUrl()
+    const mappedTasks = await Promise.all(tasks.map(async ({ assignedBy, ...task }) => {
+        // R5 gate: only surface a review board when the task is in a CLIENT-facing phase.
+        const asset = readyAssetByTask.get(task.id)
+        let reviewUrl: string | null = null
+        if (asset && isClientFacingPhase(task.status, task.clientReview)) {
             try {
-                const { tokens, expiresAt } = mintPlaybackTokens(cut.playbackId)
-                reviewVideo = { playbackId: cut.playbackId, versionId: cut.versionId, durationMs: cut.durationMs, tokens, expiresAt }
+                reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug(asset)}`
             } catch {
-                // Missing Mux signing env → degrade to "Not uploaded yet" rather than 500 the portal.
-                reviewVideo = null
+                // Any hiccup minting the share → degrade to "Not uploaded yet" rather than 500.
+                reviewUrl = null
             }
         }
-        // Synthesize AWAITING ONLY in-memory when a cut is surfaced but the client hasn't
-        // decided yet — drives the badge ('Awaiting your review') + needsYou. The REAL
+        // Synthesize AWAITING ONLY in-memory when a review board is surfaced but the client
+        // hasn't decided yet — drives the badge ('Awaiting your review') + needsYou. The REAL
         // task.clientReview (APPROVED/CHANGES) always wins the ?? and stays in the DTO.
-        const effClientReview = task.clientReview ?? (reviewVideo ? 'AWAITING' : null)
+        const effClientReview = task.clientReview ?? (reviewUrl ? 'AWAITING' : null)
+        const effProductLink = task.productLink ?? reviewUrl
         return {
         ...task,
         // [Trial P0 — isolation] The client must NEVER receive the editor's identity;
@@ -216,12 +212,12 @@ export async function getShareSnapshot(token: string) {
         updatedAt: iso(task.updatedAt)!,
         clientReviewedAt: iso(task.clientReviewedAt),
         clientStatus: deriveClientStatus(task.status, effClientReview),
-        needsYou: deriveNeedsYou({ status: task.status, productLink: task.productLink, clientReview: effClientReview }),
+        needsYou: deriveNeedsYou({ status: task.status, productLink: effProductLink, clientReview: effClientReview }),
         clientPath: formatClientHierarchy(task.client),
         workspaceName: task.workspaceId ? wsNameById.get(task.workspaceId) ?? null : null,
-        reviewVideo,
+        reviewUrl,
         }
-    })
+    }))
 
     const mappedInvoices = invoices.map((inv) => ({
         ...inv,

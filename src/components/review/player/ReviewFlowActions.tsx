@@ -17,6 +17,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { CheckCheck, Send, MessageSquareX, Loader2 } from 'lucide-react'
 import { canAutoTransition } from '@/lib/task-statuses'
@@ -57,7 +58,11 @@ export function ReviewFlowActions({
         : canAutoTransition(cur, REVIEW_STATUS_MAP.clientFixDone)
           ? REVIEW_STATUS_MAP.clientFixDone
           : null
-    const canFix = (isAssignee || isAdmin) && fixTarget != null
+    // [feedback-flow spec] "Xác nhận đã sửa xong" is the EDITOR's action only. The admin's
+    // moves are "Kết thúc feedback" (F8) and "Duyệt & gửi khách" (F10) — never F9. Gating on
+    // assignee-only means a non-assignee admin correctly waits during A3/A6 instead of seeing
+    // the editor's confirm button. (The server still allows admin as a fallback via the API.)
+    const canFix = isAssignee && fixTarget != null
     const isClientFix = fixTarget === REVIEW_STATUS_MAP.clientFixDone
 
     if (!canApprove && !canFeedback && !canFix) return null
@@ -146,7 +151,11 @@ function ConfirmFixDialog({
     onCancel: () => void
 }) {
     const targetLabel = isClientFix ? 'Đã sửa feedback (khách)' : 'Đã sửa feedback (nội bộ)'
-    return (
+    // [bug-A] The player header has `backdrop-blur`, which makes it the containing block for
+    // any `position:fixed` descendant → this modal was trapped inside the 56px header (clipped
+    // at the top, un-clickable). Portal to <body> so `fixed inset-0` covers the real viewport.
+    if (typeof document === 'undefined') return null
+    return createPortal(
         <div
             className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4"
             onClick={busy ? undefined : onCancel}
@@ -193,6 +202,7 @@ function ConfirmFixDialog({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     )
 }

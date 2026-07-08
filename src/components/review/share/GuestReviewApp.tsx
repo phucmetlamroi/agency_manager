@@ -13,7 +13,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Clock, Download, Loader2, PencilLine, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Clock, Download, Loader2, PencilLine, X, ChevronDown } from 'lucide-react'
 import useSWR from 'swr'
 import type { Fps } from '@/lib/review/timecode'
 import type { AnnotationShape, CommentDto, CreateCommentInput } from '@/lib/review/comment-client'
@@ -170,6 +170,10 @@ export function GuestReviewApp({
                     void refreshContent()
                 }}
                 refreshContent={() => void refreshContent()}
+                onVersionChange={(v) => {
+                    setVersionSnap(v)
+                    setVersionId(v.versionId)
+                }}
             />
             {identityOpen && (
                 <IdentityModal
@@ -204,6 +208,7 @@ function GuestStage({
     ensureIdentity,
     onAdoptNewHead,
     refreshContent,
+    onVersionChange,
 }: {
     slug: string
     api: ReturnType<typeof guestShareApi>
@@ -218,7 +223,9 @@ function GuestStage({
     ensureIdentity: () => Promise<void>
     onAdoptNewHead: () => void
     refreshContent: () => void
+    onVersionChange?: (v: GuestVersionView) => void
 }) {
+    const [versionSelectorOpen, setVersionSelectorOpen] = useState(false)
     const videoRef = useRef<HTMLVideoElement>(null)
     const isVideo = asset?.mediaKind === 'video'
     const ready = version?.uploadStatus === 'ready'
@@ -407,9 +414,50 @@ function GuestStage({
                         HT
                     </span>
                     <h1 className="truncate text-sm font-semibold">{asset.title}</h1>
-                    <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/80">
-                        v{version.versionNumber}
-                    </span>
+                    {asset.versions.length > 1 ? (
+                        <div className="relative">
+                            <button
+                                onClick={() => setVersionSelectorOpen(!versionSelectorOpen)}
+                                className="flex items-center gap-1 shrink-0 rounded bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/80 transition-colors hover:bg-white/15"
+                            >
+                                v{version.versionNumber}
+                                <ChevronDown className="h-3 w-3 opacity-60" />
+                            </button>
+                            {versionSelectorOpen && (
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => setVersionSelectorOpen(false)}
+                                    />
+                                    <div className="absolute left-0 mt-1 z-50 min-w-[120px] rounded-lg border border-white/10 bg-zinc-900 p-1 shadow-xl">
+                                        {asset.versions.map((v) => (
+                                            <button
+                                                key={v.versionId}
+                                                onClick={() => {
+                                                    onVersionChange?.(v)
+                                                    setVersionSelectorOpen(false)
+                                                }}
+                                                className={`flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-white/5 ${
+                                                    v.versionId === version.versionId
+                                                        ? 'font-bold text-indigo-400'
+                                                        : 'text-white/70'
+                                                }`}
+                                            >
+                                                <span>Version {v.versionNumber}</span>
+                                                {v.versionId === version.versionId && (
+                                                    <Check className="h-3.5 w-3.5 text-indigo-400" />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/80">
+                            v{version.versionNumber}
+                        </span>
+                    )}
                     {chip && <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium ${chip.cls}`}>{chip.label}</span>}
                 </div>
 

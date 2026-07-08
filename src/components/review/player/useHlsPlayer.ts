@@ -165,7 +165,8 @@ export function useHlsPlayer(opts: {
                     maxBufferLength: compact ? 12 : 30,
                     autoStartLoad: false,
                     testBandwidth: false,
-                    abrEwmaDefaultEstimate: 5_000_000,
+                    abrEwmaDefaultEstimate: 8_000_000,
+                    abrEwmaDefaultEstimateMax: 20_000_000,
                     startFragPrefetch: true,
                     capLevelToPlayerSize: compact,
                 })
@@ -182,7 +183,11 @@ export function useHlsPlayer(opts: {
                     // Single player begins at the highest rendition (B6). A compact player lets
                     // ABR choose within the player-size cap so a side-by-side Compare doesn't pull
                     // 2× top-bitrate streams at once.
-                    if (!compact) hls.startLevel = Math.max(0, hls.levels.length - 1)
+                    if (!compact) {
+                        const topLevel = Math.max(0, hls.levels.length - 1)
+                        hls.startLevel = topLevel
+                        hls.currentLevel = topLevel
+                    }
                     hls.startLoad()
                     setReady(true)
                 })

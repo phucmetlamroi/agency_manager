@@ -7,10 +7,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock, UploadCloud, Columns2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Layers, Loader2, MessageSquare, Info, Clock, UploadCloud, Columns2, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { listAssetVersions, apiMarkFeedbackDone, type AssetVersions, type VersionRow } from '@/lib/review/team-actions'
 import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
+import { fetchDownloadUrl } from '@/lib/review/player-api'
 import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 import { canAutoTransition } from '@/lib/task-statuses'
 import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
@@ -127,6 +128,29 @@ function ReviewPlayerShellInner({
         [data, currentVersionId],
     )
     const isVideo = asset?.mediaKind === 'video'
+
+    // [Download] Fetch a short-lived presigned R2 GET of the ORIGINAL file (byte-identical to the
+    // uploaded file — not a Mux rendition) and let the browser save it. Member route re-guards
+    // access + folder scope; the object is served with an attachment Content-Disposition.
+    const [downloading, setDownloading] = useState(false)
+    const handleDownload = useCallback(async () => {
+        if (!version || downloading) return
+        setDownloading(true)
+        try {
+            const { url } = await fetchDownloadUrl(version.id)
+            const a = document.createElement('a')
+            a.href = url
+            a.rel = 'noopener'
+            a.download = version.originalName || ''
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Tải xuống thất bại.')
+        } finally {
+            setDownloading(false)
+        }
+    }, [version, downloading])
     const ready = version?.uploadStatus === 'ready'
 
     // [F6/P5] Compare mode. Parse ?cmp=<left>.<right> against the loaded stack; a stale/garbage
@@ -521,6 +545,20 @@ function ReviewPlayerShellInner({
                     <UploadCloud className="h-4 w-4 text-indigo-400" />
                     <span className="hidden font-medium sm:inline">Tải version mới</span>
                 </button>
+
+                {/* [Download] Tải file gốc — full quality, byte-identical to the upload (member
+                    route, no approval gate). Only offered once the version is READY. */}
+                {version?.uploadStatus === 'ready' && (
+                    <button
+                        onClick={handleDownload}
+                        disabled={downloading}
+                        className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10 disabled:opacity-50"
+                        title="Tải file gốc về máy (chất lượng y hệt bản đã upload)"
+                    >
+                        {downloading ? <Loader2 className="h-4 w-4 animate-spin text-emerald-400" /> : <Download className="h-4 w-4 text-emerald-400" />}
+                        <span className="hidden font-medium sm:inline">Tải xuống</span>
+                    </button>
+                )}
 
                 {/* Version selector */}
                 <div className="relative">

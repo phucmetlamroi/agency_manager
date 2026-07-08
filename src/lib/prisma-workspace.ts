@@ -47,6 +47,61 @@ const noProfileModels = [
  * @param currentProfileId The ID of the current profile (optional isolation).
  * @returns Extended Prisma Client
  */
+/**
+ * [Task-loss A1] Resolve the profileId a workspace page must scope its data to.
+ *
+ * WorkspaceLayout already RECONCILES the session profile against the workspace's OWN profile (a
+ * user viewing a workspace that belongs to a different profile they can access renders under that
+ * workspace's profile). But every page re-derives profileId from the session independently, and
+ * `getWorkspacePrisma(workspaceId, sessionProfileId)` injects the WRONG profileId into each
+ * Task / Invoice query → the row filter matches nothing → the whole board looks wiped even though
+ * the tasks still exist. This helper reproduces the layout's reconcile so a page can never scope
+ * to the wrong profile:
+ *   1. base = session profile, else the user's first-granted profile (legacy / cross-profile),
+ *   2. if the workspace belongs to a DIFFERENT profile the user actually has access to → switch.
+ * Access itself is already gated by the layout; this only picks the correct data scope. Returns
+ * null only when the user has no resolvable profile at all (caller should redirect to /login).
+ */
+export async function resolveActiveProfileId(
+    userId: string,
+    workspaceId: string,
+    sessionProfileId: string | null | undefined,
+): Promise<string | null> {
+    let profileId: string | null = sessionProfileId ?? null
+    if (!profileId) {
+        try {
+            const first = await globalPrisma.profileAccess.findFirst({
+                where: { userId },
+                select: { profileId: true },
+                orderBy: { grantedAt: 'asc' },
+            })
+            profileId = first?.profileId ?? null
+        } catch (e) {
+            console.warn('[resolveActiveProfileId] first-access lookup failed:', e)
+        }
+    }
+    if (!profileId) return null
+
+    try {
+        const ws = await globalPrisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        if (ws?.profileId && ws.profileId !== profileId) {
+            const xAccess = await globalPrisma.profileAccess.findUnique({
+                where: { userId_profileId: { userId, profileId: ws.profileId } },
+                select: { profileId: true },
+            })
+            if (xAccess) profileId = xAccess.profileId
+        }
+    } catch (e) {
+        // Keep the base profileId — the layout already gated access; worst case the page shows its
+        // own-profile (possibly empty) view, exactly as before this fix. Never throw here.
+        console.warn('[resolveActiveProfileId] workspace-profile reconcile failed:', e)
+    }
+    return profileId
+}
+
 export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?: string) {
     if (!currentWorkspaceId) {
         throw new Error("getWorkspacePrisma requires a valid currentWorkspaceId")

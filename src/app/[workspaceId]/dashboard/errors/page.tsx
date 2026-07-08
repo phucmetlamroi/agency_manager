@@ -1,6 +1,6 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { getUserPerformanceScore, getStaffErrorLogsDetail } from '@/actions/analytics-actions'
 import StaffErrorDetail from '@/components/admin/analytics/StaffErrorDetail'
 import { AlertOctagon, ShieldCheck } from 'lucide-react'
@@ -12,7 +12,9 @@ export default async function UserErrorsPage({ params }: { params: Promise<{ wor
     const { workspaceId } = await params
     const userId = session.user.id
 
-    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
+    // [Task-loss A1] Reconcile with the workspace's OWN profile — see resolveActiveProfileId.
+    const profileId = await resolveActiveProfileId(userId, workspaceId, session.user.sessionProfileId)
+    const workspacePrisma = getWorkspacePrisma(workspaceId, profileId ?? undefined)
     
     const staff = await workspacePrisma.user.findUnique({
         where: { id: userId },

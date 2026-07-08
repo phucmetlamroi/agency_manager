@@ -40,7 +40,7 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
 }
 
 // ─── Tabs config — mirrors the admin board (TaskWorkflowTabs) ─
-type TabId = "assignee" | "progress" | "internal" | "client" | "overdue" | "complete"
+type TabId = "assignee" | "progress" | "internal" | "client" | "overdue" | "complete" | "other"
 
 interface TabConfig {
     id: TabId
@@ -62,7 +62,21 @@ const TABS: TabConfig[] = [
     { id: "client",   label: "Khách duyệt",  statuses: ["Đã gửi video (khách)", "Đã nhận feedback (khách)", "Đã sửa feedback (khách)"],                  color: "#06B6D4" },
     { id: "overdue",  label: "Quá hạn",      statuses: ["Quá hạn"],                                                 color: "#DC2626" },
     { id: "complete", label: "Hoàn tất",     statuses: ["Hoàn tất"],                                                color: "#10B981" },
+    // [Task-loss A3] Catch-all safety net. A task whose status matches NONE of the tabs above — a
+    // legacy value left over from before a migration, or any drift the review module / MCP could
+    // introduce — would otherwise fall out of every tab and DISAPPEAR from the editor's home. This
+    // tab surfaces those so a task can never silently vanish. Rendered only when it has tasks (see
+    // visibleTabs), so it stays invisible in normal 14-status operation.
+    { id: "other",    label: "Khác",         statuses: [],                                                          color: "#71717A" },
 ]
+
+// Statuses claimed by a real tab — the "other" catch-all shows everything NOT in here.
+const KNOWN_TAB_STATUSES = new Set(TABS.filter((t) => t.id !== "other").flatMap((t) => t.statuses))
+
+/** A task belongs to `tab`. The "other" tab claims any status no real tab covers. */
+function taskMatchesTab(tab: TabConfig, status: string): boolean {
+    return tab.id === "other" ? !KNOWN_TAB_STATUSES.has(status) : tab.statuses.includes(status)
+}
 
 const PER_PAGE = 8
 
@@ -134,7 +148,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
         if (!target) return
 
         // Switch to the correct tab so user sees context after closing modal
-        const matchingTab = TABS.find(tab => tab.statuses.includes(target.status))
+        const matchingTab = TABS.find(tab => taskMatchesTab(tab, target.status))
         if (matchingTab) setActiveTab(matchingTab.id)
 
         // Open task via existing handler (handles PreStartBlockModal vs TaskDetailModal)
@@ -162,7 +176,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
     // ─── Filter ────────────────────────────────────
     const filtered = useMemo(() => {
         const tab = TABS.find((t) => t.id === activeTab)!
-        let result = tasks.filter((t) => tab.statuses.includes(t.status))
+        let result = tasks.filter((t) => taskMatchesTab(tab, t.status))
         if (search.trim()) {
             const q = search.toLowerCase()
             result = result.filter(
@@ -182,10 +196,17 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
     const tabCounts = useMemo(() => {
         const counts: Record<string, number> = {}
         TABS.forEach((tab) => {
-            counts[tab.id] = tasks.filter((t) => tab.statuses.includes(t.status)).length
+            counts[tab.id] = tasks.filter((t) => taskMatchesTab(tab, t.status)).length
         })
         return counts
     }, [tasks])
+
+    // [Task-loss A3] Hide the "Khác" catch-all unless it actually holds a stranded task, so it
+    // never clutters the normal editor board but always appears the moment a task would vanish.
+    const visibleTabs = useMemo(
+        () => TABS.filter((tab) => tab.id !== "other" || (tabCounts.other ?? 0) > 0),
+        [tabCounts],
+    )
 
     const getStatusInfo = (status: string) =>
         STATUS_COLORS[status] || { label: status, color: NP.textMuted }
@@ -217,7 +238,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
         <div className="flex flex-col" style={{ gap: 16, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {/* ─── Tabs row ─── */}
             <div className="flex flex-wrap items-center" style={{ gap: 10 }}>
-                {TABS.map((tab) => {
+                {visibleTabs.map((tab) => {
                     const isActive = activeTab === tab.id
                     return (
                         <button

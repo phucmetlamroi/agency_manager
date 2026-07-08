@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { getProfileMembers } from '@/actions/profile-member-actions'
 import { getProfileRole } from '@/lib/profile-permissions'
+import { resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { prisma } from '@/lib/db'
 import ProfileMembersPanel from '@/components/profile/ProfileMembersPanel'
 
@@ -20,8 +21,9 @@ export default async function ProfileMembersPage({ params }: { params: Promise<{
 
     const userId = session.user.id
 
-    // Get profile from current workspace context
-    const profileId = (session.user as any).sessionProfileId as string | null | undefined
+    // Get profile from current workspace context.
+    // [Task-loss A1] Reconcile with the workspace's OWN profile — see resolveActiveProfileId.
+    const profileId = await resolveActiveProfileId(userId, workspaceId, (session.user as any).sessionProfileId)
     if (!profileId) redirect('/login')
 
     const role = await getProfileRole(userId, profileId)

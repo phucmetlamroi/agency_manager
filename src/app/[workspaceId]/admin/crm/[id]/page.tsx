@@ -1,5 +1,5 @@
 import { serializeDecimal } from '@/lib/serialization'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { prisma as globalPrisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import ClientAnalytics from '@/components/crm/ClientAnalytics'
@@ -16,16 +16,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     // middleware's fail-closed guard passes AND the lookup can't cross profiles.
     const session = await getSession()
     if (!session) redirect('/login')
-    let profileId = (session.user as any).sessionProfileId as string | null | undefined
-    if (!profileId) {
-        const firstAccess = await globalPrisma.profileAccess.findFirst({
-            where: { userId: session.user.id },
-            select: { profileId: true },
-            orderBy: { grantedAt: 'asc' },
-        })
-        profileId = firstAccess?.profileId ?? null
-        if (!profileId) redirect('/login')
-    }
+    // [Task-loss A1] Reconcile with the workspace's OWN profile — see resolveActiveProfileId.
+    const profileId = await resolveActiveProfileId(session.user.id, workspaceId, (session.user as any).sessionProfileId)
+    if (!profileId) redirect('/login')
 
     // Fetch Client with Subsidiaries, Tasks, and Invoices
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)

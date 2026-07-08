@@ -88,6 +88,8 @@ export function AnnotationCanvas({
     const rootRef = useRef<HTMLDivElement>(null)
     const [rootSize, setRootSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
     const [draft, setDraft] = useState<{ start: Pt; cur: Pt; points: Pt[] } | null>(null)
+    const draftRef = useRef(draft)
+    draftRef.current = draft
     const drawingRef = useRef(false)
 
     // Track the stage size so the content box recomputes on resize / fullscreen.
@@ -213,7 +215,7 @@ export function AnnotationCanvas({
         (e: React.PointerEvent) => {
             if (!drawingRef.current) return
             drawingRef.current = false
-            const d = draft
+            const d = draftRef.current
             setDraft(null)
             try {
                 ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
@@ -224,7 +226,7 @@ export function AnnotationCanvas({
             const shape = buildShape(tool, color, size, d)
             if (shape) onCommitShape(shape)
         },
-        [draft, tool, color, size, onCommitShape],
+        [tool, color, size, onCommitShape],
     )
 
     if (!box) return null
@@ -233,7 +235,10 @@ export function AnnotationCanvas({
     return (
         // The container never intercepts clicks; only the editable SVG does, so the
         // click-to-play toggle underneath keeps working in read-only view.
-        <div ref={rootRef} className="pointer-events-none absolute inset-0">
+        <div
+            ref={rootRef}
+            className={`absolute inset-0 ${editable ? 'pointer-events-auto touch-none' : 'pointer-events-none'}`}
+        >
             <svg
                 ref={svgRef}
                 viewBox={`0 0 ${VBW} ${vbh}`}
@@ -251,11 +256,12 @@ export function AnnotationCanvas({
                     instant the user starts the first stroke there are ZERO shapes → nothing painted →
                     pointerdown fell THROUGH the empty svg to the <video> beneath (whose click is
                     disabled while drawing) and onPointerDown NEVER fired = "toolbar works, canvas dead".
-                    fill="transparent" is a paint value (unlike fill:'none') so it hit-tests under
+                    fill="black" and opacity={0} is a paint value (unlike fill:'none' or non-standard
+                    fill:'transparent' which behaves like none in some browsers) so it hit-tests under
                     visiblePainted, making the WHOLE box catch the pen. Editable-only so the read-only
                     overlay stays click-through for the play toggle. This is the fix the box/geometry
                     patches (BR-07, 69458c1) never touched — do NOT remove. */}
-                {editable && <rect x={0} y={0} width={VBW} height={vbh} fill="transparent" />}
+                {editable && <rect x={0} y={0} width={VBW} height={vbh} fill="black" opacity={0} />}
                 {shapes.map((s, i) => renderShape(s, vbh, `s${i}`))}
                 {draft && renderDraft(tool, color, size, draft, vbh)}
             </svg>

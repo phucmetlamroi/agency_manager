@@ -64,3 +64,16 @@ export function deriveNeedsYou(t: { status: string; productLink?: string | null;
 export function needsClientAction(status: string): boolean {
     return status === 'Đã gửi video (khách)'
 }
+
+/**
+ * [B5/P4] R5 gate — may a READY cut be surfaced to the CLIENT for this task?
+ * TRUE only when the task is in a client-facing phase:
+ *   - `clientReview != null`  → the bridge ran, or the client already decided; OR
+ *   - the status string contains "khách" (client-phase, incl. a manually free-typed one).
+ * Uses a SUBSTRING on "khách" ON PURPOSE (NOT isReviewPhaseStatus / meta-lookup) so a
+ * free-typed client status still passes, while every internal "(nội bộ)" step (A2/A3/A4)
+ * and every production/system status fails → an unapproved internal cut is never leaked.
+ */
+export function isClientFacingPhase(status: string | null | undefined, clientReview: string | null | undefined): boolean {
+    return clientReview != null || /khách/i.test(status || '')
+}

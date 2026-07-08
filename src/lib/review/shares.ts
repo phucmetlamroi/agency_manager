@@ -312,16 +312,50 @@ export async function getOrCreateClientReviewSlug(asset: {
     taskId: string | null
     createdById: string
 }): Promise<string> {
-    const existing = await prisma.shareLink.findFirst({
+    // 1. Try to find a live share link containing this asset that ALREADY has allowDownload enabled
+    // and no password, to avoid minting duplicates when one is already available.
+    const alreadyEnabled = await prisma.shareLink.findFirst({
         where: {
             revokedAt: null,
             AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
             items: { some: { assetId: asset.id } },
+            allowDownload: true,
+            downloadOnlyWhenApproved: false,
+            passwordHash: null,
         },
         orderBy: { createdAt: 'asc' },
         select: { slug: true },
     })
-    if (existing) return existing.slug
+    if (alreadyEnabled) {
+        return alreadyEnabled.slug
+    }
+
+    // 2. Try to find an existing active share that is unambiguously the client's own board
+    // (created by the asset's uploader, single-item, no password). We can safely upgrade this.
+    const upgradable = await prisma.shareLink.findFirst({
+        where: {
+            revokedAt: null,
+            AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
+            items: { some: { assetId: asset.id } },
+            createdById: asset.createdById,
+            passwordHash: null,
+        },
+        orderBy: { createdAt: 'asc' },
+        select: {
+            id: true,
+            slug: true,
+            _count: {
+                select: { items: true }
+            }
+        }
+    })
+    if (upgradable && upgradable._count.items === 1) {
+        await prisma.shareLink.update({
+            where: { id: upgradable.id },
+            data: { allowDownload: true, downloadOnlyWhenApproved: false },
+        })
+        return upgradable.slug
+    }
 
     const created = await prisma.shareLink.create({
         data: {
@@ -330,6 +364,10 @@ export async function getOrCreateClientReviewSlug(asset: {
             taskId: asset.taskId,
             allowComments: true,
             showAllVersions: false,
+            // Client downloads the original (identical to the uploaded file) from their review
+            // board. Not gated behind approval so the download works as soon as it's shared.
+            allowDownload: true,
+            downloadOnlyWhenApproved: false,
             createdById: asset.createdById,
             items: { create: [{ assetId: asset.id, sortIndex: 0 }] },
         },

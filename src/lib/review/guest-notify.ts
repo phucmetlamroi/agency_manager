@@ -29,6 +29,60 @@ function renderForEvent(event: GuestEmailEvent, common: Common, statusLabel?: st
 }
 
 /**
+ * [Phase C — fan-out fix] Which verified portal notify emails should receive an event about an
+ * asset whose client is `assetClientId`? A ClientShareLink's notify email covers not just its own
+ * clientId but its WHOLE name-path subtree — every per-workspace DUPLICATE row of the same logical
+ * client AND its SUB-BRANDS — exactly the scope resolveShareToken grants a token. Matching the
+ * asset's clientId by literal equality misses sub-brand tasks and duplicate-row tasks (the link
+ * routinely points at a different, often-empty row than the one holding the deliverable). This
+ * mirrors the name-path membership in share-link-auth.ts::resolveShareToken (the source of truth);
+ * keep the two in sync. Pure (no DB) so it is unit-testable.
+ *
+ * A link L covers the asset iff segPath(asset) STARTS WITH segPath(L.seed): the asset's client is
+ * the seed itself, a duplicate row of it (equal path), or a sub-brand under it (prefix). Same
+ * profile only — distinct name-paths never match, so no cross-client / cross-tenant delivery.
+ */
+export function selectPortalNotifyLinks(
+    assetClientId: number,
+    profileClients: { id: number; name: string | null; parentId: number | null }[],
+    links: {
+        clientId: number
+        notifyEmail: string | null
+        notifyEmailUnsubToken: string | null
+        client?: { status: string; mergedIntoId: number | null } | null
+    }[],
+): { notifyEmail: string | null; notifyEmailUnsubToken: string | null }[] {
+    const byId = new Map(profileClients.map((c) => [c.id, c]))
+    const segPath = (id: number): string[] => {
+        const names: string[] = []
+        const seen = new Set<number>()
+        let cur: number | null = id
+        while (cur != null && !seen.has(cur)) {
+            seen.add(cur)
+            const c = byId.get(cur)
+            if (!c) break
+            names.push((c.name ?? '').normalize('NFC').trim().toLowerCase())
+            cur = c.parentId
+        }
+        return names.reverse()
+    }
+    const startsWith = (full: string[], prefix: string[]): boolean => {
+        if (prefix.length === 0 || full.length < prefix.length) return false
+        for (let i = 0; i < prefix.length; i++) if (full[i] !== prefix[i]) return false
+        return true
+    }
+    const assetSegs = segPath(assetClientId)
+    if (assetSegs.length === 0 || assetSegs.some((s) => s.length === 0)) return []
+    const out: { notifyEmail: string | null; notifyEmailUnsubToken: string | null }[] = []
+    for (const l of links) {
+        // A link minted against a MERGED duplicate resolves to its survivor (matches resolveShareToken).
+        const seed = l.client && l.client.status === 'MERGED' && l.client.mergedIntoId ? l.client.mergedIntoId : l.clientId
+        if (startsWith(assetSegs, segPath(seed))) out.push({ notifyEmail: l.notifyEmail, notifyEmailUnsubToken: l.notifyEmailUnsubToken })
+    }
+    return out
+}
+
+/**
  * @param statusLabel required for 'status_update' — the CLIENT-FACING EN label (never a raw
  *   internal status; the caller resolves it via portal-derive clientLabelOf + the internalOnly gate).
  */
@@ -84,14 +138,32 @@ export async function notifyGuestsOfAsset(input: {
         }
 
         // ── (2) [Phase C] Client PORTAL notify email(s) — verified in /share Settings ───────
-        // asset.clientId is the STRINGIFIED Int of Task.clientId (upload-service); parse it
-        // back to match ClientShareLink.clientId (Int). Non-numeric (slug-keyed free upload) → skip.
-        const clientId = asset?.clientId != null ? Number.parseInt(asset.clientId, 10) : NaN
-        if (Number.isFinite(clientId)) {
-            const portalLinks = await prisma.clientShareLink.findMany({
-                where: { clientId, revokedAt: null, notifyEmailVerifiedAt: { not: null }, notifyEmail: { not: null } },
-                select: { notifyEmail: true, notifyEmailUnsubToken: true },
+        // asset.clientId is the STRINGIFIED Int of Task.clientId. The verified email lives on ONE
+        // ClientShareLink (the link's SEED clientId), but its name-path scope covers the asset's
+        // client (sub-brand or per-workspace duplicate row) — so we resolve recipients by the same
+        // name-path scope resolveShareToken grants, NOT literal clientId equality (which silently
+        // misses sub-brand + duplicate-row tasks). Non-numeric (slug-keyed free upload) → skip.
+        const assetClientId = asset?.clientId != null ? Number.parseInt(asset.clientId, 10) : NaN
+        if (Number.isFinite(assetClientId)) {
+            const assetClient = await prisma.client.findUnique({
+                where: { id: assetClientId },
+                select: { profileId: true, status: true, mergedIntoId: true },
             })
+            const profileId = assetClient?.profileId ?? null
+            // Follow a MERGED asset-client to its survivor so its name-path resolves against an ACTIVE row.
+            const effectiveAssetClientId = assetClient && assetClient.status === 'MERGED' && assetClient.mergedIntoId
+                ? assetClient.mergedIntoId
+                : assetClientId
+            const [profileClients, verifiedLinks] = profileId == null
+                ? [[], []]
+                : await Promise.all([
+                    prisma.client.findMany({ where: { profileId, status: 'ACTIVE' }, select: { id: true, name: true, parentId: true } }),
+                    prisma.clientShareLink.findMany({
+                        where: { profileId, revokedAt: null, notifyEmailVerifiedAt: { not: null }, notifyEmail: { not: null } },
+                        select: { clientId: true, notifyEmail: true, notifyEmailUnsubToken: true, client: { select: { status: true, mergedIntoId: true } } },
+                    }),
+                ])
+            const portalLinks = selectPortalNotifyLinks(effectiveAssetClientId, profileClients, verifiedLinks)
             const reviewUrl = liveShare?.slug ? `${base}/r/${liveShare.slug}` : base
             for (const pl of portalLinks) {
                 const email = (pl.notifyEmail ?? '').toLowerCase()

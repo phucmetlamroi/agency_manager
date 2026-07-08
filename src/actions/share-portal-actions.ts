@@ -353,6 +353,11 @@ export async function verifyPortalNotifyEmail(
 ): Promise<{ success: boolean; error?: string }> {
     const scope = await resolveShareToken(token)
     if (!scope) return { success: false, error: 'This link is no longer valid.' }
+    // Bound OTP brute-force: a 6-digit code with a 15-min TTL must not be guessable. Cap attempts
+    // per link+ip (defense-in-depth on top of resolveShareToken's per-ip limiter).
+    const ip = await getRequestIp()
+    const rl = await rateLimit(`portal-notify-verify:${scope.shareLinkId}:${ip}`, 10, NOTIFY_CODE_TTL_MS)
+    if (!rl.success) return { success: false, error: 'Too many attempts. Please try again later.' }
     const link = await prisma.clientShareLink.findUnique({
         where: { id: scope.shareLinkId },
         select: { notifyEmailPending: true, notifyEmailCodeHash: true, notifyEmailCodeExpiresAt: true },

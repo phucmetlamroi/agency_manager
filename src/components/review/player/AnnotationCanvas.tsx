@@ -141,16 +141,17 @@ export function AnnotationCanvas({
     const iw = liveDims?.w ?? intrinsicWidth ?? null
     const ih = liveDims?.h ?? intrinsicHeight ?? null
 
-    // Never leave the surface un-drawable: with a known media aspect use the letterboxed content box;
-    // if the aspect is still unknown (no live dims AND no stored dims) fall back to filling the whole
-    // stage so drawing ALWAYS works. Exact for a video that fills the stage; slightly loose for a
-    // letterboxed one — but infinitely better than the old hard-null (feature completely dead).
+    // Never leave the surface un-drawable. `box` is non-null WHENEVER the stage has been measured
+    // (rootSize > 0), regardless of whether the media aspect is known yet: the letterboxed content
+    // box when we have dims, else the FULL stage. [hardening] The old form gated the full-stage
+    // fallback on the dims being UNKNOWN — so when dims WERE known but rootSize was momentarily 0
+    // (mount / resize / ABR race) containedBox returned null → box null → the canvas unmounted while
+    // the toolbar (which has no box guard) stayed visible = "toolbar shows, surface dead". Gating the
+    // fallback on rootSize (not on dims) means `editable` always has a mounted, full-size surface.
+    const fullStageBox: ContentBox | null =
+        rootSize.w > 0 && rootSize.h > 0 ? { left: 0, top: 0, width: rootSize.w, height: rootSize.h } : null
     const box: ContentBox | null =
-        iw && ih
-            ? containedBox(rootSize.w, rootSize.h, iw, ih)
-            : rootSize.w > 0 && rootSize.h > 0
-                ? { left: 0, top: 0, width: rootSize.w, height: rootSize.h }
-                : null
+        fullStageBox && iw && ih ? (containedBox(rootSize.w, rootSize.h, iw, ih) ?? fullStageBox) : fullStageBox
 
     // [B7] Instrument the measurement so a "can't draw" report can be confirmed on real
     // hardware without a code change: `localStorage['review:debug']='1'` in the console.
@@ -244,6 +245,17 @@ export function AnnotationCanvas({
                 onPointerUp={finish}
                 onPointerCancel={finish}
             >
+                {/* [annotation ROOT-CAUSE fix] Full-box transparent HIT TARGET. An <svg> with
+                    pointer-events:auto resolves to `visiblePainted` — it only catches a pointer where
+                    it is actually PAINTED. Every shape uses fill:'none' (stroke-only), and at the very
+                    instant the user starts the first stroke there are ZERO shapes → nothing painted →
+                    pointerdown fell THROUGH the empty svg to the <video> beneath (whose click is
+                    disabled while drawing) and onPointerDown NEVER fired = "toolbar works, canvas dead".
+                    fill="transparent" is a paint value (unlike fill:'none') so it hit-tests under
+                    visiblePainted, making the WHOLE box catch the pen. Editable-only so the read-only
+                    overlay stays click-through for the play toggle. This is the fix the box/geometry
+                    patches (BR-07, 69458c1) never touched — do NOT remove. */}
+                {editable && <rect x={0} y={0} width={VBW} height={vbh} fill="transparent" />}
                 {shapes.map((s, i) => renderShape(s, vbh, `s${i}`))}
                 {draft && renderDraft(tool, color, size, draft, vbh)}
             </svg>

@@ -14,6 +14,7 @@ import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { expireInflightUpload, reconcileStuckUploadedVersion } from './upload-service'
 // P5.4 decision side-effects. P3-B: F7 auto-flip + manager notify.
 import { syncTaskOnChangesRequested, syncTaskFromReviewEvent, revokeClientExposureOnNewVersion } from './task-sync'
+import { notifyGuestsOfAsset } from './guest-notify'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { audit } from '@/lib/audit-log'
 import { createAndBroadcastNotifications } from '@/actions/notification-actions'
@@ -729,6 +730,16 @@ export const reviewShareDecision = inngest.createFunction(
             )
             return { notified: rows.length }
         })
+
+        // [L-EMAIL-2] Acknowledge the CLIENT's decision by email (their own /r/ subscribers):
+        // approve → "thanks for approving", request_changes → "we've received your feedback".
+        // Fire-and-forget; notifyGuestsOfAsset never throws + only fans out to live subscribers.
+        await step.run('notify-client-confirm', () =>
+            notifyGuestsOfAsset({
+                assetId: data.assetId,
+                event: data.decision === 'approve' ? 'approved' : 'feedback_received',
+            }),
+        )
 
         return { ok: true }
     },

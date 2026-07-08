@@ -8,9 +8,9 @@ import { prisma } from '@/lib/db'
 import { sendEmail } from '@/lib/email'
 import { reviewLog } from './logger'
 import { guestAppBaseUrl } from './guest-emails/wrap'
-import { renderNewVersionEmail, renderCommentReplyEmail, renderStatusUpdateEmail } from './guest-emails/notices'
+import { renderNewVersionEmail, renderCommentReplyEmail, renderStatusUpdateEmail, renderFeedbackReceivedEmail, renderApprovedEmail } from './guest-emails/notices'
 
-export type GuestEmailEvent = 'version_sent' | 'comment_reply' | 'status_update'
+export type GuestEmailEvent = 'version_sent' | 'comment_reply' | 'status_update' | 'feedback_received' | 'approved'
 
 /**
  * @param statusLabel required for 'status_update' — the CLIENT-FACING EN label (never a raw
@@ -54,7 +54,11 @@ export async function notifyGuestsOfAsset(input: {
                     ? renderNewVersionEmail(common)
                     : input.event === 'comment_reply'
                       ? renderCommentReplyEmail(common)
-                      : renderStatusUpdateEmail({ ...common, statusLabel: input.statusLabel ?? 'Updated' })
+                      : input.event === 'feedback_received'
+                        ? renderFeedbackReceivedEmail(common)
+                        : input.event === 'approved'
+                          ? renderApprovedEmail(common)
+                          : renderStatusUpdateEmail({ ...common, statusLabel: input.statusLabel ?? 'Updated' })
             void sendEmail({ to: sub.email, ...rendered, headers }).catch((e) =>
                 reviewLog('error', 'guest.notify_send_failed', { assetId: input.assetId, error: String(e) }),
             )

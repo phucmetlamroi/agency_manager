@@ -98,8 +98,8 @@ export function VideoStage({
             ref={containerRef}
             className={
                 pseudoFs
-                    ? 'fixed inset-0 z-50 flex h-[100dvh] w-screen flex-col bg-black'
-                    : 'relative flex h-full w-full flex-col bg-black'
+                    ? 'fixed inset-0 z-50 flex h-[100dvh] w-screen flex-col bg-black select-none'
+                    : 'relative flex h-full w-full flex-col bg-black select-none'
             }
         >
             {/* video / image area */}

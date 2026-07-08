@@ -249,7 +249,7 @@ export function AnnotationCanvas({
         // click-to-play toggle underneath keeps working in read-only view.
         <div
             ref={rootRef}
-            className={`absolute inset-0 ${editable ? 'pointer-events-auto touch-none' : 'pointer-events-none'}`}
+            className={`absolute inset-0 ${editable ? 'pointer-events-auto touch-none select-none' : 'pointer-events-none'}`}
         >
             {/* Visual debug overlay visible to help diagnose drawing issue on user hardware */}
             {editable && (
@@ -266,7 +266,7 @@ export function AnnotationCanvas({
                 ref={svgRef}
                 viewBox={`0 0 ${VBW} ${vbh}`}
                 preserveAspectRatio="none"
-                className={editable ? 'pointer-events-auto absolute touch-none cursor-crosshair' : 'pointer-events-none absolute'}
+                className={editable ? 'pointer-events-auto absolute touch-none select-none cursor-crosshair' : 'pointer-events-none absolute'}
                 style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
@@ -279,12 +279,9 @@ export function AnnotationCanvas({
                     instant the user starts the first stroke there are ZERO shapes → nothing painted →
                     pointerdown fell THROUGH the empty svg to the <video> beneath (whose click is
                     disabled while drawing) and onPointerDown NEVER fired = "toolbar works, canvas dead".
-                    fill="black" and opacity={0} is a paint value (unlike fill:'none' or non-standard
-                    fill:'transparent' which behaves like none in some browsers) so it hit-tests under
-                    visiblePainted, making the WHOLE box catch the pen. Editable-only so the read-only
-                    overlay stays click-through for the play toggle. This is the fix the box/geometry
-                    patches (BR-07, 69458c1) never touched — do NOT remove. */}
-                {editable && <rect x={0} y={0} width={VBW} height={vbh} fill="black" opacity={0} />}
+                    Using `fill="none"` with `pointerEvents="all"` is the bulletproof SVG standard to make 
+                    the entire viewBox area hit-testable regardless of browser opacity/paint quirks. */}
+                {editable && <rect x={0} y={0} width={VBW} height={vbh} fill="none" pointerEvents="all" />}
                 {shapes.map((s, i) => renderShape(s, vbh, `s${i}`))}
                 {draft && renderDraft(tool, color, size, draft, vbh)}
             </svg>

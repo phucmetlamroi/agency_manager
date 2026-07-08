@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth'
 import { isMobileDevice } from '@/lib/device'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { prisma } from '@/lib/db'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
 import { serializeDecimal } from '@/lib/serialization'
 import { computeWorkspaceFinance } from '@/lib/finance-helpers'
@@ -30,20 +30,10 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     if (!session) redirect('/login')
 
     // [Z+1.fix3] Session profileId fallback — same pattern như dashboard/page.tsx + layout
-    let profileId = (session.user as any).sessionProfileId as string | null | undefined
-    if (!profileId) {
-        try {
-            const firstAccess = await prisma.profileAccess.findFirst({
-                where: { userId: session.user.id },
-                select: { profileId: true },
-                orderBy: { grantedAt: 'asc' },
-            })
-            profileId = firstAccess?.profileId ?? null
-        } catch (e) {
-            console.warn('[AdminDashboard] ProfileAccess fallback failed:', e)
-        }
-        if (!profileId) redirect('/login')
-    }
+    // [Task-loss A1] Reconcile with the workspace's OWN profile (cross-profile navigation) so the
+    // board can never scope to the wrong profile and appear wiped — see resolveActiveProfileId.
+    const profileId = await resolveActiveProfileId(session.user.id, workspaceId, (session.user as any).sessionProfileId)
+    if (!profileId) redirect('/login')
 
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 

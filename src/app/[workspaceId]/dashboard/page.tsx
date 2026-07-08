@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db'
 import { Suspense } from 'react'
 import { Settings2 } from 'lucide-react'
 
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
 import { serializeDecimal } from '@/lib/serialization'
 import { sanitizeTaskListForUser } from '@/lib/task-sanitize'
@@ -48,20 +48,11 @@ export default async function UserDashboard({ params, searchParams }: {
     // [Z+1.fix3] Session profileId fallback — handle legacy sessions hoặc cross-profile nav.
     // Workspace layout đã verify access, nhưng nếu sessionProfileId mismatch với
     // workspace's profile, dùng workspace's profile cho prisma context.
-    let profileId = (session.user as any).sessionProfileId as string | null | undefined
-    if (!profileId) {
-        try {
-            const firstAccess = await prisma.profileAccess.findFirst({
-                where: { userId },
-                select: { profileId: true },
-                orderBy: { grantedAt: 'asc' },
-            })
-            profileId = firstAccess?.profileId ?? null
-        } catch (e) {
-            console.warn('[UserDashboard] ProfileAccess fallback failed:', e)
-        }
-        if (!profileId) redirect('/login')
-    }
+    // [Task-loss A1] Reconcile with the workspace's OWN profile (cross-profile navigation) — else a
+    // multi-profile editor opening a workspace of another profile scopes every task query to the
+    // WRONG profile and the board looks completely wiped. Mirrors WorkspaceLayout's reconcile.
+    const profileId = await resolveActiveProfileId(userId, workspaceId, (session.user as any).sessionProfileId)
+    if (!profileId) redirect('/login')
 
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 

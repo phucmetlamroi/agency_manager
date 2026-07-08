@@ -15,12 +15,12 @@
  * - "Hoàn tất" — admin approve final
  * - "Tạm ngưng" — paused
  * - "Quá hạn" — deadline qua (cron auto-set)
- * - "Hủy" — cancelled
+ * - "Đã hủy" — cancelled
  *
  * Rules:
  * - "Hoàn tất" là TERMINAL — chỉ admin được unlock (special action)
  * - Cycle Revision → Gửi lại → Revision allowed (multi-round revision)
- * - "Hủy" terminal (chỉ admin reset được)
+ * - "Đã hủy" terminal (chỉ admin reset được)
  * - User-side transitions limited; admin có power broader
  *
  * [Sprint A] Bỏ 'Review' state — submit đi thẳng Revision (deadline cleared).
@@ -38,7 +38,7 @@ export type TaskStatus =
     | 'Revision'
     | 'Hoàn tất'
     | 'Quá hạn'
-    | 'Hủy'
+    | 'Đã hủy'
 
 /**
  * Valid transitions cho USER (assignee) role.
@@ -52,20 +52,20 @@ const USER_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
     'Revision': [],                                      // fix loop is now handled by the review module (F9)
     'Hoàn tất': [],                                      // TERMINAL cho user
     'Quá hạn': [],                                       // TERMINAL — admin cần extend deadline để unlock
-    'Hủy': [],                                           // TERMINAL
+    'Đã hủy': [],                                           // TERMINAL
 }
 
 /**
  * Valid transitions cho ADMIN role (broader power).
  */
 const ADMIN_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
-    'Đang đợi giao': ['Nhận task', 'Hủy'],
-    'Nhận task': ['Đang thực hiện', 'Đang đợi giao', 'Hủy'],
-    'Đang thực hiện': ['Revision', 'Hủy', 'Hoàn tất'],
-    'Revision': ['Hoàn tất', 'Đang thực hiện', 'Hủy'],
-    'Hoàn tất': ['Đang thực hiện', 'Hủy'],              // admin có quyền unlock (audit log!)
-    'Quá hạn': ['Đang thực hiện', 'Hoàn tất', 'Hủy'],   // admin extend deadline → resume
-    'Hủy': ['Đang đợi giao'],                            // admin re-open hủy task
+    'Đang đợi giao': ['Nhận task', 'Đã hủy'],
+    'Nhận task': ['Đang thực hiện', 'Đang đợi giao', 'Đã hủy'],
+    'Đang thực hiện': ['Revision', 'Đã hủy', 'Hoàn tất'],
+    'Revision': ['Hoàn tất', 'Đang thực hiện', 'Đã hủy'],
+    'Hoàn tất': ['Đang thực hiện', 'Đã hủy'],              // admin có quyền unlock (audit log!)
+    'Quá hạn': ['Đang thực hiện', 'Hoàn tất', 'Đã hủy'],   // admin extend deadline → resume
+    'Đã hủy': ['Đang đợi giao'],                            // admin re-open hủy task
 }
 
 export type ActorRole = 'USER' | 'ADMIN'

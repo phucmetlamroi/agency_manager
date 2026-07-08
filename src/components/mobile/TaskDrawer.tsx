@@ -49,7 +49,10 @@ const STATUS_BUTTON_CONFIG: Record<string, {
     'Hoàn tất': { label: 'Hoàn tất', icon: CheckCircle2, variant: 'success' },
     'Đang đợi giao': { label: 'Trả về hàng chờ', icon: AlertTriangle, variant: 'neutral' },
     'Nhận task': { label: 'Nhận task', icon: Play, variant: 'primary' },
-    'Hủy': { label: 'Huỷ task', icon: Trash2, variant: 'danger' },
+    // [Task-loss B2] Key is the FSM next-status. It must be the canonical 'Đã hủy' (not 'Hủy') so
+    // the mobile admin cancel button actually renders + writes a VALID status. With the old 'Hủy'
+    // key the button vanished AND, if clicked, wrote 'Hủy' → an off-list status that hid the task.
+    'Đã hủy': { label: 'Huỷ task', icon: Trash2, variant: 'danger' },
 }
 
 const VARIANT_STYLES: Record<string, string> = {

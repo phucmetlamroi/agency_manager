@@ -1,4 +1,4 @@
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { OptimisticGrid, GridUser, ScheduleItem } from '@/components/schedule/OptimisticGrid'
@@ -23,7 +23,8 @@ export default async function UserSchedulePage({
   const user = session.user
   if ((user as any).role === 'CLIENT') redirect(`/${workspaceId}/dashboard`)
 
-  const profileId = (user as any).sessionProfileId as string | undefined
+  // [Task-loss A1] Reconcile with the workspace's OWN profile — see resolveActiveProfileId.
+  const profileId = await resolveActiveProfileId(user.id, workspaceId, (user as any).sessionProfileId)
   if (!profileId) redirect('/login')
 
   // ── Date logic (unchanged) ────────────────────────────────

@@ -1,17 +1,18 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { computeWorkspaceFinance } from '@/lib/finance-helpers'
 import FinanceDashboardClient from '@/components/dashboard/FinanceDashboardClient'
 
 export default async function FinanceDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
     const session = await getSession()
-    const profileId = (session?.user as any)?.sessionProfileId
-    const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
-
     if (!session?.user?.id) redirect('/login')
+    // [Task-loss A1] Reconcile with the workspace's OWN profile — see resolveActiveProfileId.
+    const profileId = await resolveActiveProfileId(session.user.id, workspaceId, (session.user as any).sessionProfileId)
+    if (!profileId) redirect('/login')
+    const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
     const user = await workspacePrisma.user.findUnique({
         where: { id: session.user.id },

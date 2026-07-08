@@ -1,4 +1,4 @@
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import TaskTable from '@/components/TaskTable'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { getSession } from '@/lib/auth'
@@ -14,7 +14,9 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
     const session = await getSession()
     if (!session) redirect('/login')
 
-    const profileId = (session.user as any).sessionProfileId
+    // [Task-loss A1] Reconcile with the workspace's OWN profile — see resolveActiveProfileId.
+    const profileId = await resolveActiveProfileId(session.user.id, workspaceId, (session.user as any).sessionProfileId)
+    if (!profileId) redirect('/login')
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
     await checkOverdueTasks(workspaceId)

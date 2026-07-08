@@ -788,6 +788,16 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
 export async function bulkUpdateStatus(taskIds: string[], newStatus: string, workspaceId: string) {
     if (!taskIds || taskIds.length === 0) return { error: "No tasks selected" }
 
+    // [Task-loss B1] Validate the target status BEFORE writing. An off-list status (drift / a
+    // stale board column / a bad drop payload) would leave every dragged task matching NO tab =
+    // silently vanished. The other bulk path (bulkUpdateTaskStatus) already guards this; the
+    // drag-and-drop path did not. Dynamic import matches that sibling's pattern.
+    const { isValidStatus, VALID_TASK_STATUSES } = await import('@/lib/task-statuses')
+    if (!isValidStatus(newStatus)) {
+        console.error(`[bulkUpdateStatus] BLOCK invalid status "${newStatus}". Allowed:`, VALID_TASK_STATUSES)
+        return { error: `Status "${newStatus}" không hợp lệ — chặn để tránh task ẩn khỏi UI.` }
+    }
+
     try {
         const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const actorId = session?.user?.id ?? null

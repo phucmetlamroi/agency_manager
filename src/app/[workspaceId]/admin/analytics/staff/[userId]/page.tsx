@@ -1,6 +1,6 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { getUserPerformanceScore, getStaffErrorLogsDetail } from '@/actions/analytics-actions'
 import StaffErrorDetail from '@/components/admin/analytics/StaffErrorDetail'
 import { verifyWorkspaceAccess } from '@/lib/security'
@@ -20,7 +20,9 @@ export default async function StaffAnalyticsDetailPage({ params }: { params: Pro
     const session = await getSession()
     if (!session?.user) redirect('/login')
 
-    const workspacePrisma = getWorkspacePrisma(workspaceId, session.user.sessionProfileId || undefined)
+    // [Task-loss A1] Reconcile with the workspace's OWN profile — see resolveActiveProfileId.
+    const profileId = await resolveActiveProfileId(session.user.id, workspaceId, session.user.sessionProfileId)
+    const workspacePrisma = getWorkspacePrisma(workspaceId, profileId ?? undefined)
     
     const staff = await workspacePrisma.user.findUnique({
         where: { id: userId },

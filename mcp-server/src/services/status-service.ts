@@ -83,6 +83,13 @@ export async function updateTaskStatus(
         updateData.deadline = null
     }
 
+    // [Task-loss A2] Cancelling → ARCHIVE, exactly like the web app (src/actions/task-actions.ts:
+    // "auto-archive on cancel"). An 'Đã hủy' row left isArchived:false matches NO board tab AND is
+    // absent from /admin/cancelled (which lists isArchived:true) → a counted-but-invisible ghost.
+    if (newStatus === 'Đã hủy') {
+        updateData.isArchived = true
+    }
+
     // 5. Enforce invariant (assigneeId <-> status consistency)
     enforceAssigneeStatusInvariant(updateData, task)
 

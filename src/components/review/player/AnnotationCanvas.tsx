@@ -229,7 +229,19 @@ export function AnnotationCanvas({
         [tool, color, size, onCommitShape],
     )
 
-    if (!box) return null
+    if (!box) {
+        return editable ? (
+            <div className="absolute inset-0 pointer-events-none z-50">
+                <div className="absolute left-2 top-16 rounded bg-black/90 p-2 font-mono text-[10px] text-red-400 border border-red-500/20">
+                    <div>Canvas: Mounted (Error)</div>
+                    <div>Box: null (Aspect calculations blocked)</div>
+                    <div>RootSize: {rootSize.w}x{rootSize.h}</div>
+                    <div>LiveDims: {liveDims ? `${liveDims.w}x${liveDims.h}` : 'null'}</div>
+                    <div>Intrinsics: {intrinsicWidth ?? 'null'}x{intrinsicHeight ?? 'null'}</div>
+                </div>
+            </div>
+        ) : null
+    }
     const vbh = viewBoxHeight(box)
 
     return (
@@ -239,6 +251,17 @@ export function AnnotationCanvas({
             ref={rootRef}
             className={`absolute inset-0 ${editable ? 'pointer-events-auto touch-none' : 'pointer-events-none'}`}
         >
+            {/* Visual debug overlay visible to help diagnose drawing issue on user hardware */}
+            {editable && (
+                <div className="absolute left-2 top-16 z-50 rounded bg-black/90 p-2 font-mono text-[10px] text-emerald-400 border border-emerald-500/20 pointer-events-none">
+                    <div>Canvas: Mounted (OK)</div>
+                    <div>RootSize: {rootSize.w}x{rootSize.h}</div>
+                    <div>LiveDims: {liveDims ? `${liveDims.w}x${liveDims.h}` : 'null'}</div>
+                    <div>Intrinsics: {intrinsicWidth ?? 'null'}x{intrinsicHeight ?? 'null'}</div>
+                    <div>Box: {box.left.toFixed(0)},{box.top.toFixed(0)} ({box.width.toFixed(0)}x{box.height.toFixed(0)})</div>
+                    <div>Draft: {draft ? `points=${draft.points.length}` : 'null'}</div>
+                </div>
+            )}
             <svg
                 ref={svgRef}
                 viewBox={`0 0 ${VBW} ${vbh}`}

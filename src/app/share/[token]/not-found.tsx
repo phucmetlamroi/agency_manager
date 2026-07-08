@@ -12,15 +12,10 @@ export default function ShareNotFound() {
             <div style={{ maxWidth: 420, textAlign: 'center' }}>
                 <div style={{ fontSize: 40, marginBottom: 16 }}>🔗</div>
                 <h1 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 10px' }}>
-                    Link không còn hiệu lực
+                    This link is no longer valid
                 </h1>
                 <p style={{ fontSize: 14, lineHeight: 1.6, color: '#a1a1aa', margin: 0 }}>
-                    Link chia sẻ này không tồn tại, đã bị thu hồi hoặc đã hết hạn.
-                    Vui lòng liên hệ agency của bạn để nhận link mới.
-                </p>
-                <p style={{ fontSize: 13, lineHeight: 1.6, color: '#71717a', marginTop: 14 }}>
-                    This share link is invalid, revoked or expired.
-                    Please contact your agency for a new link.
+                    This share link is invalid, revoked or expired. Please contact your agency for a new link.
                 </p>
             </div>
         </div>

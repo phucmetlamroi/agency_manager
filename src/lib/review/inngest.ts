@@ -708,13 +708,14 @@ export const reviewShareDecision = inngest.createFunction(
                 data.decision === 'approve'
                     ? {
                           type: 'VIDEO_REVIEW_APPROVED',
-                          title: `✅ ${who} đã duyệt bản v${data.versionNumber}`,
+                          title: `${who} đã duyệt bản v${data.versionNumber}`,
                           body: `Task "${task.title}" — mở chi tiết task để xác nhận chuyển Hoàn tất.`,
                           taskId: data.taskId,
+                          metadata: { guestName: data.guestName, versionNumber: data.versionNumber },
                       }
                     : {
                           type: 'VIDEO_CHANGES_REQUESTED',
-                          title: `✏️ ${who} yêu cầu chỉnh sửa bản v${data.versionNumber}`,
+                          title: `${who} yêu cầu chỉnh sửa bản v${data.versionNumber}`,
                           // Only claim the task auto-flipped when it actually did — a
                           // race-lost / archived / bad-map sync returns applied:false and
                           // the task kept its status; a false "đã chuyển …" would mislead
@@ -723,6 +724,7 @@ export const reviewShareDecision = inngest.createFunction(
                               ? `Task "${task.title}" đã tự chuyển sang "${syncTarget ?? REVIEW_STATUS_MAP.changesRequested}".`
                               : `Task "${task.title}" — khách yêu cầu chỉnh sửa, kiểm tra trạng thái task.`,
                           taskId: data.taskId,
+                          metadata: { guestName: data.guestName, versionNumber: data.versionNumber },
                       },
             )
             return { notified: rows.length }

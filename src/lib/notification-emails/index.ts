@@ -13,6 +13,7 @@ import { taskDeadline1h } from './templates/taskDeadline1h'
 import { taskOverdue } from './templates/taskOverdue'
 import { taskComment } from './templates/taskComment'
 import { taskClientSubmitted } from './templates/taskClientSubmitted'
+import { reviewClientDecision } from './templates/reviewClientDecision'
 import { digestHourly } from './templates/digestHourly'
 import { digestDaily } from './templates/digestDaily'
 import type { RenderedEmail } from './shared/types'
@@ -26,6 +27,7 @@ export const templates = {
     taskOverdue,
     taskComment,
     taskClientSubmitted,
+    reviewClientDecision,
     digestHourly,
     digestDaily,
 }
@@ -55,6 +57,10 @@ export function pickTemplate(
             return 'taskComment'
         case 'TASK_CLIENT_SUBMITTED':
             return 'taskClientSubmitted'
+        // [L-EMAIL-3] Client review decisions on /r/{slug} — email the editor + manager.
+        case 'VIDEO_REVIEW_APPROVED':
+        case 'VIDEO_CHANGES_REQUESTED':
+            return 'reviewClientDecision'
         default:
             return null
     }

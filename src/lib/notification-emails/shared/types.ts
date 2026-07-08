@@ -76,6 +76,14 @@ export interface TaskClientSubmittedParams extends BaseParams {
     inboxWorkspaceId: string
 }
 
+export interface ReviewClientDecisionParams extends BaseParams {
+    taskTitle: string
+    taskId: string
+    guestName?: string | null
+    versionNumber?: number | null
+    decision: 'approve' | 'request_changes'
+}
+
 export interface DigestNotificationItem {
     type: string
     title: string

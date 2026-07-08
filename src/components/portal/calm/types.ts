@@ -152,6 +152,11 @@ export interface DeliverableActions {
     postComment?: (taskId: string, body: string, parentId?: string | null) => Promise<{ success?: boolean; error?: string }>
     /** [Trial P3] Client toggles an emoji reaction on a CLIENT-visible comment. */
     reactComment?: (commentId: string, emoji: string) => Promise<{ success?: boolean; error?: string }>
+    /** [Phase C] Notification-email settings — all token-bound; presence of notifyGet gates the Settings gear. */
+    notifyGet?: () => Promise<{ email: string | null; verified: boolean; pending: string | null } | null>
+    notifyRequest?: (email: string) => Promise<{ success: boolean; error?: string }>
+    notifyVerify?: (code: string) => Promise<{ success: boolean; error?: string }>
+    notifyRemove?: () => Promise<{ success: boolean; error?: string }>
 }
 
 /**

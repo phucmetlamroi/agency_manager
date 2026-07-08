@@ -1,12 +1,12 @@
 'use client'
 
-import { X, Plus } from 'lucide-react'
+import { X, Plus, Settings } from 'lucide-react'
 import ScopeSelector from './ScopeSelector'
 import WorkspaceSelector from './WorkspaceSelector'
 import { fmtDate } from './format'
 import type { Brand, Workspace } from './types'
 
-export default function TopBar({ scope, setScope, brands, lastUpdated, workspaces, wsScope, setWsScope, wsCounts, onCreateTask, onCreateSubClient }: {
+export default function TopBar({ scope, setScope, brands, lastUpdated, workspaces, wsScope, setWsScope, wsCounts, onCreateTask, onCreateSubClient, onOpenSettings }: {
     scope: number | 'all'
     setScope: (s: number | 'all') => void
     brands: Brand[]
@@ -19,6 +19,8 @@ export default function TopBar({ scope, setScope, brands, lastUpdated, workspace
     onCreateTask?: () => void
     /** [Client Task Submission v2] opens the new-brand panel; absent → button hidden. */
     onCreateSubClient?: () => void
+    /** [Phase C] opens the client email-notification settings; absent → gear hidden. */
+    onOpenSettings?: () => void
 }) {
     const filtering = wsScope !== 'all' || scope !== 'all'
     const clearAll = () => { setWsScope('all'); setScope('all') }
@@ -51,6 +53,11 @@ export default function TopBar({ scope, setScope, brands, lastUpdated, workspace
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ok)' }} />
                     {lastUpdated ? `Updated ${fmtDate(lastUpdated, false)}` : 'Up to date'}
                 </span>
+                {onOpenSettings && (
+                    <button onClick={onOpenSettings} className="pc-btn pc-btn-quiet" aria-label="Notification settings" title="Notification settings" style={{ height: 34, width: 34, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Settings size={16} />
+                    </button>
+                )}
                 {onCreateSubClient && (
                     <button onClick={onCreateSubClient} className="pc-btn pc-btn-quiet" style={{ height: 34, padding: '0 12px', gap: 6, fontWeight: 600, whiteSpace: 'nowrap' }}>
                         <Plus size={14} /> Brand

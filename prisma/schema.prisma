@@ -588,6 +588,16 @@ model ClientShareLink {
   canApprove         Boolean @default(true)
   passphraseHash     String?
 
+  // [Phase C] Client-managed notification email (portal Settings page). The client enters an
+  // email, verifies it with a 6-digit OTP, and it persists here until they change/remove it.
+  // Review-status emails are fanned out to it (see guest-notify). All fields null = not set.
+  notifyEmail              String?
+  notifyEmailVerifiedAt    DateTime?
+  notifyEmailPending       String? // email awaiting OTP verification (not yet the live one)
+  notifyEmailCodeHash      String? // SHA-256 of the pending 6-digit OTP
+  notifyEmailCodeExpiresAt DateTime?
+  notifyEmailUnsubToken    String?   @unique // one-click List-Unsubscribe token for notify emails
+
   client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
   profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   createdBy User?   @relation("ShareLinkCreator", fields: [createdById], references: [id], onDelete: SetNull)

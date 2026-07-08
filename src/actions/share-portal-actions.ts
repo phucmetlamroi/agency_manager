@@ -24,6 +24,8 @@ import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
+import { generateOtp, hashOtp, verifyOtp, generateRandomToken } from '@/lib/otp'
+import { sendEmail } from '@/lib/email'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { isValidReaction } from '@/lib/comment-reactions'
@@ -274,6 +276,144 @@ async function findScopedTask(
         select: select as any,
     })) as any
     return { scope, task }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   [Phase C] Client notification-email settings — token-scoped. The email is stored on the
+   ClientShareLink the token resolves to and verified with a 6-digit OTP; it persists until
+   the client changes/removes it. Review-status emails fan out to it (see guest-notify).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const NOTIFY_EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const NOTIFY_CODE_TTL_MS = 15 * 60 * 1000
+
+function renderNotifyVerifyEmailHtml(code: string, brand: string): string {
+    const b = brand.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
+    return `<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#111827;">
+<h1 style="font-size:18px;margin:0 0 12px;">Confirm your email</h1>
+<p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 16px;">Enter this code in your ${b} client portal to start receiving review updates:</p>
+<div style="font-size:30px;font-weight:800;letter-spacing:6px;text-align:center;background:#f4f4f5;border-radius:10px;padding:16px;color:#111827;">${code}</div>
+<p style="font-size:12px;color:#9ca3af;margin:16px 0 0;">This code expires in 15 minutes. If you didn't request it, you can ignore this email.</p>
+</div>`
+}
+
+/** Current notify-email state for the portal Settings panel. Null = invalid token. */
+export async function getPortalNotifyEmail(
+    token: string,
+): Promise<{ email: string | null; verified: boolean; pending: string | null } | null> {
+    const scope = await resolveShareToken(token)
+    if (!scope) return null
+    const link = await prisma.clientShareLink.findUnique({
+        where: { id: scope.shareLinkId },
+        select: { notifyEmail: true, notifyEmailVerifiedAt: true, notifyEmailPending: true },
+    })
+    return {
+        email: link?.notifyEmail ?? null,
+        verified: !!link?.notifyEmailVerifiedAt,
+        pending: link?.notifyEmailPending ?? null,
+    }
+}
+
+/** Step 1: client enters an email → store as pending + email them a 6-digit code. */
+export async function requestPortalNotifyEmail(
+    token: string,
+    rawEmail: string,
+): Promise<{ success: boolean; error?: string }> {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is no longer valid.' }
+    const email = (rawEmail || '').trim().toLowerCase()
+    if (!NOTIFY_EMAIL_RX.test(email) || email.length > 200) {
+        return { success: false, error: 'Please enter a valid email address.' }
+    }
+    const ip = await getRequestIp()
+    const rl = await rateLimit(`portal-notify-req:${scope.shareLinkId}:${ip}`, 5, 60 * 60 * 1000)
+    if (!rl.success) return { success: false, error: 'Too many attempts. Please try again in an hour.' }
+
+    const code = generateOtp()
+    await prisma.clientShareLink.update({
+        where: { id: scope.shareLinkId },
+        data: {
+            notifyEmailPending: email,
+            notifyEmailCodeHash: hashOtp(code),
+            notifyEmailCodeExpiresAt: new Date(Date.now() + NOTIFY_CODE_TTL_MS),
+        },
+    })
+    void sendEmail({
+        to: email,
+        subject: 'Your verification code',
+        html: renderNotifyVerifyEmailHtml(code, scope.profileName),
+    }).catch(() => { /* best-effort; the client can re-request */ })
+    return { success: true }
+}
+
+/** Step 2: client enters the code → promote pending → the live verified email. */
+export async function verifyPortalNotifyEmail(
+    token: string,
+    rawCode: string,
+): Promise<{ success: boolean; error?: string }> {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is no longer valid.' }
+    const link = await prisma.clientShareLink.findUnique({
+        where: { id: scope.shareLinkId },
+        select: { notifyEmailPending: true, notifyEmailCodeHash: true, notifyEmailCodeExpiresAt: true },
+    })
+    if (!link?.notifyEmailPending || !link.notifyEmailCodeHash || !link.notifyEmailCodeExpiresAt) {
+        return { success: false, error: 'No pending verification. Please request a code first.' }
+    }
+    if (link.notifyEmailCodeExpiresAt.getTime() < Date.now()) {
+        return { success: false, error: 'The code has expired. Please request a new one.' }
+    }
+    if (!verifyOtp((rawCode || '').trim(), link.notifyEmailCodeHash)) {
+        return { success: false, error: 'Incorrect code. Please try again.' }
+    }
+    await prisma.clientShareLink.update({
+        where: { id: scope.shareLinkId },
+        data: {
+            notifyEmail: link.notifyEmailPending,
+            notifyEmailVerifiedAt: new Date(),
+            notifyEmailPending: null,
+            notifyEmailCodeHash: null,
+            notifyEmailCodeExpiresAt: null,
+            notifyEmailUnsubToken: generateRandomToken(),
+        },
+    })
+    return { success: true }
+}
+
+/** Client removes/unlinks their notify email (or clears a stuck pending request). */
+export async function removePortalNotifyEmail(token: string): Promise<{ success: boolean; error?: string }> {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is no longer valid.' }
+    await prisma.clientShareLink.update({
+        where: { id: scope.shareLinkId },
+        data: {
+            notifyEmail: null,
+            notifyEmailVerifiedAt: null,
+            notifyEmailPending: null,
+            notifyEmailCodeHash: null,
+            notifyEmailCodeExpiresAt: null,
+            notifyEmailUnsubToken: null,
+        },
+    })
+    return { success: true }
+}
+
+/** One-click / page unsubscribe from portal notify emails — auth is the unsubscribe token
+ *  itself (baked into the email link/header), NOT the share token. Clears the notify email. */
+export async function unsubscribePortalNotify(unsubToken: string): Promise<{ success: boolean }> {
+    if (!unsubToken || unsubToken.length < 20 || unsubToken.length > 128) return { success: false }
+    const res = await prisma.clientShareLink.updateMany({
+        where: { notifyEmailUnsubToken: unsubToken },
+        data: {
+            notifyEmail: null,
+            notifyEmailVerifiedAt: null,
+            notifyEmailPending: null,
+            notifyEmailCodeHash: null,
+            notifyEmailCodeExpiresAt: null,
+            notifyEmailUnsubToken: null,
+        },
+    })
+    return { success: res.count > 0 }
 }
 
 /* ───────────────────────────────────────────────────────────────────────────

@@ -23,6 +23,10 @@ import {
     getCommentFeedViaToken,
     postCommentViaToken,
     toggleReactionViaToken,
+    getPortalNotifyEmail,
+    requestPortalNotifyEmail,
+    verifyPortalNotifyEmail,
+    removePortalNotifyEmail,
 } from '@/actions/share-portal-actions'
 import type { Deliverable, Invoice, Workspace, DeliverableActions } from '@/components/portal/calm/types'
 
@@ -48,6 +52,10 @@ export default function SharePortalClient({ token, clientName, profileName, bran
         getCommentFeed: (taskId) => getCommentFeedViaToken(token, taskId),
         postComment: (taskId, body, parentId) => postCommentViaToken(token, taskId, body, parentId),
         reactComment: (commentId, emoji) => toggleReactionViaToken(token, commentId, emoji),
+        notifyGet: () => getPortalNotifyEmail(token),
+        notifyRequest: (email) => requestPortalNotifyEmail(token, email),
+        notifyVerify: (code) => verifyPortalNotifyEmail(token, code),
+        notifyRemove: () => removePortalNotifyEmail(token),
     }), [token])
 
     return (

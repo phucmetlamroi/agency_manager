@@ -14,6 +14,11 @@ type Cfg = { color: string; soft: string; line: string; Icon: any; label: string
 export const STATUS_CFG: Record<string, Cfg> = {
     // Deliverable statuses (faithful to admin)
     'Awaiting your review': { color: 'var(--accent-fg)', soft: 'var(--accent-soft)', line: 'var(--accent-line)', Icon: Eye, label: 'Awaiting your review' },
+    // [B5/P4] Client-review phase labels (A5/A6/A7 clientLabels from TASK_STATUS_META). Without
+    // these, deriveClientStatus → 'Ready for your review' etc. fell through to STATUS_CFG['Received'].
+    'Ready for your review': { color: 'var(--accent-fg)', soft: 'var(--accent-soft)', line: 'var(--accent-line)', Icon: Eye, label: 'Ready for your review' },
+    'Revising': { color: 'var(--st-revision)', soft: 'var(--st-revision-soft)', line: 'var(--st-revision-line)', Icon: RotateCcw, label: 'Revising' },
+    'In review': { color: 'var(--st-received)', soft: 'var(--st-received-soft)', line: 'var(--st-received-line)', Icon: Eye, label: 'In review' },
     'Received': { color: 'var(--st-received)', soft: 'var(--st-received-soft)', line: 'var(--st-received-line)', Icon: CircleDashed, label: 'Received' },
     'In production': { color: 'var(--st-received)', soft: 'var(--st-received-soft)', line: 'var(--st-received-line)', Icon: Loader, label: 'In production' },
     'In progress': { color: 'var(--st-progress)', soft: 'var(--st-progress-soft)', line: 'var(--st-progress-line)', Icon: Loader, label: 'In progress' },
@@ -84,6 +89,9 @@ export function DeliverableTypeIcon({ type, size = 18 }: { type?: string | null;
 export function statusSentence(clientStatus: string): string {
     switch (clientStatus) {
         case 'Awaiting your review': return 'A cut is ready — please review it below.'
+        case 'Ready for your review': return 'A cut is ready — please review it below.'
+        case 'Revising': return 'We’re working through your requested changes.'
+        case 'In review': return 'Your reviewed cut is back with our team.'
         case 'Received': return 'We’ve received this and it’s queued to start.'
         case 'In production': return 'We’re lining this up to start editing.'
         case 'In progress': return 'Our team is editing this right now.'

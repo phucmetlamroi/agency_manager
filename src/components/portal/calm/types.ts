@@ -48,6 +48,16 @@ export interface Deliverable {
     /** [Atelier] The period/workspace this deliverable lives in (admin "Tháng X/2026"). */
     workspaceId: string | null
     workspaceName: string | null
+    /** [B5/P4] The READY review cut, surfaced from the review module (source of truth) so the
+     *  client can watch it embedded in the portal. Present ONLY for client-phase tasks with a
+     *  live READY task-linked asset (R5-gated). `tokens` are short-lived signed Mux JWTs. */
+    reviewVideo?: {
+        playbackId: string
+        versionId: string
+        durationMs: number | null
+        tokens: { playback: string; thumbnail: string; storyboard: string }
+        expiresAt: string
+    } | null
 }
 
 export interface Invoice {

@@ -18,7 +18,8 @@
 import { prisma } from '@/lib/db'
 import { serializeDecimal } from '@/lib/serialization'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
-import { deriveClientStatus, deriveNeedsYou } from '@/lib/portal-derive'
+import { deriveClientStatus, deriveNeedsYou, isClientFacingPhase } from '@/lib/portal-derive'
+import { mintPlaybackTokens } from '@/lib/review/mux-jwt'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
@@ -148,7 +149,59 @@ export async function getShareSnapshot(token: string) {
     // mirroring how the old getClientInvoices did `.toISOString()`.
     const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
 
-    const mappedTasks = tasks.map(({ assignedBy, ...task }) => ({
+    // ── [B5/P4] Surface the READY review cut IN the portal (no DB write) ──────
+    // Root cause of "Not uploaded yet": the portal only read the flat task.productLink /
+    // task.clientReview, which only the admin-Duyệt bridge fills. When a task reaches the
+    // client phase WITHOUT the bridge committing (admin set A5 by hand/bulk, or the bridge
+    // threw after the status flip), those stay null → no video, wrong badge. Fix: read the
+    // review module directly — the source of truth — join ReviewAsset by taskId and, for
+    // client-phase tasks only (R5 gate below), mint short-lived Mux playback tokens so the
+    // client can watch the cut embedded in their own token-gated portal. Tokens are signed
+    // JWTs (node:crypto) — NO DB write, no guest ShareLink minted, no activity recorded.
+    const taskIds = tasks.map((t) => t.id)
+    const reviewAssets = taskIds.length
+        ? await prisma.reviewAsset.findMany({
+            where: {
+                taskId: { in: taskIds },
+                deletedAt: null,
+                currentVersion: { is: { pipelineStatus: 'READY', muxPlaybackId: { not: null }, deletedAt: null } },
+            },
+            select: {
+                taskId: true,
+                currentVersion: { select: { id: true, muxPlaybackId: true, durationMs: true } },
+            },
+            orderBy: { createdAt: 'desc' }, // newest live stack per task wins
+        })
+        : []
+    // taskId → the ready cut. First (newest) live asset per task.
+    const readyCutByTask = new Map<string, { playbackId: string; versionId: string; durationMs: number | null }>()
+    for (const a of reviewAssets) {
+        const pid = a.currentVersion?.muxPlaybackId
+        if (a.taskId && pid && !readyCutByTask.has(a.taskId)) {
+            readyCutByTask.set(a.taskId, { playbackId: pid, versionId: a.currentVersion!.id, durationMs: a.currentVersion!.durationMs })
+        }
+    }
+
+    const mappedTasks = tasks.map(({ assignedBy, ...task }) => {
+        // R5 gate: only surface a cut when the task is in a CLIENT-facing phase.
+        const cut = readyCutByTask.get(task.id)
+        let reviewVideo:
+            | { playbackId: string; versionId: string; durationMs: number | null; tokens: ReturnType<typeof mintPlaybackTokens>['tokens']; expiresAt: string }
+            | null = null
+        if (cut && isClientFacingPhase(task.status, task.clientReview)) {
+            try {
+                const { tokens, expiresAt } = mintPlaybackTokens(cut.playbackId)
+                reviewVideo = { playbackId: cut.playbackId, versionId: cut.versionId, durationMs: cut.durationMs, tokens, expiresAt }
+            } catch {
+                // Missing Mux signing env → degrade to "Not uploaded yet" rather than 500 the portal.
+                reviewVideo = null
+            }
+        }
+        // Synthesize AWAITING ONLY in-memory when a cut is surfaced but the client hasn't
+        // decided yet — drives the badge ('Awaiting your review') + needsYou. The REAL
+        // task.clientReview (APPROVED/CHANGES) always wins the ?? and stays in the DTO.
+        const effClientReview = task.clientReview ?? (reviewVideo ? 'AWAITING' : null)
+        return {
         ...task,
         // [Trial P0 — isolation] The client must NEVER receive the editor's identity;
         // ship the Manager instead ("client làm việc với manager, không biết editor").
@@ -162,11 +215,13 @@ export async function getShareSnapshot(token: string) {
         createdAt: iso(task.createdAt)!,
         updatedAt: iso(task.updatedAt)!,
         clientReviewedAt: iso(task.clientReviewedAt),
-        clientStatus: deriveClientStatus(task.status, task.clientReview),
-        needsYou: deriveNeedsYou(task),
+        clientStatus: deriveClientStatus(task.status, effClientReview),
+        needsYou: deriveNeedsYou({ status: task.status, productLink: task.productLink, clientReview: effClientReview }),
         clientPath: formatClientHierarchy(task.client),
         workspaceName: task.workspaceId ? wsNameById.get(task.workspaceId) ?? null : null,
-    }))
+        reviewVideo,
+        }
+    })
 
     const mappedInvoices = invoices.map((inv) => ({
         ...inv,

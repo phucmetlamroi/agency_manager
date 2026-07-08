@@ -8,7 +8,6 @@ import {
 import { StatusBadge, statusSentence } from './ui'
 import { fmtDate, relDeadline, fmtMoney } from './format'
 import PortalCommentSection from './PortalCommentSection'
-import { PortalVideoPlayer } from './PortalVideoPlayer'
 import type { Deliverable, ActivityItem, DeliverableActions } from './types'
 
 // [Canonical Clients] The panel is credential-agnostic: all server calls go
@@ -81,19 +80,11 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 22 }}>
-                    {/* [B5/P4] The READY cut, embedded — the client watches it right here. Surfaced
-                        from the review module (source of truth) for client-phase tasks only. */}
-                    {d.reviewVideo && (
-                        <div>
-                            <PortalVideoPlayer playbackId={d.reviewVideo.playbackId} tokens={d.reviewVideo.tokens} />
-                            <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--fg-3)' }}>
-                                {done ? 'Your approved cut.' : 'Watch the latest cut, then approve it or request changes below.'}
-                                {d.duration ? <> · <span className="num">{d.duration}</span></> : null}
-                            </div>
-                        </div>
-                    )}
-                    {/* Nothing to show yet — no embedded cut and no external link. */}
-                    {!d.reviewVideo && !d.productLink && (
+                    {/* [B5/P4] The review board — opening the /r/{slug} guest page lets the client
+                        WATCH the cut, leave timecode comments, annotate and approve. `reviewUrl` is
+                        surfaced for client-phase tasks (review module = source of truth); it falls
+                        back to a staff-entered productLink. "Not uploaded yet" only when neither exists. */}
+                    {!(d.reviewUrl || d.productLink) ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: 16, borderRadius: 14, background: 'var(--surface-2)', border: '1px dashed var(--line-2)' }}>
                             <span style={{ width: 46, height: 46, borderRadius: 12, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-3)', border: '1px solid var(--line-2)', color: 'var(--fg-3)' }}><Clock size={21} /></span>
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -101,19 +92,15 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                                 <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 2 }}>The review link will appear here once editing begins.</div>
                             </div>
                         </div>
-                    )}
-                    {/* External link. Kept ALONGSIDE the embedded player only when the task is done
-                        (a Completed task's "View delivered files" link — do NOT hide it); otherwise
-                        the inline player already covers "Open the cut", so the link is redundant. */}
-                    {d.productLink && (!d.reviewVideo || done) && (
-                        <a href={d.productLink} target="_blank" rel="noopener noreferrer"
+                    ) : (
+                        <a href={d.reviewUrl || d.productLink!} target="_blank" rel="noopener noreferrer"
                             onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.background = 'var(--accent-soft)' }}
                             onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.background = 'var(--surface-2)' }}
                             style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--line-2)', transition: 'border-color .15s, background .15s' }}>
                             <span style={{ width: 46, height: 46, borderRadius: 12, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', color: 'var(--accent-fg)' }}>{done ? <FolderOpen size={22} /> : <Play size={22} style={{ marginLeft: 2 }} />}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--fg)' }}>{done ? 'View delivered files' : 'Open the cut'}</div>
-                                <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 2 }}>{done ? 'Final masters & exports' : 'Watch, review and leave comments'}{d.duration ? <> · <span className="num">{d.duration}</span></> : null}</div>
+                                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--fg)' }}>{done ? 'View delivered files' : 'Open the review'}</div>
+                                <div style={{ fontSize: 12.5, color: 'var(--fg-3)', marginTop: 2 }}>{done ? 'Final masters & exports' : 'Watch, comment and approve'}{d.duration ? <> · <span className="num">{d.duration}</span></> : null}</div>
                             </div>
                             <ExternalLink size={18} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
                         </a>

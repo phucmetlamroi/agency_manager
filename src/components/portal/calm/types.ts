@@ -48,16 +48,10 @@ export interface Deliverable {
     /** [Atelier] The period/workspace this deliverable lives in (admin "Tháng X/2026"). */
     workspaceId: string | null
     workspaceName: string | null
-    /** [B5/P4] The READY review cut, surfaced from the review module (source of truth) so the
-     *  client can watch it embedded in the portal. Present ONLY for client-phase tasks with a
-     *  live READY task-linked asset (R5-gated). `tokens` are short-lived signed Mux JWTs. */
-    reviewVideo?: {
-        playbackId: string
-        versionId: string
-        durationMs: number | null
-        tokens: { playback: string; thumbnail: string; storyboard: string }
-        expiresAt: string
-    } | null
+    /** [B5/P4] The `/r/{slug}` guest review board for this deliverable — where the client
+     *  watches the cut, leaves timecode comments, annotates and approves. Present ONLY for
+     *  client-phase tasks with a live READY task-linked asset (R5-gated). */
+    reviewUrl?: string | null
 }
 
 export interface Invoice {
@@ -158,6 +152,11 @@ export interface DeliverableActions {
     postComment?: (taskId: string, body: string, parentId?: string | null) => Promise<{ success?: boolean; error?: string }>
     /** [Trial P3] Client toggles an emoji reaction on a CLIENT-visible comment. */
     reactComment?: (commentId: string, emoji: string) => Promise<{ success?: boolean; error?: string }>
+    /** [Phase C] Notification-email settings — all token-bound; presence of notifyGet gates the Settings gear. */
+    notifyGet?: () => Promise<{ email: string | null; verified: boolean; pending: string | null } | null>
+    notifyRequest?: (email: string) => Promise<{ success: boolean; error?: string }>
+    notifyVerify?: (code: string) => Promise<{ success: boolean; error?: string }>
+    notifyRemove?: () => Promise<{ success: boolean; error?: string }>
 }
 
 /**

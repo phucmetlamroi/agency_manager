@@ -1,7 +1,21 @@
 import type { TaskStatusChangedParams, RenderedEmail } from '../shared/types'
 import { wrapTemplate, heading, subheading, card, ctaRow, avatar, banner, COLORS } from '../shared/wrapTemplate'
 import { escapeHtml, formatVietnamDateTime, formatTimeRemaining } from '../shared/format'
-import { renderStatusBadge, getStatusInfo } from '../shared/statusMap'
+import { renderStatusBadge } from '../shared/statusMap'
+
+// [L-EMAIL-1] Per-transition copy for the VIDEO REVIEW lifecycle, keyed by the canonical
+// Task.status VALUE. Professional VN tone, no emoji. Every review flip rides the single
+// TASK_STATUS_CHANGED template, so this map lets the ONE email say something specific for
+// each step; any non-review status falls back to a clean generic line.
+const REVIEW_FLIP_COPY: Record<string, { headline: string; line: string; tone?: 'success' | 'warn' }> = {
+    'Đã nộp video (nội bộ)':      { headline: 'Video đã nộp — cần duyệt nội bộ',            line: 'Editor đã nộp bản dựng. Mở task để xem và gửi feedback.' },
+    'Đang sửa feedback (nội bộ)': { headline: 'Có feedback cần sửa',                        line: 'Quản lý đã gửi feedback. Mở task để xem và sửa lại.', tone: 'warn' },
+    'Đã sửa feedback (nội bộ)':   { headline: 'Đã sửa xong — chờ duyệt',                    line: 'Editor xác nhận đã sửa xong đợt feedback này. Mở task để duyệt và gửi cho khách.' },
+    'Đã gửi video (khách)':       { headline: 'Đã gửi cho khách duyệt',                     line: 'Bản dựng đã được gửi cho khách. Đang chờ khách phản hồi.' },
+    'Đã nhận feedback (khách)':   { headline: 'Khách đã gửi feedback',                      line: 'Khách vừa yêu cầu chỉnh sửa. Mở task để xem feedback và sửa.', tone: 'warn' },
+    'Đã sửa feedback (khách)':    { headline: 'Đã sửa xong feedback khách — chờ duyệt',     line: 'Editor xác nhận đã sửa feedback của khách. Mở task để duyệt và gửi lại cho khách.' },
+    'Hoàn tất':                   { headline: 'Khách đã duyệt — hoàn tất',                  line: 'Khách đã duyệt bản dựng. Task đã hoàn tất.', tone: 'success' },
+}
 
 export async function taskStatusChanged(params: TaskStatusChangedParams): Promise<RenderedEmail> {
     const titleEsc = escapeHtml(params.taskTitle)
@@ -11,13 +25,13 @@ export async function taskStatusChanged(params: TaskStatusChangedParams): Promis
     const taskLink = wsId
         ? `${params.appUrl}/${wsId}/dashboard?taskId=${params.taskId}`
         : params.appUrl
-    const newInfo = getStatusInfo(params.newStatus)
 
-    const isDone = newInfo.label === 'Hoàn thành'
-    const isRejected = newInfo.label === 'Cần sửa' || newInfo.label === 'Bị từ chối'
+    const flip = REVIEW_FLIP_COPY[params.newStatus]
+    const headlineText = flip?.headline ?? 'Cập nhật trạng thái task'
+    const lineText = flip?.line ?? 'Trạng thái của task này vừa được cập nhật.'
 
     const inner = `
-<div style="font-size:18px;font-weight:800;color:${COLORS.TEXT_PRIMARY};margin-bottom:14px;">📋 ${titleEsc}</div>
+<div style="font-size:16px;font-weight:700;color:${COLORS.TEXT_PRIMARY};margin-bottom:14px;">${titleEsc}</div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px;">
 <tr>
 <td width="50" valign="top" style="padding-right:12px;">${avatar(params.actorAvatarUrl, params.actorName)}</td>
@@ -29,7 +43,7 @@ export async function taskStatusChanged(params: TaskStatusChangedParams): Promis
 </table>
 <div style="text-align:center;padding:14px;background:#ffffff;border-radius:8px;border:1px solid ${COLORS.BORDER};margin-bottom:12px;">
 ${renderStatusBadge(params.oldStatus)}
-<span style="margin:0 12px;color:${COLORS.TEXT_SECONDARY};font-size:14px;">───→</span>
+<span style="margin:0 12px;color:${COLORS.TEXT_SECONDARY};font-size:14px;">→</span>
 ${renderStatusBadge(params.newStatus)}
 </div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -38,12 +52,12 @@ ${params.deadline ? `<tr><td style="padding:4px 0;color:${COLORS.TEXT_SECONDARY}
 </table>`
 
     const body = `
-${heading('📋', 'Task cập nhật trạng thái')}
-${subheading(`Trạng thái của task này vừa được thay đổi.`)}
-${isDone ? banner('🎉 Tuyệt vời! Task đã hoàn thành.', 'info') : ''}
-${isRejected ? banner('⚠️ Task cần được xem xét lại.', 'warn') : ''}
+${heading('', headlineText)}
+${subheading(lineText)}
+${flip?.tone === 'success' ? banner('Task đã hoàn tất.', 'info') : ''}
+${flip?.tone === 'warn' ? banner('Cần bạn xử lý.', 'warn') : ''}
 ${card(inner)}
-${ctaRow([{ text: '📋 Xem task →', url: taskLink }])}`
+${ctaRow([{ text: 'Xem task', url: taskLink }])}`
 
     const html = await wrapTemplate({
         bodyHtml: body,
@@ -54,7 +68,7 @@ ${ctaRow([{ text: '📋 Xem task →', url: taskLink }])}`
     })
 
     return {
-        subject: `📋 Task "${params.taskTitle}" chuyển sang ${newInfo.label}`,
+        subject: flip ? `${headlineText} — "${params.taskTitle}"` : `Cập nhật trạng thái — "${params.taskTitle}"`,
         html,
     }
 }

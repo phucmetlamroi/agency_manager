@@ -11,6 +11,7 @@ import DeliverableDetailPanel from './DeliverableDetailPanel'
 import InvoiceDetailPanel from './InvoiceDetailPanel'
 import CreateRequestWizard from './CreateRequestWizard'
 import CreateSubClientPanel from './CreateSubClientPanel'
+import PortalSettings from './PortalSettings'
 import {
     deriveBrands, deriveLastUpdated,
     scopeFilterDeliverables, scopeFilterInvoices,
@@ -65,6 +66,7 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
     const [openInv, setOpenInv] = useState<string | null>(null)
     const [createOpen, setCreateOpen] = useState(false)
     const [subClientOpen, setSubClientOpen] = useState(false)
+    const [settingsOpen, setSettingsOpen] = useState(false)
 
     const effectiveActions: DeliverableActions = actions
     const invoices = initialInvoices
@@ -129,6 +131,7 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
                     workspaces={workspaces} wsScope={wsScope} setWsScope={changeWsScope} wsCounts={wsCounts}
                     onCreateTask={effectiveActions.submitRequest ? () => setCreateOpen(true) : undefined}
                     onCreateSubClient={effectiveActions.createSubClient ? () => setSubClientOpen(true) : undefined}
+                    onOpenSettings={effectiveActions.notifyGet ? () => setSettingsOpen(true) : undefined}
                 />
 
                 <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
@@ -158,6 +161,7 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
             {invObj && <InvoiceDetailPanel inv={invObj} brands={brands} onClose={() => setOpenInv(null)} />}
             {createOpen && <CreateRequestWizard actions={effectiveActions} onClose={() => setCreateOpen(false)} />}
             {subClientOpen && <CreateSubClientPanel actions={effectiveActions} onClose={() => setSubClientOpen(false)} />}
+            {settingsOpen && <PortalSettings actions={effectiveActions} onClose={() => setSettingsOpen(false)} />}
         </div>
     )
 }

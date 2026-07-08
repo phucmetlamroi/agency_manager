@@ -292,6 +292,52 @@ export async function getOrCreatePrimaryShareForAsset(
     return { share, created: true }
 }
 
+/**
+ * [B5/P4] TOKEN-SAFE get-or-create of the client review link for a task deliverable.
+ * Unlike getOrCreatePrimaryShareForAsset this does NOT call requireReviewAccess — the
+ * CALLER (share-portal getShareSnapshot) has already authorized the asset through the
+ * client's own share-token scope (task.clientId ∈ scope) AND the R5 client-phase gate.
+ * It materializes the `/r/{slug}` link the admin-Duyệt bridge would have created when the
+ * task was sent to the client, for the case where the bridge never committed.
+ *
+ * Reuses ANY live (non-revoked, unexpired) share that already exposes this asset — incl.
+ * a bridge-created one — so it never mints a second link. Otherwise creates a default OPEN
+ * share (no password), owned by the asset's creator (the uploader — a real staff User FK).
+ * Silent: no activity / audit feed (this is a client-driven read, not a staff action).
+ * Returns the slug for `/r/{slug}`.
+ */
+export async function getOrCreateClientReviewSlug(asset: {
+    id: string
+    workspaceId: string
+    taskId: string | null
+    createdById: string
+}): Promise<string> {
+    const existing = await prisma.shareLink.findFirst({
+        where: {
+            revokedAt: null,
+            AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
+            items: { some: { assetId: asset.id } },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { slug: true },
+    })
+    if (existing) return existing.slug
+
+    const created = await prisma.shareLink.create({
+        data: {
+            slug: nanoid(SLUG_LEN),
+            workspaceId: asset.workspaceId,
+            taskId: asset.taskId,
+            allowComments: true,
+            showAllVersions: false,
+            createdById: asset.createdById,
+            items: { create: [{ assetId: asset.id, sortIndex: 0 }] },
+        },
+        select: { slug: true },
+    })
+    return created.slug
+}
+
 // ─────────────────────────── list / detail (FR-F04) ───────────────────────────
 
 export interface ListSharesQuery {

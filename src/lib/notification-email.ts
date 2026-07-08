@@ -23,6 +23,7 @@ import type {
     TaskStatusChangedParams,
     TaskUnassignedParams,
     TaskClientSubmittedParams,
+    ReviewClientDecisionParams,
 } from '@/lib/notification-emails/shared/types'
 import type { NotificationType } from '@prisma/client'
 
@@ -57,6 +58,10 @@ const BYPASS_CONFIG: Record<string, {
     // [Client Task Submission v2] A client submitted a work request — admins get
     // it realtime (bypass digest + quiet hours; it's an inbound job to triage).
     TASK_CLIENT_SUBMITTED:     { bypassMute: true,  bypassDigest: true,  bypassQuietHours: true },
+    // [L-EMAIL-3] Client review decisions — the editor + manager get them realtime (an
+    // approval/change is a real handoff to act on; bypass digest so it isn't batched away).
+    VIDEO_REVIEW_APPROVED:     { bypassMute: true,  bypassDigest: true,  bypassQuietHours: false },
+    VIDEO_CHANGES_REQUESTED:   { bypassMute: true,  bypassDigest: true,  bypassQuietHours: false },
 }
 
 const DEFAULT_BYPASS = { bypassMute: false, bypassDigest: false, bypassQuietHours: false }
@@ -263,6 +268,22 @@ async function buildTemplateParams(ctx: EnrichmentContext): Promise<RenderedEmai
                 inboxWorkspaceId: meta.inboxWorkspaceId || workspaceId || '',
             }
             return await templates.taskClientSubmitted(params)
+        }
+        case 'reviewClientDecision': {
+            if (!notification.taskId) return null
+            const task = await prisma.task.findUnique({
+                where: { id: notification.taskId },
+                select: { title: true },
+            }).catch(() => null)
+            const params: ReviewClientDecisionParams = {
+                ...baseParams,
+                taskTitle: task?.title || meta.taskTitle || 'Task',
+                taskId: notification.taskId,
+                guestName: (meta.guestName as string) ?? null,
+                versionNumber: typeof meta.versionNumber === 'number' ? meta.versionNumber : null,
+                decision: notification.type === 'VIDEO_REVIEW_APPROVED' ? 'approve' : 'request_changes',
+            }
+            return await templates.reviewClientDecision(params)
         }
         default:
             return null

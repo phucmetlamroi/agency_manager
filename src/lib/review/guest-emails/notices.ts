@@ -44,6 +44,36 @@ export function renderCommentReplyEmail(input: Base): { subject: string; html: s
     }
 }
 
+/** [L-EMAIL-2] T5 — the client requested changes → acknowledge it. */
+export function renderFeedbackReceivedEmail(input: Base): { subject: string; html: string } {
+    const p = input.projectName ? `“${esc(input.projectName)}”` : 'your project'
+    return {
+        subject: `We’ve received your feedback`,
+        html: wrapGuestEmail({
+            title: 'Thanks — your feedback is in',
+            bodyHtml: `<p style="margin:0 0 8px;">We’ve received your requested changes on ${p}. Our team is working on them and we’ll email you as soon as a revised cut is ready to review.</p>`,
+            ctaLabel: 'Open the review',
+            ctaUrl: input.reviewUrl,
+            unsubscribeUrl: input.unsubscribeUrl,
+        }),
+    }
+}
+
+/** [L-EMAIL-2] T6 — the client approved the cut → thank + set expectations. */
+export function renderApprovedEmail(input: Base): { subject: string; html: string } {
+    const p = input.projectName ? `“${esc(input.projectName)}”` : 'your project'
+    return {
+        subject: `Thanks for approving your video`,
+        html: wrapGuestEmail({
+            title: 'Approved — thank you',
+            bodyHtml: `<p style="margin:0 0 8px;">Thank you for approving ${p}. We’ll take it from here and follow up with the final files.</p>`,
+            ctaLabel: 'Open the review',
+            ctaUrl: input.reviewUrl,
+            unsubscribeUrl: input.unsubscribeUrl,
+        }),
+    }
+}
+
 /** T4 — STATUS_UPDATE: a client-visible status changed (EN label only; internalOnly never here). */
 export function renderStatusUpdateEmail(input: Base & { statusLabel: string }): { subject: string; html: string } {
     const p = input.projectName ? `“${esc(input.projectName)}”` : 'Your project'

@@ -813,6 +813,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                         isAdmin={isAdmin ?? false}
                                         selectedIds={selectedIds}
                                         workspaceId={workspaceId}
+                                        onSelectionCleared={() => setRowSelection({})}
                                     />
                                 </div>
                             </div>

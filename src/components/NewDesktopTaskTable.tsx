@@ -650,6 +650,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                     isAdmin={isAdmin}
                                     selectedIds={selectedIds}
                                     workspaceId={workspaceId}
+                                    onSelectionCleared={() => setRowSelection({})}
                                 />
                                 {task.assignedBy && (
                                     <div

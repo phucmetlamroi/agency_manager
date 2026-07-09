@@ -16,6 +16,8 @@ interface AssigneeCellProps {
     isAdmin: boolean
     selectedIds?: string[]
     workspaceId: string
+    /** Clear the parent table selection after an assignment completes. */
+    onSelectionCleared?: () => void
 }
 
 /**
@@ -31,7 +33,7 @@ function rankFlag(entity: any): string | null {
     return r === 'C' ? 'bg-yellow-500' : r === 'D' ? 'bg-red-500' : null
 }
 
-export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspaceId }: AssigneeCellProps) {
+export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspaceId, onSelectionCleared }: AssigneeCellProps) {
     const router = useRouter()
     const { confirm } = useConfirm()
 
@@ -113,7 +115,11 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                 const { bulkAssignTasks } = await import('@/actions/bulk-task-actions')
                 const res = await bulkAssignTasks(selectedIds, val === "unassigned" ? null : val, workspaceId)
                 if (res.error) toast.error(res.error)
-                else { toast.success(`Đã giao ${res.count} task thành công!`); router.refresh() }
+                else {
+                    toast.success(`Đã giao ${res.count} task thành công!`)
+                    onSelectionCleared?.()
+                    router.refresh()
+                }
                 return
             }
         }
@@ -122,6 +128,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
         const assignRes = await assignTask(task.id, val === "unassigned" ? null : val, workspaceId)
         if (assignRes?.success) {
             toast.success("Đã cập nhật người làm")
+            onSelectionCleared?.()
             router.refresh()
         } else {
             toast.error("Giao task thất bại")

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import WorkspaceSettingsPanel from '@/components/workspace/WorkspaceSettingsPanel'
 import { dedupeClientsByPath } from '@/lib/client-dedupe'
+import { getStudyPlaceProgress } from '@/actions/study-place-actions'
 
 export default async function AdminSettingsPage({
     params,
@@ -96,6 +97,8 @@ export default async function AdminSettingsPage({
           )
         : []
 
+    const studyProgress = await getStudyPlaceProgress(workspaceId)
+
     const serializedWorkspace = {
         id: workspace.id,
         name: workspace.name,
@@ -119,6 +122,7 @@ export default async function AdminSettingsPage({
                 integrations={integrations}
                 pricingRules={pricingRules}
                 clients={clients}
+                studyProgress={studyProgress}
             />
         </div>
     )

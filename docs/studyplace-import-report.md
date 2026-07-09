@@ -1,0 +1,258 @@
+# StudyPlace Import Report
+
+- Study set: `vietnam-culture-review-2026-07`
+- Source DOCX: `C:\Users\Dareu\Downloads\bộ câu hỏi và trả lời.docx`
+- Imported at: 2026-07-09T17:23:00.513Z
+- Raw question blocks: 236
+- Usable questions written: 236
+- Missing correct answer blocks: 0
+- Option-count anomalies: 1
+- Score counts: `{"0/1":180,"1/1":56}`
+- Option counts: `{"3":1,"4":235}`
+
+## Anomalies
+
+1. Paragraph 1291-1299, options=3: Choose the CORRECT statement about Modern Painting
+
+## Missing Correct Answer
+
+No missing correct answers.
+
+## Checksums
+
+- 1: `09332e0d89eadf13` Fill in the blank with the correct words:
+- 2: `4d26000d49571ca3` Fill in the blank with the correct words
+- 3: `c16f907a26074556` Fill in the blank with the correct words
+- 4: `8f962ac7af2bd1f3` How many vowels are there in Vietnamese?
+- 5: `48d224698fa225fe` Choose the CORRECT statement
+- 6: `87a7ad655015fea3` Which of the following statements about Vietnam is INCORRECT?
+- 7: `5627677f0cc5b1b5` Choose the INCORRECT statemen about Vietnamese names
+- 8: `b8a4088f8d56b3c0` Which is the most common Vietnamese family name?
+- 9: `1d830a0e1d7a9b24` Which refers to the South and comes from 'Giao Chi', an ancient Sino-Vietnamese administrative term?
+- 10: `fd062796f7f689af` How many letters are used in the Vietnamese Alphabet?
+- 11: `d474451da78a3540` How many major races are there in the world?
+- 12: `554c19f4ccc2d761` How many seasons are there in Vietnam?
+- 13: `408013bf0803c004` What kind of climate does Vietnam have?
+- 14: `0e391255aaacecdc` Vietnam's weather is controlled by seasonal monsoons called
+- 15: `7295b9895f2ce3c1` How many kilometers of coastline does Vietnam have?
+- 16: `a65b7690a2f752fe` Which is the Easternmost Point of Vietnam?
+- 17: `5e25faafa7e3dff9` Which refers to the northern part of the country and comes from the sino -Vietnamese 'Dong Kinh'?
+- 18: `a82957f71fcf2245` Which refers to central Vietnam and means "Pacified South"?
+- 19: `29828968c811bc99` What is the name of the longest mountain range in Vietnam?
+- 20: `8a9643d663a2d0a7` Choose the INCORRECT statement
+- 21: `8023080c95c84ba8` Who is the ancestor of cannon casting in Vietnam?
+- 22: `13248c5d2a51ff6b` What ended French colonial rule in Vietnam?
+- 23: `71d2dff80b2e416b` What agreement ended US involvement in Vietnam?
+- 24: `a282637b45c0f863` When was the Agreement on Ending the War and Restoring Peace in Viet Nam signed?
+- 25: `2f5f74fbe742a309` Which was the first embryonic State of Vietnam?
+- 26: `190948d62935e98a` Which of the following statements about The Trinh-Nguyen Civil War is INCORRECT?
+- 27: `24234edfa081b89b` Vietnamization strategy was performed by … .
+- 28: `ea23568d2b9d36dc` Choose the INCORRECT statement
+- 29: `36c986d98acb1333` "I am not afraid of war, but I fear that the people's heart are not with us" is the famous saying of ... .
+- 30: `f772d28057449a02` Which of following statement about the Tran Dynasty is INCORRECT?
+- 31: `2fa30607d4dcec8e` When did the Gulf of Tonkin incident happen?
+- 32: `59a506b0c146f3a3` Which of the following statements about Vietnam under Northern Domination is INCORRECT?
+- 33: `81c73f21c3ac962e` What has Vietnam been called officially since 1976?
+- 34: `3adb23c76323725a` Which was considered as important, progress code and became a model for subsequent legal development in Vietnam?
+- 35: `f1dd6e4d29c0d559` How many kings did the Nguyen dynasty have?
+- 36: `8ccc1f3dcc76cd50` Fill in the blank with the correct words:
+- 37: `583a944591ba252c` Which of the following statements about Vietnam under the Nguyen Dynasty is CORRECT
+- 38: `d50e961db72eb633` Choose the INCORRECT statement about the domino theory
+- 39: `eb9934c9a601b847` Who was the successor to Ho Chi Minh as head of the Vietnamese Communist Party?
+- 40: `071a49c90d053d23` Which of the following statements about Vietnamese Nationalism is INCORRECT?
+- 41: `059257398f4a1a01` Which of the following statements about The Era of Northern Domination is INCORRECT?
+- 42: `5d78842edbb92669` Choose the INCORRECT statement
+- 43: `104fbf2ea5a42cde` How long did the Battle of Dien Bien Phu last?
+- 44: `3602bd38c4932a6e` Fill in the blank with the correct words:
+- 45: `2cb799372743b42c` Choose the INCORRECT statement
+- 46: `23c99eb1565b6533` When was the Viet Minh established?
+- 47: `da742b4982b8ae34` When did Catholicism come to Vietnam?
+- 48: `370d7a59e4dcc652` What was the golden age of Buddhism in Vietnam?
+- 49: `bbbcc800b8df31bc` Which does not belong to the three basic Buddhist traditions?
+- 50: `5457bc4242457971` Which of the following statements about Catholicism in Vietnam is INCORRECT?
+- 51: `91ffb8a1438cf282` Who founded the Hoa Hao movement?
+- 52: `242a7399b97e85f9` When was Buddhism first introduced to Vietnam (came from China)?
+- 53: `d2374257671cca2f` The Three Universal Truths in Buddhism include:
+- 54: `7eee18443c63f74b` Which is INCORRECT about "Wandering Souls" (according to the concept of the animists)?
+- 55: `87f38dce5b9a8ef4` Who is regarded as the first Vietnamese patriarch of Zen Buddhism in Vietnam?
+- 56: `a1bcfa438e65b117` Which of the following statements about Hoa Hao Buddhism is INCORRECT?
+- 57: `c77867c001c1017a` Which is INCORRECT about Taoism?
+- 58: `6109ed8f568dcc3e` Which does not belong to the three virtues which every Vietnamese Buddhist Youth Association’s member and leader are advised to follow?
+- 59: `4a280a6809618bcf` Which belong to the Five Relationships of Confucianism?
+- 60: `2a4321f899ee1053` When was Caodaism officially established?
+- 61: `45e6adc69107d893` Who founded Buddhism?
+- 62: `63630ea2c29aa959` Which of the following statements about the Yin Yang Symbol in Taoism is INCORRECT?
+- 63: `3ac42a5dd839a5e6` Which is INCORRECT about Animism under pre-colonial times?
+- 64: `6a3e28657e50879e` Which is NOT included in the Seven Sacraments?
+- 65: `8005fd52b5448e79` Which of the following statements about Confucianism in Vietnam is CORRECT?
+- 66: `b7915a991b295b5f` Which of the following statements about animism is INCORRECT?
+- 67: `ec2a34fed16b58e1` When was The Unified Buddhist Sangha of Vietnam founded?
+- 68: `6e86fbc7f713dcd5` The Basic Teachings of Buddha which are core to Buddhism are
+- 69: `b65dde094420b84f` Which is INCORRECT about Taoism?
+- 70: `450f460ab223d7a7` Who is the founder of the Taoism religion?
+- 71: `c0bfcda7d6a00bf0` Which of the following statements about animism is INCORRECT?
+- 72: `161c8d9f0daf025b` Which of the following statements about animism is CORRECT?
+- 73: `6df1548f00a529bd` Which of the following statements is not true about Confucianism?
+- 74: `49b86516e0bc6418` Who created Cao Dai?
+- 75: `45536a4a525b1204` Which of the following are beliefs of Buddhism?
+- 76: `d8b076f760087c38` Which is INCORRECT about Taoist masters?
+- 77: `51946f3d54c1998f` Who does Caodaism worship?
+- 78: `00fcc152817d1d78` Who was not a realist writer in Vietnam literature?
+- 79: `a5000a6a2cf11d64` Which does not belong to Vietnamese Literature Categories?
+- 80: `a5fb61a05a39cff2` Which was considered as the manifesto that urged Vietnamese youth to modernize themselves?
+- 81: `39dba934f277de6f` Which of the following statements about Realist Authors was INCORRECT?
+- 82: `6270de513a8e9133` How many categories may Vietnamese Literature be separated into?
+- 83: `e2a8d0d38397d23b` Which literature category did The Complete History of Great Viet belong to?
+- 84: `a8ab5a324667511a` Choose the NOT TRUE statement about The Folk Tradition
+- 85: `9cb453a15789cc4a` When did Viet scholars develop a second writing system (Vernacular characters)?
+- 86: `5158e902a5a71742` Who did not belong to the "First Generation" of Resistance Literature?
+- 87: `3ac451baeb5140c5` Which was a left-wing literary association in Tonkin during the 1930s?
+- 88: `5dfc7c59cd783742` Who was the founder of the Gia Dinh Newspaper?
+- 89: `36fb2b085bd15d60` Who was not a member of the Self-Reliance Literary Group (Tu luc van doan)?
+- 90: `41f3ef2bdfaf398c` Who belonged to the "Second Generation" of Resistance Literature?
+- 91: `b9546100231d3abd` Which of the following statements about Resistance Literature was CORRECT?
+- 92: `759aec0d5b16c489` When was the golden age for 'chu Nom'?
+- 93: `011e1ea6b10a7cbe` When was Quoc Ngu introduced?
+- 94: `92e5e14b86bd4654` Choose the INCORRECT statement about Renovation Literature
+- 95: `f8a5a9ef85ca37e0` Fill in the blank with correct words
+- 96: `03026ad1faaaf67e` Who invented Quoc Ngu?
+- 97: `84890837a12fe508` Which is not involved in the characteristics of Renovation Literature?
+- 98: `45661718b79dc1f2` Who was the leader of the Self-Reliance Literary Group (Tu luc van doan)?
+- 99: `d1b26129d56c3079` When was 'chu Nom' set as the official writing system?
+- 100: `527251989ce3c5ac` When did the Renovation literary movement in Vietnam begin?
+- 101: `aec9f7036da63ef1` Which was the work not written in Vernacular characters?
+- 102: `a9753c4c1a09f746` Which was the first Vietnamese language newspaper?
+- 103: `0c770b003f996426` Which is the best-known work of the early 19th century and today written in 'Nom' characters?
+- 104: `beb9dac47aa8a77e` Who was the Director and Editor-in-chief of Nam Phong magazine (published in Hanoi from 1917–1934)?
+- 105: `8f25f16eff282c80` Who did not belong to the "Third Generation" of Resistance Literature?
+- 106: `bdde6d0a79bdec05` When was the Indochina School of Fine Arts opened?
+- 107: `4d297be187d54d36` Which makes the Bat Trang brushwork recognizable?
+- 108: `92e715d0a90a4fb0` Which is not involved in the religious architecture?
+- 109: `31ddc59f5aa7ea52` When did the lacquers begin to use a wider palette of colors?
+- 110: `c5d758401935ee9e` Which is NOT TRUE about Pre-colonial Arts
+- 111: `639f42343a23260e` Fill in the blank with correct words:
+- 112: `f01dc169f474f454` Choose the INCORRECT statement about Vietnamese Ceramics under pre-colonial times?
+- 113: `997f54062536b6d1` Viet architecture's categories include … .
+- 114: `14818ed5a7f52ae0` Who belonged to the first generation of modern artists (who graduated from school in 1930)?
+- 115: `9bfc7067e4c2f56f` In the wood-block painting, which becomes a family heirloom, passed on from generation to generation?
+- 116: `57bd5213497c97fb` Fill in the blank with correct words
+- 117: `082c2c2b9a04433a` How was traditional black lacquer made at the beginning?
+- 118: `1bf44953dfe98f28` When was the French-founded Fine Arts School renamed Vietnam School of Fine Arts?
+- 119: `f86d62fbdc9a6d1c` Choose the INCORRECT statement about wood-block printing during pre-colonial times
+- 120: `65b7ae76a66208a6` Which type of ceramic was preferred to use in the 11th-12th centuries?
+- 121: `e9c73e0561c4f9b8` When was the College of Industrial Arts opened?
+- 122: `bc831dd1edd697da` Which type of ceramic was preferred to use in the 15th century?
+- 123: `d5c0ae907be2de1c` Choose the CORRECT statement about Modern Painting
+- 124: `62af51f825895719` Why may wood-block printing be considered a major art form?
+- 125: `192e119b57a3e384` Who had introduced Cubism into Vietnam?
+- 126: `ed0c87500a8bbe9c` Choose the NOT TRUE statement about Pre-colonial art and architecture
+- 127: `ee44057cc7d4f09a` Choose the CORRECT statement
+- 128: `e9c73e0561c4f9b8` When was the College of Industrial Arts opened?
+- 129: `eefdc8876dc184a3` Which is an INCORRECT statement about wood-block printing during pre-colonial times?
+- 130: `58b29335f995efcb` Which architecture category does the Ho Citadel belong to?
+- 131: `0b34c0bf4e9767e5` Choose the INCORRECT statement
+- 132: `99ecdc3775c08d63` Fill in the blank with correct words
+- 133: `a278e7dc44efc871` How many traditional colors were allowed to use in lacquer work at the beginning?
+- 134: `76e07bd7a42f1fd9` Which was not a function of lacquerware in ancient times?
+- 135: `f74b5d1abcf1bcda` What was the large part of Vietnamese pre-colonial art and architecture products made for?
+- 136: `9a860f5ce01eea60` Why didn’t the scroll form or murals painting in premodern times generate the same interest among Viet literati and artists as it did for their Chinese counterparts?
+- 137: `9f1829d92567e956` When did the making of ceramics (gom) in Viet lands date?
+- 138: `c856f7d71d66617e` Choose the INCORRECT statement about Vietnam architecture
+- 139: `f84691c8094d6110` Which are the inexhaustible well of inspiration to Vietnamese pre-colonial art and architecture artisans?
+- 140: `f26b016ac02b8d2b` When did Vietnam witness the emergence of two schools of arts, one in the North and the other in the South?
+- 141: `648f6034ecb66f61` Which forced all of the artists out of their inner world and into the chaotic and deadly world of the war?
+- 142: `715d257b2ddeee17` When did the making of ceramics (gom) in Viet lands truly take off?
+- 143: `6e9b5bd3f9328220` How many categories can Viet architecture be divided into?
+- 144: `682240429a44c388` Choose the CORRECT statement.
+- 145: `b9d50c8f5440ca96` Choose the INCORRECT statement about Utensils and Manners of Vietnam under Pre-colonial Times
+- 146: `163508ebbeaf24a6` Choose the NOT TRUE statement about Daily Fare in Vietnam
+- 147: `d608a67b89b3d6da` Which is usually used in soups and as a main dish, often to replace meat or fish in vegetarian cuisine?
+- 148: `6caad1a051f9f89d` Fill in the blank with the correct word
+- 149: `ac6ecffd2cc8f235` The definition of a beautiful woman in eighteenth-century Vietnam
+- 150: `52071e04697389a4` What is INCORRECT about Vietnamese Table Manners?
+- 151: `26cd5fad852e1f18` Which insect is a famous source of animal protein in Northern Vietnam?
+- 152: `9b5f6a53e1800dd4` Which present marital fidelity and happiness?
+- 153: `af2f09bde8fa501b` Fill in the blank with CORRECT words
+- 154: `e4056b210c00e891` Which contributed to Vietnam's food culture?
+- 155: `9041a590f1c8d261` Which was the main beverage during pre-colonial times?
+- 156: `80a6c7ad717c354f` In the absence of refrigeration,... was often used as a method of preserving fish for later consumption.
+- 157: `f4f7f9151f1851b3` Which insect is a famous source of animal protein in Southern Vietnam?
+- 158: `18b6e6fe7f117d93` Which was not included in the varieties of Vietnamese tea during pre-colonial times?
+- 159: `79399766b140c05f` Which was a distilled, purified product and also one of the traditional offerings to deities and ancestors?
+- 160: `469b34fde48400e4` What is disrespectful in Vietnamese culture, especially in Pre-colonial Times?
+- 161: `54a3db575da41c44` ... also played a role in pre-colonial cuisine, but it was a delicacy that was rarely eaten, even among the elite
+- 162: `83e6c6381039f8d7` Which was the reason for the blackening of the teeth with lacquer customs?
+- 163: `1bbae28d65a94e49` Fill in the blank with the correct words
+- 164: `22cf388d95fd5178` Fill in the blank with correct words:
+- 165: `d2405f1a87ce1cb3` Choose the TRUE statement about Utensils and Manners of Vietnam under Pre-colonial Times
+- 166: `385766477b4932fc` Choose the INCORRECT statement about Vietnamese Drinks Culture during pre-colonial times
+- 167: `26b91d41ea7810f2` Why shouldn't we knock the chopsticks to the bowl according to the Vietnamese' perspective?
+- 168: `a57434ff4fb2bd2b` Choose the NOT TRUE statement
+- 169: `91a04d04595427d4` In pre-colonial and particularly in colonial-era Vietnam, which was the second most important grain used in the daily meal?
+- 170: `6f8589b5e5e73f87` What is NOT TRUE about Vietnamese Table Manners
+- 171: `1ef8c756cc8a568c` Which liquor was imported from China?
+- 172: `5b5f3fa63398dea5` How can it be called the best quality fish sauce ('thuong hang')?
+- 173: `de0a60206598aa53` Choose the INCORRECT statement
+- 174: `a8a877d632f3f3a1` When did the government begin to launch birth control campaigns?
+- 175: `c2c712c8a59d8236` How many fundamental values and customs are embedded in the Vietnamese ethos?
+- 176: `0c41aeae372a7162` Who was considered as the clan leader?
+- 177: `69d200c1b4efaa5f` Choose the TRUE statement about Family Life in the SRV
+- 178: `7a828547213f685f` How many stages were there in the process of marriage in Pre-colonial Times?
+- 179: `7d676d6b2b879c74` What was not included in the "three subserviences" (tam tong) that every woman in the Pre-colonial Times had to obey?
+- 180: `31d72e9697abf27b` How old was the "normal age" to get married in Pre-colonial Times?
+- 181: `9a59ebaebe31e5ed` Which words can describe the Family in Vietnam nowadays?
+- 182: `9bf6daf7c34a7ef6` Choose the NOT TRUE statement about the Vietnamese marriage in Pre-colonial Times
+- 183: `80f24b95c3b414c9` Pre-colonial Viet identified themselves by reference to ... .
+- 184: `bb29ceec4a81add5` Which is NOT TRUE about the Vietnamese marriage in Pre-colonial Times?
+- 185: `4fc3cad8bf9fda42` Which statement is INCORRECTW about the clan leader (Truong Toc)?
+- 186: `c73793b5761b6bf1` Which is the first concern of Generation 2000?
+- 187: `c99997870fd56183` In pre-colonial times, the Viet were defined first and foremost by ... .
+- 188: `243016609dd6d8b0` What is NOT TRUE about Generation 2000
+- 189: `5eab2231947e407f` Which factor did not account for the increase of the nuclear, two-generation family since 1975?
+- 190: `a25f3291e79c9fce` Which stage below was not included in the marriage process under Pre-colonial Times?
+- 191: `6b968299b9a19c3b` What authorities did a mother-in-law not have over her daughter-in-law during the Pre-colonial Times?
+- 192: `e73ebedd7e586e17` Which is considered as proof of filial impiety in the pre-colonial time?
+- 193: `b6c74c8341ddb541` Which is NOT included in the Positive incentives which were applied to persuade the woman to use birth control in 1962?
+- 194: `7fded2579e354ac1` Choose the INCORRECT statement about the Vietnamese Family in Pre-colonial Times
+- 195: `66a2d5e6c71914f8` Which was not a reason for parents to give their children coarse nicknames such as "pig", "dog", or "stupid" in Pre-colonial Times?
+- 196: `6eec9faf332d0295` Who was instrumental in the passing of the 1958 Family Law?
+- 197: `7b120445e7d51b59` What is NOT TRUE about Family Life in the SRV?
+- 198: `9e5d0214194a6355` Which was not included in the "three assumptions of duty" policy in 1965?
+- 199: `426a28b6cec44bf6` Choose the TRUE statement about the Vietnamese Family in Pre-colonial Times
+- 200: `2c5c10a63a262ba2` Which statement is NOT TRUE about the Family Head?
+- 201: `372b5006c2085fa8` Which is NOT TRUE about the policies that were applied to persuade the woman to use birth control in 1962?
+- 202: `232f2374a7bcc2a1` Arranged marriages and polygyny were abolished by ... .
+- 203: `57e0ee0824a336fe` ... was carried out on the last day of the twelfth month.
+- 204: `3bf38c3019febf6a` Which festival is organized on the fifteenth day of the eighth month of the lunar calendar?
+- 205: `6591761cef6ed28b` The ten-year cycle is based on ...
+- 206: `684a044cea660b97` What do people usually do before Tet in Vietnam?
+- 207: `668c536f4054a1f7` Choose the NOT TRUE statement
+- 208: `e9048c4a7e554d40` Which festival is celebrated on the fifteenth day of the fourth month of the lunar calendar?
+- 209: `a546780e58dde5a7` In 1994 and 1995, the portion of the governments' budget allocated to physical fitness and sports ...
+- 210: `209d198e7a653a5f` ... occurred on the fifth day of the fifth lunar month in recognition of the summer solstice.
+- 211: `8e281571b3cc4b51` Where is the cradle of the Vietnamese civilization?
+- 212: `b3922b9d8f4ad063` Choose the NOT TRUE statement
+- 213: `41bce32659a8ee43` Which is not encompassed Vietnamese Zodiac animals?
+- 214: `1cab7e3dbf00499b` Which element in the doctrine of five elements accords with Giap-At (in the ten-cycle)?
+- 215: `9df66e224c67361b` Which element in the doctrine of five elements accords with Canh-Tan (in the ten-cycle)?
+- 216: `b06c8acb2b41ac19` The twelve-year cycle is based on ...
+- 217: `997a6e2a82bf5491` One week before the New Year was to begin, each household celebrated ...
+- 218: `3eb2c0f5b5122ed8` Choose the NOT TRUE statement
+- 219: `ea92d05e5f8522c0` Which element in the doctrine of five elements accords with Nham-Quy (in the ten-cycle)?
+- 220: `3f262976553f3dc6` When did we start using both Lunar calendar and Gregorian at the same time?
+- 221: `34a3e055b0b2666d` A sixty-year cycle is based on ...
+- 222: `b7aa352e5d2edb58` The festivals were observed by ...
+- 223: `701cfc2c02d06acd` Choose the TRUE statement about sports and leisure in the middle of the 1990s
+- 224: `a2bb5a0d70208e4e` Which is not involved in the fundamental values and customs embedded in the Vietnamese ethos?
+- 225: `a8b65b887a921d64` Choose the NOT TRUE statement
+- 226: `0304d7ec21377f91` The celebration of festivals in pre-colonial Vietnam was regulated by ...
+- 227: `a4b1fffe547f958e` Which is NOT the primary festival celebrated by pre-colonial Vietnamese?
+- 228: `77b293ceb00aefbf` What happened during the "dark decade" of sports and physical fitness in the SRV?
+- 229: `3694fa8ac3c88d9e` Which is the important unit in the traditional calendar?
+- 230: `dc4ad314af570c77` On which day were the spirits of the dead released from their torments in hell and allowed to return to the earth (according to the observation of Buddhists)
+- 231: `6a4c5a45ac455bd0` The ten-year cycle runs as follow:
+- 232: `6b58df8ffdbf5153` When did the observatory cease to function?
+- 233: `d390ab3a0e826986` In practice, the Vietnamese year begins in ...
+- 234: `286c97f7bbab7517` . ... was celebrated on the third day of the third month.
+- 235: `9ce0e0fc9f1591c1` Which is the odd one out?
+- 236: `e1af32a549520d51` When was a "dark decade" for sports and physical fitness in the SRV?

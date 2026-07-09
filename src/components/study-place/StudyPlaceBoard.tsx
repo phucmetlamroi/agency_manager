@@ -30,6 +30,7 @@ import {
     reviewStudyPlaceQuestionAction,
     toggleStudyPlaceBookmarkAction,
 } from '@/actions/study-place-actions'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
     STUDY_PLACE_QUESTIONS,
     STUDY_PLACE_SET_ID,
@@ -100,6 +101,144 @@ function masteryLabel(progress?: StudyPlaceProgressDTO) {
 
 function qualityFromCorrect(correct: boolean) {
     return correct ? 4 : 1
+}
+
+function escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function getChoiceLabel(index: number) {
+    return String.fromCharCode(65 + index)
+}
+
+function getHighlightMatches(text: string, keyTerms: StudyPlaceQuestion['keyTerms'] = []) {
+    if (!text.trim() || keyTerms.length === 0) return []
+
+    const uniqueTerms = keyTerms
+        .map((term) => ({ ...term, normalized: term.term.trim().toLowerCase() }))
+        .filter((term) => term.normalized.length > 0)
+        .filter((term, index, terms) => terms.findIndex((candidate) => candidate.normalized === term.normalized) === index)
+
+    const matches = uniqueTerms.flatMap((term) => {
+        const regex = new RegExp(escapeRegExp(term.term), 'gi')
+        return [...text.matchAll(regex)].map((match) => ({
+            start: match.index ?? 0,
+            end: (match.index ?? 0) + match[0].length,
+            text: match[0],
+            term,
+        }))
+    })
+
+    return matches
+        .sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start))
+        .reduce<typeof matches>((kept, match) => {
+            const previous = kept[kept.length - 1]
+            if (!previous || match.start >= previous.end) kept.push(match)
+            return kept
+        }, [])
+}
+
+function AnnotatedText({
+    text,
+    keyTerms,
+    className = '',
+}: {
+    text: string
+    keyTerms?: StudyPlaceQuestion['keyTerms']
+    className?: string
+}) {
+    const matches = getHighlightMatches(text, keyTerms)
+    if (matches.length === 0) return <span className={className}>{text}</span>
+
+    const nodes: React.ReactNode[] = []
+    let cursor = 0
+
+    matches.forEach((match, index) => {
+        if (cursor < match.start) {
+            nodes.push(
+                <span key={`plain-${index}-${cursor}`}>
+                    {text.slice(cursor, match.start)}
+                </span>,
+            )
+        }
+
+        nodes.push(
+            <Tooltip key={`term-${match.start}-${match.end}`}>
+                <TooltipTrigger asChild>
+                    <span
+                        title={match.term.meaning}
+                        className="rounded-md border border-amber-300/15 bg-amber-300/10 px-1 py-0.5 font-medium text-amber-50 underline decoration-amber-300/80 decoration-2 underline-offset-4 transition-colors hover:bg-amber-300/20"
+                    >
+                        {match.text}
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs border-amber-400/20 bg-zinc-950 text-zinc-100">
+                    <div className="space-y-1">
+                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-300">
+                            {match.term.term}
+                        </div>
+                        <div className="text-sm font-medium">{match.term.meaning}</div>
+                        {match.term.note && (
+                            <div className="text-xs leading-5 text-zinc-400">
+                                {match.term.note}
+                            </div>
+                        )}
+                    </div>
+                </TooltipContent>
+            </Tooltip>,
+        )
+        cursor = match.end
+    })
+
+    if (cursor < text.length) {
+        nodes.push(<span key={`tail-${cursor}`}>{text.slice(cursor)}</span>)
+    }
+
+    return <span className={className}>{nodes}</span>
+}
+
+function QuestionChoices({
+    question,
+    revealCorrect,
+    compact = false,
+    useQuestionOrder = false,
+}: {
+    question: StudyPlaceQuestion
+    revealCorrect: boolean
+    compact?: boolean
+    useQuestionOrder?: boolean
+}) {
+    const orderedOptions = useQuestionOrder ? question.options : getOptionOrder(question, 'quiz')
+
+    return (
+        <div className={compact ? 'space-y-2' : 'space-y-2.5'}>
+            {orderedOptions.map((option, index) => {
+                const isCorrect = option === question.correctAnswer
+                const tone = revealCorrect && isCorrect
+                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-50'
+                    : 'border-white/10 bg-white/[0.03] text-zinc-200'
+
+                return (
+                    <div
+                        key={option}
+                        className={`flex items-start gap-3 rounded-xl border px-3 py-3 ${tone}`}
+                    >
+                        <span className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full text-[11px] font-bold ${revealCorrect && isCorrect ? 'bg-emerald-400/20 text-emerald-200' : 'bg-white/10 text-zinc-400'}`}>
+                            {getChoiceLabel(index)}
+                        </span>
+                        <div className="min-w-0 flex-1 text-sm leading-6">
+                            <AnnotatedText text={option} keyTerms={question.keyTerms} />
+                        </div>
+                        {revealCorrect && isCorrect && (
+                            <span className="mt-0.5 rounded-full bg-emerald-400/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-200">
+                                Correct
+                            </span>
+                        )}
+                    </div>
+                )
+            })}
+        </div>
+    )
 }
 
 export default function StudyPlaceBoard({ workspaceId, initialProgress }: Props) {
@@ -191,25 +330,28 @@ export default function StudyPlaceBoard({ workspaceId, initialProgress }: Props)
 
     if (mode !== 'dashboard') {
         return (
-            <StudySession
-                mode={mode}
-                queue={questionPool}
-                queueScope={queueScope}
-                setQueueScope={setQueueScope}
-                progressMap={progressMap}
-                onBack={() => setMode('dashboard')}
-                onRate={rateQuestion}
-                onBookmark={toggleBookmark}
-                isPending={isPending}
-            />
+            <TooltipProvider delayDuration={120}>
+                <StudySession
+                    mode={mode}
+                    queue={questionPool}
+                    queueScope={queueScope}
+                    setQueueScope={setQueueScope}
+                    progressMap={progressMap}
+                    onBack={() => setMode('dashboard')}
+                    onRate={rateQuestion}
+                    onBookmark={toggleBookmark}
+                    isPending={isPending}
+                />
+            </TooltipProvider>
         )
     }
 
     const progressPercent = Math.round((stats.mastered / STUDY_PLACE_QUESTIONS.length) * 100)
 
     return (
-        <div className="space-y-5">
-            <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-5 shadow-xl">
+        <TooltipProvider delayDuration={120}>
+            <div className="space-y-5">
+                <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-5 shadow-xl">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0">
                         <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-violet-300">
@@ -274,7 +416,6 @@ export default function StudyPlaceBoard({ workspaceId, initialProgress }: Props)
                     </div>
                 </div>
             </div>
-
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {MODE_META.map((item) => {
                     const Icon = item.icon
@@ -300,7 +441,8 @@ export default function StudyPlaceBoard({ workspaceId, initialProgress }: Props)
                     )
                 })}
             </div>
-        </div>
+            </div>
+        </TooltipProvider>
     )
 }
 
@@ -394,7 +536,7 @@ function StudySession({
     if (mode === 'bank') {
         const filtered = STUDY_PLACE_QUESTIONS.filter((question) => {
             const matchesQuery = !bankQuery.trim()
-                || `${question.question} ${question.correctAnswer} ${question.viTranslation}`.toLowerCase().includes(bankQuery.toLowerCase())
+                || `${question.question} ${question.options.join(' ')} ${question.correctAnswer} ${question.viTranslation}`.toLowerCase().includes(bankQuery.toLowerCase())
             const matchesTag = bankTag === 'all' || question.tags?.includes(bankTag)
             return matchesQuery && matchesTag
         })
@@ -494,6 +636,7 @@ function StudySession({
                 revealed={revealed || !!selected || checked}
                 onReveal={() => setRevealed(true)}
                 onBookmark={() => onBookmark(current)}
+                showChoices={mode !== 'quiz' && mode !== 'sprint'}
             />
 
             {(mode === 'due' || mode === 'flashcards') && (
@@ -540,7 +683,14 @@ function StudySession({
                                 }}
                                 className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors ${tone}`}
                             >
-                                <span>{option}</span>
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <span className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full text-[11px] font-bold ${answered && isCorrect ? 'bg-emerald-400/20 text-emerald-200' : answered && isSelected ? 'bg-red-400/20 text-red-200' : 'bg-white/10 text-zinc-400'}`}>
+                                        {getChoiceLabel(optionOrder.indexOf(option))}
+                                    </span>
+                                    <span className="min-w-0 leading-6">
+                                        <AnnotatedText text={option} keyTerms={current.keyTerms} />
+                                    </span>
+                                </div>
                                 {answered && isCorrect && <Check className="h-4 w-4 shrink-0" />}
                                 {answered && isSelected && !isCorrect && <X className="h-4 w-4 shrink-0" />}
                             </button>
@@ -585,7 +735,9 @@ function StudySession({
                     ) : (
                         <div className={`rounded-xl border p-4 text-sm ${writeCorrect ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100' : 'border-amber-500/30 bg-amber-500/10 text-amber-100'}`}>
                             <div className="font-semibold">{writeCorrect ? 'Close enough.' : 'Not close yet.'}</div>
-                            <div className="mt-1 text-zinc-200">Correct answer: {current.correctAnswer}</div>
+                            <div className="mt-1 text-zinc-200">
+                                Correct answer: <AnnotatedText text={current.correctAnswer} keyTerms={current.keyTerms} />
+                            </div>
                             <button
                                 type="button"
                                 onClick={advance}
@@ -645,12 +797,13 @@ function SessionShell({ title, onBack, queueScope, setQueueScope, children }: {
     )
 }
 
-function QuestionCard({ question, progress, revealed, onReveal, onBookmark }: {
+function QuestionCard({ question, progress, revealed, onReveal, onBookmark, showChoices }: {
     question: StudyPlaceQuestion
     progress?: StudyPlaceProgressDTO
     revealed: boolean
     onReveal: () => void
     onBookmark: () => void
+    showChoices: boolean
 }) {
     return (
         <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-5">
@@ -669,7 +822,15 @@ function QuestionCard({ question, progress, revealed, onReveal, onBookmark }: {
                     {progress?.bookmarked ? <BookmarkCheck className="h-4 w-4 text-violet-300" /> : <Bookmark className="h-4 w-4" />}
                 </button>
             </div>
-            <div className="whitespace-pre-wrap text-lg font-semibold leading-8 text-zinc-50">{question.question}</div>
+            <div className="whitespace-pre-wrap text-lg font-semibold leading-8 text-zinc-50">
+                <AnnotatedText text={question.question} keyTerms={question.keyTerms} />
+            </div>
+            {showChoices && question.options.length > 0 && (
+                <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
+                    <div className="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-zinc-400">Answer choices</div>
+                    <QuestionChoices question={question} revealCorrect={revealed} useQuestionOrder compact={false} />
+                </div>
+            )}
             {!revealed ? (
                 <button
                     type="button"
@@ -682,7 +843,9 @@ function QuestionCard({ question, progress, revealed, onReveal, onBookmark }: {
             ) : (
                 <div className="mt-5 rounded-xl border border-violet-500/20 bg-violet-500/10 p-4">
                     <div className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-violet-300">Answer</div>
-                    <div className="text-base font-bold text-white">{question.correctAnswer}</div>
+                    <div className="text-base font-bold text-white">
+                        <AnnotatedText text={question.correctAnswer} keyTerms={question.keyTerms} />
+                    </div>
                 </div>
             )}
         </div>
@@ -706,7 +869,7 @@ function QuestionDetail({ question, progress, onBookmark, compact }: {
                             {question.tags?.map((tag) => <span key={tag} className="rounded-full bg-white/5 px-2 py-0.5 text-zinc-400">{tag}</span>)}
                         </div>
                         <div className={`${compact ? 'line-clamp-2' : ''} whitespace-pre-wrap text-sm font-semibold leading-6 text-zinc-100`}>
-                            {question.question}
+                            <AnnotatedText text={question.question} keyTerms={question.keyTerms} />
                         </div>
                     </div>
                     <button
@@ -724,7 +887,12 @@ function QuestionDetail({ question, progress, onBookmark, compact }: {
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)]">
                 <div className="space-y-3">
-                    <InfoBlock title="Correct answer">{question.correctAnswer}</InfoBlock>
+                    <InfoBlock title="Answer choices" contentClassName="space-y-2">
+                        <QuestionChoices question={question} revealCorrect compact={compact} useQuestionOrder />
+                    </InfoBlock>
+                    <InfoBlock title="Correct answer">
+                        <AnnotatedText text={question.correctAnswer} keyTerms={question.keyTerms} />
+                    </InfoBlock>
                     <InfoBlock title="Vietnamese meaning">{question.viTranslation}</InfoBlock>
                     {question.viExplanation && <InfoBlock title="Explanation">{question.viExplanation}</InfoBlock>}
                     {question.whyCorrect && <InfoBlock title="Why this is correct">{question.whyCorrect}</InfoBlock>}
@@ -757,11 +925,15 @@ function QuestionDetail({ question, progress, onBookmark, compact }: {
     )
 }
 
-function InfoBlock({ title, children }: { title: string; children: React.ReactNode }) {
+function InfoBlock({ title, children, contentClassName = 'whitespace-pre-wrap text-sm leading-6 text-zinc-200' }: {
+    title: string
+    children: React.ReactNode
+    contentClassName?: string
+}) {
     return (
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-zinc-400">{title}</div>
-            <div className="whitespace-pre-wrap text-sm leading-6 text-zinc-200">{children}</div>
+            <div className={contentClassName}>{children}</div>
         </div>
     )
 }

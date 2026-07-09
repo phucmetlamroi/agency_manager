@@ -1,0 +1,868 @@
+[
+  {
+    "id": "1",
+    "question": "Fill in the blank with the correct words:\n... was developed by adopting and adapting some of the symbols of Chinese characters to express Vietnamese-language sounds.",
+    "options": [
+      "Classical Chinese",
+      "The Latin alphabet",
+      "'Chu Nom'",
+      "'Chu Quoc Ngu'"
+    ],
+    "correctAnswer": "'Chu Nom'",
+    "viTranslation": "Hỏi: Điền vào chỗ trống những từ thích hợp:\n... được phát triển bằng cách áp dụng và điều chỉnh một số ký hiệu của chữ Hán để diễn đạt âm thanh tiếng Việt.\n\nĐáp án: 'Chữ Nôm'"
+  },
+  {
+    "id": "2",
+    "question": "Fill in the blank with the correct words\nThree quarters of Viet Nam's territory are made up of ... .",
+    "options": [
+      "low mountains and hilly regions",
+      "rivers and floodplains",
+      "grassed savanna",
+      "low-lying arable land"
+    ],
+    "correctAnswer": "low mountains and hilly regions",
+    "viTranslation": "Hỏi: Điền vào chỗ trống những từ đúng\nBa phần tư lãnh thổ Việt Nam được tạo thành từ ... .\n\nĐáp án: vùng núi thấp và vùng đồi núi"
+  },
+  {
+    "id": "3",
+    "question": "Fill in the blank with the correct words\n... was used by officials of the Chinese Tang Dynasty, which colonized Vietnam from the seventh century until the tenth century.",
+    "options": [
+      "Annam",
+      "Vietnam",
+      "Dai Co Viet",
+      "Nam Viet"
+    ],
+    "correctAnswer": "Nam Viet",
+    "viTranslation": "Hỏi: Điền vào chỗ trống những từ đúng\n... được sử dụng bởi các quan lại của nhà Đường Trung Quốc, nơi xâm chiếm Việt Nam từ thế kỷ thứ bảy cho đến thế kỷ thứ mười.\n\nĐáp án: Nam Việt"
+  },
+  {
+    "id": "4",
+    "question": "How many vowels are there in Vietnamese?",
+    "options": [
+      "12",
+      "11",
+      "10",
+      "9"
+    ],
+    "correctAnswer": "9",
+    "viTranslation": "Hỏi: Tiếng Việt có bao nhiêu nguyên âm?\n\nĐáp án: 9"
+  },
+  {
+    "id": "5",
+    "question": "Choose the CORRECT statement",
+    "options": [
+      "Vietnamese is a polysyllabic language",
+      "Vietnamese is a tonal language",
+      "The Vietnamese alphabet was derived from the cyrillic script.",
+      "None of the above"
+    ],
+    "correctAnswer": "Vietnamese is a tonal language",
+    "viTranslation": "Hỏi: Chọn phát biểu ĐÚNG\n\nĐáp án: Tiếng Việt là ngôn ngữ có thanh điệu"
+  },
+  {
+    "id": "6",
+    "question": "Which of the following statements about Vietnam is INCORRECT?",
+    "options": [
+      "The map resembles the letter “S” or a shoulder pole with a rice basket at each end",
+      "Vietnam is located in the heart of Southeast Asia",
+      "Vietnam's nickname is “Balcony of the Pacific”",
+      "None of the above"
+    ],
+    "correctAnswer": "None of the above",
+    "viTranslation": "Hỏi: Nhận định nào sau đây về Việt Nam là SAI?\n\nĐáp án: Không có điều nào ở trên"
+  },
+  {
+    "id": "7",
+    "question": "Choose the INCORRECT statemen about Vietnamese names",
+    "options": [
+      "The order of Vietnamese names is different from the Western ones",
+      "Common middle names are often gender-specific, such as Thi for females",
+      "Nguyen, Tran, and Le are the three most popular family names in Vietnam",
+      "None of the above"
+    ],
+    "correctAnswer": "None of the above",
+    "viTranslation": "Hỏi: Chọn phát biểu SAI về tên tiếng Việt\n\nĐáp án: Không có điều nào ở trên"
+  },
+  {
+    "id": "8",
+    "question": "How many letters are used in the Vietnamese Alphabet?",
+    "options": [
+      "26",
+      "28",
+      "29",
+      "27"
+    ],
+    "correctAnswer": "29",
+    "viTranslation": "Hỏi: Bảng chữ cái tiếng Việt có bao nhiêu chữ cái?\n\nĐáp án: 29"
+  },
+  {
+    "id": "9",
+    "question": "How many major races are there in the world?*\n0/1\nTwo\nThree\nFour\nFive\nCorrect answer\nFour\nHow many seasons are there in Vietnam?",
+    "options": [
+      "The North of Vietnam has four distinct seasons.",
+      "The South of Vietnam has two distinct seasons.",
+      "A and B are correct",
+      "None of the above"
+    ],
+    "correctAnswer": "A and B are correct",
+    "viTranslation": "Hỏi: Có bao nhiêu chủng tộc lớn trên thế giới?*\n0/1\nHai\nBa\nbốn\nnăm\nCâu trả lời đúng\nbốn\nỞ Việt Nam có bao nhiêu mùa?\n\nĐáp án: A và B đều đúng"
+  },
+  {
+    "id": "10",
+    "question": "What kind of climate does Vietnam have?",
+    "options": [
+      "Tropical Monsoon",
+      "Temperate Monsoon",
+      "Humid continental",
+      "Mediterranean",
+      "Vietnam's weather is controlled by seasonal monsoons called",
+      "*",
+      "0/1",
+      "'gio mua'",
+      "'gio Lao'",
+      "'gio tin phong'",
+      "None of the above"
+    ],
+    "correctAnswer": "'gio mua'",
+    "viTranslation": "Hỏi: Việt Nam có khí hậu như thế nào?\n\nĐáp án: 'gio mua'"
+  },
+  {
+    "id": "11",
+    "question": "How many kilometers of coastline does Vietnam have?",
+    "options": [
+      "3,260 km",
+      "1,360 km",
+      "2,960 km",
+      "3,560 km"
+    ],
+    "correctAnswer": "3,260 km",
+    "viTranslation": "Hỏi: Việt Nam có bao nhiêu km bờ biển?\n\nĐáp án: 3.260 km"
+  },
+  {
+    "id": "12",
+    "question": "What is the name of the longest mountain range in Vietnam?",
+    "options": [
+      "Annamite Range",
+      "Hoang Lien Son Mountain Range",
+      "Bach Ma Range",
+      "Hai Van Mountain Range"
+    ],
+    "correctAnswer": "Annamite Range",
+    "viTranslation": "Hỏi: Dãy núi dài nhất Việt Nam có tên là gì?\n\nĐáp án: Dãy Trường Sơn"
+  },
+  {
+    "id": "13",
+    "question": "Choose the INCORRECT statement",
+    "options": [
+      "Vietnamese is an isolating language",
+      "Vietnamese has also appropriated words from foreign languages, particularly Chinese and, more recently, French and English",
+      "There are two main regional variations in Vietnamese pronunciation",
+      "Viet scholars developed a second writing system from at least the 13th century onward"
+    ],
+    "correctAnswer": "There are two main regional variations in Vietnamese pronunciation",
+    "viTranslation": "Hỏi: Chọn phát biểu SAI\n\nĐáp án: Có hai biến thể khu vực chính trong cách phát âm tiếng Việt"
+  },
+  {
+    "id": "14",
+    "question": "Who is the ancestor of cannon casting in Vietnam?",
+    "options": [
+      "Ho Nguyen Trung",
+      "Ngo Si Lien",
+      "Tran Quoc Tuan",
+      "Nguyen Trung Truc"
+    ],
+    "correctAnswer": "Ho Nguyen Trung",
+    "viTranslation": "Hỏi: Tổ tiên của nghề đúc súng thần công ở Việt Nam là ai?\n\nĐáp án: Hồ Nguyên Trung"
+  },
+  {
+    "id": "15",
+    "question": "What ended French colonial rule in Vietnam?",
+    "options": [
+      "The Battle of Dien Bien Phu (1954)",
+      "The Battle of Hanoi (1946)",
+      "The “Hanoi-Dien Bien Phu in the air”",
+      "The Tet Offensive"
+    ],
+    "correctAnswer": "The Tet Offensive",
+    "viTranslation": "Hỏi: Điều gì đã chấm dứt ách thống trị của thực dân Pháp ở Việt Nam?\n\nĐáp án: Cuộc tấn công Tết"
+  },
+  {
+    "id": "16",
+    "question": "What agreement ended US involvement in Vietnam?",
+    "options": [
+      "The Paris Peace Accords",
+      "The Geneva Accords",
+      "The Ho–Sainteny agreement",
+      "None of the above"
+    ],
+    "correctAnswer": "None of the above",
+    "viTranslation": "Hỏi: Thỏa thuận nào chấm dứt sự can dự của Mỹ vào Việt Nam?\n\nĐáp án: Không có điều nào ở trên"
+  },
+  {
+    "id": "17",
+    "question": "When was the Agreement on Ending the War and Restoring Peace in Viet Nam signed?",
+    "options": [
+      "1975",
+      "1950",
+      "1973",
+      "1972"
+    ],
+    "correctAnswer": "1973",
+    "viTranslation": "Hỏi: Hiệp định chấm dứt chiến tranh, lập lại hòa bình ở Việt Nam được ký kết vào thời gian nào?\n\nĐáp án: 1973"
+  },
+  {
+    "id": "18",
+    "question": "Which of the following statements about The Trinh-Nguyen Civil War is INCORRECT?",
+    "options": [
+      "It was 17th-century a lengthy civil war waged between the two ruling families in Vietnam",
+      "Both of two rulers were referred to by their people as Lord and controlled their countries while the Later Le emperors did not have any real power, only maintained their title",
+      "During the Civil War, Vietnam was divided into two countries: Dang Trong (South) and Dang Ngoai (North) with the Gianh River as frontier line",
+      "None of the above"
+    ],
+    "correctAnswer": "None of the above",
+    "viTranslation": "Hỏi: Nhận định nào sau đây về cuộc nội chiến Trình-Nguyễn là SAI?\n\nĐáp án: Không có điều nào ở trên"
+  },
+  {
+    "id": "19",
+    "question": "Choose the INCORRECT statement",
+    "options": [
+      "The Tay Son Uprising first emerged as a peasant movement and later on successfully overthrew all of the corrupted governments Trịnh and Nguyễn",
+      "The country of Vietnam was mostly reunited for the first time after 200 years of division, since the Le-Mac War and later on the Trinh-Nguyen War",
+      "In 1789, The Tay Son army under the leadership of Nguyen Hue decisively smashed the invading army of Mongol Dynasty",
+      "During the era of Tay Son, the battle was fought not only by swords and spears but also by a significant numbers of cannons"
+    ],
+    "correctAnswer": "In 1789, The Tay Son army under the leadership of Nguyen Hue decisively smashed the invading army of Mongol Dynasty",
+    "viTranslation": "Hỏi: Chọn phát biểu SAI\n\nĐáp án: Năm 1789, quân Tây Sơn dưới sự chỉ huy của Nguyễn Huệ đã đánh tan quân xâm lược của nhà Mông Cổ"
+  },
+  {
+    "id": "20",
+    "question": "Which of following statement about the Tran Dynasty is INCORRECT?",
+    "options": [
+      "Tran Thai Tong founded the Tran dynasty through marriage to a Ly princess in 1225. The Tran had served as regents to the Ly",
+      "Almost Tran Kings ruled the country in similar manner to the Ly Kings.",
+      "The Tran dynasty was a brilliant dynasty with 3 victories to defeat the Mong - Nguyen enemies",
+      "Truc Lam Zen School is a Vietnamese Zen lineage formed during the Tran Dynasty, founded by King Tran Thanh Tong"
+    ],
+    "correctAnswer": "Truc Lam Zen School is a Vietnamese Zen lineage formed during the Tran Dynasty, founded by King Tran Thanh Tong",
+    "viTranslation": "Hỏi: Phát biểu nào sau đây về nhà Trần là KHÔNG ĐÚNG?\n\nĐáp án: Thiền phái Trúc Lâm là một dòng Thiền Việt Nam được hình thành từ thời nhà Trần, do vua Trần Thánh Tông sáng lập"
+  },
+  {
+    "id": "21",
+    "question": "When did the Gulf of Tonkin incident happen?",
+    "options": [
+      "1960",
+      "1964",
+      "1958",
+      "1968"
+    ],
+    "correctAnswer": "1964",
+    "viTranslation": "Hỏi: Sự cố Vịnh Bắc Bộ xảy ra khi nào?\n\nĐáp án: 1964"
+  },
+  {
+    "id": "22",
+    "question": "Which of the following statements about Vietnam under Northern Domination is INCORRECT?*\n0/1\nDuring the Chinese domination, on the basis of exposure to Chinese culture, the Vietnamese people had created their own cultural identity\nLocal customs were suppressed, and Chinese customs, rites, and institutions were imposed by force\nThe process of ethnic sinicization in Vietnam never succeeded\nNone of the above\nCorrect answer\nNone of the above\nWhat has Vietnam been called officially since 1976?",
+    "options": [
+      "The Democratic Republic of Vietnam",
+      "The Republic of Vietnam",
+      "The Socialist Republic of Vietnam",
+      "The United States of Vietnam"
+    ],
+    "correctAnswer": "The United States of Vietnam",
+    "viTranslation": "Hỏi: Câu nào sau đây về Việt Nam dưới sự đô hộ của phương Bắc là SAI?*\n0/1\nThời kỳ đô hộ của Trung Quốc, trên cơ sở tiếp xúc với văn hóa Trung Hoa, người Việt đã tạo dựng được bản sắc văn hóa riêng của mình.\nPhong tục địa phương bị đàn áp, còn phong tục, lễ nghi và thể chế của Trung Quốc bị áp đặt bằng vũ lực\nQuá trình Hán hóa dân tộc ở Việt Nam chưa bao giờ thành công\nKhông có điều nào ở trên\nCâu trả lời đúng\nKhông có điều nào ở trên\nViệt Nam chính thức được gọi là gì kể từ năm 1976?\n\nĐáp án: Hoa Kỳ của Việt Nam"
+  },
+  {
+    "id": "23",
+    "question": "How many kings did the Nguyen dynasty have?",
+    "options": [
+      "12",
+      "13",
+      "14",
+      "15"
+    ],
+    "correctAnswer": "15",
+    "viTranslation": "Hỏi: Triều Nguyễn có bao nhiêu đời vua?\n\nĐáp án: 15"
+  },
+  {
+    "id": "24",
+    "question": "Fill in the blank with the correct words:\nThe Quoc Tu Giam (Imperial Academy) was established in the reign of … .",
+    "options": [
+      "Le Thanh Tong",
+      "Ly Nhan Tong",
+      "Ly Thanh Tong",
+      "Ly Thai To",
+      "Which of the following statements about Vietnam under the Nguyen Dynasty is CORRECT",
+      "*",
+      "0/1",
+      "The village was the basic administrative and social unit of rural life",
+      "The Nguyen dynasty (1802-1945) began with the reign of king Thanh Thai",
+      "During the 17th and 18th centuries the Nguyen restricted Vietnamese settlement into lands formerly occupied by the Chams and the Cambodians",
+      "None of the above"
+    ],
+    "correctAnswer": "The village was the basic administrative and social unit of rural life",
+    "viTranslation": "Hỏi: Điền vào chỗ trống những từ thích hợp:\nQuốc Tử Giám (Học viện Hoàng gia) được thành lập dưới triều đại của … .\n\nĐáp án: Làng là đơn vị hành chính và xã hội cơ bản của đời sống nông thôn"
+  },
+  {
+    "id": "25",
+    "question": "Choose the INCORRECT statement about the domino theory",
+    "options": [
+      "If one country fell to Communism, others nearby would soon follow",
+      "It was the basis for the United States strategy of containment",
+      "The escalating US involvement in Southeast Asia was driven by the logic of the domino theory",
+      "The first figure to propose the domino theory was President Kennedy in the 1940s"
+    ],
+    "correctAnswer": "The first figure to propose the domino theory was President Kennedy in the 1940s",
+    "viTranslation": "Hỏi: Chọn phát biểu SAI về thuyết domino\n\nĐáp án: Nhân vật đầu tiên đề xuất thuyết domino là Tổng thống Kennedy vào những năm 1940"
+  },
+  {
+    "id": "26",
+    "question": "Who was the successor to Ho Chi Minh as head of the Vietnamese Communist Party?",
+    "options": [
+      "Le Duan",
+      "Le Duc Tho",
+      "Pham Minh Chinh",
+      "Le Kien Trung"
+    ],
+    "correctAnswer": "Le Kien Trung",
+    "viTranslation": "Hỏi: Ai là người kế nhiệm Hồ Chí Minh làm người đứng đầu Đảng Cộng sản Việt Nam?\n\nĐáp án: Lê Kiên Trung"
+  },
+  {
+    "id": "27",
+    "question": "Which of the following statements about Vietnamese Nationalism is INCORRECT?",
+    "options": [
+      "Before the start of the Marxism movement, the Vietnamese revolution lacked outline and leadership",
+      "The rise of Nationalism can be divided into 3 stages: Traditionalists, who wanted to restore the monarchy; Western-oriented non-communists; and Western-oriented communists",
+      "Nationalist Party of Vietnam was formed under the leadership of Nguyen Thai Hoc and modeled after the Kuomintang of Nationalist China",
+      "Phan Boi Chau and The 'Dong Du Movement' (1905-1908) was an example of Western-oriented communists"
+    ],
+    "correctAnswer": "Phan Boi Chau and The 'Dong Du Movement' (1905-1908) was an example of Western-oriented communists",
+    "viTranslation": "Hỏi: Nhận định nào sau đây về chủ nghĩa dân tộc Việt Nam là KHÔNG ĐÚNG?\n\nĐáp án: Phan Bội Châu và 'Phong trào Đông Du' (1905-1908) là một điển hình của những người cộng sản theo hướng phương Tây"
+  },
+  {
+    "id": "28",
+    "question": "Which of the following statements about The Era of Northern Domination is INCORRECT?*\n0/1\nThe Era of Northern Domination can be divided into 4 periods\nThe First Era of Northern Domination was from 111 BC–40 AD\nThe Second Era of Northern Domination was from the 1st century to the 6th century AD\nThe Fourth Era of Northern Domination was from 602 to 905\nCorrect answer\nThe Fourth Era of Northern Domination was from 602 to 905\nChoose the INCORRECT statement*\n0/1\nThe Ancestors of the Modern Vietnamese appeared in the 2nd millenium B.C.E.\nThe Lac were among the first peoples in Asia to employ irrigation systems, practice wet-rice agriculture, and cast bronze\nAu Lac was an ancient kingdom that covered parts of modern-day Guangxi and northern Vietnam\nHoa Lu Ancient Citadel was officially the oldest and the first citadel in Vietnam's history\nCorrect answer\nHoa Lu Ancient Citadel was officially the oldest and the first citadel in Vietnam's history\nHow long did the Battle of Dien Bien Phu last?",
+    "options": [
+      "57 days",
+      "47 days",
+      "68 days",
+      "90 days"
+    ],
+    "correctAnswer": "57 days",
+    "viTranslation": "Hỏi: Nhận định nào sau đây về Thời đại phương Bắc thống trị là SAI?*\n0/1\nThời kỳ Bắc thuộc có thể chia thành 4 thời kỳ\nKỷ nguyên thống trị đầu tiên của phương Bắc là từ năm 111 trước Công nguyên–40 sau Công nguyên\nKỷ nguyên thứ hai của phương Bắc thống trị là từ thế kỷ thứ 1 đến thế kỷ thứ 6 sau Công nguyên\nThời đại phương Bắc thống trị lần thứ tư từ năm 602 đến năm 905\nCâu trả lời đúng\nThời đại phương Bắc thống trị lần thứ tư từ năm 602 đến năm 905\nChọn câu KHÔNG ĐÚNG*\n0/1\nTổ tiên của người Việt Nam hiện đại xuất hiện vào thiên niên kỷ thứ 2 trước CN.\nNgười Lạc là một trong những dân tộc đầu tiên ở châu Á sử dụng hệ thống thủy lợi, trồng lúa nước và đúc đồng.\nÂu Lạc là một vương quốc cổ xưa bao phủ một phần Quảng Tây ngày nay và miền bắc Việt Nam\nCố đô Hoa Lư chính thức là thành cổ nhất và đầu tiên trong lịch sử Việt Nam\nCâu trả lời đúng\nCố đô Hoa Lư chính thức là thành cổ nhất và đầu tiên trong lịch sử Việt Nam\nTrận Điện Biên Phủ kéo dài bao lâu?\n\nĐáp án: 57 ngày"
+  },
+  {
+    "id": "29",
+    "question": "Fill in the blank with the correct words:\nDinh Bo Linh named the country ... and set up the capital in Hoa Lu, which is now Ninh Binh.",
+    "options": [
+      "Dai Co Viet",
+      "Dai Viet",
+      "Van Xuan",
+      "Nam Viet"
+    ],
+    "correctAnswer": "Nam Viet",
+    "viTranslation": "Hỏi: Điền vào chỗ trống những từ thích hợp:\nĐinh Bộ Lĩnh đặt tên nước... và đóng đô ở Hoa Lư, nay là Ninh Bình.\n\nĐáp án: Nam Việt"
+  },
+  {
+    "id": "30",
+    "question": "Choose the INCORRECT statement",
+    "options": [
+      "After the war, Vietnam had been devastated in many respects.",
+      "From 1976 to 1986, Vietnam inplemented centralized economic planning, the nationalization of industry, and agricultural collectivization.",
+      "Nguyen Van Linh is the current General Secretary of the Communist Party of Vietnam.",
+      "Vietnam first began its economic reform in 1986 by adopting the Doi Moi policy."
+    ],
+    "correctAnswer": "Nguyen Van Linh is the current General Secretary of the Communist Party of Vietnam.",
+    "viTranslation": "Hỏi: Chọn phát biểu SAI\n\nĐáp án: Nguyễn Văn Linh hiện là Tổng Bí thư Đảng Cộng sản Việt Nam."
+  },
+  {
+    "id": "31",
+    "question": "When was the Viet Minh established?",
+    "options": [
+      "1945",
+      "1941",
+      "1932",
+      "1952"
+    ],
+    "correctAnswer": "1941",
+    "viTranslation": "Hỏi: Việt Minh được thành lập khi nào?\n\nĐáp án: 1941"
+  },
+  {
+    "id": "32",
+    "question": "When did Catholicism come to Vietnam?\n1/1\nIn the 12 century\nIn the 16th century\nIn the 18th century\nNone of the above\nType in your student no. - fullname - classcode*\n···/1\nsá\nWhat was the golden age of Buddhism in Vietnam?\n0/1\nFrom the Le So to the Tay Son\nFrom the Nguyen dynasty up to now\nFrom the beginning of AD to the end of the Northern domination period\nDinh, Tien Le, Ly, Tran dynasties\nCorrect answer\nDinh, Tien Le, Ly, Tran dynasties\nWhich does not belong to the three basic Buddhist traditions?\n0/1\nTheravada\nMahayana\nVajrayana\nNone of the above\nCorrect answer\nNone of the above\nWhich of the following statements about Catholicism in Vietnam is INCORRECT?\n0/1\nThe Catholic Church flourished under the colonialists’ patronage, opening missions, schools, and hospitals all over the country, and becoming Vietnam’s largest landowner\nVietnamese Catholics were favored above their compatriots and became an educated elite under French Domination\nUnder King Minh Mang, Catholicism flourished\nAfter reunification, the communists placed restrictions on the Catholic Church and imprisoned several of its leaders who had actively opposed the new government\nCorrect answer\nUnder King Minh Mang, Catholicism flourished\nWho founded the Hoa Hao movement?\n0/1\nHuynh Phu So\nPham Cong Tac\nLe Van Trung\nNone of the above\nCorrect answer\nHuynh Phu So\nWhen was Buddhism first introduced to Vietnam (came from China)?\n1/1\nIn the 1st century C.E\nIn the Ly dynasty (11 century)\nIn about 500 B.C.E\nIn the 7th century\nThe Three Universal Truths in Buddhism include:\n0/1\nEverything is impermanent and changing\nImpermanence leads to suffering, making life imperfect\nThe self is not personal and unchanging\nAll are correct\nCorrect answer\nAll are correct\nWhich is INCORRECT about &quot;Wandering Souls&quot; (according to the concept of the animists)?\n0/1\nThe spirits of people who had died far from home, or of those with neglectful descendants, became &quot;wandering souls&quot;\n&quot;Wandering Souls&quot; might harm anyone they encountered\n&quot;Wandering Souls Day&quot; is celebrated during the 15th day of the seventh month in the lunar calendar\nNone of the above\nCorrect answer\nNone of the above\nWho is regarded as the first Vietnamese patriarch of Zen Buddhism in Vietnam?\n0/1\nKhuong Tang Hoi\nLe Dinh Tham\nMaster Khanh Hoa\nThich Tri Thu\nCorrect answer\nKhuong Tang Hoi\nWhich of the following statements about Hoa Hao Buddhism is INCORRECT?\n0/1\nIt was founded in 1939\nA Hoa Hao Buddhist practicing Buddhism for self-improvement must, first of all, do his best to comply with the Four Great Debts Of Gratitude.\nHoa Hao was a powerful independent force in South Vietnamese politics until the final victory of the communists in 1975\nHoa Hao followers are required to shave their heads and take refuge in pagodas\nCorrect answer\nHoa Hao was a powerful independent force in South Vietnamese politics until the final victory of the communists in 1975\nWhich is INCORRECT about Taoism?\n0/1\nTaoism is a spiritual philosophy that focuses on a person's outlook on life and the world around them\nOriginated in China during the struggles preceding the founding of the Qin Empire in 221 B.C.E.\nHuman beings are not a part of the grand harmony of nature in Taoism.\nThe Tao Te Ching was originally named for the man credited with writing it, Laozi\nCorrect answer\nHuman beings are not a part of the grand harmony of nature in Taoism.\nWhich does not belong to the three virtues which every Vietnamese Buddhist Youth Association’s member and leader are advised to follow?\n0/1\nCompassion\nWisdom\nBravery\nNone of the above\nCorrect answer\nNone of the above\nWhich belong to the Five Relationships of Confucianism?\n(1) father–son\n(2) husband–wife\n(3) ruler–subject\n(4) friend–friend\n(5) grandparents–nephew/niece\n0/1\n(1), (2), (3), and (4)\n(1), (2), and (4)\n(2), (3), (4), and (5)\n(1), (3), (4), and (5)\nCorrect answer\n(1), (2), (3), and (4)\nWhen was Caodaism officially established?\n0/1\nIn 1919\nIn 1926\nIn 1924\nIn 1950\nCorrect answer\nIn 1926\nWho founded Buddhism?\n0/1\nSiddhartha Gautama\nShakyamuni\nThe &quot;Buddha&quot;\nAll are correct\nCorrect answer\nAll are correct\nWhich of the following statements about the Yin Yang Symbol in Taoism is INCORRECT?\n0/1\nThe dots in the Yin Yang symbol indicate that there is no absolute yin or yang, each contains the germ of the other\nThe outer circle indicates that all things are made up of yin and yang.\nThe duality of yin and yang is an indivisible whole\nYang refers to negative/passive/female principles in nature\nCorrect answer\nYang refers to negative/passive/female principles in nature\nWhich is INCORRECT about Animism under pre-colonial times?\n0/1\nBased on the merits, the court ordained the gods of the Citadel according to levels\nThe imperial states regulated Animistic practices to legitimize imperial rule and prevent ‘tà giáo’ (“heterodox teaching”) from corrupting morals and promoting rebellion\nEach village had a ‘đình’, or communal house, used for council meetings and rituals honoring the ‘thành hoàng’, the village's patron deity\nNone of the above\nCorrect answer\nNone of the above\nWhich is NOT included in the Seven Sacraments?\n0/1\nBaptism\nEucharist\nReconciliation\nRecognition\nCorrect answer\nRecognition\nWhich of the following statements about Confucianism in Vietnam is CORRECT?\n0/1\nConfucianism was introduced into Vietnam early during Chinese rule and has maintained its influence since that time\nIn 1075, the first Confucian exam was opened with the names &quot;Confucian Studies&quot; and &quot;Three Schools of Confucianism&quot;, officially giving birth to the long history of Confucian examinations in Vietnam\nThe idea of territorial sovereignty identified in Ly Thuong Kiet's Nam Quoc Son Ha is considered to be influenced by Confucian thought\nAll are correct\nCorrect answer\nAll are correct\nWhich of the following statements about animism is INCORRECT?\n1/1\nPre-colonial villagers gave children with unattractive names so that spirits would not harm them\nUnder pre-colonial times, in many families, children were referred to by their family ranking instead of by names\nPre-colonial Viet believed that spirits inhabited rocks, trees, animals, and the rest of the natural world\nHumans were believed to have three kinds of souls: 'hon', 'phach', and 'via'\nWhen was The Unified Buddhist Sangha of Vietnam founded?\n1/1\nIn 1964\nIn 1975\nIn 1986\nIn 1968\nThe Basic Teachings of Buddha which are core to Buddhism are\n0/1\nThe Three Universal Truths\nThe Four Noble Truths\nThe Noble Eightfold Path\nAll are correct\nCorrect answer\nAll are correct\nWhich is INCORRECT about Taoism?\n1/1\nThe Taoist name is taken from Chinese letters which means the way\nThe &quot;Non-action&quot; in Taoism means &quot;doing nothing&quot;\nTaoists believe it's important to trust and recognize our own inner nature, and discover who we are\nAll things derive from a combination of the two, with 'am' supplying matter or solidity, and 'duong' subtle principle or spirit\nWho is the founder of the Taoism religion?\n1/1\nLaozi\nKongzi\nZhuangzi\nZunzi\nWhich of the following statements about animism is INCORRECT?\n0/1\nAnimism is the belief that nature is enlivened by distinct personalized spirit beings\nAnimist peoples not only worship their ancestors, but they also worship rocks, plants, and animals\nAnimism is prevalent among people who see themselves as a part of nature rather than dominating it\nAnimism is monotheistic\nCorrect answer\nAnimism is monotheistic\nWhich of the following statements about animism is CORRECT?\n0/1\nSpirits entered the body at conception or birth\nSpirits will forever leave a living person's body if the host suffered as fright, as reflected in the expression 'so mat hon'\nMen were believed to have three 'hon', and nine 'via'\nUnder pre-colonial time, a person's seventh year ('that tuan') was considered an important milestone\nCorrect answer\nSpirits entered the body at conception or birth\nWhich of the following statements is not true about Confucianism?\n1/1\nBe a system of thought and behavior originating in ancient China\nConfucianism is not a religion that is based upon the belief in a personalized God\nConfucianism concerns the issues of gods, spirits, and death\nConfucianism emphasizes the feeling of piety\nWho created Cao Dai?\n1/1\nNguyen Van Chieu\nNguyen Hoai Thanh\nNgo Dinh Nhu\nNgo Van Vo\nWhich of the following are beliefs of Buddhism?\n(1) Life is suffering\n(2) People suffer on account of desire\n(3) If desires are conquered, nirvana will be attained\n(4) Desire can be removed by following the eight-fold path\n0/1\n(1), (2), and (3)\n(1) and (2)\n(2) and (3)\n(1), (2), (3), and (4)\nCorrect answer\n(1), (2), (3), and (4)\nWhich is INCORRECT about Taoist masters?\n0/1\nTaoist masters serve as healers, mediums, and geomancers\nBy Nguyen times, they were called 'thay', 'father', and by extension, 'teacher' or 'master'\nIn modern times, it's hard to distinguish between Animist and Taoist\nNone of the above\nCorrect answer\nNone of the above\nWho does Caodaism worship?\n0/1\nGod the Father\nHoly Mother\nThe Divine Beings\nAll are correct\nCorrect answer\nAll are correct\nWho was not a realist writer in Vietnam literature?",
+    "options": [
+      "Nguyen Cong Hoan",
+      "Vu Trong Phung",
+      "Ngo Tat To",
+      "Nhat Linh"
+    ],
+    "correctAnswer": "Nhat Linh",
+    "viTranslation": "Hỏi: Đạo Công giáo đến Việt Nam từ khi nào?\n1/1\nVào thế kỷ 12\nVào thế kỷ 16\nVào thế kỷ 18\nKhông có điều nào ở trên\nNhập số sinh viên của bạn - họ tên - mã lớp*\n···/1\nsá\nThời kỳ hoàng kim của Phật giáo ở Việt Nam là gì?\n0/1\nTừ Lê Sơ đến Tây Sơn\nTừ thời nhà Nguyễn đến nay\nTừ đầu Công Nguyên đến cuối thời kỳ Bắc thuộc\nCác triều đại Đinh, Tiên Lê, Lý, Trần\nCâu trả lời đúng\nCác triều đại Đinh, Tiên Lê, Lý, Trần\nĐiều nào không thuộc về ba truyền thống cơ bản của Phật giáo?\n0/1\nNguyên thủy\nĐại thừa\nKim Cương thừa\nKhông có điều nào ở trên\nCâu trả lời đúng\nKhông có điều nào ở trên\nNhận định nào sau đây về Công giáo ở Việt Nam là SAI?\n0/1\nGiáo hội Công giáo phát triển mạnh mẽ dưới sự bảo trợ của thực dân, mở các cơ sở truyền giáo, trường học, bệnh viện trên khắp cả nước và trở thành địa chủ lớn nhất của Việt Nam.\nNgười Công giáo Việt Nam được ưu ái hơn đồng bào và trở thành tầng lớp trí thức tinh hoa dưới thời Pháp đô hộ\nDưới thời vua Minh Mạng, đạo Công giáo phát triển mạnh mẽ\nSau khi thống nhất, những người cộng sản đặt ra những hạn chế đối với Giáo hội Công giáo và bỏ tù một số nhà lãnh đạo đã tích cực phản đối chính phủ mới.\nCâu trả lời đúng\nDưới thời vua Minh Mạng, đạo Công giáo phát triển mạnh mẽ\nAi là người sáng lập phong trào Hòa Hảo?\n0/1\nHuỳnh Phú Sở\nPhạm Công Tạc\nLê Văn Trung\nKhông có điều nào ở trên\nCâu trả lời đúng\nHuỳnh Phú Sở\nPhật giáo du nhập vào Việt Nam (từ Trung Quốc) vào năm nào?\n1/1\nVào thế kỷ 1 CN\nVào thời nhà Lý (thế kỷ 11)\nVào khoảng năm 500 TCN\nVào thế kỷ thứ 7\nBa chân lý phổ quát trong Phật giáo bao gồm:\n0/1\nMọi thứ đều vô thường và thay đổi\nVô thường dẫn đến đau khổ, khiến cuộc sống trở nên bất toàn\nCái tôi không phải là cá nhân và không thay đổi\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nĐiều nào KHÔNG ĐÚNG về “Những linh hồn lang thang” (theo quan niệm của những người theo thuyết vật linh)?\n0/1\nLinh hồn của những người đã chết xa quê hương, hay của những người có con cháu bị bỏ rơi đã trở thành những “linh hồn lang thang”\n“Những linh hồn lang thang” có thể làm hại bất cứ ai chúng gặp phải\n“Ngày lang thang” được tổ chức vào ngày 15 tháng 7 âm lịch\nKhông có điều nào ở trên\nCâu trả lời đúng\nKhông có điều nào ở trên\nAi được coi là vị Tổ đầu tiên của Thiền tông Việt Nam?\n0/1\nKhương Tăng Hội\nLê Đình Thắm\nThạc sĩ Khánh Hòa\nThích Trí Thủ\nCâu trả lời đúng\nKhương Tăng Hội\nNhận định nào sau đây về Phật giáo Hòa Hảo là SAI?\n0/1\nNó được thành lập vào năm 1939\nNgười Phật tử Hòa Hảo tu theo đạo Phật để tự hoàn thiện mình trước hết phải cố gắng thực hiện Tứ Đại Ân Ân.\nHòa Hảo là một lực lượng độc lập hùng mạnh trên chính trường miền Nam Việt Nam cho đến thắng lợi cuối cùng của phe cộng sản vào năm 1975\nTín đồ Hòa Hảo phải cạo trọc đầu vào chùa trú ẩn\nCâu trả lời đúng\nHòa Hảo là một lực lượng độc lập hùng mạnh trên chính trường miền Nam Việt Nam cho đến thắng lợi cuối cùng của phe cộng sản vào năm 1975\nĐiều nào SAI về Đạo giáo?\n0/1\nĐạo giáo là một triết lý tâm linh tập trung vào quan điểm của một người về cuộc sống và thế giới xung quanh họ\nBắt nguồn từ Trung Quốc trong các cuộc đấu tranh trước khi thành lập Đế chế Tần vào năm 221 B.C.E.\nCon người không phải là một phần của sự hòa hợp vĩ đại của thiên nhiên trong Đạo giáo.\nĐạo Đức Kinh ban đầu được đặt tên theo người đàn ông có công viết ra nó, Lão Tử\nCâu trả lời đúng\nCon người không phải là một phần của sự hòa hợp vĩ đại của thiên nhiên trong Đạo giáo.\nĐiều nào không thuộc ba đức tính mà mọi hội viên và lãnh đạo Phật tử Việt Nam nên noi theo?\n0/1\nLòng trắc ẩn\nTrí tuệ\nSự dũng cảm\nKhông có điều nào ở trên\nCâu trả lời đúng\nKhông có điều nào ở trên\nCái nào thuộc Ngũ quan của Nho giáo?\n(1) cha-con\n(2) vợ chồng\n(3) người cai trị-chủ thể\n(4) bạn-bạn\n(5) ông bà-cháu trai/cháu gái\n0/1\n(1), (2), (3) và (4)\n(1), (2) và (4)\n(2), (3), (4) và (5)\n(1), (3), (4) và (5)\nCâu trả lời đúng\n(1), (2), (3) và (4)\nĐạo Cao Đài chính thức được thành lập khi nào?\n0/1\nNăm 1919\nNăm 1926\nNăm 1924\nNăm 1950\nCâu trả lời đúng\nNăm 1926\nAi sáng lập ra Phật giáo?\n0/1\nTất Đạt Đa Cồ Đàm\nThích Ca Mâu Ni\nĐức Phật\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nNhận định nào sau đây về biểu tượng Âm Dương trong Đạo giáo là SAI?\n0/1\nCác dấu chấm trong biểu tượng Âm Dương biểu thị không có âm dương tuyệt đối, cái này chứa đựng mầm mống của cái kia\nVòng tròn bên ngoài biểu thị rằng vạn vật đều được tạo thành từ âm và dương.\nTính hai mặt của âm và dương là một chỉnh thể không thể chia cắt\nDương ám chỉ những nguyên tắc tiêu cực/thụ động/nữ tính trong tự nhiên\nCâu trả lời đúng\nDương ám chỉ những nguyên tắc tiêu cực/thụ động/nữ tính trong tự nhiên\nĐiều nào KHÔNG ĐÚNG về Thuyết vật linh dưới thời tiền thuộc địa?\n0/1\nCăn cứ vào công đức, triều đình phong chức cho các vị thần Kinh thành theo cấp bậc\nCác quốc gia phong kiến quản lý các hoạt động của thuyết vật linh nhằm hợp pháp hóa sự cai trị của triều đình và ngăn chặn ‘tà giáo’ (“giáo lý dị giáo”) làm băng hoại đạo đức và thúc đẩy phản loạn\nMỗi làng có một đình đình, dùng để họp hội đồng và làm nghi lễ tôn vinh thành hoàng, vị thần bảo trợ của làng.\nKhông có điều nào ở trên\nCâu trả lời đúng\nKhông có điều nào ở trên\nĐiều nào KHÔNG được bao gồm trong Bảy Bí Tích?\n0/1\nlễ rửa tội\nThánh Thể\nHòa giải\nSự công nhận\nCâu trả lời đúng\nSự công nhận\nNhận định nào sau đây về Nho giáo ở Việt Nam là ĐÚNG?\n0/1\nNho giáo du nhập vào Việt Nam từ rất sớm dưới thời Trung Hoa cai trị và duy trì ảnh hưởng kể từ thời điểm đó.\nNăm 1075, khoa thi Nho học đầu tiên được khai mạc với tên gọi “Nho học” và “Tam học Nho học”, chính thức khai sinh ra lịch sử lâu đời về khoa học Nho học ở Việt Nam.\nTư tưởng chủ quyền lãnh thổ được xác định trong Nam Quốc Sơn Hà của Lý Thường Kiệt được cho là chịu ảnh hưởng của tư tưởng Nho giáo\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nPhát biểu nào sau đây về thuyết vật linh là KHÔNG ĐÚNG?\n1/1\nDân làng thời tiền thuộc địa đặt cho trẻ em những cái tên kém hấp dẫn để linh hồn không làm hại chúng\nDưới thời tiền thuộc địa, trong nhiều gia đình, trẻ em được gọi theo thứ bậc thay vì tên.\nNgười Việt thời tiền thuộc địa tin rằng các linh hồn cư trú trong đá, cây cối, động vật và phần còn lại của thế giới tự nhiên.\nCon người được cho là có ba loại linh hồn: 'hon', 'phach' và 'via'\nGiáo hội Phật giáo Việt Nam Thống nhất được thành lập vào năm nào?\n1/1\nNăm 1964\nNăm 1975\nNăm 1986\nNăm 1968\nNhững lời dạy cơ bản của Đức Phật là cốt lõi của Phật giáo là\n0/1\nBa sự thật phổ quát\nTứ Diệu Đế\nCon đường Bát chánh đạo\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nĐiều nào SAI về Đạo giáo?\n1/1\nTên Đạo giáo được lấy từ chữ Hán có nghĩa là con đường\n“Không hành động” trong Đạo giáo có nghĩa là “không làm gì cả”\nNhững người theo Đạo giáo tin rằng điều quan trọng là phải tin tưởng và nhận ra bản chất bên trong của chính chúng ta cũng như khám phá ra chúng ta là ai\nVạn vật đều bắt nguồn từ sự kết hợp của cả hai, với 'am' cung cấp vật chất hay độ rắn chắc, và 'dương' nguyên lý hay tinh thần vi tế\nAi là người sáng lập ra Đạo giáo?\n1/1\nlão tử\nKhổng Tử\nTrang Tử\ntôn tử\nPhát biểu nào sau đây về thuyết vật linh là KHÔNG ĐÚNG?\n0/1\nThuyết vật linh là niềm tin rằng thiên nhiên được sinh động bởi những sinh vật linh hồn được cá nhân hóa riêng biệt\nCác dân tộc theo thuyết vật linh không chỉ thờ cúng tổ tiên mà còn thờ đá, thực vật và động vật\nThuyết vật linh phổ biến ở những người coi mình là một phần của thiên nhiên hơn là thống trị nó\nThuyết vật linh là độc thần\nCâu trả lời đúng\nThuyết vật linh là độc thần\nPhát biểu nào sau đây về thuyết vật linh là ĐÚNG?\n0/1\nLinh hồn nhập vào cơ thể khi thụ thai hoặc sinh ra\nLinh hồn sẽ vĩnh viễn rời khỏi cơ thể người sống nếu chủ nhà phải chịu đựng sự sợ hãi, thể hiện qua câu nói 'so mat hon'\nĐàn ông được cho là có ba 'hon' và chín 'via'\nDưới thời tiền thuộc địa, năm thứ bảy của một người ('that tuan') được coi là một cột mốc quan trọng\nCâu trả lời đúng\nLinh hồn nhập vào cơ thể khi thụ thai hoặc sinh ra\nPhát biểu nào sau đây không đúng về Nho giáo?\n1/1\nLà một hệ thống tư tưởng và hành vi có nguồn gốc từ Trung Quốc cổ đại\nNho giáo không phải là một tôn giáo dựa trên niềm tin vào một Thiên Chúa được nhân cách hóa\nNho giáo quan tâm đến các vấn đề về thần linh và cái chết\nNho giáo đề cao lòng sùng đạo\nAi đã tạo ra Cao Đài?\n1/1\nNguyễn Văn Chiêu\nNguyễn Hoài Thanh\nNgô Đình Nhu\nNgô Văn Võ\nTín ngưỡng nào sau đây là của Phật giáo?\n(1) Cuộc sống là đau khổ\n(2) Con người đau khổ vì tham dục\n(3) Nếu chinh phục được dục vọng thì sẽ đạt được Niết-bàn\n(4) Có thể loại bỏ ham muốn bằng cách đi theo con đường tám nhánh\n0/1\n(1), (2) và (3)\n(1) và (2)\n(2) và (3)\n(1), (2), (3) và (4)\nCâu trả lời đúng\n(1), (2), (3) và (4)\nĐiều nào KHÔNG ĐÚNG về các bậc thầy Đạo giáo?\n0/1\nCác đạo sư đóng vai trò là người chữa bệnh, đồng cốt và phong thủy\nĐến thời Nguyễn, họ được gọi là 'thay', 'cha', và rộng hơn là 'thầy' hoặc 'thầy'\nThời hiện đại thật khó phân biệt giữa thuyết vật linh và đạo giáo\nKhông có điều nào ở trên\nCâu trả lời đúng\nKhông có điều nào ở trên\nĐạo Cao Đài thờ ai?\n0/1\nChúa Cha\nThánh Mẫu\nCác sinh vật thiêng liêng\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nAi không phải là nhà văn hiện thực trong văn học Việt Nam?\n\nĐáp án: Nhật Linh"
+  },
+  {
+    "id": "33",
+    "question": "Which of the following statements about Realist Authors was INCORRECT?",
+    "options": [
+      "Be influenced by Marxist ideas of class struggle, anti-imperialism, and anti-feudalism",
+      "Many of them was from the lower levels of the new urban and rural classes",
+      "Chose to depict everyday and banal activities and experiences",
+      "Focus on middle-and-upper-class characters"
+    ],
+    "correctAnswer": "Focus on middle-and-upper-class characters",
+    "viTranslation": "Hỏi: Câu nào sau đây về các tác giả theo chủ nghĩa hiện thực là KHÔNG ĐÚNG?\n\nĐáp án: Tập trung vào các nhân vật trung lưu và thượng lưu"
+  },
+  {
+    "id": "34",
+    "question": "How many categories may Vietnamese Literature be separated into?",
+    "options": [
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "correctAnswer": "3",
+    "viTranslation": "Hỏi: Văn học Việt Nam có thể được chia thành mấy loại?\n\nĐáp án: 3"
+  },
+  {
+    "id": "35",
+    "question": "Choose the NOT TRUE statement about The Folk Tradition",
+    "options": [
+      "The main purpose of folklore is to convey a moral lesson and present useful information and daily life lessons in an easy way for the common people to understand",
+      "The origins of the folk tradition cannot be precisely dated",
+      "The folk literature is always recorded in writing and passed from one generation to the next",
+      "'The Intelligent buffalo' is an example of Folktale"
+    ],
+    "correctAnswer": "The folk literature is always recorded in writing and passed from one generation to the next",
+    "viTranslation": "Hỏi: Chọn câu KHÔNG ĐÚNG về Truyền thống dân gian\n\nĐáp án: Văn học dân gian luôn được ghi chép bằng văn bản và được truyền từ thế hệ này sang thế hệ khác."
+  },
+  {
+    "id": "36",
+    "question": "When did Viet scholars develop a second writing system (Vernacular characters)?",
+    "options": [
+      "'Collected Poems in the National Language' was written in Vernacular characters.",
+      "The Vernacular characters were developed based on Latin characters.",
+      "'Nom' prevented authors from producing works that drew upon the popular traditions.",
+      "None of the above"
+    ],
+    "correctAnswer": "None of the above",
+    "viTranslation": "Hỏi: Các học giả Việt phát triển hệ thống chữ viết thứ hai (chữ bản ngữ) từ khi nào?\n\nĐáp án: Không có điều nào ở trên"
+  },
+  {
+    "id": "37",
+    "question": "Who did not belong to the &quot;First Generation&quot; of Resistance Literature?",
+    "options": [
+      "Nguyen Cong Hoan",
+      "Ngo Tat To",
+      "Nguyen Huy Tuong",
+      "Nguyen Van Bong"
+    ],
+    "correctAnswer": "Nguyen Van Bong",
+    "viTranslation": "Hỏi: Ai không thuộc “thế hệ đầu tiên” của văn học kháng chiến?\n\nĐáp án: Nguyễn Văn Bông"
+  },
+  {
+    "id": "38",
+    "question": "Who was the founder of the Gia Dinh Newspaper?",
+    "options": [
+      "Truong Vinh Ky",
+      "Huynh Tinh Cua",
+      "Pham Quynh",
+      "Nguyen Khac Hieu"
+    ],
+    "correctAnswer": "Truong Vinh Ky",
+    "viTranslation": "Hỏi: Ai là người sáng lập báo Gia Định?\n\nĐáp án: Trương Vĩnh Ký"
+  },
+  {
+    "id": "39",
+    "question": "Who was not a member of the Self-Reliance Literary Group (Tu luc van doan)?",
+    "options": [
+      "Thach Lam",
+      "Tu Mo",
+      "The Lu",
+      "None of the above"
+    ],
+    "correctAnswer": "None of the above",
+    "viTranslation": "Hỏi: Ai không phải là thành viên của Nhóm văn học Tự Lực (Tư lực văn đoàn)?\n\nĐáp án: Không có điều nào ở trên"
+  },
+  {
+    "id": "40",
+    "question": "Who belonged to the &quot;Second Generation&quot; of Resistance Literature?",
+    "options": [
+      "Nguyen Dinh Thi",
+      "Nguyen Cong Hoan",
+      "Ngo Tat To",
+      "Chu Van"
+    ],
+    "correctAnswer": "Nguyen Dinh Thi",
+    "viTranslation": "Hỏi: Ai thuộc “thế hệ thứ hai” của văn học kháng chiến?\n\nĐáp án: Nguyễn Đình Thi"
+  },
+  {
+    "id": "41",
+    "question": "Which of the following statements about Resistance Literature was CORRECT?",
+    "options": [
+      "Resistance works tend to engage in stereotyped characterizations and predictable narratives",
+      "Resistance Literature was, in short, to serve the Party's goals of mobilizing the poeple for revolutionary struggle in all its facets",
+      "Nguyen Van Bong was one of the &quot;Second Generation&quot; of Resistance Literature",
+      "All are correct"
+    ],
+    "correctAnswer": "All are correct",
+    "viTranslation": "Hỏi: Nhận định nào sau đây về Văn học kháng chiến là ĐÚNG?\n\nĐáp án: Tất cả đều đúng"
+  },
+  {
+    "id": "42",
+    "question": "When was the golden age for 'chu Nom'?",
+    "options": [
+      "18th century",
+      "16th century",
+      "15th century",
+      "19th century"
+    ],
+    "correctAnswer": "18th century",
+    "viTranslation": "Hỏi: Thời hoàng kim của chữ Nôm là khi nào?\n\nĐáp án: thế kỷ 18"
+  },
+  {
+    "id": "43",
+    "question": "When was Quoc Ngu introduced?",
+    "options": [
+      "19th century",
+      "15th century",
+      "18th century",
+      "17th century"
+    ],
+    "correctAnswer": "17th century",
+    "viTranslation": "Hỏi: Quốc Ngư được giới thiệu khi nào?\n\nĐáp án: thế kỷ 17"
+  },
+  {
+    "id": "44",
+    "question": "Choose the INCORRECT statement about Renovation Literature",
+    "options": [
+      "Nguyen Huy Thiep and Le Minh Khue were two major Renovation writers who did not have a military background",
+      "Party's Sixth Congress allowed some writers to experiment with new themes and styles and to address a number of formerly taboo topics",
+      "Le Luu was one of the famous Renovation authors with the masterpiece named &quot;Thoi Xa Vang&quot;",
+      "In the Party's Seven Congress, there was a reassertion of the Party's authority over literary matters and a restatement of writers' obligations"
+    ],
+    "correctAnswer": "In the Party's Seven Congress, there was a reassertion of the Party's authority over literary matters and a restatement of writers' obligations",
+    "viTranslation": "Hỏi: Chọn phát biểu SAI về Văn học Đổi mới\n\nĐáp án: Trong Đại hội VII của Đảng, đã có sự tái khẳng định quyền lực của Đảng đối với các vấn đề văn học và tái khẳng định nghĩa vụ của nhà văn."
+  },
+  {
+    "id": "45",
+    "question": "Fill in the blank with correct words\n&quot;Great Proclamation of the Pacification of the Wu&quot;, a masterpiece of Vietnamese literature, was written in ... .",
+    "options": [
+      "Written in Chinese characters",
+      "Written in Vernacular characters",
+      "Written in Egyptian hieroglyphs",
+      "Written in Romanized Script"
+    ],
+    "correctAnswer": "Written in Chinese characters",
+    "viTranslation": "Hỏi: Điền vào chỗ trống những từ đúng\n“Đại bình bình quân Ngô”, một kiệt tác của văn học Việt Nam, được viết bằng… .\n\nĐáp án: Viết bằng chữ Hán"
+  },
+  {
+    "id": "46",
+    "question": "Who invented Quoc Ngu?",
+    "options": [
+      "Catholic missionaries",
+      "Nguyen Van Vinh",
+      "Bui Hien",
+      "None of the above"
+    ],
+    "correctAnswer": "Catholic missionaries",
+    "viTranslation": "Hỏi: Ai đã phát minh ra Quốc Ngữ?\n\nĐáp án: Các nhà truyền giáo Công giáo"
+  },
+  {
+    "id": "47",
+    "question": "Who was the leader of the Self-Reliance Literary Group (Tu luc van doan)?",
+    "options": [
+      "Khai Hung",
+      "Nhat Linh",
+      "Hoang Dao",
+      "The Lu"
+    ],
+    "correctAnswer": "Nhat Linh",
+    "viTranslation": "Hỏi: Ai là người đứng đầu Nhóm văn học Tự Lực (Tư lực văn đoàn)?\n\nĐáp án: Nhật Linh"
+  },
+  {
+    "id": "48",
+    "question": "When was 'chu Nom' set as the official writing system?",
+    "options": [
+      "The Ho Dynasty",
+      "The Later Le Dynasty",
+      "The Nguyen Dynasty",
+      "The Tran Dynasty"
+    ],
+    "correctAnswer": "The Ho Dynasty",
+    "viTranslation": "Hỏi: Chữ Nôm được đặt làm hệ thống chữ viết chính thức từ khi nào?\n\nĐáp án: nhà Hồ"
+  },
+  {
+    "id": "49",
+    "question": "When did the Renovation literary movement in Vietnam begin?",
+    "options": [
+      "In 1986",
+      "In 1975",
+      "In 1954",
+      "In 1989"
+    ],
+    "correctAnswer": "In 1986",
+    "viTranslation": "Hỏi: Phong trào văn học Đổi mới ở Việt Nam bắt đầu từ khi nào?\n\nĐáp án: Năm 1986"
+  },
+  {
+    "id": "50",
+    "question": "Who was the Director and Editor-in-chief of Nam Phong magazine (published in Hanoi from 1917–1934)?",
+    "options": [
+      "Khai Hung",
+      "Huynh Tinh Cua",
+      "Pham Quynh",
+      "Nguyen Khac Hieu"
+    ],
+    "correctAnswer": "Nguyen Khac Hieu",
+    "viTranslation": "Hỏi: Ai là Giám đốc và Tổng biên tập tạp chí Nam Phong (xuất bản tại Hà Nội từ 1917–1934)?\n\nĐáp án: Nguyễn Khắc Hiếu"
+  },
+  {
+    "id": "51",
+    "question": "Who did not belong to the &quot;Third Generation&quot; of Resistance Literature?",
+    "options": [
+      "Nguyen Minh Chau",
+      "Anh Duc",
+      "Chu Van",
+      "Dao Vu"
+    ],
+    "correctAnswer": "Dao Vu",
+    "viTranslation": "Hỏi: Ai không thuộc “thế hệ thứ ba” của văn học kháng chiến?\n\nĐáp án: Đạo Vũ"
+  },
+  {
+    "id": "52",
+    "question": "When was the Indochina School of Fine Arts opened?*\n0/1\nIn 1925\nIn 1950\nIn 1945\nIn 1858\nCorrect answer\nIn 1925\nWhich makes the Bat Trang brushwork recognizable?*\n1/1\nThe brushwork's lightness and spontaneity and its blurred, uneven intensity\nThe brushwork's darkness and spontaneity and its sharpen\nThe brushwork's darkness and discipline and its sharpen\nNone of the above\nWhich is not involved in the religious architecture?",
+    "options": [
+      "Pagodas",
+      "Communal houses",
+      "Deified national-hero temples",
+      "None of the above"
+    ],
+    "correctAnswer": "None of the above",
+    "viTranslation": "Hỏi: Trường Mỹ thuật Đông Dương được thành lập khi nào?*\n0/1\nNăm 1925\nNăm 1950\nNăm 1945\nNăm 1858\nCâu trả lời đúng\nNăm 1925\nĐiều gì làm cho nét vẽ Bát Tràng dễ nhận biết?*\n1/1\nSự nhẹ nhàng và tự nhiên của nét vẽ cũng như cường độ mờ, không đồng đều của nó\nBóng tối, tính ngẫu hứng và độ sắc nét của nét vẽ\nBóng tối và kỷ luật của nét vẽ và sự sắc nét của nó\nKhông có điều nào ở trên\nCái nào không liên quan đến kiến trúc tôn giáo?\n\nĐáp án: Không có điều nào ở trên"
+  },
+  {
+    "id": "53",
+    "question": "When did the lacquers begin to use a wider palette of colors?*\n0/1\nDuring the French colonial period\nThe Era of Chinese Domination\nThe social Republic\nPre-colonial period\nCorrect answer\nDuring the French colonial period\nWhich is NOT TRUE about Pre-colonial Arts*\n0/1\nIn Vietnam no distinction was made between fine arts and handicrafts\nMost of the objects produced in premodern times came from the hands of master crafters\nThe knowledge and expertise was transmitted from generation to generation and kept within the confines of a village specialized in a particular craft\nThe majority of pre-colonial art and architecture of Vietnam were made by famous artisans and chosen by the court\nCorrect answer\nThe majority of pre-colonial art and architecture of Vietnam were made by famous artisans and chosen by the court\nFill in the blank with correct words:\nThe large part of pre-colonial art and architecture of Vietnam was made by ... .*\n0/1\nthe artisans who were carefully selected by the court\nanonymous and unrecognized artisans\nthe artisans who can afford to organize their own exhibitions\nNone of the above\nCorrect answer\nanonymous and unrecognized artisans\nChoose the INCORRECT statement about Vietnamese Ceramics under pre-colonial times?*\n0/1\nVietnamese glazed and unglazed wares are not the only ceramics that can be found in local markets\nVietnamese glazed and unglazed don’t have to compete with stoneware and earthenware produced by the Highlanders or by Cham and Khmer of the central and southern plains\nBat Trang artisans did not have to go far for the primary materials\nJapanese use &quot;Kochi&quot; to refer to Vietnamese ceramics\nCorrect answer\nVietnamese glazed and unglazed don’t have to compete with stoneware and earthenware produced by the Highlanders or by Cham and Khmer of the central and southern plains\nViet architecture's categories include … .",
+    "options": [
+      "Religious",
+      "Military",
+      "Civilian",
+      "All of the above"
+    ],
+    "correctAnswer": "All of the above",
+    "viTranslation": "Hỏi: Sơn mài bắt đầu sử dụng bảng màu rộng hơn từ khi nào?*\n0/1\nTrong thời kỳ Pháp thuộc\nKỷ nguyên thống trị của Trung Quốc\nCộng hòa xã hội\nThời kỳ tiền thuộc địa\nCâu trả lời đúng\nTrong thời kỳ Pháp thuộc\nĐiều nào KHÔNG ĐÚNG về nghệ thuật thời tiền thuộc địa*\n0/1\nỞ Việt Nam không có sự phân biệt giữa mỹ thuật và thủ công mỹ nghệ\nHầu hết các đồ vật được sản xuất trong thời tiền hiện đại đều đến từ bàn tay của những nghệ nhân bậc thầy\nKiến thức và chuyên môn được truyền từ thế hệ này sang thế hệ khác và được lưu giữ trong giới hạn của một ngôi làng chuyên về một nghề thủ công cụ thể.\nPhần lớn nghệ thuật và kiến trúc Việt Nam thời tiền thuộc địa đều do các nghệ nhân nổi tiếng thực hiện và được triều đình lựa chọn\nCâu trả lời đúng\nPhần lớn nghệ thuật và kiến trúc Việt Nam thời tiền thuộc địa đều do các nghệ nhân nổi tiếng thực hiện và được triều đình lựa chọn\nĐiền từ thích hợp vào chỗ trống:\nPhần lớn nghệ thuật và kiến trúc thời tiền thuộc địa của Việt Nam được tạo nên bởi ... .*\n0/1\nnhững nghệ nhân được triều đình tuyển chọn kỹ lưỡng\nnghệ nhân ẩn danh và không được công nhận\nnhững nghệ nhân có đủ khả năng để tổ chức triển lãm của riêng mình\nKhông có điều nào ở trên\nCâu trả lời đúng\nnghệ nhân ẩn danh và không được công nhận\nChọn phát biểu SAI về Gốm sứ Việt Nam thời tiền thuộc địa?*\n0/1\nĐồ gốm tráng men và không tráng men của Việt Nam không phải là đồ gốm duy nhất có thể tìm thấy ở thị trường địa phương\nĐồ tráng men và không tráng men của Việt Nam không phải cạnh tranh với đồ đá, đất nung của người Tây Nguyên hay người Chăm, người Khmer ở đồng bằng miền Trung và Nam Bộ.\nNghệ nhân Bát Tràng không cần phải đi xa để có được nguyên liệu chính\nNgười Nhật dùng “Kochi” để chỉ gốm sứ Việt Nam\nCâu trả lời đúng\nĐồ tráng men và không tráng men của Việt Nam không phải cạnh tranh với đồ đá, đất nung của người Tây Nguyên hay người Chăm, người Khmer ở đồng bằng miền Trung và Nam Bộ.\nCác hạng mục của Kiến trúc Việt bao gồm… .\n\nĐáp án: Tất cả những điều trên"
+  },
+  {
+    "id": "54",
+    "question": "Who belonged to the first generation of modern artists (who graduated from school in 1930)?*\n0/1\nTo Ngoc Van\nNguyen Gia Tri\nTran Van Can\nAll are correct\nCorrect answer\nAll are correct\nIn the wood-block painting, which becomes a family heirloom, passed on from generation to generation?*\n1/1\nThe finished block with precise carving\nThe drawing of the motif on paper\nThe demo carving block\nNone of the above\nFill in the blank with correct words\nThe more isolated &quot;...&quot; turned inward, returning its village roots and ancient folklore.",
+    "options": [
+      "Southern school of Arts",
+      "Northern School of Arts",
+      "Indochina School of Arts",
+      "Industrial School of Arts"
+    ],
+    "correctAnswer": "Northern School of Arts",
+    "viTranslation": "Hỏi: Ai thuộc thế hệ nghệ sĩ hiện đại đầu tiên (ra trường năm 1930)?*\n0/1\nTô Ngọc Vân\nNguyễn Gia Trí\nTrần Văn Cẩn\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nTrong bức tranh khắc gỗ đã trở thành vật gia truyền của gia đình, được truyền từ thế hệ này sang thế hệ khác?*\n1/1\nKhối hoàn thiện được chạm khắc chính xác\nVẽ họa tiết trên giấy\nKhối khắc demo\nKhông có điều nào ở trên\nĐiền vào chỗ trống những từ đúng\nCàng cô lập \"...\" càng hướng nội, trả lại cội nguồn làng quê và văn hóa dân gian xa xưa.\n\nĐáp án: Trường nghệ thuật phía Bắc"
+  },
+  {
+    "id": "55",
+    "question": "When was the French-founded Fine Arts School renamed Vietnam School of Fine Arts?",
+    "options": [
+      "In 1954",
+      "In 1945",
+      "In 1958",
+      "In 1949"
+    ],
+    "correctAnswer": "In 1949",
+    "viTranslation": "Hỏi: Trường Mỹ thuật do Pháp sáng lập được đổi tên thành Trường Mỹ thuật Việt Nam từ khi nào?\n\nĐáp án: Năm 1949"
+  },
+  {
+    "id": "56",
+    "question": "Choose the INCORRECT statement about wood-block printing during pre-colonial times*\n0/1\nThe themes are mutable, springing from familiar rural surroundings as well as from mythological and historical sources\nThe themes carry a symbolism meant to convey wishes of prosperity, happiness, and longevity\nThe themes are varied from mythological and historical sources\nThe themes carry a symbolism meant to impart moral, historical, or religious lessons, or to satirize\nCorrect answer\nThe themes are mutable, springing from familiar rural surroundings as well as from mythological and historical sources\nWhich type of ceramic was preferred to use in the 11th-12th centuries?*\n0/1\nCeladon-glazed ceramic made of fine white clay\nIvory glaze ceramic\nOx Blood Ceramics\nCharcoal celadon ceramics\nCorrect answer\nCeladon-glazed ceramic made of fine white clay\nWhen was the College of Industrial Arts opened?",
+    "options": [
+      "In 1954",
+      "In 1945",
+      "In 1958",
+      "In 1975"
+    ],
+    "correctAnswer": "In 1958",
+    "viTranslation": "Hỏi: Chọn phát biểu KHÔNG ĐÚNG về việc in khắc gỗ trong thời kỳ tiền thuộc địa*\n0/1\nCác chủ đề có thể thay đổi, bắt nguồn từ môi trường nông thôn quen thuộc cũng như từ các nguồn thần thoại và lịch sử.\nCác chủ đề mang tính biểu tượng nhằm truyền đạt những mong muốn thịnh vượng, hạnh phúc và trường thọ\nCác chủ đề rất đa dạng từ các nguồn thần thoại và lịch sử\nCác chủ đề mang tính biểu tượng nhằm truyền đạt các bài học về đạo đức, lịch sử hoặc tôn giáo hoặc để châm biếm.\nCâu trả lời đúng\nCác chủ đề có thể thay đổi, bắt nguồn từ môi trường nông thôn quen thuộc cũng như từ các nguồn thần thoại và lịch sử.\nLoại gốm nào được ưa chuộng sử dụng vào thế kỷ 11-12?*\n0/1\nGốm tráng men ngọc làm từ đất sét trắng mịn\nGốm men ngà\nGốm máu trâu\nGốm sứ men than\nCâu trả lời đúng\nGốm tráng men ngọc làm từ đất sét trắng mịn\nTrường Cao đẳng Mỹ thuật Công nghiệp được thành lập khi nào?\n\nĐáp án: Năm 1958"
+  },
+  {
+    "id": "57",
+    "question": "Choose the CORRECT statement about Modern Painting*\n0/1\nThe first generation of modern artists studied classicism and romanticism and followed the poetical realism trend in their works\nAlthough the first generation of modern artists mastered oil painting, they often preferred to work in mediums such as silk painting, lacquer work, and wood-block engraving\nThe pre-1945 world that the first generation of modern arts depicted was an innocent one where life seemed to flow unchanged\nCorrect answer\nThe pre-1945 world that the first generation of modern arts depicted was an innocent one where life seemed to flow unchanged\nWhy may wood-block printing be considered a major art form?*\n0/1\nBecause of its creativity\nBecause of the profusion of its production\nDue to its unique themes and the treatments\nAll are correct\nCorrect answer\nAll are correct\nWho had introduced Cubism into Vietnam?\nChoose the INCORRECT statement",
+    "options": [
+      "Tran Van Can was one of the leaders of Socialist Realist painting",
+      "To Ngoc Van was among the most influential of the first generation of painters",
+      "Nguyen Do Cung was one of the people who had introduced Cubism into Vietnam",
+      "Tran Van Can used wood to deal with themes as mundane as industrialization"
+    ],
+    "correctAnswer": "Nguyen Do Cung was one of the people who had introduced Cubism into Vietnam",
+    "viTranslation": "Hỏi: Chọn câu ĐÚNG về Tranh hiện đại*\n0/1\nThế hệ nghệ sĩ hiện đại đầu tiên nghiên cứu chủ nghĩa cổ điển và chủ nghĩa lãng mạn, đi theo xu hướng hiện thực thi ca trong tác phẩm của họ.\nMặc dù thế hệ nghệ sĩ hiện đại đầu tiên thành thạo tranh sơn dầu nhưng họ thường thích làm việc trong các chất liệu như tranh lụa, sơn mài và khắc gỗ.\nThế giới trước năm 1945 mà thế hệ nghệ thuật hiện đại đầu tiên miêu tả là một thế giới hồn nhiên nơi cuộc sống dường như không thay đổi\nCâu trả lời đúng\nThế giới trước năm 1945 mà thế hệ nghệ thuật hiện đại đầu tiên miêu tả là một thế giới hồn nhiên nơi cuộc sống dường như không thay đổi\nTại sao in khắc gỗ có thể được coi là một loại hình nghệ thuật chính?*\n0/1\nVì tính sáng tạo của nó\nBởi vì sự sản xuất phong phú của nó\nDo chủ đề độc đáo và phương pháp điều trị\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nAi đã đưa chủ nghĩa Lập thể vào Việt Nam?\nChọn phát biểu SAI\n\nĐáp án: Nguyễn Đỗ Cung là một trong những người đưa chủ nghĩa Lập thể vào Việt Nam"
+  },
+  {
+    "id": "58",
+    "question": "Choose the NOT TRUE statement about Pre-colonial art and architecture*\n0/1\nThe skills of the artisans were undeniable as far back as the first millennium B.C.E\nThe skills of the artisans were undeniable as far back as the first century B.C.E\nThe remarkable objects made by Viet artisans can be found in museums or family collections\nThe materials of pre-colonial art and architecture of Vietnam could be bamboo, persimmon wood, palm leaf\nCorrect answer\nThe skills of the artisans were undeniable as far back as the first millennium B.C.E\nChoose the CORRECT statement",
+    "options": [
+      "Wood and brick over stone were not available in “abundance” made it difficult for Vietnamese architecture's choice of construction",
+      "Wooden monuments could not last forever but became victims of Vietnam's hid and hot climate and rich fauna",
+      "Vietnam bears the imprint of Chinese civilization as well as Indian civilization",
+      "All are correct"
+    ],
+    "correctAnswer": "All are correct",
+    "viTranslation": "Hỏi: Chọn câu KHÔNG ĐÚNG về nghệ thuật và kiến trúc thời tiền thuộc địa*\n0/1\nKỹ năng của các nghệ nhân là không thể phủ nhận ngay từ thiên niên kỷ thứ nhất trước Công nguyên\nKỹ năng của các nghệ nhân là không thể phủ nhận ngay từ thế kỷ thứ nhất trước Công nguyên\nNhững đồ vật đáng chú ý do nghệ nhân Việt chế tạo có thể tìm thấy trong các bảo tàng hoặc bộ sưu tập của gia đình\nChất liệu của nghệ thuật và kiến trúc Việt Nam thời tiền thuộc địa có thể là tre, gỗ hồng, lá cọ\nCâu trả lời đúng\nKỹ năng của các nghệ nhân là không thể phủ nhận ngay từ thiên niên kỷ thứ nhất trước Công nguyên\nChọn phát biểu ĐÚNG\n\nĐáp án: Tất cả đều đúng"
+  },
+  {
+    "id": "59",
+    "question": "When was the College of Industrial Arts opened?",
+    "options": [
+      "In 1954",
+      "In 1945",
+      "In 1958",
+      "In 1975"
+    ],
+    "correctAnswer": "In 1958",
+    "viTranslation": "Hỏi: Trường Cao đẳng Mỹ thuật Công nghiệp được thành lập khi nào?\n\nĐáp án: Năm 1958"
+  },
+  {
+    "id": "60",
+    "question": "Choose the INCORRECT statement",
+    "options": [
+      "The 'dinh' is both a civil and religious edifice",
+      "The 'den' differs from the 'chua' in the sense that it has no Buddhist statuary, or at least none visible to the public",
+      "Viet pagodas look like the Chinese ones and they usually have many paintings",
+      "The Viet pagoda is a religious edifice that is meant for the practice of Buddhism"
+    ],
+    "correctAnswer": "Viet pagodas look like the Chinese ones and they usually have many paintings",
+    "viTranslation": "Hỏi: Chọn phát biểu SAI\n\nĐáp án: Chùa Việt trông giống chùa Trung Quốc và thường có nhiều tranh vẽ"
+  },
+  {
+    "id": "61",
+    "question": "Fill in the blank with correct words\nThrough the choice of themes and techniques, the &quot;...&quot; displayed a greater awareness of the West and its influences from the 1950s to the 1970s",
+    "options": [
+      "Southern School of Arts",
+      "Northern School of Arts",
+      "Indochina School of Arts",
+      "Industrial School of Arts"
+    ],
+    "correctAnswer": "Southern School of Arts",
+    "viTranslation": "Hỏi: Điền vào chỗ trống những từ đúng\nThông qua việc lựa chọn chủ đề và kỹ thuật, \"...\" thể hiện nhận thức sâu sắc hơn về phương Tây và những ảnh hưởng của nó từ những năm 1950 đến những năm 1970\n\nĐáp án: Trường nghệ thuật miền Nam"
+  },
+  {
+    "id": "62",
+    "question": "How many traditional colors were allowed to use in lacquer work at the beginning?*\n1/1\n2\n3\n4\n5\nWhich was not a function of lacquerware in ancient times?*\n1/1\nApply to ceramics and leather\nCoat furniture, pottery\nPreserve and decorate wooden items\nNone of the above\nWhat was the large part of Vietnamese pre-colonial art and architecture products made for?*\n0/1\nThe daily needs of the peasant and the luxury consumption of the elite\nThe needs of kings and mandarins\nJust the needs of the artisan's own family\nExport demand\nCorrect answer\nThe daily needs of the peasant and the luxury consumption of the elite\nWhy didn’t the scroll form or murals painting in premodern times generate the same interest among Viet literati and artists as it did for their Chinese counterparts?*\n0/1\nSince the tools (e.g., silk, paper, ink and brushes, wood-block) were not available\nSince the artistic impulse and creativity was lacking\nSince it easily to be damaged\nNone of the above\nCorrect answer\nNone of the above\nWhen did the making of ceramics (gom) in Viet lands date?*\n0/1\nNeolithic times\nPaleolithic times\nMesolithic times\nGlacial period\nCorrect answer\nNeolithic times\nChoose the INCORRECT statement about Vietnam architecture",
+    "options": [
+      "The existence of Vietnamese military architecture with its varied edifices is explained by the constant necessity for the country to defend itself against invasion and the concurrent construction of numerous citadels",
+      "The civilian architecture includes imperial palaces as well as habitations of peasants and mandarins, infrastructure, and so forth",
+      "Like the religious and military buildings, the Vietnamese civilian architectures were usually built to last",
+      "Because of the lack of space in the city, the disposition of the rooms is often compressed, with the rooms succeeding one another along a single axis"
+    ],
+    "correctAnswer": "Like the religious and military buildings, the Vietnamese civilian architectures were usually built to last",
+    "viTranslation": "Hỏi: Lúc đầu có bao nhiêu màu truyền thống được phép sử dụng trong sơn mài?*\n1/1\n2\n3\n4\n5\nĐâu không phải là chức năng của đồ sơn mài thời xưa?*\n1/1\nÁp dụng cho gốm sứ và da\nÁo khoác nội thất, đồ gốm\nBảo quản và trang trí đồ gỗ\nKhông có điều nào ở trên\nPhần lớn các sản phẩm kiến trúc và nghệ thuật thời tiền thuộc địa của Việt Nam được làm ra để làm gì?*\n0/1\nNhu cầu hàng ngày của nông dân và sự tiêu dùng xa xỉ của giới thượng lưu\nNhu cầu của vua quan\nChỉ là nhu cầu của chính gia đình nghệ nhân\nNhu cầu xuất khẩu\nCâu trả lời đúng\nNhu cầu hàng ngày của nông dân và sự tiêu dùng xa xỉ của giới thượng lưu\nTại sao hình thức cuộn hoặc tranh bích họa ở thời tiền hiện đại không tạo được sự quan tâm tương tự trong giới trí thức và nghệ sĩ Việt Nam như đối với các đối tác Trung Quốc của họ?*\n0/1\nVì các công cụ (ví dụ: lụa, giấy, mực và bút vẽ, khối gỗ) không có sẵn\nVì thiếu động lực nghệ thuật và sự sáng tạo\nVì nó dễ bị hư hỏng\nKhông có điều nào ở trên\nCâu trả lời đúng\nKhông có điều nào ở trên\nNghề làm gốm ở đất Việt có từ khi nào?*\n0/1\nthời kỳ đồ đá mới\nthời kỳ đồ đá cũ\nthời kỳ đồ đá mới\nThời kỳ băng hà\nCâu trả lời đúng\nthời kỳ đồ đá mới\nChọn phát biểu SAI về kiến trúc Việt Nam\n\nĐáp án: Giống như các công trình tôn giáo và quân sự, các công trình kiến ​​trúc dân dụng của Việt Nam thường được xây dựng để tồn tại lâu dài."
+  },
+  {
+    "id": "63",
+    "question": "When did Vietnam witness the emergence of two schools of arts, one in the North and the other in the South?",
+    "options": [
+      "In 1945",
+      "In 1975",
+      "In 1954",
+      "In 1986"
+    ],
+    "correctAnswer": "In 1954",
+    "viTranslation": "Hỏi: Việt Nam chứng kiến ​​sự xuất hiện của hai trường phái nghệ thuật một ở miền Bắc và một ở miền Nam từ khi nào?\n\nĐáp án: Năm 1954"
+  },
+  {
+    "id": "64",
+    "question": "When did the making of ceramics (gom) in Viet lands truly take off?*\n0/1\nThe independent monarchies in the 11th and 12th century\nThe 19th century\nThe French dominance period\nThe 1st century B.C.E\nCorrect answer\nThe independent monarchies in the 11th and 12th century\nHow many categories can Viet architecture be divided into?",
+    "options": [
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "correctAnswer": "3",
+    "viTranslation": "Hỏi: Nghề gốm sứ trên đất Việt thực sự cất cánh từ khi nào?*\n0/1\nCác chế độ quân chủ độc lập vào thế kỷ 11 và 12\nThế kỷ 19\nThời kỳ thống trị của Pháp\nThế kỷ 1 TCN\nCâu trả lời đúng\nCác chế độ quân chủ độc lập vào thế kỷ 11 và 12\nKiến trúc Việt có thể chia thành mấy loại?\n\nĐáp án: 3"
+  },
+  {
+    "id": "65",
+    "question": "Choose the CORRECT statement.*\n0/1\nVietnamese artists' works are mere imitations of European masters\nVietnamese artists are incapable of genuine creativity and lack any original aesthetics\nThe art and architecture of Vietnam have been strongly affected by the colonial era\nPre-colonial Viet art found its expression in bronze casting, stone and wood sculpture, block-printing, pottery, lacquer work, and architecture\nCorrect answer\nThe art and architecture of Vietnam have been strongly affected by the colonial era\nChoose the INCORRECT statement about Utensils and Manners of Vietnam under Pre-colonial Times*\n0/1\nWell-to-do families took their meals while seated upon a low table or tray, with food placed at its center\nRice was served in communal bowls placed at the center of the table on a raised tray\nCharcoal was the preferred fuel\nFamily members were not to start eating until the senior male of the household had begun the meal by serving himself from the dishes presented on the 'mam'\nCorrect answer\nRice was served in communal bowls placed at the center of the table on a raised tray\nChoose the NOT TRUE statement about Daily Fare in Vietnam*\n0/1\nThe practice in pre-colonial times was to drink alcoholic beverages before the meal if desired, and tea afterward\nIn modern life, we can have beverages throughout the meal, including soft drinks, beer, and iced coffee\nIn the countryside, dinner is usually eaten at home after the family members have returned from their work\nWheat remains the basic ingredient for every meal in Vietnam\nCorrect answer\nWheat remains the basic ingredient for every meal in Vietnam\nWhich is usually used in soups and as a main dish, often to replace meat or fish in vegetarian cuisine?*\n0/1\nCurdled soy\nShallots\nGarlic\nGinger\nCorrect answer\nCurdled soy\nFill in the blank with the correct word\n&quot;Under the influence of Buddhism's teachings on abstaining from taking the lives of sentient beings, many pre-colonial Vietnamese practiced ... at least part of time&quot;.",
+    "options": [
+      "Vegetarianism",
+      "Carnivorous",
+      "Meatatarianism",
+      "None of the above"
+    ],
+    "correctAnswer": "Vegetarianism",
+    "viTranslation": "Hỏi: Chọn câu ĐÚNG.*\n0/1\nTác phẩm của nghệ sĩ Việt chỉ là sự bắt chước của các bậc thầy châu Âu\nNghệ sĩ Việt Nam không có khả năng sáng tạo chân chính và thiếu tính thẩm mỹ nguyên bản\nNghệ thuật và kiến trúc Việt Nam chịu ảnh hưởng mạnh mẽ của thời kỳ thuộc địa\nNghệ thuật Việt thời tiền thuộc địa được thể hiện qua nghệ thuật đúc đồng, điêu khắc đá và gỗ, in khối, đồ gốm, sơn mài và kiến trúc.\nCâu trả lời đúng\nNghệ thuật và kiến trúc Việt Nam chịu ảnh hưởng mạnh mẽ của thời kỳ thuộc địa\nChọn phát biểu SAI về Đồ dùng và Cách cư xử của Việt Nam thời tiền thuộc địa*\n0/1\nNhững gia đình khá giả dùng bữa khi ngồi trên một chiếc bàn hoặc khay thấp, với thức ăn được đặt ở giữa.\nCơm được phục vụ trong bát chung đặt ở giữa bàn trên một khay nâng cao\nThan củi là nhiên liệu ưa thích\nCác thành viên trong gia đình không được bắt đầu ăn cho đến khi người đàn ông lớn tuổi trong gia đình bắt đầu bữa ăn bằng cách tự phục vụ các món ăn do 'mẹ' bày ra.\nCâu trả lời đúng\nCơm được phục vụ trong bát chung đặt ở giữa bàn trên một khay nâng cao\nChọn câu KHÔNG ĐÚNG về Giá vé hàng ngày ở Việt Nam*\n0/1\nTập quán thời tiền thuộc địa là uống đồ uống có cồn trước bữa ăn nếu muốn và uống trà sau đó.\nTrong cuộc sống hiện đại, chúng ta có thể uống đồ uống trong suốt bữa ăn, bao gồm nước ngọt, bia và cà phê đá.\nỞ nông thôn, bữa tối thường được ăn ở nhà sau khi các thành viên trong gia đình đi làm về.\nLúa mì vẫn là nguyên liệu cơ bản trong mọi bữa ăn ở Việt Nam\nCâu trả lời đúng\nLúa mì vẫn là nguyên liệu cơ bản trong mọi bữa ăn ở Việt Nam\nMón nào thường được dùng trong các món súp và làm món ăn chính, thường thay thế thịt hoặc cá trong các món ăn chay?*\n0/1\nĐậu nành đông\nhẹ tây\nTỏi\ngừng\nCâu trả lời đúng\nĐậu nành đông\nĐiền từ đúng vào chỗ trống\n“Dưới ảnh hưởng của lời dạy của Phật giáo về việc kiêng sát sinh của chúng sinh, nhiều người Việt thời tiền thuộc địa đã thực hành… ít nhất là một phần thời gian”.\n\nĐáp án: Ăn chay"
+  },
+  {
+    "id": "66",
+    "question": "What is INCORRECT about Vietnamese Table Manners?*\n0/1\nDon't sit and eat before the elders\nDo invite people before eating\nDo pass and receive everything with both hands when you receive something from the older people\nIt is not okay for you to use your own chopstick to pick up the food from the shared dish\nCorrect answer\nIt is not okay for you to use your own chopstick to pick up the food from the shared dish\nWhich insect is a famous source of animal protein in Northern Vietnam?*\n0/1\nPalm grub\nGrasshopper\nStinkbug\nWalkingstick\nCorrect answer\nGrasshopper\nWhich present marital fidelity and happiness?*\n0/1\nThe betel vine leaves and Areca Nuts\nThe betel vine leaves and opium\nTabacco and opium\nAreca Nuts and Tabacco\nCorrect answer\nThe betel vine leaves and Areca Nuts\nFill in the blank with CORRECT words\n... contributed to the Vietnamese assimilation of staples such as soy sauce, bean curd, and noodles; as well as of techniques of food preparation and consumption including stirfrying and deep-frying with the wok and the use of chopstick",
+    "options": [
+      "The nearly 1000-year period of Chinese domination",
+      "The four centuries of Western dominance",
+      "The Southward Movement",
+      "All are correct"
+    ],
+    "correctAnswer": "All are correct",
+    "viTranslation": "Hỏi: Điều gì SAI trong cách cư xử trên bàn ăn của người Việt?*\n0/1\nKhông ngồi ăn trước người lớn tuổi\nNên mời mọi người trước khi ăn\nĐưa và nhận mọi thứ bằng cả hai tay khi bạn nhận vật gì đó từ người lớn tuổi\nKhông được dùng đũa riêng để gắp thức ăn từ đĩa chung\nCâu trả lời đúng\nKhông được dùng đũa riêng để gắp thức ăn từ đĩa chung\nLoài côn trùng nào là nguồn cung cấp protein động vật nổi tiếng ở miền Bắc Việt Nam?*\n0/1\nsâu bọ cọ\nchâu chấu\nbọ hôi\nGậy đi bộ\nCâu trả lời đúng\nchâu chấu\nSự chung thủy và hạnh phúc trong hôn nhân thể hiện điều gì?*\n0/1\nLá trầu và quả cau\nLá trầu và thuốc phiện\nThuốc lá và thuốc phiện\nHạt cau và thuốc lá\nCâu trả lời đúng\nLá trầu và quả cau\nĐiền từ ĐÚNG vào chỗ trống\n... góp phần giúp người Việt đồng hóa các mặt hàng chủ lực như nước tương, đậu phụ và mì; cũng như các kỹ thuật chế biến và tiêu thụ thực phẩm bao gồm xào và chiên ngập dầu bằng chảo và sử dụng đũa\n\nĐáp án: Tất cả đều đúng"
+  },
+  {
+    "id": "67",
+    "question": "What is disrespectful in Vietnamese culture, especially in Pre-colonial Times?*\n0/1\nFamily members were not to start eating until the senior male of the household had begun the meal\nJust leave the meal right after you finished it, don't need to pay attention to anyone else in the meal\nDiners were not to move food directly from the communal bowls to their mouths\nChopsticks were never placed upright, sticking out of the food\nCorrect answer\nJust leave the meal right after you finished it, don't need to pay attention to anyone else in the meal\n... also played a role in pre-colonial cuisine, but it was a delicacy that was rarely eaten, even among the elite*\n1/1\nDog Meat\nBeef\nPork\nCrabs\nWhich was the reason for the blackening of the teeth with lacquer customs?*\n0/1\nSince betel chewing stained the teeth unevenly in a way that was considered unattractive\nSince people were forced to obey by the government\nSince people felt uncomfortable with white teeth\nNone of the above\nCorrect answer\nSince betel chewing stained the teeth unevenly in a way that was considered unattractive\nFill in the blank with the correct words\n&quot;I have never missed anyone the way I miss ... . Every time I bury the pipe, I have to dig it up again.&quot;",
+    "options": [
+      "Thuoc lao",
+      "Electronic cigarettes",
+      "Betel Leave and Areca Nut",
+      "Gum"
+    ],
+    "correctAnswer": "Gum",
+    "viTranslation": "Hỏi: Văn hóa Việt Nam, đặc biệt là thời tiền thuộc địa, thiếu tôn trọng như thế nào?*\n0/1\nCác thành viên trong gia đình không được bắt đầu ăn cho đến khi người đàn ông lớn tuổi trong gia đình bắt đầu bữa ăn.\nĂn xong chỉ cần rời khỏi bữa ăn, không cần để ý đến người khác trong bữa ăn\nThực khách không được đưa thức ăn trực tiếp từ bát chung vào miệng\nĐũa không bao giờ được đặt thẳng đứng, nhô ra khỏi thức ăn\nCâu trả lời đúng\nĂn xong chỉ cần rời khỏi bữa ăn, không cần để ý đến người khác trong bữa ăn\n... cũng đóng một vai trò quan trọng trong ẩm thực thời tiền thuộc địa, nhưng đó là một món ngon hiếm khi được ăn, ngay cả trong giới thượng lưu*\n1/1\nThịt chó\nthịt bò\nthịt lợn\nCua\nĐâu là nguyên nhân khiến răng bị đen bằng tục sơn mài?*\n0/1\nVì nhai trầu nên răng bị ố màu không đều, bị coi là kém thẩm mỹ\nVì người dân bị chính quyền buộc phải tuân theo\nTừ khi mọi người cảm thấy khó chịu với hàm răng trắng\nKhông có điều nào ở trên\nCâu trả lời đúng\nVì nhai trầu nên răng bị ố màu không đều, bị coi là kém thẩm mỹ\nĐiền vào chỗ trống những từ đúng\n“Tôi chưa bao giờ nhớ ai như cách tôi nhớ…. Mỗi lần chôn ống là phải đào lại”.\n\nĐáp án: Kẹo cao su"
+  },
+  {
+    "id": "68",
+    "question": "Fill in the blank with correct words:\n“The French government encouraged Vietnamese under the colonial era to use … by granting monopolies on its sale to private firms in return for a share of the profits”.*\n1/1\nOpium\nCoffee\nTea\nElectronic cigarettes\nChoose the TRUE statement about Utensils and Manners of Vietnam under Pre-colonial Times",
+    "options": [
+      "Vietnamese cooking equipment and eating utensils have changed a lot during pre-colonial times",
+      "Refrigeration and frozen foods were popular",
+      "Gas was the preferred fuel",
+      "Cooking methods included grilling, baking, boiling, and steaming"
+    ],
+    "correctAnswer": "Cooking methods included grilling, baking, boiling, and steaming",
+    "viTranslation": "Hỏi: Điền từ thích hợp vào chỗ trống:\n“Chính phủ Pháp khuyến khích người Việt Nam thời thuộc địa sử dụng… bằng cách cấp độc quyền bán cho các công ty tư nhân để đổi lấy một phần lợi nhuận”.*\n1/1\nthuốc phiện\ncà phê\nTrà\nThuốc lá điện tử\nChọn phát biểu ĐÚNG về Đồ dùng, ứng xử của người Việt Nam thời tiền thuộc địa\n\nĐáp án: Phương pháp nấu ăn bao gồm nướng, nướng, luộc và hấp"
+  },
+  {
+    "id": "69",
+    "question": "Choose the INCORRECT statement about Vietnamese Drinks Culture during pre-colonial times*\n0/1\nThe Viet elite did not generally participate in an elaborate ceremony comparable to that of the Japanese\nThe Viet elite connoisseurs placed the same emphasis on the myriad varieties of luxury teas, as did their counterparts in China\nThe Viet elite did develop an institutionalized practice of tea consumption\nTea and other nonalcoholic beverages were served after meals\nCorrect answer\nThe Viet elite connoisseurs placed the same emphasis on the myriad varieties of luxury teas, as did their counterparts in China\nWhy shouldn't we knock the chopsticks to the bowl according to the Vietnamese' perspective?*\n0/1\nSince it seems to invite ghosts or wandering spirits to the home\nBecause the knocking reminds of a popular song\nSince the bowl in Vietnam is very fragile compared to the other countries, knocking like that will make the bowl break even just with a little force\nNone of the above\nCorrect answer\nSince it seems to invite ghosts or wandering spirits to the home\nChoose the NOT TRUE statement*\n0/1\nPre-colonial Viet enjoyed a wide variety of cakes, candies, and puddings.\nCandies called ‘mut’ were made from papayas, coconuts, lemons, and other fruits\nPre-colonial Viet also used 'che' as desserts\nIn pre-colonial times, &quot;ice cream cafes&quot; was gained popularity, especially among Vietnamese middle-class youths\nCorrect answer\nIn pre-colonial times, &quot;ice cream cafes&quot; was gained popularity, especially among Vietnamese middle-class youths\nIn pre-colonial and particularly in colonial-era Vietnam, which was the second most important grain used in the daily meal?*\n1/1\nRice\nCorn\nBuckwheat\nOats\nWhat is NOT TRUE about Vietnamese Table Manners*\n0/1\nVietnamese people usually show their love and affection by picking up the food from the shared dish and put it in your bowl\nSticking chopsticks straight into your bowl is a taboo\nDo not knock your chopstick to your bowl\nIf you are a guest of a dinner party, it's a good idea to show up empty-handed\nCorrect answer\nIf you are a guest of a dinner party, it's a good idea to show up empty-handed\nWhich liquor was imported from China?*\n1/1\nRuou Cao Luong\nRuou Sen\nRuou Tiet De\nRuou Nep\nHow can it be called the best quality fish sauce ('thuong hang')?*\n0/1\nIt is deep amber in color with a pungent, salty taste\nIt is a light color, weak salty taste\nIt is made from big anchovies\nThere's no such thing as superior\nCorrect answer\nIt is deep amber in color with a pungent, salty taste\nChoose the INCORRECT statement*\n1/1\nDrying was likewise commonly used to preserve shrimp and squid.\nDrying was likewise commonly used to preserve crabs.\nThe most widely used sauce in Vietnam is fish sauce (nuoc mam).\nThere are many kinds of fishes that can be used to make fish sauce.\nVNC104 Quiz - Chapter 7\nTotal points6/30\nThe respondent's email (demetridraylen7272@gmail.com) was recorded on submission of this form.\nWhen did the government begin to launch birth control campaigns?*\n1/1\nIn 1962\nIn 1959\nIn 1986\nIn 1958\nHow many fundamental values and customs are embedded in the Vietnamese ethos?*\n1/1\n2\n3\n4\n5\nWho was considered as the clan leader?*\n0/1\nThe eldest male in the oldest branch directly descended from the founding ancestor\nThe eldest female in the oldest branch directly descended from the founding ancestor\nThe youngest male in the oldest branch directly descended from the founding ancestor\nThe eldest male in any branch descended from the founding ancestor\nCorrect answer\nThe eldest male in the oldest branch directly descended from the founding ancestor\nChoose the TRUE statement about Family Life in the SRV*\n0/1\nThe onerous tradition of ‘lam dau’ is no longer tolerated\nThe young bride is still forced to live with her mother-in-law\nWhen the young bride does live with her mother-in-law, she is still forced to submit to her will and whims of her\nNone of the above\nCorrect answer\nThe onerous tradition of ‘lam dau’ is no longer tolerated\nHow many stages were there in the process of marriage in Pre-colonial Times?*\n0/1\n2\n5\n3\n4\nCorrect answer\n3\nWhat was not included in the &quot;three subserviences&quot; (tam tong) that every woman in the Pre-colonial Times had to obey?*\n0/1\nobey her father before marriage\nobey her husband once married\nafter her husband died, obey her son\nobey her mother before marriage\nCorrect answer\nobey her mother before marriage\nHow old was the &quot;normal age&quot; to get married in Pre-colonial Times?*\n1/1\nFifteen for the boy and twelve to fourteen for the girl\nSixteen for the girl and eighteen for the boy\nEighteen for the girl and twenty for the boy\nFourteen for the girl and eighteen for the boy\nWhich words can describe the Family in Vietnam nowadays?*\n0/1\nTradition\nModernity\nBoth capitalism and socialism\nAll are correct\nCorrect answer\nAll are correct\nChoose the NOT TRUE statement about the Vietnamese marriage in Pre-colonial Times*\n0/1\nDivorce existed but was rare, as it brought dishonor to the divorced woman and a taint of scandal to the family\nMen were permitted to take several wives\nSecondary wives were obligated to obey the first wife in all things\nThe first wife was not allowed to participate in the selection of secondary wives\nCorrect answer\nThe first wife was not allowed to participate in the selection of secondary wives\nPre-colonial Viet identified themselves by reference to ... .*\n1/1\ntwo lineages: the internal one of the father and the external one of the mother\nonly one lineage due to the deep influence of the patriarchal in character\nonly one lineage due to the deep influence of the matriarchal in character\nNone of the above\nWhich is NOT TRUE about the Vietnamese marriage in Pre-colonial Times?*\n0/1\nMost the marriage match was arranged by a go-between\nA go-between was usually a young woman known for her large relationship and her beauty\nThe concordance of the families was considered extremely important\nThe virtuousness and accomplished domesticity of the girl was one of the elements to ascertain the prospective bride\nCorrect answer\nA go-between was usually a young woman known for her large relationship and her beauty\nWhich statement is INCORRECTW about the clan leader (Truong Toc)?",
+    "options": [
+      "Was responsible for protecting widows and minors as well as the moral anchor for all within the clan",
+      "Resided the ancestral home and presided over the family council",
+      "Was the youngest male in the oldest branch indirectly descended from the founding ancestor",
+      "Was the one to whom related families or members within each familial unit would try to resolve disputes"
+    ],
+    "correctAnswer": "Was the youngest male in the oldest branch indirectly descended from the founding ancestor",
+    "viTranslation": "Hỏi: Chọn câu SAI về văn hóa đồ uống của người Việt thời tiền thuộc địa*\n0/1\nGiới thượng lưu Việt nhìn chung không tham gia vào những nghi lễ cầu kỳ như của người Nhật.\nNhững người sành sỏi của giới thượng lưu Việt cũng đặt trọng tâm vào vô số loại trà sang trọng, cũng như những người đồng cấp của họ ở Trung Quốc.\nTầng lớp thượng lưu Việt đã phát triển một thói quen tiêu dùng trà được thể chế hóa\nTrà và đồ uống không cồn khác được phục vụ sau bữa ăn\nCâu trả lời đúng\nNhững người sành sỏi của giới thượng lưu Việt cũng đặt trọng tâm vào vô số loại trà sang trọng, cũng như những người đồng cấp của họ ở Trung Quốc.\nTại sao không nên gõ đũa vào bát theo quan điểm của người Việt?*\n0/1\nVì nó dường như mời ma hoặc linh hồn lang thang vào nhà\nVì tiếng gõ cửa gợi nhớ đến một bài hát nổi tiếng\nVì bát ở Việt Nam rất dễ vỡ so với các nước khác nên việc gõ như thế sẽ khiến bát bị vỡ chỉ với một lực nhỏ.\nKhông có điều nào ở trên\nCâu trả lời đúng\nVì nó dường như mời ma hoặc linh hồn lang thang vào nhà\nChọn câu KHÔNG ĐÚNG*\n0/1\nNgười Việt thời tiền thuộc địa thích nhiều loại bánh ngọt, kẹo và bánh pudding.\nKẹo gọi là 'mut' được làm từ đu đủ, dừa, chanh và các loại trái cây khác\nNgười Việt thời tiền thuộc địa cũng dùng chè làm món tráng miệng\nVào thời tiền thuộc địa, “quán cà phê kem” đã trở nên phổ biến, đặc biệt là trong giới trẻ trung lưu Việt Nam.\nCâu trả lời đúng\nVào thời tiền thuộc địa, “quán cà phê kem” đã trở nên phổ biến, đặc biệt là trong giới trẻ trung lưu Việt Nam.\nỞ thời tiền thuộc địa và đặc biệt là ở Việt Nam thời thuộc địa, loại ngũ cốc quan trọng thứ hai được sử dụng trong bữa ăn hàng ngày là gì?*\n1/1\ngạo\nngô\nkiều mạch\nYến mạch\nĐiều gì KHÔNG ĐÚNG về cách cư xử trên bàn ăn của người Việt*\n0/1\nNgười Việt thường thể hiện sự yêu thương, quý mến bằng cách gắp thức ăn từ đĩa chung cho vào bát của mình\nCắm thẳng đũa vào bát là điều tối kỵ\nĐừng gõ đũa vào bát của bạn\nNếu bạn là khách của một bữa tiệc tối, bạn nên đến tay không\nCâu trả lời đúng\nNếu bạn là khách của một bữa tiệc tối, bạn nên đến tay không\nLoại rượu nào được nhập khẩu từ Trung Quốc?*\n1/1\nRuou Cao Lương\nRượu Sen\nRượu Tiết Đế\nRượu Nếp\nLàm sao có thể gọi là nước mắm ngon nhất ('thương hang')?*\n0/1\nNó có màu hổ phách đậm, vị hăng, mặn\nNó có màu nhạt, vị mặn yếu\nNó được làm từ cá cơm lớn\nKhông có gì là vượt trội\nCâu trả lời đúng\nNó có màu hổ phách đậm, vị hăng, mặn\nChọn câu KHÔNG ĐÚNG*\n1/1\nViệc sấy khô cũng thường được sử dụng để bảo quản tôm và mực.\nViệc sấy khô cũng thường được sử dụng để bảo quản cua.\nLoại nước chấm được sử dụng rộng rãi nhất ở Việt Nam là nước mắm (nước mắm).\nCó rất nhiều loại cá có thể dùng làm nước mắm.\nCâu đố VNC104 - Chương 7\nTổng điểm6/30\nEmail của người trả lời (demetridraylen7272@gmail.com) đã được ghi lại khi gửi biểu mẫu này.\nChính phủ bắt đầu triển khai các chiến dịch ngừa thai khi nào?*\n1/1\nNăm 1962\nNăm 1959\nNăm 1986\nNăm 1958\nCó bao nhiêu giá trị và phong tục cơ bản được thấm nhuần trong văn hóa Việt Nam?*\n1/1\n2\n3\n4\n5\nAi được coi là trưởng nhóm?*\n0/1\nNgười đàn ông lớn tuổi nhất trong nhánh lâu đời nhất là hậu duệ trực tiếp của tổ tiên lập quốc\nNgười phụ nữ lớn tuổi nhất trong nhánh lâu đời nhất là hậu duệ trực tiếp của tổ tiên lập quốc\nNgười nam út trong nhánh già nhất trực tiếp từ tổ tiên lập quốc\nNgười đàn ông lớn tuổi nhất trong bất kỳ chi nhánh nào đều là hậu duệ của tổ tiên lập quốc\nCâu trả lời đúng\nNgười đàn ông lớn tuổi nhất trong nhánh lâu đời nhất là hậu duệ trực tiếp của tổ tiên lập quốc\nChọn câu ĐÚNG về Đời sống Gia đình ở CHXD*\n0/1\nTruyền thống khổ đau ‘lam dầu’ không còn được dung thứ\nCô dâu trẻ vẫn bị ép về sống với mẹ chồng\nCô dâu trẻ khi về sống với mẹ chồng vẫn bị buộc phải phục tùng ý muốn và ý muốn của mẹ chồng.\nKhông có điều nào ở trên\nCâu trả lời đúng\nTruyền thống khổ đau ‘lam dầu’ không còn được dung thứ\nQuá trình kết hôn ở thời tiền thuộc địa có bao nhiêu giai đoạn?*\n0/1\n2\n5\n3\n4\nCâu trả lời đúng\n3\nĐiều gì không có trong “tam tòng” mà mọi phụ nữ thời tiền thuộc địa đều phải tuân theo?*\n0/1\nvâng lời cha trước khi kết hôn\nvâng lời chồng khi đã lấy chồng\nsau khi chồng chết hãy vâng lời con trai\nvâng lời mẹ trước khi kết hôn\nCâu trả lời đúng\nvâng lời mẹ trước khi kết hôn\n\"Tuổi bình thường\" để kết hôn ở thời tiền thuộc địa là bao nhiêu?*\n1/1\nMười lăm cho con trai và mười hai đến mười bốn cho con gái\nMười sáu cho bé gái và mười tám cho bé trai\nMười tám cho cô gái và hai mươi cho chàng trai\nMười bốn cho bé gái và mười tám cho bé trai\nDùng từ ngữ nào để miêu tả Gia đình Việt Nam hiện nay?*\n0/1\nTruyền thống\nTính hiện đại\nCả chủ nghĩa tư bản và chủ nghĩa xã hội\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nChọn câu KHÔNG ĐÚNG về hôn nhân của người Việt thời tiền thuộc địa*\n0/1\nViệc ly hôn có tồn tại nhưng rất hiếm vì nó mang lại sự ô nhục cho người phụ nữ đã ly hôn và mang lại vết nhơ cho gia đình.\nĐàn ông được phép lấy nhiều vợ\nVợ thứ có nghĩa vụ phải phục tùng vợ cả trong mọi việc\nVợ cả không được tham gia chọn vợ phụ\nCâu trả lời đúng\nVợ cả không được tham gia chọn vợ phụ\nViệt tiền thuộc địa tự nhận diện mình bằng cách tham chiếu đến ... .*\n1/1\nhai dòng họ: dòng họ bên trong của cha và dòng họ bên ngoài của mẹ\nchỉ có một dòng họ do chịu ảnh hưởng sâu sắc của tính cách gia trưởng\nchỉ có một dòng họ do chịu ảnh hưởng sâu sắc của tính cách mẫu hệ\nKhông có điều nào ở trên\nĐiều nào KHÔNG ĐÚNG về hôn nhân của người Việt thời tiền thuộc địa?*\n0/1\nHầu hết cuộc hôn nhân đều được sắp xếp bởi một người trung gian\nNgười đi giữa thường là một phụ nữ trẻ nổi tiếng với mối quan hệ rộng rãi và vẻ đẹp của cô ấy.\nSự hòa thuận của gia đình được coi là vô cùng quan trọng\nĐức hạnh và gia đình thành đạt của cô gái là một trong những yếu tố để xác định cô dâu tương lai.\nCâu trả lời đúng\nNgười đi giữa thường là một phụ nữ trẻ nổi tiếng với mối quan hệ rộng rãi và vẻ đẹp của cô ấy.\nCâu nào KHÔNG ĐÚNG về tộc trưởng (Trương Tộc)?\n\nĐáp án: Là người nam trẻ nhất trong nhánh lâu đời nhất có nguồn gốc gián tiếp từ tổ tiên lập quốc"
+  },
+  {
+    "id": "70",
+    "question": "What is NOT TRUE about Generation 2000*\n0/1\nTheir first concern is job-related\nThey tend to seek the most elusive attainment of &quot;happiness&quot; through friendship and love\nMany young men have taken up the Western baseball cap\nVietnamese youth haven't adopted Western-style fashion\nCorrect answer\nVietnamese youth haven't adopted Western-style fashion\nWhich factor did not account for the increase of the nuclear, two-generation family since 1975?*\n0/1\nMigration from rural areas to cities, from the overpopulated Red River Delta to the southern highlands and provinces in the Mekong Delta, urbanization, and industrialization\nThe desire of a generation to live apart from their parents\nThe government's family planning policy\nThe traditional patriarchal influence with the need to have a male heir\nCorrect answer\nThe traditional patriarchal influence with the need to have a male heir\nWhich stage below was not included in the marriage process under Pre-colonial Times?*\n0/1\nThe preliminary discussions\nThe betrothal\nThe wedding\nThe Bachelor Party\nCorrect answer\nThe Bachelor Party\nWhat authorities did a mother-in-law not have over her daughter-in-law during the Pre-colonial Times?*\n0/1\nForce her daughter-in-law to work her to the bone from dawn to dusk\nStarve her to death\nBeat her black and blue\nNone of the above\nCorrect answer\nNone of the above\nWhich is considered as proof of filial impiety in the pre-colonial time?*\n0/1\nCelibacy\nEarly marriage\nObey parents\nLearn about the sacrifices of their ancestors\nCorrect answer\nCelibacy\nWhich is NOT included in the Positive incentives which were applied to persuade the woman to use birth control in 1962?*\n0/1\nWork promotion\nMaternity and nursery care\nAllocation of living space\nSuppression of the above answers\nCorrect answer\nSuppression of the above answers\nChoose the INCORRECT statement about the Vietnamese Family in Pre-colonial Times*\n0/1\nFilial piety was the most heavily stressed value, encompassing the duties and obligations of children toward their parents\nFilial piety bound the son or daughter in an unbreakable parental relationship because of the moral debt or gratitude that he or she owed and that could never be fully repaid\nVietnamese were taught from birth about the sacrifices of their parents and ancestors for them to get today's results\nAll are correct\nCorrect answer\nAll are correct\nWhich was not a reason for parents to give their children coarse nicknames such as &quot;pig&quot;, &quot;dog&quot;, or &quot;stupid&quot; in Pre-colonial Times?*\n1/1\nThey feared that their children would be taken away or rendered mortally ill by evil spirits\nThese nicknames were supposed to make their children undesirable in the eyes of the spirits\nThese nicknames were considered as 'hot' and 'beautiful' names at that time\nNone of the above\nWho was instrumental in the passing of the 1958 Family Law?*\n0/1\nMadame Nhu\nNguyen Thi Binh\nNgo Dinh Nhu\nHo Chi Minh\nCorrect answer\nMadame Nhu\nType in your student no. - fullname - classcode*\n···/1\nstsdf\nWhat is NOT TRUE about Family Life in the SRV?*\n0/1\nThe customs and values that once defined the Vietnamese in the pre-colonial times have suffered from the intrusion of the modern industrial world\nConcern for the care of aging parents as well as the related notion of family honor remain at the core of the Vietnamese value system, but their past definitions have become murkier, and expectations have diminished\nArranged marriages were completely removed\nParents, relatives, and friends still somewhat attempt to match the parties (such as the parents choose criteria based on the social standing of the counterpart family)\nCorrect answer\nParents, relatives, and friends still somewhat attempt to match the parties (such as the parents choose criteria based on the social standing of the counterpart family)\nWhich was not included in the &quot;three assumptions of duty&quot; policy in 1965?*\n0/1\nProduction\nFamily\nMilitary work\nEducation\nCorrect answer\nEducation\nChoose the TRUE statement about the Vietnamese Family in Pre-colonial Times*\n0/1\nThe &quot;clan&quot; included a number of families relating to each other through a common male ancestor\nAll clans in the society have a common lineage name or surname\nIn this period, &quot;Pham&quot; is the most common lineage name or surname\n&quot;Clan&quot; refers to a group of clans collectively who usually do not involve in the mainstream culture of a particular nation\nCorrect answer\nThe &quot;clan&quot; included a number of families relating to each other through a common male ancestor\nWhich statement is NOT TRUE about the Family Head?",
+    "options": [
+      "The family head ruled over all family members in all matters, including property rights, education, marriage, and profession",
+      "The family head spoke on behalf of the family in dealings with the outside world",
+      "The family head had the power to reward or to chastise everyone in the family",
+      "The family head ruled over all family members in limited matters, including property rights, education, marriage, but not profession"
+    ],
+    "correctAnswer": "The family head ruled over all family members in limited matters, including property rights, education, marriage, but not profession",
+    "viTranslation": "Hỏi: Điều KHÔNG ĐÚNG về Thế hệ 2000*\n0/1\nMối quan tâm đầu tiên của họ là liên quan đến công việc\nHọ có xu hướng tìm kiếm sự đạt được “hạnh phúc” khó nắm bắt nhất thông qua tình bạn và tình yêu.\nNhiều thanh niên đã đội mũ bóng chày phương Tây\nGiới trẻ Việt chưa tiếp thu thời trang kiểu phương Tây\nCâu trả lời đúng\nGiới trẻ Việt chưa tiếp thu thời trang kiểu phương Tây\nYếu tố nào không giải thích cho sự gia tăng số lượng gia đình hạt nhân hai thế hệ kể từ năm 1975?*\n0/1\nDi cư từ nông thôn ra thành thị, từ vùng đồng bằng sông Hồng đông dân đến vùng núi phía Nam và các tỉnh ở đồng bằng sông Cửu Long, đô thị hóa và công nghiệp hóa\nKhát vọng của một thế hệ được sống xa cha mẹ\nChính sách kế hoạch hóa gia đình của Chính phủ\nẢnh hưởng gia trưởng truyền thống với nhu cầu phải có người thừa kế là nam giới\nCâu trả lời đúng\nẢnh hưởng gia trưởng truyền thống với nhu cầu phải có người thừa kế là nam giới\nGiai đoạn nào dưới đây không được đưa vào quá trình kết hôn thời tiền thuộc địa?*\n0/1\nCác cuộc thảo luận sơ bộ\nSự hứa hôn\nĐám cưới\nBữa tiệc độc thân\nCâu trả lời đúng\nBữa tiệc độc thân\nMẹ chồng không có quyền gì đối với con dâu thời tiền thuộc địa?*\n0/1\nBắt con dâu làm việc đến tận xương tủy từ sáng đến tối\nBỏ đói cô ấy đến chết\nĐánh cô ấy đen và xanh\nKhông có điều nào ở trên\nCâu trả lời đúng\nKhông có điều nào ở trên\nĐiều nào được coi là bằng chứng về lòng hiếu thảo thời tiền thuộc địa?*\n0/1\nđộc thân\nKết hôn sớm\nVâng lời cha mẹ\nTìm hiểu về sự hy sinh của tổ tiên\nCâu trả lời đúng\nđộc thân\nĐiều nào KHÔNG được bao gồm trong Khuyến khích tích cực được áp dụng để thuyết phục người phụ nữ sử dụng biện pháp tránh thai vào năm 1962?*\n0/1\nXúc tiến công việc\nChăm sóc thai sản và nhà trẻ\nPhân bổ không gian sống\nLoại bỏ các câu trả lời trên\nCâu trả lời đúng\nLoại bỏ các câu trả lời trên\nChọn phát biểu SAI về Gia đình Việt Nam thời tiền thuộc địa*\n0/1\nLòng hiếu thảo là giá trị được nhấn mạnh nhiều nhất, bao gồm bổn phận và nghĩa vụ của con cái đối với cha mẹ.\nLòng hiếu thảo đã ràng buộc người con trong mối quan hệ cha mẹ không thể phá vỡ vì món nợ đạo đức hay lòng biết ơn mà người con mắc nợ và điều đó không bao giờ có thể hoàn trả đầy đủ.\nNgười Việt Nam từ khi sinh ra đã được dạy về sự hy sinh của cha mẹ, tổ tiên để có được kết quả như ngày nay\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nĐó không phải là lý do để cha mẹ đặt cho con mình những biệt danh thô tục như \"lợn\", \"chó\" hay \"ngu ngốc\" trong thời tiền thuộc địa?*\n1/1\nHọ sợ rằng con cái của họ sẽ bị tà linh bắt đi hoặc làm cho bệnh nặng\nNhững biệt danh này được cho là khiến con cái của họ trở nên không được ưa chuộng trong mắt các linh hồn.\nNhững biệt danh này được coi là những cái tên “hot” và “đẹp” thời bấy giờ\nKhông có điều nào ở trên\nAi là người có công trong việc thông qua Luật Gia đình năm 1958?*\n0/1\nBà Nhu\nNguyễn Thị Bình\nNgô Đình Nhu\nHồ Chí Minh\nCâu trả lời đúng\nBà Nhu\nNhập số sinh viên của bạn - họ tên - mã lớp*\n···/1\nstsdf\nĐiều gì KHÔNG ĐÚNG về Đời sống Gia đình ở CHXQ?*\n0/1\nNhững phong tục và giá trị từng định hình người Việt thời tiền thuộc địa đã bị ảnh hưởng bởi sự xâm nhập của thế giới công nghiệp hiện đại\nMối quan tâm đến việc chăm sóc cha mẹ già cũng như quan niệm liên quan đến danh dự gia đình vẫn là cốt lõi của hệ thống giá trị Việt Nam, nhưng những định nghĩa trong quá khứ của họ đã trở nên mơ hồ hơn và những kỳ vọng cũng giảm đi.\nNhững cuộc hôn nhân sắp đặt đã bị loại bỏ hoàn toàn\nCha mẹ, người thân, bạn bè vẫn phần nào cố gắng để phù hợp với các bên (chẳng hạn như cha mẹ lựa chọn tiêu chí dựa trên địa vị xã hội của gia đình đối tác)\nCâu trả lời đúng\nCha mẹ, người thân, bạn bè vẫn phần nào cố gắng để phù hợp với các bên (chẳng hạn như cha mẹ lựa chọn tiêu chí dựa trên địa vị xã hội của gia đình đối tác)\nĐiều nào không được đưa vào chính sách \"ba giả định về nghĩa vụ\" năm 1965?*\n0/1\nSản xuất\ngia đình\nCông tác quân sự\ngiáo dục\nCâu trả lời đúng\ngiáo dục\nChọn câu ĐÚNG về Gia đình Việt Nam thời tiền thuộc địa*\n0/1\n“Gia tộc” bao gồm một số gia đình có quan hệ với nhau thông qua một tổ tiên chung là nam giới\nTất cả các dòng họ trong xã hội đều có chung một họ hoặc một họ\nVào thời kỳ này, “Phạm” là họ hoặc tên dòng dõi phổ biến nhất\n\"Gia tộc\" dùng để chỉ một nhóm các gia tộc thường không tham gia vào nền văn hóa chính thống của một quốc gia cụ thể\nCâu trả lời đúng\n“Gia tộc” bao gồm một số gia đình có quan hệ với nhau thông qua một tổ tiên chung là nam giới\nCâu nào KHÔNG ĐÚNG về Người Chủ Gia Đình?\n\nĐáp án: Người đứng đầu gia đình cai trị tất cả các thành viên trong gia đình trong một số vấn đề nhất định, bao gồm quyền tài sản, giáo dục, hôn nhân nhưng không phải nghề nghiệp."
+  },
+  {
+    "id": "71",
+    "question": "What do people usually do before Tet in Vietnam?*\n0/1\nMaking Banh Chung\nDecorating their houses\nPaying off or Collecting Debts\nAll are correct\nCorrect answer\nAll are correct\nChoose the NOT TRUE statement*\n0/1\nThe celebration of festivals in pre-colonial Vietnam was regulated by a lunar calendar\nThe Vietnamese calendar begins with a date equivalent to 2637 BCE in the Gregorian calendar.\nThe Lunar calendar features a 355-day year, divided into twelve months of twenty-nine or thirty days each\nThe Lunar calendar features a 365-day year, divided into twelve months of thirty or thirty-one days each\nCorrect answer\nThe Lunar calendar features a 365-day year, divided into twelve months of thirty or thirty-one days each\nWhich festival is celebrated on the fifteenth day of the fourth month of the lunar calendar?*\n1/1\nLe Han Thuc\nLe Thanh Minh\nSakyamuni Buddha's birthday\nLe Vu Lan\nIn 1994 and 1995, the portion of the governments' budget allocated to physical fitness and sports ...*\n1/1\nincreased dramatically\nkept stable\ndecreased slightly\ndecreased dramatically\n... occurred on the fifth day of the fifth lunar month in recognition of the summer solstice.*\n1/1\nLe Han Thuc\nLe Thanh Minh\nLe Doan Ngo\nLe Vu Lan\nWhere is the cradle of the Vietnamese civilization?*\n0/1\nIn the North\nIn the South\nIn the Center\nIn the North and Center\nCorrect answer\nIn the North\nChoose the NOT TRUE statement*\n0/1\nIn the middle 1990s, Private sponsorship of sporting activities, long frowned upon by the authorities, began to emerge as an alternative source of funding.\nAfter the Renovation movement began in the late 1980s, the state increased significantly its support for athletic activities at all levels.\nAfter the Renovation movement began in the late 1980s, the state reduced its support for athletic activities at all levels.\nIn contemporary Vietnam, a variety of sports as well as amusements associated with Western pop culture are taking up the relay and replacing the traditional leisure activities\nCorrect answer\nAfter the Renovation movement began in the late 1980s, the state increased significantly its support for athletic activities at all levels.\nWhich is not encompassed Vietnamese Zodiac animals?*\n0/1\nDragon\nRabbit\nCat\nRooster\nCorrect answer\nRabbit\nWhich element in the doctrine of five elements accords with Giap-At (in the ten-cycle)?*\n1/1\nWater\nFire\nEarth\nMetal\nWhich element in the doctrine of five elements accords with Canh-Tan (in the ten-cycle)?*\n0/1\nWater\nFire\nEarth\nMetal\nCorrect answer\nMetal\nThe twelve-year cycle is based on ...*\n1/1\nrepetitions of ten- and twelve-year cycles\na doubling of the five elements\nzodiac animals\nNone are correct\nOne week before the New Year was to begin, each household celebrated ...*\n0/1\nLe Vu Lan\nLe Ruoc Ong Ba\nLe Tao Quan\nNone are correct\nCorrect answer\nLe Tao Quan\nChoose the NOT TRUE statement*\n0/1\nThe ten-year cycle has been repeated six times\nThe twelve-year cycle has been repeated five times\nThe ten-year cycle has been repeated five times\nNo named year is repeated within a single sixty-year cycle\nCorrect answer\nThe ten-year cycle has been repeated five times\nWhich element in the doctrine of five elements accords with Nham-Quy (in the ten-cycle)?*\n0/1\nWater\nFire\nEarth\nWood\nCorrect answer\nEarth\nWhen did we start using both Lunar calendar and Gregorian at the same time?*\n1/1\nIn 1967\nIn 1945\nIn 1954\nIn 1986\nA sixty-year cycle is based on ...*\n0/1\nrepetitions of ten- and twelve-year cycles\na doubling of the five elements\nzodiac animals\nNone are correct\nCorrect answer\nrepetitions of ten- and twelve-year cycles\nThe festivals were observed by ...*\n1/1\nmost Vietnamese\nthe exclusive property of a particular faith\nthe Government only\nNone are correct\nChoose the TRUE statement about sports and leisure in the middle of the 1990s*\n1/1\nThe SRV has given priority to less expensive sports which require little equipment and few training facilities.\nSponsorship of sports activities by private sponsors is prohibited\nOnly the higher-level athletic competitions, with the official organization, are avidly followed by Vietnamese fans\nThe international corporations - including producers of soft drinks, cigarettes, and alcoholic beverages - began stopping sponsoring Vietnamese national competitions\nWhich is not involved in the fundamental values and customs embedded in the Vietnamese ethos?*\n0/1\nFilial piety\nMerit\nMoral debt or gratitude\nIntelligence\nCorrect answer\nIntelligence\nChoose the NOT TRUE statement*\n1/1\nAside from the rituals and celebrations associated with the festivals, pre-colonial Vietnamese engaged in a number of activities and games for relaxation and amusement\nAlthough pre-colonial Vietnamese could be engaged in a number of festivals, they were not allowed to participate in any leisure activities\nPre-colonial villages housed a variety of organizational forms that brought villagers together to pursue shared interests.\nGambling per se was generally not considered improper unless indulged into excess when high losses or unsavory connections could threaten the stability of the gambler's family\nThe celebration of festivals in pre-colonial Vietnam was regulated by ...",
+    "options": [
+      "a Lunar Calendar",
+      "a Solar Calendar",
+      "Gregorian Calendar",
+      "None are correct"
+    ],
+    "correctAnswer": "a Lunar Calendar",
+    "viTranslation": "Hỏi: Mọi người thường làm gì trước Tết ở Việt Nam?*\n0/1\nLàm bánh chưng\nTrang trí nhà cửa của họ\nTrả nợ hoặc thu nợ\nTất cả đều đúng\nCâu trả lời đúng\nTất cả đều đúng\nChọn câu KHÔNG ĐÚNG*\n0/1\nViệc cử hành các lễ hội ở Việt Nam thời tiền thuộc địa được quy định theo âm lịch\nLịch Việt Nam bắt đầu bằng một ngày tương đương với năm 2637 TCN trong lịch Gregory.\nÂm lịch có một năm có 355 ngày, chia làm 12 tháng, mỗi tháng có 29 hoặc 30 ngày.\nÂm lịch có một năm gồm 365 ngày, được chia thành mười hai tháng, mỗi tháng có ba mươi hoặc ba mươi mốt ngày.\nCâu trả lời đúng\nÂm lịch có một năm gồm 365 ngày, được chia thành mười hai tháng, mỗi tháng có ba mươi hoặc ba mươi mốt ngày.\nLễ hội nào được tổ chức vào ngày rằm tháng tư âm lịch?*\n1/1\nLê Hán Thức\nLê Thanh Minh\nNgày đản sinh của Đức Phật Thích Ca Mâu Ni\nLê Vũ Lân\nNăm 1994 và 1995, phần ngân sách của chính phủ được phân bổ cho thể dục thể thao ...*\n1/1\ntăng lên đáng kể\ngiữ ổn định\ngiảm nhẹ\ngiảm đáng kể\n... xảy ra vào ngày 5 tháng 5 âm lịch để ghi nhận ngày hạ chí.*\n1/1\nLê Hán Thức\nLê Thanh Minh\nLê Doãn Ngô\nLê Vũ Lân\nCái nôi của nền văn minh Việt Nam ở đâu?*\n0/1\nỞ miền Bắc\nỞ miền Nam\nở trung tâm\nỞ miền Bắc và miền Trung\nCâu trả lời đúng\nỞ miền Bắc\nChọn câu KHÔNG ĐÚNG*\n0/1\nVào giữa những năm 1990, tài trợ tư nhân cho các hoạt động thể thao, vốn bị chính quyền phản đối từ lâu, bắt đầu nổi lên như một nguồn tài trợ thay thế.\nSau khi phong trào Đổi mới bắt đầu vào cuối những năm 1980, nhà nước đã tăng cường hỗ trợ đáng kể cho các hoạt động thể thao ở mọi cấp độ.\nSau khi phong trào Đổi mới bắt đầu vào cuối những năm 1980, nhà nước giảm hỗ trợ cho các hoạt động thể thao ở mọi cấp độ.\nỞ Việt Nam hiện đại, nhiều môn thể thao cũng như các trò giải trí gắn liền với văn hóa đại chúng phương Tây đang chiếm lĩnh và thay thế các hoạt động giải trí truyền thống.\nCâu trả lời đúng\nSau khi phong trào Đổi mới bắt đầu vào cuối những năm 1980, nhà nước đã tăng cường hỗ trợ đáng kể cho các hoạt động thể thao ở mọi cấp độ.\nCon giáp nào không thuộc cung hoàng đạo Việt Nam?*\n0/1\nRồng\nThỏ\ncon mèo\ngà trống\nCâu trả lời đúng\nThỏ\nYếu tố nào trong học thuyết ngũ hành phù hợp với Giáp-Ất (trong thập luân)?*\n1/1\nNước\nlửa\ntrái đất\nkim loại\nYếu tố nào trong giáo lý ngũ hành phù hợp với Cảnh Tân (trong thập luân)?*\n0/1\nNước\nlửa\ntrái đất\nkim loại\nCâu trả lời đúng\nkim loại\nChu kỳ 12 năm được dựa trên ...*\n1/1\nsự lặp lại của chu kỳ mười và mười hai năm\nsự nhân đôi của năm yếu tố\nđộng vật hoàng đạo\nKhông có cái nào đúng\nMột tuần trước khi năm mới bắt đầu, mỗi gia đình tổ chức lễ hội ...*\n0/1\nLê Vũ Lân\nLê Ruoc Ông Ba\nLê Tảo Quân\nKhông có cái nào đúng\nCâu trả lời đúng\nLê Tảo Quân\nChọn câu KHÔNG ĐÚNG*\n0/1\nChu kỳ mười năm đã được lặp lại sáu lần\nChu kỳ mười hai năm đã được lặp lại năm lần\nChu kỳ mười năm đã được lặp lại năm lần\nKhông có năm được đặt tên nào được lặp lại trong một chu kỳ sáu mươi năm\nCâu trả lời đúng\nChu kỳ mười năm đã được lặp lại năm lần\nYếu tố nào trong giáo lý ngũ hành phù hợp với Nham-Quy (trong thập luân)?*\n0/1\nNước\nlửa\ntrái đất\nGỗ\nCâu trả lời đúng\ntrái đất\nChúng ta bắt đầu sử dụng đồng thời cả lịch âm và lịch dương từ khi nào?*\n1/1\nNăm 1967\nNăm 1945\nNăm 1954\nNăm 1986\nChu kỳ sáu mươi năm được dựa trên ...*\n0/1\nsự lặp lại của chu kỳ mười và mười hai năm\nsự nhân đôi của năm yếu tố\nđộng vật hoàng đạo\nKhông có cái nào đúng\nCâu trả lời đúng\nsự lặp lại của chu kỳ mười và mười hai năm\nCác lễ hội được quan sát bởi ...*\n1/1\nngười Việt nhất\ntài sản độc quyền của một đức tin cụ thể\nChính phủ chỉ\nKhông có cái nào đúng\nChọn câu ĐÚNG về thể thao và giải trí vào giữa những năm 1990*\n1/1\nSRV đã ưu tiên cho các môn thể thao ít tốn kém hơn, đòi hỏi ít trang thiết bị và ít phương tiện tập luyện.\nCấm tài trợ cho các hoạt động thể thao bởi các nhà tài trợ tư nhân\nChỉ những giải thể thao cấp cao hơn, được tổ chức chính thức mới được người hâm mộ Việt Nam theo dõi cuồng nhiệt\nCác tập đoàn quốc tế - bao gồm các nhà sản xuất nước giải khát, thuốc lá và đồ uống có cồn - bắt đầu ngừng tài trợ cho các cuộc thi cấp quốc gia của Việt Nam\nĐiều nào không liên quan đến các giá trị và phong tục cơ bản gắn liền với văn hóa Việt Nam?*\n0/1\nlòng hiếu thảo\nBằng khen\nMón nợ đạo đức hay lòng biết ơn\nTình báo\nCâu trả lời đúng\nTình báo\nChọn câu KHÔNG ĐÚNG*\n1/1\nNgoài các nghi lễ và lễ kỷ niệm gắn liền với các lễ hội, người Việt thời tiền thuộc địa còn tham gia vào một số hoạt động và trò chơi để thư giãn và giải trí.\nMặc dù người Việt thời tiền thuộc địa có thể tham gia một số lễ hội nhưng họ không được phép tham gia bất kỳ hoạt động giải trí nào.\nCác ngôi làng thời tiền thuộc địa có nhiều hình thức tổ chức khác nhau nhằm gắn kết dân làng lại với nhau để theo đuổi những lợi ích chung.\nBản thân việc đánh bạc thường không bị coi là không đúng đắn trừ khi bị lạm dụng quá mức khi thua lỗ cao hoặc các mối quan hệ không tốt đẹp có thể đe dọa sự ổn định của gia đình người đánh bạc.\nViệc cử hành các lễ hội ở Việt Nam thời tiền thuộc địa được quy định bởi ...\n\nĐáp án: lịch âm lịch"
+  }
+]

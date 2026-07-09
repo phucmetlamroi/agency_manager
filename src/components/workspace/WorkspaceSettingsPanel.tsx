@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import ConnectorsPanel from '@/components/settings/ConnectorsPanel'
 import PricingRulesPanel from '@/components/settings/PricingRulesPanel'
 import { roleLabel } from '@/lib/display-labels'
+import StudyPlaceBoard from '@/components/study-place/StudyPlaceBoard'
 
 type IntegrationRow = {
     provider: string
@@ -32,7 +33,7 @@ type PricingRuleRow = {
 
 type ClientOption = { id: number; name: string }
 
-type TabId = 'general' | 'connectors' | 'pricing'
+type TabId = 'general' | 'connectors' | 'pricing' | 'study'
 
 type Props = {
     workspaceId: string
@@ -82,6 +83,7 @@ export default function WorkspaceSettingsPanel({
         { id: 'general', label: 'Tổng quan', icon: Settings },
         { id: 'connectors', label: 'Kết nối', icon: Plug },
         { id: 'pricing', label: 'Bảng giá', icon: DollarSign },
+        { id: 'study', label: 'StudyPlace', icon: Check },
     ]
 
     async function handleRename() {
@@ -173,6 +175,11 @@ export default function WorkspaceSettingsPanel({
             {/* Tab: Pricing Rules */}
             {activeTab === 'pricing' && (
                 <PricingRulesPanel workspaceId={workspaceId} rules={pricingRules} clients={clients} />
+            )}
+
+            {/* Tab: StudyPlace */}
+            {activeTab === 'study' && (
+                <StudyPlaceBoard />
             )}
 
             {/* Tab: General */}

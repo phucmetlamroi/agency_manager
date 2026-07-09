@@ -98,6 +98,9 @@ model Workspace {
   // Wiki — standalone Notion-style doc tree
   wikiPages WikiPage[]
 
+  // StudyPlace — per-user spaced repetition progress in Settings.
+  studyPlaceProgress StudyPlaceProgress[]
+
   profile Profile? @relation(fields: [profileId], references: [id])
 
   @@index([name])
@@ -226,6 +229,9 @@ model User {
 
   // Wiki — authored standalone doc pages
   wikiPages WikiPage[]
+
+  // StudyPlace — synchronized learning progress per workspace.
+  studyPlaceProgress StudyPlaceProgress[]
 
   // [Canonical Clients] Share links this user created (profile OWNER/ADMIN only)
   shareLinksCreated ClientShareLink[] @relation("ShareLinkCreator")
@@ -1431,6 +1437,34 @@ model WikiPage {
 
   @@index([workspaceId])
   @@index([parentId])
+}
+
+model StudyPlaceProgress {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  userId          String
+  studySetId      String
+  questionId      String
+  easeFactor      Float     @default(2.5)
+  intervalDays    Int       @default(0)
+  repetition      Int       @default(0)
+  attempts        Int       @default(0)
+  correctAttempts Int       @default(0)
+  lapses          Int       @default(0)
+  lastQuality     Int?
+  bookmarked      Boolean   @default(false)
+  lastReviewedAt  DateTime?
+  nextReviewAt    DateTime?
+  masteredAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId, studySetId, questionId], name: "workspace_user_studySet_question")
+  @@index([workspaceId, userId, studySetId, nextReviewAt])
+  @@index([workspaceId, userId, studySetId, bookmarked])
 }
 
 model Attachment {

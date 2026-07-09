@@ -12,6 +12,7 @@ import ConnectorsPanel from '@/components/settings/ConnectorsPanel'
 import PricingRulesPanel from '@/components/settings/PricingRulesPanel'
 import { roleLabel } from '@/lib/display-labels'
 import StudyPlaceBoard from '@/components/study-place/StudyPlaceBoard'
+import type { StudyPlaceProgressDTO } from '@/lib/study-place'
 
 type IntegrationRow = {
     provider: string
@@ -54,11 +55,13 @@ type Props = {
     pricingRules?: PricingRuleRow[]
     /** [Quick Create] Clients available in this profile (for pricing rule scope) */
     clients?: ClientOption[]
+    /** StudyPlace progress synchronized for the current user in this workspace */
+    studyProgress?: StudyPlaceProgressDTO[]
 }
 
 export default function WorkspaceSettingsPanel({
     workspaceId, workspace, currentUserRole, isGlobalAdmin, memberCount,
-    integrations = [], pricingRules = [], clients = [],
+    integrations = [], pricingRules = [], clients = [], studyProgress = [],
 }: Props) {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -76,7 +79,7 @@ export default function WorkspaceSettingsPanel({
     // [Quick Create] Tab navigation — restore tab from URL on mount (post-OAuth redirect)
     const initialTab = (searchParams?.get('tab') as TabId | null) ?? 'general'
     const [activeTab, setActiveTab] = useState<TabId>(
-        initialTab === 'connectors' || initialTab === 'pricing' ? initialTab : 'general',
+        initialTab === 'connectors' || initialTab === 'pricing' || initialTab === 'study' ? initialTab : 'general',
     )
 
     const TABS: Array<{ id: TabId; label: string; icon: any }> = [
@@ -85,6 +88,15 @@ export default function WorkspaceSettingsPanel({
         { id: 'pricing', label: 'Bảng giá', icon: DollarSign },
         { id: 'study', label: 'StudyPlace', icon: Check },
     ]
+
+    function handleTabChange(tabId: TabId) {
+        setActiveTab(tabId)
+        const params = new URLSearchParams(searchParams?.toString() ?? '')
+        if (tabId === 'general') params.delete('tab')
+        else params.set('tab', tabId)
+        const query = params.toString()
+        router.replace(query ? `?${query}` : '?', { scroll: false })
+    }
 
     async function handleRename() {
         if (!newName.trim() || newName.trim() === workspace.name) {
@@ -153,7 +165,7 @@ export default function WorkspaceSettingsPanel({
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => handleTabChange(tab.id)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-colors ${
                                 active
                                     ? 'bg-violet-500/20 text-violet-200 border border-violet-500/40'
@@ -179,7 +191,7 @@ export default function WorkspaceSettingsPanel({
 
             {/* Tab: StudyPlace */}
             {activeTab === 'study' && (
-                <StudyPlaceBoard />
+                <StudyPlaceBoard workspaceId={workspaceId} initialProgress={studyProgress} />
             )}
 
             {/* Tab: General */}

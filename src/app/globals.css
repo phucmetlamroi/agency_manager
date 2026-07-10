@@ -1,80 +1,122 @@
-/* [Mobile font unification] Plus Jakarta Sans giờ load qua next/font/google
- * trong app/layout.tsx — không cần @import từ Google Fonts CDN nữa.
- */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ════════════════════════════════════════════════════════════════
+   HUSTLYTASKER DESIGN TOKENS v2 — mobile redesign 2026-07
+   Kiến trúc 3 tầng: PRIMITIVE → SEMANTIC → COMPONENT.
+   Component KHÔNG tham chiếu Tier 1 trực tiếp, KHÔNG hardcode màu.
+   Nguồn quyết định: 01-NGHIEN-CUU/MASTER-DOSSIER.md QĐ-4/QĐ-5.
+   ════════════════════════════════════════════════════════════════ */
+
 @layer base {
   :root {
-    /* ═══ Neon Purple Dark Theme ═══ */
+    /* ───── TIER 1 — PRIMITIVES (cấm dùng trực tiếp trong component) ───── */
+    --violet-600: 262 83% 58%;    /* #7c3aed — nền nút primary (trắng 5.70:1) */
+    --violet-400: 255 92% 76%;    /* #a78bfa — accent text trên nền tối (7.31:1) */
+    --emerald-500: 160 84% 39%;   /* #10b981 */
+    --blue-500: 217 91% 60%;      /* #3b82f6 */
+    --amber-500: 38 92% 50%;      /* #f59e0b */
+    --red-600: 0 72% 51%;         /* #dc2626 — destructive (trắng 4.83:1) */
+    --zinc-950-hsl: 240 10% 3.9%; /* #09090b */
+    --zinc-900-hsl: 240 6% 10%;   /* #18181b */
+    --zinc-400-hsl: 240 5% 65%;   /* #a1a1aa — FLOOR text phụ (7.76:1) */
 
-    /* Background: #050505 near-black */
-    --background: 0 0% 2%;
-    --foreground: 0 0% 100%;
+    /* ───── TIER 2 — ELEVATION SURFACES (Material dark: cao hơn = sáng hơn) ───── */
+    --surface-0: 240 10% 3.9%;    /* #09090b — app background */
+    --surface-1: 240 6% 10%;      /* #18181b (zinc-900) — card/list item, nền đặc */
+    --surface-2: 240 6% 12%;      /* #1d1d20 — nested/hover/sticky solid */
+    --surface-3: 240 6% 14%;      /* #222226 — modal/sheet/dropdown */
 
-    /* Card/Surface: #0A0A0A or #121016 (dark with hint of purple) */
-    --card: 264 14% 8%;
-    --card-foreground: 0 0% 100%;
-
-    /* Popover */
-    --popover: 264 14% 8%;
-    --popover-foreground: 0 0% 100%;
-
-    /* Primary — Neon Purple #8B5CF6 */
-    --primary: 263 91% 66%;
+    /* ───── TIER 2 — SEMANTIC: shadcn core ───── */
+    --background: var(--surface-0);
+    --foreground: 0 0% 98%;               /* #fafafa — không dùng trắng tinh (OLED halation) */
+    --card: var(--surface-1);
+    --card-foreground: 0 0% 98%;
+    --popover: var(--surface-3);
+    --popover-foreground: 0 0% 98%;
+    --primary: var(--violet-600);         /* QUYẾT ĐỊNH QĐ-4: violet. INDIGO KHAI TỬ. */
     --primary-foreground: 0 0% 100%;
-
-    /* Secondary — Glow #A855F7 */
-    --secondary: 271 91% 65%;
-    --secondary-foreground: 0 0% 100%;
-
-    /* Muted — Card hover #211B31 */
-    --muted: 258 29% 15%;
-    --muted-foreground: 240 5% 65%;
-
-    /* Accent — Primary Dark #4C1D95 */
-    --accent: 262 67% 35%;
-    --accent-foreground: 0 0% 100%;
-
-    /* Destructive */
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 100%;
-
-    /* Border/Input/Ring */
-    --border: 258 20% 18%;
-    --input: 258 20% 18%;
-    --ring: 263 91% 66%;
-
-    /* Radius */
+    --primary-accent: var(--violet-400);  /* text/icon accent — thay text-indigo-400/violet-400 raw */
+    --secondary: 240 4% 12%;              /* surface trung tính (teal cũ bỏ vai trò semantic) */
+    --secondary-foreground: 0 0% 90%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: var(--zinc-400-hsl); /* FLOOR text phụ — cấm mờ hơn */
+    --accent: 240 5% 14%;                 /* hover/active surface — KHÔNG còn trùng primary */
+    --accent-foreground: 0 0% 98%;
+    --destructive: var(--red-600);
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: var(--violet-600);
     --radius: 0.75rem;
 
-    /* Charts */
-    --chart-1: 263 91% 66%;
-    --chart-2: 271 91% 65%;
-    --chart-3: 262 67% 35%;
+    /* ───── TIER 2 — SEMANTIC mở rộng ───── */
+    --success: var(--emerald-500);
+    --success-foreground: var(--zinc-950-hsl); /* CHỮ TỐI trên emerald (7.84:1 AAA) — cấm chữ trắng */
+    --info: var(--blue-500);
+    --info-foreground: 0 0% 100%;              /* chỉ badge/large text — info không làm nền nút text nhỏ */
+    --warning: var(--amber-500);
+    --warning-foreground: 240 10% 4%;
+
+    /* Charts (Tremor) — giữ nguyên */
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    /* ═══ Neon Purple Design Tokens ═══ */
-    --neon-bg: #050505;
-    --neon-surface: #0A0A0A;
-    --neon-surface-alt: #121016;
-    --neon-hover: #211B31;
-    --neon-primary: #8B5CF6;
-    --neon-glow: #A855F7;
-    --neon-dark: #4C1D95;
-    --neon-text: #FFFFFF;
-    --neon-text-secondary: #A1A1AA;
-    --neon-text-accent: #D8B4FE;
-    --neon-border: rgba(139, 92, 246, 0.15);
-    --neon-border-subtle: rgba(255, 255, 255, 0.06);
+    /* ───── TIER 2 — STATUS (khớp STATUS_META trong src/lib/task-statuses.ts) ───── */
+    --status-waiting: 271 91% 65%;   /* Đang đợi giao — purple #A855F7 */
+    --status-assigned: 217 91% 60%;  /* Nhận task     — blue   #3B82F6 */
+    --status-doing: 45 93% 47%;      /* Đang thực hiện— yellow #EAB308 */
+    --status-review: 25 95% 53%;     /* Review        — orange #F97316 */
+    --status-revision: 0 84% 60%;    /* Revision      — red    #EF4444 */
+    --status-frame: 330 81% 60%;     /* Sửa frame     — pink   #EC4899 */
+    --status-paused: 240 5% 65%;     /* Tạm ngưng     — zinc-400 #A1A1AA (nâng từ #71717A fail contrast) */
+    --status-done: 160 84% 39%;      /* Hoàn tất      — emerald #10B981 */
+
+    /* ───── TIER 2 — GLASS ───── */
+    --glass-bg-1: 0 0% 100% / 0.04;
+    --glass-bg-2: 0 0% 100% / 0.08;
+    --glass-border-1: 0 0% 100% / 0.06;
+    --glass-border-2: 0 0% 100% / 0.10;
+    --glass-border-3: 0 0% 100% / 0.14;
+    --glass-blur: 16px;
+
+    /* ───── TIER 2 — Z-INDEX (khai tử zIndex: 9999) ─────
+       4 token lõi (nav/sheet/dialog/toast) khớp MASTER-DOSSIER QĐ-4;
+       4 token phụ trợ (base/raised/sticky/popover) khớp KIEN-TRUC-RESPONSIVE §5.1 —
+       toàn bộ 8 giá trị là 1 scale duy nhất, cấm thêm giá trị mới. */
+    --z-base: 0;      /* nội dung trong flow */
+    --z-raised: 10;   /* card nhấc nhẹ, FAB, sticky-save-bar, cột pinned ScrollTable */
+    --z-sticky: 30;   /* sticky trong trang: filter pills, table header, self-row leaderboard */
+    --z-nav: 40;      /* BottomNav, header sticky */
+    --z-sheet: 50;    /* vaul drawer, Sheet, account sheet */
+    --z-dialog: 60;   /* Dialog/modal + overlay */
+    --z-popover: 65;  /* dropdown/popover/tooltip/command palette (phải nổi trên dialog) */
+    --z-toast: 70;    /* sonner */
+
+    /* ───── TIER 2 — LAYOUT/SPACING ───── */
+    --spacing-section: 2.5rem;  /* 40px — giữa các section (desktop) */
+    --spacing-group: 1.5rem;    /* 24px — giữa các field/khối độc lập */
+    --spacing-tight: 0.5rem;    /* 8px  — label ↔ input */
+    --header-h: 56px;           /* header mobile chuẩn (QĐ-2.6) */
+    --bottom-nav-h: 64px;       /* BottomNav (chưa gồm safe-area) */
+
+    /* Keyboard inset — hook useKeyboardInset (visualViewport) set giá trị này (QĐ-5.4) */
+    --kb: 0px;
+
+    /* ───── TIER 2 — MOTION ───── */
+    --duration-micro: 120ms;    /* press feedback 100–150ms */
+    --duration-base: 250ms;     /* transition thành phần 200–300ms */
+    --duration-page: 350ms;     /* trần cho chuyển trang */
+    --ease-liquid: cubic-bezier(0.16, 1, 0.3, 1); /* easing chuẩn app (khớp convention hiện có) */
   }
 
   .dark {
-    --background: 0 0% 2%;
-    --foreground: 0 0% 100%;
+    --background: var(--surface-0);
+    --foreground: 0 0% 98%;
   }
 }
 
@@ -84,259 +126,242 @@
   }
 
   html {
-    @apply bg-[#050505];
-    /* font-sans (var --font-sans = Plus Jakarta Sans, loaded từ next/font/google in app/layout.tsx) */
+    background: hsl(var(--background)); /* thay bg-[#050505] cũ — khớp themeColor #09090b (QĐ-6) */
+    /* font-sans (var --font-sans set qua next/font trong app/layout.tsx) — giữ để không rơi fallback */
     font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
     -webkit-text-size-adjust: 100%;
+    overscroll-behavior-y: none;        /* QĐ-5.6 */
+    scrollbar-gutter: stable;
   }
 
   body {
     @apply bg-background text-foreground;
-    min-height: 100vh;
-    /* Fallback for dvh */
-    min-height: -webkit-fill-available;
-    /* iOS specific fallback */
-  }
-}
-
-/* --- LIQUID GLASS UTILITIES --- */
-
-.glass-panel {
-  @apply bg-zinc-950/40 backdrop-blur-md border border-white/5 rounded-xl shadow-xl;
-}
-
-.liquid-gradient {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.4) 0%, rgba(59, 130, 246, 0.2) 100%);
-}
-
-.btn-primary {
-  @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-/* Animations */
-@keyframes aurora {
-  0% {
-    background-position: 0% 50%;
+    min-height: 100vh;   /* fallback browser cũ */
+    min-height: 100dvh;  /* thay -webkit-fill-available (QĐ-5.3) */
+    overscroll-behavior-y: none;
   }
 
-  50% {
-    background-position: 100% 50%;
+  /* Chống iOS auto-zoom TẬN GỐC — điều kiện tiên quyết để GỠ khóa zoom viewport (QĐ-5.1).
+     Mọi input/select/textarea/tiptap trên mobile ≥16px. */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea,
+    .tiptap {
+      font-size: 16px !important;
+    }
   }
 
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-/* --- UX HARDENING UTILITIES (PHASE 7) --- */
-
-/* 1. Mobile Touch Targets (Fat Finger Prevention) */
-@media (max-width: 768px) {
-
+  /* Feedback chạm: tắt tap-highlight mặc định WebKit, thay bằng .pressable / :active (F mục 6) */
   button,
-  input:not([type="checkbox"]):not([type="radio"]),
+  a,
+  [role="button"],
+  input,
   select,
-  textarea,
+  label[for] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GLASS ELEVATION SYSTEM — 4 mức DUY NHẤT (QĐ-4), thay 5 biến thể tự chế
+   surface-0 = nền app đặc (bg-background) — không cần class riêng.
+   Ngân sách blur mobile: ≤3 layer/màn (header + nav + overlay).
+   ════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* glass-1 — card/panel tĩnh trong list.
+     MOBILE: nền đặc zinc-900/90, KHÔNG blur (N card × blur = jank khi scroll).
+     DESKTOP (≥768px): mới được kính thật blur-md. */
+  .glass-1 {
+    background: hsl(var(--surface-1) / 0.9);
+    border: 1px solid hsl(var(--glass-border-1));
+    border-radius: var(--radius);
+  }
+  @media (min-width: 768px) {
+    .glass-1 {
+      background: hsl(var(--glass-bg-1));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+  }
+
+  /* glass-2 — sticky header, BottomNav, panel nổi: blur 16px */
+  .glass-2 {
+    background: hsl(var(--glass-bg-2));
+    border: 1px solid hsl(var(--glass-border-2));
+    border-radius: var(--radius);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+  }
+
+  /* glass-3 — modal/sheet/dropdown: nền GẦN ĐẶC 92% + blur 20px chỉ ở overlay */
+  .glass-3 {
+    background: hsl(var(--surface-3) / 0.92);
+    border: 1px solid hsl(var(--glass-border-3));
+    border-radius: calc(var(--radius) + 4px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 32px 80px rgb(0 0 0 / 0.6);
+  }
+
+  /* ALIAS migrate — .glass-panel cũ trỏ về glass-2; XÓA sau khi PR3 codemod xong */
+  .glass-panel {
+    @apply glass-2;
+  }
+
+  /* Nút primary legacy — giữ alias trong lúc migrate sang <Button>; scale chốt 0.97 */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-[0.97];
+  }
+
+  /* Feedback chạm chuẩn (thay tap-highlight đã tắt) — áp cho card/row/nút tự chế */
+  .pressable {
+    transition: transform var(--duration-micro) ease, background-color var(--duration-micro) ease;
+  }
+  .pressable:active {
+    transform: scale(0.97);
+    background-color: rgb(255 255 255 / 0.08);
+  }
+
+  /* Safe-area utilities (QĐ-5.2) */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  /* Padding đáy cho main content — bù BottomNav + safe-area, hết cảnh tab bar che nội dung */
+  .pb-content {
+    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 16px);
+  }
+}
+
+/* ── Touch target safety-net + hit-slop (F mục 4) ─────────────────
+   Lưới an toàn cho element chưa migrate; fix thật nằm ở Button sizes (mục 6). */
+@media (pointer: coarse) {
+  button,
   [role="button"] {
     min-height: 44px;
-    /* iOS Standard */
     min-width: 44px;
-    touch-action: manipulation;
-    /* Disable double-tap zoom */
   }
-
-  /* Checkbox/radio: native 16x16 ổn cho mobile, không cần fat-finger expand */
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+  /* Checkbox/radio: native 16px ổn — không fat-finger expand (giữ layout) */
   input[type="checkbox"],
   input[type="radio"] {
-    touch-action: manipulation;
+    min-height: unset;
+    min-width: unset;
   }
-
-  /* Exception for small icon buttons inside dense UIs - use pseudo-element expansion instead */
-  .icon-btn-dense {
+  /* Ngoại lệ UI dày đặc: icon nhỏ giữ layout, mở rộng vùng chạm bằng pseudo-element */
+  .hit-slop,
+  .icon-btn-dense { /* .icon-btn-dense = tên cũ, giữ alias tới khi codemod xong */
     min-height: unset;
     min-width: unset;
     position: relative;
   }
-
+  .hit-slop::after,
   .icon-btn-dense::after {
     content: '';
     position: absolute;
-    top: -10px;
-    bottom: -10px;
-    left: -10px;
-    right: -10px;
+    inset: -10px; /* icon 24px → hit area 44px */
   }
 }
 
-/* 2. Dynamic Viewport Height (Keyboard Overlap Fix) */
-.h-dvh {
-  height: 100dvh;
+/* ── Scrollbar (giữ nguyên hiện trạng) ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.2); }
+
+/* ── Animations chung (giữ) ── */
+@keyframes aurora {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
-.min-h-dvh {
-  min-height: 100dvh;
-}
-
-/* 3. Visual Hierarchy & Spacing (Phase 7 - Gestalt) */
-:root {
-  --spacing-section: 2.5rem;
-  /* 40px - Clear break between topics */
-  --spacing-group: 1.5rem;
-  /* 24px - Between independent fields */
-  --spacing-tight: 0.5rem;
-  /* 8px - Label to Input proximity */
-}
-
-/* Enforce Gestalt Proximity in Forms */
-.form-group {
-  margin-bottom: var(--spacing-group);
-}
-
+/* ── Form hierarchy (giữ nguyên — Gestalt Phase 7) ── */
+.form-group { margin-bottom: var(--spacing-group); }
 .form-group label {
   display: block;
   margin-bottom: var(--spacing-tight);
-  /* Pull label closer to input */
   font-weight: 500;
-  color: var(--muted-foreground);
+  color: hsl(var(--muted-foreground));
 }
+.form-section { margin-bottom: var(--spacing-section); }
 
-.form-section {
-  margin-bottom: var(--spacing-section);
-}
-
-/* Semantic Typography Hierarchy */
+/* ── Semantic typography — responsive mobile-first (mục 4) ── */
 h1.page-title {
-  font-size: 1.875rem;
-  /* 30px */
+  font-size: 1.375rem;   /* 22px mobile (text-page) */
+  line-height: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.025em;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
   background: linear-gradient(to right, #ffffff, #a1a1aa);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-
 h2.section-title {
-  font-size: 1.25rem;
-  /* 20px */
+  font-size: 1.125rem;   /* 18px mobile (text-title) */
+  line-height: 1.5rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: var(--foreground);
+  color: hsl(var(--foreground));
+}
+@media (min-width: 768px) {
+  h1.page-title { font-size: 1.875rem; line-height: 2.25rem; margin-bottom: 1.5rem; } /* 30px desktop */
+  h2.section-title { font-size: 1.25rem; line-height: 1.75rem; } /* 20px desktop */
 }
 
-/* 4. Performance (Phase 7 - DOM Optimization) */
+/* ── Performance (giữ) ── */
 .optimize-visibility {
   content-visibility: auto;
   contain-intrinsic-size: 1000px;
-  /* Estimate height to prevent scrollbar jumping */
 }
 
-/* === Radial Navigation Menu === */
-
+/* === Radial Navigation Menu (desktop-only) — token hóa màu === */
 .radial-segment {
   @apply bg-zinc-950/70 backdrop-blur-xl border border-white/10 rounded-full shadow-lg transition-colors duration-150;
 }
-
 .radial-segment-active {
-  @apply border-violet-500/40 bg-violet-950/50 shadow-violet-500/25;
+  border-color: hsl(var(--primary) / 0.4);
+  background: hsl(var(--primary) / 0.15);
+  box-shadow: 0 0 16px hsl(var(--primary) / 0.25);
 }
-
 .radial-center-glow {
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.25) 0%, transparent 70%);
+  background: radial-gradient(circle, hsl(var(--primary) / 0.25) 0%, transparent 70%);
 }
 
-/* === Portal Prose - Rich HTML notes rendering === */
-.prose-portal p {
-  margin-bottom: 0.75rem;
-  line-height: 1.75;
-  color: #d4d4d8;
-}
-
-.prose-portal p:last-child {
-  margin-bottom: 0;
-}
-
-.prose-portal strong {
-  color: #f4f4f5;
-  font-weight: 600;
-}
-
-.prose-portal em {
-  color: #a1a1aa;
-  font-style: italic;
-}
-
+/* === Portal Prose — rich HTML notes (giữ, đổi link màu về token) === */
+.prose-portal p { margin-bottom: 0.75rem; line-height: 1.75; color: #d4d4d8; }
+.prose-portal p:last-child { margin-bottom: 0; }
+.prose-portal strong { color: #f4f4f5; font-weight: 600; }
+.prose-portal em { color: #a1a1aa; font-style: italic; }
 .prose-portal a {
-  color: #818cf8;
+  color: hsl(var(--primary-accent));
   text-decoration: underline;
   text-underline-offset: 3px;
   word-break: break-all;
 }
-
-.prose-portal a:hover {
-  color: #a5b4fc;
-}
-
-.prose-portal ul {
-  list-style-type: disc;
-  padding-left: 1.25rem;
-  margin-bottom: 0.75rem;
-}
-
-.prose-portal ol {
-  list-style-type: decimal;
-  padding-left: 1.25rem;
-  margin-bottom: 0.75rem;
-}
-
-.prose-portal li {
-  margin-bottom: 0.35rem;
-  color: #d4d4d8;
-}
-
-.prose-portal h1,
-.prose-portal h2,
-.prose-portal h3 {
-  color: #f4f4f5;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  margin-top: 1rem;
+.prose-portal a:hover { color: hsl(var(--primary-accent) / 0.8); }
+.prose-portal ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+.prose-portal ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+.prose-portal li { margin-bottom: 0.35rem; color: #d4d4d8; }
+.prose-portal h1, .prose-portal h2, .prose-portal h3 {
+  color: #f4f4f5; font-weight: 600; margin-bottom: 0.5rem; margin-top: 1rem;
 }
 
 /* ═══════════════════════════════════════════════════════
    TipTap editor — force readable dark-theme colors
-   (overrides prose defaults so user input stays bright)
+   (PRESERVED khỏi file cũ — dùng ở TiptapEditor.tsx; token hóa link/accent)
    ═══════════════════════════════════════════════════════ */
 .tiptap-editor,
 .tiptap-editor p,
@@ -356,19 +381,19 @@ h2.section-title {
   color: #d4d4d8 !important;
 }
 .tiptap-editor a {
-  color: #a78bfa !important;
+  color: hsl(var(--primary-accent)) !important;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .tiptap-editor a:hover {
-  color: #c4b5fd !important;
+  color: hsl(var(--primary-accent) / 0.8) !important;
 }
 .tiptap-editor blockquote {
   color: #a1a1aa !important;
-  border-left-color: rgba(139, 92, 246, 0.4) !important;
+  border-left-color: hsl(var(--primary) / 0.4) !important;
 }
 .tiptap-editor code {
-  background: rgba(139, 92, 246, 0.10) !important;
+  background: hsl(var(--primary) / 0.1) !important;
   color: #f4f4f5 !important;
   padding: 2px 6px;
   border-radius: 4px;
@@ -383,140 +408,98 @@ h2.section-title {
 /* Empty editor placeholder */
 .tiptap-editor p.is-editor-empty:first-child::before {
   content: 'Type your note here…';
-  color: #71717a;
+  color: hsl(var(--muted-foreground));
   pointer-events: none;
   height: 0;
   float: left;
 }
 
-/* ═══════════════════════════════════════════════════════
-   Portal Status Badge — Holographic Signal Lamp Animations
-   Each status has a unique living micro-animation.
-   ═══════════════════════════════════════════════════════ */
-
-/* Pending: gentle opacity breathing */
+/* ═══ Portal Status Badge animations (giữ nguyên) ═══ */
 .portal-badge-breathe::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
   background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.07), transparent);
-  animation: _pbBreathe 2.8s ease-in-out infinite;
-  pointer-events: none;
+  animation: _pbBreathe 2.8s ease-in-out infinite; pointer-events: none;
 }
+@keyframes _pbBreathe { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
 
-@keyframes _pbBreathe {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
-}
-
-/* In Progress: sweeping scan-line shimmer */
 .portal-badge-scan::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
   background: linear-gradient(90deg, transparent 0%, rgba(167, 139, 250, 0.12) 50%, transparent 100%);
-  animation: _pbScan 2.4s ease-in-out infinite;
-  pointer-events: none;
+  animation: _pbScan 2.4s ease-in-out infinite; pointer-events: none;
 }
-
 @keyframes _pbScan {
-  0%   { transform: translateX(-100%); opacity: 0; }
-  30%  { opacity: 1; }
-  70%  { opacity: 1; }
+  0% { transform: translateX(-100%); opacity: 0; }
+  30% { opacity: 1; } 70% { opacity: 1; }
   100% { transform: translateX(100%); opacity: 0; }
 }
 
-/* Action Required: urgent double-pulse glow */
 .portal-badge-urgency::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
   background: rgba(251, 113, 133, 0.08);
-  animation: _pbUrgency 1.6s ease-in-out infinite;
-  pointer-events: none;
+  animation: _pbUrgency 1.6s ease-in-out infinite; pointer-events: none;
 }
-
 @keyframes _pbUrgency {
-  0%, 100% { opacity: 0; }
-  15% { opacity: 1; }
-  30% { opacity: 0; }
-  45% { opacity: 0.8; }
-  60% { opacity: 0; }
+  0%, 100% { opacity: 0; } 15% { opacity: 1; } 30% { opacity: 0; }
+  45% { opacity: 0.8; } 60% { opacity: 0; }
 }
 
-/* Revising: icon rotation + shimmer */
-.portal-badge-icon-spin {
-  animation: _pbIconSpin 3s linear infinite;
-}
-
-@keyframes _pbIconSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(-360deg); }
-}
+.portal-badge-icon-spin { animation: _pbIconSpin 3s linear infinite; }
+@keyframes _pbIconSpin { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
 
 .portal-badge-spin-icon::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
   background: linear-gradient(90deg, transparent, rgba(251, 146, 60, 0.07), transparent);
-  animation: _pbBreathe 3s ease-in-out infinite;
-  pointer-events: none;
+  animation: _pbBreathe 3s ease-in-out infinite; pointer-events: none;
 }
 
-/* Completed: brief afterglow flash */
 .portal-badge-settle::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
   background: rgba(52, 211, 153, 0.1);
-  animation: _pbSettle 4s ease-out infinite;
-  pointer-events: none;
+  animation: _pbSettle 4s ease-out infinite; pointer-events: none;
 }
+@keyframes _pbSettle { 0% { opacity: 0; } 5% { opacity: 1; } 15% { opacity: 0; } 100% { opacity: 0; } }
 
-@keyframes _pbSettle {
-  0%   { opacity: 0; }
-  5%   { opacity: 1; }
-  15%  { opacity: 0; }
-  100% { opacity: 0; }
-}
-
-/* ═══════════════════════════════════════════════════════
-   5C: Portal Skeleton Loading Pulse
-   ═══════════════════════════════════════════════════════ */
+/* ═══ Portal Skeleton (giữ) ═══ */
 .portal-skeleton {
-  background: linear-gradient(
-    90deg,
+  background: linear-gradient(90deg,
     rgba(255, 255, 255, 0.02) 0%,
     rgba(255, 255, 255, 0.05) 50%,
-    rgba(255, 255, 255, 0.02) 100%
-  );
+    rgba(255, 255, 255, 0.02) 100%);
   background-size: 200% 100%;
   animation: _portalShimmer 1.5s ease-in-out infinite;
   border-radius: 0.75rem;
 }
-
 @keyframes _portalShimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
 
-/* ═══════════════════════════════════════════════════════
-   5D: Portal Empty States
-   ═══════════════════════════════════════════════════════ */
+/* ═══ Portal Empty States — bỏ blur (không cần kính cho panel tĩnh), nâng text lên floor ═══ */
 .portal-empty-state {
   @apply flex flex-col items-center justify-center text-center py-12;
-  @apply bg-zinc-950/40 backdrop-blur-xl border border-dashed border-white/[0.06] rounded-2xl;
+  @apply border border-dashed border-white/[0.06] rounded-2xl;
+  background: hsl(var(--surface-1) / 0.6);
 }
+.portal-empty-state svg { @apply text-zinc-800 mb-3; }
+.portal-empty-state p { @apply text-muted-foreground text-body-sm; } /* zinc-500 cũ FAIL AA → floor zinc-400 */
 
-.portal-empty-state svg {
-  @apply text-zinc-800 mb-3;
-}
-
-.portal-empty-state p {
-  @apply text-zinc-500 text-sm;
+/* ════════════════════════════════════════════════════════════════
+   REDUCED MOTION — cho animation CSS tự chế (framer-motion đã có
+   <MotionConfig reducedMotion="user"> lo phần JS — mục 8)
+   ════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .portal-badge-breathe::after,
+  .portal-badge-scan::after,
+  .portal-badge-urgency::after,
+  .portal-badge-spin-icon::after,
+  .portal-badge-settle::after,
+  .portal-badge-icon-spin,
+  .portal-skeleton,
+  .animate-shimmer,
+  .animate-fade-in,
+  .radial-segment,
+  .pressable {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }

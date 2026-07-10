@@ -25,6 +25,38 @@ const config: Config = {
                 sans: ['var(--font-sans)', 'sans-serif'],
                 heading: ['var(--font-sans)', 'sans-serif'],
             },
+            // ── Type scale mobile 5 bậc + eyebrow (QĐ-4) — [size, { lineHeight, letterSpacing }] ──
+            fontSize: {
+                caption: ["0.75rem", { lineHeight: "1rem" }],            // 12px/16 — timestamp, meta, badge
+                "body-sm": ["0.875rem", { lineHeight: "1.375rem" }],    // 14px/22 — text phụ
+                body: ["1rem", { lineHeight: "1.5rem" }],               // 16px/24 — body mặc định + MỌI input
+                title: ["1.125rem", { lineHeight: "1.5rem" }],         // 18px/24 — card title, section heading
+                page: ["1.375rem", { lineHeight: "1.75rem" }],         // 22px/28 — page title mobile (md:text-3xl)
+                label: ["0.6875rem", { lineHeight: "1rem", letterSpacing: "0.06em" }], // 11px — eyebrow UPPERCASE duy nhất
+            },
+            // ── Touch tokens (mục 6) ──
+            spacing: {
+                touch: "2.75rem",      // 44px — min target (Apple HIG / WCAG AAA)
+                "touch-lg": "3rem",    // 48px — primary target (Material)
+            },
+            minHeight: {
+                touch: "2.75rem",
+                "touch-lg": "3rem",
+            },
+            // ── Z-index tokens — đọc từ CSS var, single source (khai tử 9999) ──
+            zIndex: {
+                base: "var(--z-base)",       // 0
+                raised: "var(--z-raised)",   // 10
+                sticky: "var(--z-sticky)",   // 30
+                nav: "var(--z-nav)",         // 40
+                sheet: "var(--z-sheet)",     // 50
+                dialog: "var(--z-dialog)",   // 60
+                popover: "var(--z-popover)", // 65
+                toast: "var(--z-toast)",     // 70
+            },
+            transitionTimingFunction: {
+                liquid: "cubic-bezier(0.16, 1, 0.3, 1)",
+            },
             colors: {
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
@@ -34,6 +66,7 @@ const config: Config = {
                 primary: {
                     DEFAULT: "hsl(var(--primary))",
                     foreground: "hsl(var(--primary-foreground))",
+                    accent: "hsl(var(--primary-accent) / <alpha-value>)",
                 },
                 secondary: {
                     DEFAULT: "hsl(var(--secondary))",
@@ -58,6 +91,36 @@ const config: Config = {
                 card: {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
+                },
+                // ── Semantic mở rộng (QĐ-4) ──
+                success: {
+                    DEFAULT: "hsl(var(--success) / <alpha-value>)",
+                    foreground: "hsl(var(--success-foreground))",
+                },
+                info: {
+                    DEFAULT: "hsl(var(--info) / <alpha-value>)",
+                    foreground: "hsl(var(--info-foreground))",
+                },
+                warning: {
+                    DEFAULT: "hsl(var(--warning) / <alpha-value>)",
+                    foreground: "hsl(var(--warning-foreground))",
+                },
+                surface: {
+                    0: "hsl(var(--surface-0) / <alpha-value>)",
+                    1: "hsl(var(--surface-1) / <alpha-value>)",
+                    2: "hsl(var(--surface-2) / <alpha-value>)",
+                    3: "hsl(var(--surface-3) / <alpha-value>)",
+                },
+                // 1 token status phục vụ đủ 4 slot (bg/bg-alpha/border/text) — Radix scale
+                status: {
+                    waiting: "hsl(var(--status-waiting) / <alpha-value>)",
+                    assigned: "hsl(var(--status-assigned) / <alpha-value>)",
+                    doing: "hsl(var(--status-doing) / <alpha-value>)",
+                    review: "hsl(var(--status-review) / <alpha-value>)",
+                    revision: "hsl(var(--status-revision) / <alpha-value>)",
+                    frame: "hsl(var(--status-frame) / <alpha-value>)",
+                    paused: "hsl(var(--status-paused) / <alpha-value>)",
+                    done: "hsl(var(--status-done) / <alpha-value>)",
                 },
                 // Tremor Colors
                 tremor: {
@@ -123,6 +186,7 @@ const config: Config = {
                 lg: "var(--radius)",
                 md: "calc(var(--radius) - 2px)",
                 sm: "calc(var(--radius) - 4px)",
+                xl: "calc(var(--radius) + 4px)", // radius modal/sheet (glass-3)
                 // Tremor
                 "tremor-small": "0.375rem",
                 "tremor-default": "0.5rem",

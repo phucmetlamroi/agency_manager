@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, userAgent } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { decrypt, encrypt, SESSION_MAX_AGE } from '@/lib/jwt'
 
@@ -19,6 +19,22 @@ export async function middleware(request: NextRequest) {
     const sessionCookie = request.cookies.get('session')
     // [QĐ-13] Giữ payload đã decrypt để rolling-refresh ở cuối (re-issue khi còn <50% hạn).
     let sessionPayload: any = null
+
+    // ── [Mobile P1 §2.2] DEVICE DETECTION — 1 nguồn chân lý ────────────────────
+    // Ưu tiên 1: cookie `view-mode` (toggle thủ công qua toggleMobileView, maxAge 1 năm).
+    // Ưu tiên 2: userAgent(req) — parser chính thức của next/server. QĐ-1: tablet +
+    // undefined ⇒ 'desktop' (iPadOS 13+ giả UA desktop → tablet nhận desktop layout).
+    // Set trên requestHeaders → finalResponse (§ "Response Assembly") forward tới layout.
+    const viewMode = request.cookies.get('view-mode')?.value
+    let deviceType: 'mobile' | 'desktop'
+    if (viewMode === 'mobile' || viewMode === 'desktop') {
+        deviceType = viewMode
+    } else {
+        const { device } = userAgent(request)
+        deviceType = device.type === 'mobile' ? 'mobile' : 'desktop'
+    }
+    requestHeaders.set('x-device-type', deviceType)
+    // ───────────────────────────────────────────────────────────────────────────
 
     // 1.5. Block Deprecated Paths (Phase 1)
     if (pathname.startsWith('/download') || pathname.startsWith('/extract')) {

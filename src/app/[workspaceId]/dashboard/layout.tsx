@@ -2,12 +2,10 @@ import { logout } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
-import { AdminShell } from '@/components/layout/AdminShell'
-import MobileLayoutShell from '@/components/layout/MobileLayoutShell'
+import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
-import { isMobileDevice } from '@/lib/device'
 
 // [Workspace ID] Permissive regex — allows UUID format AND legacy slug IDs
 // (vd: 'legacy-feb-2026', 'legacy-mar-2026' của Hustly Team profile được migrate
@@ -54,11 +52,6 @@ export default async function UserLayout({
 
     // [Sprint B] Trial banner removed.
 
-    // Mobile detection: dùng helper isMobileDevice() (user-agent + cookie 'view-mode' override).
-    // Trước đây dùng header 'x-device-type' nhưng middleware không bao giờ set →
-    // mobile users luôn nhận desktop AdminShell thay vì MobileLayoutShell.
-    const isMobile = await isMobileDevice()
-
     const handleLogout = async () => {
         'use server'
         await logout()
@@ -73,25 +66,15 @@ export default async function UserLayout({
         avatarUrl: (dbUser as any).avatarUrl,
     }
 
-    if (isMobile) {
-        return (
-            <MobileLayoutShell user={user} workspaceId={workspaceId} handleLogout={handleLogout} workspaceRole={workspaceRole}>
-                <RoleWatcher currentRole={dbUserRole} isTreasurer={dbUser.isTreasurer ?? false} />
-                {children}
-            </MobileLayoutShell>
-        )
-    }
-
-    // Auth Phase 3: hiển thị EmailMigrationModal nếu user cũ chưa hoàn tất migration.
-    // Modal KHÔNG thể đóng — block dashboard cho đến khi user nhập email + verify.
+    // Auth Phase 3: EmailMigrationModal (blocking) nếu user cũ chưa migrate email.
     const needsEmailMigration = dbUser.hasCompletedEmailMigration === false
-
-    // Impersonation banner: hiển thị nếu admin đang impersonate (audit fix #2.5)
+    // Impersonation banner (audit fix #2.5).
     const isImpersonating = (sessionUser as any).isImpersonating === true
     const impersonationExpiresAt = (sessionUser as any).impersonationExpiresAt as string | undefined
 
+    // [Mobile P1] AppShell hợp nhất — tự đọc getDeviceType() chọn desktop/mobile chrome.
     return (
-        <AdminShell user={user} workspaceId={workspaceId} viewRole="USER" workspaceRole={workspaceRole}>
+        <AppShell user={user} workspaceId={workspaceId} viewRole="USER" workspaceRole={workspaceRole} handleLogout={handleLogout}>
             <RoleWatcher currentRole={dbUserRole} isTreasurer={dbUser.isTreasurer ?? false} />
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />
@@ -104,6 +87,6 @@ export default async function UserLayout({
                 />
             )}
             {children}
-        </AdminShell>
+        </AppShell>
     )
 }

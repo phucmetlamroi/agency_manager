@@ -1,6 +1,6 @@
 // [review-fixes P1] Chrome cho các trang duyệt "Tệp" (browser/folder/shares/trash).
 // Route group (browser) → KHÔNG áp cho route player asset/[assetId] (nó full-bleed, sửa B9).
-// Membership đã được ../layout.tsx gate; đây chỉ dựng AdminShell/MobileLayoutShell + chọn
+// Membership đã được ../layout.tsx gate; đây chỉ dựng AppShell (hợp nhất, P1) + chọn
 // viewRole theo quyền admin WORKSPACE (admin thấy nav ADMIN, editor thấy nav USER). KHÔNG
 // redirect non-admin (đó là lỗi gốc B2/B3/B9). RoleWatcher.currentRole = role GLOBAL (khớp
 // /api/auth/role) để không lặp refresh; viewRole (workspace-scoped) chỉ dùng lọc nav.
@@ -8,10 +8,8 @@ import { redirect } from 'next/navigation'
 import { logout } from '@/lib/auth'
 import { verifyActiveSession, verifyProfileAdminAccess } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
-import { AdminShell } from '@/components/layout/AdminShell'
-import MobileLayoutShell from '@/components/layout/MobileLayoutShell'
+import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/db'
-import { isMobileDevice } from '@/lib/device'
 
 export default async function TeamBrowserLayout({
     children,
@@ -45,7 +43,6 @@ export default async function TeamBrowserLayout({
     const viewRole: 'ADMIN' | 'USER' = isWorkspaceAdmin ? 'ADMIN' : 'USER'
 
     const user = { username: dbUser.username, role: dbUser.role, isTreasurer: dbUser.isTreasurer, id: dbUser.id, avatarUrl: (dbUser as any).avatarUrl }
-    const isMobile = await isMobileDevice()
 
     const handleLogout = async () => {
         'use server'
@@ -53,19 +50,11 @@ export default async function TeamBrowserLayout({
         redirect('/login')
     }
 
-    if (isMobile) {
-        return (
-            <MobileLayoutShell user={user} workspaceId={workspaceId} handleLogout={handleLogout} workspaceRole={workspaceRole ?? undefined}>
-                <RoleWatcher currentRole={dbUser.role} isTreasurer={user.isTreasurer} />
-                {children}
-            </MobileLayoutShell>
-        )
-    }
-
+    // [Mobile P1] AppShell hợp nhất — tự đọc getDeviceType() chọn desktop/mobile chrome.
     return (
-        <AdminShell user={user} workspaceId={workspaceId} viewRole={viewRole} workspaceRole={workspaceRole ?? undefined}>
+        <AppShell user={user} workspaceId={workspaceId} viewRole={viewRole} workspaceRole={workspaceRole ?? undefined} handleLogout={handleLogout}>
             <RoleWatcher currentRole={dbUser.role} isTreasurer={user.isTreasurer} />
             {children}
-        </AdminShell>
+        </AppShell>
     )
 }

@@ -267,8 +267,8 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 gap: 6,
                                 padding: '8px 14px',
                                 borderRadius: 999,
-                                background: isActive ? `${tab.color}18` : 'transparent',
-                                border: isActive ? `1px solid ${tab.color}35` : '1px solid rgba(255,255,255,0.08)',
+                                background: isActive ? `color-mix(in srgb, ${tab.color} 9.41%, transparent)` : 'transparent',
+                                border: isActive ? `1px solid color-mix(in srgb, ${tab.color} 20.78%, transparent)` : '1px solid rgba(255,255,255,0.08)',
                                 color: isActive ? tab.color : '#71717A',
                                 fontSize: 12,
                                 fontWeight: 600,
@@ -284,7 +284,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                             <span style={{
                                 fontSize: 9, fontWeight: 800,
                                 padding: '1px 6px', borderRadius: 999,
-                                background: isActive ? `${tab.color}20` : 'rgba(255,255,255,0.04)',
+                                background: isActive ? `color-mix(in srgb, ${tab.color} 12.55%, transparent)` : 'rgba(255,255,255,0.04)',
                                 color: isActive ? tab.color : '#3F3F46',
                             }}>
                                 {tabCounts[tab.id]}

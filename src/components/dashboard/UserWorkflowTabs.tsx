@@ -420,8 +420,8 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                     <span
                                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0"
                                         style={{
-                                            border: `1px solid ${s.color}40`,
-                                            background: `${s.color}15`,
+                                            border: `1px solid color-mix(in srgb, ${s.color} 25.10%, transparent)`,
+                                            background: `color-mix(in srgb, ${s.color} 8.24%, transparent)`,
                                             color: s.color,
                                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         }}

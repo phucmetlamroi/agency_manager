@@ -64,7 +64,7 @@ export default function RequestsInbox({ workspaceId, initialRequests }: {
     if (requests.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center gap-4 py-20 text-center"
-                style={{ borderRadius: 20, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)' }}>
+                style={{ borderRadius: 20, background: 'hsl(var(--surface-1))', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div className="relative">
                     <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/25 to-violet-500/10 blur-2xl absolute inset-0" />
                     <div className="relative w-24 h-24 rounded-full flex items-center justify-center"
@@ -87,7 +87,7 @@ export default function RequestsInbox({ workspaceId, initialRequests }: {
                 const videoCount = r.videoList ? r.videoList.split('\n').map((s) => s.trim()).filter(Boolean).length : 0
                 const busy = busyId === r.id
                 return (
-                    <div key={r.id} style={{ borderRadius: 18, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 16px 40px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+                    <div key={r.id} style={{ borderRadius: 18, background: 'hsl(var(--surface-1))', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 16px 40px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
                         {/* Card header */}
                         <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             <div className="flex items-start justify-between gap-3">

@@ -156,7 +156,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                 className="overflow-hidden"
                 style={{
                     borderRadius: 20,
-                    background: '#18181B',
+                    background: 'hsl(var(--surface-1))',
                     border: '1px solid rgba(255,255,255,0.08)',
                     boxShadow: '0 24px 60px rgba(0,0,0,0.30)',
                 }}

@@ -151,6 +151,20 @@ async function resetLockoutOnSuccess(userId: string, ip: string) {
  *   - Padding response time 100-300ms.
  *   - Hỗ trợ rememberMe (JWT TTL 30d thay vì 7d).
  */
+/**
+ * [P0-10] Validate the post-login `?next=` target against open-redirect. Only a
+ * SAME-ORIGIN absolute path is allowed: single leading '/', no protocol-relative
+ * '//', no backslash trick, no scheme, and not /api or /login itself. Returns the
+ * safe path or null (→ caller falls back to the default destination).
+ */
+function safeNextPath(raw: unknown): string | null {
+    if (typeof raw !== 'string' || !raw) return null
+    if (!raw.startsWith('/')) return null
+    if (raw.startsWith('//') || raw.startsWith('/\\') || raw.includes('\\')) return null
+    if (raw.startsWith('/api') || raw.startsWith('/login')) return null
+    return raw
+}
+
 export async function loginAction(prevState: any, formData: FormData) {
     // Backward compat: chấp nhận cả 'username' field cũ và 'emailOrUsername' field mới
     const emailOrUsername = (
@@ -160,6 +174,9 @@ export async function loginAction(prevState: any, formData: FormData) {
     ).trim()
     const password = formData.get('password') as string
     const rememberMe = formData.get('rememberMe') === 'on' || formData.get('rememberMe') === 'true'
+    // [P0-10] Where to return after login (set by middleware as ?next= when a session
+    // expired mid-navigation). Validated against open-redirect below.
+    const nextPath = safeNextPath(formData.get('next'))
 
     if (!emailOrUsername || !password) {
         return { error: 'Vui lòng nhập đầy đủ thông tin.' }
@@ -364,7 +381,8 @@ export async function loginAction(prevState: any, formData: FormData) {
             redirect('/login')
         }
 
-        redirect(`/${firstWs.id}/admin`)
+        // [P0-10] Quay lại đúng trang trước khi phiên hết hạn nếu ?next= hợp lệ; nếu không → mặc định.
+        redirect(nextPath ?? `/${firstWs.id}/admin`)
 
     } catch (err) {
         if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err

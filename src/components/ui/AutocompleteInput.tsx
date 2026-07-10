@@ -129,7 +129,7 @@ export function AutocompleteInput({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 4 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute top-full mt-1.5 left-0 w-full z-50 max-h-[200px] overflow-y-auto rounded-2xl border border-[rgba(139,92,246,0.15)] bg-[#0A0A0A] shadow-[0_16px_48px_rgba(0,0,0,0.5)] custom-scrollbar"
+                        className="absolute top-full mt-1.5 left-0 w-full z-50 max-h-[200px] overflow-y-auto rounded-2xl border border-[rgba(139,92,246,0.15)] bg-surface-0 shadow-[0_16px_48px_rgba(0,0,0,0.5)] custom-scrollbar"
                     >
                         {emptyLabel && (
                             <button

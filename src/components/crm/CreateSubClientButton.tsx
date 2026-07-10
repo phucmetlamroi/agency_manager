@@ -41,7 +41,7 @@ export default function CreateSubClientButton({ parentId, parentName, workspaceI
 
             {isOpen && (
                 <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-[#1a1a1a] p-6 rounded-xl w-full max-w-sm border border-purple-500/30 shadow-2xl">
+                    <div className="bg-surface-1 p-6 rounded-xl w-full max-w-sm border border-purple-500/30 shadow-2xl">
                         <div className="flex justify-between items-start mb-4">
                             <h3 className="text-lg font-bold text-white">Thêm Khách hàng mới</h3>
                             <button onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-white">✕</button>

@@ -68,7 +68,7 @@ export default function RecordPaymentModal({ clientId, clientName, owed, paid, w
 
     return (
         <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', padding: 20 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: '90%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', borderRadius: 20, background: '#0A0A0A', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }} className="custom-scrollbar">
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '90%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', borderRadius: 20, background: 'hsl(var(--surface-0))', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }} className="custom-scrollbar">
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { decrypt } from '@/lib/jwt'
+import { decrypt, encrypt, SESSION_MAX_AGE } from '@/lib/jwt'
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
@@ -17,6 +17,8 @@ export async function middleware(request: NextRequest) {
 
     const requestHeaders = new Headers(request.headers)
     const sessionCookie = request.cookies.get('session')
+    // [QĐ-13] Giữ payload đã decrypt để rolling-refresh ở cuối (re-issue khi còn <50% hạn).
+    let sessionPayload: any = null
 
     // 1.5. Block Deprecated Paths (Phase 1)
     if (pathname.startsWith('/download') || pathname.startsWith('/extract')) {
@@ -59,6 +61,7 @@ export async function middleware(request: NextRequest) {
         try {
             const session = await decrypt(sessionCookie.value)
             if (!session?.user) throw new Error('Invalid session')
+            sessionPayload = session
 
             const role = session.user.role;
 
@@ -80,14 +83,25 @@ export async function middleware(request: NextRequest) {
                 }
             }
         } catch (err) {
-            console.error('[Middleware] Session Decrypt Error for path', pathname, err);
-            // Don't overly-aggressively delete cookies, just redirect to login for a fresh start 
-            // Vercel edge can sometimes throw errors decrypting if the key isn't perfectly synced.
-            const res = NextResponse.redirect(new URL('/login', request.url))
-            // Only drop the session if it's completely unreadable to prevent infinite loops, 
-            // but log it so we know.
-            console.log('[Middleware] Dropping session cookie due to decrypt error.');
-            res.cookies.delete('session')
+            const name = (err as Error)?.name
+            console.error('[Middleware] Session decrypt error for path', pathname, name);
+            // [Rủi ro #5] GIỮ cookie CHỈ khi lỗi có thể TRANSIENT — secret rotate chưa đồng bộ
+            // trên Edge (JWSSignatureVerificationFailed). Token hết hạn/hỏng THẬT (JWTExpired,
+            // JWSInvalid, JWTInvalid…) → XÓA cookie, nếu không cookie chết còn nguyên sẽ gây
+            // LOOP redirect vô hạn (trang bảo vệ → /login → /login cũng qua middleware → …).
+            const transient = name === 'JWSSignatureVerificationFailed'
+            // Trang KHÔNG bảo vệ (vd /login, /signup) phải được render — chỉ dọn cookie hỏng
+            // rồi next(), KHÔNG redirect (redirect /login khi đang ở /login = loop).
+            const protectedPaths = ['/admin', '/dashboard']
+            if (!protectedPaths.some(p => pathname.startsWith(p))) {
+                const res = NextResponse.next()
+                if (!transient) res.cookies.delete('session')
+                return res
+            }
+            const loginUrl = new URL('/login', request.url)
+            loginUrl.searchParams.set('next', pathname) // pathname-only → không open-redirect
+            const res = NextResponse.redirect(loginUrl)
+            if (!transient) res.cookies.delete('session')
             return res
         }
     }
@@ -104,6 +118,33 @@ export async function middleware(request: NextRequest) {
         maxAge: 30 * 60,
         path: '/'
     })
+
+    // [QĐ-13] Rolling refresh (jose — Edge-compatible): re-issue cookie session khi token
+    // còn <50% hạn (còn <15 ngày) → user active không bao giờ hết hạn giữa phiên (sliding
+    // window). BỎ QUA session impersonation — giữ nguyên TTL 2h của nó, tránh vô tình gia
+    // hạn phiên đóng-vai admin lên 30 ngày.
+    // ⚠️ Thu hồi phiên (force-logout / đổi mật khẩu → bump sessionVersion) KHÔNG enforce ở
+    // đây: Edge không có DB. Cổng thu hồi THẬT là verifyActiveSession() (src/lib/security.ts)
+    // so sessionVersion(JWT) vs DB ở tầng DAL — refresh chỉ gia hạn cookie, DAL vẫn chặn data.
+    if (sessionPayload?.user && !sessionPayload.user.isImpersonating) {
+        const msLeft = ((sessionPayload.exp ?? 0) * 1000) - Date.now()
+        if (msLeft > 0 && msLeft < (SESSION_MAX_AGE * 1000) / 2) {
+            // Giữ parity với login(): kèm claim `expires` (consumer /api/profile/select đọc nó)
+            // + copy nguyên `user` (role/sessionVersion/sessionProfileId… đều còn).
+            const fresh = await encrypt(
+                { user: sessionPayload.user, expires: new Date(Date.now() + SESSION_MAX_AGE * 1000) },
+                `${SESSION_MAX_AGE}s`,
+            )
+            finalResponse.cookies.set('session', fresh, {
+                maxAge: SESSION_MAX_AGE,
+                httpOnly: true,
+                // Khớp secure của auth.ts (Electron desktop chạy http → không đặt secure).
+                secure: process.env.NODE_ENV === 'production' && !process.env.ELECTRON_DESKTOP,
+                sameSite: 'lax',
+                path: '/',
+            })
+        }
+    }
 
     return finalResponse;
 }

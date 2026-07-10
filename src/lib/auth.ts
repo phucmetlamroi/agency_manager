@@ -1,7 +1,9 @@
 import { cookies } from 'next/headers'
 import { encrypt, decrypt } from './jwt'
 
-const DEFAULT_SESSION_DAYS = 7
+// [QĐ-13] Phiên mặc định 30 ngày (trước là 7 → hết hạn giữa phiên trên mobile, văng ra
+// login mất ngữ cảnh). Rolling refresh trong middleware giữ phiên sống khi user còn hoạt động.
+const DEFAULT_SESSION_DAYS = 30
 const REMEMBER_ME_DAYS = 30
 
 /**

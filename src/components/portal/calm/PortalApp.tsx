@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useMemo, type CSSProperties } from 'react'
-import { LayoutDashboard, Clapperboard, ReceiptText } from 'lucide-react'
+import { LayoutDashboard, Clapperboard, Files, ReceiptText } from 'lucide-react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import OverviewSurface from './OverviewSurface'
 import DeliverablesSurface from './DeliverablesSurface'
+import DocumentsSurface from './DocumentsSurface'
 import InvoicesSurface from './InvoicesSurface'
 import DeliverableDetailPanel from './DeliverableDetailPanel'
 import InvoiceDetailPanel from './InvoiceDetailPanel'
@@ -22,6 +23,7 @@ import type { Deliverable, Invoice, Workspace, SurfaceId, DeliverableActions } f
 const NAV: { id: SurfaceId; label: string; Icon: any }[] = [
     { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
     { id: 'deliverables', label: 'Deliverables', Icon: Clapperboard },
+    { id: 'documents', label: 'Document', Icon: Files },
     { id: 'invoices', label: 'Invoices', Icon: ReceiptText },
 ]
 
@@ -137,6 +139,7 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
                 <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
                     {active === 'overview' && <OverviewSurface key={'ov' + wsScope + scope} deliverables={scopedDels} invoices={scopedInvs} scope={scope} brands={brands} contactName={contactName} periodLabel={periodLabel} onNav={onNav} openDeliverable={openDeliverable} openInvoice={openInvoice} />}
                     {active === 'deliverables' && <DeliverablesSurface key={'dl' + wsScope + scope} deliverables={scopedDels} brands={brands} showPeriod={wsScope === 'all'} openDeliverable={openDeliverable} />}
+                    {active === 'documents' && <DocumentsSurface key={'doc' + wsScope + scope} actions={effectiveActions} wsScope={wsScope} scope={scope} />}
                     {active === 'invoices' && <InvoicesSurface key={'iv' + wsScope + scope} invoices={scopedInvs} brands={brands} showPeriod={wsScope === 'all'} openInvoice={openInvoice} activeId={openInv} />}
                 </div>
 
@@ -147,8 +150,9 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
                     {NAV.map(it => {
                         const on = active === it.id
                         const Icon = it.Icon
+                        const isDocument = it.id === 'documents'
                         return (
-                            <button key={it.id} onClick={() => onNav(it.id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', color: on ? 'var(--accent-fg)' : 'var(--fg-3)' }}>
+                            <button key={it.id} onClick={() => onNav(it.id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', color: on ? (isDocument ? '#8B5CF6' : 'var(--accent-fg)') : 'var(--fg-3)' }}>
                                 <Icon size={19} />
                                 <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{it.label}</span>
                             </button>

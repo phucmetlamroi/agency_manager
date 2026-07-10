@@ -368,7 +368,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                     className="absolute -right-3.5 top-20 h-7 w-7 rounded-full border shadow-md z-50 transition-colors"
                     style={{
                         borderColor: SIDEBAR_BORDER,
-                        background: "#18181B",
+                        background: "hsl(var(--surface-1))",
                         color: INACTIVE_TEXT,
                     }}
                     onClick={handleToggleCollapse}

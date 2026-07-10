@@ -423,7 +423,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
             {/* ─── TABLE (Glass Card) ────────────────────── */}
             <div style={{
                 borderRadius: 20,
-                background: '#18181B',
+                background: 'hsl(var(--surface-1))',
                 border: '1px solid rgba(255,255,255,0.08)',
                 boxShadow: '0 24px 60px rgba(0,0,0,0.30)',
                 overflow: 'hidden',

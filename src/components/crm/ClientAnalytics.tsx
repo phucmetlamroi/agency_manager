@@ -32,7 +32,7 @@ type ClientData = {
 const COLORS = ['#8B5CF6', '#A855F7', '#C084FC', '#7C3AED', '#6366F1', '#D8B4FE']
 
 const GlassCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => (
-    <div className={`relative overflow-hidden rounded-2xl group ${className}`} style={{ background: '#0A0A0A', border: '1px solid rgba(139,92,246,0.15)' }}>
+    <div className={`relative overflow-hidden rounded-2xl group ${className}`} style={{ background: 'hsl(var(--surface-0))', border: '1px solid rgba(139,92,246,0.15)' }}>
         {/* Ambient Hover Glow */}
         <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
         <div className="relative z-10 h-full">{children}</div>
@@ -76,7 +76,7 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
             />
 
             {/* BENTO HERO BANNER */}
-            <div className="relative overflow-hidden rounded-[2rem] p-8 group" style={{ background: '#0A0A0A', border: '1px solid rgba(139,92,246,0.15)' }}>
+            <div className="relative overflow-hidden rounded-[2rem] p-8 group" style={{ background: 'hsl(var(--surface-0))', border: '1px solid rgba(139,92,246,0.15)' }}>
                 <div className="absolute inset-0 bg-gradient-to-r from-violet-500/10 via-purple-500/5 to-transparent pointer-events-none" />
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
@@ -239,7 +239,7 @@ export default function ClientAnalytics({ client, distribution, workspaceId, rat
                     {/* [Bug fix] scrollable + no slice cap → all tasks visible, count matches the card */}
                     <div className="max-h-[420px] overflow-y-auto overflow-x-auto custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            <thead className="sticky top-0 z-10" style={{ background: '#0A0A0A' }}>
+                            <thead className="sticky top-0 z-10" style={{ background: 'hsl(var(--surface-0))' }}>
                                 <tr className="text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-white/10">
                                     <th className="pb-3 pl-2">Tên Task</th>
                                     <th className="pb-3">Trạng thái</th>

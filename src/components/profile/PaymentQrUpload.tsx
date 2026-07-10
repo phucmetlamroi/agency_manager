@@ -71,7 +71,7 @@ export default function PaymentQrUpload({ user }: { user: any }) {
     }
 
     return (
-        <Card className="bg-[#1a1a1a] border-[#333]">
+        <Card className="bg-surface-1 border-[#333]">
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <CreditCard className="w-5 h-5 text-green-400" />

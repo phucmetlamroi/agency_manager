@@ -267,7 +267,7 @@ export default async function UserDashboard({ params, searchParams }: {
                 <div className="xl:col-span-4 min-h-[328px]">
                     <Suspense
                         fallback={
-                            <div className="h-full rounded-[26px] bg-[#0A0A0A] border border-[rgba(139,92,246,0.15)] animate-pulse" />
+                            <div className="h-full rounded-[26px] bg-surface-0 border border-[rgba(139,92,246,0.15)] animate-pulse" />
                         }
                     >
                         <WidgetRankings workspaceId={workspaceId} />

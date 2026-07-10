@@ -10,13 +10,19 @@ export default function LoginPage() {
     const [state, formAction, isPending] = useActionState(loginAction, null)
     const [showPassword, setShowPassword] = useState(false)
     const [urlError, setUrlError] = useState<string | null>(null)
+    // [P0-10] returnTo path (middleware sets ?next= when a session expires mid-nav) —
+    // replayed as a hidden field so loginAction sends the user back. Read post-mount to
+    // avoid a hydration mismatch; loginAction re-validates it against open-redirect.
+    const [nextPath, setNextPath] = useState<string | null>(null)
 
     // Surface Google sign-in errors passed back as ?error= (read from
     // window.location to avoid a useSearchParams Suspense requirement).
     useEffect(() => {
-        const err = new URLSearchParams(window.location.search).get('error')
+        const params = new URLSearchParams(window.location.search)
+        const err = params.get('error')
         if (err === 'google') setUrlError('Đăng nhập bằng Google thất bại. Vui lòng thử lại.')
         else if (err === 'google_unverified') setUrlError('Email Google của bạn chưa được xác minh.')
+        setNextPath(params.get('next'))
     }, [])
 
     return (
@@ -31,6 +37,9 @@ export default function LoginPage() {
                 action={formAction}
                 className="relative w-full max-w-[440px] bg-zinc-950/60 backdrop-blur-xl border border-white/8 rounded-3xl shadow-2xl shadow-black/60 p-6 sm:p-8 flex flex-col gap-5"
             >
+                {/* [P0-10] returnTo — loginAction re-validates against open-redirect */}
+                {nextPath && <input type="hidden" name="next" value={nextPath} />}
+
                 {/* Header */}
                 <div className="text-center mb-2">
                     <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/30">

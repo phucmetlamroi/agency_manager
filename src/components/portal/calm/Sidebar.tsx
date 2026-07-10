@@ -1,12 +1,13 @@
 'use client'
 
-import { LayoutDashboard, Clapperboard, ReceiptText, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, Clapperboard, Files, ReceiptText, ShieldCheck } from 'lucide-react'
 import { mapInvoiceStatus, initials } from './format'
 import type { Deliverable, Invoice, SurfaceId } from './types'
 
 const NAV: { id: SurfaceId; label: string; Icon: any }[] = [
     { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
     { id: 'deliverables', label: 'Deliverables', Icon: Clapperboard },
+    { id: 'documents', label: 'Document', Icon: Files },
     { id: 'invoices', label: 'Invoices', Icon: ReceiptText },
 ]
 
@@ -56,13 +57,27 @@ export default function Sidebar({ active, onNav, deliverables, invoices, account
                     const b = badge[item.id] || 0
                     const danger = badgeKind[item.id] === 'danger'
                     const Icon = item.Icon
+                    const isDocument = item.id === 'documents'
                     return (
                         <button key={item.id} onClick={() => onNav(item.id)}
                             onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'var(--surface-2)' }}
                             onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent' }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 11px', borderRadius: 10, cursor: 'pointer', border: '1px solid ' + (on ? 'var(--accent-line)' : 'transparent'), background: on ? 'var(--accent-soft)' : 'transparent', transition: 'background .15s', textAlign: 'left', width: '100%' }}>
-                            <Icon size={18} style={{ color: on ? 'var(--accent-fg)' : 'var(--fg-2)' }} />
-                            <span style={{ flex: 1, fontSize: 14, fontWeight: on ? 700 : 600, color: on ? 'var(--fg)' : 'var(--fg-2)' }}>{item.label}</span>
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12,
+                                padding: '10px 11px',
+                                borderRadius: 10,
+                                cursor: 'pointer',
+                                border: '1px solid ' + (on ? (isDocument ? 'rgba(139,92,246,0.55)' : 'var(--accent-line)') : 'transparent'),
+                                background: on ? (isDocument ? '#8B5CF6' : 'var(--accent-soft)') : 'transparent',
+                                boxShadow: on && isDocument ? '0 8px 22px rgba(139,92,246,0.26)' : 'none',
+                                transition: 'background .15s',
+                                textAlign: 'left',
+                                width: '100%',
+                            }}>
+                            <Icon size={18} style={{ color: on ? (isDocument ? '#FFFFFF' : 'var(--accent-fg)') : 'var(--fg-2)' }} />
+                            <span style={{ flex: 1, fontSize: 14, fontWeight: on ? 700 : 600, color: on ? (isDocument ? '#FFFFFF' : 'var(--fg)') : 'var(--fg-2)' }}>{item.label}</span>
                             {b > 0 && (
                                 <span className="num" style={{ minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: danger ? 'var(--danger)' : 'var(--attn)', background: danger ? 'var(--danger-soft)' : 'var(--attn-soft)', border: '1px solid ' + (danger ? 'var(--danger-line)' : 'var(--attn-line)') }}>{b}</span>
                             )}

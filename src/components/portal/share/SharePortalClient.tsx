@@ -28,6 +28,7 @@ import {
     verifyPortalNotifyEmail,
     removePortalNotifyEmail,
 } from '@/actions/share-portal-actions'
+import { downloadDocumentsViaToken, getDocumentsViaToken } from '@/actions/share-document-actions'
 import type { Deliverable, Invoice, Workspace, DeliverableActions } from '@/components/portal/calm/types'
 
 export default function SharePortalClient({ token, clientName, profileName, brandLogoUrl = null, brandAccent = null, deliverables, invoices, workspaces }: {
@@ -56,6 +57,8 @@ export default function SharePortalClient({ token, clientName, profileName, bran
         notifyRequest: (email) => requestPortalNotifyEmail(token, email),
         notifyVerify: (code) => verifyPortalNotifyEmail(token, code),
         notifyRemove: () => removePortalNotifyEmail(token),
+        documents: () => getDocumentsViaToken(token),
+        downloadDocuments: (versionIds) => downloadDocumentsViaToken(token, versionIds),
     }), [token])
 
     return (

@@ -1,7 +1,7 @@
 /* Serialized DTO shapes consumed by the Calm-Dark portal surfaces.
    (Output of getClientTasks / getClientInvoices after serializeDecimal.) */
 
-export type SurfaceId = 'overview' | 'deliverables' | 'invoices'
+export type SurfaceId = 'overview' | 'deliverables' | 'documents' | 'invoices'
 
 export interface RatingDTO {
     creativeQuality: number
@@ -69,6 +69,54 @@ export interface Invoice {
 }
 
 /** A period the work was booked under — mirrors the admin's workspace switcher. */
+export interface DocumentVersion {
+    id: string
+    versionNumber: number
+    fileName: string
+    sizeBytes: string
+    durationMs: number | null
+    width: number | null
+    height: number | null
+    createdAt: string
+    posterUrl: string | null
+    storyboardVttUrl: string | null
+    publicCommentCount: number
+}
+
+export interface DocumentAsset {
+    id: string
+    folderId: string
+    title: string
+    mediaKind: 'video' | 'image'
+    workspaceId: string
+    workspaceName: string | null
+    clientId: number | null
+    clientName: string | null
+    statusLabel: string | null
+    reviewUrl: string | null
+    versionCount: number
+    currentVersion: DocumentVersion
+    createdAt: string
+}
+
+export interface DocumentFolder {
+    id: string
+    parentId: string | null
+    name: string
+    workspaceId: string | null
+    clientId: number | null
+    itemCount: number
+    totalBytes: string
+    kind: 'workspace' | 'client' | 'folder' | 'uncategorized'
+}
+
+export interface DocumentsSnapshot {
+    folders: DocumentFolder[]
+    assets: DocumentAsset[]
+    summary: { folderCount: number; assetCount: number; totalBytes: string }
+    generatedAt: string
+}
+
 export interface Workspace {
     id: string
     name: string
@@ -157,6 +205,13 @@ export interface DeliverableActions {
     notifyRequest?: (email: string) => Promise<{ success: boolean; error?: string }>
     notifyVerify?: (code: string) => Promise<{ success: boolean; error?: string }>
     notifyRemove?: () => Promise<{ success: boolean; error?: string }>
+    /** Token-scoped client Document browser. Server re-checks client/workspace scope on every call. */
+    documents?: () => Promise<DocumentsSnapshot | null>
+    downloadDocuments?: (versionIds: string[]) => Promise<{
+        success: boolean
+        error?: string
+        files?: { versionId: string; fileName: string; url: string; expiresAt: string }[]
+    }>
 }
 
 /**

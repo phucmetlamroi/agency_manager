@@ -89,8 +89,12 @@ export function AnnotationCanvas({
     const [rootSize, setRootSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
     const [draft, setDraft] = useState<{ start: Pt; cur: Pt; points: Pt[] } | null>(null)
     const draftRef = useRef(draft)
-    draftRef.current = draft
     const drawingRef = useRef(false)
+
+    // Keep pointer-up bound to the latest draft without mutating a ref during render.
+    useLayoutEffect(() => {
+        draftRef.current = draft
+    }, [draft])
 
     // Track the stage size so the content box recomputes on resize / fullscreen.
     // [B7] Measure via getBoundingClientRect (sub-pixel, layout-accurate even during the
@@ -161,17 +165,8 @@ export function AnnotationCanvas({
     // the cause is elsewhere (not the measurement race this fix targets).
     useEffect(() => {
         if (typeof window === 'undefined' || window.localStorage?.getItem('review:debug') !== '1') return
-        // eslint-disable-next-line no-console
         console.debug('[annotation] box', { editable, rootSize, liveDims, intrinsicWidth, intrinsicHeight, box })
     }, [editable, rootSize, liveDims, intrinsicWidth, intrinsicHeight, box])
-
-    // Abandon any half-drawn stroke if we leave edit mode.
-    useEffect(() => {
-        if (!editable) {
-            drawingRef.current = false
-            setDraft(null)
-        }
-    }, [editable])
 
     const svgRef = useRef<SVGSVGElement>(null)
     const eventToNorm = useCallback((clientX: number, clientY: number): Pt => {
@@ -229,62 +224,41 @@ export function AnnotationCanvas({
         [tool, color, size, onCommitShape],
     )
 
-    if (!box) {
-        return editable ? (
-            <div className="absolute inset-0 pointer-events-none z-50">
-                <div className="absolute left-2 top-16 rounded bg-black/90 p-2 font-mono text-[10px] text-red-400 border border-red-500/20">
-                    <div>Canvas: Mounted (Error)</div>
-                    <div>Box: null (Aspect calculations blocked)</div>
-                    <div>RootSize: {rootSize.w}x{rootSize.h}</div>
-                    <div>LiveDims: {liveDims ? `${liveDims.w}x${liveDims.h}` : 'null'}</div>
-                    <div>Intrinsics: {intrinsicWidth ?? 'null'}x{intrinsicHeight ?? 'null'}</div>
-                </div>
-            </div>
-        ) : null
-    }
-    const vbh = viewBoxHeight(box)
+    const vbh = box ? viewBoxHeight(box) : null
 
     return (
-        // The container never intercepts clicks; only the editable SVG does, so the
-        // click-to-play toggle underneath keeps working in read-only view.
+        // Keep the measurement root mounted even before `box` exists. Returning early
+        // here makes the ResizeObserver's target disappear, so a first 0x0 measurement
+        // can never recover and the drawing surface stays unavailable forever.
         <div
             ref={rootRef}
-            className={`absolute inset-0 ${editable ? 'pointer-events-auto touch-none select-none' : 'pointer-events-none'}`}
+            className={`absolute inset-0 ${editable && box ? 'pointer-events-auto touch-none select-none' : 'pointer-events-none'}`}
         >
-            {/* Visual debug overlay visible to help diagnose drawing issue on user hardware */}
-            {editable && (
-                <div className="absolute left-2 top-16 z-50 rounded bg-black/90 p-2 font-mono text-[10px] text-emerald-400 border border-emerald-500/20 pointer-events-none">
-                    <div>Canvas: Mounted (OK)</div>
-                    <div>RootSize: {rootSize.w}x{rootSize.h}</div>
-                    <div>LiveDims: {liveDims ? `${liveDims.w}x${liveDims.h}` : 'null'}</div>
-                    <div>Intrinsics: {intrinsicWidth ?? 'null'}x{intrinsicHeight ?? 'null'}</div>
-                    <div>Box: {box.left.toFixed(0)},{box.top.toFixed(0)} ({box.width.toFixed(0)}x{box.height.toFixed(0)})</div>
-                    <div>Draft: {draft ? `points=${draft.points.length}` : 'null'}</div>
-                </div>
+            {box && vbh != null && (
+                <svg
+                    ref={svgRef}
+                    viewBox={`0 0 ${VBW} ${vbh}`}
+                    preserveAspectRatio="none"
+                    className={editable ? 'pointer-events-auto absolute touch-none select-none cursor-crosshair' : 'pointer-events-none absolute'}
+                    style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
+                    onPointerDown={onPointerDown}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={finish}
+                    onPointerCancel={finish}
+                >
+                    {/* [annotation ROOT-CAUSE fix] Full-box transparent HIT TARGET. An <svg> with
+                        pointer-events:auto resolves to `visiblePainted` — it only catches a pointer where
+                        it is actually PAINTED. Every shape uses fill:'none' (stroke-only), and at the very
+                        instant the user starts the first stroke there are ZERO shapes → nothing painted →
+                        pointerdown fell THROUGH the empty svg to the <video> beneath (whose click is
+                        disabled while drawing) and onPointerDown NEVER fired = "toolbar works, canvas dead".
+                        Using `fill="none"` with `pointerEvents="all"` is the bulletproof SVG standard to make
+                        the entire viewBox area hit-testable regardless of browser opacity/paint quirks. */}
+                    {editable && <rect x={0} y={0} width={VBW} height={vbh} fill="none" pointerEvents="all" />}
+                    {shapes.map((s, i) => renderShape(s, vbh, `s${i}`))}
+                    {editable && draft && renderDraft(tool, color, size, draft, vbh)}
+                </svg>
             )}
-            <svg
-                ref={svgRef}
-                viewBox={`0 0 ${VBW} ${vbh}`}
-                preserveAspectRatio="none"
-                className={editable ? 'pointer-events-auto absolute touch-none select-none cursor-crosshair' : 'pointer-events-none absolute'}
-                style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={finish}
-                onPointerCancel={finish}
-            >
-                {/* [annotation ROOT-CAUSE fix] Full-box transparent HIT TARGET. An <svg> with
-                    pointer-events:auto resolves to `visiblePainted` — it only catches a pointer where
-                    it is actually PAINTED. Every shape uses fill:'none' (stroke-only), and at the very
-                    instant the user starts the first stroke there are ZERO shapes → nothing painted →
-                    pointerdown fell THROUGH the empty svg to the <video> beneath (whose click is
-                    disabled while drawing) and onPointerDown NEVER fired = "toolbar works, canvas dead".
-                    Using `fill="none"` with `pointerEvents="all"` is the bulletproof SVG standard to make 
-                    the entire viewBox area hit-testable regardless of browser opacity/paint quirks. */}
-                {editable && <rect x={0} y={0} width={VBW} height={vbh} fill="none" pointerEvents="all" />}
-                {shapes.map((s, i) => renderShape(s, vbh, `s${i}`))}
-                {draft && renderDraft(tool, color, size, draft, vbh)}
-            </svg>
         </div>
     )
 }

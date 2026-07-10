@@ -10,6 +10,7 @@ import { Bell, BellRing, Loader2, X } from 'lucide-react'
 interface Props {
     slug: string
     assetId: string
+    compact?: boolean
 }
 
 type Step = 'form' | 'pin'
@@ -23,7 +24,7 @@ async function readErr(res: Response): Promise<string> {
     }
 }
 
-export function GuestNotifyControl({ slug, assetId }: Props) {
+export function GuestNotifyControl({ slug, assetId, compact = false }: Props) {
     const [subscribed, setSubscribed] = useState<boolean | null>(null)
     const [open, setOpen] = useState(false)
     const [step, setStep] = useState<Step>('form')
@@ -135,10 +136,15 @@ export function GuestNotifyControl({ slug, assetId }: Props) {
         return (
             <span
                 title="Email updates are on. Use the unsubscribe link in any email to turn them off."
-                className="flex h-9 items-center gap-1.5 rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-3 text-sm font-medium text-emerald-300"
+                aria-label="Email updates are on"
+                className={
+                    compact
+                        ? 'grid h-8 w-8 place-items-center rounded-md border border-emerald-400/25 bg-emerald-500/10 text-emerald-300'
+                        : 'flex h-9 items-center gap-1.5 rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-3 text-sm font-medium text-emerald-300'
+                }
             >
                 <BellRing className="h-4 w-4" />
-                <span className="hidden sm:inline">Updates on</span>
+                <span className={compact ? 'sr-only' : 'hidden sm:inline'}>Updates on</span>
             </span>
         )
     }
@@ -148,11 +154,16 @@ export function GuestNotifyControl({ slug, assetId }: Props) {
             <button
                 ref={triggerRef}
                 onClick={togglePanel}
-                className="flex h-9 items-center gap-1.5 rounded-lg border border-white/10 px-3 text-sm text-white/80 hover:bg-white/10"
+                className={
+                    compact
+                        ? 'grid h-8 w-8 place-items-center rounded-md text-white/70 transition hover:bg-white/[0.08] hover:text-white'
+                        : 'flex h-9 items-center gap-1.5 rounded-lg border border-white/10 px-3 text-sm text-white/80 hover:bg-white/10'
+                }
                 title="Get email updates for this review"
+                aria-label="Get email updates for this review"
             >
                 <Bell className="h-4 w-4" />
-                <span className="hidden sm:inline">Get updates</span>
+                <span className={compact ? 'sr-only' : 'hidden sm:inline'}>Get updates</span>
             </button>
             {open && mounted && createPortal(
                 <>
@@ -170,19 +181,19 @@ export function GuestNotifyControl({ slug, assetId }: Props) {
 
                         {step === 'form' ? (
                             <>
-                                <p className="mb-2 text-xs text-white/50">Get an email when a new version is ready. We'll send a 6-digit code to confirm.</p>
+                                <p className="mb-2 text-xs text-white/50">Get an email when a new version is ready. We&apos;ll send a 6-digit code to confirm.</p>
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="you@example.com"
-                                    className="mb-2 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-indigo-400/50"
+                                    className="mb-2 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-violet-400/50"
                                     onKeyDown={(e) => e.key === 'Enter' && email.trim() && sendCode()}
                                 />
                                 <button
                                     onClick={sendCode}
                                     disabled={busy || !email.trim()}
-                                    className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-50"
+                                    className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-400 disabled:opacity-50"
                                 >
                                     {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                     Send code

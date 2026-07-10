@@ -30,7 +30,7 @@ export interface PlayerController {
     volume: number
     levels: QualityLevel[]
     currentLevel: number // -1 = auto
-    nativeHls: boolean // iPhone Safari path (no quality control)
+    nativeHls: boolean // Native-only fallback (typically iPhone/iPad Safari; no quality control)
     play: () => void
     pause: () => void
     toggle: () => void
@@ -81,7 +81,6 @@ export function useHlsPlayer(opts: {
     const [currentLevel, setCurrentLevel] = useState(-1)
     const [nativeHls, setNativeHls] = useState(false)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const hlsRef = useRef<any>(null)
     const rvfcHandleRef = useRef<number | null>(null)
     const rafHandleRef = useRef<number | null>(null)
@@ -115,6 +114,8 @@ export function useHlsPlayer(opts: {
         let cancelled = false
         setReady(false)
         setError(null)
+        setNativeHls(false)
+        setCurrentLevel(-1)
         lastFrameRef.current = -1
         refreshAttemptsRef.current = 0
         setFrame(0)
@@ -127,29 +128,28 @@ export function useHlsPlayer(opts: {
                 if (cancelled || !video) return
                 const url = hlsUrl(token.playbackId, token.tokens.playback)
 
-                if (nativeCanPlay) {
-                    setNativeHls(true)
-                    video.src = url
-                    setReady(true)
-                    return
-                }
-
                 const mod = await import('hls.js')
                 const Hls = mod.default
                 if (cancelled) return
                 if (!Hls.isSupported()) {
-                    // Last-resort: hand the URL to the element and hope for native support.
-                    video.src = url
-                    setNativeHls(true)
-                    setReady(true)
-                    return
+                    // iPhone/iPad Safari owns HLS natively. On every browser that supports
+                    // hls.js we deliberately use it instead: native implementations hide the
+                    // rendition picker and may begin at a low ABR rendition with no API for us
+                    // to correct it. The signed Mux token still orders native renditions high→low.
+                    if (nativeCanPlay) {
+                        setNativeHls(true)
+                        video.src = url
+                        setReady(true)
+                        return
+                    }
+                    throw new Error(loadErrorText)
                 }
                 // [BR-06] Kill the "blurry first 4–5s". Root cause: hls.js defaults to the
                 // LOWEST rendition and runs a bandwidth probe before ABR climbs — a review
                 // tool must be sharp from 00:00 (the first seconds are exactly what reviewers
                 // scrutinize). Countermeasures, in order:
-                //   • autoStartLoad:false + pin startLevel to the TOP rendition (below) before
-                //     any media loads — the single-player sharp-from-frame-0 guarantee.
+                //   • autoStartLoad:false + select startLevel from the parsed rendition metadata
+                //     (below) before ANY media fragment loads — sharp from frame 0.
                 //   • testBandwidth:false — don't drop to a low level to probe the pipe; honour
                 //     the pinned startLevel instead.
                 //   • abrEwmaDefaultEstimate high — assume a fast connection until real
@@ -180,13 +180,22 @@ export function useHlsPlayer(opts: {
                         label: l.height ? `${l.height}p` : `#${i + 1}`,
                     }))
                     setLevels(lv)
-                    // Single player begins at the highest rendition (B6). A compact player lets
-                    // ABR choose within the player-size cap so a side-by-side Compare doesn't pull
-                    // 2× top-bitrate streams at once.
+                    // Single player begins at the actual highest rendition (BR-06). Mux can order
+                    // variants high→low for native playback, but hls.js does not promise that its
+                    // internal array preserves that ordering. Choosing `length - 1` therefore picked
+                    // the *lowest* level for some manifests and made every review start soft.
+                    // `startLevel` sets only the first fragment; ABR remains automatic afterwards.
+                    // A compact Compare player lets ABR choose within its player-size cap so two
+                    // streams do not pull their top bitrates at once.
                     if (!compact) {
-                        const topLevel = Math.max(0, hls.levels.length - 1)
+                        const topLevel = hls.levels.reduce((bestIndex: number, level: { height?: number; bitrate?: number }, index: number, all: Array<{ height?: number; bitrate?: number }>) => {
+                            const best = all[bestIndex]
+                            const bestHeight = best?.height ?? 0
+                            const levelHeight = level.height ?? 0
+                            if (levelHeight !== bestHeight) return levelHeight > bestHeight ? index : bestIndex
+                            return (level.bitrate ?? 0) > (best?.bitrate ?? 0) ? index : bestIndex
+                        }, 0)
                         hls.startLevel = topLevel
-                        hls.currentLevel = topLevel
                     }
                     hls.startLoad()
                     setReady(true)
@@ -233,6 +242,7 @@ export function useHlsPlayer(opts: {
             }
             setNativeHls(false)
             setLevels([])
+            setCurrentLevel(-1)
             if (video) {
                 video.removeAttribute('src')
                 try {
@@ -242,7 +252,7 @@ export function useHlsPlayer(opts: {
                 }
             }
         }
-    }, [enabled, versionId, videoRef])
+    }, [compact, enabled, loadErrorText, versionId, videoRef])
 
     // ── frame tracking (rVFC when available; rAF/timeupdate fallback) ──
     useEffect(() => {

@@ -47,7 +47,7 @@ function UnsubscribeInner() {
                         disabled={state === 'busy' || !token}
                         style={{
                             padding: '10px 22px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                            background: '#7C3AED', color: '#fff', fontWeight: 700, fontSize: 14, opacity: state === 'busy' ? 0.6 : 1,
+                            background: 'hsl(var(--primary))', color: '#fff', fontWeight: 700, fontSize: 14, opacity: state === 'busy' ? 0.6 : 1,
                         }}
                     >
                         {state === 'busy' ? 'Unsubscribing…' : 'Unsubscribe'}

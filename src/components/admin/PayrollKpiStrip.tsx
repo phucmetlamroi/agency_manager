@@ -68,7 +68,7 @@ export default function PayrollKpiStrip({ totals }: { totals: PayrollTotals }) {
                                 className="w-8 h-8 rounded-full grid place-items-center flex-shrink-0"
                                 style={{ backgroundColor: 'rgba(139,92,246,0.1)' }}
                             >
-                                <Icon className="w-4 h-4" style={{ color: '#D8B4FE' }} />
+                                <Icon className="w-4 h-4" style={{ color: 'hsl(var(--primary-accent))' }} />
                             </span>
                         </div>
 
@@ -91,14 +91,14 @@ export default function PayrollKpiStrip({ totals }: { totals: PayrollTotals }) {
                                 <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#211B31' }}>
                                     <motion.div
                                         className="h-full rounded-full"
-                                        style={{ backgroundColor: '#8B5CF6' }}
+                                        style={{ backgroundColor: 'hsl(var(--primary))' }}
                                         initial={{ width: 0 }}
                                         animate={{ width: `${paidPct}%` }}
                                         transition={{ delay: 0.3, duration: 0.6, ease: 'easeOut' }}
                                     />
                                 </div>
                                 <div className="text-[11px] mt-1.5" style={{ color: '#A1A1AA' }}>
-                                    Đã trả <span style={{ color: '#D8B4FE', fontWeight: 600 }}>{paid}</span>/{totals.people}
+                                    Đã trả <span style={{ color: 'hsl(var(--primary-accent))', fontWeight: 600 }}>{paid}</span>/{totals.people}
                                 </div>
                             </div>
                         ) : (

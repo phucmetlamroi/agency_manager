@@ -557,7 +557,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                         <div>
                             <span style={{
                                 fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px',
-                                color: '#8b5cf6'
+                                color: 'hsl(var(--primary))'
                             }}>
                                 CHI TIẾT DỰ ÁN
                             </span>

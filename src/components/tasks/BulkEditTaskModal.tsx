@@ -148,7 +148,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
         key in draft ? (
             <span
                 className="inline-block w-2 h-2 rounded-full ml-2"
-                style={{ background: '#8B5CF6', boxShadow: '0 0 8px rgba(139,92,246,0.6)' }}
+                style={{ background: 'hsl(var(--primary))', boxShadow: '0 0 8px rgba(139,92,246,0.6)' }}
                 title="Đã chỉnh — sẽ áp dụng"
             />
         ) : null
@@ -276,7 +276,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                         {tabDirty && (
                                             <span
                                                 className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full"
-                                                style={{ background: '#8B5CF6' }}
+                                                style={{ background: 'hsl(var(--primary))' }}
                                             />
                                         )}
                                     </button>

@@ -64,7 +64,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                     {/* Header */}
                     <div className="p-4 border-b flex justify-between items-center shrink-0" style={{ borderColor: 'rgba(139,92,246,0.1)', backgroundColor: 'rgba(139,92,246,0.04)' }}>
                         <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                            <CreditCard className="w-5 h-5" style={{ color: '#D8B4FE' }} />
+                            <CreditCard className="w-5 h-5" style={{ color: 'hsl(var(--primary-accent))' }} />
                             Thanh Toán Lương
                         </h3>
                         <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full text-gray-400">

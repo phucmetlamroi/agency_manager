@@ -592,7 +592,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                                     border: `1px solid ${hot ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
                                                 }}
                                             >
-                                                {hot && <span style={{ width: 5, height: 5, borderRadius: 999, background: '#8B5CF6', flexShrink: 0 }} />}
+                                                {hot && <span style={{ width: 5, height: 5, borderRadius: 999, background: 'hsl(var(--primary))', flexShrink: 0 }} />}
                                                 <MessageSquare style={{ width: 8, height: 8 }} /> {uc.total}
                                             </span>
                                         )

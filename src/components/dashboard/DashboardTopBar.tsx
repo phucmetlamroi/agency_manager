@@ -276,7 +276,7 @@ export default function DashboardTopBar({
                           <Check
                             size={14}
                             className="ml-auto flex-shrink-0"
-                            style={{ color: "#8B5CF6" }}
+                            style={{ color: "hsl(var(--primary))" }}
                           />
                         )}
                       </button>

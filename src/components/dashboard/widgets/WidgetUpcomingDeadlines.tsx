@@ -278,7 +278,7 @@ export default function WidgetUpcomingDeadlines({ tasks }: Props) {
                             <span className="text-[12px] font-bold text-white">{hovered.label}</span>
                             <span
                                 className="ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-md leading-none"
-                                style={{ background: "rgba(139,92,246,0.15)", color: "#D8B4FE" }}
+                                style={{ background: "rgba(139,92,246,0.15)", color: "hsl(var(--primary-accent))" }}
                             >
                                 {hovered.items.length}
                             </span>

@@ -108,7 +108,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                     <span className="font-extrabold" style={{ fontSize: 18, color: '#A5B4FC' }}>
                         {count}
                     </span>
-                    <span className="font-semibold" style={{ fontSize: 11, color: '#6366F1' }}>
+                    <span className="font-semibold" style={{ fontSize: 11, color: 'hsl(var(--primary))' }}>
                         Task
                     </span>
                 </div>

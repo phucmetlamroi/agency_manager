@@ -85,7 +85,7 @@ export default function DashboardActionBar({
             e.currentTarget.style.background = "transparent"
           }}
         >
-          <Briefcase size={16} style={{ color: "#8B5CF6" }} />
+          <Briefcase size={16} style={{ color: "hsl(var(--primary))" }} />
           <span
             className="text-sm font-medium"
             style={{ color: "#A1A1AA" }}
@@ -169,7 +169,7 @@ export default function DashboardActionBar({
                         >
                           <Briefcase
                             className="h-4 w-4"
-                            style={{ color: "#8B5CF6" }}
+                            style={{ color: "hsl(var(--primary))" }}
                           />
                         </div>
                         <div className="flex flex-col items-start text-left overflow-hidden">
@@ -193,7 +193,7 @@ export default function DashboardActionBar({
                         {isActive && (
                           <Check
                             className="ml-auto h-4 w-4 shrink-0"
-                            style={{ color: "#8B5CF6" }}
+                            style={{ color: "hsl(var(--primary))" }}
                           />
                         )}
                       </button>
@@ -226,7 +226,7 @@ export default function DashboardActionBar({
                         border: "1px dashed rgba(139,92,246,0.3)",
                       }}
                     >
-                      <Plus className="h-3.5 w-3.5" style={{ color: "#8B5CF6" }} />
+                      <Plus className="h-3.5 w-3.5" style={{ color: "hsl(var(--primary))" }} />
                     </div>
                     <span
                       className="text-[13px] font-semibold"
@@ -256,7 +256,7 @@ export default function DashboardActionBar({
         className="flex items-center gap-2 py-2.5 px-5 text-sm font-bold text-white transition-all duration-200"
         style={{
           borderRadius: 26,
-          background: "#8B5CF6",
+          background: "hsl(var(--primary))",
           boxShadow: "0 8px 20px rgba(139,92,246,0.35)",
           fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}

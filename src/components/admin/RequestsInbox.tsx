@@ -160,7 +160,7 @@ export default function RequestsInbox({ workspaceId, initialRequests }: {
                                 <div className="flex items-center gap-2 mt-4">
                                     <button disabled={busy} onClick={() => accept(r.id)}
                                         className="inline-flex items-center gap-2"
-                                        style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF', background: '#6366F1', border: '1px solid #6366F1', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}>
+                                        style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF', background: 'hsl(var(--primary))', border: '1px solid #6366F1', borderRadius: 10, padding: '9px 16px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}>
                                         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Tạo task
                                     </button>
                                     {r.rawFootage && (

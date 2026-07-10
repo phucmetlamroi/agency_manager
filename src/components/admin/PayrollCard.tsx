@@ -91,7 +91,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
         >
             {/* Vạch accent trái — chưa thanh toán */}
             {!isPaid && (
-                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: '#8B5CF6' }} />
+                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: 'hsl(var(--primary))' }} />
             )}
 
             {/* Payment Modal */}
@@ -135,7 +135,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                         {isPaid && (
                             <div
                                 className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                                style={{ backgroundColor: '#8B5CF6', borderColor: '#0A0A0A' }}
+                                style={{ backgroundColor: 'hsl(var(--primary))', borderColor: '#0A0A0A' }}
                             >
                                 <CheckCircle2 className="w-3 h-3 text-white" />
                             </div>
@@ -154,16 +154,16 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                         style={{ backgroundColor: '#211B31' }}
                         title={`${completedTasks.length} hoàn tất · ${pendingTasks.length} đang xử lý`}
                     >
-                        <div className="h-full transition-[width] duration-500" style={{ width: `${donePct}%`, backgroundColor: '#8B5CF6' }} />
-                        <div className="h-full transition-[width] duration-500" style={{ width: `${procPct}%`, backgroundColor: '#A855F7' }} />
+                        <div className="h-full transition-[width] duration-500" style={{ width: `${donePct}%`, backgroundColor: 'hsl(var(--primary))' }} />
+                        <div className="h-full transition-[width] duration-500" style={{ width: `${procPct}%`, backgroundColor: 'hsl(var(--primary-accent))' }} />
                     </div>
                     <div className="flex items-center gap-3.5 mt-2 text-[11px]" style={{ color: '#A1A1AA' }}>
                         <span className="inline-flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#8B5CF6' }} />
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'hsl(var(--primary))' }} />
                             {completedTasks.length} hoàn tất
                         </span>
                         <span className="inline-flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#A855F7' }} />
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'hsl(var(--primary-accent))' }} />
                             {pendingTasks.length} đang xử lý
                         </span>
                     </div>

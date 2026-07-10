@@ -1,15 +1,13 @@
 // [Review module P2 · FR-04] The IN-PROGRESS comment's timecode/range drawn ON the
-// playbar, frame.io-style. Rendered as part of `timelineChildren` so it lives in the
-// exact same coordinate space as TimelineMarkers — VideoStage/PlayerControls stay
-// untouched. The layer is pointer-events-none (so hover-scrub + seek still work
-// everywhere) EXCEPT the drag handles, which stopPropagation so a handle drag never
-// also seeks. Dragging the single "create" handle sideways spawns the range; once a
-// range exists, both ends get their own handle. A ▶ on the bar plays just the range.
+// playbar, Frame.io-style. Rendered as part of `timelineChildren` so it lives in the
+// exact same coordinate space as TimelineMarkers. The layer is pointer-events-none
+// (so hover-scrub + seek still work everywhere) EXCEPT the range itself and its
+// handles. Dragging the single create handle sideways spawns the range; once a range
+// exists, both ends get their own handle. Clicking the filled range plays that span.
 
 'use client'
 
 import { useRef } from 'react'
-import { Play } from 'lucide-react'
 import { fpsFloat, type Fps } from '@/lib/review/timecode'
 import type { RangeController } from './useRangeSelection'
 import { usePlayerEnv } from './player-env'
@@ -87,15 +85,37 @@ export function PendingRangeOverlay({
         }
     }
 
+    const onHandleKeyDown = (which: 'in' | 'out') => (e: React.KeyboardEvent) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+        e.preventDefault()
+        e.stopPropagation()
+        const delta = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowLeft' ? -1 : 1)
+        if (which === 'in') {
+            range.setIn(clampF(inF + delta))
+            return
+        }
+        if (range.inFrame == null) range.freezeIn(inF)
+        const next = clampF((outF ?? inF) + delta)
+        range.setOut(next > inF ? next : null)
+    }
+
     const handleBase =
-        'pointer-events-auto absolute top-1/2 z-[3] h-5 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-sm bg-emerald-300 ring-1 ring-black/50 shadow transition hover:bg-emerald-200'
+        'pointer-events-auto absolute top-1/2 z-[4] grid h-5 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize place-items-center rounded-sm border border-violet-100/80 bg-violet-400 shadow-[0_0_0_1px_rgba(17,18,20,0.68),0_2px_8px_rgba(124,58,237,0.45)] transition hover:bg-violet-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white'
 
     return (
         <div ref={layerRef} className="pointer-events-none absolute inset-0">
             {/* filled range bar */}
             {hasRange && (
-                <div
-                    className="absolute top-1/2 z-[2] h-1.5 -translate-y-1/2 rounded-full bg-emerald-400/60"
+                <button
+                    type="button"
+                    aria-label={L.playRange}
+                    title={L.playRange}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onPlayRange(inF, outF!)
+                    }}
+                    className="pointer-events-auto absolute top-1/2 z-[2] h-2.5 -translate-y-1/2 rounded-full bg-violet-400/70 shadow-[0_0_10px_rgba(167,139,250,0.56)] transition hover:h-3 hover:bg-violet-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                     style={{ left: `${pct(inF)}%`, width: `${Math.max(0.5, pct(outF!) - pct(inF))}%` }}
                 />
             )}
@@ -106,6 +126,8 @@ export function PendingRangeOverlay({
                     <div
                         role="slider"
                         aria-label={L.rangeStartHandle}
+                        aria-valuemin={0}
+                        aria-valuemax={totalFrames - 1}
                         aria-valuenow={inF}
                         tabIndex={0}
                         className={handleBase}
@@ -114,11 +136,14 @@ export function PendingRangeOverlay({
                         onPointerMove={onMove}
                         onPointerUp={onUp}
                         onPointerCancel={onUp}
+                        onKeyDown={onHandleKeyDown('in')}
                     />
                     {/* out handle */}
                     <div
                         role="slider"
                         aria-label={L.rangeEndHandle}
+                        aria-valuemin={0}
+                        aria-valuemax={totalFrames - 1}
                         aria-valuenow={outF!}
                         tabIndex={0}
                         className={handleBase}
@@ -127,22 +152,8 @@ export function PendingRangeOverlay({
                         onPointerMove={onMove}
                         onPointerUp={onUp}
                         onPointerCancel={onUp}
+                        onKeyDown={onHandleKeyDown('out')}
                     />
-                    {/* play-range ▶ (centred above the bar) */}
-                    <button
-                        type="button"
-                        aria-label={L.playRange}
-                        title={L.playRange}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onPlayRange(inF, outF!)
-                        }}
-                        className="pointer-events-auto absolute bottom-full z-[4] mb-1 grid h-5 w-5 -translate-x-1/2 place-items-center rounded-full bg-emerald-400 text-black shadow ring-1 ring-black/40 hover:bg-emerald-300"
-                        style={{ left: `${(pct(inF) + pct(outF!)) / 2}%` }}
-                    >
-                        <Play className="h-3 w-3" />
-                    </button>
                 </>
             ) : (
                 // No range yet → a single "create" handle at the in-point. Drag it sideways
@@ -150,6 +161,8 @@ export function PendingRangeOverlay({
                 <div
                     role="slider"
                     aria-label={L.rangeCreateHandle}
+                    aria-valuemin={0}
+                    aria-valuemax={totalFrames - 1}
                     aria-valuenow={inF}
                     tabIndex={0}
                     title={L.rangeCreateHandle}
@@ -159,6 +172,7 @@ export function PendingRangeOverlay({
                     onPointerMove={onMove}
                     onPointerUp={onUp}
                     onPointerCancel={onUp}
+                    onKeyDown={onHandleKeyDown('out')}
                 />
             )}
         </div>

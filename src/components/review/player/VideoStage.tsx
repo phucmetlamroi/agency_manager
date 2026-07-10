@@ -99,11 +99,11 @@ export function VideoStage({
             className={
                 pseudoFs
                     ? 'fixed inset-0 z-50 flex h-[100dvh] w-screen flex-col bg-black select-none'
-                    : 'relative flex h-full w-full flex-col bg-black select-none'
+                    : 'relative flex h-full w-full flex-col bg-[#050505] select-none'
             }
         >
             {/* video / image area */}
-            <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+            <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
                 {mediaKind === 'video' ? (
                     <>
                         {/* h-full w-full + object-contain: the element's DISPLAY size is pinned
@@ -155,7 +155,7 @@ export function VideoStage({
 
             {/* controls (video only) */}
             {mediaKind === 'video' && (
-                <div className={fs ? '' : 'absolute inset-x-0 bottom-0'}>
+                <div className={fs ? '' : 'absolute inset-x-0 bottom-0 z-10'}>
                     <PlayerControls
                         controller={controller}
                         fps={fps}

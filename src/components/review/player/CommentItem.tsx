@@ -151,13 +151,13 @@ function SingleComment({
                 <Avatar name={authorName} url={comment.author?.avatarUrl ?? null} />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                        <span className="truncate text-sm font-medium text-white/90">{authorName}</span>
+                        <span className="truncate text-sm font-semibold text-white">{authorName}</span>
                         {comment.isInternal && (
                             <span title={L.internalBadge} className="inline-flex">
                                 <Lock className="h-3 w-3 shrink-0 text-amber-400" />
                             </span>
                         )}
-                        <span className="shrink-0 text-xs text-white/35">{relTime(comment.createdAt, L)}</span>
+                        <span className="shrink-0 text-xs text-white/50">{relTime(comment.createdAt, L)}</span>
                         {comment.editedAt && <span className="text-[10px] text-white/30">{L.edited}</span>}
                     </div>
 
@@ -167,7 +167,7 @@ function SingleComment({
                             {hasTime && (
                                 <button
                                     onClick={() => onSeekToFrame(comment.startFrame as number)}
-                                    className="flex items-center gap-1 rounded bg-indigo-500/15 px-1.5 py-0.5 font-mono text-[11px] text-indigo-300 hover:bg-indigo-500/25"
+                                    className="flex items-center gap-1 rounded border border-violet-300/20 bg-violet-400/[0.12] px-1.5 py-0.5 font-mono text-[11px] text-violet-200 transition hover:bg-violet-400/[0.20]"
                                 >
                                     <Clock className="h-3 w-3" />
                                     {fps ? frameToSmpte(comment.startFrame as number, fps) : comment.startFrame}
@@ -179,7 +179,7 @@ function SingleComment({
                             {comment.annotation && (
                                 <button
                                     onClick={() => actions.viewAnnotation(comment)}
-                                    className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-white/50 hover:bg-white/10 hover:text-white/80"
+                                    className="flex items-center gap-1 rounded border border-white/[0.10] bg-white/[0.04] px-1.5 py-0.5 text-[11px] text-white/65 transition hover:border-white/[0.20] hover:bg-white/[0.10] hover:text-white"
                                     title={L.viewDrawingTitle}
                                 >
                                     <PenLine className="h-3 w-3" /> {L.viewDrawing}
@@ -189,7 +189,7 @@ function SingleComment({
                     )}
 
                     {/* body */}
-                    <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-white/80">{comment.body}</p>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-white/85">{comment.body}</p>
 
                     {/* attachments (thumbnails → lightbox) */}
                     {comment.attachments.length > 0 && (
@@ -271,8 +271,8 @@ export const CommentThread = memo(function CommentThread({
     return (
         <div
             id={`comment-${comment.id}`}
-            className={`rounded-xl border px-2.5 py-2 transition ${
-                highlighted ? 'border-indigo-400/60 bg-indigo-500/10' : 'border-transparent hover:bg-white/[0.03]'
+            className={`rounded-lg border px-3 py-2.5 transition ${
+                highlighted ? 'border-violet-300/70 bg-violet-400/[0.12] shadow-[0_0_0_1px_rgba(196,181,253,0.10)]' : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.16] hover:bg-white/[0.05]'
             } ${resolved ? 'opacity-55' : ''}`}
         >
             <SingleComment comment={comment} fps={fps} onSeekToFrame={onSeekToFrame} actions={actions} />

@@ -157,11 +157,11 @@ export function CommentsPanel({
 
     return (
         <div className="flex h-full flex-col">
-            <div className="min-h-0 flex-1 space-y-1 overflow-auto p-2">
+            <div className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
                 {parents.length === 0 ? (
                     <div className="grid h-full place-items-center px-6 text-center">
-                        <div className="flex flex-col items-center gap-2 text-white/40">
-                            <MessageSquare className="h-8 w-8" />
+                        <div className="flex flex-col items-center gap-2 text-white/55">
+                            <MessageSquare className="h-8 w-8 text-white/45" />
                             {otherWithComments.length > 0 ? (
                                 <>
                                     <p className="text-sm">{L.emptyOtherVersions(otherTotal)}</p>

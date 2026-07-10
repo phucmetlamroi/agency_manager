@@ -13,7 +13,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Clock, Download, Loader2, PencilLine, X, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, FileVideo, Loader2, PanelRightClose, PanelRightOpen, PencilLine, X } from 'lucide-react'
 import useSWR from 'swr'
 import type { Fps } from '@/lib/review/timecode'
 import type { AnnotationShape, CommentDto, CreateCommentInput } from '@/lib/review/comment-client'
@@ -226,6 +226,7 @@ function GuestStage({
     onVersionChange?: (v: GuestVersionView) => void
 }) {
     const [versionSelectorOpen, setVersionSelectorOpen] = useState(false)
+    const [panelOpen, setPanelOpen] = useState(true)
     const videoRef = useRef<HTMLVideoElement>(null)
     const isVideo = asset?.mediaKind === 'video'
     const ready = version?.uploadStatus === 'ready'
@@ -406,30 +407,36 @@ function GuestStage({
     }
 
     return (
-        <div className="flex h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
+        <div className="flex h-[100dvh] flex-col bg-[#050505] text-zinc-100">
             {/* Header */}
-            <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-white/5 bg-zinc-950/80 px-3 py-2 backdrop-blur">
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-indigo-500/20 text-xs font-bold text-indigo-300">
-                        HT
+            <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-white/[0.10] bg-[#0c0d0f] px-3 py-2">
+                <div className="flex min-w-[12rem] flex-1 items-center gap-2.5">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-violet-300/20 bg-violet-400/[0.10] text-violet-200">
+                        <FileVideo className="h-4 w-4" />
                     </span>
-                    <h1 className="truncate text-sm font-semibold">{asset.title}</h1>
+                    <span className="hidden max-w-36 truncate text-xs text-white/45 md:inline" title={share.name}>
+                        {share.name}
+                    </span>
+                    <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-white/25 md:block" />
+                    <h1 className="min-w-0 truncate text-sm font-medium text-white" title={asset.title}>
+                        {asset.title}
+                    </h1>
                     {asset.versions.length > 1 ? (
                         <div className="relative">
                             <button
                                 onClick={() => setVersionSelectorOpen(!versionSelectorOpen)}
-                                className="flex items-center gap-1 shrink-0 rounded bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/80 transition-colors hover:bg-white/15"
+                                className="flex h-8 shrink-0 items-center gap-1 rounded-md border border-white/[0.12] bg-white/[0.045] px-2 text-xs font-medium text-white transition hover:border-white/[0.22] hover:bg-white/[0.09]"
+                                aria-label="Choose version"
+                                aria-expanded={versionSelectorOpen}
+                                title="Choose version"
                             >
                                 v{version.versionNumber}
                                 <ChevronDown className="h-3 w-3 opacity-60" />
                             </button>
                             {versionSelectorOpen && (
                                 <>
-                                    <div
-                                        className="fixed inset-0 z-40"
-                                        onClick={() => setVersionSelectorOpen(false)}
-                                    />
-                                    <div className="absolute left-0 mt-1 z-50 min-w-[120px] rounded-lg border border-white/10 bg-zinc-900 p-1 shadow-xl">
+                                    <div className="fixed inset-0 z-40" onClick={() => setVersionSelectorOpen(false)} />
+                                    <div className="absolute left-0 top-10 z-50 min-w-44 rounded-md border border-white/[0.14] bg-[#171a20] p-1.5 shadow-2xl">
                                         {asset.versions.map((v) => (
                                             <button
                                                 key={v.versionId}
@@ -437,16 +444,12 @@ function GuestStage({
                                                     onVersionChange?.(v)
                                                     setVersionSelectorOpen(false)
                                                 }}
-                                                className={`flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-white/5 ${
-                                                    v.versionId === version.versionId
-                                                        ? 'font-bold text-indigo-400'
-                                                        : 'text-white/70'
+                                                className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-white/[0.08] ${
+                                                    v.versionId === version.versionId ? 'font-bold text-indigo-400' : 'text-white/70'
                                                 }`}
                                             >
                                                 <span>Version {v.versionNumber}</span>
-                                                {v.versionId === version.versionId && (
-                                                    <Check className="h-3.5 w-3.5 text-indigo-400" />
-                                                )}
+                                                {v.versionId === version.versionId && <Check className="h-3.5 w-3.5 text-indigo-400" />}
                                             </button>
                                         ))}
                                     </div>
@@ -454,65 +457,84 @@ function GuestStage({
                             )}
                         </div>
                     ) : (
-                        <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/80">
-                            v{version.versionNumber}
-                        </span>
+                        <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/80">v{version.versionNumber}</span>
                     )}
-                    {chip && <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium ${chip.cls}`}>{chip.label}</span>}
+                    {chip && <span className={`hidden shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium sm:inline ${chip.cls}`}>{chip.label}</span>}
                 </div>
 
-                {/* Reel navigation */}
-                {itemCount > 1 && (
-                    <div className="flex items-center gap-1 text-xs text-white/60">
-                        <button
-                            onClick={() => onAssetIndex(Math.max(0, assetIndex - 1))}
-                            disabled={assetIndex === 0}
-                            className="grid h-8 w-8 place-items-center rounded-lg hover:bg-white/10 disabled:opacity-30"
-                            aria-label="Previous video"
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        <span className="tabular-nums">
-                            {assetIndex + 1} / {itemCount}
-                        </span>
-                        <button
-                            onClick={() => onAssetIndex(Math.min(itemCount - 1, assetIndex + 1))}
-                            disabled={assetIndex >= itemCount - 1}
-                            className="grid h-8 w-8 place-items-center rounded-lg hover:bg-white/10 disabled:opacity-30"
-                            aria-label="Next video"
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </button>
-                    </div>
-                )}
+                <div className="ml-auto flex w-full shrink-0 items-center justify-end gap-1 sm:w-auto">
+                    {/* Reel navigation */}
+                    {itemCount > 1 && (
+                        <div className="hidden items-center overflow-hidden rounded-md border border-white/[0.12] bg-white/[0.035] text-xs text-white/60 md:flex">
+                            <button
+                                onClick={() => onAssetIndex(Math.max(0, assetIndex - 1))}
+                                disabled={assetIndex === 0}
+                                className="grid h-8 w-8 place-items-center hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-white/20"
+                                aria-label="Previous video"
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <span className="min-w-12 border-x border-white/[0.10] px-2 text-center text-[11px] font-medium tabular-nums text-white/65">
+                                {assetIndex + 1} / {itemCount}
+                            </span>
+                            <button
+                                onClick={() => onAssetIndex(Math.min(itemCount - 1, assetIndex + 1))}
+                                disabled={assetIndex >= itemCount - 1}
+                                className="grid h-8 w-8 place-items-center hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-white/20"
+                                aria-label="Next video"
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                            </button>
+                        </div>
+                    )}
 
-                {/* [P4/FR-11] Guest email-updates opt-in (double-opt-in PIN). */}
-                {asset && <GuestNotifyControl slug={slug} assetId={asset.assetId} />}
+                    {/* [P4/FR-11] Guest email-updates opt-in (double-opt-in PIN). */}
+                    {asset && <GuestNotifyControl compact slug={slug} assetId={asset.assetId} />}
 
-                {share.allowDownload && (
+                    {share.allowDownload && (
+                        <button
+                            onClick={onDownload}
+                            disabled={!canDownload}
+                            title={canDownload ? 'Download the original file' : 'Download unlocks after approval.'}
+                            aria-label={canDownload ? 'Download the original file' : 'Download unlocks after approval'}
+                            className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-white/70 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:text-white/25"
+                        >
+                            <Download className="h-4 w-4" /> <span className="hidden xl:inline">Download</span>
+                        </button>
+                    )}
+
+                    {/* Decision buttons — always visible (FR-F03) */}
                     <button
-                        onClick={onDownload}
-                        disabled={!canDownload}
-                        title={canDownload ? 'Download the original file' : 'Download unlocks after approval.'}
-                        className="flex h-9 items-center gap-1.5 rounded-lg border border-white/10 px-3 text-sm text-white/80 hover:bg-white/10 disabled:opacity-40"
+                        onClick={() => setDecisionModal('request_changes')}
+                        className="flex h-8 items-center gap-1.5 rounded-md border border-orange-400/30 bg-orange-500/10 px-2 text-xs font-medium text-orange-300 transition hover:bg-orange-500/20"
+                        aria-label="Request changes"
+                        title="Request changes"
                     >
-                        <Download className="h-4 w-4" /> Download
+                        <PencilLine className="h-4 w-4" /> <span className="hidden xl:inline">Request changes</span>
                     </button>
-                )}
-
-                {/* Decision buttons — always visible (FR-F03) */}
-                <button
-                    onClick={() => setDecisionModal('request_changes')}
-                    className="flex h-9 items-center gap-1.5 rounded-lg border border-orange-400/30 bg-orange-500/10 px-3 text-sm font-medium text-orange-300 hover:bg-orange-500/20"
-                >
-                    <PencilLine className="h-4 w-4" /> Request changes
-                </button>
-                <button
-                    onClick={() => setDecisionModal('approve')}
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-500 px-3 text-sm font-semibold text-white hover:bg-emerald-400"
-                >
-                    <Check className="h-4 w-4" /> Approve
-                </button>
+                    <button
+                        onClick={() => setDecisionModal('approve')}
+                        className="flex h-8 items-center gap-1.5 rounded-md bg-emerald-500 px-2.5 text-xs font-semibold text-white shadow-[0_5px_14px_rgba(16,185,129,0.22)] transition hover:bg-emerald-400"
+                        aria-label="Approve"
+                        title="Approve"
+                    >
+                        <Check className="h-4 w-4" /> <span className="hidden sm:inline">Approve</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPanelOpen((open) => !open)}
+                        className={
+                            panelOpen
+                                ? 'grid h-8 w-8 place-items-center rounded-md bg-white/[0.08] text-white transition hover:bg-white/[0.13] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300'
+                                : 'grid h-8 w-8 place-items-center rounded-md text-white/70 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300'
+                        }
+                        aria-label={panelOpen ? 'Hide comments panel' : 'Show comments panel'}
+                        title={panelOpen ? 'Hide comments panel' : 'Show comments panel'}
+                        aria-pressed={panelOpen}
+                    >
+                        {panelOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+                    </button>
+                </div>
             </header>
 
             {/* decision state banner */}
@@ -528,9 +550,9 @@ function GuestStage({
             )}
             {/* new version available */}
             {newHead && (
-                <div className="flex shrink-0 items-center justify-center gap-3 bg-indigo-500/15 px-4 py-2 text-sm text-indigo-200">
+                <div className="flex shrink-0 items-center justify-center gap-3 bg-violet-500/15 px-4 py-2 text-sm text-violet-200">
                     A new version is available.
-                    <button onClick={onAdoptNewHead} className="rounded-md bg-indigo-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-400">
+                    <button onClick={onAdoptNewHead} className="rounded-md bg-violet-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-400">
                         Reload
                     </button>
                 </div>
@@ -538,7 +560,7 @@ function GuestStage({
 
             {/* Body */}
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-                <div className="relative min-h-0 flex-1 bg-black">
+                <div className="relative min-h-0 flex-1 bg-[#050505]">
                     {ready ? (
                         <VideoStage
                             videoRef={videoRef}
@@ -578,48 +600,51 @@ function GuestStage({
                     )}
                 </div>
 
-                <aside className="flex h-[42vh] shrink-0 flex-col border-t border-white/5 bg-zinc-950 lg:h-auto lg:w-[380px] lg:border-l lg:border-t-0">
-                    <div className="flex shrink-0 items-center border-b border-white/5 px-4 py-2.5 text-sm font-medium text-white/80">
-                        Comments ({feed.total})
-                    </div>
-                    <div className="min-h-0 flex-1 overflow-hidden">
-                        {share.allowComments || feed.comments.length > 0 ? (
-                            <CommentsPanel
-                                // key by version so a Reload-driven version switch resets the
-                                // composer draft/frozen-frame — never carries onto another version.
-                                key={version.versionId}
-                                versionId={version.versionId}
-                                fps={fps}
-                                mediaKind={isVideo ? 'video' : 'image'}
-                                currentUserId=""
-                                isAdmin={false}
-                                feed={feed}
-                                playheadFrame={controller.frame}
-                                durationMs={version.durationMs}
-                                annotation={canAnnotate && share.allowComments ? annotation : null}
-                                range={range}
-                                onSeekToFrame={ctlSeek}
-                                onPauseVideo={ctlPause}
-                                onFocusPlayer={onFocusPlayer}
-                                onViewAnnotation={onViewAnnotation}
-                                highlightId={highlightId}
-                                onJumpToVersion={() => {}}
-                                // comments off → read-only: old public comments stay visible,
-                                // but no composer/reply that would only 403 after identity capture.
-                                readOnly={!share.allowComments}
-                            />
-                        ) : (
-                            <div className="grid h-full place-items-center px-6 text-center text-sm text-white/40">
+                {panelOpen && (
+                    <aside className="flex h-[42vh] shrink-0 flex-col border-t border-white/[0.10] bg-[#111318] lg:h-auto lg:w-[380px] lg:border-l lg:border-t-0">
+                        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-white/[0.10] px-4 text-sm font-medium text-white/85">
+                            <span>Comments</span>
+                            <span className="rounded bg-white/[0.07] px-1.5 py-0.5 text-[11px] tabular-nums text-white/55">{feed.total}</span>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-hidden">
+                            {share.allowComments || feed.comments.length > 0 ? (
+                                <CommentsPanel
+                                    // key by version so a Reload-driven version switch resets the
+                                    // composer draft/frozen-frame — never carries onto another version.
+                                    key={version.versionId}
+                                    versionId={version.versionId}
+                                    fps={fps}
+                                    mediaKind={isVideo ? 'video' : 'image'}
+                                    currentUserId=""
+                                    isAdmin={false}
+                                    feed={feed}
+                                    playheadFrame={controller.frame}
+                                    durationMs={version.durationMs}
+                                    annotation={canAnnotate && share.allowComments ? annotation : null}
+                                    range={range}
+                                    onSeekToFrame={ctlSeek}
+                                    onPauseVideo={ctlPause}
+                                    onFocusPlayer={onFocusPlayer}
+                                    onViewAnnotation={onViewAnnotation}
+                                    highlightId={highlightId}
+                                    onJumpToVersion={() => {}}
+                                    // comments off → read-only: old public comments stay visible,
+                                    // but no composer/reply that would only 403 after identity capture.
+                                    readOnly={!share.allowComments}
+                                />
+                            ) : (
+                                <div className="grid h-full place-items-center px-6 text-center text-sm text-white/40">
+                                    Comments are turned off for this link.
+                                </div>
+                            )}
+                        </div>
+                        {!share.allowComments && feed.comments.length > 0 && (
+                            <div className="shrink-0 border-t border-white/5 px-4 py-2.5 text-center text-xs text-white/40">
                                 Comments are turned off for this link.
                             </div>
                         )}
-                    </div>
-                    {!share.allowComments && feed.comments.length > 0 && (
-                        <div className="shrink-0 border-t border-white/5 px-4 py-2.5 text-center text-xs text-white/40">
-                            Comments are turned off for this link.
-                        </div>
-                    )}
-                </aside>
+                    </aside>
+                )}
             </div>
 
             <footer className="shrink-0 border-t border-white/5 py-1.5 text-center text-[11px] text-white/30">

@@ -271,3 +271,9 @@ Review 3 lens (L11-sql+FR-03 / L13-poll+L12 / L14) × find→verify: **4 LOW con
 | TC7 | 1 nguồn sự thật approve (review module), bỏ Copy link | P4 (bridge chỉ khi admin Duyệt) · BR-01 (bỏ Copy link) |
 
 **v1 ĐÓNG:** 7 phase P0→P6 xong; L11/L13/L14 xong; L12+L19 xong (phần polish hoãn ghi rõ lý do); L17/L18 chờ chủ dự án. Regression xanh. **CHƯA push + CHƯA db-push FR-11** (chờ chủ dự án + deploy main).
+
+### B7 follow-up — annotation canvas khởi tạo bị kẹt (2026-07-10)
+
+- Video `2026-07-10 04-08-29.mp4` xác nhận BR-07 vẫn tái hiện: toolbar hiện nhưng mọi thao tác kéo chuột không tạo nét. Bảng instrument trong frame ghi `RootSize: 0x0`, trong khi `LiveDims` và `Intrinsics` đều là `1920x1080`.
+- Code thực tế khác giả thuyết gốc ở mức lifecycle: khi `box === null`, `AnnotationCanvas` render nhánh diagnostic trước khi render phần tử gắn `rootRef`. Vì vậy `useLayoutEffect`/`ResizeObserver` không có target để đo; lần đo 0x0 đầu tiên không thể tự hồi phục. Đây là vòng lặp khởi tạo, không phải lỗi aspect của video.
+- Vá: luôn mount measurement root; chỉ mount SVG và bật pointer events sau khi `box` có giá trị. Bỏ diagnostic visual khỏi UI thường; console instrumentation vẫn bật được qua `localStorage['review:debug']='1'`.

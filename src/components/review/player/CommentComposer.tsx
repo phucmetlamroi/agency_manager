@@ -308,7 +308,7 @@ export function CommentComposer({
     const smpte = (f: number) => (fps ? frameToSmpte(f, fps) : String(f))
 
     return (
-        <div className={isReply ? 'pl-9 pr-1 pt-1' : 'border-t border-white/5 bg-zinc-950/80 p-2.5'}>
+        <div className={isReply ? 'pl-9 pr-1 pt-1' : 'border-t border-white/[0.12] bg-[#171a1f] p-3 shadow-[0_-8px_20px_rgba(0,0,0,0.14)]'}>
             {/* [B8/FR-05] meta row: timecode chip (left) + visibility toggle (anchored right).
                 NO flex-wrap + the toggle's ml-auto slot is FIXED, so the toggle can't hop
                 lines when the chip appears/disappears. The In–Out range chips are gone —
@@ -318,7 +318,7 @@ export function CommentComposer({
                 <div className="mb-1.5 flex items-center gap-1.5">
                     {/* [F6] text-only comments carry the current playhead as a read-only timecode. */}
                     {isVideo && textOnly && (
-                        <span className="flex min-w-0 items-center gap-1 rounded-md bg-indigo-500/15 px-2 py-1 text-xs font-medium text-indigo-300">
+                        <span className="flex min-w-0 items-center gap-1 rounded-md border border-violet-300/20 bg-violet-400/[0.12] px-2 py-1 text-xs font-medium text-violet-200">
                             <Clock className="h-3 w-3 shrink-0" />
                             <span className="font-mono tabular-nums">{smpte(shownFrame)}</span>
                         </span>
@@ -326,7 +326,7 @@ export function CommentComposer({
                     {isVideo &&
                         hasRange &&
                         (timeAttached ? (
-                            <span className="flex min-w-0 items-center gap-1 rounded-md bg-indigo-500/15 px-2 py-1 text-xs font-medium text-indigo-300">
+                            <span className="flex min-w-0 items-center gap-1 rounded-md border border-violet-300/20 bg-violet-400/[0.12] px-2 py-1 text-xs font-medium text-violet-200">
                                 <Clock className="h-3 w-3 shrink-0" />
                                 <span className="font-mono tabular-nums">{smpte(shownFrame)}</span>
                                 {rangeOut != null && rangeOut > shownFrame && (
@@ -409,7 +409,7 @@ export function CommentComposer({
                     onKeyDown={onKeyDown}
                     rows={isReply ? 1 : 2}
                     placeholder={isReply ? L.placeholderReply : annoActive ? L.placeholderDrawing : L.placeholder}
-                    className="min-h-[38px] flex-1 resize-none rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-indigo-400/50 focus:outline-none"
+                    className="min-h-[42px] flex-1 resize-none rounded-md border border-white/[0.16] bg-[#0d0f13] px-3 py-2 text-sm text-white placeholder:text-white/45 shadow-inner focus:border-violet-300/70 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
                 />
 
                 {/* [FR-05] draw button lives in the action row now (kept out of the meta row
@@ -419,7 +419,7 @@ export function CommentComposer({
                         type="button"
                         onClick={annoActive ? () => annotation!.reset() : beginDraw}
                         className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-lg transition ${
-                            annoActive ? 'bg-indigo-500 text-white' : 'text-white/50 hover:bg-white/10 hover:text-white/80'
+                            annoActive ? 'bg-violet-500 text-white shadow-[0_4px_12px_rgba(124,58,237,0.28)]' : 'border border-white/[0.12] bg-white/[0.04] text-white/65 hover:border-white/[0.22] hover:bg-white/[0.10] hover:text-white'
                         }`}
                         title={annoActive ? L.drawExitTitle : L.drawTitle}
                         aria-label={L.draw}
@@ -440,7 +440,7 @@ export function CommentComposer({
                             <button
                                 type="button"
                                 onClick={() => setPickerOpen((v) => !v)}
-                                className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80"
+                                className="grid h-9 w-9 place-items-center rounded-md border border-white/[0.10] bg-white/[0.03] text-white/65 transition hover:border-white/[0.20] hover:bg-white/[0.10] hover:text-white"
                                 aria-label={L.insertEmoji}
                             >
                                 <Smile className="h-4 w-4" />
@@ -460,7 +460,7 @@ export function CommentComposer({
                             type="button"
                             onClick={() => fileRef.current?.click()}
                             disabled={attachments.length >= MAX_ATTACHMENTS || submitting}
-                            className="grid h-9 w-9 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white/80 disabled:opacity-30"
+                            className="grid h-9 w-9 place-items-center rounded-md border border-white/[0.10] bg-white/[0.03] text-white/65 transition hover:border-white/[0.20] hover:bg-white/[0.10] hover:text-white disabled:opacity-30"
                             aria-label={L.attachImage}
                             title={L.attachImageTitle(MAX_ATTACHMENTS)}
                         >
@@ -473,7 +473,7 @@ export function CommentComposer({
                 <button
                     onClick={() => void submit()}
                     disabled={!canSend || submitting}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-indigo-500 text-white transition hover:bg-indigo-400 disabled:opacity-40"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-violet-500 text-white shadow-[0_5px_14px_rgba(124,58,237,0.32)] transition hover:bg-violet-400 disabled:opacity-35"
                     aria-label={L.send}
                 >
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

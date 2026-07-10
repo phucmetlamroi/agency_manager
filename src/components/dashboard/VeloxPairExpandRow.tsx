@@ -57,7 +57,7 @@ function PairExpansion({ pair }: { pair: MainItemPair }) {
                     <Film size={10} className="text-emerald-300 shrink-0" />
                     <span className="text-zinc-400">Body:</span>
                     <span className="truncate flex-1">{pair.body.fullName}</span>
-                    <span className="text-zinc-500 shrink-0">{formatBytes(pair.body.sizeBytes)}</span>
+                    <span className="text-muted-foreground shrink-0">{formatBytes(pair.body.sizeBytes)}</span>
                 </div>
             )}
             {pair.hooks && (
@@ -65,25 +65,25 @@ function PairExpansion({ pair }: { pair: MainItemPair }) {
                     <Film size={10} className="text-amber-300 shrink-0" />
                     <span className="text-zinc-400">Hooks:</span>
                     <span className="truncate flex-1">{pair.hooks.fullName}</span>
-                    <span className="text-zinc-500 shrink-0">{formatBytes(pair.hooks.sizeBytes)}</span>
+                    <span className="text-muted-foreground shrink-0">{formatBytes(pair.hooks.sizeBytes)}</span>
                 </div>
             )}
             {pair.extras.map((e, i) => (
                 <div key={i} className="flex items-center gap-2">
-                    <Film size={10} className="text-zinc-500 shrink-0" />
+                    <Film size={10} className="text-muted-foreground shrink-0" />
                     <span className="text-zinc-400">Phụ:</span>
                     <span className="truncate flex-1">{e.fullName}</span>
-                    <span className="text-zinc-500 shrink-0">{formatBytes(e.sizeBytes)}</span>
+                    <span className="text-muted-foreground shrink-0">{formatBytes(e.sizeBytes)}</span>
                 </div>
             ))}
             {pair.perVideoArollUrl && (
                 <div className="flex items-center gap-2 pt-1 border-t border-white/5 mt-1">
-                    <span className="text-indigo-300">📂 Đã khớp A-Roll theo từng video</span>
+                    <span className="text-primary-accent">📂 Đã khớp A-Roll theo từng video</span>
                 </div>
             )}
             {pair.perVideoBrollUrls && pair.perVideoBrollUrls.length > 0 && (
                 <div className="flex items-center gap-2">
-                    <span className="text-indigo-300">📁 Đã khớp {pair.perVideoBrollUrls.length} folder B-roll theo từng video</span>
+                    <span className="text-primary-accent">📁 Đã khớp {pair.perVideoBrollUrls.length} folder B-roll theo từng video</span>
                 </div>
             )}
         </div>
@@ -101,11 +101,11 @@ function BundleExpansion({ bundle }: { bundle: MainItemFolderBundle }) {
                 <div key={f.fileId} className="flex items-center gap-2">
                     <Film size={10} className="text-emerald-200/60 shrink-0" />
                     <span className="truncate flex-1">{f.fullName}</span>
-                    <span className="text-zinc-500 shrink-0">{formatBytes(f.sizeBytes)}</span>
+                    <span className="text-muted-foreground shrink-0">{formatBytes(f.sizeBytes)}</span>
                 </div>
             ))}
             {bundle.folder.videoFiles.length > 6 && (
-                <p className="text-zinc-500 italic">
+                <p className="text-muted-foreground italic">
                     +{bundle.folder.videoFiles.length - 6} file khác trong bundle
                 </p>
             )}

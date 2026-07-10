@@ -51,7 +51,7 @@ export default function DeleteUserButton({ userId, workspaceId }: { userId: stri
         <button
             onClick={handleDeactivate}
             disabled={isDeactivating}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all disabled:opacity-50"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all disabled:opacity-50"
             title="Vô hiệu hoá nhân viên (khoá tài khoản, giữ dữ liệu)"
         >
             {isDeactivating ? (

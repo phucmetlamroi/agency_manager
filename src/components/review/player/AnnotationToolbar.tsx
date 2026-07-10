@@ -33,7 +33,7 @@ export function AnnotationToolbar({ ctl }: { ctl: AnnotationController }) {
                     title={t.label}
                     aria-label={t.label}
                     className={`grid h-8 w-8 place-items-center rounded-lg transition ${
-                        ctl.tool === t.key ? 'bg-indigo-500 text-white' : 'text-white/70 hover:bg-white/10'
+                        ctl.tool === t.key ? 'bg-primary text-white' : 'text-white/70 hover:bg-white/10'
                     }`}
                 >
                     {t.icon}

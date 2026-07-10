@@ -72,10 +72,10 @@ export default function GrantWorkspaceAccessModal({ profileId, targetUserId, tar
 
                     {loading ? (
                         <div className="flex items-center justify-center py-8">
-                            <Loader2 size={20} className="animate-spin text-zinc-500" />
+                            <Loader2 size={20} className="animate-spin text-muted-foreground" />
                         </div>
                     ) : workspaces.length === 0 ? (
-                        <p className="text-[13px] text-zinc-500 py-4 text-center">
+                        <p className="text-[13px] text-muted-foreground py-4 text-center">
                             Không có workspace cũ nào (Quản trị được nâng quyền trước khi tổ chức có workspace).
                         </p>
                     ) : (
@@ -88,7 +88,7 @@ export default function GrantWorkspaceAccessModal({ profileId, targetUserId, tar
                                     <Briefcase size={14} className="text-violet-400 shrink-0" />
                                     <div className="flex-1 min-w-0">
                                         <div className="text-[13px] font-semibold text-zinc-200 truncate">{w.name}</div>
-                                        <div className="text-[11px] text-zinc-500">Tạo {w.createdAt.slice(0, 10)}</div>
+                                        <div className="text-[11px] text-muted-foreground">Tạo {w.createdAt.slice(0, 10)}</div>
                                     </div>
                                     {w.alreadyGranted ? (
                                         <div className="flex items-center gap-1.5 text-[11px] text-emerald-300 font-medium">

@@ -113,7 +113,7 @@ export function NotificationPanel({ isOpen, onClose, onUnreadCountChange, incomi
                         <CheckCheck className="w-3 h-3" /> Đã đọc hết
                     </button>
                     <button onClick={onClose} className="p-1 rounded-md hover:bg-white/10 cursor-pointer bg-transparent border-none">
-                        <X className="w-3.5 h-3.5 text-zinc-500" />
+                        <X className="w-3.5 h-3.5 text-muted-foreground" />
                     </button>
                 </div>
             </div>
@@ -130,7 +130,7 @@ export function NotificationPanel({ isOpen, onClose, onUnreadCountChange, incomi
                         className={`flex-1 py-1 rounded-md border-none cursor-pointer text-[11px] font-semibold transition-colors ${
                             tab === t.id
                                 ? 'bg-violet-500/15 text-violet-400'
-                                : 'bg-transparent text-zinc-500 hover:bg-white/5'
+                                : 'bg-transparent text-muted-foreground hover:bg-white/5'
                         }`}
                     >
                         {t.label}

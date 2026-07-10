@@ -64,7 +64,7 @@ function CardBody({ task, style, isOverlay = false }: {
 }) {
     const durationSec = durationToSeconds(task.duration)
 
-    let deadlineColor = 'text-zinc-500'
+    let deadlineColor = 'text-muted-foreground'
     let deadlineText = 'Không có deadline'
     if (task.deadline) {
         const dl = new Date(task.deadline)
@@ -93,9 +93,9 @@ function CardBody({ task, style, isOverlay = false }: {
                 </div>
 
                 {task.client && (
-                    <p className="text-[11px] text-zinc-500 mb-3.5 truncate font-medium">
+                    <p className="text-[11px] text-muted-foreground mb-3.5 truncate font-medium">
                         {task.client.parent ? (
-                            <><span className="text-zinc-400">{task.client.parent}</span><span className="text-zinc-600 mx-0.5"> / </span></>
+                            <><span className="text-zinc-400">{task.client.parent}</span><span className="text-muted-foreground mx-0.5"> / </span></>
                         ) : null}
                         {task.client.name}
                     </p>
@@ -116,7 +116,7 @@ function CardBody({ task, style, isOverlay = false }: {
                 {(task.tags.length > 0 || durationSec > 0) && (
                     <div className="flex items-center gap-1.5 flex-wrap mb-1">
                         {task.tags.map(tag => (
-                            <span key={tag.id} className="px-2 py-0.5 bg-indigo-500/10 text-indigo-300 text-[9px] font-semibold rounded-md border border-indigo-500/15">
+                            <span key={tag.id} className="px-2 py-0.5 bg-primary/10 text-primary-accent text-[9px] font-semibold rounded-md border border-primary/15">
                                 {tag.name}
                             </span>
                         ))}
@@ -133,12 +133,12 @@ function CardBody({ task, style, isOverlay = false }: {
             {/* Footer */}
             <div className={`px-5 py-2.5 border-t border-white/[0.04] bg-white/[0.015] flex items-center justify-between ${isOverlay ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all duration-200`}>
                 <div className="flex items-center gap-1.5">
-                    <GripVertical className="w-3 h-3 text-zinc-600" strokeWidth={1.5} />
-                    <span className="text-[9px] text-zinc-600 uppercase tracking-widest font-bold">
+                    <GripVertical className="w-3 h-3 text-muted-foreground" strokeWidth={1.5} />
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">
                         {isOverlay ? 'Đang kéo...' : 'Kéo để nhận'}
                     </span>
                 </div>
-                <ArrowUpRight className="w-3 h-3 text-zinc-600" strokeWidth={2} />
+                <ArrowUpRight className="w-3 h-3 text-muted-foreground" strokeWidth={2} />
             </div>
 
             {/* Hover glow */}

@@ -63,7 +63,7 @@ function getActionBadgeClasses(action: string): string {
   if (action.includes('deleted') || action.includes('removed') || action.includes('revoked'))
     return 'bg-red-500/15 text-red-400 border border-red-500/20'
   if (action.includes('updated'))
-    return 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20'
+    return 'bg-primary/15 text-primary-accent border border-primary/20'
   if (action.includes('role_changed') || action.includes('transferred'))
     return 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
   return 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20'
@@ -223,7 +223,7 @@ export default function AuditLogViewer({
     <div className="space-y-6">
       {/* ---- Header ---- */}
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary-accent">
           <Shield className="h-5 w-5" />
         </div>
         <div>
@@ -235,7 +235,7 @@ export default function AuditLogViewer({
           </p>
         </div>
         {isPending && (
-          <Loader2 className="ml-auto h-4 w-4 animate-spin text-zinc-500" />
+          <Loader2 className="ml-auto h-4 w-4 animate-spin text-muted-foreground" />
         )}
       </div>
 
@@ -248,13 +248,13 @@ export default function AuditLogViewer({
 
         {/* Action type */}
         <div className="min-w-[180px] flex-1">
-          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Hành động
           </label>
           <select
             value={filterAction}
             onChange={(e) => handleActionChange(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none transition-colors focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/25"
+            className="w-full rounded-lg border border-white/10 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none transition-colors focus:border-primary/50 focus:ring-1 focus:ring-primary/25"
           >
             <option value="">Tất cả</option>
             {actionTypes.map((a) => (
@@ -267,13 +267,13 @@ export default function AuditLogViewer({
 
         {/* Actor */}
         <div className="min-w-[180px] flex-1">
-          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Người thực hiện
           </label>
           <select
             value={filterActor}
             onChange={(e) => handleActorChange(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none transition-colors focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/25"
+            className="w-full rounded-lg border border-white/10 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none transition-colors focus:border-primary/50 focus:ring-1 focus:ring-primary/25"
           >
             <option value="">Tất cả</option>
             {actors.map((a) => (
@@ -286,27 +286,27 @@ export default function AuditLogViewer({
 
         {/* Date from */}
         <div className="min-w-[150px]">
-          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Từ ngày
           </label>
           <input
             type="date"
             value={filterFrom}
             onChange={(e) => handleFromChange(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none transition-colors focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/25"
+            className="w-full rounded-lg border border-white/10 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none transition-colors focus:border-primary/50 focus:ring-1 focus:ring-primary/25"
           />
         </div>
 
         {/* Date to */}
         <div className="min-w-[150px]">
-          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Đến ngày
           </label>
           <input
             type="date"
             value={filterTo}
             onChange={(e) => handleToChange(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none transition-colors focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/25"
+            className="w-full rounded-lg border border-white/10 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none transition-colors focus:border-primary/50 focus:ring-1 focus:ring-primary/25"
           />
         </div>
 
@@ -327,7 +327,7 @@ export default function AuditLogViewer({
       <div className="space-y-1">
         {logs.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-xl border border-white/5 bg-zinc-900/20 px-6 py-16 text-center">
-            <Eye className="mb-3 h-8 w-8 text-zinc-600" />
+            <Eye className="mb-3 h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-zinc-400">
               Không có bản ghi nào
             </p>
@@ -350,7 +350,7 @@ export default function AuditLogViewer({
                 onClick={hasDetail ? () => toggleExpand(log.id) : undefined}
               >
                 {/* Timestamp */}
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3 flex-shrink-0" />
                   <span className="whitespace-nowrap font-mono">
                     {formatTimestamp(log.createdAt)}
@@ -378,7 +378,7 @@ export default function AuditLogViewer({
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-700">
                         <User className="h-3 w-3 text-zinc-400" />
                       </div>
-                      <span className="text-sm italic text-zinc-500">
+                      <span className="text-sm italic text-muted-foreground">
                         Hệ thống
                       </span>
                     </>
@@ -393,12 +393,12 @@ export default function AuditLogViewer({
                 </span>
 
                 {/* Target */}
-                <div className="text-xs text-zinc-500">
+                <div className="text-xs text-muted-foreground">
                   <span className="font-medium text-zinc-400">
                     {log.targetType}
                   </span>
                   {log.targetId && (
-                    <span className="ml-1 font-mono text-zinc-600">
+                    <span className="ml-1 font-mono text-muted-foreground">
                       {truncate(log.targetId, 12)}
                     </span>
                   )}
@@ -406,7 +406,7 @@ export default function AuditLogViewer({
 
                 {/* Expand indicator */}
                 {hasDetail && (
-                  <div className="ml-auto flex-shrink-0 text-zinc-600">
+                  <div className="ml-auto flex-shrink-0 text-muted-foreground">
                     {isExpanded ? (
                       <ChevronUp className="h-4 w-4" />
                     ) : (
@@ -421,7 +421,7 @@ export default function AuditLogViewer({
                 <div className="grid gap-4 border-b border-white/5 bg-zinc-950/60 px-4 py-4 md:grid-cols-2">
                   {log.beforeData && (
                     <div>
-                      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                         Trước
                       </p>
                       <pre className="overflow-auto rounded-xl bg-zinc-950/80 p-4 font-mono text-xs text-zinc-300">
@@ -431,7 +431,7 @@ export default function AuditLogViewer({
                   )}
                   {log.afterData && (
                     <div>
-                      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                         Sau
                       </p>
                       <pre className="overflow-auto rounded-xl bg-zinc-950/80 p-4 font-mono text-xs text-zinc-300">
@@ -441,10 +441,10 @@ export default function AuditLogViewer({
                   )}
                   {(log.ipAddress || log.userAgent) && (
                     <div className="md:col-span-2">
-                      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                         Metadata
                       </p>
-                      <div className="flex flex-wrap gap-4 text-xs text-zinc-500">
+                      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                         {log.ipAddress && (
                           <span>
                             IP:{' '}

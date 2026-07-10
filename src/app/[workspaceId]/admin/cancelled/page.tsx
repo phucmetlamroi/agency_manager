@@ -28,7 +28,7 @@ export default async function CancelledTasksPage({
             <div style={{ marginBottom: '2rem' }}>
                 <Link
                     href={`/${workspaceId}/admin`}
-                    className="inline-flex items-center gap-1.5 text-[13px] text-zinc-500 hover:text-zinc-300 transition-colors mb-3"
+                    className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-zinc-300 transition-colors mb-3"
                 >
                     <ArrowLeft size={14} /> Quay lại bảng điều khiển
                 </Link>

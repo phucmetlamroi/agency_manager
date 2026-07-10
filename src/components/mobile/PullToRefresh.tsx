@@ -63,10 +63,10 @@ export default function PullToRefresh({
             >
                 <div className="w-10 h-10 rounded-full bg-zinc-900/90 backdrop-blur-xl border border-white/10 shadow-lg flex items-center justify-center">
                     {isRefreshing ? (
-                        <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                        <Loader2 className="w-5 h-5 text-primary-accent animate-spin" />
                     ) : (
                         <motion.div style={{ rotate: indicatorRotation }}>
-                            <ArrowDown className="w-5 h-5 text-indigo-400" />
+                            <ArrowDown className="w-5 h-5 text-primary-accent" />
                         </motion.div>
                     )}
                 </div>

@@ -55,13 +55,13 @@ export function PasswordGate({ slug }: { slug: string }) {
                 onKeyDown={(e) => e.key === 'Enter' && void submit()}
                 placeholder="Password"
                 autoFocus
-                className="mt-4 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-indigo-400/50 focus:outline-none"
+                className="mt-4 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none"
             />
             {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
             <button
                 onClick={() => void submit()}
                 disabled={!password || busy}
-                className="mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-500 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-50"
+                className="mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
             >
                 {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Continue
             </button>

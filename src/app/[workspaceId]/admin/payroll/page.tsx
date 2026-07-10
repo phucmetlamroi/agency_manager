@@ -134,7 +134,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:mb-8">
                 <div>
                     <h2 className="title-gradient text-2xl sm:text-3xl m-0 font-extrabold tracking-tight">Bảng lương & Thu nhập</h2>
-                    <p className="text-zinc-500 mt-2 text-sm">
+                    <p className="text-muted-foreground mt-2 text-sm">
                         Workspace: <span className="text-white font-semibold">{workspace?.name}</span> · Tính trên các task đã "{SALARY_COMPLETED_STATUS}".
                     </p>
                 </div>
@@ -143,14 +143,14 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                     {canExportMonthlyXlsx && (
                         <a
                             href={exportUrl}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[20px] border border-[rgba(139,92,246,0.15)] text-[#D8B4FE] text-[13px] font-semibold no-underline hover:bg-[rgba(139,92,246,0.06)] transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[20px] border border-[rgba(139,92,246,0.15)] text-primary-accent text-[13px] font-semibold no-underline hover:bg-[rgba(139,92,246,0.06)] transition-colors"
                         >
                             <Download className="w-4 h-4" />
                             Xuất XLSX
                         </a>
                     )}
                     <div className="inline-flex items-center gap-2 px-3 py-2 rounded-[20px] bg-[#121016] border border-[rgba(139,92,246,0.1)] text-[#A1A1AA] text-xs font-medium">
-                        <span className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
+                        <span className="w-2 h-2 rounded-full bg-primary" />
                         Workspace · Tách biệt
                     </div>
                 </div>
@@ -179,7 +179,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                 ))}
 
                 {serializedUsers.length === 0 && (
-                    <div className="text-center py-12 text-zinc-500">
+                    <div className="text-center py-12 text-muted-foreground">
                         Không có dữ liệu lương trong tháng này.
                     </div>
                 )}

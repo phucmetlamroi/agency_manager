@@ -93,7 +93,7 @@ export default function VeloxMapNode({ node, onOpen, dense = false }: VeloxMapNo
                         {capitaliseLabel(node.label)}
                     </div>
                     {/* Sub-line: confidence + scope hint */}
-                    <div className="text-[10px] text-zinc-500 leading-tight mt-0.5">
+                    <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
                         {node.band === 'HIGH'
                             ? 'chắc'
                             : node.band === 'REVIEW'
@@ -105,7 +105,7 @@ export default function VeloxMapNode({ node, onOpen, dense = false }: VeloxMapNo
                 </div>
                 {isInteractive && (
                     <ExternalLink
-                        className="w-3.5 h-3.5 text-zinc-500 opacity-0 group-hover/node:opacity-100 transition-opacity flex-none mt-0.5"
+                        className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover/node:opacity-100 transition-opacity flex-none mt-0.5"
                         aria-hidden="true"
                     />
                 )}
@@ -154,7 +154,7 @@ export default function VeloxMapNode({ node, onOpen, dense = false }: VeloxMapNo
             {/* Note (compilation) */}
             {!dense && node.note && (
                 <p
-                    className="text-[10.5px] text-zinc-500 leading-snug mt-2 italic"
+                    className="text-[10.5px] text-muted-foreground leading-snug mt-2 italic"
                     title={node.note}
                 >
                     {node.note}

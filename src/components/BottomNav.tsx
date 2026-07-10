@@ -47,24 +47,24 @@ export default function BottomNav({ role, workspaceId }: { role: string, workspa
                         className={cn(
                             'flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 min-w-[48px]',
                             active
-                                ? 'text-indigo-400 bg-indigo-500/10'
-                                : 'text-zinc-500 hover:text-zinc-300'
+                                ? 'text-primary-accent bg-primary/10'
+                                : 'text-muted-foreground hover:text-zinc-300'
                         )}
                     >
                         <item.icon
                             className={cn(
                                 'w-5 h-5 transition-all duration-300',
-                                active ? 'text-indigo-400 drop-shadow-[0_0_6px_rgba(99,102,241,0.7)]' : 'text-zinc-500'
+                                active ? 'text-primary-accent drop-shadow-[0_0_6px_rgba(99,102,241,0.7)]' : 'text-muted-foreground'
                             )}
                         />
                         <span className={cn(
                             'text-[10px] font-semibold tracking-wide leading-none transition-all duration-300',
-                            active ? 'text-indigo-400' : 'text-zinc-500'
+                            active ? 'text-primary-accent' : 'text-muted-foreground'
                         )}>
                             {item.label}
                         </span>
                         {active && (
-                            <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-indigo-400 rounded-full" />
+                            <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />
                         )}
                     </Link>
                 )

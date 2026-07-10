@@ -140,7 +140,7 @@ export function ManageVersionsModal({
                             <Dialog.Title className="truncate text-[14px] font-semibold text-zinc-100">
                                 Quản lý phiên bản{data ? ` — ${data.asset.name}` : ''}
                             </Dialog.Title>
-                            <Dialog.Description className="mt-0.5 text-[11.5px] text-zinc-500">
+                            <Dialog.Description className="mt-0.5 text-[11.5px] text-muted-foreground">
                                 {versions.length > 0
                                     ? `${versions.length} phiên bản · mới nhất ở trên cùng`
                                     : 'Danh sách các bản dựng của asset này'}
@@ -179,7 +179,7 @@ export function ManageVersionsModal({
                                 </button>
                             </div>
                         ) : versions.length === 0 ? (
-                            <div className="py-14 text-center text-[13px] text-zinc-500">Chưa có phiên bản nào.</div>
+                            <div className="py-14 text-center text-[13px] text-muted-foreground">Chưa có phiên bản nào.</div>
                         ) : (
                             <div className="flex flex-col gap-1.5">
                                 {versions.map((v) => (
@@ -289,7 +289,7 @@ function VersionRowItem({
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={poster} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                 ) : (
-                    <span className="grid h-full w-full place-items-center text-zinc-600">
+                    <span className="grid h-full w-full place-items-center text-muted-foreground">
                         {mediaKind === 'image' ? <ImageIcon size={20} /> : <Film size={20} />}
                     </span>
                 )}
@@ -320,7 +320,7 @@ function VersionRowItem({
                         {v.originalName}
                     </span>
                 </div>
-                <div className="mt-1 truncate text-[11px] text-zinc-500" title={formatDateTime(v.createdAt)}>
+                <div className="mt-1 truncate text-[11px] text-muted-foreground" title={formatDateTime(v.createdAt)}>
                     {v.uploadedBy?.name ? `${v.uploadedBy.name} · ` : ''}
                     {formatDate(v.createdAt)} · {bytesLabel(v.sizeBytes)}
                 </div>

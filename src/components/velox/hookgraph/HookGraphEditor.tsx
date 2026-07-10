@@ -728,7 +728,7 @@ function Flow({
                             className={`flex-1 rounded-lg py-1.5 text-[11.5px] font-semibold transition-colors ${
                                 railTab === key
                                     ? 'bg-violet-500/20 text-violet-100'
-                                    : 'text-zinc-500 hover:text-zinc-300'
+                                    : 'text-muted-foreground hover:text-zinc-300'
                             }`}
                         >
                             {label}
@@ -753,7 +753,7 @@ function Flow({
                             onEditStart={pushHistoryThrottled}
                         />
                     ) : (
-                        <div className="space-y-2.5 px-4 py-7 text-[11.5px] leading-relaxed text-zinc-500">
+                        <div className="space-y-2.5 px-4 py-7 text-[11.5px] leading-relaxed text-muted-foreground">
                             <p className="text-center">
                                 Chọn một block trên canvas để sửa thuộc tính.
                             </p>

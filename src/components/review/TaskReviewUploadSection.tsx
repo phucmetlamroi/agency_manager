@@ -172,10 +172,10 @@ export function TaskReviewUploadSection({
             onDragLeave={() => setDragOver(false)}
             onDrop={onDrop}
         >
-            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 <Clapperboard size={13} className="text-violet-400" />
                 Video review
-                <span className="font-normal normal-case text-zinc-600">— khách duyệt trực tiếp</span>
+                <span className="font-normal normal-case text-muted-foreground">— khách duyệt trực tiếp</span>
             </div>
 
             {/* P3.7 — sync task → Hoàn tất when a linked deliverable is at the approved status */}
@@ -243,10 +243,10 @@ export function TaskReviewUploadSection({
                     onClick={() => fileInputRef.current?.click()}
                     className="flex w-full flex-col items-center gap-1.5 rounded-xl border border-dashed border-violet-500/25 bg-white/[0.02] px-4 py-5 text-center transition-colors hover:border-violet-500/50 hover:bg-violet-500/[0.04]"
                 >
-                    <span className="inline-flex items-center gap-2 rounded-full bg-[#8B5CF6] px-3 py-1.5 text-[12.5px] font-medium text-white">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1.5 text-[12.5px] font-medium text-white">
                         <UploadCloud size={14} /> Tải video review lên
                     </span>
-                    <span className="text-[11.5px] leading-relaxed text-zinc-500">
+                    <span className="text-[11.5px] leading-relaxed text-muted-foreground">
                         Khách xem và duyệt ngay trên web, không cần tài khoản.
                         <br />
                         Kéo thả video vào đây cũng được.
@@ -278,7 +278,7 @@ function ConfirmStrip({
                 <span className="flex-1 truncate" title={file.name}>
                     {file.name}
                 </span>
-                <span className="shrink-0 text-[10.5px] text-zinc-500">{formatBytes(file.size)}</span>
+                <span className="shrink-0 text-[10.5px] text-muted-foreground">{formatBytes(file.size)}</span>
             </div>
 
             {!ctx ? (
@@ -314,7 +314,7 @@ function ConfirmStrip({
                 <button
                     type="button"
                     onClick={onStart}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#8B5CF6] px-3 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-[#A855F7]"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-primary-accent"
                 >
                     <UploadCloud size={13} /> Bắt đầu tải lên
                 </button>
@@ -336,7 +336,7 @@ function UploadingCard({ item }: { item: UploadItem }) {
                     <Loader2 size={14} className="animate-spin" />
                     <span className="truncate">{item.name}</span>
                 </div>
-                <p className="mt-1 pl-6 text-[11px] leading-relaxed text-zinc-500">
+                <p className="mt-1 pl-6 text-[11px] leading-relaxed text-muted-foreground">
                     Đang xử lý video… thường mất 1–3 phút. Bạn có thể đóng cửa sổ này — hệ thống sẽ báo khi video sẵn
                     sàng.
                 </p>
@@ -377,18 +377,18 @@ function UploadingCard({ item }: { item: UploadItem }) {
     return (
         <div className="mb-2 rounded-xl border border-white/5 bg-white/[0.03] p-3">
             <div className="flex items-center gap-2">
-                <Film size={14} className="shrink-0 text-zinc-500" />
+                <Film size={14} className="shrink-0 text-muted-foreground" />
                 <span className="flex-1 truncate text-[12px] text-zinc-200">{item.name}</span>
-                <span className="shrink-0 text-[10.5px] tabular-nums text-zinc-500">{pct}%</span>
+                <span className="shrink-0 text-[10.5px] tabular-nums text-muted-foreground">{pct}%</span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
                 <div
-                    className={`h-full rounded-full transition-[width] duration-300 ${paused ? 'bg-amber-400/70' : 'bg-[#8B5CF6]'}`}
+                    className={`h-full rounded-full transition-[width] duration-300 ${paused ? 'bg-amber-400/70' : 'bg-primary'}`}
                     style={{ width: `${pct}%` }}
                 />
             </div>
             <div className="mt-1.5 flex items-center justify-between">
-                <span className="text-[10.5px] tabular-nums text-zinc-500">
+                <span className="text-[10.5px] tabular-nums text-muted-foreground">
                     {formatBytes(Math.min(item.bytesUploaded, item.sizeBytes))} / {formatBytes(item.sizeBytes)}
                     {item.status === 'uploading' && item.speedBps ? ` • ${formatBytes(item.speedBps)}/s` : ''}
                     {paused ? (item.pausedReason === 'network' ? ' • chờ mạng…' : ' • đã tạm dừng') : ''}
@@ -416,7 +416,7 @@ function UploadingCard({ item }: { item: UploadItem }) {
                     <button
                         type="button"
                         onClick={() => uploadEngine.cancel(item.id)}
-                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-zinc-500 hover:bg-white/[0.08] hover:text-red-300"
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-white/[0.08] hover:text-red-300"
                     >
                         <X size={11} /> Hủy
                     </button>
@@ -430,7 +430,7 @@ function UploadingCard({ item }: { item: UploadItem }) {
 
 const REVIEW_STATE: Record<ReviewStateDto, { label: string; cls: string }> = {
     draft: { label: 'Bản nháp', cls: 'bg-white/[0.06] text-zinc-400' },
-    awaiting_review: { label: 'Chờ khách duyệt', cls: 'bg-indigo-500/15 text-indigo-300' },
+    awaiting_review: { label: 'Chờ khách duyệt', cls: 'bg-primary/15 text-primary-accent' },
     changes_requested: { label: 'Khách yêu cầu sửa', cls: 'bg-amber-500/15 text-amber-300' },
     approved: { label: 'Đã duyệt', cls: 'bg-emerald-500/15 text-emerald-300' },
 }
@@ -449,9 +449,9 @@ function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; wo
                 <div className="flex items-center gap-2 text-[12px] text-violet-200">
                     <Loader2 size={14} className="animate-spin" />
                     <span className="truncate">{asset.name}</span>
-                    {v && <span className="shrink-0 text-[10.5px] text-zinc-500">v{v.versionNumber}</span>}
+                    {v && <span className="shrink-0 text-[10.5px] text-muted-foreground">v{v.versionNumber}</span>}
                 </div>
-                <p className="mt-1 pl-6 text-[11px] text-zinc-500">Đang xử lý video…</p>
+                <p className="mt-1 pl-6 text-[11px] text-muted-foreground">Đang xử lý video…</p>
             </div>
         )
     }
@@ -494,7 +494,7 @@ function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; wo
                         className="h-full w-full object-cover"
                     />
                 ) : (
-                    <div className="grid h-full w-full place-items-center text-zinc-600">
+                    <div className="grid h-full w-full place-items-center text-muted-foreground">
                         <Film size={20} />
                     </div>
                 )}
@@ -527,7 +527,7 @@ function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; wo
                     drawer column; the "Copy link khách" button was removed (FR-12 — editors
                     open review directly), which alone makes this row airy. */}
                 <div className="mt-auto flex flex-wrap items-end justify-between gap-2 pt-1.5">
-                    <span className="min-w-0 flex-1 truncate text-[10.5px] text-zinc-500">
+                    <span className="min-w-0 flex-1 truncate text-[10.5px] text-muted-foreground">
                         {v.uploadedBy?.name ? `${v.uploadedBy.name} • ` : ''}
                         {formatClock(v.createdAt)}
                         {v.commentCount > 0 ? ` • ${v.commentCount} bình luận` : ''}
@@ -536,7 +536,7 @@ function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; wo
                         type="button"
                         onClick={openReview}
                         disabled={!workspaceId}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#A855F7] disabled:opacity-50"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-primary-accent disabled:opacity-50"
                     >
                         <PlayCircle size={13} /> Mở review
                     </button>

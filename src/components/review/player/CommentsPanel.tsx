@@ -167,7 +167,7 @@ export function CommentsPanel({
                                     <p className="text-sm">{L.emptyOtherVersions(otherTotal)}</p>
                                     <button
                                         onClick={() => onJumpToVersion(otherWithComments[0].versionId)}
-                                        className="mt-1 flex items-center gap-1.5 rounded-lg bg-indigo-500/20 px-3 py-1.5 text-sm text-indigo-200 hover:bg-indigo-500/30"
+                                        className="mt-1 flex items-center gap-1.5 rounded-lg bg-primary/20 px-3 py-1.5 text-sm text-primary-accent hover:bg-primary/30"
                                     >
                                         <ArrowRightCircle className="h-4 w-4" />
                                         {L.viewVersion(otherWithComments[0].versionNumber)}

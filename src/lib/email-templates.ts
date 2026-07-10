@@ -349,6 +349,6 @@ export const emailTemplates = {
                 Thay đổi tùy chọn trong Settings &gt; Notification Preferences.
             </p>
         `
-        return wrapTemplate(content, `[AgencyManager] Bạn có ${notifications.length} thông báo mới`)
+        return wrapTemplate(content, `[HustlyTasker] Bạn có ${notifications.length} thông báo mới`)
     },
 }

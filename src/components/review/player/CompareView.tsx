@@ -161,7 +161,7 @@ export function CompareView({
                 </button>
                 <div className="min-w-0 flex-1">
                     <h1 className="flex items-center gap-1.5 truncate text-sm font-semibold">
-                        <Columns2 className="h-4 w-4 shrink-0 text-indigo-400" />
+                        <Columns2 className="h-4 w-4 shrink-0 text-primary-accent" />
                         <span className="truncate">{assetName}</span>
                     </h1>
                     <p className="text-xs text-white/40">
@@ -210,7 +210,7 @@ export function CompareView({
                         <button
                             onClick={transport.toggle}
                             disabled={!bothReady}
-                            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-40"
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-40"
                             aria-label={transport.playing ? 'Tạm dừng' : 'Phát'}
                         >
                             {transport.playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -227,7 +227,7 @@ export function CompareView({
                                 step={0.01}
                                 value={Math.min(positionSec, maxDur || 0)}
                                 onChange={(e) => transport.seekBoth(Number(e.target.value))}
-                                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/15 accent-indigo-400"
+                                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/15 accent-primary"
                                 disabled={!bothReady}
                             />
                             <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2">
@@ -266,7 +266,7 @@ export function CompareView({
                                                     setRateOpen(false)
                                                 }}
                                                 className={`block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-white/10 ${
-                                                    r === transport.rate ? 'text-indigo-300' : 'text-white/80'
+                                                    r === transport.rate ? 'text-primary-accent' : 'text-white/80'
                                                 }`}
                                             >
                                                 {r}×

@@ -23,12 +23,12 @@ export default function VeloxV4PreviewPage() {
     }
     const result = buildSampleResult()
     return (
-        <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
+        <main className="min-h-dvh bg-zinc-950 px-6 py-10 text-zinc-100">
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-2xl font-bold tracking-tight mb-1">
                     Velox v4 · Multi-Hook Map — preview
                 </h1>
-                <p className="text-sm text-zinc-500 mb-6">
+                <p className="text-sm text-muted-foreground mb-6">
                     Synthetic LGR-style fixture. Read-only. Drag-drop + Auto/Manual
                     toggle land in P4.
                 </p>

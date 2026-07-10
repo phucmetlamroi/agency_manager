@@ -111,7 +111,7 @@ function Poster({ asset, thumb }: { asset: AssetDto; thumb: ThumbScale }) {
         )
     }
     return (
-        <div className="absolute inset-0 grid place-items-center text-zinc-600">
+        <div className="absolute inset-0 grid place-items-center text-muted-foreground">
             {asset.mediaKind === 'image' ? <ImageIcon size={24} /> : <Film size={24} />}
         </div>
     )
@@ -293,7 +293,7 @@ export function FolderCardGrid({
                             {folder.name}
                         </div>
                     )}
-                    <div className="mt-0.5 truncate text-[11px] text-zinc-500">
+                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
                         {folder.itemCount} mục · {bytesLabel(folder.totalBytes)}
                     </div>
                 </div>
@@ -455,7 +455,7 @@ export function AssetCardGrid({
                     )}
                     {showInfo && v?.uploadedBy && (
                         <div
-                            className="truncate text-[11px] text-zinc-500"
+                            className="truncate text-[11px] text-muted-foreground"
                             title={`${v.uploadedBy.name} • ${formatDateTime(v.createdAt)}`}
                         >
                             {v.uploadedBy.name} • {formatDate(v.createdAt)}
@@ -467,7 +467,7 @@ export function AssetCardGrid({
                         auto-đổi qua state machine, không sửa tay trên card asset. Giữ lại 💬n. */}
                     {showInfo && commentCount > 0 && (
                         <div className="mt-0.5 flex items-center justify-end">
-                            <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-zinc-500">
+                            <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-muted-foreground">
                                 <MessageSquare size={11} />
                                 {commentCount}
                             </span>
@@ -519,10 +519,10 @@ export function InfoPanel({
                         </span>
                     )}
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                     {items.map((it) => (
                         <span key={it.label}>
-                            <span className="text-zinc-600">{it.label}:</span>{' '}
+                            <span className="text-muted-foreground">{it.label}:</span>{' '}
                             <span className="text-zinc-300">{it.value}</span>
                         </span>
                     ))}

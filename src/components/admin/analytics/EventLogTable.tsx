@@ -35,7 +35,7 @@ const columns = [
         const val = info.getValue()
         let color = 'bg-zinc-800 text-zinc-400'
         if (val === 'REVISION') color = 'bg-red-500/20 text-red-400 border border-red-500/10'
-        if (val === 'BUTTON_CLICK') color = 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/10'
+        if (val === 'BUTTON_CLICK') color = 'bg-primary/20 text-primary-accent border border-primary/10'
         if (val === 'PAGE_VIEW') color = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/10'
         
         return <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${color}`}>{val}</span>
@@ -104,7 +104,7 @@ export default function EventLogTable() {
             {table.getHeaderGroups().map(headerGroup => (
                 <tr key={headerGroup.id}>
                 {headerGroup.headers.map(header => (
-                    <th key={header.id} className="p-3 py-2 text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">
+                    <th key={header.id} className="p-3 py-2 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                 ))}
@@ -124,7 +124,7 @@ export default function EventLogTable() {
             </tbody>
         </table>
         {data.length === 0 && !loading && (
-            <div className="p-12 text-center text-zinc-600 text-xs italic">
+            <div className="p-12 text-center text-muted-foreground text-xs italic">
                 Chưa ghi nhận sự kiện nào. Hãy thao tác để xem nhật ký.
             </div>
         )}

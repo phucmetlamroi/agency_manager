@@ -117,7 +117,7 @@ export default function ShareLinkSection({ clientId, clientName, workspaceId, on
                 <button
                     onClick={create}
                     disabled={busy}
-                    style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: '#8B5CF6', border: 'none', color: '#fff', cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, opacity: busy ? 0.6 : 1, marginBottom: 16 }}
+                    style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: 'hsl(var(--primary))', border: 'none', color: '#fff', cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, opacity: busy ? 0.6 : 1, marginBottom: 16 }}
                 >
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Tạo link chia sẻ mới
                 </button>

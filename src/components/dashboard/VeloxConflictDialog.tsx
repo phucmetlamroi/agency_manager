@@ -121,7 +121,7 @@ export default function VeloxConflictDialog({ open, conflicts, onResolve, onCanc
                                     <div className="text-[13px] font-bold text-zinc-100 group-hover:text-white">
                                         Ghi đè
                                     </div>
-                                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                                    <div className="text-[11px] text-muted-foreground mt-0.5">
                                         Dùng giá trị từ Velox, thay thế giá trị đã nhập
                                     </div>
                                 </div>
@@ -139,7 +139,7 @@ export default function VeloxConflictDialog({ open, conflicts, onResolve, onCanc
                                     <div className="text-[13px] font-bold text-zinc-100 group-hover:text-white">
                                         Giữ
                                     </div>
-                                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                                    <div className="text-[11px] text-muted-foreground mt-0.5">
                                         Giữ giá trị bạn đã nhập, chỉ điền các field đang trống
                                     </div>
                                 </div>
@@ -148,16 +148,16 @@ export default function VeloxConflictDialog({ open, conflicts, onResolve, onCanc
                             <button
                                 type="button"
                                 onClick={() => onResolve('merge')}
-                                className="flex items-center gap-3 w-full px-4 py-3 rounded-2xl bg-white/[0.04] hover:bg-indigo-500/10 border border-white/5 hover:border-indigo-500/40 transition-colors text-left group"
+                                className="flex items-center gap-3 w-full px-4 py-3 rounded-2xl bg-white/[0.04] hover:bg-primary/10 border border-white/5 hover:border-primary/40 transition-colors text-left group"
                             >
-                                <div className="p-1.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 shrink-0">
-                                    <Combine size={14} className="text-indigo-300" />
+                                <div className="p-1.5 rounded-lg bg-primary/15 border border-primary/30 shrink-0">
+                                    <Combine size={14} className="text-primary-accent" />
                                 </div>
                                 <div className="min-w-0">
                                     <div className="text-[13px] font-bold text-zinc-100 group-hover:text-white">
                                         Gộp
                                     </div>
-                                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                                    <div className="text-[11px] text-muted-foreground mt-0.5">
                                         Nối nội dung (cho Video list + Notes); các field khác sẽ ghi đè
                                     </div>
                                 </div>

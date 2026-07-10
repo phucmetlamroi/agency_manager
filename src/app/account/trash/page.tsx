@@ -17,7 +17,7 @@ export default async function TrashPage() {
     const { workspaces, error } = await getMyTrashedWorkspaces()
 
     return (
-        <div className="min-h-screen px-4 py-8" style={{
+        <div className="min-h-dvh px-4 py-8" style={{
             background: 'radial-gradient(circle at top right, #2d1b5e, #000)'
         }}>
             <div className="max-w-3xl mx-auto">
@@ -36,7 +36,7 @@ export default async function TrashPage() {
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-zinc-100">Workspace Trash</h1>
-                            <p className="text-xs text-zinc-500">
+                            <p className="text-xs text-muted-foreground">
                                 Workspaces đã xóa — bạn có 30 ngày để khôi phục trước khi xóa vĩnh viễn.
                             </p>
                         </div>
@@ -49,7 +49,7 @@ export default async function TrashPage() {
                     )}
 
                     {(!workspaces || workspaces.length === 0) && (
-                        <div className="mt-8 text-center py-12 text-zinc-500">
+                        <div className="mt-8 text-center py-12 text-muted-foreground">
                             <Trash2 className="w-12 h-12 mx-auto mb-3 text-zinc-700" />
                             <p className="text-sm">Không có workspace nào trong Trash.</p>
                         </div>
@@ -73,11 +73,11 @@ export default async function TrashPage() {
                                                 {ws.name}
                                             </h3>
                                             {ws.description && (
-                                                <p className="text-xs text-zinc-500 mt-1 line-clamp-2">
+                                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                                                     {ws.description}
                                                 </p>
                                             )}
-                                            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-zinc-500">
+                                            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-muted-foreground">
                                                 {ws.deletedAt && (
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="w-3 h-3" />

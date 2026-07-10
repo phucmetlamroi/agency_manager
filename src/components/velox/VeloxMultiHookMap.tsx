@@ -55,7 +55,7 @@ export default function VeloxMultiHookMap({
                             <p className="text-zinc-400 text-sm">
                                 Velox không nhận diện được cấu trúc nào.
                             </p>
-                            <p className="text-zinc-500 text-xs mt-1">
+                            <p className="text-muted-foreground text-xs mt-1">
                                 Tất cả file trong folder đang nằm ở khay phải. Kéo thủ
                                 công khi P4 (drag-drop) hoàn thành.
                             </p>
@@ -158,7 +158,7 @@ function Chip({
     const palette = {
         emerald: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10',
         violet: 'text-violet-300 border-violet-500/30 bg-violet-500/10',
-        indigo: 'text-indigo-300 border-indigo-500/30 bg-indigo-500/10',
+        indigo: 'text-primary-accent border-primary/30 bg-primary/10',
         sky: 'text-sky-300 border-sky-500/30 bg-sky-500/10',
     }[tone]
     return (
@@ -213,7 +213,7 @@ function ConceptBlock({
                 <h3 className="text-[15px] font-bold text-white tracking-tight">
                     {concept.label}
                 </h3>
-                <span className="text-[11px] text-zinc-500 font-mono">
+                <span className="text-[11px] text-muted-foreground font-mono">
                     · {hooks.length} hook · {callouts.length} callout · {body ? '1 body' : 'không body'}
                 </span>
             </div>
@@ -223,13 +223,13 @@ function ConceptBlock({
                 className="relative grid grid-cols-[200px_1fr_200px] gap-x-2 items-center min-h-[140px]"
             >
                 {/* Lane labels */}
-                <div className="absolute -top-0.5 left-3 text-[9.5px] tracking-[0.16em] uppercase font-mono text-zinc-600">
+                <div className="absolute -top-0.5 left-3 text-[9.5px] tracking-[0.16em] uppercase font-mono text-muted-foreground">
                     Hooks
                 </div>
-                <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 text-[9.5px] tracking-[0.16em] uppercase font-mono text-zinc-600">
+                <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 text-[9.5px] tracking-[0.16em] uppercase font-mono text-muted-foreground">
                     Body
                 </div>
-                <div className="absolute -top-0.5 right-3 text-[9.5px] tracking-[0.16em] uppercase font-mono text-zinc-600">
+                <div className="absolute -top-0.5 right-3 text-[9.5px] tracking-[0.16em] uppercase font-mono text-muted-foreground">
                     CTA
                 </div>
 
@@ -276,7 +276,7 @@ function ConceptBlock({
 
             {finals.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-white/5">
-                    <div className="text-[10px] tracking-[0.16em] uppercase font-mono text-zinc-600 mb-2 flex items-center gap-2">
+                    <div className="text-[10px] tracking-[0.16em] uppercase font-mono text-muted-foreground mb-2 flex items-center gap-2">
                         <Sparkles className="w-3 h-3" /> Final / Reference
                     </div>
                     <div className="flex flex-wrap gap-2">

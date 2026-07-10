@@ -256,7 +256,7 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
                     <h1 className="font-extrabold tracking-tight text-white" style={{ fontSize: 20 }}>
                         Thùng rác
                     </h1>
-                    <p className="mt-px text-zinc-500" style={{ fontSize: 12 }}>
+                    <p className="mt-px text-muted-foreground" style={{ fontSize: 12 }}>
                         Mục đã xóa gần đây — khôi phục về vị trí cũ bất cứ lúc nào.
                     </p>
                 </div>
@@ -273,7 +273,7 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
                             <ChevronLeft size={15} /> {REVIEW_MODULE_LABEL}
                         </a>
                         {data && (
-                            <span className="text-[11px] text-zinc-500">
+                            <span className="text-[11px] text-muted-foreground">
                                 {data.total} mục{data.total > items.length ? ` (đã tải ${items.length})` : ''}
                             </span>
                         )}
@@ -304,7 +304,7 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
                                 type="button"
                                 onClick={restoreSelected}
                                 disabled={busy}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#7C3AED] disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
                             >
                                 {restoringKey === BULK_KEY ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
                                 Khôi phục ({selectedIds.size})
@@ -334,7 +334,7 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
                         >
                             <Check size={12} strokeWidth={3} />
                         </button>
-                        <span className="text-[11.5px] text-zinc-500">Chọn tất cả có thể khôi phục (đã tải)</span>
+                        <span className="text-[11.5px] text-muted-foreground">Chọn tất cả có thể khôi phục (đã tải)</span>
                     </div>
                 )}
 
@@ -362,12 +362,12 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
                         </div>
                     ) : items.length === 0 ? (
                         <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.05] text-zinc-500">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.05] text-muted-foreground">
                                 <Trash2 size={26} />
                             </div>
                             <div>
                                 <p className="text-[14px] font-medium text-zinc-200">Thùng rác trống</p>
-                                <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
+                                <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-muted-foreground">
                                     Mục bạn xóa trong {REVIEW_MODULE_LABEL} sẽ xuất hiện ở đây và có thể khôi phục trong 30 ngày.
                                 </p>
                             </div>
@@ -438,7 +438,7 @@ function PurgeConfirmModal({ label, onCancel, onConfirm }: { label: string; onCa
                         <Trash2 className="h-5 w-5" style={{ color: '#FDA4AF' }} />
                     </div>
                     <h2 className="text-[15px] font-bold text-white">Xóa vĩnh viễn {label}?</h2>
-                    <button onClick={onCancel} className="ml-auto grid h-7 w-7 place-items-center rounded-lg text-zinc-500 hover:bg-white/10 hover:text-white">
+                    <button onClick={onCancel} className="ml-auto grid h-7 w-7 place-items-center rounded-lg text-muted-foreground hover:bg-white/10 hover:text-white">
                         <X size={16} />
                     </button>
                 </div>
@@ -511,7 +511,7 @@ function TrashRow({
                 <div className="truncate text-[13px] font-medium text-zinc-100" title={item.name}>
                     {item.name}
                 </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-zinc-500">
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                     <span>{meta}</span>
                     <span className="text-zinc-700">·</span>
                     <span>Xóa bởi {item.deletedBy?.name ?? 'hệ thống'}</span>

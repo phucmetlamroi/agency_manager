@@ -37,9 +37,9 @@ const statusColors: Record<string, string> = {
     "Sửa frame": "bg-pink-500/10 text-pink-500 border-pink-500/20",
     // Bug fix: status="Quá hạn" set by cron when deadline passes — needed for visibility.
     "Quá hạn": "bg-red-600/15 text-red-600 border-red-600/30 font-bold",
-    "Đã hủy": "bg-zinc-500/10 text-zinc-500 border-zinc-500/20",
+    "Đã hủy": "bg-zinc-500/10 text-muted-foreground border-zinc-500/20",
     // [P3/F2] 6 video-lifecycle statuses (A2–A7).
-    "Đã nộp video (nội bộ)": "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+    "Đã nộp video (nội bộ)": "bg-primary/10 text-primary-accent border-primary/20",
     "Đang sửa feedback (nội bộ)": "bg-amber-500/10 text-amber-500 border-amber-500/20",
     "Đã sửa feedback (nội bộ)": "bg-teal-500/10 text-teal-400 border-teal-500/20",
     "Đã gửi video (khách)": "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",

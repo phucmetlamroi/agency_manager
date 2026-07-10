@@ -47,6 +47,16 @@ interface Props {
     clients: ClientOption[]
 }
 
+// [P0-09] Static Tailwind tone classes (full literals so the JIT scanner emits them) —
+// lets us drop the colour safelist from tailwind.config. Keep keys in sync with the
+// `color` values in RULE_TYPE_META below.
+const TONE: Record<string, { box: string; icon: string }> = {
+    emerald: { box: 'bg-emerald-500/10 border border-emerald-500/20', icon: 'text-emerald-400' },
+    indigo:  { box: 'bg-indigo-500/10 border border-indigo-500/20',   icon: 'text-indigo-400' },
+    violet:  { box: 'bg-violet-500/10 border border-violet-500/20',   icon: 'text-violet-400' },
+    amber:   { box: 'bg-amber-500/10 border border-amber-500/20',     icon: 'text-amber-400' },
+}
+
 const RULE_TYPE_META: Record<string, { label: string; icon: any; color: string }> = {
     flat: { label: 'Giá cố định', icon: DollarSign, color: 'emerald' },
     per_minute: { label: 'Theo phút', icon: Calculator, color: 'indigo' },
@@ -116,9 +126,9 @@ export default function PricingRulesPanel({ workspaceId, rules, clients }: Props
             {/* Rules list */}
             {rules.length === 0 ? (
                 <div className="rounded-2xl bg-zinc-950/60 backdrop-blur-xl border border-white/5 p-8 text-center">
-                    <Layers size={32} className="mx-auto text-zinc-600 mb-3" />
+                    <Layers size={32} className="mx-auto text-muted-foreground mb-3" />
                     <p className="text-sm text-zinc-400 mb-1">Chưa có pricing rule nào.</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-muted-foreground">
                         Tạo rule đầu tiên để Velox có thể tự động tính giá task.
                     </p>
                 </div>
@@ -135,8 +145,8 @@ export default function PricingRulesPanel({ workspaceId, rules, clients }: Props
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                                        <div className={`p-2 rounded-xl bg-${meta.color}-500/10 border border-${meta.color}-500/20`}>
-                                            <Icon size={16} className={`text-${meta.color}-400`} />
+                                        <div className={`p-2 rounded-xl ${TONE[meta.color]?.box ?? ''}`}>
+                                            <Icon size={16} className={TONE[meta.color]?.icon ?? ''} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -149,7 +159,7 @@ export default function PricingRulesPanel({ workspaceId, rules, clients }: Props
                                                         Mặc định
                                                     </span>
                                                 )}
-                                                <span className="text-[11px] text-zinc-500">
+                                                <span className="text-[11px] text-muted-foreground">
                                                     {meta.label}
                                                 </span>
                                             </div>
@@ -236,20 +246,20 @@ function ConfigPreview({ ruleType, config }: { ruleType: string; config: any }) 
     switch (ruleType) {
         case 'flat':
             return (
-                <p className="text-[11px] text-zinc-500 mt-1.5">
+                <p className="text-[11px] text-muted-foreground mt-1.5">
                     ${config.priceUSD} · {Number(config.wageVND ?? 0).toLocaleString('vi-VN')} VND/video
                 </p>
             )
         case 'per_minute':
             return (
-                <p className="text-[11px] text-zinc-500 mt-1.5">
+                <p className="text-[11px] text-muted-foreground mt-1.5">
                     ${config.ratePerMinuteUSD}/phút · {Number(config.wagePerMinuteVND ?? 0).toLocaleString('vi-VN')} VND/phút
                     {config.minimumUSD ? ` · min $${config.minimumUSD}` : ''}
                 </p>
             )
         case 'tiered_duration':
             return (
-                <p className="text-[11px] text-zinc-500 mt-1.5">
+                <p className="text-[11px] text-muted-foreground mt-1.5">
                     {(config.tiers ?? []).length} bậc · max {(config.tiers?.[config.tiers.length - 1]?.maxSeconds ?? 0)}s
                 </p>
             )
@@ -560,7 +570,7 @@ function TieredConfigForm({ config, onChange }: { config: any; onChange: (c: any
 
     return (
         <div className="space-y-2">
-            <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-zinc-500 font-bold px-1">
+            <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-muted-foreground font-bold px-1">
                 <div className="col-span-3">≤ Giây</div>
                 <div className="col-span-4">USD</div>
                 <div className="col-span-4">VND</div>

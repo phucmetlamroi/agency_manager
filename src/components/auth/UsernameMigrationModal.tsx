@@ -119,7 +119,7 @@ export function UsernameMigrationModal({ currentUsername, displayName }: Props) 
                     Hoàn tất
                 </button>
 
-                <p className="text-[10px] text-zinc-600 text-center mt-3 leading-relaxed">
+                <p className="text-[10px] text-muted-foreground text-center mt-3 leading-relaxed">
                     Bạn có thể đổi lại username sau ở phần Settings nếu cần.
                 </p>
             </div>

@@ -132,7 +132,7 @@ export default function VeloxRawFootagesModal({
                                 const rowCount = Math.max(videoTitles.length, draft.length)
                                 if (rowCount === 0) {
                                     return (
-                                        <div className="text-center py-8 text-zinc-500 text-[13px]">
+                                        <div className="text-center py-8 text-muted-foreground text-[13px]">
                                             Chưa có video nào trong videoList. Quay về form và thêm video trước.
                                         </div>
                                     )
@@ -140,7 +140,7 @@ export default function VeloxRawFootagesModal({
                                 return (
                                     <table className="w-full text-[12px] border-collapse">
                                         <thead className="sticky top-0 bg-zinc-950/95 backdrop-blur z-10">
-                                            <tr className="text-[10px] font-bold uppercase text-zinc-500">
+                                            <tr className="text-[10px] font-bold uppercase text-muted-foreground">
                                                 <th className="text-left px-2 py-2 border-b border-white/5 w-[8%]">#</th>
                                                 <th className="text-left px-2 py-2 border-b border-white/5 w-[35%]">
                                                     Tên video
@@ -158,9 +158,9 @@ export default function VeloxRawFootagesModal({
                                                         key={idx}
                                                         className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
                                                     >
-                                                        <td className="px-2 py-2 text-zinc-500 font-mono">{idx + 1}</td>
+                                                        <td className="px-2 py-2 text-muted-foreground font-mono">{idx + 1}</td>
                                                         <td className={`px-2 py-2 truncate ${
-                                                            videoTitles[idx] ? 'text-zinc-200' : 'text-zinc-600 italic'
+                                                            videoTitles[idx] ? 'text-zinc-200' : 'text-muted-foreground italic'
                                                         }`}>
                                                             {title}
                                                         </td>
@@ -184,7 +184,7 @@ export default function VeloxRawFootagesModal({
 
                         {/* Footer */}
                         <div className="flex items-center justify-between gap-3 px-6 py-3 border-t border-white/5 shrink-0">
-                            <p className="text-[11px] text-zinc-500">
+                            <p className="text-[11px] text-muted-foreground">
                                 Chỉnh title trong videoList ở form chính. Đây chỉ edit URL.
                             </p>
                             <div className="flex items-center gap-2">

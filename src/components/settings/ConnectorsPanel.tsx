@@ -44,6 +44,14 @@ interface ProviderMeta {
     authorizeUrl: string
 }
 
+// [P0-09] Static Tailwind tone classes (full literal strings so the JIT scanner emits
+// them) — this is what lets us drop the colour safelist from tailwind.config. Providers
+// use blue/emerald only; keep in sync if a provider adds a colour.
+const TONE: Record<string, { box: string; icon: string }> = {
+    blue:    { box: 'bg-blue-500/10 border border-blue-500/20',       icon: 'text-blue-400' },
+    emerald: { box: 'bg-emerald-500/10 border border-emerald-500/20', icon: 'text-emerald-400' },
+}
+
 const PROVIDERS: ProviderMeta[] = [
     {
         id: 'dropbox',
@@ -148,8 +156,8 @@ export default function ConnectorsPanel({ workspaceId, integrations }: Props) {
                         >
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-start gap-3 flex-1 min-w-0">
-                                    <div className={`p-3 rounded-xl bg-${provider.color}-500/10 border border-${provider.color}-500/20 shrink-0`}>
-                                        <Icon size={22} className={`text-${provider.color}-400`} />
+                                    <div className={`p-3 rounded-xl ${TONE[provider.color]?.box ?? ''} shrink-0`}>
+                                        <Icon size={22} className={TONE[provider.color]?.icon ?? ''} />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -168,7 +176,7 @@ export default function ConnectorsPanel({ workspaceId, integrations }: Props) {
                                         </div>
                                         <p className="text-xs text-zinc-400 mt-1">{provider.description}</p>
                                         {isConnected && integration.accountEmail && (
-                                            <p className="text-[11px] text-zinc-500 mt-2">
+                                            <p className="text-[11px] text-muted-foreground mt-2">
                                                 Kết nối với tài khoản <span className="text-zinc-300">{integration.accountEmail}</span>
                                             </p>
                                         )}

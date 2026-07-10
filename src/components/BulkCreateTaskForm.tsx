@@ -23,18 +23,18 @@ type User = {
 // ── Reusable Styled Input ────────────────────────────────────
 const FormInput = ({ label, value, onChange, placeholder, type = 'text' }: any) => (
     <div>
-        <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">{label}</label>
+        <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{label}</label>
         <input type={type} value={value} onChange={onChange} placeholder={placeholder}
-            className="w-full px-3 py-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-zinc-200 text-sm placeholder:text-zinc-700 focus:outline-none focus:border-indigo-500/50 focus:bg-zinc-900 transition-all duration-200"
+            className="w-full px-3 py-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-zinc-200 text-sm placeholder:text-zinc-700 focus:outline-none focus:border-primary/50 focus:bg-zinc-900 transition-all duration-200"
         />
     </div>
 )
 
 const FormSelect = ({ label, value, onChange, children }: any) => (
     <div>
-        <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">{label}</label>
+        <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{label}</label>
         <select value={value} onChange={onChange}
-            className="w-full px-3 py-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-zinc-200 text-sm focus:outline-none focus:border-indigo-500/50 transition-all duration-200">
+            className="w-full px-3 py-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-zinc-200 text-sm focus:outline-none focus:border-primary/50 transition-all duration-200">
             {children}
         </select>
     </div>
@@ -42,7 +42,7 @@ const FormSelect = ({ label, value, onChange, children }: any) => (
 
 const SectionBlock = ({ icon: Icon, title, color = 'indigo', children }: any) => {
     const colorMap: Record<string, string> = {
-        indigo: 'text-indigo-400 border-indigo-500/30 bg-indigo-500/5',
+        indigo: 'text-primary-accent border-primary/30 bg-primary/5',
         emerald: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5',
         blue: 'text-blue-400 border-blue-500/30 bg-blue-500/5',
     }
@@ -269,11 +269,11 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
 
                 {/* Finance Summary */}
                 <div className="rounded-lg bg-black/30 px-4 py-3 border border-white/5 text-xs space-y-1.5">
-                    <div className="flex justify-between text-zinc-500">
+                    <div className="flex justify-between text-muted-foreground">
                         <span className="flex items-center gap-1.5"><Info className="w-3 h-3" /> Tỷ giá</span>
                         <span className="font-mono text-zinc-400">1 USD = {rate.toLocaleString()} VND</span>
                     </div>
-                    <div className="flex justify-between text-zinc-500">
+                    <div className="flex justify-between text-muted-foreground">
                         <span>Doanh thu</span>
                         <span className="font-mono text-zinc-300">{revenueVnd.toLocaleString()} đ</span>
                     </div>
@@ -294,14 +294,14 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                 className={cn(
                     "rounded-xl border p-4 transition-all duration-300",
                     "bg-blue-500/5 border-blue-500/30",
-                    "hover:border-indigo-500/60 hover:bg-indigo-500/20 active:bg-indigo-500/30 shadow-lg shadow-indigo-500/5"
+                    "hover:border-primary/60 hover:bg-primary/20 active:bg-primary/30 shadow-lg shadow-primary/5"
                 )}
             >
                 <div className="flex items-center gap-2 mb-4">
                     <Link2 className="w-4 h-4 text-blue-400" />
                     <h4 className="text-xs font-bold uppercase tracking-widest text-blue-400 flex items-center gap-2">
                         {"T\u00e0i nguy\u00ean & Ghi ch\u00fa"}
-                        <span className="text-zinc-600 text-[9px] normal-case font-medium lowercase">
+                        <span className="text-muted-foreground text-[9px] normal-case font-medium lowercase">
                             (chuột phải = tags · ctrl+kéo = radial)
                         </span>
                     </h4>
@@ -324,19 +324,19 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
                 {/* Notes VI */}
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Ghi chú (Tiếng Việt)</label>
+                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Ghi chú (Tiếng Việt)</label>
                         <button type="button" onClick={() => { navigator.clipboard.writeText(notes); toast.success('Đã copy nội dung tiếng Việt') }}
-                            className="flex items-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-300 transition-colors">
+                            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-zinc-300 transition-colors">
                             <Copy size={10} /> Copy
                         </button>
                     </div>
                     <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Ghi chú thêm cho Editor (Tiếng Việt)..." rows={3}
-                        className="w-full px-3 py-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-zinc-200 text-sm placeholder:text-zinc-700 focus:outline-none focus:border-indigo-500/50 transition-all duration-200 resize-none" />
+                        className="w-full px-3 py-2.5 bg-zinc-900/60 border border-white/8 rounded-xl text-zinc-200 text-sm placeholder:text-zinc-700 focus:outline-none focus:border-primary/50 transition-all duration-200 resize-none" />
                 </div>
 
                 {/* Notes EN */}
                 <div>
-                    <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Ghi chú tiếng Anh</label>
+                    <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Ghi chú tiếng Anh</label>
                     <textarea value={notesEn} onChange={e => setNotesEn(e.target.value)} placeholder="Dán nội dung tiếng Anh vào đây..." rows={3}
                         className="w-full px-3 py-2.5 bg-zinc-900/60 border border-emerald-500/15 rounded-xl text-zinc-200 text-sm placeholder:text-zinc-700 focus:outline-none focus:border-emerald-500/40 transition-all duration-200 resize-none" />
                     <p className="text-[10px] text-zinc-700 mt-1 italic">ℹ️ Tự dán kết quả dịch vào đây để tối ưu chi phí.</p>
@@ -367,25 +367,25 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
 
 
             {/* ── BLOCK 4: Task List ────────────────────────── */}
-            <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
                 <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-400 flex items-center gap-2">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-primary-accent flex items-center gap-2">
                         <Rocket className="w-4 h-4" />
                         Danh sách Task ({parsedTitles.length})
                     </h4>
                     {parsedTitles.length > 0 && (
-                        <span className="text-[10px] text-zinc-500 bg-zinc-800 px-2 py-1 rounded-full font-mono">
+                        <span className="text-[10px] text-muted-foreground bg-zinc-800 px-2 py-1 rounded-full font-mono">
                             {parsedTitles.length} video
                         </span>
                     )}
                 </div>
-                <p className="text-[11px] text-zinc-600 mb-2">Dán danh sách tên video vào đây (mỗi dòng 1 video)</p>
+                <p className="text-[11px] text-muted-foreground mb-2">Dán danh sách tên video vào đây (mỗi dòng 1 video)</p>
                 <textarea
                     value={rawTitles}
                     onChange={e => setRawTitles(e.target.value)}
                     placeholder={`Video Intro\nVideo Review 1\nVideo Review 2`}
                     rows={8}
-                    className="w-full px-3 py-2.5 bg-zinc-950/80 border border-indigo-500/20 rounded-xl text-zinc-200 font-mono text-sm leading-relaxed focus:outline-none focus:border-indigo-500/50 transition-all duration-200 resize-none"
+                    className="w-full px-3 py-2.5 bg-zinc-950/80 border border-primary/20 rounded-xl text-zinc-200 font-mono text-sm leading-relaxed focus:outline-none focus:border-primary/50 transition-all duration-200 resize-none"
                 />
             </div>
 
@@ -393,7 +393,7 @@ export default function BulkCreateTaskForm({ users, onSuccess, workspaceId }: { 
             <button
                 onClick={handleSubmit}
                 disabled={isSubmitting || parsedTitles.length === 0}
-                className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-500 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-base rounded-xl shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-[0.98]"
+                className="w-full py-3.5 bg-gradient-to-r from-primary to-blue-500 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-base rounded-xl shadow-lg shadow-primary/25 flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-[0.98]"
             >
                 <Rocket className="w-5 h-5" />
                 {isSubmitting ? 'Đang xử lý...' : `Tạo ${parsedTitles.length > 0 ? parsedTitles.length : ''} Task Ngay`}

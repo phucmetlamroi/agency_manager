@@ -61,7 +61,7 @@ function Avatar({ name, url }: { name: string; url: string | null }) {
         return <img src={url} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
     const initials = name.trim().slice(0, 1).toUpperCase() || '?'
     return (
-        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-indigo-500/25 text-xs font-semibold text-indigo-200">
+        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/25 text-xs font-semibold text-primary-accent">
             {initials}
         </div>
     )
@@ -84,7 +84,7 @@ function Reactions({
                     onClick={() => onToggle(r.emoji, !r.reactedByMe)}
                     className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs ${
                         r.reactedByMe
-                            ? 'border-indigo-400/50 bg-indigo-500/20 text-white'
+                            ? 'border-primary/50 bg-primary/20 text-white'
                             : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
                     }`}
                 >
@@ -393,12 +393,12 @@ function InlineEdit({ initial, onSave, onCancel }: { initial: string; onSave: (b
                 onChange={(e) => setDraft(e.target.value)}
                 rows={2}
                 autoFocus
-                className="w-full resize-none rounded-lg border border-white/10 bg-zinc-900/60 px-2.5 py-1.5 text-sm text-white focus:border-indigo-400/50 focus:outline-none"
+                className="w-full resize-none rounded-lg border border-white/10 bg-zinc-900/60 px-2.5 py-1.5 text-sm text-white focus:border-primary/50 focus:outline-none"
             />
             <div className="mt-1 flex gap-1.5">
                 <button
                     onClick={() => draft.trim() && onSave(draft.trim())}
-                    className="rounded-md bg-indigo-500 px-2.5 py-1 text-xs text-white hover:bg-indigo-400"
+                    className="rounded-md bg-primary px-2.5 py-1 text-xs text-white hover:bg-primary/90"
                 >
                     {L.save}
                 </button>

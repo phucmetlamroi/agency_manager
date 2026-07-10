@@ -98,7 +98,7 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
                         {bannerUrl ? (
                             <img src={bannerUrl} alt="Banner" className="absolute inset-0 w-full h-full object-cover" />
                         ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-zinc-600 text-sm">
+                            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
                                 <ImageIcon size={20} className="mr-2" /> Chưa có banner
                             </div>
                         )}
@@ -117,7 +117,7 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
                             />
                         </label>
                     </div>
-                    <p className="text-[11px] text-zinc-600 mt-1.5 pl-1">Tỷ lệ 3:1, tối ưu 1500x500px. Max 10MB.</p>
+                    <p className="text-[11px] text-muted-foreground mt-1.5 pl-1">Tỷ lệ 3:1, tối ưu 1500x500px. Max 10MB.</p>
                 </div>
 
                 {/* Logo */}
@@ -128,7 +128,7 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
                             {logoUrl ? (
                                 <img src={logoUrl} alt="Logo" className="absolute inset-0 w-full h-full object-cover" />
                             ) : (
-                                <ImageIcon size={18} className="text-zinc-600" />
+                                <ImageIcon size={18} className="text-muted-foreground" />
                             )}
                         </div>
                         <label className="px-3 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.10] text-zinc-200 text-[12px] font-semibold cursor-pointer border border-white/10 flex items-center gap-1.5">
@@ -146,7 +146,7 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
                             />
                         </label>
                     </div>
-                    <p className="text-[11px] text-zinc-600 mt-1.5 pl-1">Vuông 512x512px. Max 5MB.</p>
+                    <p className="text-[11px] text-muted-foreground mt-1.5 pl-1">Vuông 512x512px. Max 5MB.</p>
                 </div>
 
                 {/* Name */}
@@ -202,7 +202,7 @@ export default function ProfileSettingsSection({ profileId, initial }: Props) {
                             Lưu
                         </button>
                     </div>
-                    <p className="text-[11px] text-zinc-600 mt-1.5 pl-1">Khách xem link chia sẻ sẽ thấy màu này. Để trống ô mã màu để dùng mặc định.</p>
+                    <p className="text-[11px] text-muted-foreground mt-1.5 pl-1">Khách xem link chia sẻ sẽ thấy màu này. Để trống ô mã màu để dùng mặc định.</p>
                 </div>
             </div>
 

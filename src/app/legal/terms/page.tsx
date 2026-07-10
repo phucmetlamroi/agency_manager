@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function TermsPage() {
     return (
-        <div className="min-h-screen px-4 py-12" style={{
+        <div className="min-h-dvh px-4 py-12" style={{
             background: 'radial-gradient(circle at top right, #2d1b5e, #000)'
         }}>
             <div className="max-w-3xl mx-auto">
@@ -22,7 +22,7 @@ export default function TermsPage() {
 
                 <div className="backdrop-blur-2xl bg-white/[0.04] border border-white/10 rounded-2xl shadow-2xl p-8 md:p-12">
                     <h1 className="text-3xl font-bold text-zinc-100 mb-2">Điều khoản dịch vụ</h1>
-                    <p className="text-sm text-zinc-500 mb-8">Cập nhật lần cuối: 08/05/2026</p>
+                    <p className="text-sm text-muted-foreground mb-8">Cập nhật lần cuối: 08/05/2026</p>
 
                     <div className="prose prose-invert max-w-none space-y-6 text-zinc-300 text-sm leading-relaxed">
 

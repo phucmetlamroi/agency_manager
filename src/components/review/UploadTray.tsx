@@ -76,7 +76,7 @@ export function UploadTray() {
                               ? 'Đang xử lý…'
                               : `${agg.done} xong`}
                     </span>
-                    <ChevronUp size={14} className="text-zinc-500" />
+                    <ChevronUp size={14} className="text-muted-foreground" />
                 </button>
             ) : (
                 <div className="overflow-hidden rounded-2xl border border-[rgba(139,92,246,0.2)] bg-zinc-950/90 shadow-2xl shadow-black/60 backdrop-blur-xl">
@@ -93,7 +93,7 @@ export function UploadTray() {
                         <button
                             type="button"
                             onClick={() => setExpanded(false)}
-                            className="grid h-6 w-6 place-items-center rounded-full text-zinc-500 transition-colors hover:bg-white/[0.08] hover:text-zinc-300"
+                            className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-zinc-300"
                             aria-label="Thu gọn"
                         >
                             <ChevronDown size={15} />
@@ -155,7 +155,7 @@ export function UploadTray() {
                                     <button
                                         type="button"
                                         onClick={() => setConfirmCancelAll(true)}
-                                        className="rounded-full px-2.5 py-1 text-[11.5px] text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-red-300"
+                                        className="rounded-full px-2.5 py-1 text-[11.5px] text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-red-300"
                                     >
                                         Hủy tất cả
                                     </button>
@@ -186,20 +186,20 @@ function UploadRow({ item }: { item: UploadItem }) {
         <div className="border-t border-white/5 px-3.5 py-2.5 first:border-t-0">
             <div className="flex items-center gap-2">
                 {item.kind === 'IMAGE' ? (
-                    <ImageIcon size={14} className="shrink-0 text-zinc-500" />
+                    <ImageIcon size={14} className="shrink-0 text-muted-foreground" />
                 ) : (
-                    <Film size={14} className="shrink-0 text-zinc-500" />
+                    <Film size={14} className="shrink-0 text-muted-foreground" />
                 )}
                 <span className="flex-1 truncate text-[12px] text-zinc-200" title={item.name}>
                     {item.name}
                 </span>
-                <span className="shrink-0 text-[10.5px] tabular-nums text-zinc-500">
+                <span className="shrink-0 text-[10.5px] tabular-nums text-muted-foreground">
                     {formatBytes(item.sizeBytes)}
                 </span>
             </div>
 
             {dest && (
-                <div className="mt-0.5 truncate pl-6 text-[10.5px] text-zinc-600" title={dest}>
+                <div className="mt-0.5 truncate pl-6 text-[10.5px] text-muted-foreground" title={dest}>
                     → {dest}
                 </div>
             )}
@@ -211,7 +211,7 @@ function UploadRow({ item }: { item: UploadItem }) {
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.07]">
                             <div
                                 className={`h-full rounded-full transition-[width] duration-300 ${
-                                    item.pausedReason ? 'bg-amber-400/70' : 'bg-[#8B5CF6]'
+                                    item.pausedReason ? 'bg-amber-400/70' : 'bg-primary'
                                 }`}
                                 style={{ width: `${pct}%` }}
                             />
@@ -229,7 +229,7 @@ function UploadRow({ item }: { item: UploadItem }) {
 
             {/* speed / eta line while uploading */}
             {item.status === 'uploading' && item.speedBps ? (
-                <div className="mt-1 pl-6 text-[10.5px] tabular-nums text-zinc-500">
+                <div className="mt-1 pl-6 text-[10.5px] tabular-nums text-muted-foreground">
                     {formatBytes(item.speedBps)}/s{eta != null ? ` • còn ~${formatEta(eta)}` : ''}
                 </div>
             ) : null}
@@ -268,8 +268,8 @@ function StatusLine({ item }: { item: UploadItem }) {
             </span>
         )
     if (item.status === 'canceled')
-        return <span className="flex-1 text-[11px] text-zinc-500">Đã hủy</span>
-    return <span className="flex-1 text-[11px] text-zinc-500">Chờ…</span>
+        return <span className="flex-1 text-[11px] text-muted-foreground">Đã hủy</span>
+    return <span className="flex-1 text-[11px] text-muted-foreground">Chờ…</span>
 }
 
 function RowActions({ item, onCancel }: { item: UploadItem; onCancel: () => void }) {

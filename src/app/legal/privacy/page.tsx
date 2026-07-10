@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function PrivacyPage() {
     return (
-        <div className="min-h-screen px-4 py-12" style={{
+        <div className="min-h-dvh px-4 py-12" style={{
             background: 'radial-gradient(circle at top right, #2d1b5e, #000)'
         }}>
             <div className="max-w-3xl mx-auto">
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
                         </div>
                         <h1 className="text-3xl font-bold text-zinc-100">Chính sách bảo mật</h1>
                     </div>
-                    <p className="text-sm text-zinc-500 mb-8 ml-13">Cập nhật lần cuối: 08/05/2026</p>
+                    <p className="text-sm text-muted-foreground mb-8 ml-13">Cập nhật lần cuối: 08/05/2026</p>
 
                     <div className="space-y-6 text-zinc-300 text-sm leading-relaxed">
 

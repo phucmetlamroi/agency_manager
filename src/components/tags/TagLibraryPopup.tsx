@@ -159,14 +159,14 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                     {/* Header */}
                     <div className="px-5 py-3.5 border-b border-white/5 flex items-center justify-between bg-zinc-900/40">
                         <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center">
-                                <Tag className="w-3.5 h-3.5 text-indigo-400" strokeWidth={2.5} />
+                            <div className="w-6 h-6 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                                <Tag className="w-3.5 h-3.5 text-primary-accent" strokeWidth={2.5} />
                             </div>
                             <h3 className="text-sm font-bold text-white tracking-tight">Thư viện Tag</h3>
-                            <span className="text-[10px] text-zinc-500 font-bold bg-zinc-800/50 px-1.5 py-0.5 rounded ml-1">{tags.length}/15</span>
+                            <span className="text-[10px] text-muted-foreground font-bold bg-zinc-800/50 px-1.5 py-0.5 rounded ml-1">{tags.length}/15</span>
                         </div>
                         <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors group">
-                            <X className="w-4 h-4 text-zinc-500 group-hover:text-white" />
+                            <X className="w-4 h-4 text-muted-foreground group-hover:text-white" />
                         </button>
                     </div>
 
@@ -175,7 +175,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                         {/* LEFT: Add Area */}
                         <div className="space-y-4">
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.15em] px-1">
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] px-1">
                                     Thêm Tag Mới
                                 </label>
                                 <input
@@ -186,20 +186,20 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                                     onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
                                     placeholder="Ví dụ: Urgent..."
                                     maxLength={25}
-                                    className="w-full pl-3.5 pr-3.5 py-2.5 text-sm bg-zinc-900/80 border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                                    className="w-full pl-3.5 pr-3.5 py-2.5 text-sm bg-zinc-900/80 border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all"
                                 />
                             </div>
                             <button
                                 onClick={handleAdd}
                                 disabled={loading || !newTagName.trim()}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-br from-indigo-600 to-indigo-700 text-white text-xs font-bold rounded-xl hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all active:scale-95 disabled:opacity-30 disabled:grayscale"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-br from-primary to-primary text-white text-xs font-bold rounded-xl hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all active:scale-95 disabled:opacity-30 disabled:grayscale"
                             >
                                 <Plus className="w-4 h-4" strokeWidth={3} />
                                 THÊM VÀO THƯ VIỆN
                             </button>
                             
-                            <div className="p-3 bg-indigo-500/5 rounded-xl border border-indigo-500/10">
-                                <p className="text-[10px] text-indigo-300 leading-relaxed italic opacity-70">
+                            <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
+                                <p className="text-[10px] text-primary-accent leading-relaxed italic opacity-70">
                                     💡 Các thẻ trong thư viện sẽ xuất hiện trong menu Radial để bạn đánh dấu nhanh.
                                 </p>
                             </div>
@@ -207,14 +207,14 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
 
                         {/* RIGHT: List Area */}
                         <div className="space-y-3">
-                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.15em] px-1">
+                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] px-1">
                                 Danh Sách ({tags.length})
                             </label>
                             <div className="space-y-1.5 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
                                 {tags.length === 0 ? (
                                     <div className="h-32 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-xl bg-zinc-900/20">
                                         <Tag className="w-6 h-6 text-zinc-800 mb-2" />
-                                        <p className="text-[11px] text-zinc-600 font-medium">Chưa có tag nào</p>
+                                        <p className="text-[11px] text-muted-foreground font-medium">Chưa có tag nào</p>
                                     </div>
                                 ) : (
                                     <AnimatePresence initial={false}>
@@ -233,7 +233,7 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                                                             value={editingName}
                                                             onChange={(e) => setEditingName(e.target.value)}
                                                             onKeyDown={(e) => e.key === 'Enter' && handleUpdate(tag.id)}
-                                                            className="flex-1 px-2.5 py-1 text-xs bg-zinc-800 border border-indigo-500/30 rounded-lg text-white outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                                            className="flex-1 px-2.5 py-1 text-xs bg-zinc-800 border border-primary/30 rounded-lg text-white outline-none focus:ring-2 focus:ring-primary/20"
                                                             autoFocus
                                                         />
                                                         <button onClick={() => handleUpdate(tag.id)} className="p-1 px-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md text-emerald-400 transition-colors">
@@ -246,13 +246,13 @@ export function TagLibraryPopup({ isOpen, onClose, position, workspaceId, onTags
                                                         <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-all">
                                                             <button
                                                                 onClick={() => { setEditingId(tag.id); setEditingName(tag.name) }}
-                                                                className="p-1.5 hover:bg-zinc-700/50 rounded-lg text-zinc-500 hover:text-zinc-200 transition-colors"
+                                                                className="p-1.5 hover:bg-zinc-700/50 rounded-lg text-muted-foreground hover:text-zinc-200 transition-colors"
                                                             >
                                                                 <Pencil className="w-3.5 h-3.5" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDelete(tag.id)}
-                                                                className="p-1.5 hover:bg-red-500/10 rounded-lg text-zinc-600 hover:text-red-400 transition-colors"
+                                                                className="p-1.5 hover:bg-red-500/10 rounded-lg text-muted-foreground hover:text-red-400 transition-colors"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
                                                             </button>

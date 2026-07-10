@@ -93,8 +93,8 @@ export default function BonusCalculator({ workspaceId }: { workspaceId: string }
                     ĐÃ KHÓA SỔ
                 </div>
             ) : (
-                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-[20px] text-[13px] font-bold bg-[#121016] border border-[rgba(139,92,246,0.1)] text-[#D8B4FE]">
-                    <span className="w-2 h-2 rounded-full bg-[#8B5CF6] animate-pulse" />
+                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-[20px] text-[13px] font-bold bg-[#121016] border border-[rgba(139,92,246,0.1)] text-primary-accent">
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                     ĐANG MỞ
                 </div>
             )}
@@ -127,7 +127,7 @@ export default function BonusCalculator({ workspaceId }: { workspaceId: string }
                 variant="ghost"
                 size="icon"
                 title="Cấu hình thưởng (Top 1/2/3)"
-                className="rounded-xl border border-[rgba(139,92,246,0.15)] text-[#A1A1AA] hover:bg-[rgba(139,92,246,0.1)] hover:text-[#D8B4FE]"
+                className="rounded-xl border border-[rgba(139,92,246,0.15)] text-[#A1A1AA] hover:bg-[rgba(139,92,246,0.1)] hover:text-primary-accent"
             >
                 <Settings className="w-4 h-4" />
             </Button>

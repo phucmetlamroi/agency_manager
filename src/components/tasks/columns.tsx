@@ -65,7 +65,7 @@ export const getColumns = (
             ),
             cell: ({ row }) => (
                 <div className="flex items-center gap-1">
-                    {isAdmin && <GripVertical className="w-3 h-3 text-zinc-600" />}
+                    {isAdmin && <GripVertical className="w-3 h-3 text-muted-foreground" />}
                     <Checkbox
                         checked={row.getIsSelected()}
                         onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -116,7 +116,7 @@ export const getColumns = (
                                 {taskTags?.map(tt => (
                                     <span
                                         key={tt.tagCategory.id}
-                                        className="inline-flex items-center px-2 py-0.5 bg-indigo-500/15 border border-indigo-500/25 rounded-full text-indigo-300 text-[9px] font-semibold tracking-wide"
+                                        className="inline-flex items-center px-2 py-0.5 bg-primary/15 border border-primary/25 rounded-full text-primary-accent text-[9px] font-semibold tracking-wide"
                                     >
                                         {tt.tagCategory.name}
                                     </span>

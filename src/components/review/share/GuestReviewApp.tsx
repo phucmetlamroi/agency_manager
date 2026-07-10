@@ -445,11 +445,11 @@ function GuestStage({
                                                     setVersionSelectorOpen(false)
                                                 }}
                                                 className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-white/[0.08] ${
-                                                    v.versionId === version.versionId ? 'font-bold text-indigo-400' : 'text-white/70'
+                                                    v.versionId === version.versionId ? 'font-bold text-primary-accent' : 'text-white/70'
                                                 }`}
                                             >
                                                 <span>Version {v.versionNumber}</span>
-                                                {v.versionId === version.versionId && <Check className="h-3.5 w-3.5 text-indigo-400" />}
+                                                {v.versionId === version.versionId && <Check className="h-3.5 w-3.5 text-primary-accent" />}
                                             </button>
                                         ))}
                                     </div>
@@ -793,7 +793,7 @@ function IdentityModal({
                         placeholder="Name"
                         autoFocus
                         maxLength={120}
-                        className="w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-indigo-400/50 focus:outline-none"
+                        className="w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none"
                     />
                     <input
                         value={email}
@@ -802,7 +802,7 @@ function IdentityModal({
                         placeholder="Email"
                         type="email"
                         maxLength={254}
-                        className="w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-indigo-400/50 focus:outline-none"
+                        className="w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none"
                     />
                 </div>
                 <p className="mt-2.5 text-xs text-white/40">
@@ -812,7 +812,7 @@ function IdentityModal({
                 <button
                     onClick={() => void submit()}
                     disabled={!valid || busy}
-                    className="mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-500 py-2 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-50"
+                    className="mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
                 >
                     {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Continue
                 </button>

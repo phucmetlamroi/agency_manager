@@ -94,7 +94,7 @@ export default function FlashcardMode({ questions, onExit }: FlashcardModeProps)
                     </div>
 
                     {/* Back of Card */}
-                    <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-violet-600 to-indigo-700 rounded-3xl p-8 md:p-12 shadow-[0_20px_50px_-12px_rgba(124,58,237,0.3)] border border-white/10 flex flex-col justify-center items-center text-center text-white">
+                    <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-violet-600 to-primary rounded-3xl p-8 md:p-12 shadow-[0_20px_50px_-12px_rgba(124,58,237,0.3)] border border-white/10 flex flex-col justify-center items-center text-center text-white">
                         <div className="w-full max-h-full overflow-y-auto custom-scrollbar pr-2">
                             <h4 className="text-sm font-medium text-violet-200 uppercase tracking-widest mb-4">Answer</h4>
                             <p className="text-2xl md:text-3xl font-bold mb-8 text-white">{card.correctAnswer}</p>

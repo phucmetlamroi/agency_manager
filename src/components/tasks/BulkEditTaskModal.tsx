@@ -141,14 +141,14 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
     if (!isOpen) return null
 
     const inputBase =
-        'w-full h-10 rounded-xl bg-white/[0.04] border border-violet-500/30 px-3 text-[13px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-violet-500'
+        'w-full h-10 rounded-xl bg-white/[0.04] border border-violet-500/30 px-3 text-[13px] text-zinc-200 placeholder:text-muted-foreground outline-none focus:border-violet-500'
 
     const labelBase = 'block text-[12px] font-semibold text-zinc-300 mb-1.5'
     const dirtyDot = (key: string) =>
         key in draft ? (
             <span
                 className="inline-block w-2 h-2 rounded-full ml-2"
-                style={{ background: '#8B5CF6', boxShadow: '0 0 8px rgba(139,92,246,0.6)' }}
+                style={{ background: 'hsl(var(--primary))', boxShadow: '0 0 8px rgba(139,92,246,0.6)' }}
                 title="Đã chỉnh — sẽ áp dụng"
             />
         ) : null
@@ -208,7 +208,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                         {dirtyCount > 0 ? (
                                             <span className="text-amber-300">{dirtyCount} field sẽ apply</span>
                                         ) : (
-                                            <span className="text-zinc-500">chưa chỉnh field nào</span>
+                                            <span className="text-muted-foreground">chưa chỉnh field nào</span>
                                         )}
                                     </p>
                                 </div>
@@ -276,7 +276,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                         {tabDirty && (
                                             <span
                                                 className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full"
-                                                style={{ background: '#8B5CF6' }}
+                                                style={{ background: 'hsl(var(--primary))' }}
                                             />
                                         )}
                                     </button>
@@ -311,7 +311,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                                 </option>
                                             ))}
                                         </select>
-                                        <p className="text-[10px] text-zinc-500 mt-1">
+                                        <p className="text-[10px] text-muted-foreground mt-1">
                                             Đổi trạng thái sẽ gửi email tổng hợp tới người nhận (1 email/người kèm danh sách task).
                                         </p>
                                     </div>
@@ -383,7 +383,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                             onChange={(e) => setField('productLink', e.target.value)}
                                             placeholder="Để trống = giữ nguyên · Gõ rồi xoá = xoá sạch"
                                             rows={2}
-                                            className="w-full rounded-xl bg-white/[0.04] border border-violet-500/30 px-3 py-2 text-[13px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-violet-500 resize-none"
+                                            className="w-full rounded-xl bg-white/[0.04] border border-violet-500/30 px-3 py-2 text-[13px] text-zinc-200 placeholder:text-muted-foreground outline-none focus:border-violet-500 resize-none"
                                             onFocus={() => {
                                                 if (!('productLink' in draft)) setField('productLink', '')
                                             }}
@@ -522,7 +522,7 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
                                             onChange={(html) => setField('notes', html)}
                                         />
                                     </div>
-                                    <p className="text-[10px] text-zinc-500 mt-1.5">
+                                    <p className="text-[10px] text-muted-foreground mt-1.5">
                                         Click vào editor để bắt đầu edit. Ghi rỗng → notes bị xóa trên tất cả task.
                                     </p>
                                 </div>

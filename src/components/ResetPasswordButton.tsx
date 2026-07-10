@@ -48,7 +48,7 @@ export default function ResetPasswordButton({ userId, username, workspaceId }: {
         <button
             onClick={handleTrigger}
             disabled={loading}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 border border-transparent hover:border-amber-500/20 transition-all disabled:opacity-50"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10 border border-transparent hover:border-amber-500/20 transition-all disabled:opacity-50"
             title="Đặt lại mật khẩu (gửi email OTP)"
         >
             {loading ? (

@@ -132,7 +132,7 @@ export default function NotificationSettings() {
                     </div>
                     <div>
                         <h3 className="font-bold text-zinc-200 text-sm">Thong bao qua Email</h3>
-                        <p className="text-zinc-600 text-xs">Cai dat cach ban nhan thong bao khi offline.</p>
+                        <p className="text-muted-foreground text-xs">Cai dat cach ban nhan thong bao khi offline.</p>
                     </div>
                 </div>
 
@@ -147,7 +147,7 @@ export default function NotificationSettings() {
                             </div>
                             <div>
                                 <p className="text-sm font-semibold text-zinc-200">Nhan thong bao qua email</p>
-                                <p className="text-xs text-zinc-600">Gui email khi ban khong online</p>
+                                <p className="text-xs text-muted-foreground">Gui email khi ban khong online</p>
                             </div>
                         </div>
                         <button
@@ -172,7 +172,7 @@ export default function NotificationSettings() {
                     {/* ─── Digest Mode ─── */}
                     {emailEnabled && (
                         <div className="space-y-3">
-                            <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                                 Che do gui email
                             </p>
                             <div className="grid grid-cols-2 gap-2.5">
@@ -205,7 +205,7 @@ export default function NotificationSettings() {
                                                 <div className="flex items-center gap-1.5">
                                                     <Icon
                                                         className={`w-3.5 h-3.5 ${
-                                                            active ? "text-violet-400" : "text-zinc-600"
+                                                            active ? "text-violet-400" : "text-muted-foreground"
                                                         }`}
                                                     />
                                                     <span
@@ -216,7 +216,7 @@ export default function NotificationSettings() {
                                                         {label}
                                                     </span>
                                                 </div>
-                                                <p className="text-[10px] text-zinc-600 mt-0.5">{desc}</p>
+                                                <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
                                             </div>
                                         </button>
                                     )
@@ -230,8 +230,8 @@ export default function NotificationSettings() {
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Moon className="w-3.5 h-3.5 text-zinc-500" />
-                                    <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                                    <Moon className="w-3.5 h-3.5 text-muted-foreground" />
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                                         Gio im lang
                                     </p>
                                 </div>
@@ -263,7 +263,7 @@ export default function NotificationSettings() {
                             {quietEnabled && (
                                 <div className="flex items-center gap-3 p-3.5 rounded-xl bg-zinc-900/50 border border-white/5">
                                     <div className="flex items-center gap-2 flex-1">
-                                        <span className="text-xs text-zinc-500 font-medium whitespace-nowrap">Tu</span>
+                                        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Tu</span>
                                         <select
                                             value={quietStart ?? 22}
                                             onChange={(e) => setQuietStart(Number(e.target.value))}
@@ -278,7 +278,7 @@ export default function NotificationSettings() {
                                     </div>
                                     <span className="text-zinc-700 text-sm">—</span>
                                     <div className="flex items-center gap-2 flex-1">
-                                        <span className="text-xs text-zinc-500 font-medium whitespace-nowrap">Den</span>
+                                        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Den</span>
                                         <select
                                             value={quietEnd ?? 7}
                                             onChange={(e) => setQuietEnd(Number(e.target.value))}
@@ -295,7 +295,7 @@ export default function NotificationSettings() {
                             )}
 
                             {quietEnabled && (
-                                <p className="text-[10px] text-zinc-600 px-1">
+                                <p className="text-[10px] text-muted-foreground px-1">
                                     Khong gui email trong khoang thoi gian nay (UTC+7). Thong bao van duoc luu va gui sau.
                                 </p>
                             )}
@@ -305,8 +305,8 @@ export default function NotificationSettings() {
                     {/* ─── Info hint when OFF ─── */}
                     {emailEnabled && digestMode === "OFF" && (
                         <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900/40 border border-white/5">
-                            <MailX className="w-4 h-4 text-zinc-600 mt-0.5 flex-shrink-0" />
-                            <p className="text-xs text-zinc-500">
+                            <MailX className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-muted-foreground">
                                 Ban se chi nhan thong bao trong ung dung. Khong co email nao duoc gui.
                             </p>
                         </div>
@@ -315,8 +315,8 @@ export default function NotificationSettings() {
                     {/* ─── Disabled info ─── */}
                     {!emailEnabled && (
                         <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900/40 border border-white/5">
-                            <MailX className="w-4 h-4 text-zinc-600 mt-0.5 flex-shrink-0" />
-                            <p className="text-xs text-zinc-500">
+                            <MailX className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-muted-foreground">
                                 Thong bao email da tat. Ban bat de nhan email khi co tin nhan, mention, hoac task moi.
                             </p>
                         </div>

@@ -137,7 +137,7 @@ export function PreStartBlockModal({ task, isOpen, workspaceId, onClose, onStart
                                 border: "1px solid rgba(139,92,246,0.12)",
                             }}
                         >
-                            <p className="text-[11px] uppercase tracking-widest text-zinc-500 mb-2 font-semibold">
+                            <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2 font-semibold">
                                 Task
                             </p>
                             <p className="text-[16px] font-bold text-white mb-3 break-words">
@@ -145,7 +145,7 @@ export function PreStartBlockModal({ task, isOpen, workspaceId, onClose, onStart
                             </p>
                             <div className="flex items-center gap-2 text-[13px] text-zinc-300">
                                 <Calendar className="w-4 h-4 text-violet-400" />
-                                <span className="text-zinc-500">Deadline:</span>
+                                <span className="text-muted-foreground">Deadline:</span>
                                 <span className="text-zinc-200 font-medium">{formatDeadline(task.deadline)}</span>
                             </div>
                         </div>
@@ -214,7 +214,7 @@ export function PreStartBlockModal({ task, isOpen, workspaceId, onClose, onStart
                             </button>
                         </div>
 
-                        <p className="text-[11px] text-zinc-600 text-center mt-5 leading-relaxed">
+                        <p className="text-[11px] text-muted-foreground text-center mt-5 leading-relaxed">
                             Sau khi bấm Bắt đầu, hệ thống sẽ ghi nhận thời điểm bạn nhận task
                             và admin được thông báo.
                         </p>

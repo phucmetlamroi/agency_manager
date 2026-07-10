@@ -50,12 +50,12 @@ function TrendBadge({ current, prev }: { current: number; prev: number }) {
     return (
         <span
             className="inline-flex items-center gap-[5px] text-[13px] font-bold px-3 py-1 rounded-[23px]"
-            style={{ backgroundColor: "#211B31", color: "#D8B4FE" }}
+            style={{ backgroundColor: "#211B31", color: "hsl(var(--primary-accent))" }}
         >
             {up ? (
-                <ArrowUp className="w-3.5 h-3.5" style={{ color: "#8B5CF6" }} />
+                <ArrowUp className="w-3.5 h-3.5" style={{ color: "hsl(var(--primary))" }} />
             ) : (
-                <ArrowDown className="w-3.5 h-3.5" style={{ color: "#8B5CF6" }} />
+                <ArrowDown className="w-3.5 h-3.5" style={{ color: "hsl(var(--primary))" }} />
             )}
             {up ? "+" : ""}
             {pct}%
@@ -85,7 +85,7 @@ function DonutChart({ pct }: { pct: number }) {
             </svg>
             <span
                 className="text-[22px] font-extrabold"
-                style={{ color: "#D8B4FE", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                style={{ color: "hsl(var(--primary-accent))", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
                 {pct}%
             </span>
@@ -243,7 +243,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
 
                 {/* Footer — [Sprint O] mirrors /admin/finance TOTAL REVENUE */}
                 <span className="text-[13px] mt-auto leading-snug" style={{ color: "#A1A1AA", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    Tổng doanh thu <span style={{ color: "#D8B4FE", fontWeight: 600 }}>workspace</span> (dự kiến toàn bộ task chưa archive).
+                    Tổng doanh thu <span style={{ color: "hsl(var(--primary-accent))", fontWeight: 600 }}>workspace</span> (dự kiến toàn bộ task chưa archive).
                 </span>
             </motion.div>
 
@@ -293,7 +293,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                     >
                         <span
                             className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: "#8B5CF6" }}
+                            style={{ backgroundColor: "hsl(var(--primary))" }}
                         />
                         {data.tasksInProgress} task đang làm
                     </span>
@@ -306,16 +306,16 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                             boxShadow: "0 2px 8px rgba(139,92,246,0.06)",
                         }}
                     >
-                        <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#8B5CF6" }} />
+                        <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(var(--primary))" }} />
                         {data.tasksCompleted} task hoàn tất
                     </span>
                 </div>
 
                 {/* Footer */}
                 <span className="text-[13px] mt-auto leading-snug" style={{ color: "#A1A1AA", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    Bạn đang có <span style={{ color: "#D8B4FE", fontWeight: 600 }}>{data.totalTasks}</span> task đang chạy
+                    Bạn đang có <span style={{ color: "hsl(var(--primary-accent))", fontWeight: 600 }}>{data.totalTasks}</span> task đang chạy
                     {taskPct !== null
-                        ? <>, <span style={{ color: "#D8B4FE", fontWeight: 600 }}>{taskPct >= 0 ? "nhiều hơn" : "ít hơn"} {taskPct > 0 ? taskPct : Math.abs(taskPct)}%</span> so với tháng trước.</>
+                        ? <>, <span style={{ color: "hsl(var(--primary-accent))", fontWeight: 600 }}>{taskPct >= 0 ? "nhiều hơn" : "ít hơn"} {taskPct > 0 ? taskPct : Math.abs(taskPct)}%</span> so với tháng trước.</>
                         : "."}
                 </span>
             </motion.div>
@@ -367,7 +367,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
 
                 {/* Footer */}
                 <span className="text-[13px] mt-auto leading-snug" style={{ color: "#A1A1AA", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    Bạn đã đạt <span style={{ color: "#D8B4FE", fontWeight: 600 }}>{clientPct}%</span> mục tiêu tuần này.
+                    Bạn đã đạt <span style={{ color: "hsl(var(--primary-accent))", fontWeight: 600 }}>{clientPct}%</span> mục tiêu tuần này.
                 </span>
             </motion.div>
         </div>

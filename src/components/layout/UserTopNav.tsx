@@ -26,8 +26,8 @@ export default function UserTopNav({ workspaceId }: { workspaceId: string }) {
                         href={item.href} 
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                             isActive 
-                            ? (item.danger ? 'bg-red-500/15 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_10px_rgba(99,102,241,0.2)]')
-                            : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5 border border-transparent'
+                            ? (item.danger ? 'bg-red-500/15 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-primary/15 text-primary-accent border border-primary/30 shadow-[0_0_10px_rgba(99,102,241,0.2)]')
+                            : 'text-muted-foreground hover:text-zinc-300 hover:bg-white/5 border border-transparent'
                         }`}
                     >
                         <Icon className="w-4 h-4" />

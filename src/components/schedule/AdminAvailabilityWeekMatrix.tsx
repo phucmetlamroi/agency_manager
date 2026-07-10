@@ -51,7 +51,7 @@ export default function AdminAvailabilityWeekMatrix({
     const [hoveredCell, setHoveredCell] = useState<{ day: string; hour: number } | null>(null)
 
     return (
-        <div className="flex flex-col h-[calc(100vh-80px)] bg-slate-950 overflow-hidden relative">
+        <div className="flex flex-col h-[calc(100dvh-80px)] bg-slate-950 overflow-hidden relative">
             {/* Grid Container */}
             <div className="flex-1 overflow-auto custom-scrollbar pt-2">
                 <div className="inline-grid grid-cols-[70px_repeat(7,1fr)] min-w-[1000px] w-full border-collapse">
@@ -67,10 +67,10 @@ export default function AdminAvailabilityWeekMatrix({
                             <div 
                                 key={day}
                                 className={`sticky top-0 z-30 border-b border-r border-slate-800 h-16 flex flex-col items-center justify-center transition-colors
-                                    ${isToday ? 'bg-indigo-600/20 border-b-2 border-b-indigo-500' : 'bg-slate-900'}
+                                    ${isToday ? 'bg-primary/20 border-b-2 border-b-primary' : 'bg-slate-900'}
                                 `}
                             >
-                                <span className={`text-[10px] uppercase tracking-widest font-black ${isToday ? 'text-indigo-400' : 'text-slate-500'}`}>
+                                <span className={`text-[10px] uppercase tracking-widest font-black ${isToday ? 'text-primary-accent' : 'text-slate-500'}`}>
                                     {weekday}
                                 </span>
                                 <span className={`text-sm font-black ${isToday ? 'text-white' : 'text-slate-200'}`}>
@@ -85,7 +85,7 @@ export default function AdminAvailabilityWeekMatrix({
                         <div key={`row-${hour}`} className="contents group/row">
                             {/* Sticky Hour Side */}
                             <div className={`sticky left-0 z-20 border-b border-r border-slate-800 h-16 flex items-center justify-center text-xs font-mono font-bold transition-colors
-                                ${hour === currentHour ? 'bg-indigo-600/20 text-indigo-400' : 'bg-slate-900 text-slate-500'}
+                                ${hour === currentHour ? 'bg-primary/20 text-primary-accent' : 'bg-slate-900 text-slate-500'}
                                 group-hover/row:bg-slate-800/50
                             `}>
                                 {hour.toString().padStart(2, '0')}:00
@@ -108,7 +108,7 @@ export default function AdminAvailabilityWeekMatrix({
                                             onMouseEnter={() => setHoveredCell({ day, hour })}
                                             onMouseLeave={() => setHoveredCell(null)}
                                             className={`relative border-b border-r border-slate-800/40 h-16 transition-all group overflow-visible flex flex-col p-1.5 gap-1
-                                                ${isCurrentHour ? 'bg-indigo-500/10' : 'bg-slate-950/20 hover:bg-slate-800/40'}
+                                                ${isCurrentHour ? 'bg-primary/10' : 'bg-slate-950/20 hover:bg-slate-800/40'}
                                             `}
                                         >
                                             {/* Activity Heatmap Bars - More Substantial */}
@@ -134,7 +134,7 @@ export default function AdminAvailabilityWeekMatrix({
                                                 <div className="absolute left-1/2 -bottom-2 translate-y-full -translate-x-1/2 z-[60] bg-slate-900 border border-slate-700 p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-xl min-w-[180px]">
                                                     <div className="text-[10px] uppercase font-black text-slate-400 mb-2 border-b border-slate-800 pb-1.5 flex justify-between">
                                                         <span>Nhân sự</span>
-                                                        <span className="text-indigo-400">{staffStatuses.length}</span>
+                                                        <span className="text-primary-accent">{staffStatuses.length}</span>
                                                     </div>
                                                     <div className="flex flex-col gap-1.5 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
                                                         {staffStatuses.map(s => (
@@ -149,7 +149,7 @@ export default function AdminAvailabilityWeekMatrix({
                                                 </div>
                                             )}
 
-                                            {isCurrentHour && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 shadow-[2px_0_10px_rgba(99,102,241,0.5)]" />}
+                                            {isCurrentHour && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary shadow-[2px_0_10px_rgba(99,102,241,0.5)]" />}
                                         </div>
                                     )
                                 } else {
@@ -161,7 +161,7 @@ export default function AdminAvailabilityWeekMatrix({
                                         <div
                                             key={`${day}-${hour}`}
                                             className={`relative border-b border-r border-slate-800/40 h-16 transition-all duration-150 p-2 flex flex-col justify-start items-start
-                                                ${isCurrentHour ? 'ring-1 ring-inset ring-indigo-500/40 bg-indigo-500/10' : 'hover:bg-slate-800/20'}
+                                                ${isCurrentHour ? 'ring-1 ring-inset ring-primary/40 bg-primary/10' : 'hover:bg-slate-800/20'}
                                                 ${STATUS_CLASS[status]}
                                             `}
                                         >
@@ -178,7 +178,7 @@ export default function AdminAvailabilityWeekMatrix({
                                                   <div className="w-4 h-4 rounded-full border border-white" />
                                               </div>
                                             )}
-                                            {isCurrentHour && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 shadow-[2px_0_10px_rgba(99,102,241,0.5)]" />}
+                                            {isCurrentHour && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary shadow-[2px_0_10px_rgba(99,102,241,0.5)]" />}
                                         </div>
                                     )
                                 }

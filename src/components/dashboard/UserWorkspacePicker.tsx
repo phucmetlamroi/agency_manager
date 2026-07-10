@@ -88,7 +88,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces, canCreate
                     e.currentTarget.style.background = "transparent"
                 }}
             >
-                <Briefcase size={16} style={{ color: "#8B5CF6" }} />
+                <Briefcase size={16} style={{ color: "hsl(var(--primary))" }} />
                 <span className="text-sm font-medium whitespace-nowrap" style={{ color: "#A1A1AA" }}>
                     {currentName}
                 </span>
@@ -167,7 +167,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces, canCreate
                                                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
                                                 style={{ background: "rgba(139,92,246,0.15)" }}
                                             >
-                                                <Briefcase className="h-4 w-4" style={{ color: "#8B5CF6" }} />
+                                                <Briefcase className="h-4 w-4" style={{ color: "hsl(var(--primary))" }} />
                                             </div>
                                             <div className="flex flex-col items-start text-left overflow-hidden flex-1">
                                                 <span
@@ -190,7 +190,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces, canCreate
                                             {isActive && (
                                                 <Check
                                                     className="ml-auto h-4 w-4 shrink-0"
-                                                    style={{ color: "#8B5CF6" }}
+                                                    style={{ color: "hsl(var(--primary))" }}
                                                 />
                                             )}
                                         </button>
@@ -219,7 +219,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces, canCreate
                                             border: "1px dashed rgba(139,92,246,0.3)",
                                         }}
                                     >
-                                        <Plus className="h-3.5 w-3.5" style={{ color: "#8B5CF6" }} />
+                                        <Plus className="h-3.5 w-3.5" style={{ color: "hsl(var(--primary))" }} />
                                     </div>
                                     <span
                                         className="text-[13px] font-semibold"

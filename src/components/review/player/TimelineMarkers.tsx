@@ -35,7 +35,7 @@ export function TimelineMarkers({
                     const left = pct(c.startFrame as number)
                     const right = pct(c.endFrame as number)
                     const resolved = c.completedAt != null
-                    const bar = resolved ? 'bg-emerald-400/40' : c.isInternal ? 'bg-amber-400/40' : 'bg-indigo-400/40'
+                    const bar = resolved ? 'bg-emerald-400/40' : c.isInternal ? 'bg-amber-400/40' : 'bg-primary/40'
                     return (
                         <div
                             key={`r-${c.id}`}
@@ -51,7 +51,7 @@ export function TimelineMarkers({
                     ? 'bg-emerald-400/60'
                     : c.isInternal
                       ? 'bg-amber-400'
-                      : 'bg-indigo-400'
+                      : 'bg-primary'
                 return (
                     <button
                         key={c.id}

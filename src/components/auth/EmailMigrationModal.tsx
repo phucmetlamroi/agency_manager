@@ -161,7 +161,7 @@ export default function EmailMigrationModal({ displayName, onSuccess }: Props) {
                     )}
                 </AnimatePresence>
 
-                <p className="mt-5 text-xs text-zinc-500 text-center">
+                <p className="mt-5 text-xs text-muted-foreground text-center">
                     Mọi tasks, workspace, và lịch sử của bạn vẫn được giữ nguyên.
                 </p>
             </motion.div>
@@ -188,7 +188,7 @@ function StepEmail({ email, setEmail, isPending, onSubmit }: {
             <div>
                 <label className="block text-xs font-medium text-zinc-400 mb-1.5">Email của bạn</label>
                 <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
                         type="email"
                         autoComplete="email"
@@ -300,7 +300,7 @@ function StepOtp({ email, isPending, onVerify, onResend, onBack }: {
                     type="button"
                     onClick={() => { onResend(); setResendCooldown(60) }}
                     disabled={resendCooldown > 0 || isPending}
-                    className="text-violet-400 hover:text-violet-300 disabled:text-zinc-600 transition-colors flex items-center gap-1"
+                    className="text-violet-400 hover:text-violet-300 disabled:text-muted-foreground transition-colors flex items-center gap-1"
                 >
                     <RefreshCw className="w-3 h-3" />
                     {resendCooldown > 0 ? `Gửi lại (${resendCooldown}s)` : 'Gửi lại mã'}

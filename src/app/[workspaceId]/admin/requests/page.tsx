@@ -23,7 +23,7 @@ export default async function ClientRequestsPage({ params }: { params: Promise<{
                         <h1 className="font-extrabold text-white tracking-tight" style={{ fontSize: 20 }}>
                             Hộp thư yêu cầu
                         </h1>
-                        <p className="text-zinc-500 mt-px" style={{ fontSize: 12 }}>
+                        <p className="text-muted-foreground mt-px" style={{ fontSize: 12 }}>
                             Yêu cầu công việc khách hàng gửi qua portal. Xem, tạo task hoặc từ chối.
                         </p>
                     </div>
@@ -34,7 +34,7 @@ export default async function ClientRequestsPage({ params }: { params: Promise<{
                     style={{ gap: 6, padding: '6px 14px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)' }}
                 >
                     <span className="font-extrabold" style={{ fontSize: 18, color: '#A5B4FC' }}>{count}</span>
-                    <span className="font-semibold" style={{ fontSize: 11, color: '#6366F1' }}>Chờ xử lí</span>
+                    <span className="font-semibold" style={{ fontSize: 11, color: 'hsl(var(--primary))' }}>Chờ xử lí</span>
                 </div>
             </div>
 

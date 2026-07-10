@@ -20,21 +20,21 @@ interface Props {
 }
 
 const STEP_COLORS = [
-    "from-indigo-500 to-violet-500",
+    "from-primary to-violet-500",
     "from-amber-500 to-orange-500",
     "from-cyan-500 to-teal-500",
     "from-emerald-500 to-green-500",
 ]
 
 const STEP_BG = [
-    "bg-indigo-500/10 border-indigo-500/20",
+    "bg-primary/10 border-primary/20",
     "bg-amber-500/10 border-amber-500/20",
     "bg-cyan-500/10 border-cyan-500/20",
     "bg-emerald-500/10 border-emerald-500/20",
 ]
 
 const STEP_TEXT = [
-    "text-indigo-400",
+    "text-primary-accent",
     "text-amber-400",
     "text-cyan-400",
     "text-emerald-400",
@@ -75,7 +75,7 @@ export function WorkflowStepsBar({ counts }: Props) {
                                 className={`h-full rounded-full bg-gradient-to-r ${STEP_COLORS[i]}`}
                             />
                         </div>
-                        <p className="text-[10px] text-zinc-600">{width}%</p>
+                        <p className="text-[10px] text-muted-foreground">{width}%</p>
                     </motion.div>
                 )
             })}

@@ -283,14 +283,14 @@ function LinkRow({
                     }}
                     autoFocus
                     placeholder="Dán link…"
-                    className="flex-1 h-8 rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[12px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-violet-500"
+                    className="flex-1 h-8 rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[12px] text-zinc-200 placeholder:text-muted-foreground outline-none focus:border-violet-500"
                 />
                 <button
                     type="button"
                     onClick={handleConfirm}
                     disabled={saving}
                     title="Xác nhận"
-                    className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded-full bg-primary hover:bg-primary-accent text-white disabled:opacity-50 transition-colors"
                 >
                     <Check size={13} strokeWidth={3} />
                 </button>
@@ -326,13 +326,13 @@ function LinkRow({
                     <button
                         type="button"
                         onClick={startEdit}
-                        className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-violet-300 transition-colors"
+                        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-violet-300 transition-colors"
                     >
                         <Plus size={11} />
                         Thêm link
                     </button>
                 ) : (
-                    <span className="text-[12px] text-zinc-600">Chưa có</span>
+                    <span className="text-[12px] text-muted-foreground">Chưa có</span>
                 )}
                 {canEdit && value?.trim() && (
                     <button
@@ -341,7 +341,7 @@ function LinkRow({
                         title="Sửa"
                         className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/[0.06]"
                     >
-                        <Pencil size={11} className="text-zinc-500" />
+                        <Pencil size={11} className="text-muted-foreground" />
                     </button>
                 )}
             </div>
@@ -363,7 +363,7 @@ function EditButton({ onClick, title }: { onClick: () => void; title?: string })
             aria-label={label}
             className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/[0.06] transition-colors"
         >
-            <Pencil size={12} className="text-zinc-500 hover:text-violet-300" />
+            <Pencil size={12} className="text-muted-foreground hover:text-violet-300" />
         </button>
     )
 }
@@ -385,7 +385,7 @@ function ConfirmCancelGroup({
                 disabled={saving}
                 title="Xác nhận"
                 aria-label="Xác nhận"
-                className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-primary hover:bg-primary-accent text-white disabled:opacity-50 transition-colors"
             >
                 <Check size={13} strokeWidth={3} />
             </button>
@@ -992,7 +992,7 @@ export function TaskDetailModal({
                                 )}
                                 <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-[12px] text-zinc-400">
                                     <span>Quản lý: <span className="text-zinc-200 font-medium">{(localTask.assignedBy as any)?.nickname || (localTask.assignedBy as any)?.username || '—'}</span></span>
-                                    <span className="text-zinc-600">·</span>
+                                    <span className="text-muted-foreground">·</span>
                                     <span>Người làm: <span className="text-zinc-200 font-medium">{(localTask.assignee as any)?.nickname || (localTask.assignee as any)?.username || 'Chưa giao'}</span></span>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -1078,7 +1078,7 @@ export function TaskDetailModal({
                                         )}
                                     </button>
 
-                                    <p className="text-[11px] text-zinc-500 mt-5">
+                                    <p className="text-[11px] text-muted-foreground mt-5">
                                         Một khi bắt đầu, deadline sẽ được tính từ thời điểm này.
                                     </p>
                                 </div>
@@ -1114,7 +1114,7 @@ export function TaskDetailModal({
                                                 value={draftDelivery}
                                                 onChange={(e) => setDraftDelivery(e.target.value)}
                                                 placeholder="Dán link bàn giao hoặc ghi chú trạng thái…"
-                                                className="flex-1 w-full rounded-xl bg-white/[0.04] border border-violet-500/40 p-3 text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none focus:border-violet-500 resize-none min-h-[150px]"
+                                                className="flex-1 w-full rounded-xl bg-white/[0.04] border border-violet-500/40 p-3 text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none focus:border-violet-500 resize-none min-h-[150px]"
                                                 autoFocus
                                             />
                                         ) : form.productLink?.trim() ? (
@@ -1137,7 +1137,7 @@ export function TaskDetailModal({
                                             <button
                                                 type="button"
                                                 onClick={enterEditDelivery}
-                                                className="self-start inline-flex items-center gap-1 text-[12px] text-zinc-500 hover:text-violet-300 transition-colors"
+                                                className="self-start inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-violet-300 transition-colors"
                                             >
                                                 <Plus size={12} /> Thêm link bàn giao
                                             </button>
@@ -1407,7 +1407,7 @@ export function TaskDetailModal({
                                             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(form.notes) }}
                                         />
                                     ) : (
-                                        <p className="text-[13px] text-zinc-600 min-h-[200px]">Chưa có ghi chú nào.</p>
+                                        <p className="text-[13px] text-muted-foreground min-h-[200px]">Chưa có ghi chú nào.</p>
                                     )}
                                 </Card>
                             </div>

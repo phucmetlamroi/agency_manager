@@ -49,7 +49,7 @@ function buildSwipeActions(
         right = {
             label: 'Bắt đầu',
             icon: Play,
-            color: 'bg-indigo-600 text-white',
+            color: 'bg-primary text-white',
             onAction: () => onChange('Đang thực hiện'),
         }
     } else if (valid.includes('Revision') && task.status === 'Đang thực hiện') {
@@ -265,11 +265,11 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
                             className="text-center py-16 px-4 flex flex-col items-center gap-3"
                         >
                             <div className="w-16 h-16 rounded-2xl bg-zinc-900/60 border border-white/8 flex items-center justify-center">
-                                <Inbox className="w-7 h-7 text-zinc-500" />
+                                <Inbox className="w-7 h-7 text-muted-foreground" />
                             </div>
                             <div>
                                 <p className="text-zinc-300 font-semibold">Không có task</p>
-                                <p className="text-zinc-500 text-sm mt-1">
+                                <p className="text-muted-foreground text-sm mt-1">
                                     Không có task trong "{TAB_LABELS[activeTab]}".
                                 </p>
                             </div>

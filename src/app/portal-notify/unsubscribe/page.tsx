@@ -47,7 +47,7 @@ function UnsubscribeInner() {
                         disabled={state === 'busy' || !token}
                         style={{
                             padding: '10px 22px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                            background: '#7C3AED', color: '#fff', fontWeight: 700, fontSize: 14, opacity: state === 'busy' ? 0.6 : 1,
+                            background: 'hsl(var(--primary))', color: '#fff', fontWeight: 700, fontSize: 14, opacity: state === 'busy' ? 0.6 : 1,
                         }}
                     >
                         {state === 'busy' ? 'Unsubscribing…' : 'Unsubscribe'}
@@ -61,7 +61,7 @@ function UnsubscribeInner() {
 export default function PortalNotifyUnsubscribePage() {
     return (
         <div style={{
-            minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: '#0e0e11', color: '#e4e4e7', fontFamily: 'system-ui, sans-serif', padding: 24,
         }}>
             <Suspense fallback={null}>

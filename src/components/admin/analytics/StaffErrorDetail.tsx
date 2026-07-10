@@ -69,7 +69,7 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                 </div>
                 
                 <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
-                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-4xl shadow-lg ring-4 ring-zinc-800">
+                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center font-bold text-4xl shadow-lg ring-4 ring-zinc-800">
                         {staff.nickname?.[0]?.toUpperCase() || staff.username[0]?.toUpperCase()}
                     </div>
                     
@@ -84,7 +84,7 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
 
                     <div className="flex items-center gap-4 mt-6 md:mt-0">
                         <div className="px-6 py-4 rounded-xl bg-zinc-950/50 border border-white/5 text-center shadow-inner">
-                            <p className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">Xếp hạng</p>
+                            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-1">Xếp hạng</p>
                             <Badge variant="outline" className={`text-xl px-4 py-1 border-0 ${
                                 performance?.rank === 'S' ? 'bg-purple-500/20 text-purple-400' :
                                 performance?.rank === 'A' ? 'bg-blue-500/20 text-blue-400' :
@@ -97,7 +97,7 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                             </Badge>
                         </div>
                         <div className="px-6 py-4 rounded-xl bg-zinc-950/50 border border-white/5 text-center shadow-inner">
-                            <p className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">Tổng Lỗi Tháng</p>
+                            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-1">Tổng Lỗi Tháng</p>
                             <p className="text-2xl font-bold text-red-400">-{performance?.totalPenalty || 0}đ</p>
                         </div>
                     </div>
@@ -112,7 +112,7 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                     <Badge variant="outline" className="ml-2 bg-zinc-800 border-zinc-700">{errorDetails.length} Tasks bị lỗi</Badge>
                 </h2>
                 <div className="relative w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input 
                         placeholder="Tìm tên Task hoặc lỗi..." 
                         className="pl-9 bg-zinc-900/50 border-zinc-800"
@@ -137,7 +137,7 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                         <ShieldCheck className="relative z-10 w-10 h-10 text-emerald-400 drop-shadow-[0_0_16px_rgba(52,211,153,0.8)]" />
                     </div>
                     <h3 className="text-xl font-bold text-emerald-400 mb-2">Không tìm thấy lỗi!</h3>
-                    <p className="text-zinc-500 text-sm max-w-xs mx-auto">Nhân viên này chưa bị ghi nhận lỗi nào phù hợp với tìm kiếm của bạn.</p>
+                    <p className="text-muted-foreground text-sm max-w-xs mx-auto">Nhân viên này chưa bị ghi nhận lỗi nào phù hợp với tìm kiếm của bạn.</p>
                     <div className="flex items-center justify-center gap-2 mt-4 text-xs text-emerald-500/60">
                         <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                         Duy trì phong độ hoàn hảo!
@@ -159,7 +159,7 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                                             -{taskData.totalPenalty}đ
                                         </Badge>
                                     </div>
-                                    <div className="flex items-center gap-4 text-xs text-zinc-500 font-medium">
+                                    <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
                                         {taskData.clientName && <span>Khách: <span className="text-zinc-300">{taskData.clientName}</span></span>}
                                         {taskData.projectName && <span>Dự án: <span className="text-zinc-300">{taskData.projectName}</span></span>}
                                         <span className="flex items-center gap-1">
@@ -180,24 +180,24 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                                                     </span>
                                                     <strong className="text-sm text-zinc-200">{error.errorDescription}</strong>
                                                 </div>
-                                                <p className="text-xs text-zinc-500">
-                                                    Ghi nhận bởi <span className="text-indigo-400 font-medium">{error.detectedBy}</span> vào {format(new Date(error.createdAt), 'HH:mm dd/MM')}
+                                                <p className="text-xs text-muted-foreground">
+                                                    Ghi nhận bởi <span className="text-primary-accent font-medium">{error.detectedBy}</span> vào {format(new Date(error.createdAt), 'HH:mm dd/MM')}
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-6 sm:justify-end shrink-0">
                                                 <div className="text-center">
-                                                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Vi phạm</p>
+                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Vi phạm</p>
                                                     <p className="text-sm font-bold text-zinc-300">{error.frequency} lần</p>
                                                 </div>
                                                 <div className="text-center min-w-[3rem]">
-                                                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Phạt</p>
+                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Phạt</p>
                                                     <p className="text-sm font-bold text-red-400">-{error.penalty}</p>
                                                 </div>
                                                 {!isUserView && (
                                                     <button
                                                         disabled={isPending}
                                                         onClick={() => handleDeleteError(error.id)}
-                                                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors border border-transparent hover:border-red-500/20 disabled:opacity-50"
+                                                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors border border-transparent hover:border-red-500/20 disabled:opacity-50"
                                                         title="Gỡ bỏ lỗi này"
                                                     >
                                                         <Trash2 className="w-4 h-4" />

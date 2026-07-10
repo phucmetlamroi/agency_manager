@@ -22,11 +22,11 @@ interface DashboardTopBarProps {
 }
 
 const GRADIENT_POOL = [
-  "from-[#8B5CF6] to-[#6366F1]",
+  "from-primary to-primary",
   "from-emerald-500 to-cyan-500",
   "from-amber-500 to-red-500",
   "from-pink-500 to-rose-500",
-  "from-sky-500 to-indigo-500",
+  "from-sky-500 to-primary",
 ]
 
 export default function DashboardTopBar({
@@ -89,7 +89,7 @@ export default function DashboardTopBar({
       {/* ---- Left: Heading & subtitle ---- */}
       <div className="min-w-0">
         <h1
-          className="font-extrabold leading-tight tracking-tight text-white"
+          className="font-extrabold leading-tight tracking-tight text-white truncate"
           style={{
             fontSize: 40,
             fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -158,7 +158,7 @@ export default function DashboardTopBar({
               e.currentTarget.style.background = "transparent"
             }}
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#8B5CF6] to-[#6366F1] text-xs font-bold text-white">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary text-xs font-bold text-white">
               {switching ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
@@ -276,7 +276,7 @@ export default function DashboardTopBar({
                           <Check
                             size={14}
                             className="ml-auto flex-shrink-0"
-                            style={{ color: "#8B5CF6" }}
+                            style={{ color: "hsl(var(--primary))" }}
                           />
                         )}
                       </button>

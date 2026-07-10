@@ -72,7 +72,7 @@ export function MarketplaceToggle({ workspaceId, initialOpen }: MarketplaceToggl
                         Phiên Chợ
                     </span>
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-0.5">
+                <p className="text-[11px] text-muted-foreground mt-0.5">
                     {isPending ? 'Đang xử lý...' : isOpen ? 'Đang mở — nhân viên có thể nhận task' : 'Đã đóng — nhân viên không thể nhận task'}
                 </p>
             </div>

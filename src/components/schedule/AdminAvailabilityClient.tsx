@@ -45,7 +45,7 @@ export default function AdminAvailabilityClient({ workspaceId, dateKey, weekStar
     const weekRangeStr = `${format(toDate(weekStartKey), 'dd/MM')} - ${format(toDate(weekEndKey), 'dd/MM/yyyy')}`
 
     return (
-        <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
+        <div className="flex flex-col min-h-dvh bg-slate-950 text-slate-100">
             {/* Admin Toolbar */}
             <div className="sticky top-0 z-30 p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex flex-wrap items-center gap-6 shadow-xl">
                 {/* Navigation */}
@@ -86,7 +86,7 @@ export default function AdminAvailabilityClient({ workspaceId, dateKey, weekStar
                     <select
                         value={selectedUserId}
                         onChange={(e) => setSelectedUserId(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 min-w-[180px]"
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-primary min-w-[180px]"
                     >
                         <option value="all">Tất cả nhân sự</option>
                         {users.map(u => (
@@ -116,7 +116,7 @@ export default function AdminAvailabilityClient({ workspaceId, dateKey, weekStar
                     
                     <div className="h-6 w-px bg-slate-800 hidden xl:block" />
 
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-xs font-bold">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full text-primary-accent text-xs font-bold">
                         <Users className="w-3.5 h-3.5" />
                         {users.length} Nhân sự
                     </div>

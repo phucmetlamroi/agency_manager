@@ -187,12 +187,12 @@ function HookBlockNodeInner({ id, data, selected }: NodeProps<HookNode>) {
                                 <Icon d={data.url ? I.link : I.clock} size={12} />
                             </span>
                             <span className="min-w-0 flex-1 truncate text-left">{blockSourceLabel(blockLike)}</span>
-                            <span className="shrink-0 text-zinc-500">
+                            <span className="shrink-0 text-muted-foreground">
                                 <Icon d={I.open} size={11} />
                             </span>
                         </button>
                     ) : readOnly ? (
-                        <div className="rounded-lg border border-dashed border-white/10 px-2 py-1 text-[11px] text-zinc-500">
+                        <div className="rounded-lg border border-dashed border-white/10 px-2 py-1 text-[11px] text-muted-foreground">
                             Chưa gắn nguồn
                         </div>
                     ) : (

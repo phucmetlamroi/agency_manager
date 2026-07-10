@@ -224,10 +224,10 @@ export default function WorkspaceSettingsPanel({
 
             {/* General Info */}
             <div className="bg-zinc-950/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-[80px] opacity-15 pointer-events-none bg-indigo-500" />
+                <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-[80px] opacity-15 pointer-events-none bg-primary" />
 
                 <h3 className="text-lg font-bold text-zinc-100 flex items-center gap-2 mb-5 relative z-10">
-                    <Settings className="w-5 h-5 text-indigo-400" strokeWidth={1.5} />
+                    <Settings className="w-5 h-5 text-primary-accent" strokeWidth={1.5} />
                     Thông tin Workspace
                 </h3>
 
@@ -244,13 +244,13 @@ export default function WorkspaceSettingsPanel({
                                     value={newName}
                                     onChange={e => setNewName(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleRename()}
-                                    className="flex-1 bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                                    className="flex-1 bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
                                     autoFocus
                                 />
                                 <button
                                     onClick={handleRename}
                                     disabled={renaming}
-                                    className="px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-all disabled:opacity-50 flex items-center gap-1.5"
+                                    className="px-4 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold transition-all disabled:opacity-50 flex items-center gap-1.5"
                                 >
                                     {renaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                                 </button>
@@ -281,18 +281,18 @@ export default function WorkspaceSettingsPanel({
                     {/* Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div className="bg-zinc-900/30 border border-white/5 rounded-xl p-3">
-                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Thành viên</div>
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Thành viên</div>
                             <div className="text-lg font-bold text-zinc-100">{memberCount}</div>
                         </div>
                         <div className="bg-zinc-900/30 border border-white/5 rounded-xl p-3">
-                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Trạng thái</div>
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Trạng thái</div>
                             <div className={`text-sm font-bold ${isSoftDeleted ? 'text-red-400' : 'text-emerald-400'}`}>
                                 {isSoftDeleted ? 'Đã xóa' : 'Hoạt động'}
                             </div>
                         </div>
                         <div className="bg-zinc-900/30 border border-white/5 rounded-xl p-3">
-                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Vai trò của bạn</div>
-                            <div className="text-sm font-bold text-indigo-400">{roleLabel(currentUserRole)}</div>
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Vai trò của bạn</div>
+                            <div className="text-sm font-bold text-primary-accent">{roleLabel(currentUserRole)}</div>
                         </div>
                     </div>
                 </div>
@@ -325,7 +325,7 @@ export default function WorkspaceSettingsPanel({
                                         value={deleteConfirm}
                                         onChange={e => setDeleteConfirm(e.target.value)}
                                         placeholder={workspace.name}
-                                        className="w-full bg-zinc-900/60 border border-red-500/20 rounded-xl px-4 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-red-500/40 focus:ring-2 focus:ring-red-500/10 transition-all font-mono"
+                                        className="w-full bg-zinc-900/60 border border-red-500/20 rounded-xl px-4 py-2.5 text-sm text-zinc-200 placeholder:text-muted-foreground focus:outline-none focus:border-red-500/40 focus:ring-2 focus:ring-red-500/10 transition-all font-mono"
                                     />
                                 </div>
                                 <button

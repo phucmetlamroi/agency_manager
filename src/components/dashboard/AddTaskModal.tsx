@@ -189,13 +189,13 @@ function formatDeadlinePreview(raw: string): string {
 /* ------------------------------------------------------------------ */
 
 const inputBase =
-    "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+    "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/50 focus:bg-white/[0.06]"
 
 const selectBase =
-    "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] pr-10 text-[13px] text-zinc-300 outline-none appearance-none cursor-pointer transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+    "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] pr-10 text-[13px] text-zinc-300 outline-none appearance-none cursor-pointer transition-colors focus:border-primary/50 focus:bg-white/[0.06]"
 
 const textareaBase =
-    "w-full rounded-2xl bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] py-3 text-[13px] text-zinc-300 placeholder:text-zinc-600 leading-[1.6] outline-none resize-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+    "w-full rounded-2xl bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] py-3 text-[13px] text-zinc-300 placeholder:text-muted-foreground leading-[1.6] outline-none resize-none transition-colors focus:border-primary/50 focus:bg-white/[0.06]"
 
 /* ------------------------------------------------------------------ */
 /*  Sub-components                                                     */
@@ -332,20 +332,20 @@ function StepIndicator({
                                 type="button"
                                 onClick={() => onStepClick(i)}
                                 className={`relative z-10 flex items-center justify-center w-9 h-9 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${isActive
-                                    ? "bg-[#8B5CF6] border-2 border-[#A855F7] text-white shadow-[0_4px_20px_rgba(139,92,246,0.35)]"
+                                    ? "bg-primary border-2 border-primary-accent text-white shadow-[0_4px_20px_rgba(139,92,246,0.35)]"
                                     : isCompleted
-                                        ? "bg-[#8B5CF6]/25 border-2 border-[#8B5CF6]/50 text-[#D8B4FE] shadow-[0_4px_16px_rgba(139,92,246,0.15)]"
-                                        : "bg-white/[0.06] border-2 border-white/[0.08] text-zinc-500"
+                                        ? "bg-primary/25 border-2 border-primary/50 text-primary-accent shadow-[0_4px_16px_rgba(139,92,246,0.15)]"
+                                        : "bg-white/[0.06] border-2 border-white/[0.08] text-muted-foreground"
                                     }`}
                             >
-                                {isCompleted ? <Check size={13} strokeWidth={3} className="text-[#D8B4FE]" /> : i + 1}
+                                {isCompleted ? <Check size={13} strokeWidth={3} className="text-primary-accent" /> : i + 1}
                             </button>
                             <span
                                 className={`text-[10px] leading-none transition-colors duration-200 whitespace-nowrap ${isActive
                                     ? "font-bold text-white"
                                     : isCompleted
-                                        ? "font-medium text-[#D8B4FE]"
-                                        : "font-medium text-zinc-600"
+                                        ? "font-medium text-primary-accent"
+                                        : "font-medium text-muted-foreground"
                                     }`}
                             >
                                 {stepLabel}
@@ -354,7 +354,7 @@ function StepIndicator({
 
                         {i < total - 1 && (
                             <div
-                                className={`flex-1 min-w-[12px] h-[2px] mx-0.5 transition-colors duration-200 ${isCompleted ? "bg-[#8B5CF6]/40" : "bg-white/[0.06]"
+                                className={`flex-1 min-w-[12px] h-[2px] mx-0.5 transition-colors duration-200 ${isCompleted ? "bg-primary/40" : "bg-white/[0.06]"
                                     }`}
                             />
                         )}
@@ -1092,7 +1092,7 @@ export default function AddTaskModal({
                                 </div>
                             )}
                         </div>
-                        <p className="text-[11px] text-zinc-600 pl-1">
+                        <p className="text-[11px] text-muted-foreground pl-1">
                             Đã thêm {videoCount} video
                         </p>
                     </div>
@@ -1150,7 +1150,7 @@ export default function AddTaskModal({
                             </div>
                             <div className="relative h-[28px] w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.08)] overflow-hidden">
                                 <motion.div
-                                    className="h-full rounded-full bg-gradient-to-r from-[#8B5CF6] to-[#A855F7]"
+                                    className="h-full rounded-full bg-gradient-to-r from-primary to-primary-accent"
                                     initial={{ width: 0 }}
                                     animate={{ width: `${revenuePercent}%` }}
                                     transition={{ type: "spring", stiffness: 120, damping: 20 }}
@@ -1159,7 +1159,7 @@ export default function AddTaskModal({
                                     {revenueVND.toLocaleString("vi-VN")} / {form.jobPriceUSD ? (jobPriceNum * USD_TO_VND).toLocaleString("vi-VN") : "0"}
                                 </span>
                             </div>
-                            <p className="text-[11px] text-zinc-600 pl-1">
+                            <p className="text-[11px] text-muted-foreground pl-1">
                                 {revenuePercent.toFixed(0)}% biên lợi nhuận &middot; Tỷ giá: 1 USD = {USD_TO_VND.toLocaleString()} VND
                             </p>
                         </div>
@@ -1211,14 +1211,14 @@ export default function AddTaskModal({
                         {rawFootageMode === 'MULTI_HOOK_MAP' ? (
                             <div className="flex flex-col gap-3">
                                 <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/40 px-3 py-2">
-                                    <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                                    <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
                                         Folder
                                     </span>
                                     <input
                                         value={mhmFolderUrl}
                                         onChange={(e) => setMhmFolderUrl(e.target.value)}
                                         placeholder="Dán link Dropbox / Google Drive rồi bấm “Đổ sẵn từ Velox” (tuỳ chọn)"
-                                        className="min-w-0 flex-1 bg-transparent text-[12.5px] text-zinc-200 outline-none placeholder:text-zinc-600"
+                                        className="min-w-0 flex-1 bg-transparent text-[12.5px] text-zinc-200 outline-none placeholder:text-muted-foreground"
                                     />
                                 </div>
                                 <HookGraphEditor
@@ -1314,7 +1314,7 @@ export default function AddTaskModal({
                                 const fieldEl = (
                                     <input
                                         type="url"
-                                        className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+                                        className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/50 focus:bg-white/[0.06]"
                                         placeholder={placeholder}
                                         value={form[key]}
                                         onChange={(e) => set(key, e.target.value)}
@@ -1377,7 +1377,7 @@ export default function AddTaskModal({
                         <PreviewAccordion title={`Video (${String(videoCount).padStart(2, "0")})`} defaultOpen={false}>
                             <div className="flex flex-col gap-1.5">
                                 {videoCount === 0 ? (
-                                    <span className="text-[13px] text-zinc-600">Chưa thêm video nào</span>
+                                    <span className="text-[13px] text-muted-foreground">Chưa thêm video nào</span>
                                 ) : (
                                     form.videoList
                                         .split("\n")
@@ -1438,7 +1438,7 @@ export default function AddTaskModal({
                                     dangerouslySetInnerHTML={{ __html: form.notes }}
                                 />
                             ) : (
-                                <span className="text-[13px] text-zinc-600">Chưa thêm ghi chú</span>
+                                <span className="text-[13px] text-muted-foreground">Chưa thêm ghi chú</span>
                             )}
                         </PreviewAccordion>
                     </div>
@@ -1475,15 +1475,15 @@ export default function AddTaskModal({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3 }}
             >
-                <div className="flex items-center justify-center w-[72px] h-[72px] rounded-full bg-[#8B5CF6]/20 border border-[#8B5CF6]/30">
-                    <Check size={36} className="text-[#A855F7]" strokeWidth={2.5} />
+                <div className="flex items-center justify-center w-[72px] h-[72px] rounded-full bg-primary/20 border border-primary/30">
+                    <Check size={36} className="text-primary-accent" strokeWidth={2.5} />
                 </div>
                 <h3 className="text-xl font-bold text-white">{heading}</h3>
                 <p className="text-sm text-[#A1A1AA] text-center max-w-[340px]">
                     {successAssigned ? (
                         <>
                             {taskLabel} đã được giao cho{' '}
-                            <span className="font-semibold text-[#A855F7]">{successAssigneeLabel}</span>{' '}
+                            <span className="font-semibold text-primary-accent">{successAssigneeLabel}</span>{' '}
                             và hiện ngay trên màn hình làm việc của họ. Đã gửi thông báo cho {successAssigneeLabel}.
                         </>
                     ) : (
@@ -1495,7 +1495,7 @@ export default function AddTaskModal({
                 <button
                     type="button"
                     onClick={handleDone}
-                    className="mt-2 h-11 px-10 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
+                    className="mt-2 h-11 px-10 rounded-full bg-primary hover:bg-primary-accent text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
                 >
                     Xong
                 </button>
@@ -1542,7 +1542,7 @@ export default function AddTaskModal({
                     >
                         {/* Ambient purple orb */}
                         <div
-                            className="pointer-events-none absolute top-[-60px] right-[-60px] w-[180px] h-[180px] rounded-full bg-[#8B5CF6] opacity-[0.08]"
+                            className="pointer-events-none absolute top-[-60px] right-[-60px] w-[180px] h-[180px] rounded-full bg-primary opacity-[0.08]"
                             style={{ filter: "blur(60px)" }}
                         />
 
@@ -1668,7 +1668,7 @@ export default function AddTaskModal({
                                     disabled={step === 0}
                                     className={`flex items-center gap-2 h-10 px-5 rounded-full bg-transparent border text-sm font-medium transition-colors ${step === 0
                                         ? "border-white/[0.04] text-zinc-700 cursor-default"
-                                        : "border-[rgba(139,92,246,0.15)] text-[#A1A1AA] hover:text-white hover:border-[#8B5CF6]/40 cursor-pointer"
+                                        : "border-[rgba(139,92,246,0.15)] text-[#A1A1AA] hover:text-white hover:border-primary/40 cursor-pointer"
                                         }`}
                                 >
                                     <ArrowLeft size={15} />
@@ -1679,7 +1679,7 @@ export default function AddTaskModal({
                                     <button
                                         type="button"
                                         onClick={goNext}
-                                        className="flex items-center gap-2 h-10 px-6 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
+                                        className="flex items-center gap-2 h-10 px-6 rounded-full bg-primary hover:bg-primary-accent text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)]"
                                     >
                                         Tiếp tục
                                         <ArrowRight size={15} />
@@ -1689,7 +1689,7 @@ export default function AddTaskModal({
                                         type="button"
                                         onClick={handleSubmit}
                                         disabled={submitting}
-                                        className="flex items-center gap-2 h-10 px-6 rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)] disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex items-center gap-2 h-10 px-6 rounded-full bg-primary hover:bg-primary-accent text-white text-sm font-semibold transition-colors shadow-[0_8px_20px_rgba(139,92,246,0.35)] disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Check size={15} />
                                         {submitting ? "Đang thêm..." : "Tạo task"}

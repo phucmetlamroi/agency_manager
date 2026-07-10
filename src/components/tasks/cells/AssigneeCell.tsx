@@ -206,9 +206,9 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                         <span className="truncate text-zinc-200">{displayName(task.assignee)}</span>
                     </>
                 ) : (
-                    <span className="truncate text-zinc-500">Chọn người làm</span>
+                    <span className="truncate text-muted-foreground">Chọn người làm</span>
                 )}
-                <ChevronsUpDown className="ml-auto h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                <ChevronsUpDown className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             </button>
 
             {/* Popover — portaled to <body> with fixed positioning so it is never
@@ -228,14 +228,14 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                     className="overflow-hidden rounded-lg border border-zinc-700 bg-[#18181b] shadow-[0_16px_48px_rgba(0,0,0,0.5)]"
                 >
                     <div className="flex items-center gap-2 border-b border-zinc-800 px-2.5 py-2">
-                        <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         <input
                             autoFocus
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             onKeyDown={onKeyDown}
                             placeholder="Tìm người làm…"
-                            className="w-full bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 outline-none"
+                            className="w-full bg-transparent text-xs text-zinc-200 placeholder:text-muted-foreground outline-none"
                         />
                     </div>
                     <div className="max-h-[240px] overflow-y-auto py-1 custom-scrollbar">
@@ -261,7 +261,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                         type="button"
                                         onClick={() => handleAssign(u.id)}
                                         onMouseEnter={() => setActiveIndex(idx)}
-                                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isActive ? 'bg-white/10 text-white' : isCurrent ? 'bg-[#8B5CF6]/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
+                                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isActive ? 'bg-white/10 text-white' : isCurrent ? 'bg-primary/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
                                     >
                                         <div className="relative">
                                             <Avatar className="h-5 w-5">
@@ -277,7 +277,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                 )
                             })
                         ) : (
-                            <div className="px-3 py-3 text-xs text-zinc-600">Không có kết quả</div>
+                            <div className="px-3 py-3 text-xs text-muted-foreground">Không có kết quả</div>
                         )}
                     </div>
                 </div>,

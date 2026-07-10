@@ -108,7 +108,7 @@ export function MoveCopyDialog({
             <div key={node.id}>
                 <div
                     className={`group flex items-center gap-1 rounded-lg pr-1.5 transition-colors ${
-                        isSelected ? 'bg-violet-500/20 text-violet-100' : isDisabled ? 'text-zinc-600' : 'text-zinc-300 hover:bg-white/[0.05]'
+                        isSelected ? 'bg-violet-500/20 text-violet-100' : isDisabled ? 'text-muted-foreground' : 'text-zinc-300 hover:bg-white/[0.05]'
                     }`}
                     style={{ paddingLeft: 4 + depth * 14 }}
                 >
@@ -123,7 +123,7 @@ export function MoveCopyDialog({
                                     return next
                                 })
                             }
-                            className="flex h-7 w-5 items-center justify-center text-zinc-500 hover:text-zinc-200"
+                            className="flex h-7 w-5 items-center justify-center text-muted-foreground hover:text-zinc-200"
                             aria-label={isOpen ? 'Thu gọn' : 'Mở rộng'}
                         >
                             {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -138,7 +138,7 @@ export function MoveCopyDialog({
                         className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left disabled:cursor-not-allowed"
                         title={isDisabled ? 'Không thể chọn thư mục này' : isRoot ? REVIEW_MODULE_LABEL : node.name}
                     >
-                        <FolderIcon size={14} className={`shrink-0 ${isSelected ? 'text-violet-300' : 'text-zinc-500'}`} />
+                        <FolderIcon size={14} className={`shrink-0 ${isSelected ? 'text-violet-300' : 'text-muted-foreground'}`} />
                         <span className="truncate text-[12.5px]">{isRoot ? REVIEW_MODULE_LABEL : node.name}</span>
                     </button>
                 </div>
@@ -168,13 +168,13 @@ export function MoveCopyDialog({
 
                     <div className="min-h-[220px] flex-1 overflow-y-auto p-2">
                         {loading ? (
-                            <div className="flex items-center justify-center gap-2 py-16 text-[12.5px] text-zinc-500">
+                            <div className="flex items-center justify-center gap-2 py-16 text-[12.5px] text-muted-foreground">
                                 <Loader2 size={14} className="animate-spin" /> Đang tải…
                             </div>
                         ) : error ? (
                             <p className="px-4 py-16 text-center text-[12.5px] text-red-300">{error}</p>
                         ) : roots.length === 0 ? (
-                            <p className="px-4 py-16 text-center text-[12.5px] text-zinc-500">Chưa có thư mục nào.</p>
+                            <p className="px-4 py-16 text-center text-[12.5px] text-muted-foreground">Chưa có thư mục nào.</p>
                         ) : (
                             <div className="flex flex-col gap-0.5">{roots.map((r) => renderNode(r, 0))}</div>
                         )}
@@ -192,7 +192,7 @@ export function MoveCopyDialog({
                             type="button"
                             disabled={!selectedId}
                             onClick={() => selectedId && onConfirm(selectedId)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#7C3AED] disabled:opacity-40"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-40"
                         >
                             <CtaIcon size={14} /> {cta}
                         </button>

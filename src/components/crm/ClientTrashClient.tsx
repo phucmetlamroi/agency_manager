@@ -72,7 +72,7 @@ export default function ClientTrashClient({ workspaceId, clients }: Props) {
             <div className="rounded-2xl bg-zinc-950/60 backdrop-blur-xl border border-[rgba(139,92,246,0.15)] p-8 text-center">
                 <Trash2 size={32} className="mx-auto text-zinc-700 mb-3" />
                 <p className="text-sm text-zinc-400">Không có khách hàng nào trong thùng rác.</p>
-                <p className="text-[12px] text-zinc-600 mt-1">Khách hàng đã xoá sẽ xuất hiện ở đây và có thể khôi phục.</p>
+                <p className="text-[12px] text-muted-foreground mt-1">Khách hàng đã xoá sẽ xuất hiện ở đây và có thể khôi phục.</p>
             </div>
         )
     }
@@ -90,16 +90,16 @@ export default function ClientTrashClient({ workspaceId, clients }: Props) {
                             <div className="flex-1 min-w-0">
                                 <div className="text-sm font-semibold text-zinc-100 truncate">{c.name}</div>
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] mt-0.5">
-                                    <span className="text-zinc-500 flex items-center gap-1">
+                                    <span className="text-muted-foreground flex items-center gap-1">
                                         <Clock size={10} /> Đã xoá {c.deletedAt?.slice(0, 10) ?? '—'}
                                     </span>
                                     {c.taskCount > 0 && (
-                                        <span className="text-zinc-500 flex items-center gap-1">
+                                        <span className="text-muted-foreground flex items-center gap-1">
                                             <FileText size={10} /> {c.taskCount} task
                                         </span>
                                     )}
                                     {c.subCount > 0 && (
-                                        <span className="text-zinc-500 flex items-center gap-1">
+                                        <span className="text-muted-foreground flex items-center gap-1">
                                             <Users size={10} /> {c.subCount} brand con
                                         </span>
                                     )}

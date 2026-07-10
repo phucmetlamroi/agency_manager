@@ -116,7 +116,7 @@ export default function VeloxBrollMatchSelector({
                             </div>
                         )}
                         {broll.looseFiles.length > 0 && (
-                            <div className="text-zinc-500 italic">
+                            <div className="text-muted-foreground italic">
                                 + {broll.looseFiles.length} file B-roll lẻ ở thư mục gốc
                             </div>
                         )}
@@ -147,7 +147,7 @@ export default function VeloxBrollMatchSelector({
                             <ChevronDown
                                 size={12}
                                 className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 ${
-                                    isPending ? 'text-amber-300' : 'text-zinc-500'
+                                    isPending ? 'text-amber-300' : 'text-muted-foreground'
                                 }`}
                             />
                         </div>

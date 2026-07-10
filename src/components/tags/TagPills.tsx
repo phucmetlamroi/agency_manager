@@ -29,7 +29,7 @@ export function TagPills({ tags, onRemove, readonly = false }: TagPillsProps) {
                             damping: 20,
                             delay: i * 0.04
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/15 border border-indigo-500/30 rounded-full text-indigo-200 text-[11px] font-semibold tracking-wide hover:bg-indigo-500/25 transition-colors hover:border-indigo-500/50"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/15 border border-primary/30 rounded-full text-primary-accent text-[11px] font-semibold tracking-wide hover:bg-primary/25 transition-colors hover:border-primary/50"
                     >
                         {tag.name}
                         {!readonly && onRemove && (
@@ -37,7 +37,7 @@ export function TagPills({ tags, onRemove, readonly = false }: TagPillsProps) {
                                 whileHover={{ scale: 1.2 }}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => onRemove(tag.id)}
-                                className="ml-0.5 text-indigo-300 hover:text-indigo-100 transition-colors"
+                                className="ml-0.5 text-primary-accent hover:text-primary-accent/80 transition-colors"
                             >
                                 <X className="w-3 h-3" />
                             </motion.button>

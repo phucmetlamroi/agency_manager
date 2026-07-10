@@ -48,7 +48,7 @@ function Segmented<T extends string>({
 function Field({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="mb-3 last:mb-0">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{label}</div>
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
             {children}
         </div>
     )

@@ -208,7 +208,7 @@ export function GuestNotifyControl({ slug, assetId, compact = false }: Props) {
                                     value={pin}
                                     onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                     placeholder="000000"
-                                    className="mb-2 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2 text-center text-lg font-semibold tracking-[0.4em] text-white placeholder-white/25 outline-none focus:border-indigo-400/50"
+                                    className="mb-2 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-3 py-2 text-center text-lg font-semibold tracking-[0.4em] text-white placeholder-white/25 outline-none focus:border-primary/50"
                                     onKeyDown={(e) => e.key === 'Enter' && pin.length === 6 && verify()}
                                 />
                                 <button

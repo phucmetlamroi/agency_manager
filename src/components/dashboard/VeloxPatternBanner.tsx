@@ -61,11 +61,11 @@ const TONE_STYLES = {
     indigo: {
         bg: 'rgba(99,102,241,0.08)',
         border: 'rgba(99,102,241,0.30)',
-        text: 'text-indigo-100',
-        sub: 'text-indigo-200/80',
-        iconBg: 'bg-indigo-500/15',
-        iconBorder: 'border-indigo-500/30',
-        iconText: 'text-indigo-300',
+        text: 'text-primary-accent',
+        sub: 'text-primary-accent/80',
+        iconBg: 'bg-primary/15',
+        iconBorder: 'border-primary/30',
+        iconText: 'text-primary-accent',
     },
     // Red tone is used by P0_EMPTY only — it tells the user the scan
     // succeeded but the folder they pasted isn't usable as-is, so they need

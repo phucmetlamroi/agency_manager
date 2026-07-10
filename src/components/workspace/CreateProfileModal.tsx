@@ -100,10 +100,10 @@ export default function CreateProfileModal({ open, onClose, onCreated }: Props) 
                                     onKeyDown={e => e.key === 'Enter' && !creating && handleCreate()}
                                     placeholder="VD: Agency A, Team Marketing..."
                                     maxLength={50}
-                                    className="w-full bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                    className="w-full bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-muted-foreground focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
                                     autoFocus
                                 />
-                                <p className="text-[10px] text-zinc-500 mt-1.5">{name.length}/50 ký tự</p>
+                                <p className="text-[10px] text-muted-foreground mt-1.5">{name.length}/50 ký tự</p>
                             </div>
 
                             {/* Info note */}

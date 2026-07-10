@@ -62,14 +62,14 @@ export default function VeloxMapTray({
                     <div className="text-[13px] font-semibold text-white tracking-tight">
                         {title}
                     </div>
-                    <div className="text-[11px] text-zinc-500 font-mono">
+                    <div className="text-[11px] text-muted-foreground font-mono">
                         {files.length} file{files.length === 1 ? '' : 's'}
                         {subline ? ` · ${subline}` : ''}
                     </div>
                 </div>
                 <ChevronRight
                     className={[
-                        'w-4 h-4 text-zinc-500 transition-transform duration-200',
+                        'w-4 h-4 text-muted-foreground transition-transform duration-200',
                         open && 'rotate-90',
                     ]
                         .filter(Boolean)
@@ -88,12 +88,12 @@ export default function VeloxMapTray({
                         className="overflow-hidden"
                     >
                         <div className="px-3 pb-3 pt-1">
-                            <p className="text-[11px] text-zinc-500 px-1 py-2 leading-snug italic">
+                            <p className="text-[11px] text-muted-foreground px-1 py-2 leading-snug italic">
                                 {helpText}
                             </p>
                             <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1 velox-scroll">
                                 {files.length === 0 ? (
-                                    <div className="text-[11px] text-zinc-600 italic text-center py-3">
+                                    <div className="text-[11px] text-muted-foreground italic text-center py-3">
                                         (trống)
                                     </div>
                                 ) : (
@@ -136,13 +136,13 @@ function FileRow({
             ].join(' ')}
             title={file.rawReason || file.path}
         >
-            <div className="w-5 h-5 rounded-md bg-white/5 grid place-items-center text-[10px] text-zinc-500 flex-none font-mono">
+            <div className="w-5 h-5 rounded-md bg-white/5 grid place-items-center text-[10px] text-muted-foreground flex-none font-mono">
                 {highlight ? '?' : '▦'}
             </div>
             <span className="flex-1 min-w-0 text-[11.5px] font-mono truncate">
                 {file.name}
             </span>
-            <span className="text-[10px] text-zinc-600 font-mono flex-none">
+            <span className="text-[10px] text-muted-foreground font-mono flex-none">
                 {formatSize(file.sizeBytes)}
             </span>
         </button>

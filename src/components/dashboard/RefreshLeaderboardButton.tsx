@@ -32,8 +32,8 @@ export default function RefreshLeaderboardButton({ isAdmin }: { isAdmin: boolean
             disabled={isPending || cooldown}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-bold transition-all
                 ${cooldown 
-                    ? 'bg-zinc-800 border-zinc-700 text-zinc-500 cursor-not-allowed' 
-                    : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20 active:scale-95'
+                    ? 'bg-zinc-800 border-zinc-700 text-muted-foreground cursor-not-allowed' 
+                    : 'bg-primary/10 border-primary/30 text-primary-accent hover:bg-primary/20 active:scale-95'
                 }`}
             title="Làm mới bảng xếp hạng"
         >

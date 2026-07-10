@@ -33,7 +33,7 @@ export default function DynamicDashboardGrid({ initialData }: { initialData?: an
         { i: 'traffic_chart', x: 0, y: 6, w: 12, h: 5, minW: 6 },
     ]
 
-    if (!mounted) return <div className="p-12 text-center text-zinc-500 animate-pulse">Đang tải Phân tích Workspace...</div>
+    if (!mounted) return <div className="p-12 text-center text-muted-foreground animate-pulse">Đang tải Phân tích Workspace...</div>
 
     return (
         <div ref={containerRef} className="w-full min-h-[1000px] overflow-hidden">

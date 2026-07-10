@@ -46,7 +46,7 @@ export default async function UserErrorsPage({ params }: { params: Promise<{ wor
                         Hồ Sơ Vi Phạm Của Bạn
                     </span>
                 </h1>
-                <p className="text-zinc-500 text-sm mt-1">Danh sách chi tiết các lỗi đã được ghi nhận trong tháng.</p>
+                <p className="text-muted-foreground text-sm mt-1">Danh sách chi tiết các lỗi đã được ghi nhận trong tháng.</p>
             </div>
 
             {/* ── StaffErrorDetail Component ──────────── */}

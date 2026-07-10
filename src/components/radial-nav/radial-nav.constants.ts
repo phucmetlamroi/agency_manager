@@ -109,7 +109,7 @@ export const DEFAULT_CONFIG: RadialNavConfig = {
 
 // Color map
 export const COLOR_MAP: Record<string, { bg: string; border: string; glow: string; text: string }> = {
-    indigo:  { bg: 'bg-indigo-950/60',  border: 'border-indigo-500/40',  glow: 'shadow-indigo-500/30',  text: 'text-indigo-300'  },
+    indigo:  { bg: 'bg-primary/60',  border: 'border-primary/40',  glow: 'shadow-primary/30',  text: 'text-primary-accent'  },
     violet:  { bg: 'bg-violet-950/60',  border: 'border-violet-500/40',  glow: 'shadow-violet-500/30',  text: 'text-violet-300'  },
     cyan:    { bg: 'bg-cyan-950/60',    border: 'border-cyan-500/40',    glow: 'shadow-cyan-500/30',    text: 'text-cyan-300'    },
     emerald: { bg: 'bg-emerald-950/60', border: 'border-emerald-500/40', glow: 'shadow-emerald-500/30', text: 'text-emerald-300' },

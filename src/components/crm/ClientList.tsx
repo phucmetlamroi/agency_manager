@@ -744,7 +744,7 @@ function ClientItem({
                                 style={{
                                     fontSize: 10,
                                     fontWeight: 700,
-                                    color: '#8B5CF6',
+                                    color: 'hsl(var(--primary))',
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
                                     marginBottom: 6,
@@ -832,7 +832,7 @@ function ClientItem({
                                     padding: '8px 20px 4px 80px',
                                     fontSize: 10,
                                     fontWeight: 700,
-                                    color: '#8B5CF6',
+                                    color: 'hsl(var(--primary))',
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
                                 }}

@@ -300,7 +300,7 @@ export function ShareLinkModal({
                         <button
                             onClick={() => void (share ? doSave() : doCreate())}
                             disabled={busy}
-                            className="flex items-center gap-1.5 rounded-xl bg-[#8B5CF6] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#A855F7] disabled:opacity-60"
+                            className="flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-primary-accent disabled:opacity-60"
                         >
                             {busy && <Loader2 size={13} className="animate-spin" />}
                             {share ? 'Lưu' : 'Tạo link'}

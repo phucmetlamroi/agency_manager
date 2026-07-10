@@ -143,14 +143,14 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                     {canExportMonthlyXlsx && (
                         <a
                             href={exportUrl}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[20px] border border-[rgba(139,92,246,0.15)] text-[#D8B4FE] text-[13px] font-semibold no-underline hover:bg-[rgba(139,92,246,0.06)] transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[20px] border border-[rgba(139,92,246,0.15)] text-primary-accent text-[13px] font-semibold no-underline hover:bg-[rgba(139,92,246,0.06)] transition-colors"
                         >
                             <Download className="w-4 h-4" />
                             Xuất XLSX
                         </a>
                     )}
                     <div className="inline-flex items-center gap-2 px-3 py-2 rounded-[20px] bg-[#121016] border border-[rgba(139,92,246,0.1)] text-[#A1A1AA] text-xs font-medium">
-                        <span className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
+                        <span className="w-2 h-2 rounded-full bg-primary" />
                         Workspace · Tách biệt
                     </div>
                 </div>

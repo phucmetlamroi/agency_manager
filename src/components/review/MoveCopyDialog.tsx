@@ -192,7 +192,7 @@ export function MoveCopyDialog({
                             type="button"
                             disabled={!selectedId}
                             onClick={() => selectedId && onConfirm(selectedId)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#7C3AED] disabled:opacity-40"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-40"
                         >
                             <CtaIcon size={14} /> {cta}
                         </button>

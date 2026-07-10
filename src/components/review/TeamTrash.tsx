@@ -304,7 +304,7 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
                                 type="button"
                                 onClick={restoreSelected}
                                 disabled={busy}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#7C3AED] disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
                             >
                                 {restoringKey === BULK_KEY ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
                                 Khôi phục ({selectedIds.size})

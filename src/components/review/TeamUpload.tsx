@@ -49,7 +49,7 @@ export function NewMenu({
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#7C3AED]"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-primary/90"
                 >
                     <Plus size={14} /> Mới
                 </button>

@@ -243,7 +243,7 @@ export function TaskReviewUploadSection({
                     onClick={() => fileInputRef.current?.click()}
                     className="flex w-full flex-col items-center gap-1.5 rounded-xl border border-dashed border-violet-500/25 bg-white/[0.02] px-4 py-5 text-center transition-colors hover:border-violet-500/50 hover:bg-violet-500/[0.04]"
                 >
-                    <span className="inline-flex items-center gap-2 rounded-full bg-[#8B5CF6] px-3 py-1.5 text-[12.5px] font-medium text-white">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1.5 text-[12.5px] font-medium text-white">
                         <UploadCloud size={14} /> Tải video review lên
                     </span>
                     <span className="text-[11.5px] leading-relaxed text-muted-foreground">
@@ -314,7 +314,7 @@ function ConfirmStrip({
                 <button
                     type="button"
                     onClick={onStart}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#8B5CF6] px-3 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-[#A855F7]"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-primary-accent"
                 >
                     <UploadCloud size={13} /> Bắt đầu tải lên
                 </button>
@@ -383,7 +383,7 @@ function UploadingCard({ item }: { item: UploadItem }) {
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
                 <div
-                    className={`h-full rounded-full transition-[width] duration-300 ${paused ? 'bg-amber-400/70' : 'bg-[#8B5CF6]'}`}
+                    className={`h-full rounded-full transition-[width] duration-300 ${paused ? 'bg-amber-400/70' : 'bg-primary'}`}
                     style={{ width: `${pct}%` }}
                 />
             </div>
@@ -536,7 +536,7 @@ function DeliverableCard({ asset, workspaceId }: { asset: TaskDeliverableDto; wo
                         type="button"
                         onClick={openReview}
                         disabled={!workspaceId}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#8B5CF6] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#A855F7] disabled:opacity-50"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-primary-accent disabled:opacity-50"
                     >
                         <PlayCircle size={13} /> Mở review
                     </button>

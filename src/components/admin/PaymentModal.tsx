@@ -78,7 +78,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                         {/* Salary Info */}
                         <div className="text-center shrink-0">
                             <div className="text-sm text-gray-400 mb-1">Tổng thực nhận</div>
-                            <div className="text-4xl font-black bg-gradient-to-r from-[#8B5CF6] to-[#D8B4FE] bg-clip-text text-transparent">
+                            <div className="text-4xl font-black bg-gradient-to-r from-primary to-primary-accent bg-clip-text text-transparent">
                                 {payrollData.totalAmount.toLocaleString()} đ
                             </div>
                             <div className="text-xs text-gray-500 mt-1">
@@ -98,7 +98,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                                     />
                                     {/* Scan Line Animation */}
                                     <motion.div
-                                        className="absolute w-full h-1 bg-[#8B5CF6]/60 shadow-[0_0_10px_rgba(139,92,246,0.8)]"
+                                        className="absolute w-full h-1 bg-primary/60 shadow-[0_0_10px_rgba(139,92,246,0.8)]"
                                         animate={{ top: ['0%', '100%', '0%'] }}
                                         transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                                     />
@@ -122,7 +122,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                                     <div className="text-xs text-gray-500 uppercase">STK</div>
                                     <button
                                         onClick={copyAccount}
-                                        className="flex items-center gap-2 font-mono text-[#D8B4FE] hover:text-[#C4A5F5] hover:underline"
+                                        className="flex items-center gap-2 font-mono text-primary-accent hover:text-[#C4A5F5] hover:underline"
                                     >
                                         {user.paymentAccountNum || '---'}
                                         <Copy className="w-3 h-3" />
@@ -134,7 +134,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                             <button
                                 onClick={handleConfirm}
                                 disabled={loading}
-                                className="w-full py-3 bg-gradient-to-r from-[#8B5CF6] to-[#A855F7] text-white font-bold rounded-xl shadow-lg shadow-violet-500/30 hover:scale-[1.02] hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                                className="w-full py-3 bg-gradient-to-r from-primary to-primary-accent text-white font-bold rounded-xl shadow-lg shadow-violet-500/30 hover:scale-[1.02] hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                             >
                                 {loading ? (
                                     'Đang xử lý...'

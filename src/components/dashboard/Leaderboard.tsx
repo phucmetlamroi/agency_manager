@@ -152,22 +152,22 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
         0: {
             height: 'h-[100px]',
             bg: 'bg-[#4C1D95]',
-            ringCls: 'ring-2 ring-[#8B5CF6]/50',
-            fallbackBg: 'bg-gradient-to-br from-[#8B5CF6] to-[#4C1D95]',
+            ringCls: 'ring-2 ring-primary/50',
+            fallbackBg: 'bg-gradient-to-br from-primary to-[#4C1D95]',
             label: '2',
         },
         1: {
             height: 'h-[120px]',
-            bg: 'bg-[#8B5CF6]',
-            ringCls: 'ring-2 ring-[#A855F7]',
-            fallbackBg: 'bg-gradient-to-br from-[#A855F7] to-[#8B5CF6]',
+            bg: 'bg-primary',
+            ringCls: 'ring-2 ring-primary-accent',
+            fallbackBg: 'bg-gradient-to-br from-primary-accent to-primary',
             label: '1',
         },
         2: {
             height: 'h-[80px]',
             bg: 'bg-[#211B31]',
             ringCls: 'ring-2 ring-[#4C1D95]/50',
-            fallbackBg: 'bg-gradient-to-br from-[#8B5CF6] to-[#4C1D95]',
+            fallbackBg: 'bg-gradient-to-br from-primary to-[#4C1D95]',
             label: '3',
         },
     }

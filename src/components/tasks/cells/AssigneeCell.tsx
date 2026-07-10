@@ -261,7 +261,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                         type="button"
                                         onClick={() => handleAssign(u.id)}
                                         onMouseEnter={() => setActiveIndex(idx)}
-                                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isActive ? 'bg-white/10 text-white' : isCurrent ? 'bg-[#8B5CF6]/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
+                                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isActive ? 'bg-white/10 text-white' : isCurrent ? 'bg-primary/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
                                     >
                                         <div className="relative">
                                             <Avatar className="h-5 w-5">

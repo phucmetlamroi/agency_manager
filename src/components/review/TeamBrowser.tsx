@@ -1839,7 +1839,7 @@ function EmptyState({ atRoot, onUpload, onNewFolder }: { atRoot: boolean; onUplo
                 <button
                     type="button"
                     onClick={onUpload}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#8B5CF6] px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#7C3AED]"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-primary/90"
                 >
                     <UploadCloud size={14} /> Tải asset lên
                 </button>

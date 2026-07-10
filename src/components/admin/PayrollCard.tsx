@@ -196,7 +196,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                     {/* CTA */}
                     {isPaid ? (
                         <div className="flex items-center gap-2">
-                            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-[20px] text-[13px] font-bold bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.3)] text-[#D8B4FE]">
+                            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-[20px] text-[13px] font-bold bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.3)] text-primary-accent">
                                 <CheckCircle2 className="w-4 h-4" />
                                 Đã thanh toán
                             </div>
@@ -228,19 +228,19 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                 <div className="flex items-center gap-2 px-5 py-2.5">
                     <button
                         onClick={() => setShowPending(false)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${!showPending ? 'bg-[rgba(139,92,246,0.15)] text-[#D8B4FE] border-[rgba(139,92,246,0.3)]' : 'text-[#71717A] hover:text-[#A1A1AA] border-transparent'}`}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${!showPending ? 'bg-[rgba(139,92,246,0.15)] text-primary-accent border-[rgba(139,92,246,0.3)]' : 'text-[#71717A] hover:text-[#A1A1AA] border-transparent'}`}
                     >
                         Hoàn tất ({completedTasks.length})
                     </button>
                     <button
                         onClick={() => setShowPending(true)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${showPending ? 'bg-[rgba(139,92,246,0.15)] text-[#D8B4FE] border-[rgba(139,92,246,0.3)]' : 'text-[#71717A] hover:text-[#A1A1AA] border-transparent'}`}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${showPending ? 'bg-[rgba(139,92,246,0.15)] text-primary-accent border-[rgba(139,92,246,0.3)]' : 'text-[#71717A] hover:text-[#A1A1AA] border-transparent'}`}
                     >
                         Dự kiến ({pendingTasks.length})
                     </button>
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className="ml-auto p-1.5 rounded-lg text-[#71717A] hover:text-[#D8B4FE] hover:bg-[rgba(139,92,246,0.08)] transition-colors"
+                        className="ml-auto p-1.5 rounded-lg text-[#71717A] hover:text-primary-accent hover:bg-[rgba(139,92,246,0.08)] transition-colors"
                         title={isExpanded ? 'Thu gọn' : 'Xem chi tiết'}
                     >
                         <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
@@ -270,7 +270,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                                                 <div className="text-sm font-medium text-zinc-200 flex items-center gap-2 flex-wrap">
                                                     {task.title}
                                                     {showPending && (
-                                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[rgba(139,92,246,0.1)] text-[#D8B4FE] border border-[rgba(139,92,246,0.2)] flex-shrink-0">
+                                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[rgba(139,92,246,0.1)] text-primary-accent border border-[rgba(139,92,246,0.2)] flex-shrink-0">
                                                             {task.status}
                                                         </span>
                                                     )}
@@ -295,7 +295,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                                     {bonusData && !showPending && (
                                         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl mt-1" style={{ backgroundColor: 'rgba(139,92,246,0.08)' }}>
                                             <div className="min-w-0 flex-1">
-                                                <div className="text-sm font-bold text-[#D8B4FE] flex items-center gap-2">
+                                                <div className="text-sm font-bold text-primary-accent flex items-center gap-2">
                                                     <Trophy className="w-3.5 h-3.5" />
                                                     {rankEmoji} Thưởng Top {bonusData.rank}{bonusPercent > 0 ? ` · ${bonusPercent}%` : ''}
                                                 </div>
@@ -305,7 +305,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                                                         : `Thực nhận: ${Number(bonusData.revenue).toLocaleString()}đ`}
                                                 </div>
                                             </div>
-                                            <div className="font-mono text-sm font-bold text-[#D8B4FE] tabular-nums flex-shrink-0">
+                                            <div className="font-mono text-sm font-bold text-primary-accent tabular-nums flex-shrink-0">
                                                 +{bonusData.bonusAmount.toLocaleString()} đ
                                             </div>
                                         </div>

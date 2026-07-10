@@ -88,7 +88,7 @@ export function AutocompleteInput({
                 </div>
                 <input
                     ref={inputRef}
-                    className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] pl-9 pr-9 text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+                    className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] pl-9 pr-9 text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/50 focus:bg-white/[0.06]"
                     placeholder={placeholder}
                     value={displayValue}
                     onChange={(e) => {
@@ -158,7 +158,7 @@ export function AutocompleteInput({
                                     }}
                                     className={`w-full text-left px-4 py-2.5 text-[13px] transition-colors ${
                                         o.id === selectedId
-                                            ? 'bg-[#8B5CF6]/10 text-white'
+                                            ? 'bg-primary/10 text-white'
                                             : 'text-zinc-300 hover:bg-white/[0.06]'
                                     }`}
                                 >

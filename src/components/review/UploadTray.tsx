@@ -211,7 +211,7 @@ function UploadRow({ item }: { item: UploadItem }) {
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.07]">
                             <div
                                 className={`h-full rounded-full transition-[width] duration-300 ${
-                                    item.pausedReason ? 'bg-amber-400/70' : 'bg-[#8B5CF6]'
+                                    item.pausedReason ? 'bg-amber-400/70' : 'bg-primary'
                                 }`}
                                 style={{ width: `${pct}%` }}
                             />

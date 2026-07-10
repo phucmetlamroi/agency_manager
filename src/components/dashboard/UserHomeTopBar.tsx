@@ -30,7 +30,7 @@ interface UserHomeTopBarProps {
 }
 
 const GRADIENT_POOL = [
-    "from-[#8B5CF6] to-[#6366F1]",
+    "from-primary to-primary",
     "from-emerald-500 to-cyan-500",
     "from-amber-500 to-red-500",
     "from-pink-500 to-rose-500",
@@ -220,7 +220,7 @@ export default function UserHomeTopBar({
                             e.currentTarget.style.background = "transparent"
                         }}
                     >
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full overflow-hidden bg-gradient-to-br from-[#8B5CF6] to-[#6366F1] text-xs font-bold text-white">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full overflow-hidden bg-gradient-to-br from-primary to-primary text-xs font-bold text-white">
                             {switching ? (
                                 <Loader2 size={14} className="animate-spin" />
                             ) : avatarUrl ? (

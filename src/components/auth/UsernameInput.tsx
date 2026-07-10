@@ -108,7 +108,7 @@ export function UsernameInput({
                     autoComplete="off"
                     autoCapitalize="off"
                     spellCheck={false}
-                    className="w-full h-11 px-4 pr-10 rounded-xl bg-white/[0.04] border border-[rgba(139,92,246,0.20)] text-sm text-zinc-100 placeholder:text-muted-foreground outline-none transition-colors focus:border-[#8B5CF6]/60 focus:bg-white/[0.06]"
+                    className="w-full h-11 px-4 pr-10 rounded-xl bg-white/[0.04] border border-[rgba(139,92,246,0.20)] text-sm text-zinc-100 placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/60 focus:bg-white/[0.06]"
                 />
                 {/* Status icon */}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">

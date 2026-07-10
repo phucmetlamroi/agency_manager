@@ -290,7 +290,7 @@ function LinkRow({
                     onClick={handleConfirm}
                     disabled={saving}
                     title="Xác nhận"
-                    className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded-full bg-primary hover:bg-primary-accent text-white disabled:opacity-50 transition-colors"
                 >
                     <Check size={13} strokeWidth={3} />
                 </button>
@@ -385,7 +385,7 @@ function ConfirmCancelGroup({
                 disabled={saving}
                 title="Xác nhận"
                 aria-label="Xác nhận"
-                className="w-7 h-7 flex items-center justify-center rounded-full bg-[#8B5CF6] hover:bg-[#A855F7] text-white disabled:opacity-50 transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-primary hover:bg-primary-accent text-white disabled:opacity-50 transition-colors"
             >
                 <Check size={13} strokeWidth={3} />
             </button>

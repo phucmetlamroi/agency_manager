@@ -89,7 +89,7 @@ export default function DashboardTopBar({
       {/* ---- Left: Heading & subtitle ---- */}
       <div className="min-w-0">
         <h1
-          className="font-extrabold leading-tight tracking-tight text-white"
+          className="font-extrabold leading-tight tracking-tight text-white truncate"
           style={{
             fontSize: 40,
             fontFamily: "'Plus Jakarta Sans', sans-serif",

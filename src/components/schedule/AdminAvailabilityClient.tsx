@@ -45,7 +45,7 @@ export default function AdminAvailabilityClient({ workspaceId, dateKey, weekStar
     const weekRangeStr = `${format(toDate(weekStartKey), 'dd/MM')} - ${format(toDate(weekEndKey), 'dd/MM/yyyy')}`
 
     return (
-        <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
+        <div className="flex flex-col min-h-dvh bg-slate-950 text-slate-100">
             {/* Admin Toolbar */}
             <div className="sticky top-0 z-30 p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex flex-wrap items-center gap-6 shadow-xl">
                 {/* Navigation */}

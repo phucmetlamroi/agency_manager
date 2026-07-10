@@ -78,7 +78,7 @@ function RadialLines({ segments, origin }: { segments: RadialSegment[]; origin: 
     return (
         <svg
             className="pointer-events-none fixed inset-0 z-[99995]"
-            style={{ width: '100vw', height: '100vh' }}
+            style={{ width: '100vw', height: '100dvh' }}
         >
             {segments.map((_, i) => {
                 const pos = getSegmentPosition(i, n, RADIAL_RADIUS)

@@ -23,7 +23,7 @@ export default function VeloxV4PreviewPage() {
     }
     const result = buildSampleResult()
     return (
-        <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
+        <main className="min-h-dvh bg-zinc-950 px-6 py-10 text-zinc-100">
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-2xl font-bold tracking-tight mb-1">
                     Velox v4 · Multi-Hook Map — preview

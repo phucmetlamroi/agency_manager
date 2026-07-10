@@ -24,7 +24,7 @@ function renderPage(opts: { ok: boolean; title: string; message: string; setting
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>${title}</title>
 </head>
-<body style="margin:0;padding:0;background:#F4F4F4;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.6;min-height:100vh;display:flex;align-items:center;justify-content:center;">
+<body style="margin:0;padding:0;background:#F4F4F4;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.6;min-height:100dvh;display:flex;align-items:center;justify-content:center;">
 <div style="background:#fff;max-width:480px;width:90%;margin:32px auto;padding:48px 40px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.08);text-align:center;">
 <div style="font-size:64px;line-height:1;margin-bottom:18px;">${icon}</div>
 <h1 style="margin:0 0 12px 0;font-size:24px;font-weight:800;color:${accent};">${title}</h1>

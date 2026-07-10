@@ -51,7 +51,7 @@ export default function AdminAvailabilityWeekMatrix({
     const [hoveredCell, setHoveredCell] = useState<{ day: string; hour: number } | null>(null)
 
     return (
-        <div className="flex flex-col h-[calc(100vh-80px)] bg-slate-950 overflow-hidden relative">
+        <div className="flex flex-col h-[calc(100dvh-80px)] bg-slate-950 overflow-hidden relative">
             {/* Grid Container */}
             <div className="flex-1 overflow-auto custom-scrollbar pt-2">
                 <div className="inline-grid grid-cols-[70px_repeat(7,1fr)] min-w-[1000px] w-full border-collapse">

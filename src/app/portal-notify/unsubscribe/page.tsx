@@ -61,7 +61,7 @@ function UnsubscribeInner() {
 export default function PortalNotifyUnsubscribePage() {
     return (
         <div style={{
-            minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: '#0e0e11', color: '#e4e4e7', fontFamily: 'system-ui, sans-serif', padding: 24,
         }}>
             <Suspense fallback={null}>

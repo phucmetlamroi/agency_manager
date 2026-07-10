@@ -17,7 +17,7 @@ export default async function TrashPage() {
     const { workspaces, error } = await getMyTrashedWorkspaces()
 
     return (
-        <div className="min-h-screen px-4 py-8" style={{
+        <div className="min-h-dvh px-4 py-8" style={{
             background: 'radial-gradient(circle at top right, #2d1b5e, #000)'
         }}>
             <div className="max-w-3xl mx-auto">

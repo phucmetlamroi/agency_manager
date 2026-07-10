@@ -160,7 +160,7 @@ function StatusPill({ status }: { status: string }) {
     return (
         <span
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold"
-            style={{ background: s.bg, color: s.color, border: `1px solid ${s.color}30` }}
+            style={{ background: s.bg, color: s.color, border: `1px solid color-mix(in srgb, ${s.color} 18.82%, transparent)` }}
         >
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />
             {s.label}
@@ -173,7 +173,7 @@ function TypePill({ type }: { type: string }) {
     return (
         <span
             className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold"
-            style={{ background: t.bg, color: t.color, border: `1px solid ${t.color}30` }}
+            style={{ background: t.bg, color: t.color, border: `1px solid color-mix(in srgb, ${t.color} 18.82%, transparent)` }}
         >
             {taskTypeLabel(type)}
         </span>

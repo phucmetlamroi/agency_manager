@@ -212,7 +212,7 @@ export default function MobileTaskCard({
                                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20'
                                 : primaryActionStatus === 'Revision'
                                     ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/20'
-                                    : 'bg-primary hover:bg-primary text-white shadow-lg shadow-primary/20'
+                                    : 'bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20'
                                 }`}
                         >
                             {primaryActionStatus === 'Hoàn tất' ? (

@@ -210,7 +210,7 @@ export function CompareView({
                         <button
                             onClick={transport.toggle}
                             disabled={!bothReady}
-                            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-white hover:bg-primary disabled:opacity-40"
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-40"
                             aria-label={transport.playing ? 'Tạm dừng' : 'Phát'}
                         >
                             {transport.playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}

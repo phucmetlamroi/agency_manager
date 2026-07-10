@@ -812,7 +812,7 @@ function IdentityModal({
                 <button
                     onClick={() => void submit()}
                     disabled={!valid || busy}
-                    className="mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary disabled:opacity-50"
+                    className="mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
                 >
                     {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Continue
                 </button>

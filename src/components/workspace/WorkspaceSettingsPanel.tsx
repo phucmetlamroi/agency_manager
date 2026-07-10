@@ -250,7 +250,7 @@ export default function WorkspaceSettingsPanel({
                                 <button
                                     onClick={handleRename}
                                     disabled={renaming}
-                                    className="px-4 py-3 rounded-xl bg-primary hover:bg-primary text-white text-sm font-bold transition-all disabled:opacity-50 flex items-center gap-1.5"
+                                    className="px-4 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold transition-all disabled:opacity-50 flex items-center gap-1.5"
                                 >
                                     {renaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                                 </button>

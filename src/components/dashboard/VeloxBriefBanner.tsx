@@ -76,7 +76,7 @@ export default function VeloxBriefBanner({
                                         href={b.file.previewUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1 text-[10px] text-primary-accent hover:text-primary-accent shrink-0"
+                                        className="flex items-center gap-1 text-[10px] text-primary-accent hover:text-primary-accent/80 shrink-0"
                                     >
                                         <ExternalLink size={10} />
                                         Mở
@@ -114,7 +114,7 @@ export default function VeloxBriefBanner({
                                         href={s.file.previewUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1 text-[10px] text-primary-accent hover:text-primary-accent shrink-0"
+                                        className="flex items-center gap-1 text-[10px] text-primary-accent hover:text-primary-accent/80 shrink-0"
                                     >
                                         <ExternalLink size={10} />
                                         Mở

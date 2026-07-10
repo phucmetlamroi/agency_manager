@@ -214,7 +214,7 @@ const PriceTemplateSelector = forwardRef<PriceTemplateSelectorHandle, PriceTempl
                                             <input type="text" value={newVnd} onChange={e => setNewVnd(e.target.value)} placeholder="VND" className="px-2.5 py-1.5 bg-zinc-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500/50" />
                                         </div>
                                         <div className="flex gap-2">
-                                            <button type="button" onClick={handleCreate} disabled={loading} className="flex-1 py-1.5 bg-primary hover:bg-primary disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors">
+                                            <button type="button" onClick={handleCreate} disabled={loading} className="flex-1 py-1.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors">
                                                 {loading ? '...' : 'Lưu'}
                                             </button>
                                             <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-1.5 bg-zinc-800 text-zinc-400 text-xs rounded-lg hover:bg-zinc-700 transition-colors">Huỷ</button>

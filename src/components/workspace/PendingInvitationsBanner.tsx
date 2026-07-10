@@ -122,7 +122,7 @@ export default function PendingInvitationsBanner() {
                                 <button
                                     onClick={() => handleAccept(inv.id)}
                                     disabled={actionLoading === inv.id}
-                                    className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 shadow-lg shadow-primary/20"
+                                    className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 shadow-lg shadow-primary/20"
                                 >
                                     {actionLoading === inv.id ? (
                                         <Loader2 className="w-3 h-3 animate-spin" />

@@ -56,7 +56,7 @@ const STATUS_BUTTON_CONFIG: Record<string, {
 }
 
 const VARIANT_STYLES: Record<string, string> = {
-    primary: 'bg-primary hover:bg-primary text-white shadow-lg shadow-primary/20',
+    primary: 'bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20',
     success: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20',
     warning: 'bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-600/20',
     neutral: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-white/10',
@@ -254,7 +254,7 @@ export function TaskDrawer({
                             {canAssign && !showAssignPicker && (
                                 <button
                                     onClick={() => setShowAssignPicker(true)}
-                                    className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-primary hover:bg-primary text-white shadow-lg shadow-primary/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                    className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                 >
                                     <UserPlus className="w-4 h-4" />
                                     Giao cho thành viên

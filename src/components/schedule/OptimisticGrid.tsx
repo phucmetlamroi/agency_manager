@@ -452,7 +452,7 @@ export function OptimisticGrid({
           <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => (viewMode === 'SINGLE_WEEK' ? setWeekBase(addWeeks(weekBase, 1)) : setSelectedDay(addDays(selectedDay, 1)))}>
             <ChevronRight className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" className="text-[10px] font-black h-9 px-3 rounded-xl hover:bg-primary/10 hover:text-primary" onClick={() => { setWeekBase(new Date()); setSelectedDay(new Date()) }}>TIẾP THEO</Button>
+          <Button variant="ghost" className="text-[10px] font-black h-9 px-3 rounded-xl hover:bg-primary/10 hover:text-primary/80" onClick={() => { setWeekBase(new Date()); setSelectedDay(new Date()) }}>TIẾP THEO</Button>
         </div>
       </div>
 
@@ -491,7 +491,7 @@ export function OptimisticGrid({
                            <span className={cn('font-black tracking-tighter', isToday ? 'text-primary' : 'text-foreground', isCompact ? 'text-sm' : 'text-lg')}>{isWeek ? format(day, 'dd/MM') : 'Thành viên'}</span>
                            {isWeek && !readOnly && (
                              <div className="flex gap-1 group">
-                                <button title="Sao chép ngày" onClick={() => handleCopyDay(day)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground/30 hover:text-primary transition-all"><Copy className="h-3.5 w-3.5" /></button>
+                                <button title="Sao chép ngày" onClick={() => handleCopyDay(day)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground/30 hover:text-primary/80 transition-all"><Copy className="h-3.5 w-3.5" /></button>
                                 {copyData && <button title="Dán vào đây" onClick={() => handlePasteDay(day, 'ONE')} className="p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20"><ClipboardCheck className="h-3.5 w-3.5" /></button>}
                                 <button title="Xoá lịch ngày" onClick={() => handleClearDay(day)} className="p-1.5 hover:bg-red-50 rounded-lg text-muted-foreground/30 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
                              </div>
@@ -555,7 +555,7 @@ export function OptimisticGrid({
                    <div className="text-[9px] font-black text-muted-foreground uppercase pl-1">MẪU NHANH</div>
                    <div className="grid grid-cols-2 gap-1.5">
                       {PRESETS.map(p => (
-                        <button key={p.label} onClick={() => applyStatusRange('ADD', p)} className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/50 hover:bg-primary/10 hover:text-primary text-[10px] font-black transition-all text-left leading-none">
+                        <button key={p.label} onClick={() => applyStatusRange('ADD', p)} className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/50 hover:bg-primary/10 hover:text-primary/80 text-[10px] font-black transition-all text-left leading-none">
                            <span>{p.icon}</span> <span>{p.label.split(' ')[0]}</span>
                         </button>
                       ))}

@@ -37,7 +37,7 @@ export function TagPills({ tags, onRemove, readonly = false }: TagPillsProps) {
                                 whileHover={{ scale: 1.2 }}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => onRemove(tag.id)}
-                                className="ml-0.5 text-primary-accent hover:text-primary-accent transition-colors"
+                                className="ml-0.5 text-primary-accent hover:text-primary-accent/80 transition-colors"
                             >
                                 <X className="w-3 h-3" />
                             </motion.button>

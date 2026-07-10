@@ -229,7 +229,7 @@ export default function AvailabilityWeekEditor({ workspaceId, days, activeTool }
                     <button
                         onClick={handleSave}
                         disabled={isPending}
-                        className="flex items-center gap-3 px-8 py-4 bg-primary hover:bg-primary text-white rounded-2xl font-bold shadow-2xl shadow-primary/40 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
+                        className="flex items-center gap-3 px-8 py-4 bg-primary hover:bg-primary/90 text-white rounded-2xl font-bold shadow-2xl shadow-primary/40 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
                     >
                         {isPending ? (
                             <Loader2 className="w-5 h-5 animate-spin" />

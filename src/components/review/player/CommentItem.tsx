@@ -398,7 +398,7 @@ function InlineEdit({ initial, onSave, onCancel }: { initial: string; onSave: (b
             <div className="mt-1 flex gap-1.5">
                 <button
                     onClick={() => draft.trim() && onSave(draft.trim())}
-                    className="rounded-md bg-primary px-2.5 py-1 text-xs text-white hover:bg-primary"
+                    className="rounded-md bg-primary px-2.5 py-1 text-xs text-white hover:bg-primary/90"
                 >
                     {L.save}
                 </button>

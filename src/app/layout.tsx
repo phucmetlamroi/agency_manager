@@ -38,9 +38,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // [QĐ-5.1] BỎ khóa zoom (WCAG 1.4.4). An toàn vì globals.css ép mọi input ≥16px
+  // trên mobile (chống iOS auto-zoom tận gốc) — lý do khóa zoom đã bị loại bỏ.
   viewportFit: 'cover',
+  themeColor: '#09090b', // khớp --background (QĐ-6)
 }
 
 export default function RootLayout({

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AlertTriangle, UserCircle, ArrowLeftRight, Settings, LogOut, Monitor, X, ScrollText, UsersRound } from 'lucide-react'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { roleLabel } from '@/lib/display-labels'
+import { BrandLogo } from '@/components/layout/BrandLogo'
 
 export default function MobileLayoutShell({
     children,
@@ -30,14 +31,7 @@ export default function MobileLayoutShell({
         <div className="flex min-h-dvh bg-zinc-950 text-zinc-100 flex-col overflow-x-hidden font-sans">
             {/* SLIM HEADER */}
             <header className="flex items-center justify-between px-4 pb-3 pt-[calc(12px+env(safe-area-inset-top))] bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-50 border-b border-white/8">
-                <div className="flex items-center gap-2">
-                    <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-xs shadow-md shadow-indigo-500/30">
-                        A
-                    </div>
-                    <h1 className="font-extrabold text-lg leading-none text-zinc-100 tracking-tight">
-                        Agency<span className="text-indigo-400">Manager</span>
-                    </h1>
-                </div>
+                <BrandLogo />
 
                 {/* Right cluster: NotificationBell + Avatar */}
                 <div className="flex items-center gap-2">

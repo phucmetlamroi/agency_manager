@@ -170,7 +170,7 @@ export async function GET(req: NextRequest) {
         }
 
         const workbook = new ExcelJS.Workbook()
-        workbook.creator = 'AgencyManager'
+        workbook.creator = 'HustlyTasker'
         workbook.created = new Date()
         workbook.modified = new Date()
 

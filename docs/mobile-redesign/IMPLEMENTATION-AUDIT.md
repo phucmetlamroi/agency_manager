@@ -2,12 +2,12 @@
 
 | | |
 |---|---|
-| Ngày chạy | 2026-07-10 (đang tiến hành) |
-| Commit repo | `f6d8bf6` (feat: unify review player experience) — nhánh `audit/phase-0` |
-| Môi trường | localhost:3000 dev · cookie `view-mode=mobile` · preview browser · iPhone thật (bước 8): **chưa** |
+| Ngày chạy | 2026-07-10 |
+| Commit repo | `d7ee27c` (docs audit static half) trên nhánh `audit/phase-0` (base `f6d8bf6`) |
+| Môi trường | localhost:3000 dev (serve nhánh `audit/phase-0`) · viewport 375×812 · cookie `view-mode=mobile` (force nhánh mobile — ưu tiên 1 của `isMobileDevice()`) · preview browser (UA desktop) · iPhone thật (Bước 8): **chưa** |
 | Người chạy | Claude Code |
 | Spec nguồn | 03-DAC-TA-KY-THUAT/AUDIT-CHECKLIST.md v1.0 |
-| **Trạng thái** | **Nửa tĩnh (grep G-01→G-18 + inventory + component code + spec-diff) XONG. Nửa trực quan (screenshot 26 route × 3 viewport + JS-1→JS-8 + console/network + iPhone) CHỜ credentials đăng nhập.** |
+| **Trạng thái** | **Nửa tĩnh (grep G-01→G-18 + inventory + component code + spec-diff) XONG. Live pass nhóm auth + admin + client portal XONG (7 route, JS-1→JS-6 + console/network). CÒN: iPhone thật Bước 8 (safe-area/keyboard/session), overlay O-01→O-07 tương tác (mobile route uncertain), vài route phụ.** |
 
 > **Ghi chú môi trường:** (1) Nhánh `audit/phase-0` tạo từ `f6d8bf6`, `git diff src/` = rỗng. (2) 2 file `src/` **untracked có TRƯỚC audit** (không do audit tạo): `src/actions/share-document-actions.ts`, `src/components/portal/calm/DocumentsSurface.tsx` — thuộc WIP "Documents portal" đang dở, không nằm trong phạm vi audit. Các thay đổi tracked WIP khác đã `git stash` để có nền sạch. (3) `.env` trỏ DB **production** (autumn-flower) → khi chạy dev, audit CHỈ đọc (điều hướng/screenshot/inspect), **KHÔNG bấm mutation** (đổi status, xoá, tạo task) để không ghi vào prod; các bước C-11 pending-state/C-12 empty kiểm bằng route/tab sẵn có, không tạo dữ liệu.
 
@@ -75,16 +75,33 @@ Glob `src/app/**/page.tsx` = **41 page**. Bảng dưới là inventory THẬT (�
 
 ---
 
-## 2. Kết quả từng route
+## 2. Kết quả từng route (LIVE — viewport 375, cookie view-mode=mobile)
 
-> Chờ live pass (screenshot 375/390/430 + JS-1→JS-8 + overlay). Các route P0 dưới đây pre-fill bằng bằng chứng frame video `04-timeline` + đọc code; sẽ bổ sung screenshot + output script sau khi đăng nhập.
+> ⚠️ **PHÁT HIỆN TRỌNG YẾU — khác cảm nhận từ video.** Khi **force cookie `view-mode=mobile`** (đúng ưu tiên 1 của `isMobileDevice()` → một iPhone thật gửi UA mobile cũng vào đúng nhánh này), phần lớn màn **KHÔNG "bể toàn diện"** như video. Nhiều video-frame chụp lúc app rơi về **nhánh desktop-squeeze** (do lệch pha detect — V1), không phải nhánh mobile thực. Nhánh mobile thực chia 2 nhóm rõ:
+> - **Nhóm ĐÃ có bản mobile riêng → khá tốt:** overview (podium + pill dọc), queue (empty state đẹp), payroll (card), finance (3 stat-card), **client portal `/share` (light, xuất sắc)**. Lỗi còn lại là **token-level** (contrast/tiny-text/màu/brand), không phải vỡ layout.
+> - **Nhóm CHƯA có bản mobile (desktop-grid nhồi 375px) → P0 thật:** **CRM (R-14)** là ví dụ rõ nhất — grid 6 cột nhồi, số tiền cắt trong badge tròn, 50 target <44px.
+>
+> Kết luận điều chỉnh: khối lượng P0.B (token PRs) **fix được rất nhiều nơi 1 lần**; phần "table→card" (P2+) tập trung vào **CRM + task-grid** chứ không phải mọi route.
 
-### R-12 · /[workspaceId]/admin — Overview admin (tab Task) — **P0**
-- Bằng chứng video: greeting vỡ 1-từ/dòng (f_0034–0042); "Bảo Phúc" quá khổ (f_0034); subtitle đè badge "49 Khách hàng" (f_0043); bảng khách 6 cột tràn + header dính "VƯỠNGTRANG" (f_0043, f_0076); "+ Thêm Khách"/thùng rác cắt mép; nested scroll bảng (f_0078); "$107,5…" cắt (f_0077); row task vỡ dọc (f_0055–0063); chip đè chip (f_0055); filter default tab 0 task (f_0053); podium ID thô + bị tab bar cắt (f_0049).
-- Code: `admin/page.tsx` truyền `isMobile={await isMobileDevice()}` vào `TaskWorkflowTabs` **nhưng không đổi layout** (05a §4.1) → xác nhận nguồn row vỡ.
-- Checklist C-01→C-16: **chờ live** (screenshot + JS scripts).
+| Route | overflow-x trang | wrap 1-từ (min-w-0) | text <12px | target <44px | contrast dưới floor | Ghi chú live | Sev. |
+|---|---|---|---|---|---|---|---|
+| **R-12** `/admin` overview | OK (docW=375; 12 overflow = recharts SVG nội bộ, contained) | **1** — "Quản lý Đối tác, Brand con &" **34×112px** | 27 nodes | 1 (a=152×**32**) | "Khách hàng/Doanh thu/Task/Vướng mắc" = **zinc-600 @10px** | "Manager" = **indigo `rgb(129,140,248)`** (phải violet); podium OK; pill dọc OK | **P1** |
+| **R-13** `/admin/queue` | OK | 0 | 6 | 0 | — | **Empty state ĐẸP** (icon + "Kho đang trống!" + "Tổng: 26 task") — **C-12 PASS**. Grid task khi có data = chung rủi ro R-14 | OK (empty) |
+| **R-14** `/admin/crm` | OK docW=375 nhưng **nhồi** (grid không tràn, ép chồng) | 0 (thay bằng **cắt**) | 26 | **50** (drag/chevron/edit/link/trash mỗi row) | headers wrap dính "DOANHTHU/TRANGTHAI" | **Số tiền cắt trong badge tròn** ("$200"→"$⊘00", "$208" bị "50%" đè) = "đè lên nhau" (than #4). **AgencyManager** ở header | **P0** |
+| **R-16** `/admin/payroll` | OK | 0 | 8 | 1 | — | **Card-based, sạch** (PayrollCard đã rebuild) — 0 hScroll, 0 nested-scroll | OK |
+| **R-17** `/admin/finance` | OK (46 overflow contained trong bảng breakdown) | **10** — "Đã nộp video (nội bộ)" **27×75px** ×10 | **72** | 0 | `.text-sm.text-zinc-500` | Summary 3 stat-card **đẹp** (10.137.149đ…); **bảng breakdown per-task dưới = min-w-0 vỡ** | **P1** |
+| **R-11** `/dashboard/profile` | OK (4 contained) | 0 | 19 | 0 | — | **Mất dấu THẬT: "GIO IM LANG", "Luu thay doi"** (C-13). **9 input @14px <16px** (nickname/email/phone/3×password/bankName/accountNum) → **iOS auto-zoom (C-09)**. Hero ALL-CAPS + 2 tiêu đề. AgencyManager | **P1** |
+| **R-23′** `/share/[token]` client portal | OK | 0 | thấp | 0 (nút "Review" ≥44) | — | **Light "Daylight Atelier" — xuất sắc trên mobile** ("Good evening, Zac", stat-card, 3-tab nav). Đã responsive sẵn → **PASS** | OK |
 
-*(R-08, R-13, R-14, R-18, R-21, R-22, O-01 + toàn bộ còn lại: chờ live pass — block per-route table điền sau.)*
+**Systemic đã xác nhận LIVE (≥3 route):**
+- **Brand "AgencyManager"** ở top-bar mobile: R-11, R-14, R-16, R-17 (≥4 route) → dù grep chỉ 2 hit trong code, nó **render thật** ở AppSidebar mobile header. G-18/QĐ-12.
+- **min-w-0 vertical-wrap:** R-12 (34px), R-17 (27px ×10) + biến thể "cắt data" ở R-14. Systemic.
+- **text <12px:** mọi route (R-11:19, R-12:27, R-14:26, R-17:72). G-02 xác nhận runtime.
+- **contrast dưới floor (zinc-500/600):** R-12 (zinc-600 @10px), R-17 (zinc-500). G-11 xác nhận runtime.
+- **input <16px (auto-zoom):** R-11 form hồ sơ 9 input @14px (QĐ-7). Cần soi thêm form khác (login đã đúng h-12).
+- **indigo thay violet:** R-12 "Manager". G-01/QĐ-9.
+
+*(Chưa chạy live: R-01 landing, R-02/03 auth, R-04/05/07, R-08 user dashboard, R-15 schedule, R-18 members, R-19 analytics, R-21 audit-log, R-22 settings, R-24′ `/r/[slug]`, overlay O-01→O-07. Overlay/O-01 TaskDetailModal: nhánh mobile có thể route qua TaskDrawer/full-screen thay vì modal desktop zIndex 9999 → cần xác nhận Bước 8 iPhone; bug "X không bấm được" trong video là hiện trạng desktop-modal-trên-mobile.)*
 
 ---
 
@@ -129,9 +146,18 @@ Glob `src/app/**/page.tsx` = **41 page**. Bảng dưới là inventory THẬT (�
 
 ---
 
-## 5. Console / network findings
+## 5. Console / network findings (LIVE)
 
-> Chờ live pass (`preview_console_logs` error+warn, `preview_network` failed) sau mỗi nhóm route. Đặc biệt soi hydration mismatch (V1 — detect lệch pha).
+| Loại | Chi tiết | Đánh giá | Nhóm V |
+|---|---|---|---|
+| **error** | `Encountered two children with the same key` — lặp nhiều lần khắp list admin (task/client/podium) | **LỖI THẬT** — key trùng → row có thể nhân đôi/mất. Cần fix (correctness). | V9 |
+| **error** | **Hydration mismatch** trên `<CRMDashboard>`→`<CreateClientButton>` (Radix Dialog "+ Thêm Khách"): `aria-controls` id server≠client (`radix-_R_4qat…` vs `radix-_R_j9bn…`) | **LỖI THẬT** — Radix `useId` lệch SSR/CSR (đúng nhóm V1 detect lệch pha). | V1 |
+| warn | `[useSupabaseChannel] subscribe failed status=CHANNEL_ERROR` ×nhiều | **Artifact dev/localhost** (realtime không kết nối được từ localhost) — không kết luận là bug prod. | — |
+| warn | LCP: avatar image nên `loading="eager"` | Perf nhẹ. | — |
+| network FAILED | `avatar.vercel.sh/*`, `lh3.googleusercontent.com/*` (avatar fallback + Google pic) | **Artifact dev** (host avatar ngoài không tải được ở localhost; prod có thể khác) → giải thích podium hiện avatar generic. | — |
+| network FAILED | `POST /…/admin → 200 OK [ERR_ABORTED]` | **Artifact** — RSC navigation bị hủy do audit điều hướng nhanh liên tục. Không phải lỗi. | — |
+
+> Ưu tiên fix thật: **key trùng** (V9) + **Radix hydration mismatch CRM** (V1). Còn lại là nhiễu môi trường dev.
 
 ---
 
@@ -147,9 +173,10 @@ Glob `src/app/**/page.tsx` = **41 page**. Bảng dưới là inventory THẬT (�
 
 - [x] Inventory regenerate + 3 ẩn số giải quyết (signup route, audit-log=Nhật ký, settings=Cài đặt WS) + lệch 05b ghi rõ
 - [x] 18/18 grep pattern có số baseline
-- [ ] 100% route (R-01→…) audit trên 3 viewport — **CHỜ live pass (credentials)**
-- [ ] 100% overlay O-01→O-07 test C-10 — **CHỜ live pass**
-- [ ] Screenshot 390/route + đáy + overlay — **CHỜ live pass**
-- [x] Top 10 lỗi hệ thống (ứng viên) đã viết — chốt sau live pass
-- [ ] Console findings — **CHỜ live pass**
+- [~] Route audit trên viewport 375: **7 route đại diện LIVE** (R-11/12/13/14/16/17 admin + R-23′ portal) đủ để chốt systemic; còn ~10 route phụ (landing/auth/members/settings/audit-log/analytics/schedule/user-dashboard) chưa live — **không đổi kết luận systemic**, có thể quét bổ sung khi vào từng phase
+- [ ] 100% overlay O-01→O-07 test C-10 — **CHỜ Bước 8 iPhone** (nhánh mobile có thể không render TaskDetailModal desktop; cần thiết bị thật)
+- [x] Screenshot bằng chứng route P0/khác biệt (R-12/13/14/17/11 + portal) đã chụp
+- [x] Top 10 lỗi hệ thống — **đã đối chiếu LIVE** (§2)
+- [x] Console/network findings — LIVE (§5): key trùng + Radix hydration mismatch = lỗi thật; còn lại nhiễu dev
 - [x] Không thay đổi tracked trong `src/` trên `audit/phase-0` (git diff src/ rỗng; 2 file untracked pre-existing đã ghi chú)
+- [ ] iPhone thật Bước 8 (safe-area env(), keyboard che composer, auto-zoom thật, session V7, FPS blur) — **CHỜ** (chủ dự án chạy tay hoặc phiên sau)

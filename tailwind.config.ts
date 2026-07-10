@@ -223,35 +223,10 @@ const config: Config = {
             },
         },
     },
-    safelist: [
-        {
-            pattern:
-                /^(bg-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200|300|400|500|600|700|800|900|950))$/,
-            variants: ["hover", "ui-selected"],
-        },
-        {
-            pattern:
-                /^(text-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200|300|400|500|600|700|800|900|950))$/,
-            variants: ["hover", "ui-selected"],
-        },
-        {
-            pattern:
-                /^(border-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200|300|400|500|600|700|800|900|950))$/,
-            variants: ["hover", "ui-selected"],
-        },
-        {
-            pattern:
-                /^(ring-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200|300|400|500|600|700|800|900|950))$/,
-        },
-        {
-            pattern:
-                /^(stroke-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200|300|400|500|600|700|800|900|950))$/,
-        },
-        {
-            pattern:
-                /^(fill-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200|300|400|500|600|700|800|900|950))$/,
-        },
-    ],
+    // [P0-09] Full-rainbow safelist REMOVED. Its only consumers were the runtime-built
+    // colour classes in ConnectorsPanel + PricingRulesPanel, now converted to STATIC
+    // literal classes (their local TONE maps) that the JIT scanner emits directly.
+    // Dropping the safelist stops shipping ~22 colours × 11 shades × 6 utils of unused CSS.
     plugins: [
         require("tailwindcss-animate"),
         require("@tailwindcss/typography"),

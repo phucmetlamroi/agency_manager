@@ -47,6 +47,16 @@ interface Props {
     clients: ClientOption[]
 }
 
+// [P0-09] Static Tailwind tone classes (full literals so the JIT scanner emits them) —
+// lets us drop the colour safelist from tailwind.config. Keep keys in sync with the
+// `color` values in RULE_TYPE_META below.
+const TONE: Record<string, { box: string; icon: string }> = {
+    emerald: { box: 'bg-emerald-500/10 border border-emerald-500/20', icon: 'text-emerald-400' },
+    indigo:  { box: 'bg-indigo-500/10 border border-indigo-500/20',   icon: 'text-indigo-400' },
+    violet:  { box: 'bg-violet-500/10 border border-violet-500/20',   icon: 'text-violet-400' },
+    amber:   { box: 'bg-amber-500/10 border border-amber-500/20',     icon: 'text-amber-400' },
+}
+
 const RULE_TYPE_META: Record<string, { label: string; icon: any; color: string }> = {
     flat: { label: 'Giá cố định', icon: DollarSign, color: 'emerald' },
     per_minute: { label: 'Theo phút', icon: Calculator, color: 'indigo' },
@@ -135,8 +145,8 @@ export default function PricingRulesPanel({ workspaceId, rules, clients }: Props
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                                        <div className={`p-2 rounded-xl bg-${meta.color}-500/10 border border-${meta.color}-500/20`}>
-                                            <Icon size={16} className={`text-${meta.color}-400`} />
+                                        <div className={`p-2 rounded-xl ${TONE[meta.color]?.box ?? ''}`}>
+                                            <Icon size={16} className={TONE[meta.color]?.icon ?? ''} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">

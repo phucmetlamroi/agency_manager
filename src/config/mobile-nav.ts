@@ -3,11 +3,9 @@
 // nhau (active match dài-nhất-trước ở BottomNav → mỗi route sáng đúng 1 tab, Rủi ro #11).
 //
 // LƯU Ý sequencing:
-//  • Tab "Menu" (hub /admin/menu) thuộc PR③ — route chưa tồn tại ở phase này nên CHƯA
-//    thêm vào ADMIN_TABS (tránh tab 404). PR③ thêm { key:'menu', ... } + tạo route.
 //  • USER: dashboard = trang chủ + danh sách task (một màn) → không tách tab "Task"
 //    riêng (sẽ đè /dashboard). Bộ 4 tab = Trang chủ · Lịch · Lương(mới) · Hồ sơ.
-import { Home, ListTodo, CalendarDays, Wallet, UserCircle, Users, type LucideIcon } from 'lucide-react'
+import { Home, ListTodo, CalendarDays, Wallet, UserCircle, Users, Menu, type LucideIcon } from 'lucide-react'
 
 export interface MobileTab {
     key: string
@@ -31,6 +29,7 @@ const ADMIN_TABS = (ws: string): MobileTab[] => [
     { key: 'queue', label: 'Task', href: `/${ws}/admin/queue`, icon: ListTodo },
     { key: 'crm', label: 'Khách', href: `/${ws}/admin/crm`, icon: Users },
     { key: 'schedule', label: 'Lịch', href: `/${ws}/admin/schedule`, icon: CalendarDays },
+    { key: 'menu', label: 'Menu', href: `/${ws}/admin/menu`, icon: Menu },
 ]
 
 export function getTabsForRole(role: string, workspaceId: string): MobileTab[] {

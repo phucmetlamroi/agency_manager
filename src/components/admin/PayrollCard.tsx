@@ -83,7 +83,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
             whileHover={{ borderColor: rs ? rs.ring : 'rgba(139,92,246,0.25)', y: -2 }}
             className={`relative overflow-hidden rounded-[26px] transition-colors duration-150 ${isPaid ? 'opacity-70' : ''} ${totalIncome === 0 ? 'opacity-60' : ''}`}
             style={{
-                backgroundColor: '#0A0A0A',
+                backgroundColor: 'hsl(var(--surface-0))',
                 border: `1px solid ${rs ? rs.ring : 'rgba(139,92,246,0.15)'}`,
                 boxShadow: rs ? `0 0 28px ${rs.glow}` : undefined,
                 fontFamily: FONT,
@@ -135,7 +135,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                         {isPaid && (
                             <div
                                 className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                                style={{ backgroundColor: 'hsl(var(--primary))', borderColor: '#0A0A0A' }}
+                                style={{ backgroundColor: 'hsl(var(--primary))', borderColor: 'hsl(var(--surface-0))' }}
                             >
                                 <CheckCircle2 className="w-3 h-3 text-white" />
                             </div>

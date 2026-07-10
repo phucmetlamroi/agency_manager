@@ -174,7 +174,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
 
     return (
         <div
-            className="relative overflow-hidden rounded-[26px] bg-[#0A0A0A] border border-[rgba(139,92,246,0.15)] shadow-2xl shadow-black/60 flex flex-col h-full"
+            className="relative overflow-hidden rounded-[26px] bg-surface-0 border border-[rgba(139,92,246,0.15)] shadow-2xl shadow-black/60 flex flex-col h-full"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
         >
             {/* ===== HEADER ===== */}
@@ -210,7 +210,7 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                             return (
                                 <div key={person.id} className="flex flex-col items-center flex-1">
                                     {/* Avatar */}
-                                    <Avatar className={`h-11 w-11 ${cfg.ringCls} border-2 border-[#0A0A0A] mb-2`}>
+                                    <Avatar className={`h-11 w-11 ${cfg.ringCls} border-2 border-surface-0 mb-2`}>
                                         <AvatarImage
                                             src={person.avatarUrl || `https://avatar.vercel.sh/${person.username}`}
                                             className="object-cover"

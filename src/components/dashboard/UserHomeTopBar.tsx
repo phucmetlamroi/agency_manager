@@ -155,7 +155,7 @@ export default function UserHomeTopBar({
                                 padding: "10px 14px",
                                 borderRadius: 26,
                                 border: "1px solid rgba(139,92,246,0.15)",
-                                background: "#0A0A0A",
+                                background: "hsl(var(--surface-0))",
                             }}
                         >
                             <Search size={16} style={{ color: "#A1A1AA", flexShrink: 0 }} />
@@ -262,7 +262,7 @@ export default function UserHomeTopBar({
                             style={{
                                 borderRadius: 16,
                                 border: "1px solid rgba(139,92,246,0.15)",
-                                background: "#0A0A0A",
+                                background: "hsl(var(--surface-0))",
                                 boxShadow:
                                     "0 16px 48px rgba(0,0,0,0.50), 0 0 40px rgba(139,92,246,0.06)",
                             }}

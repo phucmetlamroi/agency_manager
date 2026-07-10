@@ -58,7 +58,7 @@ export default function PayrollKpiStrip({ totals }: { totals: PayrollTotals }) {
                         transition={{ delay: 0.05 + i * 0.05, duration: 0.4, ease: 'easeOut' }}
                         whileHover={{ borderColor: 'rgba(139,92,246,0.25)' }}
                         className="relative overflow-hidden rounded-[26px] p-5 flex flex-col gap-3 min-w-0 transition-colors duration-150"
-                        style={{ backgroundColor: '#0A0A0A', border: '1px solid rgba(139,92,246,0.15)', fontFamily: FONT }}
+                        style={{ backgroundColor: 'hsl(var(--surface-0))', border: '1px solid rgba(139,92,246,0.15)', fontFamily: FONT }}
                     >
                         <div className="flex items-center justify-between gap-2">
                             <span className="text-[13px] font-medium truncate" style={{ color: '#A1A1AA' }}>

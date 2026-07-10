@@ -60,7 +60,7 @@ export default function CreateClientButton({ partners, workspaceId }: { partners
                     + Thêm Khách
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-[#1a1a1a] border-gray-800 text-white">
+            <DialogContent className="sm:max-w-[425px] bg-surface-1 border-gray-800 text-white">
                 <DialogHeader>
                     <DialogTitle>Thêm Khách hàng Mới</DialogTitle>
                     <DialogDescription className="text-gray-400">

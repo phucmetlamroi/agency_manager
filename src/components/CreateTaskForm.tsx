@@ -237,7 +237,7 @@ export default function CreateTaskForm({ users, workspaceId }: { users: User[], 
                     name="notes_en"
                     placeholder="Dán nội dung tiếng Anh vào đây..."
                     rows={3}
-                    style={{ width: '100%', padding: '0.5rem', background: '#1a1a1a', border: '1px solid #22c55e44', color: 'white', borderRadius: '6px' }}
+                    style={{ width: '100%', padding: '0.5rem', background: 'hsl(var(--surface-1))', border: '1px solid #22c55e44', color: 'white', borderRadius: '6px' }}
                 />
                 <p style={{ fontSize: '0.65rem', color: '#555', marginTop: '4px' }}>ℹ️ Tự dán kết quả dịch vào ô này để tối ưu chi phí.</p>
             </div>

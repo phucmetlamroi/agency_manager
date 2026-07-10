@@ -178,7 +178,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                 transition={{ delay: 0.05, duration: 0.4, ease: "easeOut" }}
                 className="relative overflow-hidden rounded-[26px] p-5 flex flex-col gap-4 min-w-0 transition-colors duration-150"
                 style={{
-                    backgroundColor: "#0A0A0A",
+                    backgroundColor: "hsl(var(--surface-0))",
                     border: "1px solid rgba(139,92,246,0.15)",
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
@@ -254,7 +254,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                 transition={{ delay: 0.1, duration: 0.4, ease: "easeOut" }}
                 className="relative overflow-hidden rounded-[26px] p-5 flex flex-col gap-4 min-w-0 transition-colors duration-150"
                 style={{
-                    backgroundColor: "#0A0A0A",
+                    backgroundColor: "hsl(var(--surface-0))",
                     border: "1px solid rgba(139,92,246,0.15)",
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
@@ -327,7 +327,7 @@ export function AdminKPIWidgets({ data }: { data: KPIData }) {
                 transition={{ delay: 0.15, duration: 0.4, ease: "easeOut" }}
                 className="relative overflow-hidden rounded-[26px] p-5 flex flex-col gap-4 min-w-0 transition-colors duration-150"
                 style={{
-                    backgroundColor: "#0A0A0A",
+                    backgroundColor: "hsl(var(--surface-0))",
                     border: "1px solid rgba(139,92,246,0.15)",
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}

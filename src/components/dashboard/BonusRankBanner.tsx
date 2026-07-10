@@ -60,7 +60,7 @@ export default function BonusRankBanner({
             className="relative overflow-hidden rounded-[20px] px-5 py-4 flex items-center gap-4"
             style={{
                 border: `1px solid ${m.ring}`,
-                background: "#0A0A0A",
+                background: "hsl(var(--surface-0))",
                 boxShadow: `0 8px 30px ${m.glow}`,
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
             }}

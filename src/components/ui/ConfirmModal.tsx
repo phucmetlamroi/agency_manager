@@ -56,7 +56,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                     onClick={handleCancel}
                 >
                     <div
-                        className="bg-[#1a1a1a]/90 border border-white/10 rounded-2xl p-6 w-[90%] max-w-md shadow-2xl transform scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden"
+                        className="bg-surface-1/90 border border-white/10 rounded-2xl p-6 w-[90%] max-w-md shadow-2xl transform scale-100 animate-in zoom-in-95 duration-200 relative overflow-hidden"
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Ambient Glow */}

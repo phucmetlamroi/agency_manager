@@ -59,7 +59,7 @@ export default function PaymentModal({ isOpen, onClose, user, payrollData, works
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="relative w-full max-w-lg border rounded-[26px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-                    style={{ backgroundColor: '#0A0A0A', borderColor: 'rgba(139,92,246,0.15)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                    style={{ backgroundColor: 'hsl(var(--surface-0))', borderColor: 'rgba(139,92,246,0.15)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                 >
                     {/* Header */}
                     <div className="p-4 border-b flex justify-between items-center shrink-0" style={{ borderColor: 'rgba(139,92,246,0.1)', backgroundColor: 'rgba(139,92,246,0.04)' }}>

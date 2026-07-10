@@ -225,7 +225,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                         transform: coords.openUp ? 'translateY(-100%)' : 'none',
                         zIndex: 1000,
                     }}
-                    className="overflow-hidden rounded-lg border border-zinc-700 bg-[#18181b] shadow-[0_16px_48px_rgba(0,0,0,0.5)]"
+                    className="overflow-hidden rounded-lg border border-zinc-700 bg-surface-1 shadow-[0_16px_48px_rgba(0,0,0,0.5)]"
                 >
                     <div className="flex items-center gap-2 border-b border-zinc-800 px-2.5 py-2">
                         <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -269,7 +269,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                                 <AvatarFallback>{displayName(u)[0]}</AvatarFallback>
                                             </Avatar>
                                             {flagColor && (
-                                                <div className={`absolute -bottom-1 -right-1 h-2 w-2 rounded-full border border-[#18181b] ${flagColor} shadow-sm`} title={`Cảnh báo hạng ${(u as any).monthlyRanks?.[0]?.rank}`} />
+                                                <div className={`absolute -bottom-1 -right-1 h-2 w-2 rounded-full border border-surface-1 ${flagColor} shadow-sm`} title={`Cảnh báo hạng ${(u as any).monthlyRanks?.[0]?.rank}`} />
                                             )}
                                         </div>
                                         <span className="truncate">{displayName(u)}</span>

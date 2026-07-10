@@ -99,7 +99,7 @@ export default function ClientsManagerPanel({
                 flexDirection: 'column',
                 height: '100%',
                 borderRadius: 26,
-                background: '#0A0A0A',
+                background: 'hsl(var(--surface-0))',
                 border: '1px solid rgba(139,92,246,0.15)',
                 boxShadow: '0 24px 60px rgba(0,0,0,0.55)',
                 overflow: 'hidden',

@@ -815,7 +815,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
     // Cấp-3 in-place: render inline lấp đầy ô (orchestrator lo breadcrumb + back)
     if (embedded) {
         return (
-            <div className="flex flex-col lg:flex-row w-full h-full overflow-hidden" style={{ background: '#0A0A0A' }}>
+            <div className="flex flex-col lg:flex-row w-full h-full overflow-hidden" style={{ background: 'hsl(var(--surface-0))' }}>
                 {body}
             </div>
         )

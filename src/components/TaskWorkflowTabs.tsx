@@ -27,26 +27,29 @@ import {
 
 // ─── STATUS CONFIG ──────────────────────────────────────────
 const STATUS_COLORS: Record<string, { label: string; color: string }> = {
-    'Nhận task':       { label: 'Nhận task',       color: '#3B82F6' },
-    'Đã nhận task':   { label: 'Đã nhận task',   color: '#3B82F6' },
-    'Đang đợi giao':   { label: 'Đang đợi giao',   color: '#A855F7' },
-    'Đang thực hiện':  { label: 'Đang thực hiện',  color: '#EAB308' },
+    // [P0-08b] hex → --status-* tokens (themeable; identical hues). Legacy → 8 base tokens;
+    // the 6 video statuses → tokens added in globals.css. This map is concat-free (colours
+    // used directly in inline style), so hsl(var()) is safe here.
+    'Nhận task':       { label: 'Nhận task',       color: 'hsl(var(--status-assigned))' },
+    'Đã nhận task':   { label: 'Đã nhận task',   color: 'hsl(var(--status-assigned))' },
+    'Đang đợi giao':   { label: 'Đang đợi giao',   color: 'hsl(var(--status-waiting))' },
+    'Đang thực hiện':  { label: 'Đang thực hiện',  color: 'hsl(var(--status-doing))' },
     // [Sprint A removed] 'Review' status — submit giờ đi thẳng Revision
     // [L18a] value stays 'Revision' (load-bearing); only the VN display label changes.
     // [bug-report #2] 'Sửa frame' / 'Gửi lại' / 'Tạm ngưng' removed.
-    'Revision':            { label: 'Sửa lại',             color: '#EF4444' },
-    'Hoàn tất':     { label: 'Hoàn tất',     color: '#10B981' },
+    'Revision':            { label: 'Sửa lại',             color: 'hsl(var(--status-revision))' },
+    'Hoàn tất':     { label: 'Hoàn tất',     color: 'hsl(var(--status-done))' },
     // Bug fix: Cron auto-set status='Quá hạn' khi deadline qua nhưng tab list
     // không bao gồm → task overdue bị "thất lạc" khỏi mọi tab.
-    'Quá hạn':      { label: 'Quá hạn',      color: '#DC2626' },
-    'Đã hủy':       { label: 'Đã hủy',       color: '#52525B' },
+    'Quá hạn':      { label: 'Quá hạn',      color: 'hsl(var(--destructive))' },
+    'Đã hủy':       { label: 'Đã hủy',       color: 'hsl(var(--status-cancelled))' },
     // [P3/F2] 6 video-lifecycle statuses (A2–A7).
-    'Đã nộp video (nội bộ)':      { label: 'Đã nộp video (nội bộ)',      color: '#6366F1' },
-    'Đang sửa feedback (nội bộ)': { label: 'Đang sửa feedback (nội bộ)', color: '#F59E0B' },
-    'Đã sửa feedback (nội bộ)':   { label: 'Đã sửa feedback (nội bộ)',   color: '#14B8A6' },
-    'Đã gửi video (khách)':       { label: 'Đã gửi video (khách)',       color: '#06B6D4' },
-    'Đã nhận feedback (khách)':   { label: 'Đã nhận feedback (khách)',   color: '#EF4444' },
-    'Đã sửa feedback (khách)':    { label: 'Đã sửa feedback (khách)',    color: '#8B5CF6' },
+    'Đã nộp video (nội bộ)':      { label: 'Đã nộp video (nội bộ)',      color: 'hsl(var(--status-submitted))' },
+    'Đang sửa feedback (nội bộ)': { label: 'Đang sửa feedback (nội bộ)', color: 'hsl(var(--status-fixing))' },
+    'Đã sửa feedback (nội bộ)':   { label: 'Đã sửa feedback (nội bộ)',   color: 'hsl(var(--status-fixed))' },
+    'Đã gửi video (khách)':       { label: 'Đã gửi video (khách)',       color: 'hsl(var(--status-sent))' },
+    'Đã nhận feedback (khách)':   { label: 'Đã nhận feedback (khách)',   color: 'hsl(var(--status-revision))' },
+    'Đã sửa feedback (khách)':    { label: 'Đã sửa feedback (khách)',    color: 'hsl(var(--status-client-fixed))' },
 }
 
 const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }> = {
@@ -77,14 +80,14 @@ interface TabConfig {
 // internal-review phase in the video workflow). The 'client' tab drop is handled specially in
 // handleTabDrop (real send-to-client), so its targetStatus stays null here.
 const TABS: TabConfig[] = [
-    { id: 'all',      label: 'Đã giao task',    statuses: ['Nhận task', 'Đã nhận task'],                          color: '#8B5CF6', targetStatus: null },
-    { id: 'progress', label: 'Đang làm',        statuses: ['Đang thực hiện'],                                     color: '#EAB308', targetStatus: 'Đang thực hiện' },
-    { id: 'internal', label: 'Duyệt nội bộ',    statuses: ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Revision'], color: '#F97316', targetStatus: 'Đã nộp video (nội bộ)' },
-    { id: 'client',   label: 'Khách duyệt',     statuses: ['Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)'], color: '#06B6D4', targetStatus: null },
+    { id: 'all',      label: 'Đã giao task',    statuses: ['Nhận task', 'Đã nhận task'],                          color: 'hsl(var(--primary))', targetStatus: null },
+    { id: 'progress', label: 'Đang làm',        statuses: ['Đang thực hiện'],                                     color: 'hsl(var(--status-doing))', targetStatus: 'Đang thực hiện' },
+    { id: 'internal', label: 'Duyệt nội bộ',    statuses: ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Revision'], color: 'hsl(var(--status-review))', targetStatus: 'Đã nộp video (nội bộ)' },
+    { id: 'client',   label: 'Khách duyệt',     statuses: ['Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)'], color: 'hsl(var(--status-sent))', targetStatus: null },
     // Tab "Quá hạn": task bị cron set status='Quá hạn'. Task video (cronOverdueEligible=false)
     // KHÔNG bị cron đè status — chúng vẫn hiện badge "QUÁ HẠN" derive ở tab phase của mình.
-    { id: 'overdue',  label: 'Quá hạn',         statuses: ['Quá hạn'],                                            color: '#DC2626', targetStatus: 'Quá hạn' },
-    { id: 'done',     label: 'Hoàn tất',        statuses: ['Hoàn tất'],                                           color: '#10B981', targetStatus: 'Hoàn tất' },
+    { id: 'overdue',  label: 'Quá hạn',         statuses: ['Quá hạn'],                                            color: 'hsl(var(--destructive))', targetStatus: 'Quá hạn' },
+    { id: 'done',     label: 'Hoàn tất',        statuses: ['Hoàn tất'],                                           color: 'hsl(var(--status-done))', targetStatus: 'Hoàn tất' },
 ]
 
 const PER_PAGE = 8

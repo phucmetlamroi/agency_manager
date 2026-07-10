@@ -75,6 +75,14 @@
     --status-frame: 330 81% 60%;     /* Sửa frame     — pink   #EC4899 */
     --status-paused: 240 5% 65%;     /* Tạm ngưng     — zinc-400 #A1A1AA (nâng từ #71717A fail contrast) */
     --status-done: 160 84% 39%;      /* Hoàn tất      — emerald #10B981 */
+    /* 6 video-lifecycle statuses (A2–A7, review-fixes P3) — exact board hues, tokenised.
+       A6 'Đã nhận feedback (khách)' reuses --status-revision (#EF4444, same hue+meaning). */
+    --status-submitted:    239 84% 67%;      /* A2 Đã nộp video (nội bộ)      — indigo #6366F1 */
+    --status-fixing:       var(--amber-500); /* A3 Đang sửa feedback (nội bộ) — amber  #F59E0B */
+    --status-fixed:        173 80% 40%;      /* A4 Đã sửa feedback (nội bộ)   — teal   #14B8A6 */
+    --status-sent:         189 94% 43%;      /* A5 Đã gửi video (khách)       — cyan   #06B6D4 */
+    --status-client-fixed: 258 90% 66%;      /* A7 Đã sửa feedback (khách)    — violet #8B5CF6 */
+    --status-cancelled:    240 4% 34%;       /* Đã hủy — zinc-600 #52525B */
 
     /* ───── TIER 2 — GLASS ───── */
     --glass-bg-1: 0 0% 100% / 0.04;

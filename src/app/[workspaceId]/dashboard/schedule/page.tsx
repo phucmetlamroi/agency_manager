@@ -85,11 +85,11 @@ export default async function UserSchedulePage({
             <CalendarDays className="w-6 h-6 text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
             Lịch làm việc của tôi
           </h1>
-          <p className="text-zinc-600 text-sm mt-1">Kéo rê để đánh dấu thời gian bận của bạn trong tuần</p>
+          <p className="text-muted-foreground text-sm mt-1">Kéo rê để đánh dấu thời gian bận của bạn trong tuần</p>
         </div>
         {/* Hint chip */}
-        <div className="hidden md:flex items-center gap-2 text-xs text-zinc-600 bg-zinc-900/60 border border-white/5 px-3 py-2 rounded-xl">
-          <Info className="w-3.5 h-3.5 text-indigo-400" />
+        <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground bg-zinc-900/60 border border-white/5 px-3 py-2 rounded-xl">
+          <Info className="w-3.5 h-3.5 text-primary-accent" />
           Nhấn giữ &amp; kéo để đặt lịch
         </div>
       </div>

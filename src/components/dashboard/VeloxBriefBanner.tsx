@@ -57,26 +57,26 @@ export default function VeloxBriefBanner({
                 border: '1px solid rgba(99,102,241,0.30)',
             }}
         >
-            <div className="p-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 shrink-0">
-                <FileText size={16} className="text-indigo-300" />
+            <div className="p-2 rounded-xl bg-primary/15 border border-primary/30 shrink-0">
+                <FileText size={16} className="text-primary-accent" />
             </div>
             <div className="flex-1 min-w-0">
                 {/* Brief section */}
                 {briefingDocs.length > 0 && (
                     <>
-                        <h4 className="text-sm font-extrabold text-indigo-100 mb-1.5">
+                        <h4 className="text-sm font-extrabold text-primary-accent mb-1.5">
                             Brief đính kèm ({briefingDocs.length})
                         </h4>
                         <ul className="space-y-1.5 mb-3">
                             {briefingDocs.map((b, i) => (
-                                <li key={i} className="flex items-center gap-2 text-[12px] text-indigo-200/90">
+                                <li key={i} className="flex items-center gap-2 text-[12px] text-primary-accent/90">
                                     <span>{BRIEF_ICON[b.type]}</span>
                                     <span className="truncate flex-1">{b.file.fullName}</span>
                                     <a
                                         href={b.file.previewUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1 text-[10px] text-indigo-300 hover:text-indigo-200 shrink-0"
+                                        className="flex items-center gap-1 text-[10px] text-primary-accent hover:text-primary-accent shrink-0"
                                     >
                                         <ExternalLink size={10} />
                                         Mở
@@ -89,9 +89,9 @@ export default function VeloxBriefBanner({
                                 type="checkbox"
                                 checked={appendToNotes}
                                 onChange={(e) => onToggleAppend(e.target.checked)}
-                                className="w-3.5 h-3.5 rounded border-white/20 bg-zinc-900 text-indigo-500"
+                                className="w-3.5 h-3.5 rounded border-white/20 bg-zinc-900 text-primary-accent"
                             />
-                            <span className="text-[11px] text-indigo-200">
+                            <span className="text-[11px] text-primary-accent">
                                 Tự thêm URL vào ghi chú của mọi task (D4)
                             </span>
                         </label>
@@ -100,21 +100,21 @@ export default function VeloxBriefBanner({
 
                 {/* Script / Transcript section */}
                 {scriptDocs.length > 0 && (
-                    <div className={briefingDocs.length > 0 ? 'mt-3 pt-3 border-t border-indigo-500/20' : ''}>
-                        <h4 className="text-sm font-extrabold text-indigo-100 mb-1.5 flex items-center gap-1.5">
-                            <ScrollText size={13} className="text-indigo-300" />
+                    <div className={briefingDocs.length > 0 ? 'mt-3 pt-3 border-t border-primary/20' : ''}>
+                        <h4 className="text-sm font-extrabold text-primary-accent mb-1.5 flex items-center gap-1.5">
+                            <ScrollText size={13} className="text-primary-accent" />
                             Script / Transcript ({scriptDocs.length})
                         </h4>
                         <ul className="space-y-1.5 mb-2">
                             {scriptDocs.map((s, i) => (
-                                <li key={i} className="flex items-center gap-2 text-[12px] text-indigo-200/90">
+                                <li key={i} className="flex items-center gap-2 text-[12px] text-primary-accent/90">
                                     <span>{SCRIPT_ICON[s.type]}</span>
                                     <span className="truncate flex-1">{s.file.fullName}</span>
                                     <a
                                         href={s.file.previewUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1 text-[10px] text-indigo-300 hover:text-indigo-200 shrink-0"
+                                        className="flex items-center gap-1 text-[10px] text-primary-accent hover:text-primary-accent shrink-0"
                                     >
                                         <ExternalLink size={10} />
                                         Mở
@@ -122,7 +122,7 @@ export default function VeloxBriefBanner({
                                 </li>
                             ))}
                         </ul>
-                        <p className="text-[10px] text-indigo-300/70 italic">
+                        <p className="text-[10px] text-primary-accent/70 italic">
                             Sẽ tự điền vào ô <strong>Kịch bản</strong> ở Bước 4 Tài nguyên.
                         </p>
                     </div>

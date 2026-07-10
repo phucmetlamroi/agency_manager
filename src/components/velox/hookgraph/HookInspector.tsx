@@ -14,8 +14,8 @@ import { formatTimecode } from '@/lib/velox/hook-graph-types'
 import { STATUS_META, TAG_PALETTE, rgba, tagHex } from './hook-graph-style'
 
 const fieldCls =
-    'w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-[12px] text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-violet-400/60'
-const labelCls = 'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500'
+    'w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-[12px] text-zinc-100 outline-none transition-colors placeholder:text-muted-foreground focus:border-violet-400/60'
+const labelCls = 'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'
 
 /** The three statuses the user asked for (others stay in the type for back-compat). */
 const STATUS3: HookBlockStatus[] = ['DRAFT', 'REVIEW', 'APPROVED']
@@ -65,7 +65,7 @@ export function HookInspector({
                 <button
                     type="button"
                     onClick={onClose}
-                    className="rounded-md px-1.5 py-0.5 text-[11px] text-zinc-500 hover:bg-white/10 hover:text-zinc-200"
+                    className="rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-white/10 hover:text-zinc-200"
                 >
                     ✕
                 </button>
@@ -139,7 +139,7 @@ export function HookInspector({
                                 onFocus={() => onEditStart?.()}
                                 onChange={(e) => setDuration(Number(e.target.value) || 0, durSec)}
                             />
-                            <span className="shrink-0 text-[11px] text-zinc-500">phút</span>
+                            <span className="shrink-0 text-[11px] text-muted-foreground">phút</span>
                         </div>
                         <div className="flex flex-1 items-center gap-1.5">
                             <input
@@ -152,7 +152,7 @@ export function HookInspector({
                                 onFocus={() => onEditStart?.()}
                                 onChange={(e) => setDuration(durMin, Number(e.target.value) || 0)}
                             />
-                            <span className="shrink-0 text-[11px] text-zinc-500">giây</span>
+                            <span className="shrink-0 text-[11px] text-muted-foreground">giây</span>
                         </div>
                     </div>
                 </div>
@@ -183,7 +183,7 @@ export function HookInspector({
                             className={`rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors ${
                                 !block.status
                                     ? 'border-white/20 bg-white/10 text-zinc-200'
-                                    : 'border-white/10 text-zinc-500 hover:text-zinc-300'
+                                    : 'border-white/10 text-muted-foreground hover:text-zinc-300'
                             }`}
                         >
                             Không
@@ -218,7 +218,7 @@ export function HookInspector({
                     <button
                         type="button"
                         onClick={() => setShowTc((v) => !v)}
-                        className="flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300"
+                        className="flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-zinc-300"
                     >
                         <span>Timecode {tc ? `· ${formatTimecode(tc.inSec)}–${formatTimecode(tc.outSec)}` : '(tuỳ chọn)'}</span>
                         <span>{showTc ? '▾' : '▸'}</span>
@@ -234,7 +234,7 @@ export function HookInspector({
                             />
                             <div className="flex items-center gap-2">
                                 <div className="flex-1">
-                                    <span className="mb-0.5 block text-[9px] uppercase tracking-wide text-zinc-600">
+                                    <span className="mb-0.5 block text-[9px] uppercase tracking-wide text-muted-foreground">
                                         In (giây) · {formatTimecode(tc?.inSec ?? 0)}
                                     </span>
                                     <input
@@ -247,7 +247,7 @@ export function HookInspector({
                                     />
                                 </div>
                                 <div className="flex-1">
-                                    <span className="mb-0.5 block text-[9px] uppercase tracking-wide text-zinc-600">
+                                    <span className="mb-0.5 block text-[9px] uppercase tracking-wide text-muted-foreground">
                                         Out (giây) · {formatTimecode(tc?.outSec ?? 0)}
                                     </span>
                                     <input

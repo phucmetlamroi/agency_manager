@@ -659,7 +659,7 @@ export default function QuickCreateMode({
                 </label>
                 <div className="flex gap-2">
                     <div className="flex-1 relative">
-                        <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                        <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                         <input
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
@@ -734,7 +734,7 @@ export default function QuickCreateMode({
                     <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-zinc-400 group-hover:text-zinc-200 transition-colors">
                         <Settings2 size={13} /> Tuỳ chọn Velox
                     </span>
-                    <ChevronDown size={15} className={`text-zinc-500 transition-transform ${showToggles ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={15} className={`text-muted-foreground transition-transform ${showToggles ? 'rotate-180' : ''}`} />
                 </button>
                 {showToggles && (
                 <div className="grid grid-cols-2 gap-2">
@@ -846,7 +846,7 @@ export default function QuickCreateMode({
             {scanResult && (
                 <>
                     {scanResult.isWrapper && (
-                        <div className="rounded-2xl bg-indigo-500/[0.06] border border-indigo-500/20 p-3 text-[12px] text-indigo-200">
+                        <div className="rounded-2xl bg-primary/[0.06] border border-primary/20 p-3 text-[12px] text-primary-accent">
                             ↪️ Đã auto-drill từ wrapper "{scanResult.diagnostics.wrapperName ?? '?'}" — confidence {scanResult.wrapperConfidence}/10
                         </div>
                     )}
@@ -885,11 +885,11 @@ export default function QuickCreateMode({
                             <div className="grid grid-cols-[24px_24px_1fr_140px_100px_80px_90px] gap-2 px-3 py-2 border-b border-white/10 bg-white/[0.02]">
                                 <div></div>
                                 <div></div>
-                                <div className="text-[10px] font-bold uppercase text-zinc-500">Tên</div>
-                                <div className="text-[10px] font-bold uppercase text-zinc-500">Nguồn</div>
-                                <div className="text-[10px] font-bold uppercase text-zinc-500">Thời lượng</div>
-                                <div className="text-[10px] font-bold uppercase text-zinc-500">Loại</div>
-                                <div className="text-[10px] font-bold uppercase text-zinc-500">USD</div>
+                                <div className="text-[10px] font-bold uppercase text-muted-foreground">Tên</div>
+                                <div className="text-[10px] font-bold uppercase text-muted-foreground">Nguồn</div>
+                                <div className="text-[10px] font-bold uppercase text-muted-foreground">Thời lượng</div>
+                                <div className="text-[10px] font-bold uppercase text-muted-foreground">Loại</div>
+                                <div className="text-[10px] font-bold uppercase text-muted-foreground">USD</div>
                             </div>
                             <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
                                 {scanResult.mainItems.map((item) => {
@@ -901,7 +901,7 @@ export default function QuickCreateMode({
                                         <div key={key}>
                                             <div
                                                 className={`grid grid-cols-[24px_24px_1fr_140px_100px_80px_90px] gap-2 px-3 py-2 border-b border-white/5 text-xs ${
-                                                    selected ? 'text-zinc-200' : 'text-zinc-500 opacity-50'
+                                                    selected ? 'text-zinc-200' : 'text-muted-foreground opacity-50'
                                                 }`}
                                             >
                                                 <div className="flex items-center">
@@ -964,7 +964,7 @@ export default function QuickCreateMode({
                             </div>
                         </div>
                         {scanResult.diagnostics.patternDetectionRationale && (
-                            <p className="mt-2 text-[10px] text-zinc-500 italic">
+                            <p className="mt-2 text-[10px] text-muted-foreground italic">
                                 {scanResult.diagnostics.patternDetectionRationale}
                             </p>
                         )}
@@ -986,7 +986,7 @@ export default function QuickCreateMode({
                     {/* V3 Apply footer */}
                     <div className="mt-4 rounded-2xl bg-zinc-900/60 border border-violet-500/20 p-4 flex items-center justify-between gap-4">
                         <div>
-                            <div className="text-[10px] uppercase font-bold text-zinc-500">Velox Deep Scan</div>
+                            <div className="text-[10px] uppercase font-bold text-muted-foreground">Velox Deep Scan</div>
                             <div className="text-sm font-bold text-zinc-100 mt-0.5">
                                 {selectedItemIds.size} / {scanResult.mainItems.length} task · {scanResult.primaryPattern} · confidence {Math.round(scanResult.confidence * 100)}%
                             </div>
@@ -1035,7 +1035,7 @@ export default function QuickCreateMode({
                         )}
                     </div>
                     <div className="rounded-2xl bg-zinc-900/40 border border-white/5 overflow-hidden">
-                        <div className="grid grid-cols-[28px_1fr_70px_90px_80px_100px] gap-2 px-3 py-2 text-[10px] font-bold uppercase text-zinc-500 border-b border-white/5">
+                        <div className="grid grid-cols-[28px_1fr_70px_90px_80px_100px] gap-2 px-3 py-2 text-[10px] font-bold uppercase text-muted-foreground border-b border-white/5">
                             <div></div>
                             <div>Tên task</div>
                             <div>Thời lượng</div>
@@ -1048,7 +1048,7 @@ export default function QuickCreateMode({
                                 <div
                                     key={row.rowId}
                                     className={`grid grid-cols-[28px_1fr_70px_90px_80px_100px] gap-2 px-3 py-2 border-b border-white/5 text-xs ${
-                                        row.selected ? 'text-zinc-200' : 'text-zinc-500 opacity-50'
+                                        row.selected ? 'text-zinc-200' : 'text-muted-foreground opacity-50'
                                     }`}
                                 >
                                     <input
@@ -1137,7 +1137,7 @@ export default function QuickCreateMode({
                     {/* Summary + Submit */}
                     <div className="mt-4 rounded-2xl bg-zinc-900/60 border border-violet-500/20 p-4 flex items-center justify-between gap-4">
                         <div>
-                            <div className="text-[10px] uppercase font-bold text-zinc-500">Tổng cộng</div>
+                            <div className="text-[10px] uppercase font-bold text-muted-foreground">Tổng cộng</div>
                             <div className="text-sm font-bold text-zinc-100 mt-0.5">
                                 {selectedCount} task ·{' '}
                                 <span className="text-emerald-400">${totalUSD.toFixed(2)}</span> ·{' '}
@@ -1191,9 +1191,9 @@ export default function QuickCreateMode({
             {/* Empty state */}
             {scannedVideos.length === 0 && !scanResult && !scanning && (
                 <div className="rounded-2xl bg-zinc-900/30 border border-dashed border-white/10 p-8 text-center">
-                    <Sparkles size={28} className="mx-auto text-zinc-600 mb-2" />
+                    <Sparkles size={28} className="mx-auto text-muted-foreground mb-2" />
                     <p className="text-sm text-zinc-400">Chưa quét folder nào.</p>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                         Dán link folder Dropbox/Google Drive ở trên rồi bấm Quét.
                     </p>
                 </div>

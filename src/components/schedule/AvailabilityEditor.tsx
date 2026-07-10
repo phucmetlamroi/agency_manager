@@ -141,11 +141,11 @@ export default function AvailabilityEditor({ workspaceId, dateKey, initialSchedu
                 >
                     Bận tạm
                 </button>
-                <span className="text-xs text-zinc-500 ml-auto">{isPending ? 'Đang lưu...' : 'Kéo để tô lịch'}</span>
+                <span className="text-xs text-muted-foreground ml-auto">{isPending ? 'Đang lưu...' : 'Kéo để tô lịch'}</span>
             </div>
 
             <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Chú thích</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Chú thích</span>
                 <div className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.35)] ${STATUS_DOT.FREE}`} />
                     <span>{STATUS_LABEL.FREE}</span>
@@ -168,7 +168,7 @@ export default function AvailabilityEditor({ workspaceId, dateKey, initialSchedu
                     {Array.from({ length: 24 }).map((_, hour) => (
                         <div
                             key={`hour-${hour}`}
-                            className={`h-10 border-b border-r border-zinc-800 text-[10px] text-zinc-500 flex items-center justify-center ${hour === currentHour && dateKey === todayKey ? 'bg-white/5 text-white ring-1 ring-white/10 shadow-[0_0_12px_rgba(255,255,255,0.15)]' : ''}`}
+                            className={`h-10 border-b border-r border-zinc-800 text-[10px] text-muted-foreground flex items-center justify-center ${hour === currentHour && dateKey === todayKey ? 'bg-white/5 text-white ring-1 ring-white/10 shadow-[0_0_12px_rgba(255,255,255,0.15)]' : ''}`}
                         >
                             {hour}:00
                         </div>

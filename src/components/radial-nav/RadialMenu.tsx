@@ -164,7 +164,7 @@ function RadialSegmentItem({
             >
                 {createElement(getIcon(segment.icon), {
                     className: `w-5 h-5 transition-colors duration-150 ${
-                        isUnassigned ? 'text-zinc-600' : (isHovered ? colors.text : 'text-zinc-400')
+                        isUnassigned ? 'text-muted-foreground' : (isHovered ? colors.text : 'text-zinc-400')
                     }`,
                 })}
             </motion.button>
@@ -180,7 +180,7 @@ function RadialSegmentItem({
                     text-xs font-semibold px-2 py-0.5 rounded-full
                     bg-zinc-900/90 border border-white/10
                     backdrop-blur-sm
-                    ${isUnassigned ? 'text-zinc-500' : (isHovered ? colors.text : 'text-zinc-400')}
+                    ${isUnassigned ? 'text-muted-foreground' : (isHovered ? colors.text : 'text-zinc-400')}
                 `}>
                     {segment.label}
                 </span>
@@ -276,7 +276,7 @@ export function RadialMenu({
                 >
                     <button
                         onClick={(e) => { e.stopPropagation(); onClose(); onOpenConfig() }}
-                        className="-translate-x-1/2 flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                        className="-translate-x-1/2 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-zinc-300 transition-colors"
                     >
                         <Settings className="w-3 h-3" />
                         <span>Ctrl+Shift+K</span>

@@ -49,7 +49,7 @@ export default function AvatarUpload({ user }: { user: any }) {
                 onClick={() => !isPending && fileInputRef.current?.click()}
             >
                 {/* Outer Ring / Glow */}
-                <div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
+                <div className="absolute -inset-1 bg-gradient-to-tr from-primary to-purple-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
                 
                 {/* Avatar Container */}
                 <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-zinc-900 bg-zinc-800 shadow-2xl">
@@ -62,7 +62,7 @@ export default function AvatarUpload({ user }: { user: any }) {
                             unoptimized
                         />
                     ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 bg-zinc-900">
+                        <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-zinc-900">
                             <User className="w-12 h-12 mb-1 opacity-20" />
                             <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">Chưa có ảnh</span>
                         </div>
@@ -71,7 +71,7 @@ export default function AvatarUpload({ user }: { user: any }) {
                     {/* Loading Overlay */}
                     {isPending && (
                         <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center animate-in fade-in duration-300">
-                            <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+                            <Loader2 className="w-8 h-8 animate-spin text-primary-accent" />
                             <span className="text-[10px] text-zinc-300 mt-2 font-bold uppercase tracking-tighter">Đang tải...</span>
                         </div>
                     )}
@@ -99,7 +99,7 @@ export default function AvatarUpload({ user }: { user: any }) {
 
             <div className="text-center">
                 <h4 className="text-zinc-200 font-bold text-lg">{user.username}</h4>
-                <p className="text-zinc-500 text-xs uppercase tracking-widest font-medium mt-0.5">{roleLabel(user.role)}</p>
+                <p className="text-muted-foreground text-xs uppercase tracking-widest font-medium mt-0.5">{roleLabel(user.role)}</p>
                 
                 <div className="mt-4 flex items-center justify-center gap-2">
                     <Button 
@@ -113,7 +113,7 @@ export default function AvatarUpload({ user }: { user: any }) {
                         Tải ảnh mới
                     </Button>
                 </div>
-                <p className="text-[10px] text-zinc-600 mt-3 italic">Hỗ trợ JPG, PNG, WebP (Tối đa 10MB)</p>
+                <p className="text-[10px] text-muted-foreground mt-3 italic">Hỗ trợ JPG, PNG, WebP (Tối đa 10MB)</p>
             </div>
         </div>
     )

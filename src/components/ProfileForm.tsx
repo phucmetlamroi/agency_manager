@@ -17,20 +17,20 @@ function GlassInput({ id, name, label, icon: Icon, type = 'text', value, default
 
     return (
         <div>
-            <label htmlFor={id} className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">{label}</label>
+            <label htmlFor={id} className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">{label}</label>
             <div className="relative">
-                <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                     id={id} name={name} type={inputType}
                     defaultValue={defaultValue} value={value} onChange={onChange}
                     disabled={disabled} placeholder={placeholder}
-                    className={`w-full pl-10 pr-${isPassword ? '10' : '4'} py-2.5 rounded-xl text-sm border bg-zinc-900/60 text-zinc-200 placeholder:text-zinc-700 focus:outline-none focus:border-indigo-500/50 focus:bg-zinc-900 transition-all duration-200 ${
-                        disabled ? 'border-white/5 text-zinc-600 cursor-not-allowed' : 'border-white/8 hover:border-white/15'
+                    className={`w-full pl-10 pr-${isPassword ? '10' : '4'} py-2.5 rounded-xl text-sm border bg-zinc-900/60 text-zinc-200 placeholder:text-zinc-700 focus:outline-none focus:border-primary/50 focus:bg-zinc-900 transition-all duration-200 ${
+                        disabled ? 'border-white/5 text-muted-foreground cursor-not-allowed' : 'border-white/8 hover:border-white/15'
                     }`}
                 />
                 {isPassword && (
                     <button type="button" onClick={() => setShowPass(!showPass)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-300 transition-colors">
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-zinc-300 transition-colors">
                         {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                 )}
@@ -44,7 +44,7 @@ function SettingsCard({ icon: Icon, title, description, accentColor = 'indigo', 
     icon: any; title: string; description: string; accentColor?: string; children: React.ReactNode; footer?: React.ReactNode
 }) {
     const colorMap: Record<string, { border: string; bg: string; text: string; glow: string }> = {
-        indigo: { border: 'border-indigo-500/20', bg: 'bg-indigo-500/5', text: 'text-indigo-400', glow: 'bg-indigo-500/6' },
+        indigo: { border: 'border-primary/20', bg: 'bg-primary/5', text: 'text-primary-accent', glow: 'bg-primary/6' },
         amber: { border: 'border-amber-500/20', bg: 'bg-amber-500/5', text: 'text-amber-400', glow: 'bg-amber-500/6' },
     }
     const c = colorMap[accentColor] || colorMap.indigo
@@ -60,7 +60,7 @@ function SettingsCard({ icon: Icon, title, description, accentColor = 'indigo', 
                     </div>
                     <div>
                         <h3 className="font-bold text-zinc-200 text-sm">{title}</h3>
-                        <p className="text-zinc-600 text-xs">{description}</p>
+                        <p className="text-muted-foreground text-xs">{description}</p>
                     </div>
                 </div>
                 {/* Content */}
@@ -125,7 +125,7 @@ export default function ProfileForm({ user }: { user: any }) {
                 accentColor="indigo"
                 footer={
                     <button type="submit" form="profile-form" disabled={isLoading}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-500 hover:brightness-110 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-500/20 transition-all active:scale-[0.98]">
+                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-blue-500 hover:brightness-110 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-[0.98]">
                         {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                         Lưu thay đổi
                     </button>

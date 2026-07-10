@@ -89,14 +89,14 @@ export default function BonusConfigModal({ workspaceId, onClose }: { workspaceId
                 </div>
 
                 <div className="px-5 pb-5">
-                    <p className="text-xs text-zinc-500 mb-4 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
                         Áp dụng cho <b className="text-zinc-300">team này</b>, dùng lại mọi tháng. Thưởng ={' '}
                         <b className="text-zinc-300">%</b> × <b className="text-zinc-300">Thực nhận</b> của người đứng hạng.
                         {isDefault && <span className="text-amber-400/80"> (đang là mặc định — lưu để chỉnh riêng cho team)</span>}
                     </p>
 
                     {loading ? (
-                        <div className="flex items-center justify-center gap-2 py-10 text-sm text-zinc-500">
+                        <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
                             <Loader2 className="w-4 h-4 animate-spin" /> Đang tải…
                         </div>
                     ) : (
@@ -133,9 +133,9 @@ export default function BonusConfigModal({ workspaceId, onClose }: { workspaceId
                                             value={r.enabled ? (r.percent || '') : ''}
                                             onChange={(e) => setPercent(r.rank, Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
                                             placeholder="0"
-                                            className="w-20 bg-zinc-900/70 border border-white/10 rounded-lg px-3 py-2 text-sm text-right text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50 disabled:opacity-40"
+                                            className="w-20 bg-zinc-900/70 border border-white/10 rounded-lg px-3 py-2 text-sm text-right text-zinc-100 placeholder:text-muted-foreground focus:outline-none focus:border-violet-500/50 disabled:opacity-40"
                                         />
-                                        <span className="text-zinc-500 text-sm">%</span>
+                                        <span className="text-muted-foreground text-sm">%</span>
                                     </div>
                                 </div>
                             ))}

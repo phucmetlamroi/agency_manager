@@ -224,7 +224,7 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
             disabled={disabled}
             title={title}
             className={`p-1.5 rounded-md transition-colors flex items-center justify-center
-                ${isActive ? 'bg-zinc-200 text-black dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/10'}
+                ${isActive ? 'bg-zinc-200 text-black dark:bg-zinc-700 dark:text-white' : 'text-muted-foreground hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/10'}
                 disabled:opacity-40 disabled:cursor-not-allowed`}
         >
             <Icon size={16} />
@@ -241,7 +241,7 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                     <div className="bg-zinc-950 border border-white/10 p-4 rounded-lg shadow-xl w-80 flex flex-col gap-3">
                         <h3 className="font-bold text-sm text-zinc-100">Sửa liên kết</h3>
                         <div>
-                            <label className="text-xs text-zinc-500 font-bold">Văn bản hiển thị</label>
+                            <label className="text-xs text-muted-foreground font-bold">Văn bản hiển thị</label>
                             <input
                                 value={linkText}
                                 onChange={(e) => setLinkText(e.target.value)}
@@ -250,7 +250,7 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                             />
                         </div>
                         <div>
-                            <label className="text-xs text-zinc-500 font-bold">URL</label>
+                            <label className="text-xs text-muted-foreground font-bold">URL</label>
                             <input
                                 value={linkUrl}
                                 onChange={(e) => setLinkUrl(e.target.value)}
@@ -389,7 +389,7 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                             type="button"
                             onClick={() => setLhMenuOpen((v) => !v)}
                             title="Giãn dòng"
-                            className={`p-1.5 rounded-md transition-colors flex items-center justify-center ${lhMenuOpen ? 'bg-zinc-200 text-black dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/10'}`}
+                            className={`p-1.5 rounded-md transition-colors flex items-center justify-center ${lhMenuOpen ? 'bg-zinc-200 text-black dark:bg-zinc-700 dark:text-white' : 'text-muted-foreground hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/10'}`}
                         >
                             <MoveVertical size={16} />
                         </button>
@@ -412,7 +412,7 @@ export default function TiptapEditor({ content, onChange, editable = true }: Tip
                                         ;(editor.chain().focus() as any).unsetLineHeight().run()
                                         setLhMenuOpen(false)
                                     }}
-                                    className="w-full text-left px-3 py-1.5 text-xs text-zinc-500 hover:bg-white/5"
+                                    className="w-full text-left px-3 py-1.5 text-xs text-muted-foreground hover:bg-white/5"
                                 >
                                     Mặc định
                                 </button>

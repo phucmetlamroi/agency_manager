@@ -21,14 +21,14 @@ export default async function CRMDashboard({ params }: { params: Promise<{ works
             <header className="flex flex-col gap-3 mb-5 sm:flex-row sm:items-start sm:justify-between sm:mb-7">
                 {/* Left side */}
                 <div className="flex items-start gap-3 sm:gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center flex-shrink-0">
-                        <Building2 className="w-5 h-5 text-indigo-300" />
+                    <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-5 h-5 text-primary-accent" />
                     </div>
                     <div>
                         <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight leading-tight m-0">
                             Quản lý Khách hàng
                         </h1>
-                        <p className="text-xs text-zinc-500 mt-1 m-0">
+                        <p className="text-xs text-muted-foreground mt-1 m-0">
                             Hệ thống quản lý Đối tác, Brand con và Chỉ số Hiệu suất.
                         </p>
                     </div>
@@ -42,11 +42,11 @@ export default async function CRMDashboard({ params }: { params: Promise<{ works
                     >
                         <Trash2 className="w-3.5 h-3.5" /> Thùng rác
                     </Link>
-                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/12 border border-indigo-500/25">
-                        <span className="text-lg font-bold text-indigo-300">
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/12 border border-primary/25">
+                        <span className="text-lg font-bold text-primary-accent">
                             {clientCount}
                         </span>
-                        <span className="text-[11px] text-indigo-500 font-medium">
+                        <span className="text-[11px] text-primary-accent font-medium">
                             Khách hàng
                         </span>
                     </div>

@@ -225,7 +225,7 @@ export default function VeloxMultiHookMapEditor({
                 <>
                     <div className="flex items-center justify-between flex-wrap gap-3">
                         <ModeToggle mode={mode} onChange={switchMode} />
-                        <p className="text-[11px] text-zinc-500 italic">
+                        <p className="text-[11px] text-muted-foreground italic">
                             Bấm vào node hoặc file để mở menu "Chuyển đến…".
                         </p>
                     </div>
@@ -270,7 +270,7 @@ function ScanBar({
 }) {
     return (
         <div className="bg-zinc-950/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-lg shadow-black/40">
-            <label className="text-[11px] tracking-[0.16em] uppercase font-mono text-zinc-500 block mb-2">
+            <label className="text-[11px] tracking-[0.16em] uppercase font-mono text-muted-foreground block mb-2">
                 Folder Dropbox / Google Drive
             </label>
             <div className="flex flex-col md:flex-row gap-2">
@@ -397,7 +397,7 @@ function MovePopoverOverlay({
             >
                 <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="min-w-0 flex-1">
-                        <div className="text-[10px] tracking-[0.16em] uppercase font-mono text-zinc-500">
+                        <div className="text-[10px] tracking-[0.16em] uppercase font-mono text-muted-foreground">
                             Chuyển đến…
                         </div>
                         <div className="text-[14px] font-bold text-white truncate mt-0.5" title={fileName}>
@@ -466,7 +466,7 @@ function MovePopoverOverlay({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
-        <div className="text-[10px] tracking-[0.16em] uppercase font-mono text-zinc-600 px-1 pt-2 pb-1">
+        <div className="text-[10px] tracking-[0.16em] uppercase font-mono text-muted-foreground px-1 pt-2 pb-1">
             {children}
         </div>
     )
@@ -489,7 +489,7 @@ function PickRow({
         >
             <span className="text-[12.5px] text-zinc-200 truncate">{label}</span>
             {hint && (
-                <span className="text-[10px] font-mono text-zinc-500 flex-none">{hint}</span>
+                <span className="text-[10px] font-mono text-muted-foreground flex-none">{hint}</span>
             )}
         </button>
     )

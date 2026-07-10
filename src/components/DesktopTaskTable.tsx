@@ -211,17 +211,17 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
             <div className="flex flex-col gap-4 optimize-visibility">
                 {/* Bulk Actions Bar */}
                 {isAdmin && selectedIds.length > 0 && (
-                    <div className="sticky top-0 z-30 bg-indigo-700 text-white px-5 py-3 rounded-xl flex items-center justify-between shadow-[0_10px_40px_rgba(79,70,229,0.4)] animate-in slide-in-from-top duration-300 border border-indigo-500 mb-2">
+                    <div className="sticky top-0 z-30 bg-primary text-white px-5 py-3 rounded-xl flex items-center justify-between shadow-[0_10px_40px_rgba(79,70,229,0.4)] animate-in slide-in-from-top duration-300 border border-primary mb-2">
                         <div className="flex items-center gap-5">
                             <div className="flex flex-col">
                                 <span className="text-sm font-black tracking-tight">\u0110ANG CH\u1eccN {selectedIds.length} T\u00c1C V\u1ee4</span>
-                                <button onClick={() => setSelectedIds([])} className="text-[10px] text-indigo-300 hover:text-white underline text-left transition-colors">H\u1ee7y ch\u1ecdn t\u1ea5t c\u1ea3</button>
+                                <button onClick={() => setSelectedIds([])} className="text-[10px] text-primary-accent hover:text-white underline text-left transition-colors">H\u1ee7y ch\u1ecdn t\u1ea5t c\u1ea3</button>
                             </div>
                             
-                            <div className="h-8 w-px bg-indigo-500/50 mx-2" />
+                            <div className="h-8 w-px bg-primary/50 mx-2" />
 
                             <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">\u0110\u1ed5i tr\u1ea1ng th\u00e1i l\u00f4:</span>
+                                <span className="text-[10px] font-bold text-primary-accent uppercase tracking-widest">\u0110\u1ed5i tr\u1ea1ng th\u00e1i l\u00f4:</span>
                                 <select
                                     disabled={isUpdating}
                                     onChange={(e) => {
@@ -233,7 +233,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                                         }
                                         handleStatusChange(selectedIds[0], val)
                                     }}
-                                    className="bg-indigo-900 border border-indigo-400 text-white font-bold text-xs px-3 py-2 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-white/20 transition-all disabled:opacity-50"
+                                    className="bg-primary border border-primary text-white font-bold text-xs px-3 py-2 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-white/20 transition-all disabled:opacity-50"
                                 >
 
                                     <option value="">-- Ch\u1ecdn tr\u1ea1ng th\u00e1i --</option>
@@ -282,7 +282,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                     const isSelected = selectedIds.includes(task.id);
                     return (
                         <div key={task.id}
-                            className={`glass-panel group relative p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-all border-l-4 ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-500/5' : ''}`}
+                            className={`glass-panel group relative p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-all border-l-4 ${isSelected ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
                             style={{
                                 borderLeftColor: isSelected ? '#6366f1' : (statusColors[task.status] || '#ccc')
                             }}

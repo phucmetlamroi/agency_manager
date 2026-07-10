@@ -46,7 +46,7 @@ export default function CancelledTasksClient({ workspaceId, tasks }: Props) {
             <div className="rounded-2xl bg-zinc-950/60 backdrop-blur-xl border border-white/10 p-8 text-center">
                 <XCircle size={32} className="mx-auto text-zinc-700 mb-3" />
                 <p className="text-sm text-zinc-400">Không có task nào đã hủy / lưu trữ.</p>
-                <p className="text-[12px] text-zinc-600 mt-1">
+                <p className="text-[12px] text-muted-foreground mt-1">
                     Task chuyển sang “Đã hủy” sẽ xuất hiện ở đây và có thể khôi phục.
                 </p>
             </div>
@@ -66,16 +66,16 @@ export default function CancelledTasksClient({ workspaceId, tasks }: Props) {
                             <div className="flex-1 min-w-0">
                                 <div className="text-sm font-semibold text-zinc-100 truncate">{t.title}</div>
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] mt-0.5">
-                                    <span className="text-zinc-500 flex items-center gap-1">
+                                    <span className="text-muted-foreground flex items-center gap-1">
                                         <Clock size={10} /> {t.updatedAt?.slice(0, 10) ?? '—'}
                                     </span>
                                     {t.clientName && (
-                                        <span className="text-zinc-500 flex items-center gap-1">
+                                        <span className="text-muted-foreground flex items-center gap-1">
                                             <Building2 size={10} /> {t.clientName}
                                         </span>
                                     )}
                                     {t.assigneeName && (
-                                        <span className="text-zinc-500 flex items-center gap-1">
+                                        <span className="text-muted-foreground flex items-center gap-1">
                                             <User size={10} /> {t.assigneeName}
                                         </span>
                                     )}

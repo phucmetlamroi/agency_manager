@@ -866,9 +866,9 @@ function ReviewPlayerShellInner({
         >
           {uploadDragOver && (
             <div className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-black/60 backdrop-blur-sm">
-              <div className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-indigo-400 px-8 py-6 text-center">
-                <UploadCloud className="h-9 w-9 text-indigo-200" />
-                <p className="text-sm font-medium text-indigo-100">
+              <div className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-primary px-8 py-6 text-center">
+                <UploadCloud className="h-9 w-9 text-primary-accent" />
+                <p className="text-sm font-medium text-primary-accent">
                   Thả để tạo v
                   {data.versions.reduce(
                     (m, v) => Math.max(m, v.versionNumber),
@@ -1085,7 +1085,7 @@ function InfoTab({
           <ol className="relative space-y-2 pl-3">
             {history.map((h) => (
               <li key={h.id} className="relative text-sm">
-                <span className="absolute -left-3 top-1.5 h-1.5 w-1.5 rounded-full bg-indigo-400/70" />
+                <span className="absolute -left-3 top-1.5 h-1.5 w-1.5 rounded-full bg-primary/70" />
                 <div className="text-white/85">
                   {h.label}
                   {h.versionNumber != null && (

@@ -123,7 +123,7 @@ export default function SignupPage() {
                     </Link>
                     <div>
                         <h1 className="text-2xl font-extrabold text-zinc-100 tracking-tight">Tạo tài khoản</h1>
-                        <p className="text-xs text-zinc-500">Hustly<span className="text-violet-400 font-semibold">Tasker</span> · Miễn phí, đầy đủ tính năng</p>
+                        <p className="text-xs text-muted-foreground">Hustly<span className="text-violet-400 font-semibold">Tasker</span> · Miễn phí, đầy đủ tính năng</p>
                     </div>
                 </div>
 
@@ -144,7 +144,7 @@ export default function SignupPage() {
                 <GoogleSignInButton label="Đăng ký với Google" />
                 <div className="flex items-center gap-3 my-4">
                     <div className="flex-1 h-px bg-white/10" />
-                    <span className="text-xs text-zinc-500 font-medium">hoặc</span>
+                    <span className="text-xs text-muted-foreground font-medium">hoặc</span>
                     <div className="flex-1 h-px bg-white/10" />
                 </div>
 
@@ -153,7 +153,7 @@ export default function SignupPage() {
                     <div>
                         <label className="block text-xs font-medium text-zinc-400 mb-1.5">Tên hiển thị</label>
                         <div className="relative">
-                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
                                 type="text"
                                 autoComplete="name"
@@ -172,10 +172,10 @@ export default function SignupPage() {
                     {/* [Username Handle] Username (handle) */}
                     <div>
                         <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                            Username <span className="text-zinc-600">· @handle dùng để mời / login</span>
+                            Username <span className="text-muted-foreground">· @handle dùng để mời / login</span>
                         </label>
                         <div className="relative">
-                            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10 pointer-events-none" />
+                            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10 pointer-events-none" />
                             <div className="pl-7">
                                 <UsernameInput
                                     value={username}
@@ -193,7 +193,7 @@ export default function SignupPage() {
                     <div>
                         <label className="block text-xs font-medium text-zinc-400 mb-1.5">Email</label>
                         <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
                                 type="email"
                                 autoComplete="email"
@@ -213,7 +213,7 @@ export default function SignupPage() {
                     <div>
                         <label className="block text-xs font-medium text-zinc-400 mb-1.5">Mật khẩu (≥ 12 ký tự)</label>
                         <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
                                 type={showPwd ? 'text' : 'password'}
                                 autoComplete="new-password"
@@ -292,7 +292,7 @@ export default function SignupPage() {
 
                     {/* Diagnostic: hiển thị lý do disabled khi user đã fill các field cơ bản */}
                     {!canSubmit && !isPending && displayName && email && (
-                        <div className="text-xs text-zinc-500 text-center space-y-0.5">
+                        <div className="text-xs text-muted-foreground text-center space-y-0.5">
                             {!lengthOk && (
                                 <p>⚠️ Mật khẩu cần ≥12 ký tự (hiện: {password.length})</p>
                             )}
@@ -302,7 +302,7 @@ export default function SignupPage() {
                         </div>
                     )}
 
-                    <p className="text-center text-xs text-zinc-500 mt-2">
+                    <p className="text-center text-xs text-muted-foreground mt-2">
                         Đã có tài khoản?{' '}
                         <Link href="/login" className="text-violet-400 hover:text-violet-300">
                             Đăng nhập

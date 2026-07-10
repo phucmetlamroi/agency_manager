@@ -114,11 +114,11 @@ export default function MobileTaskCard({
                 <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
                                 {taskTypeLabel(task.type) || 'TASK'}
                             </span>
                             {clientLabel && (
-                                <span className="text-[10px] uppercase font-medium text-indigo-400 tracking-wide truncate">
+                                <span className="text-[10px] uppercase font-medium text-primary-accent tracking-wide truncate">
                                     · {clientLabel}
                                 </span>
                             )}
@@ -134,7 +134,7 @@ export default function MobileTaskCard({
                             <Popover.Trigger asChild>
                                 <button
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex-shrink-0 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors"
+                                    className="flex-shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors"
                                     aria-label="Thao tác nhanh"
                                 >
                                     <MoreVertical className="w-4 h-4" />
@@ -177,7 +177,7 @@ export default function MobileTaskCard({
                     </div>
 
                     {task.deadline && (
-                        <div className={`flex items-center gap-1 text-[11px] ${isOverdue ? 'text-red-400 font-bold' : 'text-zinc-500'}`}>
+                        <div className={`flex items-center gap-1 text-[11px] ${isOverdue ? 'text-red-400 font-bold' : 'text-muted-foreground'}`}>
                             <Clock className="w-3 h-3" />
                             <span className="font-mono">
                                 {new Date(task.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
@@ -197,7 +197,7 @@ export default function MobileTaskCard({
                             </span>
                         ) : (
                             task.assignee && (
-                                <span className="text-xs text-zinc-500 truncate">
+                                <span className="text-xs text-muted-foreground truncate">
                                     {(task.assignee as any).displayName?.trim() || `@${task.assignee.username}`}
                                 </span>
                             )
@@ -212,7 +212,7 @@ export default function MobileTaskCard({
                                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20'
                                 : primaryActionStatus === 'Revision'
                                     ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/20'
-                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                                    : 'bg-primary hover:bg-primary text-white shadow-lg shadow-primary/20'
                                 }`}
                         >
                             {primaryActionStatus === 'Hoàn tất' ? (

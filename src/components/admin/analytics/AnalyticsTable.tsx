@@ -113,7 +113,7 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
           return (
             <div className="text-center flex justify-center">
                <Link href={`/${workspaceId}/admin/analytics/staff/${row.id}`} onClick={e => e.stopPropagation()}>
-                 <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors border border-indigo-500/20 text-xs font-semibold">
+                 <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary-accent rounded-lg transition-colors border border-primary/20 text-xs font-semibold">
                    <Eye className="w-3.5 h-3.5" /> Chi tiết
                  </div>
                </Link>
@@ -160,12 +160,12 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
             placeholder="Tìm nhân sự..."
             value={globalFilter ?? ''}
             onChange={e => setGlobalFilter(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 w-64 outline-none"
+            className="bg-zinc-950 border border-zinc-800 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block p-2 w-64 outline-none"
           />
         </div>
         <div className="overflow-x-auto flex-1 custom-scrollbar">
           <table className="w-full text-sm text-left text-zinc-400">
-            <thead className="text-xs text-zinc-500 uppercase bg-zinc-950/50 border-b border-zinc-800 sticky top-0 z-10 backdrop-blur-md">
+            <thead className="text-xs text-muted-foreground uppercase bg-zinc-950/50 border-b border-zinc-800 sticky top-0 z-10 backdrop-blur-md">
               {table.getHeaderGroups().map(headerGroup => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map(header => (
@@ -176,7 +176,7 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
                     >
                       <div className="flex items-center gap-1 cursor-pointer justify-center">
                         {flexRender(header.column.columnDef.header, header.getContext())}
-                        <span className="text-zinc-600">
+                        <span className="text-muted-foreground">
                           {{ asc: ' ▲', desc: ' ▼' }[header.column.getIsSorted() as string] ?? null}
                         </span>
                       </div>
@@ -190,7 +190,7 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
                 <tr 
                   key={row.id} 
                   onClick={() => loadDetails(row.original.id)}
-                  className={`border-b border-zinc-800/50 cursor-pointer transition-all duration-200 ${selectedUserId === row.original.id ? 'bg-indigo-950/30 border-indigo-500/30 shadow-[inset_4px_0_0_0_rgba(99,102,241,1)]' : 'hover:bg-zinc-900/50 bg-transparent'}`}
+                  className={`border-b border-zinc-800/50 cursor-pointer transition-all duration-200 ${selectedUserId === row.original.id ? 'bg-primary/30 border-primary/30 shadow-[inset_4px_0_0_0_rgba(99,102,241,1)]' : 'hover:bg-zinc-900/50 bg-transparent'}`}
                 >
                   {row.getVisibleCells().map(cell => (
                     <td key={cell.id} className="px-6 py-4">
@@ -201,7 +201,7 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
               ))}
               {table.getRowModel().rows.length === 0 && (
                   <tr>
-                    <td colSpan={columns.length} className="px-6 py-8 text-center text-zinc-500">
+                    <td colSpan={columns.length} className="px-6 py-8 text-center text-muted-foreground">
                       Chưa có dữ liệu thống kê trong tháng này.
                     </td>
                   </tr>
@@ -218,7 +218,7 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
                   <h3 className="font-bold text-red-500 flex items-center gap-2">
                       <span className="text-lg">📈</span> Hồ Sơ Vi Phạm
                   </h3>
-                  <button onClick={() => setSelectedUserId(null)} className="text-zinc-500 hover:text-white transition-colors bg-zinc-900/50 rounded-full w-8 h-8 flex items-center justify-center">✕</button>
+                  <button onClick={() => setSelectedUserId(null)} className="text-muted-foreground hover:text-white transition-colors bg-zinc-900/50 rounded-full w-8 h-8 flex items-center justify-center">✕</button>
               </div>
               <div className="p-4 flex-1 overflow-y-auto custom-scrollbar bg-gradient-to-b from-red-950/5 to-transparent">
                   {loadingDetails ? (
@@ -246,13 +246,13 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
                                                 </span>
                                             )}
                                             {!hasError && (
-                                                <span className="text-[10px] text-zinc-600 uppercase font-bold tracking-tighter">Sạch lỗi</span>
+                                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Sạch lỗi</span>
                                             )}
                                         </div>
-                                        <p className={`text-xs mb-3 leading-relaxed ${hasError ? 'text-zinc-300' : 'text-zinc-500'}`}>{err.description}</p>
+                                        <p className={`text-xs mb-3 leading-relaxed ${hasError ? 'text-zinc-300' : 'text-muted-foreground'}`}>{err.description}</p>
                                         <div className={`flex justify-between items-center text-xs border-t pt-3 mt-1 ${hasError ? 'border-red-900/20' : 'border-zinc-800/50'}`}>
-                                            <span className="text-zinc-500 uppercase tracking-wider text-[10px]">Tần suất mắc lỗi</span>
-                                            <span className={`px-2 py-1 rounded font-bold ${hasError ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                                            <span className="text-muted-foreground uppercase tracking-wider text-[10px]">Tần suất mắc lỗi</span>
+                                            <span className={`px-2 py-1 rounded font-bold ${hasError ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-muted-foreground'}`}>
                                                 {err.totalFrequency} lần
                                             </span>
                                         </div>
@@ -264,7 +264,7 @@ export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalyt
                       <div className="text-center py-16 flex flex-col items-center justify-center">
                           <span className="text-4xl mb-4">🏆</span>
                           <p className="text-zinc-400 font-medium">Không có lỗi nào được ghi nhận.</p>
-                          <p className="text-zinc-600 text-sm mt-1">Nhân sự xuất sắc!</p>
+                          <p className="text-muted-foreground text-sm mt-1">Nhân sự xuất sắc!</p>
                       </div>
                   )}
               </div>

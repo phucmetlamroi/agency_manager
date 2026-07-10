@@ -427,7 +427,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     </div>
 
                     <div className="px-5 pt-4 pb-3 border-b border-zinc-700 space-y-3">
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Cấu hình</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Cấu hình</p>
                         <div className="flex gap-3">
                             <div className="flex-1 bg-zinc-900/50 rounded-xl border border-zinc-700 px-3 py-2 flex items-center gap-2">
                                 <span className="text-[11px] font-semibold text-zinc-400 whitespace-nowrap">Thuế %</span>
@@ -484,9 +484,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
 
                     <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 custom-scrollbar">
                         {isLoading ? (
-                            <div className="flex justify-center mt-10"><Loader2 className="animate-spin text-zinc-500" size={28} /></div>
+                            <div className="flex justify-center mt-10"><Loader2 className="animate-spin text-muted-foreground" size={28} /></div>
                         ) : tasks.length === 0 ? (
-                            <p className="text-sm text-zinc-500 text-center mt-10 italic">Không có task chưa xuất hóa đơn.</p>
+                            <p className="text-sm text-muted-foreground text-center mt-10 italic">Không có task chưa xuất hóa đơn.</p>
                         ) : (
                             <Accordion type="multiple" defaultValue={Object.keys(groupedTasks)} className="space-y-2">
                                 {Object.entries(groupedTasks).map(([brand, brandTasks]) => (
@@ -494,7 +494,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                         <AccordionTrigger className="px-4 py-2.5 hover:no-underline hover:bg-zinc-700/30 transition-colors">
                                             <div className="flex justify-between items-center w-full mr-2">
                                                 <span className="font-bold text-sm text-zinc-200">{brand}</span>
-                                                <span className="text-[11px] text-zinc-500 font-normal bg-zinc-800 px-2 py-0.5 rounded-full">{brandTasks.length} task</span>
+                                                <span className="text-[11px] text-muted-foreground font-normal bg-zinc-800 px-2 py-0.5 rounded-full">{brandTasks.length} task</span>
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent className="px-3 pb-3 pt-0">
@@ -511,7 +511,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                                             </div>
                                                             <div className="flex flex-col min-w-0">
                                                                  <div className="text-xs font-semibold text-zinc-200 truncate">{task.title}</div>
-                                                                <div className="text-[10px] text-zinc-500 mt-0.5">{new Date(task.createdAt).toLocaleDateString('vi-VN')}</div>
+                                                                <div className="text-[10px] text-muted-foreground mt-0.5">{new Date(task.createdAt).toLocaleDateString('vi-VN')}</div>
                                                             </div>
                                                         </div>
                                                         <div className="text-xs font-bold text-emerald-400 whitespace-nowrap ml-2 shrink-0">
@@ -533,7 +533,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                                 setEditingItemId(newItem.id)
                                 setEditForm({ description: newItem.description, unitPrice: 0, quantity: 1 })
                             }}
-                            className="w-full py-2.5 border border-dashed border-zinc-700 rounded-xl text-sm text-zinc-500 hover:border-violet-500/50 hover:text-violet-400 hover:bg-violet-500/5 flex items-center justify-center gap-2 transition-all"
+                            className="w-full py-2.5 border border-dashed border-zinc-700 rounded-xl text-sm text-muted-foreground hover:border-violet-500/50 hover:text-violet-400 hover:bg-violet-500/5 flex items-center justify-center gap-2 transition-all"
                         >
                             <Plus size={14} /> Thêm hạng mục thủ công
                         </button>
@@ -542,7 +542,7 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     <div className="px-5 py-5 border-t border-zinc-700 bg-zinc-800 space-y-4 shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.1)]">
                         <div className="space-y-3">
                             <div className="flex justify-between items-center px-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Hồ sơ thanh toán</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Hồ sơ thanh toán</label>
                                 <BillingProfileManager
                                     currentProfileId={billingProfileId}
                                     workspaceId={workspaceId}
@@ -581,9 +581,9 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                     <div className="h-12 border-b border-zinc-800 flex items-center px-6 gap-4 shrink-0">
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Xem trước trực tiếp</span>
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Xem trước trực tiếp</span>
                         </div>
-                        <span className="ml-auto text-[11px] text-zinc-600 font-mono">{invoiceNumber}</span>
+                        <span className="ml-auto text-[11px] text-muted-foreground font-mono">{invoiceNumber}</span>
                     </div>
 
                     <div className="flex-1 overflow-y-auto py-8 px-10 flex items-start justify-center custom-scrollbar bg-zinc-950">

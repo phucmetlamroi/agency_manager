@@ -134,7 +134,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:mb-8">
                 <div>
                     <h2 className="title-gradient text-2xl sm:text-3xl m-0 font-extrabold tracking-tight">Bảng lương & Thu nhập</h2>
-                    <p className="text-zinc-500 mt-2 text-sm">
+                    <p className="text-muted-foreground mt-2 text-sm">
                         Workspace: <span className="text-white font-semibold">{workspace?.name}</span> · Tính trên các task đã "{SALARY_COMPLETED_STATUS}".
                     </p>
                 </div>
@@ -179,7 +179,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
                 ))}
 
                 {serializedUsers.length === 0 && (
-                    <div className="text-center py-12 text-zinc-500">
+                    <div className="text-center py-12 text-muted-foreground">
                         Không có dữ liệu lương trong tháng này.
                     </div>
                 )}

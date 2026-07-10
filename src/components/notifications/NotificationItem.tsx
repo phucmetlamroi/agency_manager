@@ -18,7 +18,7 @@ interface Props {
 const TYPE_ICON: Record<string, { icon: any; color: string; bg: string }> = {
     TASK_ASSIGNED:         { icon: ClipboardList,  color: 'text-violet-400',  bg: 'bg-violet-500/15' },
     TASK_UNASSIGNED:       { icon: ClipboardList,  color: 'text-zinc-400',    bg: 'bg-zinc-500/15' },
-    TASK_STATUS_CHANGED:   { icon: ClipboardList,  color: 'text-indigo-400',  bg: 'bg-indigo-500/15' },
+    TASK_STATUS_CHANGED:   { icon: ClipboardList,  color: 'text-primary-accent',  bg: 'bg-primary/15' },
     TASK_DEADLINE_APPROACHING: { icon: Clock,      color: 'text-amber-400',   bg: 'bg-amber-500/15' },
     TASK_OVERDUE:          { icon: AlertTriangle,  color: 'text-red-400',     bg: 'bg-red-500/15' },
     TASK_COMMENT:          { icon: MessageSquare,  color: 'text-violet-400',  bg: 'bg-violet-500/15' },
@@ -152,7 +152,7 @@ export function NotificationItem({ notification, onLocalUpdate, onLocalRemove, o
                     <span className={`text-[12px] truncate ${notification.isRead ? 'text-zinc-300 font-medium' : 'text-white font-bold'}`}>
                         {notification.title}
                     </span>
-                    <span className="text-[10px] text-zinc-600 shrink-0">{formatTime(notification.createdAt)}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">{formatTime(notification.createdAt)}</span>
                 </div>
                 <div className="text-[11px] text-zinc-400 line-clamp-2 mt-0.5">
                     {notification.body}

@@ -330,7 +330,7 @@ export function CommentComposer({
                                 <Clock className="h-3 w-3 shrink-0" />
                                 <span className="font-mono tabular-nums">{smpte(shownFrame)}</span>
                                 {rangeOut != null && rangeOut > shownFrame && (
-                                    <span className="font-mono tabular-nums text-indigo-200/80"> – {smpte(clampFrame(rangeOut))}</span>
+                                    <span className="font-mono tabular-nums text-primary-accent/80"> – {smpte(clampFrame(rangeOut))}</span>
                                 )}
                                 {!annoActive && (
                                     <button
@@ -426,7 +426,7 @@ export function CommentComposer({
                     >
                         <PenLine className="h-4 w-4" />
                         {annoActive && annoCount > 0 && (
-                            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-white px-1 text-[10px] font-bold text-indigo-600">
+                            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-white px-1 text-[10px] font-bold text-primary-accent">
                                 {annoCount}
                             </span>
                         )}

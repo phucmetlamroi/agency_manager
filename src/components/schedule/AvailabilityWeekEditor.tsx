@@ -169,16 +169,16 @@ export default function AvailabilityWeekEditor({ workspaceId, days, activeTool }
                             <div 
                                 key={day.dateKey}
                                 className={`sticky top-0 z-20 border-b border-r border-slate-800 h-16 flex flex-col items-center justify-center transition-colors
-                                    ${isToday ? 'bg-indigo-600/10' : 'bg-slate-900'}
+                                    ${isToday ? 'bg-primary/10' : 'bg-slate-900'}
                                 `}
                             >
-                                <span className={`text-[10px] uppercase tracking-tighter ${isToday ? 'text-indigo-400' : 'text-slate-500'}`}>
+                                <span className={`text-[10px] uppercase tracking-tighter ${isToday ? 'text-primary-accent' : 'text-slate-500'}`}>
                                     {weekday}
                                 </span>
                                 <span className={`text-sm font-bold ${isToday ? 'text-white' : 'text-slate-200'}`}>
                                     {dayMonth}
                                 </span>
-                                {isToday && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />}
+                                {isToday && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary shadow-[0_0_10px_rgba(99,102,241,0.5)]" />}
                             </div>
                         )
                     })}
@@ -206,7 +206,7 @@ export default function AvailabilityWeekEditor({ workspaceId, days, activeTool }
                                         className={`relative border-b border-r border-slate-800/40 h-12 transition-all duration-75 select-none
                                             ${locked ? 'bg-slate-950/80 cursor-not-allowed' : 'cursor-crosshair hover:bg-slate-800/30'}
                                             ${selected ? STATUS_ACTIVE_CLASS[activeTool] : STATUS_CLASS[status]}
-                                            ${isCurrentHour ? 'after:content-[""] after:absolute after:inset-0 after:ring-1 after:ring-indigo-500/50 after:bg-indigo-500/5' : ''}
+                                            ${isCurrentHour ? 'after:content-[""] after:absolute after:inset-0 after:ring-1 after:ring-primary/50 after:bg-primary/5' : ''}
                                         `}
                                     >
                                         {/* Status Text overlay for clarity if needed, or just color */}
@@ -229,7 +229,7 @@ export default function AvailabilityWeekEditor({ workspaceId, days, activeTool }
                     <button
                         onClick={handleSave}
                         disabled={isPending}
-                        className="flex items-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold shadow-2xl shadow-indigo-600/40 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
+                        className="flex items-center gap-3 px-8 py-4 bg-primary hover:bg-primary text-white rounded-2xl font-bold shadow-2xl shadow-primary/40 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
                     >
                         {isPending ? (
                             <Loader2 className="w-5 h-5 animate-spin" />

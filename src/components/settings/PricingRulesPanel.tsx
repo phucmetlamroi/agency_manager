@@ -116,9 +116,9 @@ export default function PricingRulesPanel({ workspaceId, rules, clients }: Props
             {/* Rules list */}
             {rules.length === 0 ? (
                 <div className="rounded-2xl bg-zinc-950/60 backdrop-blur-xl border border-white/5 p-8 text-center">
-                    <Layers size={32} className="mx-auto text-zinc-600 mb-3" />
+                    <Layers size={32} className="mx-auto text-muted-foreground mb-3" />
                     <p className="text-sm text-zinc-400 mb-1">Chưa có pricing rule nào.</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-muted-foreground">
                         Tạo rule đầu tiên để Velox có thể tự động tính giá task.
                     </p>
                 </div>
@@ -149,7 +149,7 @@ export default function PricingRulesPanel({ workspaceId, rules, clients }: Props
                                                         Mặc định
                                                     </span>
                                                 )}
-                                                <span className="text-[11px] text-zinc-500">
+                                                <span className="text-[11px] text-muted-foreground">
                                                     {meta.label}
                                                 </span>
                                             </div>
@@ -236,20 +236,20 @@ function ConfigPreview({ ruleType, config }: { ruleType: string; config: any }) 
     switch (ruleType) {
         case 'flat':
             return (
-                <p className="text-[11px] text-zinc-500 mt-1.5">
+                <p className="text-[11px] text-muted-foreground mt-1.5">
                     ${config.priceUSD} · {Number(config.wageVND ?? 0).toLocaleString('vi-VN')} VND/video
                 </p>
             )
         case 'per_minute':
             return (
-                <p className="text-[11px] text-zinc-500 mt-1.5">
+                <p className="text-[11px] text-muted-foreground mt-1.5">
                     ${config.ratePerMinuteUSD}/phút · {Number(config.wagePerMinuteVND ?? 0).toLocaleString('vi-VN')} VND/phút
                     {config.minimumUSD ? ` · min $${config.minimumUSD}` : ''}
                 </p>
             )
         case 'tiered_duration':
             return (
-                <p className="text-[11px] text-zinc-500 mt-1.5">
+                <p className="text-[11px] text-muted-foreground mt-1.5">
                     {(config.tiers ?? []).length} bậc · max {(config.tiers?.[config.tiers.length - 1]?.maxSeconds ?? 0)}s
                 </p>
             )
@@ -560,7 +560,7 @@ function TieredConfigForm({ config, onChange }: { config: any; onChange: (c: any
 
     return (
         <div className="space-y-2">
-            <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-zinc-500 font-bold px-1">
+            <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-muted-foreground font-bold px-1">
                 <div className="col-span-3">≤ Giây</div>
                 <div className="col-span-4">USD</div>
                 <div className="col-span-4">VND</div>

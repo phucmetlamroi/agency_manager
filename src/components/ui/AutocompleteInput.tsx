@@ -88,7 +88,7 @@ export function AutocompleteInput({
                 </div>
                 <input
                     ref={inputRef}
-                    className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] pl-9 pr-9 text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+                    className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] pl-9 pr-9 text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
                     placeholder={placeholder}
                     value={displayValue}
                     onChange={(e) => {
@@ -140,7 +140,7 @@ export function AutocompleteInput({
                                     setIsSearching(false)
                                     setQuery('')
                                 }}
-                                className="w-full text-left px-4 py-2.5 text-[13px] text-zinc-500 hover:bg-white/[0.06] transition-colors"
+                                className="w-full text-left px-4 py-2.5 text-[13px] text-muted-foreground hover:bg-white/[0.06] transition-colors"
                             >
                                 {emptyLabel}
                             </button>
@@ -164,8 +164,8 @@ export function AutocompleteInput({
                                 >
                                     {o.parentLabel ? (
                                         <>
-                                            <span className="text-zinc-500">{o.parentLabel}</span>
-                                            <span className="text-zinc-600 mx-1">/</span>
+                                            <span className="text-muted-foreground">{o.parentLabel}</span>
+                                            <span className="text-muted-foreground mx-1">/</span>
                                             <span>{o.label}</span>
                                         </>
                                     ) : (
@@ -174,7 +174,7 @@ export function AutocompleteInput({
                                 </button>
                             ))
                         ) : (
-                            <div className="px-4 py-3 text-[13px] text-zinc-600">Không có kết quả</div>
+                            <div className="px-4 py-3 text-[13px] text-muted-foreground">Không có kết quả</div>
                         )}
                     </motion.div>
                 )}

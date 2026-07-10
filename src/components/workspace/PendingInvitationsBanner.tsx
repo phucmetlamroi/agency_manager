@@ -84,8 +84,8 @@ export default function PendingInvitationsBanner() {
                 exit={{ opacity: 0, y: -10 }}
                 className="mb-4"
             >
-                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-bold text-indigo-400">
+                <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-bold text-primary-accent">
                         <Sparkles className="w-4 h-4" strokeWidth={2} />
                         Lời mời tham gia Workspace ({invitations.length})
                     </div>
@@ -95,14 +95,14 @@ export default function PendingInvitationsBanner() {
                             key={inv.id}
                             className="bg-zinc-900/40 border border-white/5 rounded-xl p-3 flex items-center gap-3 flex-wrap"
                         >
-                            <div className="w-9 h-9 rounded-lg bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                                <Mail className="w-4 h-4 text-indigo-400" strokeWidth={1.5} />
+                            <div className="w-9 h-9 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
+                                <Mail className="w-4 h-4 text-primary-accent" strokeWidth={1.5} />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="text-sm font-semibold text-zinc-100">
                                     {inv.workspace.name}
                                 </div>
-                                <div className="text-[11px] text-zinc-500">
+                                <div className="text-[11px] text-muted-foreground">
                                     Mời bởi {inv.invitedBy.nickname || inv.invitedBy.username} · Vai trò: {roleLabel(inv.role)}
                                 </div>
                             </div>
@@ -122,7 +122,7 @@ export default function PendingInvitationsBanner() {
                                 <button
                                     onClick={() => handleAccept(inv.id)}
                                     disabled={actionLoading === inv.id}
-                                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 shadow-lg shadow-indigo-500/20"
+                                    className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 shadow-lg shadow-primary/20"
                                 >
                                     {actionLoading === inv.id ? (
                                         <Loader2 className="w-3 h-3 animate-spin" />

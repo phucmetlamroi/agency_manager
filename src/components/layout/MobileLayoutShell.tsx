@@ -41,11 +41,11 @@ export default function MobileLayoutShell({
                         className="relative cursor-pointer group"
                         aria-label="Mở menu người dùng"
                     >
-                        <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/10 group-hover:ring-indigo-500/50 transition-all duration-300 shadow-md shadow-indigo-500/20 bg-zinc-900">
+                        <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/10 group-hover:ring-primary/50 transition-all duration-300 shadow-md shadow-primary/20 bg-zinc-900">
                             {user.avatarUrl ? (
                                 <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
                             ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-xs text-white">
+                                <div className="w-full h-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center font-bold text-xs text-white">
                                     {user.username?.[0]?.toUpperCase()}
                                 </div>
                             )}
@@ -84,17 +84,17 @@ export default function MobileLayoutShell({
                         </button>
 
                         <div className="flex flex-col items-center mt-8 mb-8">
-                            <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center mb-4 shadow-xl shadow-indigo-500/30 ring-4 ring-indigo-500/20 bg-zinc-900">
+                            <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center mb-4 shadow-xl shadow-primary/30 ring-4 ring-primary/20 bg-zinc-900">
                                 {user.avatarUrl ? (
                                     <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-black text-white">
+                                    <div className="w-full h-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-3xl font-black text-white">
                                         {user.username?.[0]?.toUpperCase()}
                                     </div>
                                 )}
                             </div>
                             <h2 className="text-xl font-bold text-zinc-100">{user.username}</h2>
-                            <p className="text-sm text-zinc-500 uppercase tracking-widest font-sans">{roleLabel(user.role)}</p>
+                            <p className="text-sm text-muted-foreground uppercase tracking-widest font-sans">{roleLabel(user.role)}</p>
                         </div>
 
                         <div className="flex-1 flex flex-col gap-2">
@@ -105,7 +105,7 @@ export default function MobileLayoutShell({
                             <Link href={`/${workspaceId}/dashboard/profile`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 flex items-center gap-3 text-zinc-200 border border-white/5">
                                 <UserCircle className="w-4 h-4" /> Hồ sơ
                             </Link>
-                            <Link href={`/api/profile/select`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all duration-300 flex items-center gap-3 border border-indigo-500/20">
+                            <Link href={`/api/profile/select`} onClick={() => setIsDrawerOpen(false)} className="w-full text-left px-4 py-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary-accent transition-all duration-300 flex items-center gap-3 border border-primary/20">
                                 <ArrowLeftRight className="w-4 h-4" /> Chuyển Team / Workspace
                             </Link>
                             {/* Admin-only links */}

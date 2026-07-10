@@ -52,7 +52,7 @@ type Props = {
 
 const ROLE_BADGE: Record<ProfileRole, { color: string; icon: any }> = {
     OWNER: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: Crown },
-    ADMIN: { color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', icon: Shield },
+    ADMIN: { color: 'text-primary-accent bg-primary/10 border-primary/20', icon: Shield },
     USER: { color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/20', icon: Users },
     CLIENT: { color: 'text-violet-400 bg-violet-500/10 border-violet-500/20', icon: Users },
 }
@@ -177,7 +177,7 @@ export default function ProfileMembersPanel({
                                         )}
                                     </div>
                                     {m.user.email && (
-                                        <span className="text-[11px] text-zinc-500 truncate">{m.user.email}</span>
+                                        <span className="text-[11px] text-muted-foreground truncate">{m.user.email}</span>
                                     )}
                                 </div>
                                 <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold ${badge.color}`}>
@@ -199,7 +199,7 @@ export default function ProfileMembersPanel({
                                                 {m.role === 'USER' && (
                                                     <button
                                                         onClick={() => handleRoleChange(m.userId, 'ADMIN')}
-                                                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-white/[0.06] text-indigo-300"
+                                                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-white/[0.06] text-primary-accent"
                                                     >
                                                         <Shield size={13} /> Nâng lên Quản trị
                                                     </button>

@@ -156,7 +156,7 @@ export default function CreateWorkspaceModal({ open, onClose, currentWorkspaceId
                                     </button>
                                     <div className="flex items-center gap-3 my-1 pt-3">
                                         <div className="flex-1 h-px bg-white/5" />
-                                        <span className="text-[10px] text-zinc-600 uppercase tracking-wider">hoặc tạo mới</span>
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">hoặc tạo mới</span>
                                         <div className="flex-1 h-px bg-white/5" />
                                     </div>
                                 </div>
@@ -172,15 +172,15 @@ export default function CreateWorkspaceModal({ open, onClose, currentWorkspaceId
                                     onKeyDown={e => e.key === 'Enter' && !creating && handleCreate()}
                                     placeholder="VD: Marketing Team, Design Squad..."
                                     maxLength={50}
-                                    className="w-full bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                    className="w-full bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-muted-foreground focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
                                     autoFocus
                                 />
-                                <p className="text-[10px] text-zinc-500 mt-1.5">{name.length}/50 ký tự</p>
+                                <p className="text-[10px] text-muted-foreground mt-1.5">{name.length}/50 ký tự</p>
                             </div>
 
                             <div>
                                 <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                                    Mô tả <span className="text-zinc-600">(tuỳ chọn)</span>
+                                    Mô tả <span className="text-muted-foreground">(tuỳ chọn)</span>
                                 </label>
                                 <textarea
                                     value={description}
@@ -188,7 +188,7 @@ export default function CreateWorkspaceModal({ open, onClose, currentWorkspaceId
                                     placeholder="Mô tả ngắn về workspace này..."
                                     rows={3}
                                     maxLength={200}
-                                    className="w-full bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all resize-none"
+                                    className="w-full bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-muted-foreground focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all resize-none"
                                 />
                             </div>
 

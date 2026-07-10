@@ -1204,7 +1204,7 @@ export function TeamBrowser({
                     <h1 className="font-extrabold tracking-tight text-white" style={{ fontSize: 20 }}>
                         {REVIEW_MODULE_LABEL}
                     </h1>
-                    <p className="mt-px text-zinc-500" style={{ fontSize: 12 }}>
+                    <p className="mt-px text-muted-foreground" style={{ fontSize: 12 }}>
                         Trình duyệt bản dựng video — khách duyệt qua link, đồng bộ trạng thái task.
                     </p>
                 </div>
@@ -1214,7 +1214,7 @@ export function TeamBrowser({
             <div className="flex overflow-hidden rounded-2xl border border-white/5 bg-zinc-950/60 shadow-xl shadow-black/40 backdrop-blur-xl">
                 {/* left: ASSETS tree */}
                 <aside className="hidden w-[248px] shrink-0 flex-col border-r border-white/5 bg-black/20 lg:flex">
-                    <div className="flex items-center gap-2 px-4 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                    <div className="flex items-center gap-2 px-4 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                         <Layers size={13} className="text-violet-400/80" />
                         Assets
                     </div>
@@ -1242,7 +1242,7 @@ export function TeamBrowser({
                     <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
                         <BreadcrumbTrail trail={trail} onNavigate={go} />
                         {currentFolder && (
-                            <div className="hidden shrink-0 items-center gap-3 text-[11px] text-zinc-500 sm:flex">
+                            <div className="hidden shrink-0 items-center gap-3 text-[11px] text-muted-foreground sm:flex">
                                 <span>{data?.summary.folderCount ?? 0} thư mục</span>
                                 <span>·</span>
                                 <span>{data?.summary.assetCount ?? 0} video</span>
@@ -1563,7 +1563,7 @@ function BreadcrumbTrail({
     onNavigate: (id: string | null) => void
 }) {
     const COLLAPSE_AFTER = 4
-    const Sep = () => <ChevronRight size={13} className="shrink-0 text-zinc-600" />
+    const Sep = () => <ChevronRight size={13} className="shrink-0 text-muted-foreground" />
     const Crumb = ({ c, last }: { c: { id: string | null; name: string }; last: boolean }) =>
         last ? (
             <span className="truncate font-semibold text-zinc-100" title={c.name}>
@@ -1620,7 +1620,7 @@ function BreadcrumbTrail({
                                 className="flex cursor-pointer items-center gap-2 truncate rounded-lg px-2.5 py-[7px] text-[12.5px] outline-none data-[highlighted]:bg-violet-500/15 data-[highlighted]:text-white"
                                 style={{ paddingLeft: 10 + i * 10 }}
                             >
-                                <FolderIcon size={13} className="shrink-0 text-zinc-500" />
+                                <FolderIcon size={13} className="shrink-0 text-muted-foreground" />
                                 <span className="truncate">{c.name}</span>
                             </DropdownMenu.Item>
                         ))}
@@ -1665,7 +1665,7 @@ function TreeSidebar({
     const roots = childrenOf.get(null) ?? []
     if (roots.length === 0) {
         return (
-            <p className="px-3 py-6 text-center text-[11.5px] leading-relaxed text-zinc-600">
+            <p className="px-3 py-6 text-center text-[11.5px] leading-relaxed text-muted-foreground">
                 Chưa có thư mục nào.
                 <br />
                 Bản dựng tải lên từ task sẽ hiện ở đây.
@@ -1691,7 +1691,7 @@ function TreeSidebar({
                         <button
                             type="button"
                             onClick={() => onToggle(node.id)}
-                            className="flex h-6 w-5 items-center justify-center text-zinc-500 hover:text-zinc-200"
+                            className="flex h-6 w-5 items-center justify-center text-muted-foreground hover:text-zinc-200"
                             aria-label={isOpen ? 'Thu gọn' : 'Mở rộng'}
                         >
                             {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -1705,7 +1705,7 @@ function TreeSidebar({
                         className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left"
                         title={isRoot ? REVIEW_MODULE_LABEL : node.name}
                     >
-                        <FolderIcon size={14} className={selected ? 'shrink-0 text-violet-300' : 'shrink-0 text-zinc-500'} />
+                        <FolderIcon size={14} className={selected ? 'shrink-0 text-violet-300' : 'shrink-0 text-muted-foreground'} />
                         <span className="truncate text-[12.5px]">{isRoot ? REVIEW_MODULE_LABEL : node.name}</span>
                     </button>
                 </div>
@@ -1722,7 +1722,7 @@ function TreeSidebar({
 function Section({ label, count, children }: { label: string; count: number; children: ReactNode }) {
     return (
         <div className="mb-5 last:mb-0">
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {label}
                 <span className="rounded-full bg-white/[0.06] px-1.5 py-px text-[10px] font-medium text-zinc-400">
                     {count}
@@ -1763,7 +1763,7 @@ function PendingFolderTile({ name }: { name: string }) {
                     <div className="truncate text-[13px] font-medium text-zinc-100" title={name}>
                         {name}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-zinc-500">
+                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
                         <Loader2 size={11} className="animate-spin" /> Đang tạo…
                     </div>
                 </div>
@@ -1829,7 +1829,7 @@ function EmptyState({ atRoot, onUpload, onNewFolder }: { atRoot: boolean; onUplo
                 <p className="text-[14px] font-medium text-zinc-200">
                     {atRoot ? 'Chưa có asset nào trong workspace này' : 'Thư mục trống'}
                 </p>
-                <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
+                <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-muted-foreground">
                     {atRoot
                         ? 'Upload video từ khối BÀN GIAO của task để hệ thống tự tạo thư mục theo khách hàng, hoặc kéo thả file vào đây.'
                         : 'Kéo thả file vào đây, hoặc dùng nút “+ Mới” để tải lên.'}

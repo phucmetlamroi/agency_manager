@@ -58,7 +58,7 @@ export default function ProfileSwitcher({
             disabled={loading}
             value={currentProfileId || ''} 
             onChange={handleChange}
-            className="text-xs py-1.5 px-2 rounded-md bg-neutral-900 border border-neutral-700 text-neutral-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 min-w-[120px]"
+            className="text-xs py-1.5 px-2 rounded-md bg-neutral-900 border border-neutral-700 text-neutral-300 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 min-w-[120px]"
         >
             <option value="">-- Chưa gán Team --</option>
             {profiles.map(p => (

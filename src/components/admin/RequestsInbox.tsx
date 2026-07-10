@@ -66,15 +66,15 @@ export default function RequestsInbox({ workspaceId, initialRequests }: {
             <div className="flex flex-col items-center justify-center gap-4 py-20 text-center"
                 style={{ borderRadius: 20, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div className="relative">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500/25 to-violet-500/10 blur-2xl absolute inset-0" />
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/25 to-violet-500/10 blur-2xl absolute inset-0" />
                     <div className="relative w-24 h-24 rounded-full flex items-center justify-center"
                         style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(99,102,241,0.06))', border: '1px solid rgba(99,102,241,0.25)' }}>
-                        <Sparkles className="w-7 h-7 text-indigo-300" />
+                        <Sparkles className="w-7 h-7 text-primary-accent" />
                     </div>
                 </div>
                 <div>
                     <h3 className="text-lg font-bold text-zinc-100">Chưa có yêu cầu nào</h3>
-                    <p className="text-zinc-500 text-sm max-w-xs mt-1">Khi khách hàng gửi yêu cầu qua portal, nó sẽ xuất hiện ở đây để bạn duyệt.</p>
+                    <p className="text-muted-foreground text-sm max-w-xs mt-1">Khi khách hàng gửi yêu cầu qua portal, nó sẽ xuất hiện ở đây để bạn duyệt.</p>
                 </div>
             </div>
         )
@@ -96,9 +96,9 @@ export default function RequestsInbox({ workspaceId, initialRequests }: {
                                         <span className="font-bold text-white" style={{ fontSize: 15 }}>{r.title}</span>
                                         <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.04em', color: '#A5B4FC', background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 999, padding: '2px 8px' }}>MỚI</span>
                                     </div>
-                                    <div className="text-zinc-500 mt-1" style={{ fontSize: 12.5 }}>{r.clientName ?? 'Khách hàng'}</div>
+                                    <div className="text-muted-foreground mt-1" style={{ fontSize: 12.5 }}>{r.clientName ?? 'Khách hàng'}</div>
                                 </div>
-                                <div className="flex items-center gap-1.5 flex-shrink-0 text-zinc-500" style={{ fontSize: 11.5 }}>
+                                <div className="flex items-center gap-1.5 flex-shrink-0 text-muted-foreground" style={{ fontSize: 11.5 }}>
                                     <Clock className="w-3.5 h-3.5" /> {fmt(r.createdAt)}
                                 </div>
                             </div>

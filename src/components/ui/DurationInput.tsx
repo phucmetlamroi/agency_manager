@@ -116,7 +116,7 @@ export function DurationInput({ value, onChange, disabled = false }: DurationInp
 
             {/* Parse preview hint */}
             {isEditing && rawInput && (
-                <p className={`text-[10px] font-medium ${parsed?.valid ? 'text-emerald-400' : 'text-zinc-600'}`}>
+                <p className={`text-[10px] font-medium ${parsed?.valid ? 'text-emerald-400' : 'text-muted-foreground'}`}>
                     {parsed?.valid ? `= ${parsed.display}` : 'Định dạng: 1p30s, 45s, 2p'}
                 </p>
             )}

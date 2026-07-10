@@ -56,7 +56,7 @@ const STATUS_BUTTON_CONFIG: Record<string, {
 }
 
 const VARIANT_STYLES: Record<string, string> = {
-    primary: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20',
+    primary: 'bg-primary hover:bg-primary text-white shadow-lg shadow-primary/20',
     success: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20',
     warning: 'bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-600/20',
     neutral: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-white/10',
@@ -160,12 +160,12 @@ export function TaskDrawer({
                                         <User className="w-4 h-4" /> Người làm
                                     </h4>
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold border border-indigo-500/30">
+                                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary-accent font-bold border border-primary/30">
                                             {((task.assignee?.displayName?.trim() || task.assignee?.username))?.[0]?.toUpperCase() || '?'}
                                         </div>
                                         <div>
                                             <p className="text-white font-medium">{(task.assignee?.displayName?.trim() || task.assignee?.username) ?? 'Chưa giao'}</p>
-                                            <p className="text-xs text-zinc-500">
+                                            <p className="text-xs text-muted-foreground">
                                                 {task.assignee ? 'Nhân viên' : 'Chạm "Trả lại" để đẩy về chợ task'}
                                             </p>
                                         </div>
@@ -225,7 +225,7 @@ export function TaskDrawer({
                                         </span>
                                         <button
                                             onClick={() => setShowAssignPicker(false)}
-                                            className="text-xs text-zinc-500 hover:text-zinc-300"
+                                            className="text-xs text-muted-foreground hover:text-zinc-300"
                                         >
                                             Đóng
                                         </button>
@@ -238,7 +238,7 @@ export function TaskDrawer({
                                                 onClick={() => handleAssign(u.id)}
                                                 className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 active:bg-white/10 transition-colors text-left disabled:opacity-50"
                                             >
-                                                <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 text-xs font-bold">
+                                                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary-accent text-xs font-bold">
                                                     {((u.displayName?.trim() || u.username))[0]?.toUpperCase()}
                                                 </div>
                                                 <span className="text-sm text-zinc-100">
@@ -254,7 +254,7 @@ export function TaskDrawer({
                             {canAssign && !showAssignPicker && (
                                 <button
                                     onClick={() => setShowAssignPicker(true)}
-                                    className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                    className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-primary hover:bg-primary text-white shadow-lg shadow-primary/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                 >
                                     <UserPlus className="w-4 h-4" />
                                     Giao cho thành viên

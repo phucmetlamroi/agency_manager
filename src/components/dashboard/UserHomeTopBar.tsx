@@ -34,7 +34,7 @@ const GRADIENT_POOL = [
     "from-emerald-500 to-cyan-500",
     "from-amber-500 to-red-500",
     "from-pink-500 to-rose-500",
-    "from-sky-500 to-indigo-500",
+    "from-sky-500 to-primary",
 ]
 
 /**

@@ -94,10 +94,10 @@ export default function WelcomeClient({ profileName, canCreateWorkspace = false 
                                 className="w-20 h-20 rounded-full bg-zinc-800/40 border border-zinc-700/60 flex items-center justify-center mx-auto mb-4"
                                 aria-label="Tạo workspace bị khóa"
                             >
-                                <Lock className="w-8 h-8 text-zinc-500" strokeWidth={1.8} />
+                                <Lock className="w-8 h-8 text-muted-foreground" strokeWidth={1.8} />
                             </div>
 
-                            <p className="text-xs text-zinc-500 font-medium">
+                            <p className="text-xs text-muted-foreground font-medium">
                                 Chỉ chủ Profile mới có quyền tạo workspace.
                             </p>
                         </>
@@ -108,7 +108,7 @@ export default function WelcomeClient({ profileName, canCreateWorkspace = false 
                 <div className="mt-6 text-center">
                     <a
                         href="/api/auth/logout"
-                        className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-zinc-300 transition-colors"
                     >
                         <LogOut size={12} />
                         Đăng xuất

@@ -70,12 +70,12 @@ function SortableSegmentRow({
             <button
                 {...attributes}
                 {...listeners}
-                className="text-zinc-600 hover:text-zinc-400 cursor-grab active:cursor-grabbing transition-colors"
+                className="text-muted-foreground hover:text-zinc-400 cursor-grab active:cursor-grabbing transition-colors"
             >
                 <GripVertical className="w-4 h-4" />
             </button>
 
-            <span className="text-xs text-zinc-600 w-4 text-center font-mono">{index + 1}</span>
+            <span className="text-xs text-muted-foreground w-4 text-center font-mono">{index + 1}</span>
 
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colors.bg} border ${colors.border}`}>
                 {createElement(getIcon(segment.icon), { className: `w-4 h-4 ${colors.text}` })}
@@ -83,14 +83,14 @@ function SortableSegmentRow({
 
             <span className="flex-1 text-sm text-zinc-300 font-medium">{segment.label}</span>
 
-            <span className="text-xs text-zinc-600 font-mono hidden sm:block truncate max-w-[160px]">
+            <span className="text-xs text-muted-foreground font-mono hidden sm:block truncate max-w-[160px]">
                 {segment.path ? segment.path.replace('[workspaceId]', '...') : 'Chưa gán'}
             </span>
 
             {canRemove && (
                 <button
                     onClick={() => onRemove(segment.id)}
-                    className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all p-1 rounded-lg hover:bg-red-400/10"
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all p-1 rounded-lg hover:bg-red-400/10"
                 >
                     <X className="w-3.5 h-3.5" />
                 </button>
@@ -130,7 +130,7 @@ function RouteRow({
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-zinc-300">{label}</p>
-                <p className="text-[10px] text-zinc-600 font-mono truncate">
+                <p className="text-[10px] text-muted-foreground font-mono truncate">
                     {path.replace('[workspaceId]', '...')}
                 </p>
             </div>
@@ -140,7 +140,7 @@ function RouteRow({
                 className={`flex-shrink-0 p-1 rounded-lg transition-all
                     ${isAdded || disabled
                         ? 'text-zinc-700 cursor-not-allowed'
-                        : 'text-zinc-500 hover:text-violet-400 hover:bg-violet-400/10 cursor-pointer'
+                        : 'text-muted-foreground hover:text-violet-400 hover:bg-violet-400/10 cursor-pointer'
                     }`}
             >
                 <Plus className="w-3.5 h-3.5" />
@@ -254,7 +254,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                             onClick={e => e.stopPropagation()}
                         >
                             <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full blur-[100px] opacity-15 pointer-events-none bg-violet-500" />
-                            <div className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full blur-[80px] opacity-10 pointer-events-none bg-indigo-500" />
+                            <div className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full blur-[80px] opacity-10 pointer-events-none bg-primary" />
 
                             <div className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-white/8">
                                 <div className="flex items-center gap-3">
@@ -263,14 +263,14 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                     </div>
                                     <div>
                                         <h2 className="text-sm font-semibold text-zinc-100">Điều hướng nhanh</h2>
-                                        <p className="text-xs text-zinc-500">6 ô radial, ô nào chưa gán sẽ hiện &quot;Trống&quot;</p>
+                                        <p className="text-xs text-muted-foreground">6 ô radial, ô nào chưa gán sẽ hiện &quot;Trống&quot;</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs text-zinc-600 font-mono">Ctrl+Shift+K</span>
+                                    <span className="text-xs text-muted-foreground font-mono">Ctrl+Shift+K</span>
                                     <button
                                         onClick={() => handleOpenChange(false)}
-                                        className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors"
+                                        className="p-1.5 rounded-lg text-muted-foreground hover:text-zinc-300 hover:bg-white/5 transition-colors"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
@@ -304,7 +304,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                                 6 slot hiện tại
                                             </p>
                                             <div className="flex items-center gap-1.5">
-                                                <span className={`text-xs font-mono ${atMax ? 'text-amber-400' : 'text-zinc-600'}`}>
+                                                <span className={`text-xs font-mono ${atMax ? 'text-amber-400' : 'text-muted-foreground'}`}>
                                                     {assignedCount}/{RADIAL_SLOT_COUNT}
                                                 </span>
                                             </div>
@@ -337,7 +337,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                                 <DragOverlay>
                                                     {activeSegment && (
                                                         <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-900/90 border border-violet-500/30 shadow-xl shadow-violet-500/10">
-                                                            <GripVertical className="w-4 h-4 text-zinc-500" />
+                                                            <GripVertical className="w-4 h-4 text-muted-foreground" />
                                                             <span className="text-sm text-zinc-200 font-medium">{activeSegment.label}</span>
                                                         </div>
                                                     )}
@@ -357,7 +357,7 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                             <div className="relative z-10 flex items-center justify-between px-6 py-4 border-t border-white/8">
                                 <button
                                     onClick={handleReset}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-zinc-500 hover:text-zinc-300
+                                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-muted-foreground hover:text-zinc-300
                                         hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
                                 >
                                     <RotateCcw className="w-3.5 h-3.5" />
@@ -375,9 +375,9 @@ export function RadialConfigModal({ open, onOpenChange, config, onSave, availabl
                                     <button
                                         onClick={handleSave}
                                         className="px-4 py-2 rounded-xl text-xs font-semibold text-white
-                                            bg-gradient-to-r from-violet-600 to-indigo-600
+                                            bg-gradient-to-r from-violet-600 to-primary
                                             shadow-lg shadow-violet-500/20
-                                            hover:from-violet-500 hover:to-indigo-500
+                                            hover:from-violet-500 hover:to-primary
                                             flex items-center gap-1.5 transition-all active:scale-95"
                                     >
                                         <Save className="w-3.5 h-3.5" />

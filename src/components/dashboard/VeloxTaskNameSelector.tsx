@@ -68,12 +68,12 @@ export default function VeloxTaskNameSelector({
                 </select>
                 <ChevronDown
                     size={12}
-                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500"
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 />
             </div>
 
             <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase text-zinc-500">Xem trước</p>
+                <p className="text-[10px] font-bold uppercase text-muted-foreground">Xem trước</p>
                 {preview.map((name, i) => (
                     <div
                         key={i}
@@ -83,7 +83,7 @@ export default function VeloxTaskNameSelector({
                     </div>
                 ))}
                 {mainItems.length > 3 && (
-                    <p className="text-[10px] text-zinc-500 italic">
+                    <p className="text-[10px] text-muted-foreground italic">
                         +{mainItems.length - 3} task khác sẽ được đổi tên theo cùng định dạng.
                     </p>
                 )}

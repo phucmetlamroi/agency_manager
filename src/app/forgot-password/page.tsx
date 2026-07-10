@@ -55,7 +55,7 @@ export default function ForgotPasswordPage() {
                                 <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-colors ${
                                     isDone ? 'bg-emerald-500/20 text-emerald-400' :
                                     isActive ? 'bg-violet-500/30 text-violet-300 ring-2 ring-violet-500/50' :
-                                    'bg-zinc-800/50 text-zinc-500'
+                                    'bg-zinc-800/50 text-muted-foreground'
                                 }`}>
                                     {isDone ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
                                 </div>
@@ -207,7 +207,7 @@ export default function ForgotPasswordPage() {
                             <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
                             <h2 className="text-xl font-bold text-zinc-100 mb-2">Đã cập nhật!</h2>
                             <p className="text-sm text-zinc-400 mb-1">Mật khẩu của bạn đã được thay đổi thành công.</p>
-                            <p className="text-xs text-zinc-500">Đang chuyển đến trang đăng nhập...</p>
+                            <p className="text-xs text-muted-foreground">Đang chuyển đến trang đăng nhập...</p>
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -239,7 +239,7 @@ function StepEmail({ email, setEmail, isPending, onSubmit }: {
             <div>
                 <label className="block text-xs font-medium text-zinc-400 mb-1.5">Email</label>
                 <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
                         type="email"
                         autoComplete="email"
@@ -373,7 +373,7 @@ function StepOtp({ email, isPending, onVerify, onResend, onBack }: {
                     type="button"
                     onClick={() => { onResend(); setResendCooldown(60) }}
                     disabled={resendCooldown > 0 || isPending}
-                    className="text-violet-400 hover:text-violet-300 disabled:text-zinc-600 transition-colors flex items-center gap-1"
+                    className="text-violet-400 hover:text-violet-300 disabled:text-muted-foreground transition-colors flex items-center gap-1"
                 >
                     <RefreshCw className="w-3 h-3" />
                     {resendCooldown > 0 ? `Gửi lại (${resendCooldown}s)` : 'Gửi lại mã'}
@@ -412,7 +412,7 @@ function StepPassword({ isPending, onSubmit }: {
             <div>
                 <label className="block text-xs font-medium text-zinc-400 mb-1.5">Mật khẩu mới</label>
                 <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
                         type={showPwd ? 'text' : 'password'}
                         autoComplete="new-password"
@@ -429,7 +429,7 @@ function StepPassword({ isPending, onSubmit }: {
                         {showPwd ? 'Ẩn' : 'Hiện'}
                     </button>
                 </div>
-                <p className={`text-xs mt-1 ${lengthOk ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                <p className={`text-xs mt-1 ${lengthOk ? 'text-emerald-400' : 'text-muted-foreground'}`}>
                     {lengthOk ? '✓' : '○'} Tối thiểu 12 ký tự
                 </p>
             </div>
@@ -437,7 +437,7 @@ function StepPassword({ isPending, onSubmit }: {
             <div>
                 <label className="block text-xs font-medium text-zinc-400 mb-1.5">Xác nhận mật khẩu</label>
                 <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
                         type={showPwd ? 'text' : 'password'}
                         autoComplete="new-password"

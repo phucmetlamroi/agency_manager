@@ -87,7 +87,7 @@ export function SharesTable({ workspaceId }: { workspaceId: string }) {
                         <ArrowLeft size={16} />
                     </a>
                     <h1 className="text-[15px] font-semibold">Link chia sẻ</h1>
-                    {items && <span className="text-[12px] text-zinc-500">{items.length} link</span>}
+                    {items && <span className="text-[12px] text-muted-foreground">{items.length} link</span>}
                     <div className="flex-1" />
                     <div className="flex gap-1">
                         {(['all', 'active', 'revoked', 'expired'] as const).map((k) => (
@@ -120,13 +120,13 @@ export function SharesTable({ workspaceId }: { workspaceId: string }) {
                     </div>
                 ) : !items ? (
                     <div className="grid h-48 place-items-center">
-                        <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
                 ) : items.length === 0 ? (
                     <div className="mt-14 text-center">
                         <Link2 className="mx-auto h-8 w-8 text-zinc-700" />
                         <p className="mt-2 text-[13.5px] font-medium text-zinc-300">Chưa có link chia sẻ nào</p>
-                        <p className="mt-1 text-[12px] text-zinc-500">
+                        <p className="mt-1 text-[12px] text-muted-foreground">
                             Tạo link từ menu chuột phải trên asset, hoặc từ khối BÀN GIAO của task.
                         </p>
                     </div>
@@ -134,7 +134,7 @@ export function SharesTable({ workspaceId }: { workspaceId: string }) {
                     <div className="mt-4 overflow-x-auto rounded-2xl border border-white/[0.07]">
                         <table className="w-full min-w-[760px] text-left text-[12.5px]">
                             <thead>
-                                <tr className="border-b border-white/[0.07] text-[11px] uppercase tracking-wide text-zinc-500">
+                                <tr className="border-b border-white/[0.07] text-[11px] uppercase tracking-wide text-muted-foreground">
                                     <th className="px-3.5 py-2.5 font-medium">Tên</th>
                                     <th className="px-3.5 py-2.5 font-medium">Đích</th>
                                     <th className="px-3.5 py-2.5 font-medium">Trạng thái</th>
@@ -163,7 +163,7 @@ export function SharesTable({ workspaceId }: { workspaceId: string }) {
                                             </td>
                                             <td className="px-3.5 py-2.5 text-zinc-300" title={s.lastViewedAt ? `Xem lần cuối: ${fmtDate(s.lastViewedAt)}` : undefined}>
                                                 <span className="inline-flex items-center gap-1">
-                                                    <Eye size={12} className="text-zinc-500" /> {s.viewCount}
+                                                    <Eye size={12} className="text-muted-foreground" /> {s.viewCount}
                                                 </span>
                                             </td>
                                             <td className="px-3.5 py-2.5 text-zinc-400">{fmtDate(s.createdAt)}</td>

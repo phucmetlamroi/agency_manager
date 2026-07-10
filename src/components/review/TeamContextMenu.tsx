@@ -78,7 +78,7 @@ function Sep() {
     return <ContextMenu.Separator className="my-1 h-px bg-white/[0.07]" />
 }
 
-const SOON = <span className="rounded bg-white/[0.06] px-1.5 py-px text-[9.5px] font-medium uppercase tracking-wide text-zinc-500">bản sau</span>
+const SOON = <span className="rounded bg-white/[0.06] px-1.5 py-px text-[9.5px] font-medium uppercase tracking-wide text-muted-foreground">bản sau</span>
 
 export interface ItemMenuHandlers {
     onDownload: () => void

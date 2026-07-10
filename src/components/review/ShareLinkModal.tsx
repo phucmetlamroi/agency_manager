@@ -180,18 +180,18 @@ export function ShareLinkModal({
                 </p>
 
                 <label className="mt-3.5 block">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Tên link</span>
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tên link</span>
                     <input
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         maxLength={200}
-                        className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900/50 px-3 py-2 text-[13px] text-white placeholder:text-zinc-600 focus:border-violet-400/50 focus:outline-none"
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900/50 px-3 py-2 text-[13px] text-white placeholder:text-muted-foreground focus:border-violet-400/50 focus:outline-none"
                         placeholder="Tên hiển thị nội bộ…"
                     />
                 </label>
 
                 <div className="mt-3.5">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Quyền</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Quyền</p>
                     <div className="mt-1.5 space-y-1.5">
                         <Toggle label="Cho phép bình luận" checked={allowComments} onChange={setAllowComments} />
                         <Toggle label="Cho phép tải xuống" checked={allowDownload} onChange={setAllowDownload} />
@@ -205,7 +205,7 @@ export function ShareLinkModal({
                 </div>
 
                 <div className="mt-3.5">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Bảo mật</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Bảo mật</p>
                     <div className="mt-1.5 flex gap-2">
                         <input
                             type="password"
@@ -221,7 +221,7 @@ export function ShareLinkModal({
                                       ? 'Đang có mật khẩu — nhập để đổi'
                                       : 'Đặt mật khẩu…'
                             }
-                            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-900/50 px-3 py-2 text-[13px] text-white placeholder:text-zinc-600 focus:border-violet-400/50 focus:outline-none"
+                            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-900/50 px-3 py-2 text-[13px] text-white placeholder:text-muted-foreground focus:border-violet-400/50 focus:outline-none"
                         />
                         {(share ?? existing)?.hasPassword && !removePassword && (
                             <button
@@ -264,7 +264,7 @@ export function ShareLinkModal({
 
                 {/* URL row */}
                 <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/40 px-3 py-2">
-                    <Link2 size={14} className="shrink-0 text-zinc-500" />
+                    <Link2 size={14} className="shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-zinc-300">
                         {share ? share.url.replace(/^https?:\/\//, '') : 'Link sẽ hiện sau khi tạo'}
                     </span>

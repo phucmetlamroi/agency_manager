@@ -47,7 +47,7 @@ function FullScreenDropZone() {
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="absolute inset-0 bg-gradient-to-b from-indigo-950/20 via-indigo-950/30 to-indigo-950/50"
+                className="absolute inset-0 bg-gradient-to-b from-primary/20 via-primary/30 to-primary/50"
             />
 
             {/* ── Pulsing edge glow (viewport border) ── */}
@@ -69,25 +69,25 @@ function FullScreenDropZone() {
                 <motion.div
                     animate={{ x: ['-100%', '100%'] }}
                     transition={{ repeat: Infinity, duration: 3, ease: 'linear' }}
-                    className="absolute top-0 left-0 w-1/3 h-[2px] bg-gradient-to-r from-transparent via-indigo-400/60 to-transparent"
+                    className="absolute top-0 left-0 w-1/3 h-[2px] bg-gradient-to-r from-transparent via-primary/60 to-transparent"
                 />
                 {/* Bottom edge */}
                 <motion.div
                     animate={{ x: ['100%', '-100%'] }}
                     transition={{ repeat: Infinity, duration: 3, ease: 'linear' }}
-                    className="absolute bottom-0 right-0 w-1/3 h-[2px] bg-gradient-to-r from-transparent via-indigo-400/60 to-transparent"
+                    className="absolute bottom-0 right-0 w-1/3 h-[2px] bg-gradient-to-r from-transparent via-primary/60 to-transparent"
                 />
                 {/* Left edge */}
                 <motion.div
                     animate={{ y: ['-100%', '100%'] }}
                     transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}
-                    className="absolute top-0 left-0 w-[2px] h-1/3 bg-gradient-to-b from-transparent via-indigo-400/40 to-transparent"
+                    className="absolute top-0 left-0 w-[2px] h-1/3 bg-gradient-to-b from-transparent via-primary/40 to-transparent"
                 />
                 {/* Right edge */}
                 <motion.div
                     animate={{ y: ['100%', '-100%'] }}
                     transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}
-                    className="absolute top-0 right-0 w-[2px] h-1/3 bg-gradient-to-b from-transparent via-indigo-400/40 to-transparent"
+                    className="absolute top-0 right-0 w-[2px] h-1/3 bg-gradient-to-b from-transparent via-primary/40 to-transparent"
                 />
             </div>
 
@@ -112,7 +112,7 @@ function FullScreenDropZone() {
                             ],
                         }}
                         transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
-                        className="flex items-center gap-4 px-10 py-5 rounded-2xl bg-indigo-950/85 border-2 border-dashed backdrop-blur-2xl"
+                        className="flex items-center gap-4 px-10 py-5 rounded-2xl bg-primary/85 border-2 border-dashed backdrop-blur-2xl"
                     >
                         <motion.div
                             animate={{
@@ -120,16 +120,16 @@ function FullScreenDropZone() {
                                 scale: [1, 1.12, 1],
                             }}
                             transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
-                            className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center"
+                            className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center"
                         >
-                            <Download className="w-5 h-5 text-indigo-400" strokeWidth={2} />
+                            <Download className="w-5 h-5 text-primary-accent" strokeWidth={2} />
                         </motion.div>
                         <div>
-                            <p className="text-base font-extrabold text-indigo-300 uppercase tracking-widest">
+                            <p className="text-base font-extrabold text-primary-accent uppercase tracking-widest">
                                 Thả ra để nhận task
                             </p>
-                            <p className="text-[11px] text-indigo-400/60 mt-0.5 font-medium">
-                                Nhả chuột ở bất kỳ đâu · Nhấn <kbd className="px-1.5 py-0.5 bg-indigo-500/15 rounded text-indigo-300/80 text-[10px] border border-indigo-500/20">Esc</kbd> để hủy
+                            <p className="text-[11px] text-primary-accent/60 mt-0.5 font-medium">
+                                Nhả chuột ở bất kỳ đâu · Nhấn <kbd className="px-1.5 py-0.5 bg-primary/15 rounded text-primary-accent/80 text-[10px] border border-primary/20">Esc</kbd> để hủy
                             </p>
                         </div>
                         <motion.div
@@ -322,11 +322,11 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                                 </motion.div>
                                             ) : null}
                                         </div>
-                                        <p className="text-xs text-zinc-500 mt-0.5 font-medium">
+                                        <p className="text-xs text-muted-foreground mt-0.5 font-medium">
                                             <span className="text-amber-400/80 font-bold">{tasks.length}</span>
                                             <span className="mx-1.5">task khả dụng</span>
-                                            <span className="text-zinc-600">·</span>
-                                            <span className="text-zinc-600 ml-1.5 italic">
+                                            <span className="text-muted-foreground">·</span>
+                                            <span className="text-muted-foreground ml-1.5 italic">
                                                 {activeTask ? '🎯 Thả ở bất kỳ đâu để nhận task' : 'Kéo thẻ ra để nhận'}
                                             </span>
                                         </p>
@@ -340,7 +340,7 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                         transition={{ duration: 0.35 }}
                                         onClick={fetchTasks}
                                         disabled={loading}
-                                        className="p-2.5 hover:bg-white/5 rounded-xl transition-colors text-zinc-500 hover:text-zinc-300 disabled:opacity-40"
+                                        className="p-2.5 hover:bg-white/5 rounded-xl transition-colors text-muted-foreground hover:text-zinc-300 disabled:opacity-40"
                                         title="Làm mới"
                                     >
                                         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.5} />
@@ -349,7 +349,7 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                         whileHover={{ scale: 1.1 }}
                                         whileTap={{ scale: 0.9 }}
                                         onClick={onClose}
-                                        className="p-2.5 hover:bg-white/5 rounded-xl transition-colors text-zinc-500 hover:text-zinc-300"
+                                        className="p-2.5 hover:bg-white/5 rounded-xl transition-colors text-muted-foreground hover:text-zinc-300"
                                     >
                                         <X className="w-5 h-5" strokeWidth={1.5} />
                                     </motion.button>
@@ -384,7 +384,7 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                         <h3 className="text-xl font-extrabold text-zinc-200 tracking-tight">
                                             Phiên chợ hiện đang đóng
                                         </h3>
-                                        <p className="text-sm text-zinc-500 mt-3 max-w-[320px] leading-relaxed">
+                                        <p className="text-sm text-muted-foreground mt-3 max-w-[320px] leading-relaxed">
                                             Admin chưa mở phiên chợ. Vui lòng chờ admin mở nhé!
                                         </p>
                                         <div className="mt-6 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/8 border border-red-500/15">
@@ -402,7 +402,7 @@ export function TaskMarketplace({ isOpen, onClose, workspaceId, onTaskCountChang
                                             <Sparkles className="w-8 h-8 text-emerald-400/70" strokeWidth={1.5} />
                                         </motion.div>
                                         <h3 className="text-lg font-extrabold text-zinc-300 tracking-tight">Chợ đang trống!</h3>
-                                        <p className="text-sm text-zinc-600 mt-2 max-w-[260px] leading-relaxed">
+                                        <p className="text-sm text-muted-foreground mt-2 max-w-[260px] leading-relaxed">
                                             Tất cả task đã được nhận. Quay lại sau nhé.
                                         </p>
                                     </div>

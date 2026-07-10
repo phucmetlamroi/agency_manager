@@ -168,7 +168,7 @@ export default function ConnectorsPanel({ workspaceId, integrations }: Props) {
                                         </div>
                                         <p className="text-xs text-zinc-400 mt-1">{provider.description}</p>
                                         {isConnected && integration.accountEmail && (
-                                            <p className="text-[11px] text-zinc-500 mt-2">
+                                            <p className="text-[11px] text-muted-foreground mt-2">
                                                 Kết nối với tài khoản <span className="text-zinc-300">{integration.accountEmail}</span>
                                             </p>
                                         )}

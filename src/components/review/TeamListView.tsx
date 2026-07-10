@@ -47,7 +47,7 @@ function Thumb({ asset }: { asset: AssetDto }) {
                     className="h-full w-full object-cover"
                 />
             ) : (
-                <div className="grid h-full w-full place-items-center text-zinc-600">
+                <div className="grid h-full w-full place-items-center text-muted-foreground">
                     {asset.mediaKind === 'image' ? <ImageIcon size={14} /> : <Film size={14} />}
                 </div>
             )}
@@ -120,7 +120,7 @@ export function TeamListView({
         <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] border-collapse text-left">
                 <thead>
-                    <tr className="border-b border-white/10 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    <tr className="border-b border-white/10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                         <th className="w-9 px-3 py-2">
                             <button
                                 type="button"
@@ -182,12 +182,12 @@ export function TeamListView({
                                     )}
                                 </div>
                             </td>
-                            <td className="px-3 py-2 text-zinc-600">—</td>
+                            <td className="px-3 py-2 text-muted-foreground">—</td>
                             <td className="px-3 py-2 text-zinc-400">{formatDate(f.createdAt)}</td>
                             <td className="px-3 py-2 text-zinc-400">{f.createdBy?.name ?? '—'}</td>
-                            <td className="px-3 py-2 text-right text-zinc-600">—</td>
+                            <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                             <td className="px-3 py-2 text-right tabular-nums text-zinc-400">{bytesLabel(f.totalBytes)}</td>
-                            <td className="px-3 py-2 text-right text-zinc-600">—</td>
+                            <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                         </tr>
                     ))}
                     {assets.map((a) => {

@@ -27,7 +27,7 @@ export default function PrivacyPage() {
                         </div>
                         <h1 className="text-3xl font-bold text-zinc-100">Chính sách bảo mật</h1>
                     </div>
-                    <p className="text-sm text-zinc-500 mb-8 ml-13">Cập nhật lần cuối: 08/05/2026</p>
+                    <p className="text-sm text-muted-foreground mb-8 ml-13">Cập nhật lần cuối: 08/05/2026</p>
 
                     <div className="space-y-6 text-zinc-300 text-sm leading-relaxed">
 

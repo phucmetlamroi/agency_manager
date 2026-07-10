@@ -48,7 +48,7 @@ export default function ProfileTrashClient({ workspaceId, profiles }: Props) {
             <div className="rounded-2xl bg-zinc-950/60 backdrop-blur-xl border border-[rgba(139,92,246,0.15)] p-8 text-center">
                 <Trash2 size={32} className="mx-auto text-zinc-700 mb-3" />
                 <p className="text-sm text-zinc-400">Không có tổ chức nào trong thùng rác.</p>
-                <p className="text-[12px] text-zinc-600 mt-1">Tổ chức đã xóa sẽ xuất hiện ở đây.</p>
+                <p className="text-[12px] text-muted-foreground mt-1">Tổ chức đã xóa sẽ xuất hiện ở đây.</p>
             </div>
         )
     }
@@ -67,7 +67,7 @@ export default function ProfileTrashClient({ workspaceId, profiles }: Props) {
                             <div className="flex-1 min-w-0">
                                 <div className="text-sm font-semibold text-zinc-100 truncate">{p.name}</div>
                                 <div className="flex items-center gap-3 text-[11px] mt-0.5">
-                                    <span className="text-zinc-500 flex items-center gap-1">
+                                    <span className="text-muted-foreground flex items-center gap-1">
                                         <Clock size={10} /> Xóa {p.deletedAt?.slice(0, 10)}
                                     </span>
                                     <span className={isExpiringSoon ? 'text-red-300 flex items-center gap-1 font-semibold' : 'text-amber-400 flex items-center gap-1'}>

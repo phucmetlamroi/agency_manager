@@ -121,7 +121,7 @@ export default function CrossTeamManager({ userId, currentProfileId, profiles, a
                     <button 
                         onClick={handleRequest}
                         disabled={!selectedTarget || isSubmitting}
-                        className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white p-1 rounded transition-colors"
+                        className="bg-primary hover:bg-primary disabled:opacity-50 text-white p-1 rounded transition-colors"
                         title="Gửi yêu cầu du học"
                     >
                         <Send className="w-3 h-3" />

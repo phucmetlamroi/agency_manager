@@ -33,14 +33,14 @@ export function HookVariantPanel({
                     </span>
                     <span className="pb-0.5 text-sm font-medium text-zinc-400">biến thể</span>
                 </div>
-                <p className="mt-1 text-[11px] leading-snug text-zinc-500">
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
                     Mỗi đường đi qua sơ đồ là một video phải dựng.
                 </p>
             </div>
 
             <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
                 {readout.count === 0 ? (
-                    <div className="mx-1.5 mt-2 rounded-xl border border-dashed border-white/10 px-3 py-5 text-center text-[11.5px] leading-relaxed text-zinc-500">
+                    <div className="mx-1.5 mt-2 rounded-xl border border-dashed border-white/10 px-3 py-5 text-center text-[11.5px] leading-relaxed text-muted-foreground">
                         Chưa có biến thể nào.
                         <br />
                         Thêm block rồi nối chúng lại để tạo đường đi.
@@ -57,7 +57,7 @@ export function HookVariantPanel({
                                     onBlur={() => onHoverPath(null)}
                                     className="group flex w-full items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:border-violet-400/30 hover:bg-violet-500/10"
                                 >
-                                    <span className="w-5 shrink-0 text-[10px] font-semibold tabular-nums text-zinc-600 group-hover:text-violet-300">
+                                    <span className="w-5 shrink-0 text-[10px] font-semibold tabular-nums text-muted-foreground group-hover:text-violet-300">
                                         {String(i + 1).padStart(2, '0')}
                                     </span>
                                     <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5">
@@ -65,7 +65,7 @@ export function HookVariantPanel({
                                             const b = byId.get(bid)
                                             return (
                                                 <span key={bid} className="inline-flex items-center gap-1">
-                                                    {k > 0 && <span className="text-zinc-600">›</span>}
+                                                    {k > 0 && <span className="text-muted-foreground">›</span>}
                                                     <span
                                                         className="h-1.5 w-1.5 shrink-0 rounded-full"
                                                         style={{ background: tagHex(b?.tag) }}
@@ -78,7 +78,7 @@ export function HookVariantPanel({
                                         })}
                                     </span>
                                     {p.runtimeSec > 0 && (
-                                        <span className="shrink-0 text-[10px] tabular-nums text-zinc-500">
+                                        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
                                             {formatTimecode(p.runtimeSec)}
                                         </span>
                                     )}

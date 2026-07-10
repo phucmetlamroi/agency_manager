@@ -120,7 +120,7 @@ export function StatusControl({
                             trailing={<ChevronDown size={10} className="shrink-0 opacity-70" />}
                         />
                     ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-white/15 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-500 hover:border-white/25 hover:text-zinc-300">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-white/15 px-1.5 py-0.5 text-[10.5px] font-medium text-muted-foreground hover:border-white/25 hover:text-zinc-300">
                             <Plus size={10} /> Trạng thái
                         </span>
                     )}
@@ -136,7 +136,7 @@ export function StatusControl({
                     style={{ fontFamily: "var(--font-sans), 'Plus Jakarta Sans', sans-serif" }}
                 >
                     <div className="flex items-center gap-1.5 border-b border-white/[0.07] px-2.5 py-2">
-                        <Search size={13} className="shrink-0 text-zinc-500" />
+                        <Search size={13} className="shrink-0 text-muted-foreground" />
                         <input
                             ref={searchRef}
                             value={query}
@@ -147,7 +147,7 @@ export function StatusControl({
                                 if (e.key === 'Escape') setOpen(false)
                             }}
                             placeholder="Tìm trạng thái…"
-                            className="w-full bg-transparent text-[12.5px] text-zinc-100 placeholder:text-zinc-600 outline-none"
+                            className="w-full bg-transparent text-[12.5px] text-zinc-100 placeholder:text-muted-foreground outline-none"
                         />
                     </div>
                     <div className="max-h-[260px] overflow-y-auto p-1">
@@ -162,13 +162,13 @@ export function StatusControl({
                             </button>
                         )}
                         {loading ? (
-                            <div className="flex items-center gap-2 px-2.5 py-3 text-[12px] text-zinc-500">
+                            <div className="flex items-center gap-2 px-2.5 py-3 text-[12px] text-muted-foreground">
                                 <Loader2 size={13} className="animate-spin" /> Đang tải…
                             </div>
                         ) : error ? (
                             <div className="px-2.5 py-3 text-[12px] text-red-300/90">Không tải được danh sách trạng thái.</div>
                         ) : filtered.length === 0 ? (
-                            <div className="px-2.5 py-3 text-[12px] text-zinc-500">Không có trạng thái khớp.</div>
+                            <div className="px-2.5 py-3 text-[12px] text-muted-foreground">Không có trạng thái khớp.</div>
                         ) : (
                             filtered.map((o) => {
                                 const c = statusColor(o.value)

@@ -157,7 +157,7 @@ export function TagRadialMenu({ isOpen, origin, tags, selectedTagIds, onToggle, 
             >
                 {/* Center dot (CSS @keyframes pulse — scale + opacity only) */}
                 <div
-                    className="rounded-full bg-indigo-400"
+                    className="rounded-full bg-primary"
                     style={{
                         position: 'absolute',
                         width: 12,
@@ -229,9 +229,9 @@ export function TagRadialMenu({ isOpen, origin, tags, selectedTagIds, onToggle, 
                             className={[
                                 'absolute flex items-center justify-center rounded-full border-2 radial-petal-hitbox',
                                 isSelected
-                                    ? 'bg-indigo-500/40 border-indigo-400 shadow-lg shadow-indigo-500/40'
+                                    ? 'bg-primary/40 border-primary shadow-lg shadow-primary/40'
                                     : isHovered
-                                        ? 'bg-indigo-500/20 border-indigo-400/50 shadow-md shadow-indigo-500/10'
+                                        ? 'bg-primary/20 border-primary/50 shadow-md shadow-primary/10'
                                         : hasTag
                                             ? 'bg-zinc-900/70 border-white/10 hover:border-white/25 hover:bg-zinc-800/70'
                                             : 'bg-zinc-900/30 border-white/5 cursor-default',
@@ -256,7 +256,7 @@ export function TagRadialMenu({ isOpen, origin, tags, selectedTagIds, onToggle, 
                             }}
                         >
                             <span className={`text-[10px] font-bold text-center leading-tight px-1 transition-colors ${
-                                isSelected || isHovered ? 'text-indigo-100' : hasTag ? 'text-zinc-200' : 'text-zinc-600'
+                                isSelected || isHovered ? 'text-primary-accent' : hasTag ? 'text-zinc-200' : 'text-muted-foreground'
                             }`}>
                                 {tag?.name || 'Trống'}
                             </span>

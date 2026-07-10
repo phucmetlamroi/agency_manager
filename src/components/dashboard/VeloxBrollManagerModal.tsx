@@ -150,7 +150,7 @@ export default function VeloxBrollManagerModal({
                         <div className="flex-1 overflow-auto custom-scrollbar px-6 py-4">
                             <table className="w-full text-[11px] border-collapse">
                                 <thead className="sticky top-0 bg-zinc-950/95 backdrop-blur z-10">
-                                    <tr className="text-[10px] font-bold uppercase text-zinc-500">
+                                    <tr className="text-[10px] font-bold uppercase text-muted-foreground">
                                         <th className="text-left px-2 py-2 border-b border-white/5">Task</th>
                                         <th className="text-left px-2 py-2 border-b border-white/5">Chung ({generalFolderUrls.length})</th>
                                         <th className="text-left px-2 py-2 border-b border-white/5">Theo video ({perVideoFolderUrls.length})</th>
@@ -165,7 +165,7 @@ export default function VeloxBrollManagerModal({
                                                 <td className="px-2 py-2 text-zinc-200 font-medium align-top max-w-[200px]">
                                                     <div className="truncate">{getTaskLabel(m)}</div>
                                                     {m.videoIndex && (
-                                                        <div className="text-[10px] text-zinc-500">
+                                                        <div className="text-[10px] text-muted-foreground">
                                                             Video #{m.videoIndex}
                                                         </div>
                                                     )}
@@ -208,7 +208,7 @@ export default function VeloxBrollManagerModal({
                                                 </td>
                                                 <td className="px-2 py-2 align-top">
                                                     {looseFileUrls.length > 5 ? (
-                                                        <div className="text-[10px] text-zinc-500 italic">
+                                                        <div className="text-[10px] text-muted-foreground italic">
                                                             {looseFileUrls.length} file — tick 5 cái đầu hoặc bỏ qua
                                                         </div>
                                                     ) : null}

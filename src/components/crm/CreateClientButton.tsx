@@ -56,7 +56,7 @@ export default function CreateClientButton({ partners, workspaceId }: { partners
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border-0">
+                <Button className="bg-gradient-to-r from-purple-600 to-primary hover:from-purple-500 hover:to-primary text-white border-0">
                     + Thêm Khách
                 </Button>
             </DialogTrigger>

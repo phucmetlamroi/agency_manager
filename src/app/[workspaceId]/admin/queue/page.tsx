@@ -89,7 +89,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                         <h1 className="font-extrabold text-white tracking-tight" style={{ fontSize: 20 }}>
                             Kho Task Đợi
                         </h1>
-                        <p className="text-zinc-500 mt-px" style={{ fontSize: 12 }}>
+                        <p className="text-muted-foreground mt-px" style={{ fontSize: 12 }}>
                             Danh sách các công việc chờ xử lí/phân công. Vui lòng phân công cho nhân viên.
                         </p>
                     </div>
@@ -170,7 +170,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                     }}
                 >
                     <div className="flex items-center gap-2">
-                        <ListChecks className="w-4 h-4 text-zinc-500" />
+                        <ListChecks className="w-4 h-4 text-muted-foreground" />
                         <span className="font-bold text-white" style={{ fontSize: 13 }}>
                             Danh sách chờ phân công
                         </span>
@@ -180,7 +180,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                             {/* Type count badges */}
                             {shortForm > 0 && (
                                 <span
-                                    className="font-semibold text-zinc-500"
+                                    className="font-semibold text-muted-foreground"
                                     style={{
                                         fontSize: 11,
                                         padding: '4px 10px',
@@ -194,7 +194,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                             )}
                             {longForm > 0 && (
                                 <span
-                                    className="font-semibold text-zinc-500"
+                                    className="font-semibold text-muted-foreground"
                                     style={{
                                         fontSize: 11,
                                         padding: '4px 10px',
@@ -208,7 +208,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                             )}
                             {trial > 0 && (
                                 <span
-                                    className="font-semibold text-zinc-500"
+                                    className="font-semibold text-muted-foreground"
                                     style={{
                                         fontSize: 11,
                                         padding: '4px 10px',
@@ -281,7 +281,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                             {/* Message */}
                             <div className="text-center space-y-2">
                                 <h3 className="text-xl font-bold text-zinc-100">Kho đang trống!</h3>
-                                <p className="text-zinc-500 text-sm max-w-xs">
+                                <p className="text-muted-foreground text-sm max-w-xs">
                                     Tuyệt vời — mọi công việc đều đã được phân công
                                 </p>
                             </div>
@@ -301,7 +301,7 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
                                     Đã phân công hết task
                                 </div>
                                 <div
-                                    className="flex items-center gap-2 text-zinc-500 text-xs"
+                                    className="flex items-center gap-2 text-muted-foreground text-xs"
                                     style={{
                                         padding: '8px 16px',
                                         borderRadius: 12,

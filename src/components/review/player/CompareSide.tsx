@@ -37,10 +37,10 @@ export function CompareSide({
     const version = versions.find((v) => v.id === versionId) ?? null
 
     return (
-        <div className={`relative flex min-h-0 flex-col bg-black ${isActive ? 'ring-2 ring-inset ring-indigo-400' : ''}`}>
+        <div className={`relative flex min-h-0 flex-col bg-black ${isActive ? 'ring-2 ring-inset ring-primary' : ''}`}>
             {/* top bar: v-badge + per-side selector + (active) audio indicator — above the activate overlay */}
             <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-black/70 to-transparent p-2">
-                <span className="pointer-events-auto grid h-7 min-w-9 place-items-center rounded bg-indigo-500/20 px-1.5 text-xs font-semibold text-indigo-200">
+                <span className="pointer-events-auto grid h-7 min-w-9 place-items-center rounded bg-primary/20 px-1.5 text-xs font-semibold text-primary-accent">
                     v{version?.versionNumber ?? '—'}
                 </span>
                 <div className="pointer-events-auto relative">
@@ -48,7 +48,7 @@ export function CompareSide({
                         onClick={() => setOpen((v) => !v)}
                         className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5 text-xs text-white/85 backdrop-blur hover:bg-black/70"
                     >
-                        <Layers className="h-3.5 w-3.5 text-indigo-300" />
+                        <Layers className="h-3.5 w-3.5 text-primary-accent" />
                         <span className="max-w-[9rem] truncate">{version?.originalName ?? 'Chọn phiên bản'}</span>
                         <ChevronDown className="h-3.5 w-3.5 text-white/40" />
                     </button>
@@ -71,7 +71,7 @@ export function CompareSide({
                                             } ${disabled ? 'cursor-not-allowed opacity-30' : 'hover:bg-white/10'}`}
                                             title={disabled ? 'Đang so sánh ở bên kia' : undefined}
                                         >
-                                            <span className="grid h-7 w-9 shrink-0 place-items-center rounded bg-indigo-500/15 text-xs font-semibold text-indigo-300">
+                                            <span className="grid h-7 w-9 shrink-0 place-items-center rounded bg-primary/15 text-xs font-semibold text-primary-accent">
                                                 v{v.versionNumber}
                                             </span>
                                             <span className="min-w-0 flex-1">
@@ -86,7 +86,7 @@ export function CompareSide({
                     )}
                 </div>
                 {isActive && (
-                    <span className="pointer-events-auto ml-auto grid h-7 w-7 place-items-center rounded bg-indigo-500/20 text-indigo-200" title="Đang bật tiếng bên này">
+                    <span className="pointer-events-auto ml-auto grid h-7 w-7 place-items-center rounded bg-primary/20 text-primary-accent" title="Đang bật tiếng bên này">
                         <Volume2 className="h-4 w-4" />
                     </span>
                 )}

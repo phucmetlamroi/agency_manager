@@ -433,7 +433,7 @@ export default function StudyPlaceBoard({ workspaceId, initialProgress }: Props)
                                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/15 text-violet-200">
                                     <Icon className="h-5 w-5" />
                                 </span>
-                                <ChevronRight className="h-4 w-4 text-zinc-500 transition-transform group-hover:translate-x-0.5 group-hover:text-violet-300" />
+                                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-violet-300" />
                             </div>
                             <div className="text-sm font-semibold text-zinc-100">{item.label}</div>
                             <p className="mt-1 text-xs leading-5 text-zinc-400">{item.desc}</p>
@@ -546,12 +546,12 @@ function StudySession({
                 <div className="space-y-4">
                     <div className="flex flex-col gap-2 md:flex-row">
                         <label className="relative flex-1">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <input
                                 value={bankQuery}
                                 onChange={(event) => setBankQuery(event.target.value)}
                                 placeholder="Search questions, answers, Vietnamese notes..."
-                                className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950/70 pl-9 pr-3 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-violet-500/50"
+                                className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950/70 pl-9 pr-3 text-sm text-zinc-100 outline-none transition-colors placeholder:text-muted-foreground focus:border-violet-500/50"
                             />
                         </label>
                         <select
@@ -717,7 +717,7 @@ function StudySession({
                         value={typed}
                         onChange={(event) => setTyped(event.target.value)}
                         placeholder="Type the exact answer or the main keywords you remember..."
-                        className="min-h-[112px] w-full rounded-xl border border-white/10 bg-zinc-950/70 p-4 text-base text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-500/50"
+                        className="min-h-[112px] w-full rounded-xl border border-white/10 bg-zinc-950/70 p-4 text-base text-zinc-100 outline-none placeholder:text-muted-foreground focus:border-violet-500/50"
                     />
                     {!checked ? (
                         <button
@@ -863,7 +863,7 @@ function QuestionDetail({ question, progress, onBookmark, compact }: {
             <summary className="cursor-pointer list-none">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+                        <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                             <span>#{question.id}</span>
                             <span>{masteryLabel(progress)}</span>
                             {question.tags?.map((tag) => <span key={tag} className="rounded-full bg-white/5 px-2 py-0.5 text-zinc-400">{tag}</span>)}
@@ -906,7 +906,7 @@ function QuestionDetail({ question, progress, onBookmark, compact }: {
                                     <div key={`${term.term}-${index}`} className="rounded-lg bg-black/20 p-3 text-sm">
                                         <div className="font-semibold text-zinc-100">{term.term}</div>
                                         <div className="mt-1 text-zinc-300">{term.meaning}</div>
-                                        <div className="mt-1 text-xs leading-5 text-zinc-500">{term.note}</div>
+                                        <div className="mt-1 text-xs leading-5 text-muted-foreground">{term.note}</div>
                                     </div>
                                 ))}
                             </div>

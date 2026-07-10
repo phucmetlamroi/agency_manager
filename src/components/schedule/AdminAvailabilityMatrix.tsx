@@ -43,7 +43,7 @@ export default function AdminAvailabilityMatrix({
     return (
         <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-zinc-800 bg-zinc-950/50 p-4">
             <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-zinc-400">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Chú thích</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Chú thích</span>
                 <div className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.35)] ${STATUS_DOT.FREE}`} />
                     <span>{STATUS_LABEL.FREE}</span>
@@ -65,7 +65,7 @@ export default function AdminAvailabilityMatrix({
                     {Array.from({ length: 24 }).map((_, hour) => (
                         <div
                             key={`header-${hour}`}
-                            className={`h-10 border-b border-r border-zinc-800 text-[10px] text-zinc-500 flex items-center justify-center ${hour === currentHour ? 'bg-white/5 text-white ring-1 ring-white/10 shadow-[0_0_12px_rgba(255,255,255,0.15)]' : ''}`}
+                            className={`h-10 border-b border-r border-zinc-800 text-[10px] text-muted-foreground flex items-center justify-center ${hour === currentHour ? 'bg-white/5 text-white ring-1 ring-white/10 shadow-[0_0_12px_rgba(255,255,255,0.15)]' : ''}`}
                         >
                             {hour}:00
                         </div>
@@ -76,7 +76,7 @@ export default function AdminAvailabilityMatrix({
                     <div key={user.id} className="grid grid-cols-[220px_repeat(24,minmax(40px,1fr))]">
                         <div className="sticky left-0 z-10 bg-zinc-950/95 border-r border-b border-zinc-800 px-4 py-3 text-xs text-zinc-200">
                             <div className="font-semibold">{user.nickname || user.username}</div>
-                            <div className="text-[10px] text-zinc-500">{user.username}</div>
+                            <div className="text-[10px] text-muted-foreground">{user.username}</div>
                         </div>
                         {user.schedule.map((status, index) => (
                             <div

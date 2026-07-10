@@ -68,14 +68,14 @@ export default function WorkspaceError({
                     background: 'rgba(255,255,255,0.04)',
                     border: '1px solid rgba(255,255,255,0.08)',
                 }}>
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 mb-1.5">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1.5">
                         Chi tiết lỗi
                     </p>
                     <p className="text-[12px] text-red-300 break-words font-mono mb-1">
                         {error.message || 'Lỗi không xác định'}
                     </p>
                     {error.digest && (
-                        <p className="text-[11px] text-zinc-500 break-all font-mono">
+                        <p className="text-[11px] text-muted-foreground break-all font-mono">
                             ID: {error.digest}
                         </p>
                     )}

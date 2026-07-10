@@ -98,7 +98,7 @@ export default function TransferOwnershipModal({ workspaceId, members, currentUs
                         Chọn OWNER mới
                     </label>
                     {candidates.length === 0 ? (
-                        <div className="text-sm text-zinc-500 bg-zinc-900/50 border border-white/5 rounded-xl p-4 text-center">
+                        <div className="text-sm text-muted-foreground bg-zinc-900/50 border border-white/5 rounded-xl p-4 text-center">
                             Không có thành viên nào đủ điều kiện. Hãy thêm thành viên trước.
                         </div>
                     ) : (
@@ -126,7 +126,7 @@ export default function TransferOwnershipModal({ workspaceId, members, currentUs
                                             <div className="text-sm font-semibold text-zinc-100 truncate">
                                                 {m.user.nickname || m.user.username}
                                             </div>
-                                            <div className="text-[11px] text-zinc-500">
+                                            <div className="text-[11px] text-muted-foreground">
                                                 @{m.user.username} · {roleLabel(m.role)}
                                             </div>
                                         </div>
@@ -153,7 +153,7 @@ export default function TransferOwnershipModal({ workspaceId, members, currentUs
                             value={confirmText}
                             onChange={e => setConfirmText(e.target.value)}
                             placeholder="TRANSFER"
-                            className="w-full bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 transition-all font-mono"
+                            className="w-full bg-zinc-900/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 transition-all font-mono"
                         />
                     </div>
                 )}

@@ -30,19 +30,19 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
 
             {/* ── Page Header ───────────────────────────── */}
             <div className="text-center space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] font-bold uppercase tracking-wider mb-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary-accent text-[11px] font-bold uppercase tracking-wider mb-2">
                     <ShieldCheck className="w-3.5 h-3.5" />
                     Cài đặt tài khoản
                 </div>
                 <h1 className="text-3xl font-black text-white italic tracking-tighter">
                     THÔNG TIN CÁ NHÂN
                 </h1>
-                <p className="text-zinc-500 text-sm max-w-sm mx-auto font-medium">Quản lý hồ sơ, bảo mật và thông tin thanh toán của bạn.</p>
+                <p className="text-muted-foreground text-sm max-w-sm mx-auto font-medium">Quản lý hồ sơ, bảo mật và thông tin thanh toán của bạn.</p>
             </div>
 
             {/* ── Avatar Section ── */}
             <div className="relative">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/10 blur-[100px] rounded-full pointer-events-none" />
                 <AvatarUpload user={user} />
             </div>
 
@@ -51,7 +51,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
             {/* ── Profile Info + Password ──────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-2 px-1">
-                    <UserCircle className="w-5 h-5 text-indigo-400" />
+                    <UserCircle className="w-5 h-5 text-primary-accent" />
                     <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Hồ sơ & Bảo mật</h2>
                 </div>
                 <ProfileForm user={user} />
@@ -76,7 +76,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
                         </div>
                         <div>
                             <h3 className="font-bold text-zinc-200 text-sm">Thông tin nhận lương</h3>
-                            <p className="text-zinc-600 text-xs">Cập nhật tài khoản ngân hàng để nhận thanh toán lương.</p>
+                            <p className="text-muted-foreground text-xs">Cập nhật tài khoản ngân hàng để nhận thanh toán lương.</p>
                         </div>
                     </div>
                     <div className="px-6 py-5">

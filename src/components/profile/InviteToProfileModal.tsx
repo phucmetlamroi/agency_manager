@@ -61,7 +61,7 @@ export default function InviteToProfileModal({ profileId, profileName, workspace
                             value={usernameOrEmail}
                             onChange={(e) => setUsernameOrEmail(e.target.value)}
                             placeholder="username hoặc user@example.com"
-                            className="mt-1.5 h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none focus:border-violet-500/50"
+                            className="mt-1.5 h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none focus:border-violet-500/50"
                         />
                     </div>
                     <div>
@@ -73,7 +73,7 @@ export default function InviteToProfileModal({ profileId, profileName, workspace
                                 className={`flex-1 py-2.5 px-4 rounded-full text-[13px] font-semibold border transition ${
                                     role === 'USER'
                                         ? 'bg-zinc-500/15 text-zinc-200 border-zinc-500/30'
-                                        : 'bg-white/[0.02] text-zinc-500 border-white/5 hover:text-zinc-300'
+                                        : 'bg-white/[0.02] text-muted-foreground border-white/5 hover:text-zinc-300'
                                 }`}
                             >
                                 Nhân viên (Chỉ xem)
@@ -83,14 +83,14 @@ export default function InviteToProfileModal({ profileId, profileName, workspace
                                 onClick={() => setRole('ADMIN')}
                                 className={`flex-1 py-2.5 px-4 rounded-full text-[13px] font-semibold border transition ${
                                     role === 'ADMIN'
-                                        ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
-                                        : 'bg-white/[0.02] text-zinc-500 border-white/5 hover:text-zinc-300'
+                                        ? 'bg-primary/15 text-primary-accent border-primary/30'
+                                        : 'bg-white/[0.02] text-muted-foreground border-white/5 hover:text-zinc-300'
                                 }`}
                             >
                                 Quản trị
                             </button>
                         </div>
-                        <p className="text-[11px] text-zinc-600 mt-2 pl-1 leading-relaxed">
+                        <p className="text-[11px] text-muted-foreground mt-2 pl-1 leading-relaxed">
                             <strong className="text-zinc-400">Nhân viên:</strong> chỉ xem.{' '}
                             <strong className="text-zinc-400">Quản trị:</strong> tạo workspace + mời thành viên (không xóa được). Quản trị chỉ tự động thấy workspace mới tạo sau khi được mời — workspace cũ cần Chủ sở hữu cấp riêng.
                         </p>

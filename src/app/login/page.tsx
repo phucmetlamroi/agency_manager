@@ -24,7 +24,7 @@ export default function LoginPage() {
             {/* Background glow */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] bg-gradient-radial from-violet-600/20 to-transparent blur-3xl" />
-                <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-radial from-indigo-600/15 to-transparent blur-3xl" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-gradient-radial from-primary/15 to-transparent blur-3xl" />
             </div>
 
             <form
@@ -33,7 +33,7 @@ export default function LoginPage() {
             >
                 {/* Header */}
                 <div className="text-center mb-2">
-                    <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/30">
+                    <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/30">
                         <span className="text-white font-black text-2xl">H</span>
                     </div>
                     <h1 className="text-3xl font-extrabold text-white tracking-tight">Đăng nhập</h1>
@@ -53,7 +53,7 @@ export default function LoginPage() {
                 {/* Divider */}
                 <div className="flex items-center gap-3">
                     <div className="flex-1 h-px bg-white/10" />
-                    <span className="text-xs text-zinc-500 font-medium">hoặc</span>
+                    <span className="text-xs text-muted-foreground font-medium">hoặc</span>
                     <div className="flex-1 h-px bg-white/10" />
                 </div>
 
@@ -61,7 +61,7 @@ export default function LoginPage() {
                 <div className="flex flex-col gap-2">
                     <label className="text-sm text-zinc-300 font-medium">Email hoặc tên đăng nhập</label>
                     <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                         <input
                             name="emailOrUsername"
                             type="text"
@@ -70,7 +70,7 @@ export default function LoginPage() {
                             autoCapitalize="none"
                             required
                             placeholder="ban@congty.vn"
-                            className="w-full h-12 pl-11 pr-4 rounded-xl bg-zinc-900/60 border border-white/10 text-white placeholder:text-zinc-600 focus:border-violet-500/50 focus:bg-zinc-900/80 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all"
+                            className="w-full h-12 pl-11 pr-4 rounded-xl bg-zinc-900/60 border border-white/10 text-white placeholder:text-muted-foreground focus:border-violet-500/50 focus:bg-zinc-900/80 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all"
                         />
                     </div>
                 </div>
@@ -79,19 +79,19 @@ export default function LoginPage() {
                 <div className="flex flex-col gap-2">
                     <label className="text-sm text-zinc-300 font-medium">Mật khẩu</label>
                     <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                         <input
                             name="password"
                             type={showPassword ? 'text' : 'password'}
                             autoComplete="current-password"
                             required
                             placeholder="••••••••"
-                            className="w-full h-12 pl-11 pr-12 rounded-xl bg-zinc-900/60 border border-white/10 text-white placeholder:text-zinc-600 focus:border-violet-500/50 focus:bg-zinc-900/80 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all"
+                            className="w-full h-12 pl-11 pr-12 rounded-xl bg-zinc-900/60 border border-white/10 text-white placeholder:text-muted-foreground focus:border-violet-500/50 focus:bg-zinc-900/80 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all"
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-muted-foreground hover:text-zinc-300 hover:bg-white/5 transition-colors"
                             tabIndex={-1}
                             aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                         >
@@ -122,7 +122,7 @@ export default function LoginPage() {
                 <button
                     type="submit"
                     disabled={isPending}
-                    className="w-full h-12 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold shadow-lg shadow-violet-600/30 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-violet-600 hover:from-primary hover:to-violet-500 text-white font-bold shadow-lg shadow-violet-600/30 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     {isPending ? (
                         <>
@@ -134,7 +134,7 @@ export default function LoginPage() {
                     )}
                 </button>
 
-                <p className="text-center text-sm text-zinc-500 mt-1">
+                <p className="text-center text-sm text-muted-foreground mt-1">
                     Chưa có tài khoản?{' '}
                     <Link href="/signup" className="text-violet-400 hover:text-violet-300 font-semibold transition-colors">
                         Đăng ký

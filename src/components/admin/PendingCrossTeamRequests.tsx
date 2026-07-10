@@ -36,8 +36,8 @@ export default function PendingCrossTeamRequests({ requests, workspaceId }: Prop
     }
 
     return (
-        <div className="bg-gradient-to-br from-indigo-900/30 to-purple-900/20 border border-indigo-500/30 rounded-xl p-4 mb-6 shadow-lg shadow-indigo-500/10">
-            <h3 className="text-indigo-400 font-bold flex items-center gap-2 mb-3 text-sm">
+        <div className="bg-gradient-to-br from-primary/30 to-purple-900/20 border border-primary/30 rounded-xl p-4 mb-6 shadow-lg shadow-primary/10">
+            <h3 className="text-primary-accent font-bold flex items-center gap-2 mb-3 text-sm">
                 <Clock className="w-4 h-4" /> 
                 Yêu cầu "Du học" chờ duyệt ({requests.length})
             </h3>

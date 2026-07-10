@@ -49,7 +49,7 @@ export default function FrictionHeatmap() {
                 </button>
             </div>
 
-            <div className="flex text-[10px] text-zinc-500 mb-2 ml-8 uppercase font-bold tracking-widest">
+            <div className="flex text-[10px] text-muted-foreground mb-2 ml-8 uppercase font-bold tracking-widest">
                 {days.map(day => (
                     <div key={day} className="flex-1 text-center font-medium">{day}</div>
                 ))}
@@ -58,7 +58,7 @@ export default function FrictionHeatmap() {
             <div className="flex-1 flex flex-col gap-1">
                 {hours.map((hour) => (
                     <div key={hour} className="flex-1 flex gap-1 items-center min-h-[12px]">
-                        <div className="w-8 text-[10px] text-zinc-600 text-right pr-2 font-mono">
+                        <div className="w-8 text-[10px] text-muted-foreground text-right pr-2 font-mono">
                             {hour.toString().padStart(2, '0')}h
                         </div>
                         {matrix.length > 0 ? days.map((day, dIdx) => {
@@ -80,7 +80,7 @@ export default function FrictionHeatmap() {
                 ))}
             </div>
             
-            <div className="mt-4 flex items-center justify-end gap-2 text-[10px] text-zinc-500 font-bold uppercase">
+            <div className="mt-4 flex items-center justify-end gap-2 text-[10px] text-muted-foreground font-bold uppercase">
                 <span>Ít hoạt động</span>
                 <div className="w-3 h-3 rounded bg-orange-500/20" />
                 <div className="w-3 h-3 rounded bg-orange-500/50" />

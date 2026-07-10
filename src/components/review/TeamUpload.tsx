@@ -233,11 +233,11 @@ export function UploadingCard({ item, aspect, showInfo }: { item: UploadItem; as
             </div>
             {showInfo && (
                 <div className="flex items-center gap-1.5 p-2.5">
-                    <KindIcon size={13} className="shrink-0 text-zinc-500" />
+                    <KindIcon size={13} className="shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-[12px] text-zinc-300" title={item.name}>
                         {item.name}
                     </span>
-                    <span className="shrink-0 text-[10.5px] tabular-nums text-zinc-500">{formatBytes(item.sizeBytes)}</span>
+                    <span className="shrink-0 text-[10.5px] tabular-nums text-muted-foreground">{formatBytes(item.sizeBytes)}</span>
                 </div>
             )}
         </div>

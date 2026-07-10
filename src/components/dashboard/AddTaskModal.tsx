@@ -189,13 +189,13 @@ function formatDeadlinePreview(raw: string): string {
 /* ------------------------------------------------------------------ */
 
 const inputBase =
-    "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+    "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
 
 const selectBase =
     "h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] pr-10 text-[13px] text-zinc-300 outline-none appearance-none cursor-pointer transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
 
 const textareaBase =
-    "w-full rounded-2xl bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] py-3 text-[13px] text-zinc-300 placeholder:text-zinc-600 leading-[1.6] outline-none resize-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+    "w-full rounded-2xl bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] py-3 text-[13px] text-zinc-300 placeholder:text-muted-foreground leading-[1.6] outline-none resize-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
 
 /* ------------------------------------------------------------------ */
 /*  Sub-components                                                     */
@@ -335,7 +335,7 @@ function StepIndicator({
                                     ? "bg-[#8B5CF6] border-2 border-[#A855F7] text-white shadow-[0_4px_20px_rgba(139,92,246,0.35)]"
                                     : isCompleted
                                         ? "bg-[#8B5CF6]/25 border-2 border-[#8B5CF6]/50 text-[#D8B4FE] shadow-[0_4px_16px_rgba(139,92,246,0.15)]"
-                                        : "bg-white/[0.06] border-2 border-white/[0.08] text-zinc-500"
+                                        : "bg-white/[0.06] border-2 border-white/[0.08] text-muted-foreground"
                                     }`}
                             >
                                 {isCompleted ? <Check size={13} strokeWidth={3} className="text-[#D8B4FE]" /> : i + 1}
@@ -345,7 +345,7 @@ function StepIndicator({
                                     ? "font-bold text-white"
                                     : isCompleted
                                         ? "font-medium text-[#D8B4FE]"
-                                        : "font-medium text-zinc-600"
+                                        : "font-medium text-muted-foreground"
                                     }`}
                             >
                                 {stepLabel}
@@ -1092,7 +1092,7 @@ export default function AddTaskModal({
                                 </div>
                             )}
                         </div>
-                        <p className="text-[11px] text-zinc-600 pl-1">
+                        <p className="text-[11px] text-muted-foreground pl-1">
                             Đã thêm {videoCount} video
                         </p>
                     </div>
@@ -1159,7 +1159,7 @@ export default function AddTaskModal({
                                     {revenueVND.toLocaleString("vi-VN")} / {form.jobPriceUSD ? (jobPriceNum * USD_TO_VND).toLocaleString("vi-VN") : "0"}
                                 </span>
                             </div>
-                            <p className="text-[11px] text-zinc-600 pl-1">
+                            <p className="text-[11px] text-muted-foreground pl-1">
                                 {revenuePercent.toFixed(0)}% biên lợi nhuận &middot; Tỷ giá: 1 USD = {USD_TO_VND.toLocaleString()} VND
                             </p>
                         </div>
@@ -1211,14 +1211,14 @@ export default function AddTaskModal({
                         {rawFootageMode === 'MULTI_HOOK_MAP' ? (
                             <div className="flex flex-col gap-3">
                                 <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/40 px-3 py-2">
-                                    <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                                    <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
                                         Folder
                                     </span>
                                     <input
                                         value={mhmFolderUrl}
                                         onChange={(e) => setMhmFolderUrl(e.target.value)}
                                         placeholder="Dán link Dropbox / Google Drive rồi bấm “Đổ sẵn từ Velox” (tuỳ chọn)"
-                                        className="min-w-0 flex-1 bg-transparent text-[12.5px] text-zinc-200 outline-none placeholder:text-zinc-600"
+                                        className="min-w-0 flex-1 bg-transparent text-[12.5px] text-zinc-200 outline-none placeholder:text-muted-foreground"
                                     />
                                 </div>
                                 <HookGraphEditor
@@ -1314,7 +1314,7 @@ export default function AddTaskModal({
                                 const fieldEl = (
                                     <input
                                         type="url"
-                                        className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
+                                        className="h-11 w-full rounded-full bg-white/[0.04] border border-[rgba(139,92,246,0.12)] px-[18px] text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none transition-colors focus:border-[#8B5CF6]/50 focus:bg-white/[0.06]"
                                         placeholder={placeholder}
                                         value={form[key]}
                                         onChange={(e) => set(key, e.target.value)}
@@ -1377,7 +1377,7 @@ export default function AddTaskModal({
                         <PreviewAccordion title={`Video (${String(videoCount).padStart(2, "0")})`} defaultOpen={false}>
                             <div className="flex flex-col gap-1.5">
                                 {videoCount === 0 ? (
-                                    <span className="text-[13px] text-zinc-600">Chưa thêm video nào</span>
+                                    <span className="text-[13px] text-muted-foreground">Chưa thêm video nào</span>
                                 ) : (
                                     form.videoList
                                         .split("\n")
@@ -1438,7 +1438,7 @@ export default function AddTaskModal({
                                     dangerouslySetInnerHTML={{ __html: form.notes }}
                                 />
                             ) : (
-                                <span className="text-[13px] text-zinc-600">Chưa thêm ghi chú</span>
+                                <span className="text-[13px] text-muted-foreground">Chưa thêm ghi chú</span>
                             )}
                         </PreviewAccordion>
                     </div>

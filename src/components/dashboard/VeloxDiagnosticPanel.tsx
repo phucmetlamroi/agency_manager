@@ -33,15 +33,15 @@ export default function VeloxDiagnosticPanel({ result }: Props) {
                 className="w-full flex items-center justify-between gap-2 px-4 py-2.5 hover:bg-white/[0.03] transition-colors"
             >
                 <div className="flex items-center gap-2">
-                    <Bug size={12} className="text-zinc-500" />
+                    <Bug size={12} className="text-muted-foreground" />
                     <span className="text-[11px] font-bold uppercase tracking-wide text-zinc-400">
                         Xem chi tiết — Diagnostic
                     </span>
                 </div>
                 {expanded ? (
-                    <ChevronDown size={12} className="text-zinc-500" />
+                    <ChevronDown size={12} className="text-muted-foreground" />
                 ) : (
-                    <ChevronRight size={12} className="text-zinc-500" />
+                    <ChevronRight size={12} className="text-muted-foreground" />
                 )}
             </button>
 
@@ -49,7 +49,7 @@ export default function VeloxDiagnosticPanel({ result }: Props) {
                 <div className="px-4 pb-4 space-y-3 border-t border-white/5 pt-3">
                     {/* Pattern rationale */}
                     <div>
-                        <p className="text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
                             Pattern detection rationale
                         </p>
                         <p className="text-[11px] text-zinc-300">
@@ -60,7 +60,7 @@ export default function VeloxDiagnosticPanel({ result }: Props) {
                     {/* Wrapper breakdown (D5) */}
                     {d.isWrapper && d.wrapperConfidenceBreakdown && (
                         <div>
-                            <p className="text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
                                 D5 Wrapper confidence — {d.wrapperConfidenceBreakdown.total}/10
                             </p>
                             <div className="text-[11px] text-zinc-300 space-y-0.5 pl-2 border-l border-white/10">
@@ -84,7 +84,7 @@ export default function VeloxDiagnosticPanel({ result }: Props) {
                     {/* Batch prefix detected */}
                     {d.prefixDetected && (
                         <div>
-                            <p className="text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
                                 Batch prefix detected (D1)
                             </p>
                             <code className="text-[11px] text-violet-300 bg-zinc-900/60 px-2 py-0.5 rounded">
@@ -116,7 +116,7 @@ export default function VeloxDiagnosticPanel({ result }: Props) {
 function DiagStat({ label, value }: { label: string; value: number }) {
     return (
         <div className="rounded-lg bg-white/[0.03] border border-white/5 p-2">
-            <p className="text-[9px] text-zinc-500 uppercase font-semibold">{label}</p>
+            <p className="text-[9px] text-muted-foreground uppercase font-semibold">{label}</p>
             <p className="text-[14px] font-mono font-bold text-zinc-200 mt-0.5">{value}</p>
         </div>
     )
@@ -125,12 +125,12 @@ function DiagStat({ label, value }: { label: string; value: number }) {
 function SubfolderTable({ scores }: { scores: ScanDiagnosticsV3['subfolderScores'] }) {
     return (
         <details className="text-[11px]">
-            <summary className="cursor-pointer text-[10px] font-bold uppercase text-zinc-500 hover:text-zinc-300">
+            <summary className="cursor-pointer text-[10px] font-bold uppercase text-muted-foreground hover:text-zinc-300">
                 Subfolder scores ({scores.length})
             </summary>
             <div className="mt-2 overflow-auto max-h-[200px] custom-scrollbar">
                 <table className="w-full text-[10px]">
-                    <thead className="text-zinc-500">
+                    <thead className="text-muted-foreground">
                         <tr>
                             <th className="text-left px-1 py-1">Tên</th>
                             <th className="text-left px-1 py-1">Vai trò</th>
@@ -167,12 +167,12 @@ function SubfolderTable({ scores }: { scores: ScanDiagnosticsV3['subfolderScores
 function FileTable({ scores }: { scores: NonNullable<ScanDiagnosticsV3['fileScores']> }) {
     return (
         <details className="text-[11px]">
-            <summary className="cursor-pointer text-[10px] font-bold uppercase text-zinc-500 hover:text-zinc-300">
+            <summary className="cursor-pointer text-[10px] font-bold uppercase text-muted-foreground hover:text-zinc-300">
                 Root file scores ({scores.length})
             </summary>
             <div className="mt-2 overflow-auto max-h-[200px] custom-scrollbar">
                 <table className="w-full text-[10px]">
-                    <thead className="text-zinc-500">
+                    <thead className="text-muted-foreground">
                         <tr>
                             <th className="text-left px-1 py-1">Tên</th>
                             <th className="text-left px-1 py-1">Phân loại</th>
@@ -201,7 +201,7 @@ function FileTable({ scores }: { scores: NonNullable<ScanDiagnosticsV3['fileScor
 function PairingTable({ groups }: { groups: NonNullable<ScanDiagnosticsV3['pairingGroups']> }) {
     return (
         <details className="text-[11px]">
-            <summary className="cursor-pointer text-[10px] font-bold uppercase text-zinc-500 hover:text-zinc-300">
+            <summary className="cursor-pointer text-[10px] font-bold uppercase text-muted-foreground hover:text-zinc-300">
                 Pairing groups ({groups.length})
             </summary>
             <div className="mt-2 space-y-1.5">

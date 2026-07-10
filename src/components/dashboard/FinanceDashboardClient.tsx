@@ -297,7 +297,7 @@ export default function FinanceDashboardClient({ data }: { data: FinanceData }) 
                         <div key={t.id}
                             className={`grid ${isTeam ? 'grid-cols-[2fr_1fr_1fr_1fr_1fr]' : 'grid-cols-[2fr_1fr_1fr]'} gap-0 px-6 py-3.5 items-center transition-colors hover:bg-white/[0.02] ${!t.isCompleted ? 'opacity-60' : ''}`}
                         >
-                            <div className="pr-4">
+                            <div className="pr-4 min-w-0">
                                 <p className={`text-sm font-medium ${t.isCompleted ? 'text-zinc-200' : 'text-zinc-400'} mb-1.5 truncate`}>{t.title}</p>
                                 <div className="flex items-center gap-2">
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${

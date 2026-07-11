@@ -157,7 +157,7 @@ export function CommentsPanel({
 
     return (
         <div className="flex h-full flex-col">
-            <div className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
+            <div className="min-h-0 flex-1 space-y-2.5 overflow-auto p-3.5">
                 {parents.length === 0 ? (
                     <div className="grid h-full place-items-center px-6 text-center">
                         <div className="flex flex-col items-center gap-2 text-white/55">

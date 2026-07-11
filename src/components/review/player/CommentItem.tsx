@@ -271,14 +271,15 @@ export const CommentThread = memo(function CommentThread({
     return (
         <div
             id={`comment-${comment.id}`}
-            className={`rounded-lg border px-3 py-2.5 transition ${
-                highlighted ? 'border-violet-300/70 bg-violet-400/[0.12] shadow-[0_0_0_1px_rgba(196,181,253,0.10)]' : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.16] hover:bg-white/[0.05]'
+            className={`group/thread rounded-xl border px-3.5 py-3 transition ${
+                highlighted ? 'border-violet-300/70 bg-violet-400/[0.12] shadow-[0_0_0_1px_rgba(196,181,253,0.10)]' : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.16] hover:bg-white/[0.04]'
             } ${resolved ? 'opacity-55' : ''}`}
         >
             <SingleComment comment={comment} fps={fps} onSeekToFrame={onSeekToFrame} actions={actions} />
 
-            {/* action row */}
-            <div className="mt-1 flex items-center gap-1 pl-9 text-white/40">
+            {/* action row — grouped under a hairline divider (frame.io); kept always
+                visible (never hover-only) so touch reviewers can reach reply/resolve. */}
+            <div className="mt-2 flex items-center gap-1 border-t border-white/[0.06] pl-9 pt-2 text-white/45">
                 {canReply && (
                     <button
                         onClick={() => setReplying((v) => !v)}

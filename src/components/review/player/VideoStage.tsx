@@ -153,9 +153,13 @@ export function VideoStage({
                 {overlay}
             </div>
 
-            {/* controls (video only) */}
+            {/* controls (video only) — always an in-flow block BELOW the video (frame.io
+                model). Previously non-fullscreen floated this as `absolute bottom-0`, which
+                overlapped and hid the bottom of the letterboxed frame; the reviewer must be
+                able to see the ENTIRE frame (nothing clipped) to catch errors in the lower
+                content. The video area is `flex-1 min-h-0`, so it shrinks to make room. */}
             {mediaKind === 'video' && (
-                <div className={fs ? '' : 'absolute inset-x-0 bottom-0 z-10'}>
+                <div className="shrink-0">
                     <PlayerControls
                         controller={controller}
                         fps={fps}

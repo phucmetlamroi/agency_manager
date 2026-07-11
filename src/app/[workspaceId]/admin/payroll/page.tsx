@@ -8,6 +8,8 @@ import PayrollKpiStrip from '@/components/admin/PayrollKpiStrip'
 import { serializeDecimal } from '@/lib/serialization'
 import { SALARY_COMPLETED_STATUS, SALARY_PENDING_STATUSES } from '@/lib/task-statuses'
 import { extractPayrollCycle } from '@/lib/payroll-cycle'
+import { isMobileDevice } from '@/lib/device'
+import MobilePayroll from '@/components/admin/MobilePayroll'
 import { Download } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -127,6 +129,22 @@ export default async function PayrollPage({ params }: { params: Promise<{ worksp
     const exportUrl = monthParam
         ? `/api/exports/monthly-tasks-xlsx?workspaceId=${workspaceId}&month=${monthParam}`
         : `/api/exports/monthly-tasks-xlsx?workspaceId=${workspaceId}`
+
+    // [Mobile P4.4 / M12] Dispatcher UA: mobile → MobilePayroll (mirror CÙNG dữ liệu đã
+    // fetch/serialize ở trên — trang gate ADMIN nên KHÔNG phải leak). Desktop giữ NGUYÊN
+    // VẸN nhánh return bên dưới (không đổi 1 byte).
+    if (await isMobileDevice()) {
+        return (
+            <MobilePayroll
+                users={serializedUsers}
+                workspaceId={workspaceId}
+                currentMonth={payrollCycle.month}
+                currentYear={payrollCycle.year}
+                workspaceName={workspace?.name ?? null}
+                totals={kpiTotals}
+            />
+        )
+    }
 
     return (
         <div className="max-w-[1200px] mx-auto">

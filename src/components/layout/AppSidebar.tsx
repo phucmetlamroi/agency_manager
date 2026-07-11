@@ -19,7 +19,6 @@ import {
     ChevronRight,
     UserCircle,
     Activity,
-    Menu,
     CalendarDays,
     AlertOctagon,
     ArrowRightLeft,
@@ -44,7 +43,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Logo } from "@/components/brand/Logo"
 import { getUnreadRequestCount } from "@/actions/client-request-actions"
 
@@ -128,21 +126,12 @@ const FONT = "var(--font-sans), 'Plus Jakarta Sans', sans-serif"
 export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'ADMIN', workspaceRole }: SidebarProps) {
     const pathname = usePathname()
     const [collapsed, setCollapsed] = React.useState(false)
-    const [isMobile, setIsMobile] = React.useState(false)
     // Use workspace role for permission checks, falling back to global role for backwards compat
     const isAdminUser = workspaceRole
         ? (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN' || user.role === 'ADMIN')
         : user.role === 'ADMIN'
     const otherViewRole: ViewRole = viewRole === 'ADMIN' ? 'USER' : 'ADMIN'
     const switchRoleHref = viewRole === 'ADMIN' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`
-
-    // Handle resize
-    React.useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 768)
-        checkMobile()
-        window.addEventListener("resize", checkMobile)
-        return () => window.removeEventListener("resize", checkMobile)
-    }, [])
 
     // Notify parent of collapse changes
     const handleToggleCollapse = () => {
@@ -174,143 +163,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
         return () => { alive = false; clearInterval(t) }
     }, [workspaceId])
 
-    // ── Mobile: top bar + sheet drawer ──
-    if (isMobile) {
-        return (
-            <div
-                className="fixed top-0 left-0 right-0 h-[72px] flex items-center px-5 justify-between z-40"
-                style={{
-                    background: SIDEBAR_BG,
-                    backdropFilter: "blur(20px)",
-                    borderBottom: `1px solid ${DIVIDER}`,
-                    fontFamily: FONT,
-                }}
-            >
-                {/* Mobile logo */}
-                <div className="flex items-center gap-2">
-                    <Logo
-                        className="h-7 w-auto text-white"
-                        style={{ filter: "drop-shadow(0 0 8px rgba(139,92,246,0.35))" }}
-                    />
-                </div>
-
-                <div className="flex items-center gap-1">
-                    {/* [bell-cleanup] NotificationBell removed — admin dùng DashboardTopBar bell, user view dùng PWS bell */}
-                    <Sheet>
-                        <SheetTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-100">
-                                <Menu className="h-6 w-6" />
-                            </Button>
-                        </SheetTrigger>
-                    <SheetContent
-                        side="left"
-                        className="w-[280px] p-0 border-r"
-                        style={{
-                            background: SIDEBAR_BG,
-                            backdropFilter: "blur(20px)",
-                            borderColor: SIDEBAR_BORDER,
-                            fontFamily: FONT,
-                        }}
-                    >
-                        <div className="flex flex-col h-full">
-                            {/* Sheet logo */}
-                            <div
-                                className="flex items-center gap-3 h-[72px] px-5"
-                                style={{ borderBottom: `1px solid ${DIVIDER}` }}
-                            >
-                                <Logo
-                                    className="h-8 w-auto text-white shrink-0"
-                                    style={{ filter: "drop-shadow(0 0 10px rgba(139,92,246,0.4))" }}
-                                />
-                                <span className="text-[9px] uppercase font-mono tracking-[0.18em] ml-auto" style={{ color: INACTIVE_TEXT }}>
-                                    {viewRole === 'ADMIN' ? 'Quản trị' : 'Nhân viên'} &middot; v2.4
-                                </span>
-                            </div>
-
-                            {/* [User dashboard redesign] Profile/Workspace switcher moved to:
-                                - Profile picker → UserHomeTopBar dropdown (top-right)
-                                - Workspace picker → UserWorkspacePicker pill (inside content area) */}
-
-                            {/* Sheet nav */}
-                            <nav className="flex-1 px-4 py-5 flex flex-col gap-[16px] overflow-auto">
-                                {filteredNavItems.map((item) => {
-                                    const isActive = !item.external && pathname === item.href
-                                    const activeBg = item.danger ? "#EF4444" : ACTIVE_BG
-                                    const activeGlow = item.danger ? "0 4px 20px rgba(239,68,68,0.35)" : ACTIVE_GLOW
-                                    const inactiveColor = item.danger ? "#F87171" : INACTIVE_TEXT
-                                    const NavAnchor: React.ElementType = item.external ? "a" : Link
-                                    const externalProps = item.external ? { target: "_blank", rel: "noopener noreferrer" } : {}
-                                    return (
-                                        <NavAnchor
-                                            key={item.href}
-                                            href={item.href}
-                                            {...externalProps}
-                                            className="flex items-center gap-3 text-[14px] font-semibold transition-all duration-200"
-                                            style={{
-                                                height: 52,
-                                                paddingLeft: 16,
-                                                paddingRight: 16,
-                                                borderRadius: 26,
-                                                fontFamily: FONT,
-                                                background: isActive ? activeBg : "transparent",
-                                                color: isActive ? "#FFFFFF" : inactiveColor,
-                                                boxShadow: isActive ? activeGlow : "none",
-                                            }}
-                                        >
-                                            <item.icon className="w-[20px] h-[20px] flex-shrink-0" />
-                                            <span className="flex-1">{item.label}</span>
-                                        </NavAnchor>
-                                    )
-                                })}
-                                {isAdminUser && (
-                                    <Link
-                                        href={switchRoleHref}
-                                        className="flex items-center gap-3 text-[14px] font-semibold transition-all duration-200 mt-2"
-                                        style={{
-                                            height: 52,
-                                            paddingLeft: 16,
-                                            paddingRight: 16,
-                                            borderRadius: 26,
-                                            fontFamily: FONT,
-                                            background: "rgba(99,102,241,0.1)",
-                                            color: "#818CF8",
-                                            border: "1px solid rgba(99,102,241,0.2)",
-                                        }}
-                                    >
-                                        <ArrowRightLeft className="w-[20px] h-[20px] flex-shrink-0" />
-                                        <span className="flex-1">Chuyển sang chế độ {otherViewRole === 'ADMIN' ? 'Quản trị' : 'Nhân viên'}</span>
-                                    </Link>
-                                )}
-                            </nav>
-
-                            {/* Sheet profile */}
-                            <div
-                                className="flex items-center gap-3 mx-4 mb-4 px-4"
-                                style={{
-                                    borderTop: `1px solid ${DIVIDER}`,
-                                    paddingTop: 16,
-                                }}
-                            >
-                                <div
-                                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-[13px] flex-shrink-0"
-                                    style={{ background: AVATAR_GRADIENT }}
-                                >
-                                    {getInitials(user.username)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-[13px] font-bold text-white truncate" style={{ fontFamily: FONT }}>{user.username}</div>
-                                    <div className="text-[11px] font-medium uppercase tracking-[0.08em]" style={{ color: INACTIVE_TEXT, fontFamily: FONT }}>{roleLabel(user.role)}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </SheetContent>
-                    </Sheet>
-                </div>
-            </div>
-        )
-    }
-
-    // ── Desktop: full sidebar ──
+    // ── Sidebar (chỉ render qua AppShellDesktop — deviceType==='desktop') ──
     return (
         <TooltipProvider delayDuration={0}>
             <aside

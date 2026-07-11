@@ -55,7 +55,15 @@ export default function RootLayout({
         <ConfirmProvider>
           <RadialNavProvider>
             {children}
-            <Toaster position="top-center" theme="dark" richColors />
+            {/* [Mobile P1 §3.5/H3] top-center; mobileOffset đẩy toast xuống dưới header
+                56px + safe-area (không đè đồng hồ iOS / header). Mặc định 4s. */}
+            <Toaster
+              position="top-center"
+              theme="dark"
+              richColors
+              duration={4000}
+              mobileOffset={{ top: 'calc(56px + env(safe-area-inset-top) + 8px)' }}
+            />
           </RadialNavProvider>
         </ConfirmProvider>
       </body>

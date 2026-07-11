@@ -1,13 +1,15 @@
 "use client"
 
+// [Mobile P1 — công tắc lớn] Nhánh DESKTOP của AppShell hợp nhất.
+// Nội dung y hệt AdminShell cũ (đã xóa) — giữ desktop BẤT BIẾN về mặt nhìn
+// (R4 / DR-3): AppSidebar 261/72px + main + CommandMenu ⌘K + UploadTray.
 import * as React from "react"
 import { AppSidebar } from "./AppSidebar"
 import { CommandMenu } from "./CommandMenu"
 import { UploadTray } from "@/components/review/UploadTray"
 import { cn } from "@/lib/utils"
 
-
-interface AdminShellProps {
+interface AppShellDesktopProps {
     children: React.ReactNode
     user: {
         username: string
@@ -21,9 +23,7 @@ interface AdminShellProps {
     workspaceRole?: string
 }
 
-
-
-export function AdminShell({ children, user, workspaceId, viewRole = 'ADMIN', workspaceRole }: AdminShellProps) {
+export function AppShellDesktop({ children, user, workspaceId, viewRole = 'ADMIN', workspaceRole }: AppShellDesktopProps) {
     const [collapsed, setCollapsed] = React.useState(false)
 
     return (

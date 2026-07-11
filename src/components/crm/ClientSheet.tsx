@@ -7,7 +7,7 @@
 import { useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MobileSheet } from '@/components/ui/mobile-sheet'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,8 @@ export default function ClientSheet({
     metrics,
     workspaceId,
     onEdit,
+    onPortal,
+    portalPending = false,
 }: {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -40,6 +42,9 @@ export default function ClientSheet({
     metrics: ClientMetrics | null
     workspaceId: string
     onEdit: (client: ClientNode) => void
+    /** [design-handoff 2c] Tạo + copy link Portal khách (createClientShareLink) — do list xử lý. */
+    onPortal?: (client: ClientNode) => void
+    portalPending?: boolean
 }) {
     const router = useRouter()
     const { confirm } = useConfirm()
@@ -95,6 +100,18 @@ export default function ClientSheet({
                     <Button asChild variant="outline" className="h-12 w-full">
                         <Link href={`/${workspaceId}/admin/crm/${client.id}`}>Xem trang khách →</Link>
                     </Button>
+
+                    {/* Chia sẻ Portal khách (createClientShareLink → copy) */}
+                    {onPortal && (
+                        <Button
+                            variant="outline"
+                            className="h-12 w-full gap-2"
+                            disabled={portalPending}
+                            onClick={() => onPortal(client)}
+                        >
+                            <Share2 className="h-4 w-4" /> {portalPending ? 'Đang tạo link…' : 'Chia sẻ Portal khách'}
+                        </Button>
+                    )}
 
                     {/* Hàng nút: Sửa (secondary) + Xóa (destructive) — gap-2 */}
                     <div className="flex gap-2">

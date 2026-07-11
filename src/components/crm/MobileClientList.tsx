@@ -6,12 +6,15 @@
 // mắc + card list + "Tải thêm" + EmptyState. State search/sort/filter client-side.
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, ArrowDownUp, ChevronDown, Check, AlertTriangle, Users } from 'lucide-react'
+import { Search, ArrowDownUp, ChevronDown, Check, AlertTriangle, Users, Share2, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import CreateClientButton from '@/components/crm/CreateClientButton'
 import MobileClientCard, { computeClientMetrics, type ClientNode, type ClientMetrics } from './MobileClientCard'
 import ClientSheet from './ClientSheet'
+import SwipeableCard from '@/components/mobile/SwipeableCard'
 import { EmptyState } from '@/components/ui/empty-state'
+import { createClientShareLink } from '@/actions/share-link-actions'
+import { formatCompactVNDWithUnit } from '@/lib/format-compact'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -68,6 +71,42 @@ export default function MobileClientList({ clients, workspaceId }: { clients: Cl
         () => clients.filter((c) => metricsById[c.id]?.hasFriction).length,
         [clients, metricsById],
     )
+
+    // Money-first: tổng doanh thu (header) + max (chuẩn hoá bề rộng thanh trên mỗi card).
+    const { maxRevenue, totalRevenue } = useMemo(() => {
+        let max = 0
+        let total = 0
+        for (const c of clients) {
+            const r = metricsById[c.id]?.revenueVND ?? 0
+            total += r
+            if (r > max) max = r
+        }
+        return { maxRevenue: max, totalRevenue: total }
+    }, [clients, metricsById])
+
+    // [design-handoff 2c] Quẹt hàng → "Chia sẻ": tạo link Portal khách + copy clipboard.
+    const [portalPendingId, setPortalPendingId] = useState<number | null>(null)
+    const handlePortal = async (client: ClientNode) => {
+        if (portalPendingId !== null) return
+        setPortalPendingId(client.id)
+        try {
+            const res = await createClientShareLink(client.id, workspaceId)
+            if (!res.success) {
+                toast.error(res.error || 'Không tạo được link Portal.')
+                return
+            }
+            try {
+                await navigator.clipboard.writeText(res.url)
+                toast.success('Đã tạo link Portal — đã copy vào clipboard')
+            } catch {
+                toast.success('Đã tạo link Portal', { description: res.url })
+            }
+        } catch {
+            toast.error('Không tạo được link Portal. Vui lòng thử lại.')
+        } finally {
+            setPortalPendingId(null)
+        }
+    }
 
     const processed = useMemo(() => {
         const q = searchQuery.trim().toLowerCase()
@@ -170,6 +209,17 @@ export default function MobileClientList({ clients, workspaceId }: { clients: Cl
                 </div>
             </div>
 
+            {/* ── Money-first: tổng doanh thu ── */}
+            {totalRevenue > 0 && (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.06] px-3 py-2.5">
+                    <Wallet className="h-4 w-4 shrink-0 text-emerald-400" />
+                    <span className="text-body-sm text-muted-foreground">Tổng doanh thu</span>
+                    <span className="ml-auto whitespace-nowrap font-mono text-[15px] font-bold text-emerald-400">
+                        {formatCompactVNDWithUnit(totalRevenue)}
+                    </span>
+                </div>
+            )}
+
             {/* ── Search (h-12, ≥16px chặn iOS zoom) ── */}
             <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -236,7 +286,17 @@ export default function MobileClientList({ clients, workspaceId }: { clients: Cl
             ) : (
                 <div className="space-y-3">
                     {visible.map((c) => (
-                        <MobileClientCard key={c.id} client={c} metrics={metricsById[c.id]} onOpen={openSheet} />
+                        <SwipeableCard
+                            key={c.id}
+                            rightAction={{
+                                label: 'Chia sẻ',
+                                icon: Share2,
+                                color: 'bg-primary text-white',
+                                onAction: () => handlePortal(c),
+                            }}
+                        >
+                            <MobileClientCard client={c} metrics={metricsById[c.id]} maxRevenue={maxRevenue} onOpen={openSheet} />
+                        </SwipeableCard>
                     ))}
                 </div>
             )}
@@ -260,6 +320,8 @@ export default function MobileClientList({ clients, workspaceId }: { clients: Cl
                 metrics={selectedClient ? metricsById[selectedClient.id] : null}
                 workspaceId={workspaceId}
                 onEdit={handleEdit}
+                onPortal={handlePortal}
+                portalPending={selectedClient !== null && portalPendingId === selectedClient.id}
             />
 
             {/* ── Dialog Sửa tên (giữ nguyên server action updateClient) ── */}

@@ -10,58 +10,58 @@
    ────────────────────────────────────────────────────────────────── */
 
 .portal-calm {
-  /* Surfaces — warm cream paper. Cards lift LIGHTER off the paper;
-     controls/menus press a touch DARKER (inset/filled). */
-  --void:       #F7F3EC;   /* app background — the paper */
-  --sidebar:    #F1EBDF;   /* sidebar — a subtly deeper panel */
-  --surface:    #FCFAF5;   /* cards — near-white, lift off the paper */
-  --surface-2:  #EFE8DA;   /* inputs / ghost buttons / hover — filled paper */
-  --surface-3:  #E7DECC;   /* menus / deepest hover — pressed paper */
+  /* Surfaces — dark, matching the staff app (zinc-950 base). Cards lift LIGHTER
+     off the base; controls/menus press a touch DARKER (inset/filled). */
+  --void:       #09090B;   /* app background — zinc-950 */
+  --sidebar:    #0C0C10;   /* sidebar — a subtly distinct panel */
+  --surface:    #131317;   /* cards — lift off the base */
+  --surface-2:  #1A1A20;   /* inputs / ghost buttons / hover */
+  --surface-3:  #232329;   /* menus / deepest hover */
 
-  /* Hairlines — ink, single-layer */
-  --line:       rgba(26, 23, 20, 0.08);
-  --line-2:     rgba(26, 23, 20, 0.14);
-  --line-hover: rgba(26, 23, 20, 0.26);
+  /* Hairlines — white, single-layer */
+  --line:       rgba(255, 255, 255, 0.07);
+  --line-2:     rgba(255, 255, 255, 0.12);
+  --line-hover: rgba(255, 255, 255, 0.22);
 
-  /* Text ladder — ink → taupe → stone (dark on light) */
-  --fg:   #1A1714;
-  --fg-1: #322B24;
-  --fg-2: #5E5446;
-  --fg-3: #8A7E6B;
-  --fg-4: #B0A48E;
+  /* Text ladder — light → zinc (light on dark) */
+  --fg:   #FAFAFA;
+  --fg-1: #E7E7EA;
+  --fg-2: #A1A1AA;
+  --fg-3: #71717A;
+  --fg-4: #52525B;
 
-  /* Terracotta accent (the studio's one signature) */
-  --accent:      #C2562F;
-  --accent-fg:   #A0441E;   /* accent as TEXT/icon — darker to read on paper */
-  --accent-soft: rgba(194, 86, 47, 0.10);
-  --accent-line: rgba(194, 86, 47, 0.30);
+  /* Violet accent (matches the staff app + review player) */
+  --accent:      #8B5CF6;
+  --accent-fg:   #C4B5FD;   /* accent as TEXT/icon — lighter to read on dark */
+  --accent-soft: rgba(139, 92, 246, 0.14);
+  --accent-line: rgba(139, 92, 246, 0.35);
 
-  /* Functional status — light-tuned (text colors that read on paper).
+  /* Functional status — dark-tuned (text colors that read on dark).
      [P2] re-keyed/extended with admin-mirrored statuses; these stay as the
      base set (used by invoice statuses + as fallbacks). */
-  --ok:      #2F8F57; --ok-soft:      rgba(47, 143, 87, 0.12);  --ok-line:      rgba(47, 143, 87, 0.30);
-  --attn:    #9A6A12; --attn-soft:    rgba(154, 106, 18, 0.12); --attn-line:    rgba(154, 106, 18, 0.30);
-  --revise:  #C05A2C; --revise-soft:  rgba(192, 90, 44, 0.12);  --revise-line:  rgba(192, 90, 44, 0.30);
-  --danger:  #C0443D; --danger-soft:  rgba(192, 68, 61, 0.12);  --danger-line:  rgba(192, 68, 61, 0.30);
-  --neutral: #6E6557; --neutral-soft: rgba(110, 101, 87, 0.10); --neutral-line: rgba(110, 101, 87, 0.24);
+  --ok:      #34D399; --ok-soft:      rgba(52, 211, 153, 0.14); --ok-line:      rgba(52, 211, 153, 0.32);
+  --attn:    #FBBF24; --attn-soft:    rgba(251, 191, 36, 0.14); --attn-line:    rgba(251, 191, 36, 0.32);
+  --revise:  #FB923C; --revise-soft:  rgba(251, 146, 60, 0.14); --revise-line:  rgba(251, 146, 60, 0.32);
+  --danger:  #F87171; --danger-soft:  rgba(248, 113, 113, 0.14); --danger-line: rgba(248, 113, 113, 0.32);
+  --neutral: #A1A1AA; --neutral-soft: rgba(161, 161, 170, 0.12); --neutral-line: rgba(161, 161, 170, 0.26);
 
-  /* [P2] Admin-mirrored status hues (light-tuned from StatusCell.tsx). */
-  --st-received: #2563B0; --st-received-soft: rgba(37, 99, 176, 0.11);  --st-received-line: rgba(37, 99, 176, 0.28);
-  --st-progress: #9A6A12; --st-progress-soft: rgba(154, 106, 18, 0.12); --st-progress-line: rgba(154, 106, 18, 0.30);
-  --st-revision: #C0443D; --st-revision-soft: rgba(192, 68, 61, 0.12);  --st-revision-line: rgba(192, 68, 61, 0.30);
-  --st-resent:   #C05A2C; --st-resent-soft:   rgba(192, 90, 44, 0.12);  --st-resent-line:   rgba(192, 90, 44, 0.30);
-  --st-hold:     #6E6557; --st-hold-soft:     rgba(110, 101, 87, 0.10); --st-hold-line:     rgba(110, 101, 87, 0.24);
-  --st-done:     #2F8F57; --st-done-soft:     rgba(47, 143, 87, 0.12);  --st-done-line:     rgba(47, 143, 87, 0.30);
+  /* [P2] Admin-mirrored status hues (dark-tuned from StatusCell.tsx). */
+  --st-received: #60A5FA; --st-received-soft: rgba(96, 165, 250, 0.14);  --st-received-line: rgba(96, 165, 250, 0.32);
+  --st-progress: #FBBF24; --st-progress-soft: rgba(251, 191, 36, 0.14); --st-progress-line: rgba(251, 191, 36, 0.32);
+  --st-revision: #F87171; --st-revision-soft: rgba(248, 113, 113, 0.14);  --st-revision-line: rgba(248, 113, 113, 0.32);
+  --st-resent:   #FB923C; --st-resent-soft:   rgba(251, 146, 60, 0.14);  --st-resent-line:   rgba(251, 146, 60, 0.32);
+  --st-hold:     #A1A1AA; --st-hold-soft:     rgba(161, 161, 170, 0.12); --st-hold-line:     rgba(161, 161, 170, 0.26);
+  --st-done:     #34D399; --st-done-soft:     rgba(52, 211, 153, 0.14);  --st-done-line:     rgba(52, 211, 153, 0.32);
 
   --r-card: 18px;
   --r-md: 13px;
   --r-sm: 10px;
   --r-pill: 999px;
 
-  /* Soft, ink-based shadows — gentle on paper. */
-  --shadow-1: 0 1px 2px rgba(26, 23, 20, 0.06);
-  --shadow-2: 0 8px 24px rgba(26, 23, 20, 0.10);
-  --shadow-panel: -24px 0 60px rgba(26, 23, 20, 0.16);
+  /* Soft, black-based shadows — deeper on the dark base. */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.50);
+  --shadow-panel: -24px 0 60px rgba(0, 0, 0, 0.55);
 
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -71,10 +71,9 @@
 
   position: relative;
   background-color: var(--void);
-  /* Two whisper-faint warm washes — a softbox just out of frame. */
+  /* One whisper-faint violet wash for depth — a soft glow, matching the app. */
   background-image:
-    radial-gradient(135% 90% at 8% -8%, rgba(194, 86, 47, 0.05), transparent 58%),
-    radial-gradient(120% 70% at 100% 0%, rgba(224, 164, 88, 0.045), transparent 52%);
+    radial-gradient(130% 85% at 8% -8%, rgba(139, 92, 246, 0.07), transparent 56%);
   background-attachment: fixed;
   color: var(--fg-1);
   font-family: var(--font-ui);
@@ -84,18 +83,9 @@
   text-rendering: optimizeLegibility;
 }
 
-/* Paper tooth — a whisper of grain so the cream isn't flat. multiply keeps
-   it as a subtractive texture; pointer-events:none so it never blocks clicks. */
-.portal-calm::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  pointer-events: none;
-  opacity: 0.022;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
+/* The cream "paper tooth" grain is dropped on the dark theme — a multiply grain
+   on a near-black base only muddies it. The dark base carries its own depth via
+   the faint violet wash above. (::after left unused; reduced-motion still no-ops it.) */
 
 /* ── Typography ── */
 .portal-calm .pc-display,
@@ -138,8 +128,8 @@
 }
 .portal-calm .pc-btn:active:not(:disabled) { transform: translateY(0.5px); }
 .portal-calm .pc-btn:disabled { cursor: not-allowed; opacity: .5; }
-.portal-calm .pc-btn-primary { background: var(--accent); color: #FFF7EF; box-shadow: 0 2px 10px rgba(194, 86, 47, 0.18); }
-.portal-calm .pc-btn-primary:hover:not(:disabled) { background: #A9492A; }
+.portal-calm .pc-btn-primary { background: var(--accent); color: #FFFFFF; box-shadow: 0 2px 12px rgba(139, 92, 246, 0.32); }
+.portal-calm .pc-btn-primary:hover:not(:disabled) { background: #7C3AED; }
 .portal-calm .pc-btn-ghost { background: var(--surface-2); color: var(--fg-1); border-color: var(--line-2); }
 .portal-calm .pc-btn-ghost:hover:not(:disabled) { background: var(--surface-3); border-color: var(--line-hover); }
 .portal-calm .pc-btn-quiet { background: transparent; color: var(--fg-2); border-color: var(--line-2); }
@@ -193,8 +183,8 @@
 /* ── Scrollbars ── */
 .portal-calm ::-webkit-scrollbar { width: 9px; height: 9px; }
 .portal-calm ::-webkit-scrollbar-track { background: transparent; }
-.portal-calm ::-webkit-scrollbar-thumb { background: rgba(26, 23, 20, 0.16); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
-.portal-calm ::-webkit-scrollbar-thumb:hover { background: rgba(26, 23, 20, 0.30); background-clip: padding-box; }
+.portal-calm ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+.portal-calm ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); background-clip: padding-box; }
 
 /* ── Quiet motion ── */
 @keyframes pc-fadeUp { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
@@ -225,7 +215,7 @@
 .portal-calm button { font-family: var(--font-ui); }
 
 /* Color scheme + responsive */
-.portal-calm { color-scheme: light; }
+.portal-calm { color-scheme: dark; }
 /* Desktop has the sidebar for navigation, so hide the mobile bottom nav at md+.
    It sets display:flex inline (which overrides Tailwind's md:hidden class), so
    this rule needs !important to win. */

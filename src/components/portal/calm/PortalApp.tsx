@@ -111,12 +111,14 @@ export default function PortalApp({ workspaceId, locale, currentUserId, accountN
 
     // [Trial P3 — white-label] Override the portal accent tokens with the agency's
     // brand color (validated hex from the server). color-mix keeps soft/line tints
-    // consistent for any hue; falls back to the theme's terracotta when unset.
+    // consistent for any hue; falls back to the theme's violet when unset. On the dark
+    // theme --accent-fg is the accent used as TEXT/icon, so it's lightened toward white
+    // to keep contrast even when the brand hue is a mid/dark tone.
     const accentStyle: CSSProperties = brandAccent
         ? ({
             ['--accent' as any]: brandAccent,
-            ['--accent-fg' as any]: brandAccent,
-            ['--accent-soft' as any]: `color-mix(in srgb, ${brandAccent} 12%, transparent)`,
+            ['--accent-fg' as any]: `color-mix(in srgb, ${brandAccent} 62%, white)`,
+            ['--accent-soft' as any]: `color-mix(in srgb, ${brandAccent} 14%, transparent)`,
             ['--accent-line' as any]: `color-mix(in srgb, ${brandAccent} 35%, transparent)`,
         })
         : {}

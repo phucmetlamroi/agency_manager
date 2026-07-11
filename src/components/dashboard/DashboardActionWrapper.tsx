@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { Plus } from "lucide-react"
 import DashboardActionBar from "./DashboardActionBar"
 import AddTaskModal from "./AddTaskModal"
 import { toast } from "sonner"
@@ -42,6 +43,12 @@ interface DashboardActionWrapperProps {
   /** [Quick Create] Current exchange rate snapshot */
   exchangeRate?: number
   onTaskCreated?: () => void
+  /**
+   * [Mobile P2 §2b] 'bar' (default) = the desktop DashboardActionBar; 'fab' = a floating
+   * "+" button (mobile Task tab) that opens the SAME AddTaskModal + submit flow. Desktop is
+   * byte-identical because it never passes this prop.
+   */
+  variant?: 'bar' | 'fab'
 }
 
 // [QA R1 — user decision] A Multi-Hook Map can't fan out across a batch — attach it to
@@ -78,6 +85,7 @@ export default function DashboardActionWrapper({
   canCreateWorkspace = false,
   pricingRules = [],
   exchangeRate = 26300,
+  variant = 'bar',
 }: DashboardActionWrapperProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const router = useRouter()
@@ -396,13 +404,25 @@ export default function DashboardActionWrapper({
 
   return (
     <>
-      <DashboardActionBar
-        workspaceId={workspaceId}
-        onAddTask={() => setModalOpen(true)}
-        workspaces={workspaces}
-        userRole={userRole}
-        canCreateWorkspace={canCreateWorkspace}
-      />
+      {variant === 'fab' ? (
+        // [Mobile P2 §2b] Floating "+" — thumb-zone, above the bottom tab bar + safe-area.
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          aria-label="Tạo task"
+          className="fixed right-4 bottom-[calc(64px+env(safe-area-inset-bottom)+16px)] z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/30 transition-transform active:scale-95"
+        >
+          <Plus className="h-6 w-6" strokeWidth={2.5} />
+        </button>
+      ) : (
+        <DashboardActionBar
+          workspaceId={workspaceId}
+          onAddTask={() => setModalOpen(true)}
+          workspaces={workspaces}
+          userRole={userRole}
+          canCreateWorkspace={canCreateWorkspace}
+        />
+      )}
       <AddTaskModal
         open={modalOpen}
         onClose={closeModal}

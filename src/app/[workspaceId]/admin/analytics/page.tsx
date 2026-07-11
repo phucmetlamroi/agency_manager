@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation'
 import AnalyticsTable from '@/components/admin/analytics/AnalyticsTable'
+import MobileAnalytics from '@/components/admin/analytics/MobileAnalytics'
 import { getAnalyticsData } from '@/actions/analytics-actions'
 import LivePresenceBoard from '@/components/admin/analytics/LivePresenceBoard'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { isMobileDevice } from '@/lib/device'
 
 export default async function AdminAnalyticsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -18,6 +20,12 @@ export default async function AdminAnalyticsPage({ params }: { params: Promise<{
     }
 
     const analyticsData = await getAnalyticsData(workspaceId)
+
+    // [Mobile P4.6 / M12] Nhánh mobile SAU cổng gate ADMIN (không bypass), TRƯỚC return
+    // desktop. Nhánh desktop giữ NGUYÊN VẸN từng byte (HARD INVARIANT #1).
+    if (await isMobileDevice()) {
+        return <MobileAnalytics data={analyticsData} workspaceId={workspaceId} />
+    }
 
     return (
         <div className="h-full flex flex-col p-6 w-full max-w-[1700px] mx-auto space-y-6">

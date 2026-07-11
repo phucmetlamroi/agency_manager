@@ -2,7 +2,7 @@
 
 import { TaskWithUser } from '@/types/admin'
 import { motion } from 'framer-motion'
-import { MoreVertical, Play, Send, CheckCircle2, Pause, AlertTriangle, Clock } from 'lucide-react'
+import { MoreVertical, Play, Send, CheckCircle2, Pause, AlertTriangle, Clock, Loader2 } from 'lucide-react'
 import * as Popover from '@radix-ui/react-popover'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
@@ -28,6 +28,8 @@ interface MobileTaskCardProps {
     onAction: (task: TaskWithUser) => void
     onQuickStatusChange?: (task: TaskWithUser, newStatus: string) => void
     isAdmin: boolean
+    /** [FR-H2] Có request đổi status đang bay cho task này → khoá + hiện spinner. */
+    pending?: boolean
     index?: number
 }
 
@@ -36,6 +38,7 @@ export default function MobileTaskCard({
     onAction,
     onQuickStatusChange,
     isAdmin,
+    pending = false,
     index = 0,
 }: MobileTaskCardProps) {
     // Unified status colour (hex + rgba bg) from the shared map.
@@ -67,6 +70,7 @@ export default function MobileTaskCard({
 
     const handlePrimaryAction = (e: React.MouseEvent) => {
         e.stopPropagation()
+        if (pending) return
         if (primaryActionStatus && onQuickStatusChange) {
             onQuickStatusChange(task, primaryActionStatus)
         }
@@ -74,6 +78,7 @@ export default function MobileTaskCard({
 
     const handleQuickAction = (e: React.MouseEvent, status: string) => {
         e.stopPropagation()
+        if (pending) return
         if (onQuickStatusChange) {
             onQuickStatusChange(task, status)
         }
@@ -131,7 +136,8 @@ export default function MobileTaskCard({
                             <Popover.Trigger asChild>
                                 <button
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex-shrink-0 flex items-center justify-center w-11 h-11 -mr-1.5 rounded-lg text-muted-foreground hover:text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors"
+                                    disabled={pending}
+                                    className="flex-shrink-0 flex items-center justify-center w-11 h-11 -mr-1.5 rounded-lg text-muted-foreground hover:text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                                     aria-label="Thao tác nhanh"
                                 >
                                     <MoreVertical className="w-4 h-4" />
@@ -193,14 +199,18 @@ export default function MobileTaskCard({
                     {primaryActionStatus && PRIMARY_LABEL[primaryActionStatus] && (
                         <button
                             onClick={handlePrimaryAction}
-                            className={`flex-shrink-0 inline-flex items-center justify-center gap-1 px-3.5 min-h-[44px] rounded-lg text-xs font-bold transition-all active:scale-95 ${primaryActionStatus === 'Hoàn tất'
+                            disabled={pending}
+                            aria-busy={pending}
+                            className={`flex-shrink-0 inline-flex items-center justify-center gap-1 px-3.5 min-h-[44px] rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none ${primaryActionStatus === 'Hoàn tất'
                                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20'
                                 : primaryActionStatus === 'Revision'
                                     ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/20'
                                     : 'bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20'
                                 }`}
                         >
-                            {primaryActionStatus === 'Hoàn tất' ? (
+                            {pending ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : primaryActionStatus === 'Hoàn tất' ? (
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                             ) : primaryActionStatus === 'Revision' ? (
                                 <Send className="w-3.5 h-3.5" />

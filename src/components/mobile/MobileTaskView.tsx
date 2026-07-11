@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { TaskWithUser } from '@/types/admin'
 import { deleteTask } from '@/actions/task-management-actions'
@@ -11,10 +11,11 @@ import SwipeableCard, { SwipeAction } from './SwipeableCard'
 import PullToRefresh from './PullToRefresh'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
+import { EmptyState } from '@/components/ui/empty-state'
 import { TaskDrawer } from '@/components/mobile/TaskDrawer'
 import { PreStartBlockModal } from '@/components/tasks/PreStartBlockModal'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Pause, CheckCircle2, Send, Play, Inbox } from 'lucide-react'
+import { Pause, CheckCircle2, Send, Play } from 'lucide-react'
 import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
 
 type TabKey = 'DOING' | 'ASSIGNED' | 'REVISE' | 'OVERDUE' | 'ALL'
@@ -119,23 +120,60 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
     // [FR-D2] Initialise to the first non-empty tab so the default view has data.
     const [activeTab, setActiveTab] = useState<TabKey>(() => pickInitialTab(tasks))
 
+    // [FR-H2] Optimistic UI — cập nhật status NGAY khi bấm, chờ server xác nhận.
+    // Map taskId → status ghi đè lạc quan (xoá khi server bắt kịp hoặc rollback khi lỗi).
+    // target = status lạc quan hiển thị; base = status server TRƯỚC khi ghi đè (để reconcile).
+    const [optimisticStatus, setOptimisticStatus] = useState<Record<string, { target: string; base: string }>>({})
+    // Các task đang có request status bay trên đường — khoá control để chặn double-submit.
+    const [pendingStatusIds, setPendingStatusIds] = useState<Set<string>>(() => new Set())
+
+    // Danh sách task "hiệu dụng" = tasks server + ghi đè lạc quan → badge/filter/count
+    // đều phản chiếu status mới ngay lập tức, khớp đúng kết quả sau router.refresh().
+    const effectiveTasks = useMemo<TaskWithUser[]>(
+        () => tasks.map(t => (optimisticStatus[t.id] != null ? { ...t, status: optimisticStatus[t.id].target } : t)),
+        [tasks, optimisticStatus],
+    )
+
     // Hide skeleton after first paint (visual fade-in for immediate feedback)
     useEffect(() => {
         const t = setTimeout(() => setIsHydrating(false), 150)
         return () => clearTimeout(t)
     }, [])
 
-    // Filter Logic
+    // [FR-H2] Reconcile: khi dữ liệu server mới về (sau refresh), bỏ các ghi đè lạc quan
+    // đã được server xác nhận (status khớp) hoặc task không còn — tránh badge cũ bị kẹt.
     useEffect(() => {
-        let res = tasks
-        if (activeTab === 'ASSIGNED') res = tasks.filter(t => t.status === 'Nhận task')
-        if (activeTab === 'DOING') res = tasks.filter(t => t.status === 'Đang thực hiện')
-        if (activeTab === 'REVISE') res = tasks.filter(t => t.status === 'Revision')
-        if (activeTab === 'OVERDUE') res = tasks.filter(t => t.status === 'Quá hạn')
-        setFilteredTasks(res)
-    }, [tasks, activeTab])
+        setOptimisticStatus(prev => {
+            const ids = Object.keys(prev)
+            if (ids.length === 0) return prev
+            const next: Record<string, { target: string; base: string }> = {}
+            let changed = false
+            for (const id of ids) {
+                const serverTask = tasks.find(t => t.id === id)
+                // Bỏ ghi đè NGAY khi server đã DỜI khỏi baseline (refetch đã về → server là chân lý),
+                // dù server dừng ở target của ta HAY một status khác (đổi nền/đồng thời → server thắng,
+                // không kẹt badge cũ). Chỉ giữ peek khi server vẫn ở baseline (refetch chưa phản ánh).
+                if (!serverTask || serverTask.status !== prev[id].base) {
+                    changed = true
+                    continue
+                }
+                next[id] = prev[id]
+            }
+            return changed ? next : prev
+        })
+    }, [tasks])
 
-    const tabCount = (tab: TabKey): number => countForTab(tasks, tab)
+    // Filter Logic — lọc trên danh sách hiệu dụng (đã áp status lạc quan)
+    useEffect(() => {
+        let res = effectiveTasks
+        if (activeTab === 'ASSIGNED') res = effectiveTasks.filter(t => t.status === 'Nhận task')
+        if (activeTab === 'DOING') res = effectiveTasks.filter(t => t.status === 'Đang thực hiện')
+        if (activeTab === 'REVISE') res = effectiveTasks.filter(t => t.status === 'Revision')
+        if (activeTab === 'OVERDUE') res = effectiveTasks.filter(t => t.status === 'Quá hạn')
+        setFilteredTasks(res)
+    }, [effectiveTasks, activeTab])
+
+    const tabCount = (tab: TabKey): number => countForTab(effectiveTasks, tab)
 
     // [Sprint P audit-fix] handleTaskClick is dead code — MobileTaskCard
     // actually calls handleAction (line ~263 below: onAction={handleAction}).
@@ -152,16 +190,56 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
         setIsDrawerOpen(true)
     }
 
-    const performStatusChange = async (taskId: string, status: string) => {
-        const res = await updateTaskStatus(taskId, status, workspaceId)
-        if ((res as any)?.error) {
-            toast.error((res as any).error)
-            return false
+    // [FR-H2] Optimistic status change with rollback.
+    // 1) Ghi đè status ngay (badge/filter cập nhật tức thì) + khoá control (pending).
+    // 2) Gọi server. Lỗi/exception → gỡ ghi đè (khôi phục ĐÚNG status server trước đó) + toast.
+    //    Thành công → giữ ghi đè, refresh; reconcile effect sẽ dọn khi server bắt kịp.
+    // Không dùng cho DELETE (delete phải chờ server xác nhận).
+    const performStatusChange = async (taskId: string, status: string): Promise<boolean> => {
+        // Chặn double-submit (bấm/swipe/popover cùng lúc trên 1 task đang bay).
+        if (pendingStatusIds.has(taskId)) return false
+
+        // Baseline = status server hiện tại (trước khi ghi đè) — reconcile nhường server bất cứ khi
+        // nào nó dời khỏi baseline (kể cả dời sang status KHÁC target, do đổi nền/đồng thời).
+        const baseStatus = tasks.find(t => t.id === taskId)?.status ?? status
+        setOptimisticStatus(prev => ({ ...prev, [taskId]: { target: status, base: baseStatus } }))
+        setPendingStatusIds(prev => {
+            const next = new Set(prev)
+            next.add(taskId)
+            return next
+        })
+
+        const rollback = () =>
+            setOptimisticStatus(prev => {
+                if (prev[taskId] == null) return prev
+                const next = { ...prev }
+                delete next[taskId]
+                return next
+            })
+
+        let ok = false
+        try {
+            const res = await updateTaskStatus(taskId, status, workspaceId)
+            if ((res as any)?.error) {
+                rollback()
+                toast.error((res as any).error)
+            } else {
+                ok = true
+                toast.success(`Đã chuyển trạng thái sang "${status}"`)
+                // Server data will catch up; reconcile effect clears the override.
+                startTransition(() => router.refresh())
+            }
+        } catch {
+            rollback()
+            toast.error('Không thể cập nhật trạng thái. Vui lòng thử lại.')
+        } finally {
+            setPendingStatusIds(prev => {
+                const next = new Set(prev)
+                next.delete(taskId)
+                return next
+            })
         }
-        toast.success(`Đã chuyển trạng thái sang "${status}"`)
-        // Refresh server data
-        startTransition(() => router.refresh())
-        return true
+        return ok
     }
 
     const handleStatusChangeFromDrawer = async (status: string) => {
@@ -201,6 +279,47 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
                 setTimeout(resolve, 600)
             })
         })
+    }
+
+    // [FR-H4 / Pattern 9] Empty state cho tab đang lọc rỗng.
+    //  • cả list rỗng → 'first-use' ("Chưa có task nào").
+    //  • tab này rỗng nhưng tab khác còn task → 'no-results' + deep-link sang tab đó.
+    //  • hết task ở bộ lọc (không có tab gợi ý) → 'cleared' + lối về "Tất cả".
+    const renderEmptyState = () => {
+        if (effectiveTasks.length === 0) {
+            return (
+                <EmptyState
+                    variant="first-use"
+                    title="Chưa có task nào"
+                    description="Khi có task được giao, chúng sẽ xuất hiện ở đây."
+                />
+            )
+        }
+        const suggestion = TAB_ORDER.find(
+            t => t !== activeTab && t !== 'ALL' && countForTab(effectiveTasks, t) > 0,
+        )
+        if (suggestion) {
+            const n = countForTab(effectiveTasks, suggestion)
+            return (
+                <EmptyState
+                    variant="no-results"
+                    title="Không có task ở bộ lọc này"
+                    description={`Có ${n} task ở "${TAB_LABELS[suggestion]}".`}
+                    cta={{
+                        label: `Xem ${n} task ${TAB_LABELS[suggestion]}`,
+                        onClick: () => setActiveTab(suggestion),
+                    }}
+                />
+            )
+        }
+        return (
+            <EmptyState
+                variant="cleared"
+                title="Đã xử lý hết task"
+                description="Không còn task nào ở bộ lọc này."
+                cta={activeTab !== 'ALL' ? { label: 'Xem tất cả task', onClick: () => setActiveTab('ALL') } : undefined}
+            />
+        )
     }
 
     return (
@@ -258,6 +377,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
                                                 isAdmin={isAdmin}
                                                 onAction={handleAction}
                                                 onQuickStatusChange={handleQuickStatusChange}
+                                                pending={pendingStatusIds.has(task.id)}
                                                 index={idx}
                                             />
                                         </SwipeableCard>
@@ -267,22 +387,14 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
                         </AnimatePresence>
                     )}
 
-                    {/* Empty state */}
+                    {/* [FR-H4] Empty state — Pattern 9 EmptyState với deep-link/CTA */}
                     {!isHydrating && filteredTasks.length === 0 && (
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-center py-16 px-4 flex flex-col items-center gap-3"
+                            className="pt-4"
                         >
-                            <div className="w-16 h-16 rounded-2xl bg-zinc-900/60 border border-white/8 flex items-center justify-center">
-                                <Inbox className="w-7 h-7 text-muted-foreground" />
-                            </div>
-                            <div>
-                                <p className="text-zinc-300 font-semibold">Không có task</p>
-                                <p className="text-muted-foreground text-sm mt-1">
-                                    Không có task trong "{TAB_LABELS[activeTab]}".
-                                </p>
-                            </div>
+                            {renderEmptyState()}
                         </motion.div>
                     )}
                 </div>

@@ -259,6 +259,7 @@ export const CommentThread = memo(function CommentThread({
     const L = PLAYER_L10N[env.lang]
     const [replying, setReplying] = useState(false)
     const [editingTop, setEditingTop] = useState(false)
+    const [confirmDelete, setConfirmDelete] = useState<{ id: string; message: string } | null>(null)
     const resolved = comment.completedAt != null
     // P5.3: ownership/permission checks live in the env (internal: author/admin
     // against currentUserId·isAdmin baked into the provider; guest: own comments
@@ -316,9 +317,7 @@ export const CommentThread = memo(function CommentThread({
                 )}
                 {canDelete && (
                     <button
-                        onClick={() => {
-                            if (confirm(L.confirmDeleteComment)) actions.remove(comment.id)
-                        }}
+                        onClick={() => setConfirmDelete({ id: comment.id, message: L.confirmDeleteComment })}
                         className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-red-500/15 hover:text-red-300"
                     >
                         <Trash2 className="h-3 w-3" /> {L.del}
@@ -348,9 +347,7 @@ export const CommentThread = memo(function CommentThread({
                             </div>
                             {env.can.deleteComment(r) ? (
                                 <button
-                                    onClick={() => {
-                                        if (confirm(L.confirmDeleteReply)) actions.remove(r.id)
-                                    }}
+                                    onClick={() => setConfirmDelete({ id: r.id, message: L.confirmDeleteReply })}
                                     className="mt-1 grid h-6 w-6 shrink-0 place-items-center rounded text-white/30 opacity-0 hover:bg-red-500/15 hover:text-red-300 group-hover/comment:opacity-100"
                                     aria-label={L.del}
                                 >
@@ -380,9 +377,83 @@ export const CommentThread = memo(function CommentThread({
                     onCancel={() => setReplying(false)}
                 />
             )}
+
+            {confirmDelete && (
+                <ConfirmDialog
+                    message={confirmDelete.message}
+                    onConfirm={() => {
+                        actions.remove(confirmDelete.id)
+                        setConfirmDelete(null)
+                    }}
+                    onCancel={() => setConfirmDelete(null)}
+                />
+            )}
         </div>
     )
 })
+
+// In-app delete confirmation (replaces the native window.confirm — FR: "make a proper
+// popup, not the browser dialog"). Fixed overlay so it escapes the scrollable panel;
+// Esc cancels, Enter confirms; shared VN internal + EN guest via player-l10n.
+function ConfirmDialog({
+    message,
+    onConfirm,
+    onCancel,
+}: {
+    message: string
+    onConfirm: () => void
+    onCancel: () => void
+}) {
+    const L = PLAYER_L10N[usePlayerEnv().lang]
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.stopPropagation()
+                e.preventDefault()
+                onCancel()
+            } else if (e.key === 'Enter') {
+                e.stopPropagation()
+                e.preventDefault()
+                onConfirm()
+            }
+        }
+        window.addEventListener('keydown', onKey, { capture: true })
+        return () => window.removeEventListener('keydown', onKey, { capture: true })
+    }, [onConfirm, onCancel])
+
+    return (
+        <div className="fixed inset-0 z-[120] grid place-items-center bg-black/70 p-4" onClick={onCancel}>
+            <div
+                role="alertdialog"
+                aria-modal="true"
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-xs rounded-2xl border border-white/10 bg-[#16181d] p-4 shadow-2xl"
+            >
+                <div className="flex items-start gap-3">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-red-500/15 text-red-300">
+                        <Trash2 className="h-4 w-4" />
+                    </span>
+                    <p className="pt-1.5 text-sm leading-6 text-white/85">{message}</p>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                    <button
+                        onClick={onCancel}
+                        className="rounded-lg px-3 py-1.5 text-sm text-white/70 transition hover:bg-white/10"
+                    >
+                        {L.cancel}
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        autoFocus
+                        className="rounded-lg bg-red-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                    >
+                        {L.del}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 function InlineEdit({ initial, onSave, onCancel }: { initial: string; onSave: (b: string) => void; onCancel: () => void }) {
     const [draft, setDraft] = useState(initial)

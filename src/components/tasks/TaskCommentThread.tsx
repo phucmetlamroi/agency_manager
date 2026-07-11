@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Send, Loader2, Lock, Pencil, Trash2, Check, X, CornerDownRight, SmilePlus, UserPlus, CircleDot, CheckCircle2, RotateCcw } from 'lucide-react'
 import { COMMENT_REACTIONS } from '@/lib/comment-reactions'
 import { renderCommentMarkdown } from '@/lib/comment-markdown'
+import { getDisplayName } from '@/lib/display-name'
 
 export interface ThreadReaction { emoji: string; count: number; mine: boolean }
 
@@ -332,8 +333,8 @@ export default function TaskCommentThread({
                     ) : res.map((m) => (
                         <button key={m.id} onClick={() => { setAssignFor(null); runAction(() => onAssign!(commentId, m.id)) }}
                             style={{ display: 'flex', alignItems: 'center', gap: 7, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 7, padding: '5px 7px', color: c.text }}>
-                            <Avatar name={m.nickname || m.username} />
-                            <span style={{ fontSize: 12.5 }}>{m.nickname || m.username}</span>
+                            <Avatar name={getDisplayName(m)} />
+                            <span style={{ fontSize: 12.5 }}>{getDisplayName(m)}</span>
                         </button>
                     ))}
                 </div>
@@ -520,8 +521,8 @@ export default function TaskCommentThread({
                                 return (
                                     <button key={m.id} onMouseDown={(e) => { e.preventDefault(); insertMention(m) }}
                                         style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 7, textAlign: 'left', cursor: 'pointer', borderRadius: 7, padding: '5px 7px', border: 'none', background: i === mentionIdx ? c.accentSoft : 'transparent', color: c.text }}>
-                                        <Avatar name={m.nickname || m.username} />
-                                        <span style={{ fontSize: 12.5, fontWeight: 600 }}>{m.nickname || m.username}</span>
+                                        <Avatar name={getDisplayName(m)} />
+                                        <span style={{ fontSize: 12.5, fontWeight: 600 }}>{getDisplayName(m)}</span>
                                         <span style={{ fontSize: 11, color: c.faint }}>@{m.username}</span>
                                         {relLabel && (
                                             <span style={{ marginLeft: 'auto', fontSize: 9.5, fontWeight: 700, color: c.mention, background: c.accentSoft, border: `1px solid ${c.accentLine}`, borderRadius: 999, padding: '1px 6px', flexShrink: 0 }}>{relLabel}</span>

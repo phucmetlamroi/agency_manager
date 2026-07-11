@@ -317,14 +317,17 @@ function ReviewPlayerShellInner({
   }, [assetId]);
 
   // [FR-04] Pending timecode/range shared between the composer (right) and the timeline
-  // (left). range-playback loops [in,out] once, pausing at the out-point.
+  // (left). range-playback LOOPS [in,out] (frame.io) until the range is cleared.
   const range = useRangeSelection();
-  const playRange = useRangePlayback(
+  const { playRange, stopRange } = useRangePlayback(
     controller.frame,
     controller.seekToFrame,
     controller.play,
-    controller.pause,
   );
+  // Turn the loop off the instant the range is cleared or collapsed to a point (✕ / composer close).
+  useEffect(() => {
+    if (!range.active || range.outFrame == null) stopRange();
+  }, [range.active, range.outFrame, stopRange]);
 
   // Annotation draw state (P4.4). Owned here because BOTH the overlay and the
   // composer read it. `viewAnno` is the read-only "show this comment's drawing"
@@ -903,6 +906,7 @@ function ReviewPlayerShellInner({
                     durationSec={controller.durationSec}
                     playheadFrame={controller.frame}
                     onPlayRange={playRange}
+                    onScrubFrame={controller.seekToFrame}
                   />
                 </>
               }

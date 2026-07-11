@@ -236,9 +236,13 @@ function GuestStage({
     const controller = useHlsPlayer({ videoRef, versionId: enabled ? version!.versionId : null, fps, enabled })
     const feed = useComments(version?.versionId ?? null)
 
-    // [FR-04] Pending timecode/range shared with the timeline; range-playback loops [in,out].
+    // [FR-04] Pending timecode/range shared with the timeline; range-playback LOOPS [in,out] (frame.io).
     const range = useRangeSelection()
-    const playRange = useRangePlayback(controller.frame, controller.seekToFrame, controller.play, controller.pause)
+    const { playRange, stopRange } = useRangePlayback(controller.frame, controller.seekToFrame, controller.play)
+    // Stop the loop the instant the range is cleared or collapsed to a point (✕ / composer close).
+    useEffect(() => {
+        if (!range.active || range.outFrame == null) stopRange()
+    }, [range.active, range.outFrame, stopRange])
 
     // Annotation (guest can draw — public comments carry drawings too).
     const annotation = useAnnotation()
@@ -586,6 +590,7 @@ function GuestStage({
                                         durationSec={controller.durationSec}
                                         playheadFrame={controller.frame}
                                         onPlayRange={playRange}
+                                        onScrubFrame={controller.seekToFrame}
                                     />
                                 </>
                             }

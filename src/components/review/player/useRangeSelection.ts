@@ -63,31 +63,36 @@ export function useRangeSelection(): RangeController {
 }
 
 /**
- * [FR-04] Range playback: play [inFrame, outFrame] once, then pause at the out-point.
- * A ref (not state) holds the stop frame so the frame-tick effect doesn't churn the
- * caller. `frame` is the live playhead; the other three are the controller's STABLE
- * methods, so this never re-subscribes on every frame.
+ * [FR-04 · frame.io range loop] Range playback: play [inFrame, outFrame] and LOOP —
+ * each time the playhead reaches the out-point, snap back to the in-point instead of
+ * stopping, so the span repeats until the reviewer clears/collapses the range. A ref
+ * (not state) holds the loop bounds so the frame-tick effect doesn't churn the caller.
+ * `frame` is the live playhead; `seekToFrame`/`play` are the controller's STABLE methods.
+ *
+ * `stopRange()` disarms the loop (playback then continues normally). The shell calls it
+ * whenever the range is cleared or collapsed to a point — that is the "turn the range
+ * off" affordance, together with the ✕ on the timeline marker.
  */
 export function useRangePlayback(
     frame: number,
     seekToFrame: (f: number) => void,
     play: () => void,
-    pause: () => void,
-): (inFrame: number, outFrame: number) => void {
-    const stopAtRef = useRef<number | null>(null)
+): { playRange: (inFrame: number, outFrame: number) => void; stopRange: () => void } {
+    const loopRef = useRef<{ inFrame: number; outFrame: number } | null>(null)
     const playRange = useCallback(
         (inFrame: number, outFrame: number) => {
-            stopAtRef.current = outFrame
+            loopRef.current = { inFrame, outFrame }
             seekToFrame(inFrame)
             play()
         },
         [seekToFrame, play],
     )
+    const stopRange = useCallback(() => {
+        loopRef.current = null
+    }, [])
     useEffect(() => {
-        if (stopAtRef.current != null && frame >= stopAtRef.current) {
-            stopAtRef.current = null
-            pause()
-        }
-    }, [frame, pause])
-    return playRange
+        const loop = loopRef.current
+        if (loop && frame >= loop.outFrame) seekToFrame(loop.inFrame)
+    }, [frame, seekToFrame])
+    return { playRange, stopRange }
 }

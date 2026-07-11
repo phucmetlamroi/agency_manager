@@ -31,6 +31,9 @@ interface MobileTaskCardProps {
     /** [FR-H2] Có request đổi status đang bay cho task này → khoá + hiện spinner. */
     pending?: boolean
     index?: number
+    /** [Owner review 2026-07-11] Thẻ TỐI GIẢN cho bảng theo dõi tiến độ admin: chỉ
+     *  vạch màu + tên + (status · người làm · deadline). Bỏ tiền / nút / menu để không vỡ. */
+    minimal?: boolean
 }
 
 export default function MobileTaskCard({
@@ -40,6 +43,7 @@ export default function MobileTaskCard({
     isAdmin,
     pending = false,
     index = 0,
+    minimal = false,
 }: MobileTaskCardProps) {
     // Unified status colour (hex + rgba bg) from the shared map.
     const statusInfo = getStatusInfo(task.status)
@@ -82,6 +86,47 @@ export default function MobileTaskCard({
         if (onQuickStatusChange) {
             onQuickStatusChange(task, status)
         }
+    }
+
+    // [Owner review 2026-07-11] Thẻ TỐI GIẢN cho bảng theo dõi tiến độ admin: vạch màu status +
+    // tên task + 1 dòng meta (status · người làm · deadline) tự wrap. KHÔNG tiền / nút / menu →
+    // không thể tràn/vỡ. Bấm cả thẻ mở chi tiết (đổi status trong drawer như thường).
+    if (minimal) {
+        const assigneeLabel = task.assignee
+            ? ((task.assignee as any).displayName?.trim() || `@${task.assignee.username}`)
+            : null
+        return (
+            <motion.div
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, delay: Math.min(index * 0.02, 0.2), ease: 'easeOut' }}
+                whileTap={{ scale: 0.99 }}
+                onClick={handleCardClick}
+                aria-busy={pending}
+                className="relative flex items-stretch gap-3 overflow-hidden rounded-xl border border-white/8 bg-zinc-950/60 cursor-pointer transition-colors active:bg-zinc-900/70"
+            >
+                <div className="w-1 shrink-0" style={{ backgroundColor: statusInfo.color }} />
+                <div className="min-w-0 flex-1 py-3 pr-3">
+                    <h3 className="line-clamp-2 break-words text-[15px] font-semibold leading-snug text-white">
+                        {task.title}
+                    </h3>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 font-medium" style={{ color: statusInfo.color }}>
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: statusInfo.color }} />
+                            {statusInfo.label}
+                        </span>
+                        {assigneeLabel && <span className="truncate">· {assigneeLabel}</span>}
+                        {task.deadline && (
+                            <span className={isOverdue ? 'font-semibold text-red-400' : ''}>
+                                · {new Date(task.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </motion.div>
+        )
     }
 
     return (

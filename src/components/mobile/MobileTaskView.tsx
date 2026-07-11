@@ -31,6 +31,21 @@ const TAB_LABELS: Record<TabKey, string> = {
 
 const TAB_ORDER: TabKey[] = ['DOING', 'ASSIGNED', 'REVISE', 'OVERDUE', 'ALL']
 
+// Count tasks for a given tab (shared by the badge counts + initial-tab picker).
+function countForTab(tasks: TaskWithUser[], tab: TabKey): number {
+    if (tab === 'ASSIGNED') return tasks.filter(t => t.status === 'Nhận task').length
+    if (tab === 'DOING') return tasks.filter(t => t.status === 'Đang thực hiện').length
+    if (tab === 'REVISE') return tasks.filter(t => t.status === 'Revision').length
+    if (tab === 'OVERDUE') return tasks.filter(t => t.status === 'Quá hạn').length
+    return tasks.length
+}
+
+// [FR-D2] Default tab = first tab (in TAB_ORDER) that actually has data; fall back
+// to ALL when every bucket is empty. Prevents landing on an empty "Đang làm" tab.
+function pickInitialTab(tasks: TaskWithUser[]): TabKey {
+    return TAB_ORDER.find(tab => countForTab(tasks, tab) > 0) ?? 'ALL'
+}
+
 /**
  * Build swipe actions per task based on FSM-valid transitions.
  * Right swipe = primary positive action (Bắt đầu / Nộp bài / Hoàn tất / Gửi lại).
@@ -101,7 +116,8 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
 
     // Filter State
     const [filteredTasks, setFilteredTasks] = useState<TaskWithUser[]>([])
-    const [activeTab, setActiveTab] = useState<TabKey>('DOING')
+    // [FR-D2] Initialise to the first non-empty tab so the default view has data.
+    const [activeTab, setActiveTab] = useState<TabKey>(() => pickInitialTab(tasks))
 
     // Hide skeleton after first paint (visual fade-in for immediate feedback)
     useEffect(() => {
@@ -119,13 +135,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
         setFilteredTasks(res)
     }, [tasks, activeTab])
 
-    const tabCount = (tab: TabKey): number => {
-        if (tab === 'ASSIGNED') return tasks.filter(t => t.status === 'Nhận task').length
-        if (tab === 'DOING') return tasks.filter(t => t.status === 'Đang thực hiện').length
-        if (tab === 'REVISE') return tasks.filter(t => t.status === 'Revision').length
-        if (tab === 'OVERDUE') return tasks.filter(t => t.status === 'Quá hạn').length
-        return tasks.length
-    }
+    const tabCount = (tab: TabKey): number => countForTab(tasks, tab)
 
     // [Sprint P audit-fix] handleTaskClick is dead code — MobileTaskCard
     // actually calls handleAction (line ~263 below: onAction={handleAction}).

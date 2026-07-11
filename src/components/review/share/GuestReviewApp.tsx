@@ -238,7 +238,7 @@ function GuestStage({
 
     // [FR-04] Pending timecode/range shared with the timeline; range-playback LOOPS [in,out] (frame.io).
     const range = useRangeSelection()
-    const { playRange, stopRange } = useRangePlayback(controller.frame, controller.seekToFrame, controller.play)
+    const { playRange, stopRange } = useRangePlayback(controller.frame, controller.seekToFrame, controller.play, controller.pause, controller.isPlaying)
     // Stop the loop the instant the range is cleared or collapsed to a point (✕ / composer close).
     useEffect(() => {
         if (!range.active || range.outFrame == null) stopRange()

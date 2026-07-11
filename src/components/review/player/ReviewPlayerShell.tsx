@@ -323,6 +323,8 @@ function ReviewPlayerShellInner({
     controller.frame,
     controller.seekToFrame,
     controller.play,
+    controller.pause,
+    controller.isPlaying,
   );
   // Turn the loop off the instant the range is cleared or collapsed to a point (✕ / composer close).
   useEffect(() => {

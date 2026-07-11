@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
     AlertTriangle,
     Check,
@@ -123,9 +123,10 @@ function SelectionCheck({ checked }: { checked: boolean }) {
     )
 }
 
-function FolderTile({ folder, selected, onToggle, onOpen }: {
+function FolderTile({ folder, selected, onSelect, onToggle, onOpen }: {
     folder: DocumentFolder
     selected: boolean
+    onSelect: (e: ReactMouseEvent) => void
     onToggle: () => void
     onOpen: () => void
 }) {
@@ -133,6 +134,7 @@ function FolderTile({ folder, selected, onToggle, onOpen }: {
         <div
             role="button"
             tabIndex={0}
+            onClick={onSelect}
             onDoubleClick={onOpen}
             onKeyDown={(e) => { if (e.key === 'Enter') onOpen() }}
             style={{
@@ -190,10 +192,11 @@ function FolderTile({ folder, selected, onToggle, onOpen }: {
     )
 }
 
-function AssetTile({ asset, selected, layout, onToggle, onOpen }: {
+function AssetTile({ asset, selected, layout, onSelect, onToggle, onOpen }: {
     asset: DocumentAsset
     selected: boolean
     layout: Layout
+    onSelect: (e: ReactMouseEvent) => void
     onToggle: () => void
     onOpen: () => void
 }) {
@@ -204,6 +207,7 @@ function AssetTile({ asset, selected, layout, onToggle, onOpen }: {
             <div
                 role="button"
                 tabIndex={0}
+                onClick={onSelect}
                 onDoubleClick={onOpen}
                 onKeyDown={(e) => { if (e.key === 'Enter') onOpen() }}
                 style={{
@@ -243,6 +247,7 @@ function AssetTile({ asset, selected, layout, onToggle, onOpen }: {
         <div
             role="button"
             tabIndex={0}
+            onClick={onSelect}
             onDoubleClick={onOpen}
             onKeyDown={(e) => { if (e.key === 'Enter') onOpen() }}
             style={{
@@ -363,6 +368,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
     const [expanded, setExpanded] = useState<Set<string>>(new Set())
     const [selected, setSelected] = useState<Set<string>>(new Set())
+    const [anchor, setAnchor] = useState<string | null>(null)
     const [downloading, setDownloading] = useState(false)
     const [downloadMessage, setDownloadMessage] = useState<string | null>(null)
 
@@ -483,6 +489,56 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
         else next.add(key)
         return next
     })
+
+    // [N4] Click-to-select like the admin file browser: a plain click selects one item,
+    // Ctrl/Cmd-click toggles it into the selection, Shift-click extends a range from the
+    // anchor. (The small ✓ badge stays as a direct toggle too.) Ordered over the current
+    // folder's folders-then-files, matching the on-screen order for Shift-range.
+    const orderedKeys = useMemo(
+        () => [...currentFolders.map((f) => folderKey(f.id)), ...currentAssets.map((a) => assetKey(a.id))],
+        [currentFolders, currentAssets],
+    )
+    const onItemClick = (key: string, e: ReactMouseEvent) => {
+        const additive = e.ctrlKey || e.metaKey
+        if (e.shiftKey && anchor) {
+            const a = orderedKeys.indexOf(anchor)
+            const b = orderedKeys.indexOf(key)
+            if (a >= 0 && b >= 0) {
+                const [lo, hi] = a < b ? [a, b] : [b, a]
+                setSelected((prev) => {
+                    const next = new Set(prev)
+                    for (const k of orderedKeys.slice(lo, hi + 1)) next.add(k)
+                    return next
+                })
+                return
+            }
+        }
+        if (additive) {
+            toggle(key)
+            setAnchor(key)
+            return
+        }
+        setSelected(new Set([key]))
+        setAnchor(key)
+    }
+
+    // Admin-parity keyboard: Esc clears the selection, Ctrl/Cmd+A selects the whole folder.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            const t = e.target as HTMLElement | null
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+            if (e.key === 'Escape') {
+                setSelected((prev) => (prev.size ? new Set() : prev))
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+                if (orderedKeys.length) {
+                    e.preventDefault()
+                    setSelected(new Set(orderedKeys))
+                }
+            }
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [orderedKeys])
 
     const downloadVersions = async (versionIds: string[]) => {
         if (!actions.downloadDocuments || versionIds.length === 0) return
@@ -642,6 +698,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
                                                             key={folder.id}
                                                             folder={folder}
                                                             selected={selected.has(folderKey(folder.id))}
+                                                            onSelect={(e) => onItemClick(folderKey(folder.id), e)}
                                                             onToggle={() => toggle(folderKey(folder.id))}
                                                             onOpen={() => {
                                                                 setCurrentFolderId(folder.id)
@@ -665,6 +722,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
                                                             asset={asset}
                                                             layout={layout}
                                                             selected={selected.has(assetKey(asset.id))}
+                                                            onSelect={(e) => onItemClick(assetKey(asset.id), e)}
                                                             onToggle={() => toggle(assetKey(asset.id))}
                                                             onOpen={() => {
                                                                 if (asset.reviewUrl) window.open(asset.reviewUrl, '_blank', 'noopener,noreferrer')

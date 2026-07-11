@@ -11,11 +11,10 @@ import { withShareRoute } from '@/lib/review/route-auth'
 import { getClientIp, limitDb } from '@/lib/review/rate-limit-db'
 import {
     GUEST_COOKIE_TTL_SEC,
-    createGuestSession,
-    getGuestSession,
     guestCookieAttrs,
     guestCookieName,
     requireShare,
+    resolveGuestForWrite,
 } from '@/lib/review/share-auth'
 import { createGuestComment, guestCreateCommentSchema } from '@/lib/review/share-comments'
 import { apiJson } from '@/lib/review/errors'
@@ -53,20 +52,14 @@ export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => 
     if (!parsed.ok) return parsed.res
     const { guest: guestInput, ...commentInput } = parsed.data
 
-    let guest = await getGuestSession(share, req.cookies)
-    let rawTokenToSet: string | null = null
-    if (!guest) {
-        if (!guestInput) {
-            return apiError(401, 'UNAUTHORIZED', 'Please add your name and email to comment.')
-        }
-        const created = await createGuestSession(share, {
-            name: guestInput.name,
-            email: guestInput.email.toLowerCase(),
-            userAgent: req.headers.get('user-agent')?.slice(0, 300) ?? null,
-        })
-        guest = created.session
-        rawTokenToSet = created.rawToken
-    }
+    // [P5] existing session → modal input → known-client auto-identity (throws 401 only
+    // when the visitor is anonymous AND the link has no client).
+    const { session: guest, rawToken: rawTokenToSet } = await resolveGuestForWrite(
+        share,
+        req.cookies,
+        guestInput ?? null,
+        req.headers.get('user-agent')?.slice(0, 300) ?? null,
+    )
 
     const result = await createGuestComment(share, guest, commentInput)
     const res = apiJson(result, { status: 201 })

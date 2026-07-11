@@ -1,5 +1,6 @@
 import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import TaskTable from '@/components/TaskTable'
+import MobileTaskView from '@/components/mobile/MobileTaskView'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -67,6 +68,21 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
     const shortForm = unassignedTasks.filter((t: any) => t.type === 'Short form').length
     const longForm  = unassignedTasks.filter((t: any) => t.type === 'Long form').length
     const trial     = unassignedTasks.filter((t: any) => t.type === 'Trial').length
+
+    // [Owner review 2026-07-11 / Cách A] Trên MOBILE, tab "Task" = BẢNG THEO DÕI TIẾN ĐỘ đầy đủ
+    // (TẤT CẢ task theo status, thẻ tối giản) thay vì chỉ hàng chờ giao — đây là "theo dõi tiến độ"
+    // chủ dự án tìm mãi không thấy. Desktop giữ nguyên trang hàng chờ giao bên dưới (không đụng).
+    if (await isMobileDevice()) {
+        return (
+            <MobileTaskView
+                tasks={serializeDecimal(tasks) as any}
+                isAdmin={true}
+                users={users}
+                workspaceId={workspaceId}
+                minimal
+            />
+        )
+    }
 
     return (
         <div className="flex flex-col gap-5 max-w-5xl mx-auto">

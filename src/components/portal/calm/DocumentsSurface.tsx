@@ -524,7 +524,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
 
     return (
         <div className="pc-view-in" style={{ padding: '24px', height: '100%', minHeight: 0 }}>
-            <div style={{ margin: '0 auto', maxWidth: 1280, height: '100%', minHeight: 520, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ margin: '0 auto', maxWidth: 'none', height: '100%', minHeight: 520, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}>
                     <div>
                         <p className="eyebrow" style={{ marginBottom: 5, color: VIOLET }}>Client document room</p>
@@ -541,7 +541,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
                     </div>
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0, borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.10)', background: '#07070A', boxShadow: '0 18px 50px rgba(0,0,0,0.22)' }}>
+                <div style={{ flex: 1, minHeight: 0, borderRadius: 14, overflow: 'hidden', border: '1px solid var(--line)' }}>
                     <div className="grid grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]" style={{ height: '100%', minHeight: 520 }}>
                         <aside className="hidden md:block" style={{ borderRight: '1px solid rgba(255,255,255,0.08)', background: '#0B0B10', padding: 14, overflow: 'auto' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 12px', color: '#71717A', fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em' }}>

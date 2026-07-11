@@ -152,10 +152,15 @@ export function PlayerControls({
                     />
                 </div>
                 {timelineChildren}
+                {/* frame.io-style playhead: a slim ~2px vertical needle that's always
+                    visible; the round knob only fades in on track hover (group-hover) so
+                    the resting state stays clean instead of the old thick 14px blob. */}
                 <div
-                    className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#0a0c10] bg-violet-100 shadow-[0_0_0_2px_rgba(167,139,250,0.84)]"
+                    className="pointer-events-none absolute top-1/2 z-20 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_4px_rgba(0,0,0,0.7)]"
                     style={{ left: `${progress * 100}%` }}
-                />
+                >
+                    <span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 scale-0 rounded-full bg-white opacity-0 shadow-[0_1px_4px_rgba(0,0,0,0.55)] transition duration-100 group-hover:scale-100 group-hover:opacity-100" />
+                </div>
                 {hover && (
                     <div
                         className="pointer-events-none absolute bottom-7 z-10 -translate-x-1/2"

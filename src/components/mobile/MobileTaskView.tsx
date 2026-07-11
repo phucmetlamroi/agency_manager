@@ -98,11 +98,13 @@ function buildSwipeActions(
     return { right, left }
 }
 
-export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
+export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, minimal = false }: {
     tasks: TaskWithUser[]
     isAdmin: boolean
     users?: { id: string; username: string; nickname?: string | null; displayName?: string | null }[]
     workspaceId: string
+    /** [Owner review 2026-07-11] Bảng theo dõi tiến độ admin dùng thẻ tối giản. */
+    minimal?: boolean
 }) {
     const router = useRouter()
     const { confirm } = useConfirm()
@@ -379,6 +381,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users }: {
                                                 onQuickStatusChange={handleQuickStatusChange}
                                                 pending={pendingStatusIds.has(task.id)}
                                                 index={idx}
+                                                minimal={minimal}
                                             />
                                         </SwipeableCard>
                                     </motion.div>

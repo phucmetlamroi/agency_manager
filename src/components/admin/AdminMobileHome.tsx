@@ -63,10 +63,17 @@ export default function AdminMobileHome({
                 <p className="min-w-0 truncate text-body text-muted-foreground">
                     Chào <span className="font-semibold text-foreground">{greetingName}</span> 👋
                 </p>
-                <span className="inline-flex h-11 shrink-0 items-center gap-1 rounded-lg glass-1 px-3 text-body-sm text-foreground">
+                {/* [Owner review 2026-07-11] "Tháng = workspace" — chevron trước đây là affordance
+                    GIẢ (span tĩnh, bấm không sổ). Nay badge dẫn thẳng tới trang đổi workspace/kỳ
+                    (đúng ý "đổi tháng" của chủ dự án). */}
+                <Link
+                    href="/api/profile/select"
+                    aria-label="Đổi kỳ / workspace"
+                    className="inline-flex h-11 shrink-0 items-center gap-1 rounded-lg glass-1 px-3 text-body-sm text-foreground transition-colors active:bg-white/10"
+                >
                     {periodLabel}
                     <ChevronDown size={16} className="text-muted-foreground" />
-                </span>
+                </Link>
             </div>
 
             {/* ── KPI ───────────────────────────────────────────── */}

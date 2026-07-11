@@ -10,7 +10,9 @@ import { cn } from '@/lib/utils'
 export const dynamic = 'force-dynamic'
 
 type IconType = React.ComponentType<{ className?: string }>
-interface Row { label: string; href: string; icon: IconType; treasurerOnly?: boolean }
+// [Owner review 2026-07-11] Mỗi dòng KÈM MÔ TẢ — chủ dự án không rõ "Phân tích"/"Thành viên/
+// Tổ chức" là gì + tìm mãi "theo dõi hiệu suất" (chính là Phân tích). Copy theo UI-UX-SPEC Phụ lục A.
+interface Row { label: string; desc: string; href: string; icon: IconType; treasurerOnly?: boolean }
 
 export default async function AdminMenuPage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId: ws } = await params
@@ -22,18 +24,18 @@ export default async function AdminMenuPage({ params }: { params: Promise<{ work
     const sections: { title: string; rows: Row[] }[] = [
         {
             title: 'Vận hành', rows: [
-                { label: 'Hộp thư yêu cầu', href: `/${ws}/admin/requests`, icon: Inbox },
-                { label: 'Bảng lương', href: `/${ws}/admin/payroll`, icon: Wallet },
-                { label: 'Tài chính', href: `/${ws}/admin/finance`, icon: Building2, treasurerOnly: true },
+                { label: 'Hộp thư yêu cầu', desc: 'Yêu cầu tạo task khách gửi vào', href: `/${ws}/admin/requests`, icon: Inbox },
+                { label: 'Bảng lương', desc: 'Lương & thanh toán theo kỳ', href: `/${ws}/admin/payroll`, icon: Wallet },
+                { label: 'Tài chính', desc: 'Thu chi của workspace', href: `/${ws}/admin/finance`, icon: Building2, treasurerOnly: true },
             ],
         },
         {
             title: 'Tổ chức', rows: [
-                { label: 'Thành viên', href: `/${ws}/admin/profile-members`, icon: UsersRound },
-                { label: 'Thùng rác tổ chức', href: `/${ws}/admin/profile-trash`, icon: Trash2 },
-                { label: 'Phân tích', href: `/${ws}/admin/analytics`, icon: Activity },
-                { label: 'Nhật ký hoạt động', href: `/${ws}/admin/audit-log`, icon: ScrollText },
-                { label: 'Cài đặt', href: `/${ws}/admin/settings`, icon: Settings },
+                { label: 'Thành viên', desc: 'Quản lý người trong tổ chức', href: `/${ws}/admin/profile-members`, icon: UsersRound },
+                { label: 'Phân tích hiệu suất', desc: 'Số liệu năng suất & lỗi của team', href: `/${ws}/admin/analytics`, icon: Activity },
+                { label: 'Nhật ký hoạt động', desc: 'Ai đã làm gì, khi nào', href: `/${ws}/admin/audit-log`, icon: ScrollText },
+                { label: 'Thùng rác tổ chức', desc: 'Khôi phục mục đã xoá', href: `/${ws}/admin/profile-trash`, icon: Trash2 },
+                { label: 'Cài đặt', desc: 'Tên, kết nối, tổ chức, vùng nguy hiểm', href: `/${ws}/admin/settings`, icon: Settings },
             ],
         },
     ]
@@ -53,12 +55,15 @@ export default async function AdminMenuPage({ params }: { params: Promise<{ work
                                     key={r.href}
                                     href={r.href}
                                     className={cn(
-                                        'flex min-h-[56px] items-center gap-3 px-4 py-3 text-sm text-zinc-200 transition-colors hover:bg-white/5',
+                                        'flex min-h-[56px] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/5',
                                         i > 0 && 'border-t border-white/5'
                                     )}
                                 >
                                     <r.icon className="h-5 w-5 shrink-0 text-primary-accent" />
-                                    <span className="flex-1">{r.label}</span>
+                                    <div className="min-w-0 flex-1">
+                                        <span className="block truncate text-sm text-zinc-100">{r.label}</span>
+                                        <span className="block truncate text-caption text-muted-foreground">{r.desc}</span>
+                                    </div>
                                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                                 </Link>
                             ))}

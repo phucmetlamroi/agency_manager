@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db'
 import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { computeWorkspaceFinance } from '@/lib/finance-helpers'
 import FinanceDashboardClient from '@/components/dashboard/FinanceDashboardClient'
+import { isMobileDevice } from '@/lib/device'
+import MobileFinance from '@/components/dashboard/MobileFinance'
 
 export default async function FinanceDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -67,6 +69,32 @@ export default async function FinanceDashboard({ params }: { params: Promise<{ w
             isCompleted: t.status === 'Ho\u00e0n t\u1ea5t',
         }
     })
+
+    // [Mobile P4.5 / M12] Dispatcher UA: mobile → MobileFinance (mirror CÙNG `finance`
+    // + `transactions` đã tính ở trên — KHÔNG tính lại). Gate `canViewFinance` (OWNER/
+    // ADMIN) ở TRÊN đã chặn non-admin nên mobile KHÔNG phải cổng lách (HARD INVARIANT #1/#4).
+    // Nhánh desktop <FinanceDashboardClient> bên dưới giữ NGUYÊN VẸN (0 byte diff).
+    if (await isMobileDevice()) {
+        return (
+            <MobileFinance
+                data={{
+                    totalRevenueVND: finance.totalRevenueVND,
+                    totalWageVND: finance.totalWageVND,
+                    netProfit: finance.netProfit,
+                    profitMargin: finance.profitMargin,
+                    completedCount: finance.completedCount,
+                    projectedRevenueVND: finance.projectedRevenueVND,
+                    projectedWageVND: finance.projectedWageVND,
+                    projectedNetProfit: finance.projectedNetProfit,
+                    projectedMargin: finance.projectedMargin,
+                    allTasksCount: finance.allTasksCount,
+                    pendingCount: finance.pendingCount,
+                    exchangeRate: finance.exchangeRate,
+                    transactions,
+                }}
+            />
+        )
+    }
 
     return (
         <FinanceDashboardClient

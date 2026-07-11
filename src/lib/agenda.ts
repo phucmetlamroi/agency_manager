@@ -5,8 +5,13 @@
 // "quá hạn" in the Attention block, not the forward agenda).
 
 import { getStatusInfo } from '@/lib/status-colors'
+import { isReviewPhaseStatus } from '@/lib/task-statuses'
 import type { WeekStripDay } from '@/components/dashboard/WeekStrip'
 import type { AgendaGroup } from '@/components/dashboard/AgendaList'
+
+/** Statuses that mean "an editor still has to fix this" (classic Revision + the two
+ *  feedback-fixing video statuses). Shared by the admin Attention block + editor Today. */
+export const REVISION_STATUSES = ['Revision', 'Đang sửa feedback (nội bộ)', 'Đã nhận feedback (khách)']
 
 export type AgendaTask = {
     id: string
@@ -100,4 +105,65 @@ export function buildWeekAndAgenda(
     }
 
     return { week, agenda }
+}
+
+export type TodayItem = {
+    id: string
+    title: string
+    statusColor: string
+    /** Short meta line, e.g. "Quá hạn 2 ngày" / "Sửa lại" / "Hạn 18:00 hôm nay". */
+    meta: string
+}
+
+/**
+ * [M2.2 · FR-C2.1] The editor "Hôm nay" block — ≤5 tasks that need attention today,
+ * in priority order: quá hạn → cần sửa (Revision) → đến hạn hôm nay. Tasks that are
+ * neither overdue, in revision, nor due today are omitted.
+ */
+export function buildTodayTasks(tasks: AgendaTask[], now: Date, limit = 5): TodayItem[] {
+    const today0 = startOfDay(now)
+    const tomorrow0 = new Date(today0.getTime() + 86400000)
+
+    type Ranked = { p: number; sortKey: number; item: TodayItem }
+    const ranked: Ranked[] = []
+
+    for (const t of tasks) {
+        const dl = t.deadline ? new Date(t.deadline) : null
+        const dlValid = dl && !isNaN(dl.getTime())
+        const isRevision = REVISION_STATUSES.includes(t.status)
+        const isOverdue =
+            !!dlValid &&
+            (dl as Date) < now &&
+            !isReviewPhaseStatus(t.status) &&
+            t.status !== 'Hoàn tất' &&
+            t.status !== 'Đã hủy'
+        const isDueToday = !!dlValid && (dl as Date) >= today0 && (dl as Date) < tomorrow0
+
+        let p: number
+        let meta: string
+        if (isOverdue) {
+            p = 0
+            // startOfDay rounds to day boundaries → integer day diff. Same-day-overdue
+            // (deadline earlier today) = 0 days → "Quá hạn hôm nay" (not "1 ngày").
+            const days = Math.round((today0.getTime() - startOfDay(dl as Date).getTime()) / 86400000)
+            meta = days <= 0 ? 'Quá hạn hôm nay' : `Quá hạn ${days} ngày`
+        } else if (isRevision) {
+            p = 1
+            meta = getStatusInfo(t.status).label
+        } else if (isDueToday) {
+            p = 2
+            meta = `Hạn ${hhmm(dl as Date)} hôm nay`
+        } else {
+            continue
+        }
+
+        ranked.push({
+            p,
+            sortKey: dlValid ? (dl as Date).getTime() : Number.MAX_SAFE_INTEGER,
+            item: { id: t.id, title: t.title, statusColor: getStatusInfo(t.status).color, meta },
+        })
+    }
+
+    ranked.sort((a, b) => (a.p !== b.p ? a.p - b.p : a.sortKey - b.sortKey))
+    return ranked.slice(0, limit).map((r) => r.item)
 }

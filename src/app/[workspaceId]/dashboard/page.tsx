@@ -20,6 +20,12 @@ import WidgetTotalTasks from '@/components/dashboard/widgets/WidgetTotalTasks'
 import UserWorkflowTabs from '@/components/dashboard/UserWorkflowTabs'
 import PendingInvitationsBanner from '@/components/workspace/PendingInvitationsBanner'
 import BonusRankBanner from '@/components/dashboard/BonusRankBanner'
+// [P3/M2] Mobile Today-first editor home (desktop bento below stays untouched — DR-2/3/4).
+import { isMobileDevice } from '@/lib/device'
+import EditorMobileHome from '@/components/dashboard/EditorMobileHome'
+import { getLeaderboardData } from '@/components/dashboard/Leaderboard'
+import { getDisplayName } from '@/lib/display-name'
+import { REVISION_STATUSES } from '@/lib/agenda'
 
 export const dynamic = 'force-dynamic'
 
@@ -191,6 +197,39 @@ export default async function UserDashboard({ params, searchParams }: {
               select: { id: true, name: true, description: true },
           })
         : []
+
+    // ── [P3/M2] MOBILE Today-first editor home ───────────────────────
+    // Desktop /dashboard keeps its bento (the `return` below) — DR-2/3/4. Mobile gets a
+    // 1-column Today-first layout composed from the SAME already-fetched (sanitized) tasks
+    // + salary totals + cached leaderboard (no new server actions — NFR-4.1).
+    const isMobileHome = await isMobileDevice()
+    if (isMobileHome) {
+        const needsFix = tasks.filter((t: any) => REVISION_STATUSES.includes(t.status)).length
+        const ownTasks = tasks.map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            deadline: t.deadline,
+            status: t.status,
+        }))
+        const leaderboardEntries = (await getLeaderboardData(workspaceId, profileId)).map((e: any) => ({
+            id: e.id,
+            username: e.username,
+            taskCount: e.taskCount,
+            avatarUrl: e.avatarUrl,
+        }))
+        return (
+            <EditorMobileHome
+                workspaceId={workspaceId}
+                greetingName={getDisplayName(currentUser, { fallback: 'bạn' })}
+                periodLabel={`Tháng ${now.getMonth() + 1}/${now.getFullYear()}`}
+                currentUserId={userId}
+                salary={{ received: earnedTotal + bonusAmount, sparkline, taskCount: completedCount }}
+                stats={{ doing: inProgressTasks, needsFix, rank: bonusRank, completed: completedCount }}
+                ownTasks={ownTasks}
+                leaderboard={leaderboardEntries}
+            />
+        )
+    }
 
     return (
         <div className="flex flex-col gap-5">

@@ -40,8 +40,9 @@ const LABELS = ['', 'Quá yếu', 'Yếu', 'Trung bình', 'Khá', 'Mạnh']
 
 export default function PasswordStrengthMeter({ password }: Props) {
     const s = score(password)
+    // [M14/f_0024] mt-2 tách bar khỏi input để không dính mép nhìn nhầm border.
     return (
-        <div className="mt-1.5">
+        <div className="mt-2">
             <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map((bar) => (
                     <div
@@ -52,7 +53,7 @@ export default function PasswordStrengthMeter({ password }: Props) {
                 ))}
             </div>
             {password && (
-                <p className="text-[11px] mt-1" style={{ color: COLORS[s] }}>
+                <p className="text-caption mt-1.5" style={{ color: COLORS[s] }}>
                     {LABELS[s]}
                 </p>
             )}

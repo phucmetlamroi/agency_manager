@@ -6,7 +6,7 @@
 
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
-import { resolveShareGate, getGuestSession } from '@/lib/review/share-auth'
+import { resolveShareGate, getGuestSession, resolveShareClient } from '@/lib/review/share-auth'
 import { buildGuestShareContent } from '@/lib/review/share-guest'
 import { GuestReviewApp } from '@/components/review/share/GuestReviewApp'
 import { GateScreen, PasswordGate } from '@/components/review/share/GateScreens'
@@ -38,7 +38,11 @@ export default async function GuestSharePage({ params }: { params: Promise<{ slu
     }
 
     const guest = await getGuestSession(gate.share, cookieStore)
-    const content = await buildGuestShareContent(gate.share, guest?.name ?? null)
+    // [P5] Skip the Name/Email modal for the agency's own client — a task-created share is
+    // that client's link, so pre-seed the client name (resolved server-side). External
+    // (Team) links with no client keep the modal. Runs only when there's no guest cookie.
+    const displayName = guest?.name ?? (await resolveShareClient(gate.share))?.name ?? null
+    const content = await buildGuestShareContent(gate.share, displayName)
     if (content.items.length === 0) {
         // Everything behind the link is in the trash → same "unavailable" screen (FR-B13 AC5).
         return <GateScreen kind="unavailable" />

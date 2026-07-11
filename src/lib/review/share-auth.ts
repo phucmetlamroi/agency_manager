@@ -175,6 +175,82 @@ export async function createGuestSession(
     return { session, rawToken }
 }
 
+// ─────────────────────────── [P5] known-client auto-identity ───────────────────────────
+
+/**
+ * Resolve the CLIENT a share is FOR. A share created from a task (`share.taskId`) belongs
+ * to that task's client, so the link IS that client's link. Returns null for Team-level
+ * shares (no task) or when the client is absent / not ACTIVE — those keep the guest
+ * Name+Email modal (truly external recipients).
+ */
+export async function resolveShareClient(share: ShareLink): Promise<{ id: number; name: string } | null> {
+    if (!share.taskId) return null
+    const task = await prisma.task.findUnique({
+        where: { id: share.taskId },
+        select: { client: { select: { id: true, name: true, status: true } } },
+    })
+    const c = task?.client
+    if (!c || c.status !== 'ACTIVE') return null
+    return { id: c.id, name: c.name }
+}
+
+/**
+ * [P5, owner opt-in] For a share tied to a known client, provision a GuestSession
+ * identified AS that client — so the agency's own clients never see the Name/Email modal
+ * (only external share-link recipients do). The email is a synthetic, non-routable address
+ * (`.invalid`, RFC 2606) because Client has no email column, and emailVerifiedAt is set so
+ * the FR-11 PIN double-opt-in never emails it. This is SAFE: the guest email is only ever
+ * used by that PIN flow — the comment path notifies staff only, never the guest.
+ */
+export async function createLinkClientGuestSession(
+    share: ShareLink,
+    opts: { userAgent?: string | null } = {},
+): Promise<{ session: GuestSession; rawToken: string } | null> {
+    const client = await resolveShareClient(share)
+    if (!client) return null
+    const rawToken = randomBytes(32).toString('base64url')
+    const session = await prisma.guestSession.create({
+        data: {
+            shareLinkId: share.id,
+            tokenHash: sha256hex(rawToken),
+            name: client.name,
+            email: `noreply+client-${client.id}@review.invalid`,
+            emailVerifiedAt: new Date(),
+            userAgent: opts.userAgent ?? null,
+        },
+    })
+    return { session, rawToken }
+}
+
+/**
+ * Resolve the guest session for a WRITE route, in order: (1) the existing rv_guest cookie
+ * session, (2) the { name, email } the modal submitted (external guest, first write), or
+ * (3) the share's own client (known-client auto-identity, no modal). Throws 401 only when
+ * the visitor is truly anonymous AND the link has no client. `rawToken` is non-null when a
+ * session was just created — the caller MUST set the rv_guest cookie with it on the response.
+ */
+export async function resolveGuestForWrite(
+    share: ShareWithItems,
+    cookies: CookieReader,
+    guestInput: { name: string; email: string } | null,
+    userAgent: string | null,
+    denyMessage = 'Please add your name and email to comment.',
+): Promise<{ session: GuestSession; rawToken: string | null }> {
+    const existing = await getGuestSession(share, cookies)
+    if (existing) return { session: existing, rawToken: null }
+    if (guestInput) {
+        const created = await createGuestSession(share, {
+            name: guestInput.name,
+            email: guestInput.email.toLowerCase(),
+            userAgent,
+        })
+        return { session: created.session, rawToken: created.rawToken }
+    }
+    const linkGuest = await createLinkClientGuestSession(share, { userAgent })
+    if (linkGuest) return linkGuest
+    throw apiError(401, 'UNAUTHORIZED', denyMessage)
+}
+
 /** Standard attributes for every guest-facing cookie we set. */
 export function guestCookieAttrs(maxAgeSec: number) {
     return {

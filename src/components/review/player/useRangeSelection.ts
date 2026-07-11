@@ -63,25 +63,31 @@ export function useRangeSelection(): RangeController {
 }
 
 /**
- * [FR-04 · frame.io range loop] Range playback: play [inFrame, outFrame] and LOOP —
- * each time the playhead reaches the out-point, snap back to the in-point instead of
- * stopping, so the span repeats until the reviewer clears/collapses the range. A ref
- * (not state) holds the loop bounds so the frame-tick effect doesn't churn the caller.
- * `frame` is the live playhead; `seekToFrame`/`play` are the controller's STABLE methods.
+ * [FR-04 · range playback, owner-specified] Play [inFrame, outFrame], then STOP at the
+ * out-point (never run past the range). Pressing play again REPLAYS within the range
+ * (seek back to the in-point) — "dừng ở cuối, bấm play thì lặp lại trong khoảng, cứ thế".
+ * Refs (not state) hold the bounds + the at-end latch so the frame-tick effect never
+ * churns the caller. `frame`/`isPlaying` are live; `seekToFrame`/`play`/`pause` are the
+ * controller's STABLE methods.
  *
- * `stopRange()` disarms the loop (playback then continues normally). The shell calls it
- * whenever the range is cleared or collapsed to a point — that is the "turn the range
- * off" affordance, together with the ✕ on the timeline marker.
+ * `stopRange()` disarms it (the shell calls it when the range is cleared/collapsed — the
+ * "turn the range off" affordance, together with the ✕ on the timeline marker).
  */
 export function useRangePlayback(
     frame: number,
     seekToFrame: (f: number) => void,
     play: () => void,
+    pause: () => void,
+    isPlaying: boolean,
 ): { playRange: (inFrame: number, outFrame: number) => void; stopRange: () => void } {
     const loopRef = useRef<{ inFrame: number; outFrame: number } | null>(null)
+    const atEndRef = useRef(false) // reached the out-point and paused there
+    const wasPlayingRef = useRef(isPlaying)
+
     const playRange = useCallback(
         (inFrame: number, outFrame: number) => {
             loopRef.current = { inFrame, outFrame }
+            atEndRef.current = false
             seekToFrame(inFrame)
             play()
         },
@@ -89,10 +95,32 @@ export function useRangePlayback(
     )
     const stopRange = useCallback(() => {
         loopRef.current = null
+        atEndRef.current = false
     }, [])
+
+    // Reaching the out-point PAUSES at the end of the range. The at-end latch clears if
+    // the playhead later moves back inside the range (e.g. a manual seek).
     useEffect(() => {
         const loop = loopRef.current
-        if (loop && frame >= loop.outFrame) seekToFrame(loop.inFrame)
-    }, [frame, seekToFrame])
+        if (!loop) return
+        if (!atEndRef.current && frame >= loop.outFrame) {
+            atEndRef.current = true
+            pause()
+        } else if (atEndRef.current && frame < loop.outFrame - 1) {
+            atEndRef.current = false
+        }
+    }, [frame, pause])
+
+    // Pressing play after the range ended → replay WITHIN the range (seek to in), instead
+    // of running past it.
+    useEffect(() => {
+        const started = isPlaying && !wasPlayingRef.current
+        wasPlayingRef.current = isPlaying
+        if (started && loopRef.current && atEndRef.current) {
+            atEndRef.current = false
+            seekToFrame(loopRef.current.inFrame)
+        }
+    }, [isPlaying, seekToFrame])
+
     return { playRange, stopRange }
 }

@@ -238,7 +238,7 @@ function GuestStage({
 
     // [FR-04] Pending timecode/range shared with the timeline; range-playback LOOPS [in,out] (frame.io).
     const range = useRangeSelection()
-    const { playRange, stopRange } = useRangePlayback(controller.frame, controller.seekToFrame, controller.play)
+    const { playRange, stopRange } = useRangePlayback(controller.frame, controller.seekToFrame, controller.play, controller.pause, controller.isPlaying)
     // Stop the loop the instant the range is cleared or collapsed to a point (✕ / composer close).
     useEffect(() => {
         if (!range.active || range.outFrame == null) stopRange()
@@ -501,9 +501,9 @@ function GuestStage({
                             disabled={!canDownload}
                             title={canDownload ? 'Download the original file' : 'Download unlocks after approval.'}
                             aria-label={canDownload ? 'Download the original file' : 'Download unlocks after approval'}
-                            className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-white/70 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:text-white/25"
+                            className="flex h-8 items-center gap-1.5 rounded-md border border-white/15 bg-white/[0.05] px-3 text-xs font-semibold text-white transition hover:border-white/30 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:border-white/[0.08] disabled:bg-transparent disabled:text-white/25"
                         >
-                            <Download className="h-4 w-4" /> <span className="hidden xl:inline">Download</span>
+                            <Download className="h-4 w-4" /> <span>Download</span>
                         </button>
                     )}
 

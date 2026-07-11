@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import CreateClientButton from '@/components/crm/CreateClientButton'
 import MobileClientCard, { computeClientMetrics, type ClientNode, type ClientMetrics } from './MobileClientCard'
 import ClientSheet from './ClientSheet'
+import MobileInvoiceFlow from '@/components/invoice/MobileInvoiceFlow'
 import SwipeableCard from '@/components/mobile/SwipeableCard'
 import { EmptyState } from '@/components/ui/empty-state'
 import { createClientShareLink } from '@/actions/share-link-actions'
@@ -54,6 +55,13 @@ export default function MobileClientList({ clients, workspaceId }: { clients: Cl
     const [sheetOpen, setSheetOpen] = useState(false)
     const [editingClient, setEditingClient] = useState<ClientNode | null>(null)
     const [editName, setEditName] = useState('')
+
+    // [PR#3] Invoice 2-step flow — opened from the sheet, rendered full-screen at list level.
+    const [invoiceClient, setInvoiceClient] = useState<ClientNode | null>(null)
+    const handleInvoice = (client: ClientNode) => {
+        setSheetOpen(false)
+        setInvoiceClient(client)
+    }
 
     const openSheet = (client: ClientNode) => {
         setSelectedClient(client)
@@ -322,7 +330,19 @@ export default function MobileClientList({ clients, workspaceId }: { clients: Cl
                 onEdit={handleEdit}
                 onPortal={handlePortal}
                 portalPending={selectedClient !== null && portalPendingId === selectedClient.id}
+                onInvoice={handleInvoice}
             />
+
+            {/* ── Invoice 2-step full-screen flow (PR#3) ── */}
+            {invoiceClient && (
+                <MobileInvoiceFlow
+                    open={!!invoiceClient}
+                    onClose={() => setInvoiceClient(null)}
+                    clientId={invoiceClient.id}
+                    clientName={invoiceClient.name}
+                    workspaceId={workspaceId}
+                />
+            )}
 
             {/* ── Dialog Sửa tên (giữ nguyên server action updateClient) ── */}
             <Dialog open={!!editingClient} onOpenChange={(o) => !o && setEditingClient(null)}>

@@ -7,7 +7,7 @@
 import { useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Pencil, Trash2, Share2 } from 'lucide-react'
+import { Pencil, Trash2, Share2, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { MobileSheet } from '@/components/ui/mobile-sheet'
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,7 @@ export default function ClientSheet({
     onEdit,
     onPortal,
     portalPending = false,
+    onInvoice,
 }: {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -45,6 +46,8 @@ export default function ClientSheet({
     /** [design-handoff 2c] Tạo + copy link Portal khách (createClientShareLink) — do list xử lý. */
     onPortal?: (client: ClientNode) => void
     portalPending?: boolean
+    /** [design-handoff §3 / PR#3] Mở flow tạo hóa đơn 2 bước — do list mở MobileInvoiceFlow. */
+    onInvoice?: (client: ClientNode) => void
 }) {
     const router = useRouter()
     const { confirm } = useConfirm()
@@ -95,6 +98,13 @@ export default function ClientSheet({
                         {/* Client model chưa có trường liên hệ/email → hiển thị placeholder, không bịa dữ liệu. */}
                         <Field label="Liên hệ" value="Chưa cập nhật" valueClassName="text-muted-foreground font-normal" />
                     </dl>
+
+                    {/* Tạo hóa đơn 2 bước (mobile) */}
+                    {onInvoice && (
+                        <Button className="h-12 w-full gap-2" onClick={() => onInvoice(client)}>
+                            <FileText className="h-4 w-4" /> Tạo hóa đơn
+                        </Button>
+                    )}
 
                     {/* Xem trang khách → spoke /admin/crm/[id] */}
                     <Button asChild variant="outline" className="h-12 w-full">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Drawer } from "vaul"
 import { TaskWithUser } from "@/types/admin"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,7 @@ import { isReviewPhaseStatus } from "@/lib/task-statuses"
 import { assignTask } from "@/actions/task-management-actions"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { useHistoryBackClose } from "@/hooks/useHistoryBackClose"
 
 interface TaskDrawerProps {
     open: boolean
@@ -77,6 +78,14 @@ export function TaskDrawer({
     const router = useRouter()
     const [showAssignPicker, setShowAssignPicker] = useState(false)
     const [isAssigning, setIsAssigning] = useState(false)
+    // [P2 FR-D5 / QĐ-6] vaul controlled snap — mở mặc định ở 0.45 (peek), kéo lên 0.96 (full).
+    const [snap, setSnap] = useState<number | string | null>(0.45)
+    // [P2 FR-G3] Back gesture đóng drawer thay vì rời trang; cleanup của hook tự dọn history entry
+    // khi đóng bằng UI (nút Đóng / kéo xuống / tap scrim) — cùng cơ chế guard như AccountSheet.
+    const close = useCallback(() => onOpenChange(false), [onOpenChange])
+    useHistoryBackClose(open, close)
+    // Mỗi lần mở lại luôn về snap peek 0.45 (không giữ 0.96 của lần trước).
+    useEffect(() => { if (open) setSnap(0.45) }, [open])
 
     if (!task) return null
     const clientLabel = formatClientHierarchy(task.client)
@@ -112,10 +121,19 @@ export function TaskDrawer({
     }
 
     return (
-        <Drawer.Root open={open} onOpenChange={onOpenChange}>
+        <Drawer.Root
+            open={open}
+            onOpenChange={onOpenChange}
+            snapPoints={[0.45, 0.96]}
+            activeSnapPoint={snap}
+            setActiveSnapPoint={setSnap}
+            fadeFromIndex={1}
+            snapToSequentialPoint
+            repositionInputs={false}
+        >
             <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm" />
-                <Drawer.Content className="bg-zinc-950 flex flex-col rounded-t-[20px] h-[92%] mt-24 fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 outline-none">
+                <Drawer.Overlay className="fixed inset-0 bg-black/50 z-sheet backdrop-blur-sm" />
+                <Drawer.Content className="bg-zinc-950 flex flex-col rounded-t-[20px] h-[96%] fixed bottom-0 left-0 right-0 z-sheet border-t border-white/10 outline-none">
                     <div className="p-4 bg-zinc-950 rounded-t-[20px] flex-1 overflow-auto">
                         <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-zinc-700 mb-6" />
 

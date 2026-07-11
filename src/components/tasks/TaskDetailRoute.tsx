@@ -1,26 +1,30 @@
 "use client"
 
-// [P2-D3] Client wrapper that adapts the existing TaskDetailModal to a ROUTE.
+// [P2-D3/D4] Client wrapper that adapts task detail to a ROUTE, branching by device:
+//  - mobile → TaskDetailMobile (M5 full-screen page: 3 tabs + composer-above-keyboard)
+//  - desktop → TaskDetailModal (existing drawer; unchanged)
 // The route's presence IS the "open" state; closing navigates back (router.back
-// falls back to the workspace root when there's no history — e.g. a fresh
-// deep-link load). Reuses TaskDetailModal verbatim so behavior + edit/save flows
-// are identical to the desktop modal (the polished M5 mobile layout comes in PR3).
+// falls back to the workspace root when there's no history — e.g. a fresh deep-link).
 
 import { useCallback } from "react"
 import { useRouter } from "next/navigation"
 import type { TaskWithUser } from "@/types/admin"
+import type { DeviceType } from "@/lib/device"
 import { TaskDetailModal } from "./TaskDetailModal"
+import { TaskDetailMobile } from "./TaskDetailMobile"
 
 export function TaskDetailRoute({
     task,
     isAdmin,
     currentUserId,
     workspaceId,
+    deviceType,
 }: {
     task: TaskWithUser
     isAdmin: boolean
     currentUserId: string
     workspaceId: string
+    deviceType: DeviceType
 }) {
     const router = useRouter()
 
@@ -33,6 +37,18 @@ export function TaskDetailRoute({
             router.push(`/${workspaceId}`)
         }
     }, [router, workspaceId])
+
+    if (deviceType === 'mobile') {
+        return (
+            <TaskDetailMobile
+                task={task}
+                isAdmin={isAdmin}
+                currentUserId={currentUserId}
+                workspaceId={workspaceId}
+                onClose={handleClose}
+            />
+        )
+    }
 
     return (
         <TaskDetailModal

@@ -7,7 +7,7 @@ import ProfileForm from '@/components/ProfileForm'
 import PaymentQrUpload from '@/components/profile/PaymentQrUpload'
 import AvatarUpload from '@/components/profile/AvatarUpload'
 import NotificationSettings from '@/components/profile/NotificationSettings'
-import { UserCircle, CreditCard, ShieldCheck, Bell } from 'lucide-react'
+import { UserCircle, CreditCard, Bell } from 'lucide-react'
 
 export default async function ProfilePage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -26,23 +26,15 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
     if (!user) redirect('/login')
 
     return (
-        <div className="max-w-3xl mx-auto space-y-10 pb-20 pt-4">
+        <div className="max-w-3xl mx-auto space-y-8 pb-24 pt-2">
 
-            {/* ── Page Header ───────────────────────────── */}
-            <div className="text-center space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary-accent text-[11px] font-bold uppercase tracking-wider mb-2">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Cài đặt tài khoản
-                </div>
-                <h1 className="text-3xl font-black text-white italic tracking-tighter">
-                    THÔNG TIN CÁ NHÂN
-                </h1>
-                <p className="text-muted-foreground text-sm max-w-sm mx-auto font-medium">Quản lý hồ sơ, bảo mật và thông tin thanh toán của bạn.</p>
-            </div>
+            {/* [M10/FR-F3.1/FR-F3.2] Hero ALL-CAPS "THÔNG TIN CÁ NHÂN" (tiêu đề lặp, chiếm trọn
+                màn đầu — f_0089/f_0106) đã xóa cả desktop lẫn mobile. Vào thẳng avatar row gọn. */}
 
             {/* ── Avatar Section ── */}
             <div className="relative">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/10 blur-[100px] rounded-full pointer-events-none" />
+                {/* Ambient orb: chỉ desktop (QĐ-11 — ngân sách blur mobile) */}
+                <div className="absolute top-1/2 left-1/2 hidden -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/10 blur-[100px] rounded-full pointer-events-none md:block" />
                 <AvatarUpload user={user} />
             </div>
 

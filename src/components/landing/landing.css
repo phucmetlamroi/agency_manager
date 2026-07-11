@@ -359,6 +359,17 @@ html {
   font-size: 0.92rem;
 }
 
+/* [M17/FR-A9/f_0004] Kill the mobile tap-flash + accidental text-selection on interactive
+   chrome only (nav links, buttons/CTAs, skip-link) — body/marketing copy stays selectable. */
+.htl .site-nav a,
+.htl .btn,
+.htl .site-header__cta,
+.htl .skip-link {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* ---------------------------------------------------------------
    Layout primitives
 --------------------------------------------------------------- */
@@ -418,6 +429,8 @@ html {
   letter-spacing: 0.22em;
   color: var(--sand);
   margin-bottom: 1.4rem;
+  /* [M17/FR-J1.2/f_0015] mono eyebrow không rơi "NGẮN" xuống dòng riêng khi wrap */
+  text-wrap: balance;
 }
 
 .htl .eyebrow--amber {

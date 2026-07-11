@@ -2,29 +2,16 @@
 
 import { TaskWithUser } from '@/types/admin'
 import { motion } from 'framer-motion'
-import { MoreVertical, Play, Send, CheckCircle2, Pause, AlertTriangle, Clock } from 'lucide-react'
+import { MoreVertical, Play, Send, CheckCircle2, Pause, AlertTriangle, Clock, Loader2 } from 'lucide-react'
 import * as Popover from '@radix-ui/react-popover'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
 import { taskTypeLabel } from '@/lib/display-labels'
 import { isReviewPhaseStatus } from '@/lib/task-statuses'
+import { getStatusInfo } from '@/components/tasks/detail-sections/_shared'
 
-// ─── Status palette aligned với design-system ─────────────────
-// emerald=success, indigo=pending, amber=in-progress, red=urgent
-// rose=cancelled, sky=waiting, violet=initial, pink=variant
-const STATUS_PALETTE: Record<string, { dot: string; text: string; bg: string }> = {
-    'Đang đợi giao': { dot: 'bg-violet-500', text: 'text-violet-300', bg: 'bg-violet-500/10' },
-    'Nhận task': { dot: 'bg-sky-500', text: 'text-sky-300', bg: 'bg-sky-500/10' },
-    'Đang thực hiện': { dot: 'bg-amber-500', text: 'text-amber-300', bg: 'bg-amber-500/10' },
-    'Revision': { dot: 'bg-red-500', text: 'text-red-300', bg: 'bg-red-500/10' },
-    'Sửa frame': { dot: 'bg-pink-500', text: 'text-pink-300', bg: 'bg-pink-500/10' },
-    'Gửi lại': { dot: 'bg-sky-500', text: 'text-sky-300', bg: 'bg-sky-500/10' },
-    'Tạm ngưng': { dot: 'bg-zinc-500', text: 'text-zinc-300', bg: 'bg-zinc-500/10' },
-    'Quá hạn': { dot: 'bg-red-600', text: 'text-red-400', bg: 'bg-red-600/10' },
-    'Hoàn tất': { dot: 'bg-emerald-500', text: 'text-emerald-300', bg: 'bg-emerald-500/10' },
-    'Đã hủy': { dot: 'bg-rose-500', text: 'text-rose-300', bg: 'bg-rose-500/10' },
-}
-
+// Status colours now come from the shared getStatusInfo map (single source of
+// truth — see @/components/tasks/detail-sections/_shared). Icons stay local.
 const STATUS_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
     'Đang thực hiện': Play,
     'Revision': Send,
@@ -41,6 +28,8 @@ interface MobileTaskCardProps {
     onAction: (task: TaskWithUser) => void
     onQuickStatusChange?: (task: TaskWithUser, newStatus: string) => void
     isAdmin: boolean
+    /** [FR-H2] Có request đổi status đang bay cho task này → khoá + hiện spinner. */
+    pending?: boolean
     index?: number
 }
 
@@ -49,13 +38,11 @@ export default function MobileTaskCard({
     onAction,
     onQuickStatusChange,
     isAdmin,
+    pending = false,
     index = 0,
 }: MobileTaskCardProps) {
-    const palette = STATUS_PALETTE[task.status] ?? {
-        dot: 'bg-zinc-500',
-        text: 'text-zinc-300',
-        bg: 'bg-zinc-500/10',
-    }
+    // Unified status colour (hex + rgba bg) from the shared map.
+    const statusInfo = getStatusInfo(task.status)
 
     const isOverdue = task.deadline
         && new Date() > new Date(task.deadline)
@@ -83,6 +70,7 @@ export default function MobileTaskCard({
 
     const handlePrimaryAction = (e: React.MouseEvent) => {
         e.stopPropagation()
+        if (pending) return
         if (primaryActionStatus && onQuickStatusChange) {
             onQuickStatusChange(task, primaryActionStatus)
         }
@@ -90,6 +78,7 @@ export default function MobileTaskCard({
 
     const handleQuickAction = (e: React.MouseEvent, status: string) => {
         e.stopPropagation()
+        if (pending) return
         if (onQuickStatusChange) {
             onQuickStatusChange(task, status)
         }
@@ -106,35 +95,49 @@ export default function MobileTaskCard({
             onClick={handleCardClick}
             className="relative bg-zinc-950/60 backdrop-blur-xl rounded-2xl border border-white/8 shadow-xl shadow-black/30 overflow-hidden cursor-pointer"
         >
-            {/* Status accent bar (left) */}
-            <div className={`absolute left-0 top-0 bottom-0 w-1 ${palette.dot}`} />
+            {/* Status accent bar (left) — unified status colour */}
+            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: statusInfo.color }} />
 
-            <div className="p-4 pl-5">
-                {/* ── Header row: type + 3-dot menu ── */}
-                <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
-                                {taskTypeLabel(task.type) || 'TASK'}
+            <div className="p-3.5 pl-4">
+                {/* ── Line 1: meta (type · client) + deadline ── */}
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex-shrink-0">
+                            {taskTypeLabel(task.type) || 'TASK'}
+                        </span>
+                        {clientLabel && (
+                            <span className="text-[10px] uppercase font-medium text-primary-accent tracking-wide truncate">
+                                · {clientLabel}
                             </span>
-                            {clientLabel && (
-                                <span className="text-[10px] uppercase font-medium text-primary-accent tracking-wide truncate">
-                                    · {clientLabel}
-                                </span>
-                            )}
-                        </div>
-                        <h3 className="text-white font-extrabold text-base leading-tight line-clamp-2 tracking-tight">
-                            {task.title}
-                        </h3>
+                        )}
                     </div>
 
-                    {/* Real 3-dot menu (Popover) */}
+                    {task.deadline && (
+                        <div className={`flex items-center gap-1 text-[11px] flex-shrink-0 ${isOverdue ? 'text-red-400 font-bold' : 'text-muted-foreground'}`}>
+                            <Clock className="w-3 h-3" />
+                            <span className="font-mono">
+                                {new Date(task.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                                {' '}
+                                {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Line 2: title + 3-dot menu (44×44 effective tap target) ── */}
+                <div className="flex items-start justify-between gap-1">
+                    <h3 className="text-white font-extrabold text-base leading-tight line-clamp-2 break-words min-w-0 flex-1 tracking-tight">
+                        {task.title}
+                    </h3>
+
+                    {/* Real 3-dot menu (Popover) — bg is transparent so the 44px box is invisible hit-area */}
                     {validNextStatuses.length > 0 && (
                         <Popover.Root>
                             <Popover.Trigger asChild>
                                 <button
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex-shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors"
+                                    disabled={pending}
+                                    className="flex-shrink-0 flex items-center justify-center w-11 h-11 -mr-1.5 rounded-lg text-muted-foreground hover:text-zinc-200 hover:bg-white/5 active:bg-white/10 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                                     aria-label="Thao tác nhanh"
                                 >
                                     <MoreVertical className="w-4 h-4" />
@@ -167,32 +170,20 @@ export default function MobileTaskCard({
                     )}
                 </div>
 
-                {/* ── Status pill + Deadline row ── */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${palette.bg} border border-white/5`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${palette.dot}`} />
-                        <span className={`text-[11px] font-semibold ${palette.text}`}>
-                            {task.status}
+                {/* ── Line 3: status pill + value/assignee + inline action ── */}
+                <div className="flex items-center justify-between gap-2 mt-2.5">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold min-w-0 max-w-full"
+                            style={{ background: statusInfo.bg, color: statusInfo.color, border: `1px solid color-mix(in srgb, ${statusInfo.color} 18.82%, transparent)` }}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusInfo.color }} />
+                            <span className="truncate">{statusInfo.label}</span>
                         </span>
-                    </div>
 
-                    {task.deadline && (
-                        <div className={`flex items-center gap-1 text-[11px] ${isOverdue ? 'text-red-400 font-bold' : 'text-muted-foreground'}`}>
-                            <Clock className="w-3 h-3" />
-                            <span className="font-mono">
-                                {new Date(task.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
-                                {' '}
-                                {new Date(task.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                {/* ── Footer: value (admin) / assignee (user) + inline action ── */}
-                <div className="flex items-center justify-between gap-2 pt-3 border-t border-white/5">
-                    <div className="flex items-center gap-2 min-w-0">
+                        {/* Money must never truncate (zero-data-loss); pill shrinks first. */}
                         {isAdmin ? (
-                            <span className="font-mono font-bold text-emerald-400 text-sm drop-shadow-[0_0_6px_rgba(52,211,153,0.4)]">
+                            <span className="font-mono font-bold text-emerald-400 text-sm drop-shadow-[0_0_6px_rgba(52,211,153,0.4)] flex-shrink-0">
                                 {Number(task.value || 0).toLocaleString()} đ
                             </span>
                         ) : (
@@ -204,18 +195,22 @@ export default function MobileTaskCard({
                         )}
                     </div>
 
-                    {/* Inline primary action */}
+                    {/* Inline primary action — min-h-[44px] tap target */}
                     {primaryActionStatus && PRIMARY_LABEL[primaryActionStatus] && (
                         <button
                             onClick={handlePrimaryAction}
-                            className={`flex-shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${primaryActionStatus === 'Hoàn tất'
+                            disabled={pending}
+                            aria-busy={pending}
+                            className={`flex-shrink-0 inline-flex items-center justify-center gap-1 px-3.5 min-h-[44px] rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none ${primaryActionStatus === 'Hoàn tất'
                                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20'
                                 : primaryActionStatus === 'Revision'
                                     ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/20'
                                     : 'bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20'
                                 }`}
                         >
-                            {primaryActionStatus === 'Hoàn tất' ? (
+                            {pending ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : primaryActionStatus === 'Hoàn tất' ? (
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                             ) : primaryActionStatus === 'Revision' ? (
                                 <Send className="w-3.5 h-3.5" />

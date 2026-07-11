@@ -1,7 +1,9 @@
 import { getClients } from '@/actions/crm-actions'
 import { serializeDecimal } from '@/lib/serialization'
 import ClientList from '@/components/crm/ClientList'
+import MobileClientList from '@/components/crm/MobileClientList'
 import CreateClientButton from '@/components/crm/CreateClientButton'
+import { isMobileDevice } from '@/lib/device'
 import Link from 'next/link'
 import { Building2, Users, Trash2 } from 'lucide-react'
 
@@ -14,6 +16,12 @@ export default async function CRMDashboard({ params }: { params: Promise<{ works
     // Type casting for UI component
     const typedClients = clients as any[]
     const clientCount = typedClients.length
+
+    // [Mobile P4 / M7 — QĐ-1 tầng 2] Dispatcher UA: mobile → card list; desktop giữ
+    // bảng 6 cột ClientList.tsx NGUYÊN VẸN (nhánh return bên dưới không đổi 1 byte).
+    if (await isMobileDevice()) {
+        return <MobileClientList clients={serializeDecimal(clients) as any} workspaceId={workspaceId} />
+    }
 
     return (
         <div className="px-3 py-4 sm:px-7 sm:py-6">

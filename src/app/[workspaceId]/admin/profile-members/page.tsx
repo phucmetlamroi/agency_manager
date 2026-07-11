@@ -4,7 +4,9 @@ import { getProfileMembers } from '@/actions/profile-member-actions'
 import { getProfileRole } from '@/lib/profile-permissions'
 import { resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { prisma } from '@/lib/db'
+import { isMobileDevice } from '@/lib/device'
 import ProfileMembersPanel from '@/components/profile/ProfileMembersPanel'
+import MobileProfileMembersList from '@/components/admin/MobileProfileMembersList'
 
 /**
  * [Sprint Z] Profile Members management page.
@@ -57,6 +59,22 @@ export default async function ProfileMembersPage({ params }: { params: Promise<{
                 <h2 className="title-gradient">Thành viên tổ chức</h2>
                 <p style={{ color: '#ef4444', marginTop: 16 }}>{error}</p>
             </div>
+        )
+    }
+
+    // [Mobile P4.2 / M8] Dispatcher UA: mobile → card/row roster; desktop giữ
+    // ProfileMembersPanel NGUYÊN VẸN (nhánh return desktop bên dưới không đổi 1 byte).
+    // Tái dùng cùng dữ liệu members + role đã tính; server action giữ nguyên chữ ký.
+    if (await isMobileDevice()) {
+        return (
+            <MobileProfileMembersList
+                profileId={profileId}
+                profileName={profile.name}
+                workspaceId={workspaceId}
+                members={members}
+                currentUserId={userId}
+                currentUserRole={role}
+            />
         )
     }
 

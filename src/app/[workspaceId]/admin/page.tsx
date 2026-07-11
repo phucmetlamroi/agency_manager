@@ -6,7 +6,7 @@ import { isMobileDevice } from '@/lib/device'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { prisma } from '@/lib/db'
 import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
-import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
+import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS, isReviewPhaseStatus } from '@/lib/task-statuses'
 import { serializeDecimal } from '@/lib/serialization'
 import { computeWorkspaceFinance } from '@/lib/finance-helpers'
 import { Suspense } from 'react'
@@ -23,6 +23,10 @@ import { dedupeClientsByPath } from '@/lib/client-dedupe'
 import { getAvailableProfiles } from '@/actions/profile-actions'
 import { getClients } from '@/actions/crm-actions'
 import { isProfileOwner } from '@/lib/profile-permissions'
+// [P3/M3] Mobile Today-first admin home (desktop bento below stays untouched — DR-2/3/4).
+import AdminMobileHome from '@/components/admin/AdminMobileHome'
+import { getLeaderboardData } from '@/components/dashboard/Leaderboard'
+import { getDisplayName } from '@/lib/display-name'
 
 export default async function AdminDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -208,6 +212,80 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     const { formatUserDisplay, formatUserInitials } = await import('@/lib/format-user')
     const displayName = formatUserDisplay(currentUser) || 'Admin'
     const initials = formatUserInitials(currentUser) || 'AD'
+
+    // ── [P3/M3] MOBILE Today-first home ──────────────────────────────
+    // Desktop /admin keeps its existing bento (the `return` below) — DR-2/3/4. Mobile
+    // gets a distinct 1-column layout composed ONLY from data already fetched above +
+    // the cached leaderboard (no new server actions — NFR-4.1).
+    const isMobileHome = await isMobileDevice()
+    if (isMobileHome) {
+        const REVISION_STATUSES = ['Revision', 'Đang sửa feedback (nội bộ)', 'Đã nhận feedback (khách)']
+        // Overdue = cron-flagged 'Quá hạn' OR a live deadline in the past that ISN'T in a
+        // review phase / terminal — mirrors the desktop board rule (TaskWorkflowTabs
+        // getDeadlineColor: review-phase tasks are never overdue). Not the cron whitelist,
+        // which (legacy) still counts 'Revision'.
+        const overdueCount = tasks.filter((t: any) =>
+            t.status === 'Quá hạn' ||
+            (t.deadline &&
+                new Date(t.deadline) < now &&
+                !isReviewPhaseStatus(t.status) &&
+                t.status !== 'Hoàn tất' &&
+                t.status !== 'Đã hủy'),
+        ).length
+        const revisionCount = tasks.filter((t: any) => REVISION_STATUSES.includes(t.status)).length
+        const waitingAssignCount = tasks.filter((t: any) =>
+            !t.assigneeId && t.status !== 'Hoàn tất' && t.status !== 'Đã hủy',
+        ).length
+        const clientIssuesCount = new Set(
+            tasks
+                .filter((t: any) => t.status === 'Đã nhận feedback (khách)' && t.clientId)
+                .map((t: any) => t.clientId),
+        ).size
+        const completedThisPeriod = completedTasks.filter((t: any) => new Date(t.updatedAt) >= startOfMonth).length
+
+        const leaderboardEntries = (await getLeaderboardData(workspaceId, profileId)).map((e: any) => ({
+            id: e.id,
+            username: e.username,
+            taskCount: e.taskCount,
+            avatarUrl: e.avatarUrl,
+        }))
+
+        const agendaTasks = tasks
+            .filter((t: any) => t.deadline)
+            .map((t: any) => ({
+                id: t.id,
+                title: t.title,
+                deadline: t.deadline,
+                status: t.status,
+                assigneeName: t.assignee ? getDisplayName(t.assignee) : undefined,
+                assigneeAvatarUrl: null,
+            }))
+
+        return (
+            <AdminMobileHome
+                workspaceId={workspaceId}
+                greetingName={getDisplayName(currentUser, { fallback: 'bạn' })}
+                periodLabel={`Tháng ${now.getMonth() + 1}/${now.getFullYear()}`}
+                currentUserId={session.user.id}
+                kpi={{
+                    revenueVND: grossRevenueVND,
+                    sparkline: sparklineData.map((d: any) => d.v),
+                    running: tasksInProgress,
+                    waitingAssign: waitingAssignCount,
+                    clientIssues: clientIssuesCount,
+                    completedThisPeriod,
+                }}
+                attention={{
+                    overdue: overdueCount,
+                    revision: revisionCount,
+                    waiting: waitingAssignCount,
+                    client: clientIssuesCount,
+                }}
+                agendaTasks={agendaTasks}
+                leaderboard={leaderboardEntries}
+            />
+        )
+    }
 
     return (
         <div className="flex flex-col gap-5">

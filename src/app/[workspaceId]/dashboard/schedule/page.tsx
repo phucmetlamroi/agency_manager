@@ -98,7 +98,10 @@ export default async function UserSchedulePage({
       <div className="relative rounded-2xl border border-purple-500/15 bg-zinc-950/70 backdrop-blur-md shadow-xl shadow-black/40 overflow-hidden">
         {/* Ambient top glow */}
         <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-96 h-40 bg-purple-500/6 blur-3xl rounded-full pointer-events-none" />
-        <div className="relative z-10 p-4">
+        {/* [P3/M13] Mobile: the weekly availability grid is wider than 375px — let it
+            scroll horizontally inside the card instead of being clipped by the parent's
+            overflow-hidden (mirrors admin/schedule's overflow-x-auto). Desktop unaffected. */}
+        <div className="relative z-10 p-4 overflow-x-auto overscroll-x-contain">
           <OptimisticGrid
             workspaceId={workspaceId}
             profileId={profileId}

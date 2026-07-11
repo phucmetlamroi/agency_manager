@@ -6,6 +6,8 @@ import {
     getAuditLogActors,
 } from '@/actions/audit-actions'
 import AuditLogViewer from '@/components/workspace/AuditLogViewer'
+import MobileAuditLog from '@/components/admin/MobileAuditLog'
+import { isMobileDevice } from '@/lib/device'
 
 export default async function AdminAuditLogPage({
     params,
@@ -28,6 +30,24 @@ export default async function AdminAuditLogPage({
         ])
     } catch {
         redirect(`/${workspaceId}/admin`)
+    }
+
+    // [Mobile P4.3 / M9] Dispatcher UA: mobile → danh sách humanize hoá; desktop giữ
+    // AuditLogViewer.tsx NGUYÊN VẸN (nhánh return bên dưới không đổi 1 byte). Cùng props
+    // server-fetched → không đổi chữ ký action, không đổi schema.
+    if (await isMobileDevice()) {
+        return (
+            <MobileAuditLog
+                workspaceId={workspaceId}
+                initialLogs={logsResult.logs}
+                initialTotal={logsResult.total}
+                initialPage={logsResult.page}
+                initialPageSize={logsResult.pageSize}
+                initialTotalPages={logsResult.totalPages}
+                actionTypes={actionTypes}
+                actors={actors}
+            />
+        )
     }
 
     return (

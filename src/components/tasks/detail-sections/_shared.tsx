@@ -57,33 +57,13 @@ if (typeof window !== 'undefined' && !globalThis.__taskDetailDompurifyLinkHookRe
 /*  Status / Type maps                                                     */
 /* ────────────────────────────────────────────────────────────────────── */
 
-export const STATUS_COLORS: Record<string, { label: string; color: string; bg: string }> = {
-    'Nhận task': { label: 'Nhận task', color: '#3B82F6', bg: 'rgba(59,130,246,0.10)' },
-    'Đã nhận task': { label: 'Đã nhận task', color: '#3B82F6', bg: 'rgba(59,130,246,0.10)' },
-    'Đang đợi giao': { label: 'Đang đợi giao', color: '#A855F7', bg: 'rgba(168,85,247,0.10)' },
-    'Đang thực hiện': { label: 'Đang thực hiện', color: '#EAB308', bg: 'rgba(234,179,8,0.10)' },
-    'Revision': { label: 'Sửa lại', color: '#EF4444', bg: 'rgba(239,68,68,0.10)' }, // [L18a] display only; value stays 'Revision'
-    'Sửa frame': { label: 'Sửa frame', color: '#EC4899', bg: 'rgba(236,72,153,0.10)' },
-    'Gửi lại': { label: 'Gửi lại', color: '#F97316', bg: 'rgba(249,115,22,0.10)' },
-    'Tạm ngưng': { label: 'Tạm ngưng', color: '#71717A', bg: 'rgba(113,113,122,0.10)' },
-    'Hoàn tất': { label: 'Hoàn tất', color: '#10B981', bg: 'rgba(16,185,129,0.10)' },
-    'Quá hạn': { label: 'Quá hạn', color: '#DC2626', bg: 'rgba(220,38,38,0.10)' },
-    'Đã hủy': { label: 'Đã hủy', color: '#52525B', bg: 'rgba(82,82,91,0.10)' },
-}
-export const TYPE_COLORS: Record<string, { color: string; bg: string }> = {
-    'Short form': { color: '#38BDF8', bg: 'rgba(56,189,248,0.10)' },
-    'Long form': { color: '#A78BFA', bg: 'rgba(139,92,246,0.10)' },
-    'Trial': { color: '#FBBF24', bg: 'rgba(245,158,11,0.10)' },
-    'Short': { color: '#38BDF8', bg: 'rgba(56,189,248,0.10)' },
-    'Long': { color: '#A78BFA', bg: 'rgba(139,92,246,0.10)' },
-}
-
-export function getStatusInfo(status: string) {
-    return STATUS_COLORS[status] || { label: status, color: '#71717A', bg: 'rgba(113,113,122,0.10)' }
-}
-export function getTypeInfo(type: string) {
-    return TYPE_COLORS[type] || { color: '#A1A1AA', bg: 'rgba(161,161,170,0.10)' }
-}
+// [P3] STATUS_COLORS/TYPE_COLORS/getStatusInfo/getTypeInfo moved verbatim to the
+// server-safe '@/lib/status-colors' (this file is "use client" → can't be imported by
+// RSC dashboard code). Imported here (for internal use below) AND re-exported so every
+// existing P2 consumer keeps working and both surfaces share ONE map. Values unchanged
+// → desktop render identical (DR-3 safe).
+import { STATUS_COLORS, TYPE_COLORS, getStatusInfo, getTypeInfo } from '@/lib/status-colors'
+export { STATUS_COLORS, TYPE_COLORS, getStatusInfo, getTypeInfo }
 
 /* ────────────────────────────────────────────────────────────────────── */
 /*  Helpers                                                                */

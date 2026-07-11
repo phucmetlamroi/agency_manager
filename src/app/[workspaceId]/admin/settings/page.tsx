@@ -3,6 +3,8 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import WorkspaceSettingsPanel from '@/components/workspace/WorkspaceSettingsPanel'
+import MobileWorkspaceSettings from '@/components/workspace/MobileWorkspaceSettings'
+import { isMobileDevice } from '@/lib/device'
 import { dedupeClientsByPath } from '@/lib/client-dedupe'
 import { getStudyPlaceProgress } from '@/actions/study-place-actions'
 
@@ -106,6 +108,26 @@ export default async function AdminSettingsPage({
         status: workspace.status,
         deletedAt: workspace.deletedAt?.toISOString() ?? null,
         hardDeleteAfter: workspace.hardDeleteAfter?.toISOString() ?? null,
+    }
+
+    // [Mobile P4.7 / M11] Dispatcher UA: mobile → MobileWorkspaceSettings; desktop giữ
+    // WorkspaceSettingsPanel NGUYÊN VẸN (nhánh return desktop bên dưới không đổi 1 byte).
+    // Gate verifyWorkspaceAccess('ADMIN') ở đầu hàm vẫn chạy TRƯỚC nhánh này (không bypass).
+    // Cùng bộ props, cùng server action — không đổi chữ ký.
+    if (await isMobileDevice()) {
+        return (
+            <MobileWorkspaceSettings
+                workspaceId={workspaceId}
+                workspace={serializedWorkspace}
+                currentUserRole={workspaceRole}
+                isGlobalAdmin={isGlobalAdmin}
+                memberCount={memberCount}
+                integrations={integrations}
+                pricingRules={pricingRules}
+                clients={clients}
+                studyProgress={studyProgress}
+            />
+        )
     }
 
     return (

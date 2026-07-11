@@ -25,8 +25,6 @@ export default function SignupPage() {
     const router = useRouter()
     const [displayName, setDisplayName] = useState('')
     const [username, setUsername] = useState('')
-    /** [Username Handle] tracks if username passes BOTH format + uniqueness check */
-    const [usernameValid, setUsernameValid] = useState(false)
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [acceptTos, setAcceptTos] = useState(false)
@@ -40,15 +38,6 @@ export default function SignupPage() {
     // [BotID migration] Bỏ Turnstile widget + 6s fallback timer. Vercel BotID
     // chạy passive trong background (initBotId trong instrumentation-client.ts),
     // không cần token state ở client.
-
-    const lengthOk = password.length >= 12
-    const canSubmit =
-        displayName.trim().length >= 2 &&
-        usernameValid &&
-        email &&
-        lengthOk &&
-        acceptTos &&
-        !isPending
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -151,7 +140,7 @@ export default function SignupPage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* DisplayName */}
                     <div>
-                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Tên hiển thị</label>
+                        <label className="block text-body-sm font-medium text-zinc-300 mb-1.5">Tên hiển thị</label>
                         <div className="relative">
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
@@ -169,29 +158,22 @@ export default function SignupPage() {
                         {fieldErrors.displayName && <p className="text-xs text-red-400 mt-1">{fieldErrors.displayName}</p>}
                     </div>
 
-                    {/* [Username Handle] Username (handle) */}
+                    {/* [Username Handle] Username (handle) — @ icon INSIDE khung qua leadingIcon (hết lệch lề f_0023) */}
                     <div>
-                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                        <label className="block text-body-sm font-medium text-zinc-300 mb-1.5">
                             Username <span className="text-muted-foreground">· @handle dùng để mời / login</span>
                         </label>
-                        <div className="relative">
-                            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10 pointer-events-none" />
-                            <div className="pl-7">
-                                <UsernameInput
-                                    value={username}
-                                    onChange={(v, valid) => {
-                                        setUsername(v)
-                                        setUsernameValid(valid)
-                                    }}
-                                />
-                            </div>
-                        </div>
-                        {fieldErrors.username && <p className="text-xs text-red-400 mt-1">{fieldErrors.username}</p>}
+                        <UsernameInput
+                            value={username}
+                            onChange={(v) => setUsername(v)}
+                            leadingIcon={<AtSign className="h-4 w-4" />}
+                        />
+                        {fieldErrors.username && <p className="text-body-sm text-destructive mt-1">{fieldErrors.username}</p>}
                     </div>
 
                     {/* Email */}
                     <div>
-                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Email</label>
+                        <label className="block text-body-sm font-medium text-zinc-300 mb-1.5">Email</label>
                         <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
@@ -211,7 +193,7 @@ export default function SignupPage() {
 
                     {/* Password */}
                     <div>
-                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Mật khẩu (≥ 12 ký tự)</label>
+                        <label className="block text-body-sm font-medium text-zinc-300 mb-1.5">Mật khẩu (≥ 12 ký tự)</label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
@@ -280,29 +262,18 @@ export default function SignupPage() {
                     {/* Bot detection error (server returns errors.turnstile khi BotID flag bot) */}
                     {fieldErrors.turnstile && <p className="text-xs text-red-400">{fieldErrors.turnstile}</p>}
 
-                    {/* Submit + diagnostics khi disabled */}
+                    {/* [M14/FR-F6, f_0027] KHÔNG disable chờ hợp lệ — chỉ chặn double-submit khi đang gửi.
+                        Native required/minLength + type=email tự focus field lỗi đầu tiên; lỗi username từ server hiện inline. */}
                     <button
                         type="submit"
-                        disabled={!canSubmit}
-                        className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-xl shadow-lg shadow-violet-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                        disabled={isPending}
+                        className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold rounded-xl shadow-lg shadow-violet-600/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                     >
                         {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                        Đăng ký
+                        {isPending ? 'Đang tạo tài khoản…' : 'Đăng ký'}
                     </button>
 
-                    {/* Diagnostic: hiển thị lý do disabled khi user đã fill các field cơ bản */}
-                    {!canSubmit && !isPending && displayName && email && (
-                        <div className="text-xs text-muted-foreground text-center space-y-0.5">
-                            {!lengthOk && (
-                                <p>⚠️ Mật khẩu cần ≥12 ký tự (hiện: {password.length})</p>
-                            )}
-                            {!acceptTos && (
-                                <p>⚠️ Vui lòng tick đồng ý điều khoản</p>
-                            )}
-                        </div>
-                    )}
-
-                    <p className="text-center text-xs text-muted-foreground mt-2">
+                    <p className="text-center text-body-sm text-muted-foreground mt-2">
                         Đã có tài khoản?{' '}
                         <Link href="/login" className="text-violet-400 hover:text-violet-300">
                             Đăng nhập

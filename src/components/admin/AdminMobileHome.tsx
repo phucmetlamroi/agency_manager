@@ -11,9 +11,11 @@ import WeekStrip from '@/components/dashboard/WeekStrip'
 import AgendaList from '@/components/dashboard/AgendaList'
 import LeaderboardCompact, { type LeaderboardEntry } from '@/components/dashboard/LeaderboardCompact'
 import AttentionSection, { type AttentionRow } from '@/components/admin/AttentionSection'
+import AdminTriageQueue, { type TriageTask } from '@/components/admin/AdminTriageQueue'
 import { EmptyState } from '@/components/ui/empty-state'
 import { buildWeekAndAgenda, type AgendaTask } from '@/lib/agenda'
 import { formatCompactVNDWithUnit, formatCompactCount } from '@/lib/format-compact'
+import type { ClientRequestDTO } from '@/actions/client-request-actions'
 
 export type AdminMobileHomeProps = {
     workspaceId: string
@@ -32,6 +34,12 @@ export type AdminMobileHomeProps = {
     agendaTasks: AgendaTask[]
     leaderboard: LeaderboardEntry[]
     leaderboardUpdatedLabel?: string
+    /** [PR#4] Hàng đợi triage — 3 nguồn compose ở admin/page.tsx (không thêm server action). */
+    triage: {
+        tasks: TriageTask[]
+        requests: ClientRequestDTO[]
+        users: { id: string; username: string; nickname?: string | null; displayName?: string | null }[]
+    }
 }
 
 export default function AdminMobileHome({
@@ -44,6 +52,7 @@ export default function AdminMobileHome({
     agendaTasks,
     leaderboard,
     leaderboardUpdatedLabel,
+    triage,
 }: AdminMobileHomeProps) {
     const { week, agenda } = buildWeekAndAgenda(agendaTasks, new Date(), { withAssignee: true })
     const base = `/${workspaceId}`
@@ -75,6 +84,14 @@ export default function AdminMobileHome({
                     <ChevronDown size={16} className="text-muted-foreground" />
                 </Link>
             </div>
+
+            {/* ── Hàng đợi triage (hero — thay chỗ hero cũ) ─────── */}
+            <AdminTriageQueue
+                tasks={triage.tasks}
+                requests={triage.requests}
+                users={triage.users}
+                workspaceId={workspaceId}
+            />
 
             {/* ── KPI ───────────────────────────────────────────── */}
             <div className="flex flex-col gap-3">

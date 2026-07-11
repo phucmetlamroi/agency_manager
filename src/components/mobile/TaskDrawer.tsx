@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import {
-    Calendar, Link as LinkIcon, User, Play, Pause, Send, CheckCircle2, AlertTriangle, Trash2, UserPlus, Users,
+    Calendar, Link as LinkIcon, User, Play, Pause, Send, CheckCircle2, AlertTriangle, Trash2, UserPlus, Users, Maximize2,
 } from "lucide-react"
+import Link from "next/link"
 // [Hotfix 2026-06-13] browser-only dompurify — see TaskDetailModal.tsx note.
 import DOMPurify from "dompurify"
 import { ensureExternalLinks } from "@/lib/utils"
@@ -259,6 +260,19 @@ export function TaskDrawer({
                                     <UserPlus className="w-4 h-4" />
                                     Giao cho thành viên
                                 </button>
+                            )}
+
+                            {/* [P2-D3] Mở trang chi tiết đầy đủ (route full-screen /task/[taskId]) —
+                                quick-peek này chỉ là preview; "Xem đầy đủ" điều hướng sang trang riêng có nút Back. */}
+                            {workspaceId && !showAssignPicker && (
+                                <Link
+                                    href={`/${workspaceId}/task/${task.id}`}
+                                    onClick={() => onOpenChange(false)}
+                                    className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-white/[0.06] hover:bg-white/[0.10] text-zinc-100 border border-white/10 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    <Maximize2 className="w-4 h-4" />
+                                    Xem đầy đủ
+                                </Link>
                             )}
 
                             {/* Status transition buttons (FSM-driven) */}

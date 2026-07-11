@@ -1,5 +1,18 @@
 "use client"
 
+// [P2-01] Desktop task-detail drawer. Refactored into a CONTAINER: all state,
+// the parse-effect, and every server-action call (updateTaskDetails, bulk*,
+// updateTaskStatus, get/saveHookGraph) live here; the presentational sections
+// (TaskStatusBar / TaskMainSection / TaskResourcesSection / TaskCommentsSection)
+// and the shared primitives (./detail-sections/_shared) receive props. Render
+// output is byte-identical to the pre-split version (desktop DR-3 safe).
+//
+// NB overlay: the right-side drawer + zIndex:9999 + DialogPrimitive.Content asChild
+// are intentionally KEPT here. z-index tokenisation was audited and deferred (the
+// app's overlay stack legitimately runs to 99999 which the token scale can't
+// express); the drawer→centered-dialog standardisation is the overlay phase
+// (P2-PR5), device-tested there — not blind-changed in the split.
+
 import React, { useState, useEffect } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
@@ -8,400 +21,26 @@ import { updateTaskStatus } from "@/actions/task-actions"
 import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
 import { toast } from "sonner"
-import { TaskReviewUploadSection } from "@/components/review/TaskReviewUploadSection"
 import { Dialog } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
 // [Hotfix 2026-06-13] plain 'dompurify' (browser-only, zero deps) replaces
-// isomorphic-dompurify: the latter eagerly required jsdom on the SERVER
-// during SSR of this client component → jsdom's html-encoding-sniffer
-// require()s an ESM-only package → ERR_REQUIRE_ESM 500 on Vercel for every
-// route importing this modal. All .sanitize() calls here run client-side
-// only (the modal renders on user interaction, post-hydration).
+// isomorphic-dompurify: the latter eagerly required jsdom on the SERVER during
+// SSR of this client component → ERR_REQUIRE_ESM 500 on Vercel. All .sanitize()
+// calls here run client-side only (modal renders on interaction, post-hydration).
 import DOMPurify from 'dompurify'
-import { cn } from "@/lib/utils"
-import { taskTypeLabel } from "@/lib/display-labels"
-
-// ── DOMPurify global hook: force every anchor in sanitized HTML to open in
-// a new tab. Runs once at module load (DOMPurify is a singleton, so this
-// applies to ALL .sanitize() calls in this module + downstream consumers).
-// Guard with a global flag so HMR / multiple imports don't stack hooks.
-declare global {
-    // eslint-disable-next-line no-var
-    var __taskDetailDompurifyLinkHookRegistered: boolean | undefined
-}
-if (typeof window !== 'undefined' && !globalThis.__taskDetailDompurifyLinkHookRegistered) {
-    DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-        if (node.tagName === 'A') {
-            node.setAttribute('target', '_blank')
-            node.setAttribute('rel', 'noopener noreferrer')
-        }
-    })
-    globalThis.__taskDetailDompurifyLinkHookRegistered = true
-}
 import { motion } from "framer-motion"
-import {
-    X, Pencil, LayoutGrid, FolderOpen, ExternalLink, Check, Plus,
-    Lock, Play, Loader2,
-} from "lucide-react"
+import { Lock, Play, Loader2 } from "lucide-react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import TaskCommentColumn from "./TaskCommentColumn"
+import {
+    getStatusInfo, parseContent, Card, EditButton, ConfirmCancelGroup, TabNav,
+    type TaskDetailForm,
+} from "./detail-sections/_shared"
+import { TaskStatusBar } from "./detail-sections/TaskStatusBar"
+import { TaskMainSection } from "./detail-sections/TaskMainSection"
+import { TaskResourcesSection } from "./detail-sections/TaskResourcesSection"
+import { TaskCommentsSection } from "./detail-sections/TaskCommentsSection"
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap/TiptapEditor'), { ssr: false })
-// [Hook Graph] React Flow is client-only + heavy — lazy-load so it ships only
-// when a task with a Multi-Hook Map is opened.
-const HookGraphViewer = dynamic(
-    () => import('@/components/velox/hookgraph/HookGraphViewer').then((m) => m.HookGraphViewer),
-    { ssr: false },
-)
-const HookGraphEditor = dynamic(
-    () => import('@/components/velox/hookgraph/HookGraphEditor').then((m) => m.HookGraphEditor),
-    { ssr: false },
-)
-
-/* ────────────────────────────────────────────────────────────────────── */
-/*  Status / Type maps                                                     */
-/* ────────────────────────────────────────────────────────────────────── */
-
-const STATUS_COLORS: Record<string, { label: string; color: string; bg: string }> = {
-    'Nhận task': { label: 'Nhận task', color: '#3B82F6', bg: 'rgba(59,130,246,0.10)' },
-    'Đã nhận task': { label: 'Đã nhận task', color: '#3B82F6', bg: 'rgba(59,130,246,0.10)' },
-    'Đang đợi giao': { label: 'Đang đợi giao', color: '#A855F7', bg: 'rgba(168,85,247,0.10)' },
-    'Đang thực hiện': { label: 'Đang thực hiện', color: '#EAB308', bg: 'rgba(234,179,8,0.10)' },
-    'Revision': { label: 'Sửa lại', color: '#EF4444', bg: 'rgba(239,68,68,0.10)' }, // [L18a] display only; value stays 'Revision'
-    'Sửa frame': { label: 'Sửa frame', color: '#EC4899', bg: 'rgba(236,72,153,0.10)' },
-    'Gửi lại': { label: 'Gửi lại', color: '#F97316', bg: 'rgba(249,115,22,0.10)' },
-    'Tạm ngưng': { label: 'Tạm ngưng', color: '#71717A', bg: 'rgba(113,113,122,0.10)' },
-    'Hoàn tất': { label: 'Hoàn tất', color: '#10B981', bg: 'rgba(16,185,129,0.10)' },
-    'Quá hạn': { label: 'Quá hạn', color: '#DC2626', bg: 'rgba(220,38,38,0.10)' },
-    'Đã hủy': { label: 'Đã hủy', color: '#52525B', bg: 'rgba(82,82,91,0.10)' },
-}
-const TYPE_COLORS: Record<string, { color: string; bg: string }> = {
-    'Short form': { color: '#38BDF8', bg: 'rgba(56,189,248,0.10)' },
-    'Long form': { color: '#A78BFA', bg: 'rgba(139,92,246,0.10)' },
-    'Trial': { color: '#FBBF24', bg: 'rgba(245,158,11,0.10)' },
-    'Short': { color: '#38BDF8', bg: 'rgba(56,189,248,0.10)' },
-    'Long': { color: '#A78BFA', bg: 'rgba(139,92,246,0.10)' },
-}
-
-function getStatusInfo(status: string) {
-    return STATUS_COLORS[status] || { label: status, color: '#71717A', bg: 'rgba(113,113,122,0.10)' }
-}
-function getTypeInfo(type: string) {
-    return TYPE_COLORS[type] || { color: '#A1A1AA', bg: 'rgba(161,161,170,0.10)' }
-}
-
-/* ────────────────────────────────────────────────────────────────────── */
-/*  Helpers                                                                */
-/* ────────────────────────────────────────────────────────────────────── */
-
-function formatDate(d: Date | string | null): string {
-    if (!d) return '—'
-    const dt = new Date(d)
-    if (isNaN(dt.getTime())) return '—'
-    const pad = (n: number) => (n < 10 ? '0' + n : String(n))
-    return `${dt.getFullYear()} - ${pad(dt.getMonth() + 1)} - ${pad(dt.getDate())}  ·  ${pad(dt.getHours())}:${pad(dt.getMinutes())}`
-}
-
-function parseContent(content: string | null): string {
-    if (!content) return ''
-    if (/<[a-z][\s\S]*>/i.test(content)) return content
-    return content.split('\n').filter((l) => l.trim()).map((l) => `<p>${l}</p>`).join('')
-}
-
-function formatLink(link: string | null) {
-    if (!link) return '#'
-    if (link.startsWith('http')) return link
-    return `https://${link}`
-}
-
-/* ────────────────────────────────────────────────────────────────────── */
-/*  Card wrapper                                                           */
-/* ────────────────────────────────────────────────────────────────────── */
-
-function Card({
-    title,
-    children,
-    className = '',
-    rightSlot,
-}: {
-    title?: string
-    children: React.ReactNode
-    className?: string
-    rightSlot?: React.ReactNode
-}) {
-    return (
-        <div
-            className={cn(
-                "rounded-2xl bg-white/[0.04] border border-[rgba(139,92,246,0.12)] p-4 flex flex-col",
-                className,
-            )}
-        >
-            {(title || rightSlot) && (
-                <div className="flex items-center justify-between mb-3">
-                    {title && (
-                        <h4 className="text-[12px] font-bold uppercase tracking-wide text-zinc-400">
-                            {title}
-                        </h4>
-                    )}
-                    {rightSlot}
-                </div>
-            )}
-            {children}
-        </div>
-    )
-}
-
-/* ────────────────────────────────────────────────────────────────────── */
-/*  Pills                                                                  */
-/* ────────────────────────────────────────────────────────────────────── */
-
-function StatusPill({ status }: { status: string }) {
-    const s = getStatusInfo(status)
-    return (
-        <span
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold"
-            style={{ background: s.bg, color: s.color, border: `1px solid color-mix(in srgb, ${s.color} 18.82%, transparent)` }}
-        >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />
-            {s.label}
-        </span>
-    )
-}
-function TypePill({ type }: { type: string }) {
-    if (!type) return null
-    const t = getTypeInfo(type)
-    return (
-        <span
-            className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold"
-            style={{ background: t.bg, color: t.color, border: `1px solid color-mix(in srgb, ${t.color} 18.82%, transparent)` }}
-        >
-            {taskTypeLabel(type)}
-        </span>
-    )
-}
-
-/* ────────────────────────────────────────────────────────────────────── */
-/*  Tab navigation                                                         */
-/* ────────────────────────────────────────────────────────────────────── */
-
-function TabNav({
-    activeTab,
-    onChange,
-}: {
-    activeTab: 'main' | 'assets'
-    onChange: (tab: 'main' | 'assets') => void
-}) {
-    const tabs = [
-        { id: 'main' as const, label: 'Chính', icon: LayoutGrid },
-        { id: 'assets' as const, label: 'Tài nguyên', icon: FolderOpen },
-    ]
-    return (
-        <div className="mx-6 my-4 flex items-center bg-white/[0.04] border border-white/5 rounded-full p-1">
-            {tabs.map((tab) => {
-                const isActive = activeTab === tab.id
-                const Icon = tab.icon
-                return (
-                    <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => onChange(tab.id)}
-                        className={cn(
-                            "flex-1 flex items-center justify-center gap-2 py-2 rounded-full text-[13px] font-semibold transition-colors",
-                            isActive
-                                ? "bg-white/[0.08] text-white shadow-[0_2px_8px_rgba(139,92,246,0.15)]"
-                                : "text-zinc-400 hover:text-zinc-200",
-                        )}
-                    >
-                        <Icon size={14} strokeWidth={1.8} />
-                        {tab.label}
-                    </button>
-                )
-            })}
-        </div>
-    )
-}
-
-/* ────────────────────────────────────────────────────────────────────── */
-/*  LinkRow — per-field inline edit + named hyperlink display              */
-/* ────────────────────────────────────────────────────────────────────── */
-
-function LinkRow({
-    label,
-    value,
-    canEdit,
-    onSave,
-}: {
-    label: string
-    value: string
-    canEdit: boolean
-    onSave: (newValue: string) => Promise<void>
-}) {
-    const [isEditing, setIsEditing] = useState(false)
-    const [draft, setDraft] = useState(value)
-    const [saving, setSaving] = useState(false)
-
-    useEffect(() => {
-        setDraft(value)
-    }, [value])
-
-    const startEdit = () => {
-        setDraft(value)
-        setIsEditing(true)
-    }
-    const cancelEdit = () => {
-        setDraft(value)
-        setIsEditing(false)
-    }
-    const handleConfirm = async () => {
-        if (saving) return
-        if (draft.trim() === value.trim()) {
-            setIsEditing(false)
-            return
-        }
-        setSaving(true)
-        try {
-            await onSave(draft.trim())
-            setIsEditing(false)
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    if (isEditing) {
-        return (
-            <div className="flex items-center gap-2 py-2 border-b border-white/5 last:border-0">
-                <span className="text-[12px] font-medium text-zinc-300 flex-shrink-0 w-[120px]">
-                    {label}
-                </span>
-                <input
-                    type="url"
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleConfirm()
-                        if (e.key === 'Escape') cancelEdit()
-                    }}
-                    autoFocus
-                    placeholder="Dán link…"
-                    className="flex-1 h-8 rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[12px] text-zinc-200 placeholder:text-muted-foreground outline-none focus:border-violet-500"
-                />
-                <button
-                    type="button"
-                    onClick={handleConfirm}
-                    disabled={saving}
-                    title="Xác nhận"
-                    className="w-7 h-7 flex items-center justify-center rounded-full bg-primary hover:bg-primary-accent text-white disabled:opacity-50 transition-colors"
-                >
-                    <Check size={13} strokeWidth={3} />
-                </button>
-                <button
-                    type="button"
-                    onClick={cancelEdit}
-                    disabled={saving}
-                    title="Huỷ"
-                    className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 disabled:opacity-50 transition-colors"
-                >
-                    <X size={13} />
-                </button>
-            </div>
-        )
-    }
-
-    return (
-        <div className="flex items-center justify-between gap-3 py-2 border-b border-white/5 last:border-0 group">
-            <span className="text-[12px] font-medium text-zinc-300 flex-shrink-0">{label}</span>
-            <div className="flex items-center gap-2 min-w-0">
-                {value?.trim() ? (
-                    <a
-                        href={formatLink(value)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[12px] text-violet-400 hover:text-violet-300 truncate max-w-[180px]"
-                        title={value}
-                    >
-                        <span className="truncate">Xem {label}</span>
-                        <ExternalLink size={11} className="flex-shrink-0" />
-                    </a>
-                ) : canEdit ? (
-                    <button
-                        type="button"
-                        onClick={startEdit}
-                        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-violet-300 transition-colors"
-                    >
-                        <Plus size={11} />
-                        Thêm link
-                    </button>
-                ) : (
-                    <span className="text-[12px] text-muted-foreground">Chưa có</span>
-                )}
-                {canEdit && value?.trim() && (
-                    <button
-                        type="button"
-                        onClick={startEdit}
-                        title="Sửa"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/[0.06]"
-                    >
-                        <Pencil size={11} className="text-muted-foreground" />
-                    </button>
-                )}
-            </div>
-        </div>
-    )
-}
-
-/* ────────────────────────────────────────────────────────────────────── */
-/*  EditableCard — wraps a card with inline edit toggle (Delivery/Deadline/Finance) */
-/* ────────────────────────────────────────────────────────────────────── */
-
-function EditButton({ onClick, title }: { onClick: () => void; title?: string }) {
-    const label = title ?? "Sửa"
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            title={label}
-            aria-label={label}
-            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/[0.06] transition-colors"
-        >
-            <Pencil size={12} className="text-muted-foreground hover:text-violet-300" />
-        </button>
-    )
-}
-
-function ConfirmCancelGroup({
-    onConfirm,
-    onCancel,
-    saving,
-}: {
-    onConfirm: () => void
-    onCancel: () => void
-    saving: boolean
-}) {
-    return (
-        <div className="flex items-center gap-1.5">
-            <button
-                type="button"
-                onClick={onConfirm}
-                disabled={saving}
-                title="Xác nhận"
-                aria-label="Xác nhận"
-                className="w-7 h-7 flex items-center justify-center rounded-full bg-primary hover:bg-primary-accent text-white disabled:opacity-50 transition-colors"
-            >
-                <Check size={13} strokeWidth={3} />
-            </button>
-            <button
-                type="button"
-                onClick={onCancel}
-                disabled={saving}
-                title="Huỷ"
-                aria-label="Huỷ"
-                className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 disabled:opacity-50 transition-colors"
-            >
-                <X size={13} />
-            </button>
-        </div>
-    )
-}
 
 /* ────────────────────────────────────────────────────────────────────── */
 /*  Main Component                                                         */
@@ -529,7 +168,7 @@ export function TaskDetailModal({
     const [draftNotes, setDraftNotes] = useState('')
 
     // Live form (keeps current values for display + base for save merging)
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<TaskDetailForm>({
         productLink: '',
         deadline: '',
         jobPriceUSD: 0,
@@ -726,7 +365,6 @@ export function TaskDetailModal({
      * Editor flow: paste link → click ✓ → link saved + (if non-admin assignee in
      * 'Đang thực hiện', single-task mode) auto-transition to Revision.
      *
-     * Replaces the old 2-step flow (save link + click "Nộp bài" footer button).
      * Server-side `updateTaskStatus` detects isUserDelivery from runtime state
      * (newStatus=Revision, oldStatus=Đang thực hiện, isAssignee, productLink) and
      * fires email taskDelivered + audit task.delivered automatically.
@@ -928,503 +566,203 @@ export function TaskDetailModal({
                         {/* [Trial P1] LEFT column — task info (was the centered modal body) */}
                         <div className="flex flex-col min-w-0" style={{ flex: 1, height: '100%', position: 'relative', zIndex: 1 }}>
 
-                        {/* HEADER */}
-                        <div className="flex flex-col gap-3 px-6 pt-6 pb-3 border-b border-white/5 relative z-[1]">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-[16px] font-extrabold text-white">Chi tiết Task</h2>
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    aria-label="Đóng chi tiết task"
-                                    className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.04] hover:bg-white/[0.10] text-zinc-400 hover:text-white transition-colors"
-                                >
-                                    <X size={16} />
-                                </button>
-                            </div>
+                            {/* HEADER */}
+                            <TaskStatusBar
+                                localTask={localTask}
+                                isAdmin={isAdmin}
+                                isBulkMode={isBulkMode}
+                                bulkCount={bulkCount}
+                                onClose={onClose}
+                                editingTitle={editingTitle}
+                                draftTitle={draftTitle}
+                                setDraftTitle={setDraftTitle}
+                                setEditingTitle={setEditingTitle}
+                                savingCard={savingCard}
+                                onSaveTitle={handleSaveTitle}
+                                onEnterEditTitle={enterEditTitle}
+                            />
 
-                            {/* [Bulk fix] Bulk mode indicator — shows user that any edit will apply to N tasks */}
-                            {isBulkMode && (
-                                <div
-                                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
-                                    style={{
-                                        background: 'rgba(139,92,246,0.10)',
-                                        border: '1px solid rgba(139,92,246,0.30)',
-                                    }}
-                                >
-                                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-violet-500/20 text-violet-300 text-xs font-bold">
-                                        {bulkCount}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-[12px] font-bold text-violet-200">
-                                            Sửa hàng loạt — đang chỉnh {bulkCount} task cùng lúc
+                            {/* [Sprint M] Locked state — non-admin assignee must click "Bắt đầu" first */}
+                            {isLocked ? (
+                                <div className="flex-1 flex items-center justify-center px-6 pb-6 pt-4 relative z-[1]">
+                                    <div
+                                        className="w-full max-w-md mx-auto rounded-3xl p-8 flex flex-col items-center text-center"
+                                        style={{
+                                            background: 'rgba(139,92,246,0.04)',
+                                            border: '1px solid rgba(139,92,246,0.18)',
+                                            boxShadow: '0 24px 64px rgba(0,0,0,0.40)',
+                                        }}
+                                    >
+                                        {/* Lock icon — pulse animation */}
+                                        <div className="relative mb-5">
+                                            <div
+                                                className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                                                style={{
+                                                    background: 'rgba(139,92,246,0.12)',
+                                                    border: '1px solid rgba(139,92,246,0.25)',
+                                                }}
+                                            >
+                                                <Lock className="w-7 h-7 text-violet-300" strokeWidth={1.8} />
+                                            </div>
                                         </div>
-                                        <div className="text-[11px] text-violet-300/80">
-                                            Mọi thay đổi sẽ được áp dụng cho toàn bộ task đã tick.
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
-                            <div className="flex flex-col gap-2">
-                                {isAdmin && editingTitle && !isBulkMode ? (
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            autoFocus
-                                            value={draftTitle}
-                                            onChange={(e) => setDraftTitle(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') handleSaveTitle()
-                                                else if (e.key === 'Escape') setEditingTitle(false)
-                                            }}
-                                            maxLength={200}
-                                            placeholder="Tên video / task"
-                                            className="flex-1 min-w-0 bg-zinc-900/70 border border-violet-500/40 rounded-lg px-3 py-1.5 text-[16px] font-bold text-white outline-none focus:border-violet-400"
-                                        />
-                                        <ConfirmCancelGroup onConfirm={handleSaveTitle} onCancel={() => setEditingTitle(false)} saving={savingCard} />
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                        <h3 className="text-[18px] font-extrabold text-white tracking-tight truncate">
-                                            {localTask.title}
+                                        <h3
+                                            className="text-[18px] font-extrabold text-white mb-2 tracking-tight"
+                                            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                                        >
+                                            Bạn chưa bắt đầu task này
                                         </h3>
-                                        {isAdmin && !isBulkMode && <EditButton onClick={enterEditTitle} title="Đổi tên video" />}
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-[12px] text-zinc-400">
-                                    <span>Quản lý: <span className="text-zinc-200 font-medium">{(localTask.assignedBy as any)?.nickname || (localTask.assignedBy as any)?.username || '—'}</span></span>
-                                    <span className="text-muted-foreground">·</span>
-                                    <span>Người làm: <span className="text-zinc-200 font-medium">{(localTask.assignee as any)?.nickname || (localTask.assignee as any)?.username || 'Chưa giao'}</span></span>
-                                </div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <StatusPill status={localTask.status} />
-                                    {localTask.type && <TypePill type={localTask.type} />}
-                                </div>
-                            </div>
-                        </div>
+                                        <p className="text-[13px] text-zinc-400 mb-7 leading-relaxed max-w-xs">
+                                            Bấm <span className="text-violet-300 font-semibold">Bắt đầu</span> để xem chi tiết
+                                            và chính thức nhận task. Trạng thái sẽ chuyển sang{' '}
+                                            <span className="text-yellow-300 font-semibold">Đang thực hiện</span>.
+                                        </p>
 
-                        {/* [Sprint M] Locked state — non-admin assignee must click "Bắt đầu" first */}
-                        {isLocked ? (
-                            <div className="flex-1 flex items-center justify-center px-6 pb-6 pt-4 relative z-[1]">
-                                <div
-                                    className="w-full max-w-md mx-auto rounded-3xl p-8 flex flex-col items-center text-center"
-                                    style={{
-                                        background: 'rgba(139,92,246,0.04)',
-                                        border: '1px solid rgba(139,92,246,0.18)',
-                                        boxShadow: '0 24px 64px rgba(0,0,0,0.40)',
-                                    }}
-                                >
-                                    {/* Lock icon — pulse animation */}
-                                    <div className="relative mb-5">
-                                        <div
-                                            className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                                        {/* Start button — big violet gradient with pulse ring */}
+                                        <button
+                                            type="button"
+                                            onClick={handleStartTask}
+                                            disabled={starting}
+                                            className="group relative inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-white font-bold transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
                                             style={{
-                                                background: 'rgba(139,92,246,0.12)',
-                                                border: '1px solid rgba(139,92,246,0.25)',
+                                                background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+                                                boxShadow: '0 12px 32px rgba(139,92,246,0.45)',
+                                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                                fontSize: 14,
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!starting) {
+                                                    e.currentTarget.style.background = 'linear-gradient(135deg, #9D6FFF 0%, #8B5CF6 100%)'
+                                                    e.currentTarget.style.boxShadow = '0 16px 40px rgba(139,92,246,0.60)'
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)'
+                                                e.currentTarget.style.boxShadow = '0 12px 32px rgba(139,92,246,0.45)'
                                             }}
                                         >
-                                            <Lock className="w-7 h-7 text-violet-300" strokeWidth={1.8} />
-                                        </div>
+                                            {starting ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    Đang bắt đầu…
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Play className="w-4 h-4" strokeWidth={2.5} />
+                                                    Bắt đầu
+                                                </>
+                                            )}
+                                            {/* Pulse ring */}
+                                            {!starting && (
+                                                <span className="absolute inset-0 rounded-full border-2 border-violet-400/40 animate-ping pointer-events-none" />
+                                            )}
+                                        </button>
+
+                                        <p className="text-[11px] text-muted-foreground mt-5">
+                                            Một khi bắt đầu, deadline sẽ được tính từ thời điểm này.
+                                        </p>
                                     </div>
-
-                                    <h3
-                                        className="text-[18px] font-extrabold text-white mb-2 tracking-tight"
-                                        style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                                    >
-                                        Bạn chưa bắt đầu task này
-                                    </h3>
-                                    <p className="text-[13px] text-zinc-400 mb-7 leading-relaxed max-w-xs">
-                                        Bấm <span className="text-violet-300 font-semibold">Bắt đầu</span> để xem chi tiết
-                                        và chính thức nhận task. Trạng thái sẽ chuyển sang{' '}
-                                        <span className="text-yellow-300 font-semibold">Đang thực hiện</span>.
-                                    </p>
-
-                                    {/* Start button — big violet gradient with pulse ring */}
-                                    <button
-                                        type="button"
-                                        onClick={handleStartTask}
-                                        disabled={starting}
-                                        className="group relative inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-white font-bold transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
-                                            boxShadow: '0 12px 32px rgba(139,92,246,0.45)',
-                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                            fontSize: 14,
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            if (!starting) {
-                                                e.currentTarget.style.background = 'linear-gradient(135deg, #9D6FFF 0%, #8B5CF6 100%)'
-                                                e.currentTarget.style.boxShadow = '0 16px 40px rgba(139,92,246,0.60)'
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)'
-                                            e.currentTarget.style.boxShadow = '0 12px 32px rgba(139,92,246,0.45)'
-                                        }}
-                                    >
-                                        {starting ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                Đang bắt đầu…
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Play className="w-4 h-4" strokeWidth={2.5} />
-                                                Bắt đầu
-                                            </>
-                                        )}
-                                        {/* Pulse ring */}
-                                        {!starting && (
-                                            <span className="absolute inset-0 rounded-full border-2 border-violet-400/40 animate-ping pointer-events-none" />
-                                        )}
-                                    </button>
-
-                                    <p className="text-[11px] text-muted-foreground mt-5">
-                                        Một khi bắt đầu, deadline sẽ được tính từ thời điểm này.
-                                    </p>
                                 </div>
-                            </div>
-                        ) : (
-                          <>
-                        {/* TAB NAV */}
-                        <TabNav activeTab={activeTab} onChange={setActiveTab} />
+                            ) : (
+                                <>
+                                    {/* TAB NAV */}
+                                    <TabNav activeTab={activeTab} onChange={setActiveTab} />
 
-                        {/* TAB CONTENT */}
-                        <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar relative z-[1]">
-                            {/* TAB MAIN */}
-                            {activeTab === 'main' && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {/* DELIVERY card — editable by BOTH admin and user (assignee submits delivery link here) */}
-                                    <Card
-                                        title="Bàn giao"
-                                        className="min-h-[220px]"
-                                        rightSlot={
-                                            !editingDelivery ? (
-                                                <EditButton onClick={enterEditDelivery} />
-                                            ) : (
-                                                <ConfirmCancelGroup
-                                                    onConfirm={handleSaveDelivery}
-                                                    onCancel={() => setEditingDelivery(false)}
-                                                    saving={savingCard}
-                                                />
-                                            )
-                                        }
-                                    >
-                                        {editingDelivery ? (
-                                            <textarea
-                                                value={draftDelivery}
-                                                onChange={(e) => setDraftDelivery(e.target.value)}
-                                                placeholder="Dán link bàn giao hoặc ghi chú trạng thái…"
-                                                className="flex-1 w-full rounded-xl bg-white/[0.04] border border-violet-500/40 p-3 text-[13px] text-zinc-300 placeholder:text-muted-foreground outline-none focus:border-violet-500 resize-none min-h-[150px]"
-                                                autoFocus
-                                            />
-                                        ) : form.productLink?.trim() ? (
-                                            form.productLink.startsWith('http') ? (
-                                                <a
-                                                    href={formatLink(form.productLink)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-[13px] text-violet-400 hover:text-violet-300 inline-flex items-center gap-1"
-                                                >
-                                                    <span>Xem bản bàn giao</span>
-                                                    <ExternalLink size={12} className="flex-shrink-0" />
-                                                </a>
-                                            ) : (
-                                                <p className="text-[13px] text-zinc-300 leading-relaxed whitespace-pre-wrap">
-                                                    {form.productLink}
-                                                </p>
-                                            )
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={enterEditDelivery}
-                                                className="self-start inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-violet-300 transition-colors"
-                                            >
-                                                <Plus size={12} /> Thêm link bàn giao
-                                            </button>
-                                        )}
-
-                                        {/* [Review P1.10 + P3.7] Up thẳng video review + sync task → Hoàn tất */}
-                                        {localTask?.id && (
-                                            <TaskReviewUploadSection
-                                                taskId={localTask.id}
-                                                taskStatus={localTask.status}
+                                    {/* TAB CONTENT */}
+                                    <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar relative z-[1]">
+                                        {/* TAB MAIN */}
+                                        {activeTab === 'main' && (
+                                            <TaskMainSection
+                                                localTask={localTask}
+                                                form={form}
+                                                isAdmin={isAdmin}
+                                                savingCard={savingCard}
+                                                editingDelivery={editingDelivery}
+                                                draftDelivery={draftDelivery}
+                                                setDraftDelivery={setDraftDelivery}
+                                                onEnterEditDelivery={enterEditDelivery}
+                                                onSaveDelivery={handleSaveDelivery}
+                                                setEditingDelivery={setEditingDelivery}
+                                                editingDeadline={editingDeadline}
+                                                draftDeadline={draftDeadline}
+                                                setDraftDeadline={setDraftDeadline}
+                                                onEnterEditDeadline={enterEditDeadline}
+                                                onSaveDeadline={handleSaveDeadline}
+                                                setEditingDeadline={setEditingDeadline}
+                                                editingFinance={editingFinance}
+                                                draftFinance={draftFinance}
+                                                setDraftFinance={setDraftFinance}
+                                                onEnterEditFinance={enterEditFinance}
+                                                onSaveFinance={handleSaveFinance}
+                                                setEditingFinance={setEditingFinance}
                                                 onTaskCompleted={() =>
                                                     setLocalTask((prev) => (prev ? { ...prev, status: 'Hoàn tất' } : prev))
                                                 }
                                             />
                                         )}
-                                    </Card>
 
-                                    {/* RIGHT — Deadline + Finance stacked */}
-                                    <div className="flex flex-col gap-4">
-                                        <Card
-                                            title="Deadline"
-                                            rightSlot={
-                                                isAdmin && !editingDeadline ? (
-                                                    <EditButton onClick={enterEditDeadline} />
-                                                ) : editingDeadline ? (
-                                                    <ConfirmCancelGroup
-                                                        onConfirm={handleSaveDeadline}
-                                                        onCancel={() => setEditingDeadline(false)}
-                                                        saving={savingCard}
-                                                    />
-                                                ) : null
-                                            }
-                                        >
-                                            {editingDeadline ? (
-                                                <input
-                                                    type="datetime-local"
-                                                    value={draftDeadline}
-                                                    onChange={(e) => setDraftDeadline(e.target.value)}
-                                                    autoFocus
-                                                    className="h-9 w-full rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[13px] text-zinc-300 outline-none focus:border-violet-500"
-                                                />
-                                            ) : (
-                                                <span className="text-[14px] font-semibold text-zinc-200">
-                                                    {formatDate(localTask.deadline)}
-                                                </span>
-                                            )}
-                                        </Card>
-
-                                        <Card
-                                            title="Tài chính"
-                                            rightSlot={
-                                                isAdmin && !editingFinance ? (
-                                                    <EditButton onClick={enterEditFinance} />
-                                                ) : editingFinance ? (
-                                                    <ConfirmCancelGroup
-                                                        onConfirm={handleSaveFinance}
-                                                        onCancel={() => setEditingFinance(false)}
-                                                        saving={savingCard}
-                                                    />
-                                                ) : null
-                                            }
-                                        >
-                                            {editingFinance && isAdmin ? (
-                                                <div className="flex flex-col gap-2">
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-[12px] text-zinc-400">Khách ($)</span>
-                                                        <input
-                                                            type="number"
-                                                            value={draftFinance.jobPriceUSD}
-                                                            onChange={(e) => setDraftFinance(d => ({ ...d, jobPriceUSD: Number(e.target.value) }))}
-                                                            autoFocus
-                                                            className="w-28 h-8 rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[13px] text-zinc-200 text-right outline-none focus:border-violet-500"
-                                                        />
-                                                    </div>
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-[12px] text-zinc-400">Nhân viên (VND)</span>
-                                                        <input
-                                                            type="number"
-                                                            value={draftFinance.value}
-                                                            onChange={(e) => setDraftFinance(d => ({ ...d, value: Number(e.target.value) }))}
-                                                            className="w-32 h-8 rounded-full bg-white/[0.06] border border-violet-500/40 px-3 text-[13px] text-zinc-200 text-right outline-none focus:border-violet-500"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col gap-2">
-                                                    {/* [Sprint J P0] Client ($) = agency revenue. ADMIN-ONLY display.
-                                                        Non-admin (staff) chỉ thấy Staff (VND) — lương riêng của họ. */}
-                                                    {isAdmin && (
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-[12px] text-zinc-400">Khách ($)</span>
-                                                            <span className="text-[14px] font-bold text-emerald-400">
-                                                                $ {Number(form.jobPriceUSD || 0).toLocaleString('en-US')}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[12px] text-zinc-400">Nhân viên (VND)</span>
-                                                        <span className="text-[14px] font-bold text-zinc-200">
-                                                            VND {Number(form.value || 0).toLocaleString('vi-VN')}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </Card>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* TAB ASSETS */}
-                            {activeTab === 'assets' &&
-                                (showMapPanel && hookGraph ? (
-                                    /* [Hook Graph] Map panel — opened from the RAW Assets row.
-                                       Has a "← Quay lại" button back to the Resources grid. */
-                                    <Card
-                                        title="🗺 Multi-Hook Map"
-                                        rightSlot={
-                                            <div className="flex items-center gap-2">
-                                                {isAdmin &&
-                                                    (editingMap ? (
-                                                        <>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleCancelMap}
-                                                                className="rounded-lg px-2.5 py-1 text-[12px] text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
-                                                            >
-                                                                Hủy
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleSaveMap}
-                                                                disabled={savingMap}
-                                                                className="rounded-lg bg-violet-600 px-3 py-1 text-[12px] font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
-                                                            >
-                                                                {savingMap ? 'Đang lưu…' : 'Lưu map'}
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleEditMap}
-                                                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-medium text-violet-300 hover:bg-violet-500/15"
-                                                        >
-                                                            <Pencil className="h-3.5 w-3.5" /> Sửa map
-                                                        </button>
-                                                    ))}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (editingMap) handleCancelMap()
-                                                        setShowMapPanel(false)
-                                                    }}
-                                                    className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[12px] font-medium text-zinc-300 hover:bg-white/10 hover:text-white"
-                                                >
-                                                    ← Quay lại
-                                                </button>
-                                            </div>
-                                        }
-                                    >
-                                        {editingMap ? (
-                                            <HookGraphEditor
-                                                initialGraph={editGraph ?? hookGraph}
-                                                onChange={setEditGraph}
-                                                height={460}
+                                        {/* TAB ASSETS */}
+                                        {activeTab === 'assets' && (
+                                            <TaskResourcesSection
+                                                form={form}
+                                                isAdmin={isAdmin}
+                                                hookGraph={hookGraph}
+                                                editingMap={editingMap}
+                                                editGraph={editGraph}
+                                                setEditGraph={setEditGraph}
+                                                savingMap={savingMap}
+                                                showMapPanel={showMapPanel}
+                                                setShowMapPanel={setShowMapPanel}
+                                                onEditMap={handleEditMap}
+                                                onCancelMap={handleCancelMap}
+                                                onSaveMap={handleSaveMap}
+                                                onSaveResource={saveResource}
+                                                onSaveReference={saveReference}
                                             />
-                                        ) : (
-                                            <HookGraphViewer graph={hookGraph} height={440} />
                                         )}
-                                    </Card>
-                                ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Card title="Tài nguyên">
-                                        <div className="flex flex-col">
-                                            {hookGraph ? (
-                                                /* [Hook Graph] RAW Assets holds a Multi-Hook Map —
-                                                   show a "configured" pill that opens the map panel. */
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowMapPanel(true)}
-                                                    title="Mở sơ đồ Multi-hook Map"
-                                                    className="group flex w-full items-center justify-between gap-3 border-b border-white/5 py-2 text-left last:border-0"
-                                                >
-                                                    <span className="flex-shrink-0 text-[12px] font-medium text-zinc-300">
-                                                        File RAW
-                                                    </span>
-                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-[12px] font-semibold text-violet-300 transition-colors group-hover:bg-violet-500/20">
-                                                        🗺 Multi-hook Map · {hookGraph.blocks.length} block
-                                                        <span className="text-violet-400">→</span>
-                                                    </span>
-                                                </button>
-                                            ) : (
-                                                <LinkRow
-                                                    label="File RAW"
-                                                    value={form.linkRaw}
-                                                    canEdit={isAdmin}
-                                                    onSave={(v) => saveResource('linkRaw', v)}
-                                                />
-                                            )}
-                                            <LinkRow
-                                                label="File B-Roll"
-                                                value={form.linkBroll}
-                                                canEdit={isAdmin}
-                                                onSave={(v) => saveResource('linkBroll', v)}
-                                            />
-                                            <LinkRow
-                                                label="Kịch bản"
-                                                value={form.scriptLink}
-                                                canEdit={isAdmin}
-                                                onSave={(v) => saveResource('scriptLink', v)}
-                                            />
-                                            <LinkRow
-                                                label="Thư mục nộp bài"
-                                                value={form.submissionFolder}
-                                                canEdit={isAdmin}
-                                                onSave={(v) => saveResource('submissionFolder', v)}
-                                            />
+
+                                        {/* GHI CHÚ — không còn là tab; luôn hiển thị dưới nội dung tab. */}
+                                        <div className="mt-5 pt-5 border-t border-white/5">
+                                            <Card
+                                                title="Ghi chú"
+                                                rightSlot={
+                                                    isAdmin && !editingNotes ? (
+                                                        <EditButton onClick={enterEditNotes} />
+                                                    ) : editingNotes ? (
+                                                        <ConfirmCancelGroup
+                                                            onConfirm={handleSaveNotes}
+                                                            onCancel={() => setEditingNotes(false)}
+                                                            saving={savingCard}
+                                                        />
+                                                    ) : null
+                                                }
+                                            >
+                                                {editingNotes ? (
+                                                    <div className="rounded-xl overflow-hidden border border-white/5 bg-white/[0.02] min-h-[260px]">
+                                                        <TiptapEditor
+                                                            content={draftNotes}
+                                                            onChange={(html) => setDraftNotes(html)}
+                                                        />
+                                                    </div>
+                                                ) : form.notes?.trim() ? (
+                                                    <div
+                                                        className="prose prose-invert prose-sm max-w-none text-zinc-300 leading-relaxed min-h-[200px]"
+                                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(form.notes) }}
+                                                    />
+                                                ) : (
+                                                    <p className="text-[13px] text-muted-foreground min-h-[200px]">Chưa có ghi chú nào.</p>
+                                                )}
+                                            </Card>
                                         </div>
-                                    </Card>
 
-                                    <Card title="Tham khảo">
-                                        <div className="flex flex-col">
-                                            <LinkRow
-                                                label="Tài liệu tham khảo"
-                                                value={form.references}
-                                                canEdit={isAdmin}
-                                                onSave={(v) => saveReference('references', v)}
-                                            />
-                                            <LinkRow
-                                                label="Dự án mẫu"
-                                                value={form.collectFilesLink}
-                                                canEdit={isAdmin}
-                                                onSave={(v) => saveReference('collectFilesLink', v)}
-                                            />
-                                        </div>
-                                    </Card>
-                                </div>
-                                ))}
-
-                            {/* TAB NOTES */}
-                            {/* [Trial] GHI CHÚ — không còn là tab; luôn hiển thị dưới nội dung
-                                tab ("Chính" / "Tài nguyên" vẫn switch qua lại ở trên). */}
-                            <div className="mt-5 pt-5 border-t border-white/5">
-                                <Card
-                                    title="Ghi chú"
-                                    rightSlot={
-                                        isAdmin && !editingNotes ? (
-                                            <EditButton onClick={enterEditNotes} />
-                                        ) : editingNotes ? (
-                                            <ConfirmCancelGroup
-                                                onConfirm={handleSaveNotes}
-                                                onCancel={() => setEditingNotes(false)}
-                                                saving={savingCard}
-                                            />
-                                        ) : null
-                                    }
-                                >
-                                    {editingNotes ? (
-                                        <div className="rounded-xl overflow-hidden border border-white/5 bg-white/[0.02] min-h-[260px]">
-                                            <TiptapEditor
-                                                content={draftNotes}
-                                                onChange={(html) => setDraftNotes(html)}
-                                            />
-                                        </div>
-                                    ) : form.notes?.trim() ? (
-                                        <div
-                                            className="prose prose-invert prose-sm max-w-none text-zinc-300 leading-relaxed min-h-[200px]"
-                                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(form.notes) }}
-                                        />
-                                    ) : (
-                                        <p className="text-[13px] text-muted-foreground min-h-[200px]">Chưa có ghi chú nào.</p>
-                                    )}
-                                </Card>
-                            </div>
-
-                        </div>
-
-                          </>
-                        )}
+                                    </div>
+                                </>
+                            )}
 
                         </div>{/* end LEFT column */}
 
                         {/* [Trial P1] RIGHT column — ClickUp-style comment + activity feed */}
-                        {task && (
-                            <div style={{ width: 400, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', zIndex: 1, background: 'rgba(0,0,0,0.22)' }}>
-                                <TaskCommentColumn taskId={task.id} workspaceId={workspaceId} />
-                            </div>
-                        )}
+                        {task && <TaskCommentsSection taskId={task.id} workspaceId={workspaceId} />}
                     </motion.div>
                 </DialogPrimitive.Content>
             </DialogPrimitive.Portal>

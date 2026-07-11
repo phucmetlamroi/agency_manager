@@ -11,6 +11,7 @@ import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { sanitizeClientText, FEEDBACK_MAX_LEN } from '@/lib/sanitize'
 import { audit } from '@/lib/audit-log'
+import { getDisplayName } from '@/lib/display-name'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser, broadcastToTopic } from '@/lib/notification-broadcast'
 import { getTaskCommentChannel, TASK_COMMENT_EVENTS } from '@/lib/notification-channels'
@@ -197,7 +198,9 @@ export async function getTaskActivityFeed(taskId: string, workspaceId: string): 
         staffIds.length ? prisma.user.findMany({ where: { id: { in: staffIds } }, select: { id: true, username: true, nickname: true } }) : [],
         clientIds.length ? prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, name: true } }) : [],
     ])
-    const staffName = new Map(staff.map((u) => [u.id, u.nickname || u.username]))
+    // [FR-E5] getDisplayName strips raw technical handles (g_<hex>) — feeds comment
+    // authors, activity actors, and action-assigned names below.
+    const staffName = new Map(staff.map((u) => [u.id, getDisplayName(u)]))
     const clientName = new Map(clients.map((c) => [c.id, c.name]))
 
     const commentItems: TaskFeedItem[] = comments.map((c) => ({

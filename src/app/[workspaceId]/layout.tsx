@@ -11,9 +11,13 @@ import { UsernameMigrationModal } from '@/components/auth/UsernameMigrationModal
 
 export default async function WorkspaceLayout({
     children,
+    modal,
     params
 }: {
     children: React.ReactNode
+    // [P2-D3] Intercepting parallel-route slot for /task/[taskId] (renders null via
+    // @modal/default.tsx on every normal page + hard refresh).
+    modal?: React.ReactNode
     params: Promise<{ workspaceId: string }>
 }) {
     const session = await getSession()
@@ -173,6 +177,8 @@ export default async function WorkspaceLayout({
                 <div className="flex-1 min-h-0 overflow-hidden relative">
                     {children}
                 </div>
+                {/* [P2-D3] Intercepting task-detail modal slot (fixed-positioned when active). */}
+                {modal}
                 {/* Marketplace modal portal — opened by Store icon in top-bars (event mode) */}
                 <MarketplaceProvider
                     workspaceId={workspaceId}

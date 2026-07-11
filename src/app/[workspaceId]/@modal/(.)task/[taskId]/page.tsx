@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { loadTaskDetail } from '@/lib/task-detail-loader'
+import { getDeviceType } from '@/lib/device'
 import { TaskDetailRoute } from '@/components/tasks/TaskDetailRoute'
 
 // [P2-D3] Intercepting parallel-route slot: when a task URL is reached via an
@@ -17,7 +18,10 @@ export default async function InterceptedTaskDetail({
     params: Promise<{ workspaceId: string; taskId: string }>
 }) {
     const { workspaceId, taskId } = await params
-    const data = await loadTaskDetail(workspaceId, taskId)
+    const [data, deviceType] = await Promise.all([
+        loadTaskDetail(workspaceId, taskId),
+        getDeviceType(),
+    ])
     if (data.kind === 'redirect') redirect(data.to)
     if (data.kind === 'notFound') notFound()
 
@@ -27,6 +31,7 @@ export default async function InterceptedTaskDetail({
             isAdmin={data.isAdmin}
             currentUserId={data.currentUserId}
             workspaceId={workspaceId}
+            deviceType={deviceType}
         />
     )
 }

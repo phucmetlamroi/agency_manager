@@ -187,11 +187,26 @@ export async function resolveShareClient(share: ShareLink): Promise<{ id: number
     if (!share.taskId) return null
     const task = await prisma.task.findUnique({
         where: { id: share.taskId },
-        select: { client: { select: { id: true, name: true, status: true } } },
+        select: { client: { select: { id: true, name: true, status: true, parentId: true } } },
     })
-    const c = task?.client
-    if (!c || c.status !== 'ACTIVE') return null
-    return { id: c.id, name: c.name }
+    type ClientNode = { id: number; name: string; status: string; parentId: number | null }
+    const c0 = task?.client
+    if (!c0 || c0.status !== 'ACTIVE') return null
+    // Walk up to the MAIN client: comments must show the top-level client name (e.g.
+    // "Jack"), NOT the sub-client / brand the task is filed under (e.g. "MotoHalo").
+    // Bounded loop guards against a cycle in malformed parent chains; stop at the last
+    // ACTIVE ancestor if a parent is archived/merged.
+    let current: ClientNode = c0
+    let guard = 0
+    while (current.parentId != null && guard++ < 10) {
+        const parent: ClientNode | null = await prisma.client.findUnique({
+            where: { id: current.parentId },
+            select: { id: true, name: true, status: true, parentId: true },
+        })
+        if (!parent || parent.status !== 'ACTIVE') break
+        current = parent
+    }
+    return { id: current.id, name: current.name }
 }
 
 /**

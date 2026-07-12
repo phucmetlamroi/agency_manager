@@ -61,9 +61,9 @@ export interface McData {
 
 const card = 'rgba(24,24,27,0.60)'
 const cardBorder = '1px solid rgba(255,255,255,0.06)'
-const RAIL: { icon: LucideIcon; active?: boolean; divider?: boolean; title?: string; nav?: 'queue' | 'requests' | 'tien' }[] = [
+const RAIL: { icon: LucideIcon; active?: boolean; divider?: boolean; title?: string; nav?: 'queue' | 'requests' | 'tien' | 'lich' }[] = [
     { icon: LayoutDashboard, active: true }, { icon: ListTodo, nav: 'queue', title: 'Kho Task Đợi' }, { icon: Inbox, nav: 'requests', title: 'Hộp thư yêu cầu' }, { icon: Clapperboard },
-    { icon: CalendarDays }, { icon: Wallet, nav: 'tien', title: 'Tiền — Payroll', divider: true }, { icon: Building2 },
+    { icon: CalendarDays, nav: 'lich', title: 'Lịch' }, { icon: Wallet, nav: 'tien', title: 'Tiền — Payroll', divider: true }, { icon: Building2 },
     { icon: UsersRound, divider: true }, { icon: Trash2 }, { icon: Activity, title: 'Phân tích' }, { icon: ScrollText, title: 'Nhật ký hoạt động' },
 ]
 
@@ -164,7 +164,8 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                 {RAIL.map((r, i) => {
                     const href = r.nav === 'queue' ? `/${data.workspaceId}/mc/queue`
                         : r.nav === 'requests' ? `/${data.workspaceId}/admin/requests`
-                            : r.nav === 'tien' ? `/${data.workspaceId}/mc/tien` : undefined
+                            : r.nav === 'tien' ? `/${data.workspaceId}/mc/tien`
+                                : r.nav === 'lich' ? `/${data.workspaceId}/mc/lich` : undefined
                     const icon = <RailIcon icon={r.icon} active={r.active} title={r.title} />
                     return (
                         <div key={i} style={{ display: 'contents' }}>

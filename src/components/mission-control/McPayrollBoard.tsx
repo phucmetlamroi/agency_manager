@@ -47,7 +47,7 @@ export interface McPayrollData {
 
 const RAIL: { icon: typeof ListTodo; active?: boolean; href?: string; divider?: boolean }[] = [
     { icon: LayoutDashboard, href: "MC" }, { icon: ListTodo, href: "QUEUE" }, { icon: Inbox, href: "REQ" },
-    { icon: Clapperboard }, { icon: CalendarDays }, { icon: Wallet, active: true, divider: true }, { icon: Building2 },
+    { icon: Clapperboard }, { icon: CalendarDays, href: "LICH" }, { icon: Wallet, active: true, divider: true }, { icon: Building2 },
 ]
 
 type Cur = "VND" | "USD"
@@ -92,7 +92,8 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
     const railHref = (h?: string) =>
         h === "MC" ? `/${data.workspaceId}/mc`
             : h === "QUEUE" ? `/${data.workspaceId}/mc/queue`
-                : h === "REQ" ? `/${data.workspaceId}/admin/requests` : undefined
+                : h === "REQ" ? `/${data.workspaceId}/admin/requests`
+                    : h === "LICH" ? `/${data.workspaceId}/mc/lich` : undefined
 
     return (
         <div style={{ minHeight: "100dvh", background: "#050505", color: "#F4F4F5", display: "flex", position: "relative", fontFamily: '"Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif' }}>

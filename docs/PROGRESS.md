@@ -4,8 +4,9 @@ Branch: `claude/mission-control` · **commit-only, KHÔNG push** · design = 31 
 Done trước autoloop: M1–M4 + cosmetic pass (`7eb4a4d`).
 
 ## Autoloop M5 → M31 (tự chạy)
-- [ ] **M5 Finance** — đang build (route `/mc/finance` + `McFinanceBoard`, reuse `computeWorkspaceFinance`)
-- [ ] M6 Lịch · M7 Hộp thư · M8 Tệp/Review · M9 Thành viên · M10 Add Task · M11 Player
+- [x] **M5 Finance** ✅ `7e227f8` — `/mc/finance` + `McFinanceBoard`, reuse `computeWorkspaceFinance`
+- [x] **M6 Lịch** ✅ — `/mc/lich` + `McCalendarBoard`; Nhân sự (reuse `getAdminAvailabilityWeek` read-only) + Deadline (Task, week/month); sửa lịch bắc cầu GĐ1
+- [ ] M7 Hộp thư · M8 Tệp/Review · M9 Thành viên · M10 Add Task · M11 Player
 - [ ] M12 CRM · M13 Hóa đơn · M14 Hồ sơ TT · M15 Hồ sơ cá nhân
 - [ ] M16 Vận hành bảng · M17 Bulk · M18 Phiên Chợ · M19 Sửa task · M20 Velox+HookMap
 - [ ] M21 Shares · M22 Trash+Versions · M23 Compare · M24 Payroll thưởng · M25 CRM tiền · M26 Thùng rác gộp

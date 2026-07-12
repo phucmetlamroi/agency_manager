@@ -60,8 +60,8 @@ export interface McData {
 
 const card = 'rgba(24,24,27,0.60)'
 const cardBorder = '1px solid rgba(255,255,255,0.06)'
-const RAIL: { icon: LucideIcon; active?: boolean; divider?: boolean; title?: string }[] = [
-    { icon: LayoutDashboard, active: true }, { icon: ListTodo }, { icon: Inbox }, { icon: Clapperboard },
+const RAIL: { icon: LucideIcon; active?: boolean; divider?: boolean; title?: string; nav?: 'queue' | 'requests' }[] = [
+    { icon: LayoutDashboard, active: true }, { icon: ListTodo, nav: 'queue', title: 'Kho Task Đợi' }, { icon: Inbox, nav: 'requests', title: 'Hộp thư yêu cầu' }, { icon: Clapperboard },
     { icon: CalendarDays }, { icon: Wallet, divider: true }, { icon: Building2 },
     { icon: UsersRound, divider: true }, { icon: Trash2 }, { icon: Activity, title: 'Phân tích' }, { icon: ScrollText, title: 'Nhật ký hoạt động' },
 ]
@@ -147,12 +147,17 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 18px rgba(139,92,246,0.40)', marginBottom: 12 }}>
                     <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>H</span>
                 </div>
-                {RAIL.map((r, i) => (
-                    <div key={i} style={{ display: 'contents' }}>
-                        {r.divider && <div style={{ width: 28, height: 1, background: 'rgba(255,255,255,0.08)', margin: '8px 0' }} />}
-                        <RailIcon icon={r.icon} active={r.active} title={r.title} />
-                    </div>
-                ))}
+                {RAIL.map((r, i) => {
+                    const href = r.nav === 'queue' ? `/${data.workspaceId}/mc/queue`
+                        : r.nav === 'requests' ? `/${data.workspaceId}/admin/requests` : undefined
+                    const icon = <RailIcon icon={r.icon} active={r.active} title={r.title} />
+                    return (
+                        <div key={i} style={{ display: 'contents' }}>
+                            {r.divider && <div style={{ width: 28, height: 1, background: 'rgba(255,255,255,0.08)', margin: '8px 0' }} />}
+                            {href ? <Link href={href}>{icon}</Link> : icon}
+                        </div>
+                    )
+                })}
                 <div style={{ flex: 1 }} />
                 {/* [M1 interactivity] Back to Giao diện 1 — clears the ui-pref cookie first. */}
                 <McBackLink backHref={data.backHref} />

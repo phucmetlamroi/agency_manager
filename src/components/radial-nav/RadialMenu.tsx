@@ -14,6 +14,8 @@ type RadialMenuProps = {
     segments: RadialSegment[]
     origin: { x: number; y: number }
     hoveredIndex: number | null
+    /** [Mobile PR#6] Touch-opened radial has no mouseup-to-close → render a tap-outside backdrop. */
+    dismissable?: boolean
     onSelect: (index: number) => void
     onClose: () => void
     onOpenConfig: () => void
@@ -196,6 +198,7 @@ export function RadialMenu({
     segments,
     origin,
     hoveredIndex,
+    dismissable,
     onSelect,
     onClose,
     onOpenConfig,
@@ -205,6 +208,16 @@ export function RadialMenu({
 
     const content = (
         <>
+            {/* [Mobile PR#6] Tap-outside close layer — only for touch-opened (dismissable) radial. */}
+            {dismissable && (
+                <div
+                    className="fixed inset-0 z-[99993]"
+                    onClick={onClose}
+                    onTouchStart={(e) => { e.preventDefault(); onClose() }}
+                    aria-hidden
+                />
+            )}
+
             {/* Subtle radial backdrop */}
             <motion.div
                 className="fixed inset-0 z-[99994] pointer-events-none"

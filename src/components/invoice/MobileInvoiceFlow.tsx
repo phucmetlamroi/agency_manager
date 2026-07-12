@@ -9,11 +9,12 @@
 //   Bước 1 "Chọn mục": groupByBrand + task selector (auto-select all) + manual items + line
 //                       items (edit inline) + running subtotal.
 //   Bước 2 "Thiết lập": billing profile + số/ngày + thuế/trả trước/cọc + link + field EN + tổng.
+//   [design-handoff parity] reskinned under `.mroot` (indigo #6366F1 --m-* tokens) to match the
+//   owner's prototype — presentational only; no money/calc/payload change.
 
-import { useState, useEffect, useMemo } from 'react'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect, useMemo, type CSSProperties } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Plus, Trash2, Pencil, Check, FileDown, X, ChevronDown } from 'lucide-react'
+import { Loader2, Plus, Trash2, Pencil, Check, FileDown, X, ChevronDown, ChevronLeft, ArrowRight, Layers, Landmark, PiggyBank, Languages } from 'lucide-react'
 import { getUnbilledTasks, getBillingProfiles, createInvoiceRecord } from '@/actions/invoice-actions'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
@@ -337,102 +338,108 @@ export default function MobileInvoiceFlow({ open, onClose, clientId, clientName,
 
     if (!open) return null
 
-    const inputCls =
-        'w-full rounded-xl border border-white/10 bg-zinc-900/70 px-3 py-3 text-base text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/40'
+    // Presentational-only helpers (prototype parity — no logic/calc/payload impact).
+    const faux: CSSProperties = {
+        height: 40,
+        width: '100%',
+        borderRadius: 11,
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid var(--m-border-3)',
+        padding: '0 11px',
+        fontSize: 12.5,
+        color: 'var(--m-fg-1)',
+        outline: 'none',
+    }
+    const selectedProfile = billingProfiles.find((p) => p.id === billingProfileId)
 
     return (
-        <div className="fixed inset-0 z-dialog flex flex-col bg-zinc-950">
-            {/* ── Header (X + title + step) ── */}
-            <header className="flex items-center gap-3 border-b border-white/8 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)]">
+        <div className="mroot m-scr fixed inset-0 z-dialog flex flex-col" style={{ background: 'var(--m-bg-1)' }}>
+            {/* ── Header ── */}
+            <header
+                className="flex items-center gap-2.5 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)]"
+                style={{ borderBottom: '1px solid var(--m-border-2)' }}
+            >
                 <button
                     type="button"
-                    onClick={onClose}
-                    aria-label="Đóng"
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors active:bg-white/10"
+                    onClick={step === 1 ? onClose : () => setStep(1)}
+                    aria-label={step === 1 ? 'Đóng' : 'Quay lại'}
+                    className="m-press flex h-10 w-10 items-center justify-center rounded-full"
+                    style={{ color: 'var(--m-fg-3)' }}
                 >
-                    <X className="h-5 w-5" />
+                    {step === 1 ? <X size={22} /> : <ChevronLeft size={22} />}
                 </button>
-                <div className="min-w-0 flex-1">
-                    <h1 className="truncate text-[15px] font-bold text-foreground">Tạo hóa đơn</h1>
-                    <p className="truncate text-caption text-muted-foreground">{clientName}</p>
+                <div className="min-w-0 flex-1" style={{ lineHeight: 1.25 }}>
+                    <h1 className="truncate" style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--m-fg-1)' }}>
+                        {step === 1 ? `Tạo invoice — ${clientName}` : 'Thiết lập hóa đơn'}
+                    </h1>
+                    <p className={step === 1 ? 'truncate' : 'm-mono truncate'} style={{ fontSize: 10.5, color: 'var(--m-fg-4)', marginTop: 1 }}>
+                        {step === 1 ? 'chỉ task chưa xuất hóa đơn (UNBILLED)' : `${invoiceNumber} · tự sinh, sửa được`}
+                    </p>
                 </div>
-                <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-caption font-bold text-primary-accent">
-                    Bước {step}/2
-                </span>
+                <span className="m-mono shrink-0" style={{ fontSize: 11, color: 'var(--m-primary-fg)' }}>{step}/2</span>
             </header>
 
+            {/* ── Progress bar ── */}
+            <div className="flex" style={{ gap: 5, padding: '0 16px 8px' }}>
+                <span style={{ flex: 1, height: 4, borderRadius: 99, background: 'var(--m-primary)', boxShadow: step === 1 ? '0 0 10px var(--m-primary-glow)' : 'none' }} />
+                <span style={{ flex: 1, height: 4, borderRadius: 99, background: step === 2 ? 'var(--m-primary)' : 'var(--m-border-2)', boxShadow: step === 2 ? '0 0 10px var(--m-primary-glow)' : 'none' }} />
+            </div>
+
             {/* ── Body ── */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 pb-[calc(88px+env(safe-area-inset-bottom))]">
+            <div className="flex-1 overflow-y-auto px-4" style={{ paddingTop: 4, paddingBottom: 'calc(122px + env(safe-area-inset-bottom))' }}>
                 {isLoading ? (
                     <div className="flex justify-center pt-16">
-                        <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+                        <Loader2 className="h-7 w-7 animate-spin" style={{ color: 'var(--m-fg-3)' }} />
                     </div>
                 ) : step === 1 ? (
-                    /* ══ Bước 1: Chọn mục ══ */
-                    <div className="flex flex-col gap-3">
-                        {/* Config chips */}
-                        <div className="flex flex-wrap items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setGroupByBrand((v) => !v)}
-                                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-caption font-bold transition-colors ${groupByBrand ? 'border-primary/60 bg-primary/15 text-primary-accent' : 'border-white/10 bg-zinc-900/70 text-muted-foreground'}`}
-                            >
-                                <span className={`h-2 w-2 rounded-full ${groupByBrand ? 'bg-primary-accent' : 'bg-zinc-500'}`} />
-                                Gộp theo Brand
-                            </button>
-                            {depositBalance > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={() => setApplyDeposit((v) => !v)}
-                                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-caption font-bold transition-colors ${applyDeposit ? 'border-warning/60 bg-warning/15 text-warning' : 'border-white/10 bg-zinc-900/70 text-muted-foreground'}`}
-                                >
-                                    <span className={`h-2 w-2 rounded-full ${applyDeposit ? 'bg-warning' : 'bg-zinc-500'}`} />
-                                    Dùng cọc (-{currency}{maxDeductible})
-                                </button>
-                            )}
+                    /* ══ STEP 1 — Chọn mục ══ */
+                    <div className="flex flex-col" style={{ gap: 11 }}>
+                        {/* Gộp theo brand — switch row */}
+                        <div className="flex items-center" style={{ gap: 9, padding: '2px 2px' }}>
+                            <Layers size={14} style={{ color: 'var(--m-primary-hover)' }} />
+                            <span style={{ fontSize: 11.5, color: 'var(--m-fg-3)' }}>Gộp theo brand</span>
+                            <span style={{ flex: 1 }} />
+                            <MSwitch on={groupByBrand} onClick={() => setGroupByBrand((v) => !v)} />
                         </div>
 
-                        {/* Task selector — grouped by brand */}
+                        {/* Grouped task list */}
                         {tasks.length === 0 ? (
-                            <p className="pt-6 text-center text-body-sm italic text-muted-foreground">Không có task chưa xuất hóa đơn.</p>
+                            <p className="text-center" style={{ paddingTop: 24, fontStyle: 'italic', fontSize: 12.5, color: 'var(--m-fg-4)' }}>Không có task chưa xuất hóa đơn.</p>
                         ) : (
-                            <div className="flex flex-col gap-2">
-                                {Object.entries(groupedTasks).map(([brand, brandTasks]) => (
-                                    <div key={brand} className="overflow-hidden rounded-xl border border-white/8 bg-zinc-900/40">
-                                        <div className="flex items-center justify-between px-3 py-2">
-                                            <span className="text-body-sm font-bold text-zinc-200">{brand}</span>
-                                            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-caption text-muted-foreground">{brandTasks.length} task</span>
-                                        </div>
-                                        <div className="flex flex-col gap-1.5 px-2 pb-2">
-                                            {brandTasks.map((task) => {
-                                                const sel = selectedTaskIds.includes(task.id)
-                                                return (
-                                                    <button
-                                                        type="button"
-                                                        key={task.id}
-                                                        onClick={() => toggleTask(task.id)}
-                                                        className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2.5 text-left transition-colors ${sel ? 'border-primary/40 bg-primary/10' : 'border-white/8 bg-zinc-800/60'}`}
-                                                    >
-                                                        <span className="flex min-w-0 items-center gap-2.5">
-                                                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${sel ? 'border-primary bg-primary text-white' : 'border-zinc-600'}`}>
-                                                                {sel && <Check className="h-3 w-3" />}
-                                                            </span>
-                                                            <span className="min-w-0">
-                                                                <span className="block truncate text-body-sm font-semibold text-zinc-200">{task.title}</span>
-                                                                <span className="block text-caption text-muted-foreground">{new Date(task.createdAt).toLocaleDateString('vi-VN')}</span>
-                                                            </span>
-                                                        </span>
-                                                        <span className="shrink-0 whitespace-nowrap font-mono text-body-sm font-bold text-emerald-400">{formatCurrency(task.jobPriceUSD)}</span>
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
+                            Object.entries(groupedTasks).map(([brand, brandTasks]) => (
+                                <div key={brand}>
+                                    <div className="m-eb" style={{ marginBottom: 6, paddingLeft: 2 }}>{brand === clientName ? `${brand} — trực tiếp` : `${brand} — brand con`}</div>
+                                    <div className="m-card" style={{ overflow: 'hidden' }}>
+                                        {brandTasks.map((task, i) => {
+                                            const sel = selectedTaskIds.includes(task.id)
+                                            const created = new Date(task.createdAt)
+                                            const shortDate = `${created.getDate()}/${created.getMonth() + 1}`
+                                            const meta = task.status ? `${task.status} · ${shortDate}` : shortDate
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={task.id}
+                                                    onClick={() => toggleTask(task.id)}
+                                                    className="flex w-full items-center text-left"
+                                                    style={{ gap: 10, padding: '10px 12px', background: 'transparent', border: 0, borderBottom: i < brandTasks.length - 1 ? '1px solid var(--m-border-1)' : 'none' }}
+                                                >
+                                                    <span style={{ width: 18, height: 18, borderRadius: 6, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: sel ? 'var(--m-primary)' : 'transparent', border: sel ? 'none' : '1.5px solid rgba(255,255,255,0.20)' }}>
+                                                        {sel && <Check size={12} color="#fff" strokeWidth={3} />}
+                                                    </span>
+                                                    <span className="min-w-0" style={{ flex: 1 }}>
+                                                        <span className="block truncate" style={{ fontSize: 12.5, fontWeight: 600, color: sel ? 'var(--m-fg-1)' : 'var(--m-fg-3)' }}>{task.title}</span>
+                                                        <span className="block" style={{ fontSize: 10, color: 'var(--m-fg-4)', marginTop: 1 }}>{meta}</span>
+                                                    </span>
+                                                    <span className="m-mono shrink-0 whitespace-nowrap" style={{ fontSize: 12.5, fontWeight: 700, color: sel ? 'var(--m-fg-1)' : 'var(--m-fg-4)' }}>{formatCurrency(task.jobPriceUSD)}</span>
+                                                </button>
+                                            )
+                                        })}
                                     </div>
-                                ))}
-                            </div>
+                                </div>
+                            ))
                         )}
 
-                        {/* Add manual item */}
+                        {/* Add manual line */}
                         <button
                             type="button"
                             onClick={() => {
@@ -441,55 +448,55 @@ export default function MobileInvoiceFlow({ open, onClose, clientId, clientName,
                                 setEditingItemId(newItem.id)
                                 setEditForm({ description: newItem.description, unitPrice: 0, quantity: 1 })
                             }}
-                            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 text-body-sm text-muted-foreground transition-colors active:bg-white/5"
+                            className="m-note"
+                            style={{ width: '100%' }}
                         >
-                            <Plus className="h-4 w-4" /> Thêm hạng mục thủ công
+                            <Plus size={14} style={{ color: 'var(--m-primary-fg)' }} />
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--m-primary-fg)' }}>Thêm dòng thủ công</span>
+                            <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--m-fg-4)' }}>mô tả · SL · đơn giá</span>
                         </button>
 
                         {/* Line items (activeItems) — edit inline */}
                         {activeItems.length > 0 && (
-                            <div className="mt-1 flex flex-col gap-2">
-                                <p className="text-caption font-bold uppercase tracking-widest text-muted-foreground">Hạng mục hóa đơn</p>
+                            <div className="flex flex-col" style={{ gap: 8 }}>
                                 {activeItems.map((item) => (
-                                    <div key={item.id} className="rounded-xl border border-white/8 bg-zinc-900/60 p-3">
+                                    <div key={item.id} className="m-card" style={{ padding: 12 }}>
                                         {editingItemId === item.id ? (
-                                            <div className="flex flex-col gap-2">
-                                                <input className={inputCls} value={editForm.description} onChange={(e) => applyEditField({ description: e.target.value })} placeholder="Mô tả" />
-                                                <div className="flex gap-2">
+                                            <div className="flex flex-col" style={{ gap: 8 }}>
+                                                <input style={faux} value={editForm.description} onChange={(e) => applyEditField({ description: e.target.value })} placeholder="Mô tả" />
+                                                <div className="flex" style={{ gap: 8 }}>
                                                     <label className="flex-1">
-                                                        <span className="mb-1 block text-caption text-muted-foreground">Số lượng</span>
-                                                        <input type="number" inputMode="decimal" className={inputCls} value={editForm.quantity} onChange={(e) => applyEditField({ quantity: Number(e.target.value) })} />
+                                                        <span className="m-eb block" style={{ marginBottom: 4 }}>Số lượng</span>
+                                                        <input type="number" inputMode="decimal" style={faux} value={editForm.quantity} onChange={(e) => applyEditField({ quantity: Number(e.target.value) })} />
                                                     </label>
                                                     <label className="flex-1">
-                                                        <span className="mb-1 block text-caption text-muted-foreground">Đơn giá ({currency})</span>
-                                                        <input type="number" inputMode="decimal" className={inputCls} value={editForm.unitPrice} onChange={(e) => applyEditField({ unitPrice: Number(e.target.value) })} />
+                                                        <span className="m-eb block" style={{ marginBottom: 4 }}>Đơn giá ({currency})</span>
+                                                        <input type="number" inputMode="decimal" style={faux} value={editForm.unitPrice} onChange={(e) => applyEditField({ unitPrice: Number(e.target.value) })} />
                                                     </label>
                                                 </div>
-                                                <div className="flex items-center justify-between pt-1">
-                                                    <span className="font-mono text-body-sm font-bold text-emerald-400">{currency}{(editForm.unitPrice * editForm.quantity).toFixed(2)}</span>
-                                                    <Button className="h-10 gap-1.5" onClick={saveEditItem}>
-                                                        <Check className="h-4 w-4" /> Xong
-                                                    </Button>
+                                                <div className="flex items-center justify-between" style={{ paddingTop: 2 }}>
+                                                    <span className="m-mono" style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--m-fg-1)' }}>{currency}{(editForm.unitPrice * editForm.quantity).toFixed(2)}</span>
+                                                    <button type="button" className="m-btnP" style={{ padding: '0 16px' }} onClick={saveEditItem}>
+                                                        <Check size={16} /> Xong
+                                                    </button>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="flex items-start justify-between gap-2">
+                                            <div className="flex items-start justify-between" style={{ gap: 8 }}>
                                                 <div className="min-w-0">
-                                                    <div className="break-words text-body-sm font-semibold text-foreground">{item.description}</div>
-                                                    {item.note && <div className="mt-0.5 text-caption text-muted-foreground">{item.note}</div>}
-                                                    <div className="mt-1 text-caption text-muted-foreground">
-                                                        {item.quantity} × {currency}{item.unitPrice.toFixed(2)}
-                                                    </div>
+                                                    <div className="break-words" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--m-fg-1)' }}>{item.description}</div>
+                                                    {item.note && <div style={{ fontSize: 10, color: 'var(--m-fg-4)', marginTop: 2 }}>{item.note}</div>}
+                                                    <div className="m-mono" style={{ fontSize: 10, color: 'var(--m-fg-4)', marginTop: 2 }}>{item.quantity} × {currency}{item.unitPrice.toFixed(2)}</div>
                                                 </div>
-                                                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                                                    <span className="whitespace-nowrap font-mono text-body-sm font-bold text-foreground">{currency}{item.amount.toFixed(2)}</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <button type="button" onClick={() => handleEditItem(item)} aria-label="Sửa" className="flex h-10 w-10 items-center justify-center rounded-lg text-primary-accent active:bg-white/5">
-                                                            <Pencil className="h-4 w-4" />
+                                                <div className="flex shrink-0 flex-col items-end" style={{ gap: 6 }}>
+                                                    <span className="m-mono whitespace-nowrap" style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--m-fg-1)' }}>{currency}{item.amount.toFixed(2)}</span>
+                                                    <div className="flex items-center" style={{ gap: 6 }}>
+                                                        <button type="button" onClick={() => handleEditItem(item)} aria-label="Sửa" className="m-press flex h-10 w-10 items-center justify-center" style={{ color: 'var(--m-primary-fg)' }}>
+                                                            <Pencil size={16} />
                                                         </button>
                                                         {item.isManual && (
-                                                            <button type="button" onClick={() => setManualItems((prev) => prev.filter((m) => m.id !== item.id))} aria-label="Xóa" className="flex h-10 w-10 items-center justify-center rounded-lg text-red-400 active:bg-white/5">
-                                                                <Trash2 className="h-4 w-4" />
+                                                            <button type="button" onClick={() => setManualItems((prev) => prev.filter((m) => m.id !== item.id))} aria-label="Xóa" className="m-press flex h-10 w-10 items-center justify-center" style={{ color: 'var(--m-danger-fg)' }}>
+                                                                <Trash2 size={16} />
                                                             </button>
                                                         )}
                                                     </div>
@@ -500,20 +507,35 @@ export default function MobileInvoiceFlow({ open, onClose, clientId, clientName,
                                 ))}
                             </div>
                         )}
-
-                        {/* Running subtotal */}
-                        <div className="flex items-center justify-between rounded-xl border border-white/8 bg-zinc-900/60 px-3 py-3">
-                            <span className="text-body-sm text-muted-foreground">Tạm tính</span>
-                            <span className="whitespace-nowrap font-mono text-[15px] font-bold text-foreground">{currency}{activeSubtotal.toFixed(2)}</span>
-                        </div>
                     </div>
                 ) : (
-                    /* ══ Bước 2: Thiết lập ══ */
-                    <div className="flex flex-col gap-4">
+                    /* ══ STEP 2 — Thiết lập ══ */
+                    <div className="flex flex-col" style={{ gap: 11 }}>
                         {/* Hồ sơ thanh toán */}
                         <div>
-                            <div className="mb-1.5 flex items-center justify-between">
-                                <label className="text-caption font-bold uppercase tracking-widest text-muted-foreground">Hồ sơ thanh toán</label>
+                            <div className="m-card" style={{ position: 'relative', padding: '11px 13px', display: 'flex', alignItems: 'center', gap: 9 }}>
+                                <Landmark size={16} style={{ color: 'var(--m-primary-hover)', flexShrink: 0 }} />
+                                <div className="min-w-0" style={{ flex: 1 }}>
+                                    <div className="truncate" style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--m-fg-1)' }}>
+                                        {selectedProfile ? selectedProfile.profileName : '-- Chọn hồ sơ thanh toán --'}
+                                        {selectedProfile?.isDefault && <span style={{ fontSize: 9.5, fontWeight: 400, color: 'var(--m-fg-4)' }}> · mặc định</span>}
+                                    </div>
+                                    <div style={{ fontSize: 10, color: 'var(--m-fg-4)', marginTop: 1 }}>hồ sơ thanh toán · tiền tệ {currency}</div>
+                                </div>
+                                <ChevronDown size={14} style={{ color: 'var(--m-fg-4)', flexShrink: 0 }} />
+                                <select
+                                    aria-label="Hồ sơ thanh toán"
+                                    className="absolute inset-0 h-full w-full opacity-0"
+                                    value={billingProfileId}
+                                    onChange={(e) => setBillingProfileId(e.target.value)}
+                                >
+                                    <option value="">-- Chọn hồ sơ thanh toán --</option>
+                                    {billingProfiles.map((p) => (
+                                        <option key={p.id} value={p.id}>{p.profileName} ({p.bankName})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div style={{ marginTop: 6 }}>
                                 <BillingProfileManager
                                     currentProfileId={billingProfileId}
                                     workspaceId={workspaceId}
@@ -523,129 +545,153 @@ export default function MobileInvoiceFlow({ open, onClose, clientId, clientName,
                                     }}
                                 />
                             </div>
-                            <div className="relative">
-                                <select
-                                    className={`${inputCls} appearance-none pr-10`}
-                                    value={billingProfileId}
-                                    onChange={(e) => setBillingProfileId(e.target.value)}
-                                >
-                                    <option value="">-- Chọn hồ sơ thanh toán --</option>
-                                    {billingProfiles.map((p) => (
-                                        <option key={p.id} value={p.id}>{p.profileName} ({p.bankName})</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            </div>
                         </div>
 
-                        {/* Số + ngày */}
-                        <label className="block">
-                            <span className="mb-1.5 block text-caption font-bold uppercase tracking-widest text-muted-foreground">Số hóa đơn</span>
-                            <input className={`${inputCls} font-mono`} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
-                        </label>
-                        <div className="flex gap-2">
+                        {/* Dates 2-up */}
+                        <div className="flex" style={{ gap: 8 }}>
                             <label className="flex-1">
-                                <span className="mb-1.5 block text-caption font-bold uppercase tracking-widest text-muted-foreground">Ngày xuất</span>
-                                <input type="date" className={inputCls} value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+                                <span className="m-eb block" style={{ marginBottom: 4 }}>Phát hành</span>
+                                <input type="date" style={faux} value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
                             </label>
                             <label className="flex-1">
-                                <span className="mb-1.5 block text-caption font-bold uppercase tracking-widest text-muted-foreground">Hạn ({dueDateLabel})</span>
-                                <input className={inputCls} value={dueDate} onChange={(e) => setDueDate(e.target.value)} placeholder="vd. Khi có yêu cầu" />
+                                <span className="m-eb block" style={{ marginBottom: 4 }}>Hạn "{dueDateLabel}"</span>
+                                <input style={faux} value={dueDate} onChange={(e) => setDueDate(e.target.value)} placeholder="Khi có yêu cầu" />
                             </label>
                         </div>
 
-                        {/* Thuế + trả trước */}
-                        <div className="flex gap-2">
-                            <label className="flex-1">
-                                <span className="mb-1.5 block text-caption font-bold uppercase tracking-widest text-muted-foreground">Thuế %</span>
-                                <input type="number" inputMode="decimal" className={inputCls} value={taxPercent} onChange={(e) => setTaxPercent(Number(e.target.value))} />
+                        {/* Thuế % + Link thanh toán */}
+                        <div className="flex" style={{ gap: 8 }}>
+                            <label style={{ flex: 1 }}>
+                                <span className="m-eb block" style={{ marginBottom: 4 }}>Thuế %</span>
+                                <input type="number" inputMode="decimal" className="m-mono" style={faux} value={taxPercent} onChange={(e) => setTaxPercent(Number(e.target.value))} />
                             </label>
-                            <label className="flex-1">
-                                <span className="mb-1.5 block text-caption font-bold uppercase tracking-widest text-muted-foreground">Trả trước ({currency})</span>
-                                <input type="number" inputMode="decimal" className={inputCls} value={customPrepaid} onChange={(e) => setCustomPrepaid(Number(e.target.value))} />
+                            <label style={{ flex: 2 }}>
+                                <span className="m-eb block" style={{ marginBottom: 4 }}>Link thanh toán</span>
+                                <input style={faux} value={paymentLink} onChange={(e) => setPaymentLink(e.target.value)} placeholder="https://…" />
                             </label>
                         </div>
 
+                        {/* Số hóa đơn + Trả trước (KEEP — prototype hides these but they feed the record/PDF) */}
+                        <div className="flex" style={{ gap: 8 }}>
+                            <label className="flex-1">
+                                <span className="m-eb block" style={{ marginBottom: 4 }}>Số hóa đơn</span>
+                                <input className="m-mono" style={faux} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
+                            </label>
+                            <label className="flex-1">
+                                <span className="m-eb block" style={{ marginBottom: 4 }}>Trả trước ({currency})</span>
+                                <input type="number" inputMode="decimal" className="m-mono" style={faux} value={customPrepaid} onChange={(e) => setCustomPrepaid(Number(e.target.value))} />
+                            </label>
+                        </div>
+
+                        {/* Deposit toggle */}
                         {depositBalance > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => setApplyDeposit((v) => !v)}
-                                className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-2 text-caption font-bold transition-colors ${applyDeposit ? 'border-warning/60 bg-warning/15 text-warning' : 'border-white/10 bg-zinc-900/70 text-muted-foreground'}`}
-                            >
-                                <span className={`h-2 w-2 rounded-full ${applyDeposit ? 'bg-warning' : 'bg-zinc-500'}`} />
-                                Dùng tiền cọc (-{currency}{maxDeductible})
-                            </button>
+                            <div className="m-card flex items-center" style={{ gap: 9, padding: '10px 13px' }}>
+                                <PiggyBank size={16} style={{ color: 'var(--m-success-fg)', flexShrink: 0 }} />
+                                <div className="min-w-0" style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--m-fg-1)' }}>Trừ tiền cọc hiện có</div>
+                                    <div className="m-mono" style={{ fontSize: 10, color: 'var(--m-fg-4)', marginTop: 1 }}>số dư cọc {currency}{depositBalance}</div>
+                                </div>
+                                <MSwitch on={applyDeposit} onClick={() => setApplyDeposit((v) => !v)} />
+                            </div>
                         )}
 
-                        <label className="block">
-                            <span className="mb-1.5 block text-caption font-bold uppercase tracking-widest text-muted-foreground">Link thanh toán</span>
-                            <input className={inputCls} value={paymentLink} onChange={(e) => setPaymentLink(e.target.value)} placeholder="https://..." />
-                        </label>
-
-                        {/* Field EN cho khách (PDF) */}
-                        <div className="rounded-xl border border-white/8 bg-zinc-900/40 p-3">
-                            <p className="mb-2 text-caption font-bold uppercase tracking-widest text-muted-foreground">Hiển thị cho khách (PDF · English)</p>
-                            <div className="flex flex-col gap-2">
-                                <input className={inputCls} value={customAgencyName} onChange={(e) => setCustomAgencyName(e.target.value)} placeholder="Agency name" />
-                                <input className={inputCls} value={customTitle} onChange={(e) => setCustomTitle(e.target.value.toUpperCase())} placeholder="INVOICE" />
-                                <textarea className={`${inputCls} resize-none`} rows={2} value={customClientAddress} onChange={(e) => setCustomClientAddress(e.target.value)} placeholder="Địa chỉ khách hàng…" />
+                        {/* EN client fields (PDF) */}
+                        <div className="m-card" style={{ padding: '11px 13px', borderStyle: 'dashed' }}>
+                            <div className="flex items-center" style={{ gap: 8, marginBottom: 8 }}>
+                                <Languages size={15} style={{ color: 'var(--m-fg-4)', flexShrink: 0 }} />
+                                <span style={{ fontSize: 11.5, color: 'var(--m-fg-3)' }}>Trường hiển thị cho khách (EN): INVOICE · Agency Manager · địa chỉ</span>
+                            </div>
+                            <div className="flex flex-col" style={{ gap: 8 }}>
+                                <input style={faux} value={customAgencyName} onChange={(e) => setCustomAgencyName(e.target.value)} placeholder="Agency name" />
+                                <input style={faux} value={customTitle} onChange={(e) => setCustomTitle(e.target.value.toUpperCase())} placeholder="INVOICE" />
+                                <textarea style={{ ...faux, height: 'auto', padding: '9px 11px', resize: 'none' }} rows={2} value={customClientAddress} onChange={(e) => setCustomClientAddress(e.target.value)} placeholder="Địa chỉ khách hàng…" />
                             </div>
                         </div>
 
                         {/* Totals */}
-                        <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-zinc-900/60 p-4">
-                            <div className="flex justify-between text-body-sm text-muted-foreground">
-                                <span>Tạm tính</span>
-                                <span className="font-mono">{currency}{activeSubtotal.toFixed(2)}</span>
-                            </div>
-                            {taxPercent > 0 && (
-                                <div className="flex justify-between text-body-sm text-muted-foreground">
-                                    <span>Thuế ({taxPercent}%)</span>
-                                    <span className="font-mono">{currency}{activeTaxAmount.toFixed(2)}</span>
+                        <div className="m-card" style={{ position: 'relative', overflow: 'hidden', background: 'var(--m-bg-2)', padding: '12px 14px' }}>
+                            <span className="m-orb" style={{ background: 'rgba(16,185,129,.08)', top: -40, right: -34 }} />
+                            <div className="relative flex flex-col" style={{ gap: 4 }}>
+                                <div className="m-mono flex justify-between" style={{ fontSize: 12, color: 'var(--m-fg-3)' }}>
+                                    <span>Subtotal</span>
+                                    <span>{currency}{activeSubtotal.toFixed(2)}</span>
                                 </div>
-                            )}
-                            {totalDeducted > 0 && (
-                                <div className="flex justify-between text-body-sm text-red-400">
-                                    <span>Giảm trừ / Trả trước</span>
-                                    <span className="font-mono">-{currency}{totalDeducted.toFixed(2)}</span>
+                                {taxPercent > 0 && (
+                                    <div className="m-mono flex justify-between" style={{ fontSize: 12, color: 'var(--m-fg-3)' }}>
+                                        <span>Tax {taxPercent}%</span>
+                                        <span>{currency}{activeTaxAmount.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                {totalDeducted > 0 && (
+                                    <div className="m-mono flex justify-between" style={{ fontSize: 12, color: 'var(--m-danger-fg)' }}>
+                                        <span>Deposit</span>
+                                        <span>−{currency}{totalDeducted.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                <div style={{ borderTop: '1px solid var(--m-border-2)', margin: '8px 0 6px' }} />
+                                <div className="flex items-center justify-between">
+                                    <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', color: 'var(--m-fg-3)' }}>TOTAL DUE</span>
+                                    <span className="m-mono whitespace-nowrap" style={{ fontSize: 20, fontWeight: 800, color: 'var(--m-success-fg)' }}>{currency}{finalTotalDue.toFixed(2)}</span>
                                 </div>
-                            )}
-                            <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-3">
-                                <span className="text-caption font-bold uppercase tracking-widest text-muted-foreground">Tổng cộng</span>
-                                <span className="whitespace-nowrap font-mono text-2xl font-black text-emerald-400">{currency}{finalTotalDue.toFixed(2)}</span>
                             </div>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* ── Sticky footer nav ── */}
-            <footer className="absolute inset-x-0 bottom-0 flex gap-2 border-t border-white/8 bg-zinc-950/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2.5 backdrop-blur-xl">
-                {step === 1 ? (
-                    <Button
-                        className="h-12 w-full"
-                        disabled={isLoading || activeItems.length === 0}
+            {/* ── Bottom action ── */}
+            {step === 1 ? (
+                <div
+                    className="absolute inset-x-0 bottom-0"
+                    style={{ background: 'var(--m-glass-zinc-strong)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderTop: '1px solid var(--m-border-2)', borderRadius: '24px 24px 0 0', padding: '12px 18px calc(16px + env(safe-area-inset-bottom))', boxShadow: '0 -12px 40px rgba(0,0,0,.5)' }}
+                >
+                    <div className="flex items-center" style={{ marginBottom: 10 }}>
+                        <span style={{ fontSize: 12, color: 'var(--m-fg-3)' }}>Đã chọn <b style={{ color: 'var(--m-fg-1)', fontWeight: 700 }}>{activeItems.length} mục</b></span>
+                        <span style={{ flex: 1 }} />
+                        <span className="m-mono" style={{ fontSize: 16, fontWeight: 800, color: 'var(--m-fg-1)' }}>{currency}{activeSubtotal.toFixed(2)}</span>
+                    </div>
+                    <button
+                        type="button"
                         onClick={() => setStep(2)}
+                        disabled={isLoading || activeItems.length === 0}
+                        className="m-btnP w-full disabled:opacity-40"
+                        style={{ height: 48, borderRadius: 13, fontSize: 13.5, fontWeight: 800, boxShadow: '0 0 22px var(--m-primary-glow)' }}
                     >
-                        Tiếp: Thiết lập →
-                    </Button>
-                ) : (
-                    <>
-                        <Button variant="outline" className="h-12 flex-1" onClick={() => setStep(1)}>
-                            ← Quay lại
-                        </Button>
-                        <button
-                            type="button"
-                            onClick={handleGenerate}
-                            disabled={isGenerating || activeItems.length === 0 || !billingProfileId}
-                            className="flex h-12 flex-[1.4] items-center justify-center gap-2 rounded-xl bg-primary text-base font-bold text-white shadow-lg shadow-primary/30 transition-transform active:scale-[0.98] disabled:opacity-40"
-                        >
-                            {isGenerating ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
-                            {isGenerating ? 'Đang tạo…' : 'Xuất & Lưu'}
-                        </button>
-                    </>
-                )}
-            </footer>
+                        Tiếp tục <ArrowRight size={15} />
+                    </button>
+                </div>
+            ) : (
+                <div
+                    className="absolute inset-x-0 bottom-0"
+                    style={{ background: 'var(--m-glass-zinc-strong)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderTop: '1px solid var(--m-border-2)', padding: '12px 16px calc(14px + env(safe-area-inset-bottom))' }}
+                >
+                    <button
+                        type="button"
+                        onClick={handleGenerate}
+                        disabled={isGenerating || activeItems.length === 0 || !billingProfileId}
+                        className="m-btnP w-full disabled:opacity-40"
+                        style={{ height: 50, borderRadius: 14, fontSize: 13.5, fontWeight: 800, boxShadow: '0 0 24px var(--m-primary-glow)' }}
+                    >
+                        {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown size={16} />}
+                        {isGenerating ? 'Đang tạo…' : 'Tạo invoice & xuất PDF'}
+                    </button>
+                </div>
+            )}
         </div>
+    )
+}
+
+// iOS-style toggle switch (presentational; prototype parity).
+function MSwitch({ on, onClick }: { on: boolean; onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={on}
+            onClick={onClick}
+            style={{ position: 'relative', width: 38, height: 22, borderRadius: 999, flex: 'none', border: 0, cursor: 'pointer', background: on ? 'var(--m-primary)' : 'var(--m-border-3)', transition: 'background .15s' }}
+        >
+            <span style={{ position: 'absolute', top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+        </button>
     )
 }

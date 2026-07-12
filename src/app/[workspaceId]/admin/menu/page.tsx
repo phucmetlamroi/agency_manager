@@ -1,15 +1,18 @@
 // [Mobile P1 §3.5 / M15] Menu hub — section-list các khu quản trị KHÔNG nằm trên
-// BottomNav (Trang chủ/Task/Khách/Lịch đã có tab riêng). Row ≥56px, lọc "Tài chính"
+// BottomNav (Trang chủ/Task/Khách/Lịch đã có tab riêng). Row ≥48px, lọc "Tài chính"
 // theo isTreasurer. Admin layout đã gate quyền (canAccessAdmin) → trang chỉ dựng list.
+// [design-handoff parity] reskinned under `.mroot` (indigo #6366F1 --m-* tokens) to match the
+// owner's prototype — presentational only; server guards + data + hrefs unchanged. The account/
+// workspace-switch entry stays on the shell AppHeader (avatar→AccountSheet), so this page has no
+// in-page header — avoids two divergent workspace-switch paths per the spec's risk note.
 import { verifyActiveSession } from '@/lib/security'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Inbox, Wallet, Building2, UsersRound, Trash2, Activity, ScrollText, Settings, ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
-type IconType = React.ComponentType<{ className?: string }>
+type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties; size?: number }>
 // [Owner review 2026-07-11] Mỗi dòng KÈM MÔ TẢ — chủ dự án không rõ "Phân tích"/"Thành viên/
 // Tổ chức" là gì + tìm mãi "theo dõi hiệu suất" (chính là Phân tích). Copy theo UI-UX-SPEC Phụ lục A.
 interface Row { label: string; desc: string; href: string; icon: IconType; treasurerOnly?: boolean }
@@ -41,36 +44,36 @@ export default async function AdminMenuPage({ params }: { params: Promise<{ work
     ]
 
     return (
-        <div className="flex flex-col gap-6">
-            <h1 className="text-[22px] font-bold tracking-tight text-foreground">Menu quản trị</h1>
+        <section className="mroot m-scr flex flex-col gap-3">
             {sections.map((sec) => {
                 const rows = sec.rows.filter((r) => !r.treasurerOnly || isTreasurer)
                 if (!rows.length) return null
                 return (
-                    <section key={sec.title} className="flex flex-col gap-1.5">
-                        <h2 className="px-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">{sec.title}</h2>
-                        <div className="overflow-hidden rounded-2xl border border-white/10 glass-1">
+                    <div key={sec.title} className="flex flex-col" style={{ gap: 6 }}>
+                        <h2 className="m-eb" style={{ paddingLeft: 2 }}>{sec.title}</h2>
+                        <div className="m-card overflow-hidden">
                             {rows.map((r, i) => (
                                 <Link
                                     key={r.href}
                                     href={r.href}
-                                    className={cn(
-                                        'flex min-h-[56px] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/5',
-                                        i > 0 && 'border-t border-white/5'
-                                    )}
+                                    className="m-press flex items-center"
+                                    style={{ gap: 10, padding: '11px 14px', minHeight: 48, borderBottom: i < rows.length - 1 ? '1px solid var(--m-border-1)' : 'none' }}
                                 >
-                                    <r.icon className="h-5 w-5 shrink-0 text-primary-accent" />
-                                    <div className="min-w-0 flex-1">
-                                        <span className="block truncate text-sm text-zinc-100">{r.label}</span>
-                                        <span className="block truncate text-caption text-muted-foreground">{r.desc}</span>
+                                    <r.icon size={19} style={{ color: 'var(--m-primary-hover)', flexShrink: 0 }} />
+                                    <div className="min-w-0" style={{ flex: 1 }}>
+                                        <span className="block truncate" style={{ fontSize: 13, fontWeight: 600, color: 'var(--m-fg-1)' }}>{r.label}</span>
+                                        <span className="block truncate" style={{ fontSize: 10.5, color: 'var(--m-fg-4)', marginTop: 1 }}>{r.desc}</span>
                                     </div>
-                                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    {r.treasurerOnly && (
+                                        <span className="m-pill" style={{ fontSize: 9, padding: '1px 7px', color: 'var(--m-fg-3)', flexShrink: 0 }}>Treasurer</span>
+                                    )}
+                                    <ChevronRight size={15} style={{ color: 'var(--m-fg-4)', flexShrink: 0 }} />
                                 </Link>
                             ))}
                         </div>
-                    </section>
+                    </div>
                 )
             })}
-        </div>
+        </section>
     )
 }

@@ -39,6 +39,18 @@ const BULK_STATUS_OPTIONS: { value: string; label: string }[] = [
     { value: 'Đã hủy', label: 'Huỷ task' },
 ]
 
+// [visual-parity] Per-phase indicator hex (prototype PH[] + pool lilac). Used for the position
+// dots + active-dot glow. Presentational only — task-board-phases.ts statuses[] stay untouched.
+const PHASE_HEX: Record<BoardPhaseId, string> = {
+    pool: '#A855F7', all: '#3B82F6', progress: '#EAB308', internal: '#6366F1',
+    client: '#06B6D4', overdue: '#DC2626', done: '#10B981',
+}
+function hexA(hex: string, a: number): string {
+    const h = hex.replace('#', '')
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+    return `rgba(${r},${g},${b},${a})`
+}
+
 /**
  * Build swipe actions per task based on FSM-valid transitions.
  * Right swipe = primary positive action (Bắt đầu / Nộp bài / Hoàn tất / Gửi lại).
@@ -398,53 +410,54 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
     }
 
     return (
-        <div className="relative flex min-h-dvh flex-col gap-3 pb-24">
-            {/* ── Phase rail (kanban 6 phase) — horizontal snap, active centered ── */}
-            <div className="sticky top-[calc(52px+env(safe-area-inset-top))] z-10 border-b border-white/5 bg-zinc-950/85 pb-2 pt-2 shadow-[0_4px_20px_rgba(0,0,0,0.4)] backdrop-blur-xl">
-                <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-3">
+        <div className="mroot relative flex min-h-dvh flex-col gap-3 pb-24">
+            {/* ── Phase rail (prototype: text-baseline strip, active = 800/15px + indigo underline) ── */}
+            <div
+                className="no-scrollbar sticky top-[calc(52px+env(safe-area-inset-top))] z-10"
+                style={{ background: 'var(--m-glass-zinc-strong)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid var(--m-border-1)' }}
+            >
+                <div className="no-scrollbar" style={{ display: 'flex', alignItems: 'baseline', gap: 16, padding: '4px 12px 8px', whiteSpace: 'nowrap', overflowX: 'auto' }}>
                     {BOARD_PHASES.map(phase => {
                         const count = phaseCount(phase.id)
                         const isActive = activePhase === phase.id
+                        const isOverdue = phase.id === 'overdue'
                         return (
-                            <motion.button
+                            <button
                                 key={phase.id}
                                 ref={el => { btnRefs.current[phase.id] = el }}
                                 onClick={() => setActivePhase(phase.id)}
-                                whileTap={{ scale: 0.94 }}
-                                className={`relative flex shrink-0 snap-center items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-bold transition-colors ${isActive
-                                    ? 'border-white bg-white text-black shadow-md shadow-white/10'
-                                    : 'border-white/8 bg-zinc-900/70 text-zinc-400 hover:text-zinc-200'
-                                    }`}
+                                style={{
+                                    flex: 'none', background: 'transparent', border: 0, cursor: 'pointer',
+                                    display: 'inline-flex', alignItems: 'baseline', gap: 6,
+                                    fontSize: isActive ? 15 : 12, fontWeight: isActive ? 800 : 600, letterSpacing: '-0.01em',
+                                    color: isActive ? 'var(--m-fg-0)' : isOverdue ? 'var(--m-danger-fg)' : 'var(--m-fg-4)',
+                                    borderBottom: isActive ? '2px solid var(--m-primary)' : '2px solid transparent',
+                                    paddingBottom: 3, transition: 'color .15s, font-size .15s',
+                                    textShadow: isActive ? '0 0 18px var(--m-primary-glow)' : 'none',
+                                }}
                             >
-                                <span
-                                    className="h-2 w-2 shrink-0 rounded-full"
-                                    style={{ background: isActive ? '#000' : phase.color, opacity: isActive ? 0.85 : 1 }}
-                                />
                                 {phase.label}
                                 {count > 0 && (
-                                    <span className={`flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] ${isActive ? 'bg-zinc-900 text-white' : 'bg-white/10 text-zinc-300'
-                                        }`}>
-                                        {count}
-                                    </span>
+                                    <span className="m-mono" style={{ fontSize: isActive ? 12 : 11, color: isActive ? 'var(--m-primary-fg)' : 'var(--m-fg-4)' }}>{count}</span>
                                 )}
-                            </motion.button>
+                            </button>
                         )
                     })}
                 </div>
-                {/* Position dots — 6 phase indicator */}
-                <div className="mt-2 flex items-center justify-center gap-1.5">
+                {/* Position dots — per-phase hex, active = wide pill + glow */}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 7, paddingBottom: 8 }}>
                     {BOARD_PHASES.map(phase => {
                         const isActive = activePhase === phase.id
+                        const hex = PHASE_HEX[phase.id]
                         return (
                             <button
                                 key={phase.id}
                                 aria-label={phase.label}
                                 onClick={() => setActivePhase(phase.id)}
-                                className="rounded-full transition-all"
                                 style={{
-                                    width: isActive ? 18 : 6,
-                                    height: 6,
-                                    background: isActive ? phase.color : 'rgba(255,255,255,0.18)',
+                                    width: isActive ? 20 : 6, height: 6, borderRadius: 99, padding: 0, border: 0, cursor: 'pointer',
+                                    background: hex, opacity: isActive ? 1 : 0.45,
+                                    boxShadow: isActive ? `0 0 10px ${hexA(hex, 0.5)}` : 'none', transition: 'all .2s',
                                 }}
                             />
                         )
@@ -476,7 +489,8 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                                         onTouchMove={handleTouchMove}
                                         onTouchEnd={clearLongPress}
                                         onTouchCancel={clearLongPress}
-                                        className={`relative rounded-2xl ${isSelected ? 'outline outline-2 outline-primary' : ''}`}
+                                        className="relative rounded-2xl"
+                                        style={isSelected ? { outline: '2px solid var(--m-primary)', outlineOffset: 0 } : undefined}
                                     >
                                         <SwipeableCard
                                             rightAction={swipe.right}
@@ -494,8 +508,10 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                                         </SwipeableCard>
                                         {selectionMode && (
                                             <span
-                                                className={`pointer-events-none absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 ${isSelected ? 'border-primary bg-primary text-white' : 'border-white/40 bg-zinc-900/70'
-                                                    }`}
+                                                className="pointer-events-none absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2"
+                                                style={isSelected
+                                                    ? { borderColor: 'var(--m-primary)', background: 'var(--m-primary)', color: '#fff' }
+                                                    : { borderColor: 'rgba(255,255,255,0.4)', background: 'rgba(24,24,27,0.7)' }}
                                             >
                                                 {isSelected && <Check className="h-3.5 w-3.5" />}
                                             </span>
@@ -527,7 +543,8 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 24 }}
                         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                        className="fixed inset-x-3 bottom-[calc(64px+env(safe-area-inset-bottom)+8px)] z-[45] flex items-center justify-between gap-2 rounded-2xl border border-primary/30 bg-zinc-950/95 px-3 py-2.5 shadow-2xl shadow-black/60 backdrop-blur-xl"
+                        className="fixed inset-x-3 bottom-[calc(64px+env(safe-area-inset-bottom)+8px)] z-[45] flex items-center justify-between gap-2 rounded-2xl px-3 py-2.5 shadow-2xl shadow-black/60"
+                        style={{ background: 'var(--m-glass-zinc-strong)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(99,102,241,0.30)' }}
                     >
                         <span className="text-[13px] font-semibold text-white">
                             Đã chọn <strong>{selectedIds.size}</strong>
@@ -536,7 +553,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                             {/* Giao lại */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-primary/15 px-3 text-xs font-bold text-primary-accent transition-colors active:bg-primary/25">
+                                    <button className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-xs font-bold transition-colors active:brightness-125" style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--m-primary-fg)' }}>
                                         <UserPlus className="h-4 w-4" /> Giao
                                     </button>
                                 </DropdownMenuTrigger>
@@ -556,7 +573,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                             {/* Đổi trạng thái */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-white/5 px-3 text-xs font-bold text-zinc-200 transition-colors active:bg-white/10">
+                                    <button className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-xs font-bold transition-colors active:brightness-125" style={{ background: 'var(--m-glass-2)', color: 'var(--m-fg-2)' }}>
                                         <ArrowLeftRight className="h-4 w-4" /> Chuyển
                                     </button>
                                 </DropdownMenuTrigger>

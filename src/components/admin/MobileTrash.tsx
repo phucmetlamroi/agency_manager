@@ -1,18 +1,19 @@
 'use client'
 
-// [Mobile design-handoff §2 (3k) / PR#7] Thùng rác gộp 3 nguồn thành 1 màn segmented (Task đã
-// hủy · Khách đã xoá · Tổ chức đã xoá). Dùng lại action sẵn có; khách: khôi phục bất cứ lúc nào,
-// xoá vĩnh viễn THỦ CÔNG (đúng copy). Đếm 30 ngày CHỈ cho tổ chức (profile.daysUntilHardDelete).
+// [Mobile design-handoff §2 (3k) / PR#7 · visual-parity redo] Thùng rác gộp 3 nguồn thành 1 màn
+// segmented (Task đã hủy · Khách · Tổ chức). VISUAL theo prototype: header icon+title, 3 .m-seg
+// (label · count, không icon), Task gộp vào 1 .m-card (hairline giữa hàng) + pill "Khôi phục"
+// gọn; Khách thêm pill "Xóa hẳn" (vẫn qua confirm danger); Tổ chức đếm 30 ngày. Styling qua
+// `.mroot .m-*` (indigo #6366F1), desktop KHÔNG đụng. LOGIC + chữ ký action giữ nguyên.
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Undo2, Trash2, ListChecks, Users, Building2 } from 'lucide-react'
+import { Trash2, RotateCcw } from 'lucide-react'
 import { restoreCancelledTask } from '@/actions/task-actions'
 import { restoreClient, permanentlyDeleteClient } from '@/actions/crm-actions'
 import { restoreProfileAction } from '@/actions/profile-actions'
 import { useConfirm } from '@/components/ui/ConfirmModal'
-import { EmptyState } from '@/components/ui/empty-state'
 
 type TrashTask = { id: string; title: string }
 type TrashClient = { id: number; name: string; _count?: { tasks: number; subsidiaries: number; invoices: number } }
@@ -98,115 +99,142 @@ export default function MobileTrash({
         } catch { toast.error('Khôi phục thất bại') } finally { setBusy(null) }
     }
 
-    const SEGS: { key: Seg; label: string; icon: typeof ListChecks; n: number }[] = [
-        { key: 'tasks', label: 'Task', icon: ListChecks, n: tasks.length },
-        { key: 'clients', label: 'Khách', icon: Users, n: clients.length },
-        { key: 'profiles', label: 'Tổ chức', icon: Building2, n: profiles.length },
+    const SEGS: { key: Seg; full: string; n: number }[] = [
+        { key: 'tasks', full: 'Task đã hủy', n: tasks.length },
+        { key: 'clients', full: 'Khách', n: clients.length },
+        { key: 'profiles', full: 'Tổ chức', n: profiles.length },
     ]
 
     return (
-        <div className="flex flex-col gap-3 px-3 pb-[calc(64px+env(safe-area-inset-bottom)+16px)] pt-2">
-            <h1 className="text-page font-bold text-foreground">Thùng rác</h1>
+        <section className="mroot m-scr flex flex-col gap-3 px-3 pb-[calc(64px+env(safe-area-inset-bottom)+16px)] pt-2">
+            {/* header */}
+            <div className="m-row" style={{ gap: 10, padding: '10px 0 8px' }}>
+                <Trash2 className="h-5 w-5" style={{ color: 'var(--m-fg-3)' }} />
+                <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--m-fg-1)' }}>Thùng rác</span>
+            </div>
 
-            <div className="flex gap-1 rounded-xl border border-white/8 bg-zinc-900/60 p-1">
+            {/* segmented */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
                 {SEGS.map((s) => (
                     <button
                         key={s.key}
                         type="button"
                         onClick={() => setSeg(s.key)}
-                        className={`inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg text-caption font-bold transition-colors ${seg === s.key ? 'bg-primary text-white' : 'text-muted-foreground active:bg-white/5'}`}
+                        className={seg === s.key ? 'm-seg on' : 'm-seg'}
+                        style={{ flex: seg === s.key ? 1.2 : 1, fontSize: 11.5 }}
                     >
-                        <s.icon className="h-4 w-4" /> {s.label}
-                        {s.n > 0 && <span className={`rounded-full px-1.5 text-[10px] ${seg === s.key ? 'bg-white/20' : 'bg-white/10'}`}>{s.n}</span>}
+                        {s.full} · {s.n}
                     </button>
                 ))}
             </div>
 
+            {/* TASKS */}
             {seg === 'tasks' && (
                 tasks.length === 0 ? (
-                    <EmptyState variant="cleared" title="Không có task đã hủy" />
+                    <EmptyCard text="Không có task đã hủy" />
                 ) : (
-                    <div className="flex flex-col gap-2">
-                        {tasks.map((t) => (
-                            <Row key={t.id} title={t.title} busy={busy === `t:${t.id}`}>
-                                <RestoreBtn onClick={() => restoreTask(t)} disabled={busy === `t:${t.id}`} />
-                            </Row>
-                        ))}
-                    </div>
+                    <>
+                        <div className="m-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                            {tasks.map((t, i) => {
+                                const rowBusy = busy === `t:${t.id}`
+                                return (
+                                    <div key={t.id} style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: i < tasks.length - 1 ? '1px solid var(--m-border-1)' : 'none', opacity: rowBusy ? 0.6 : 1 }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={ROW_TITLE}>{t.title}</div>
+                                            <div style={ROW_META}>Đã hủy</div>
+                                        </div>
+                                        <RestorePill onClick={() => restoreTask(t)} disabled={rowBusy} />
+                                    </div>
+                                )
+                            })}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: 'var(--m-fg-4)', textAlign: 'center' }}>khôi phục task đưa về đúng trạng thái trước khi hủy</div>
+                    </>
                 )
             )}
 
+            {/* CLIENTS */}
             {seg === 'clients' && (
                 clients.length === 0 ? (
-                    <EmptyState variant="cleared" title="Không có khách trong thùng rác" />
+                    <EmptyCard text="Không có khách trong thùng rác" />
                 ) : (
                     <>
-                        <p className="text-caption text-muted-foreground">Khôi phục bất cứ lúc nào; xoá vĩnh viễn là thủ công.</p>
+                        <p style={{ fontSize: 13, color: 'var(--m-fg-3)' }}>Khôi phục bất cứ lúc nào; xoá vĩnh viễn là thủ công.</p>
                         <div className="flex flex-col gap-2">
-                            {clients.map((c) => (
-                                <Row
-                                    key={c.id}
-                                    title={c.name}
-                                    subtitle={c._count ? `${c._count.tasks} task · ${c._count.subsidiaries} brand con · ${c._count.invoices} hóa đơn` : undefined}
-                                    busy={busy === `c:${c.id}`}
-                                >
-                                    <RestoreBtn onClick={() => restoreCli(c)} disabled={busy === `c:${c.id}`} />
-                                    <button
-                                        type="button"
-                                        onClick={() => purgeCli(c)}
-                                        disabled={busy === `c:${c.id}`}
-                                        className="inline-flex h-10 items-center gap-1.5 rounded-full bg-red-500/15 px-3 text-caption font-bold text-red-400 transition-colors active:bg-red-500/25 disabled:opacity-50"
-                                    >
-                                        <Trash2 className="h-4 w-4" /> Xoá vĩnh viễn
-                                    </button>
-                                </Row>
-                            ))}
+                            {clients.map((c) => {
+                                const rowBusy = busy === `c:${c.id}`
+                                return (
+                                    <div key={c.id} className="m-card" style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 8, opacity: rowBusy ? 0.6 : 1 }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={ROW_TITLE}>{c.name}</div>
+                                            {c._count && <div style={ROW_META}>{c._count.tasks} task · {c._count.subsidiaries} brand con · {c._count.invoices} hóa đơn</div>}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                                            <RestorePill onClick={() => restoreCli(c)} disabled={rowBusy} />
+                                            <span
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={() => !rowBusy && purgeCli(c)}
+                                                className="m-pill dan m-press"
+                                                style={{ cursor: rowBusy ? 'default' : 'pointer', opacity: rowBusy ? 0.5 : 1 }}
+                                            >
+                                                Xóa hẳn
+                                            </span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
                     </>
                 )
             )}
 
+            {/* PROFILES */}
             {seg === 'profiles' && (
                 profiles.length === 0 ? (
-                    <EmptyState variant="cleared" title="Không có tổ chức đã xoá" />
+                    <EmptyCard text="Không có tổ chức đã xoá" />
                 ) : (
                     <div className="flex flex-col gap-2">
-                        {profiles.map((p) => (
-                            <Row
-                                key={p.id}
-                                title={p.name}
-                                subtitle={p.daysUntilHardDelete > 0 ? `Xoá vĩnh viễn sau ${p.daysUntilHardDelete} ngày` : 'Sắp bị xoá vĩnh viễn'}
-                                busy={busy === `p:${p.id}`}
-                            >
-                                <RestoreBtn onClick={() => restoreProf(p)} disabled={busy === `p:${p.id}`} />
-                            </Row>
-                        ))}
+                        {profiles.map((p) => {
+                            const rowBusy = busy === `p:${p.id}`
+                            return (
+                                <div key={p.id} className="m-card" style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 8, opacity: rowBusy ? 0.6 : 1 }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={ROW_TITLE}>{p.name}</div>
+                                        <div style={ROW_META}>{p.daysUntilHardDelete > 0 ? `Xoá vĩnh viễn sau ${p.daysUntilHardDelete} ngày` : 'Sắp bị xoá vĩnh viễn'}</div>
+                                    </div>
+                                    <RestorePill onClick={() => restoreProf(p)} disabled={rowBusy} />
+                                </div>
+                            )
+                        })}
                     </div>
                 )
             )}
-        </div>
+        </section>
     )
 }
 
-function Row({ title, subtitle, busy, children }: { title: string; subtitle?: string; busy?: boolean; children: React.ReactNode }) {
-    return (
-        <div className={`rounded-xl border border-white/8 bg-zinc-900/60 p-3 ${busy ? 'opacity-60' : ''}`}>
-            <div className="truncate text-body-sm font-semibold text-foreground">{title}</div>
-            {subtitle && <div className="mt-0.5 truncate text-caption text-muted-foreground">{subtitle}</div>}
-            <div className="mt-2 flex flex-wrap items-center gap-2">{children}</div>
-        </div>
-    )
-}
+const ROW_TITLE: React.CSSProperties = { fontSize: 12.5, fontWeight: 700, color: 'var(--m-fg-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+const ROW_META: React.CSSProperties = { marginTop: 1, fontSize: 10.5, color: 'var(--m-fg-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 
-function RestoreBtn({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+function RestorePill({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            disabled={disabled}
-            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-primary/15 px-3 text-caption font-bold text-primary-accent transition-colors active:bg-primary/25 disabled:opacity-50"
+        <span
+            role="button"
+            tabIndex={0}
+            onClick={() => !disabled && onClick()}
+            className="m-pill suc m-press"
+            style={{ cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1 }}
         >
-            <Undo2 className="h-4 w-4" /> Khôi phục
-        </button>
+            <RotateCcw style={{ width: 11, height: 11 }} /> Khôi phục
+        </span>
+    )
+}
+
+function EmptyCard({ text }: { text: string }) {
+    return (
+        <div className="m-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '40px 16px', textAlign: 'center' }}>
+            <p style={{ fontSize: 13, color: 'var(--m-fg-4)' }}>{text}</p>
+        </div>
     )
 }

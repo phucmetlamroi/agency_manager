@@ -1,16 +1,12 @@
 'use client'
 
-// [Mobile design-handoff §1/§6 (2a) / PR#4] Trang chủ = hàng đợi triage. Compose từ 3 nguồn
-// (admin/page.tsx đã fetch, không thêm server action): task Quá hạn + task review-phase +
-// yêu cầu khách (getClientRequests). Mỗi thẻ có bộ nút theo loại; "Để sau" đẩy cuối hàng; mỗi
-// action = OPTIMISTIC bỏ thẻ + toast "Hoàn tác" 5s TRƯỚC khi commit (huỷ trong 5s = không gọi
-// server). Actions dùng lại: bulkAssignTasks / updateTaskStatus / acceptClientRequest /
-// rejectClientRequest.
-//
-// GHI CHÚ lệch spec: thẻ review-phase spec ghi "Gửi khách/Y-c sửa → ReviewFlowActions (F10)" —
-// flow đó neo theo ASSET của review module, không lấy sạch từ 1 thẻ home. Ở đây thẻ review dùng
-// "Đổi trạng thái" (updateTaskStatus, hợp lệ cho status video theo R10) + "Mở" (vào chi tiết để
-// chạy đúng review-flow). Đã note để owner biết.
+// [Mobile design-handoff §1/§6 (2a) / PR#4 · visual-parity redo] Trang chủ = hàng đợi triage.
+// VISUAL: thẻ CHỒNG (deck) đúng prototype — 1 thẻ trước lớn + 2 thẻ ma xoay sau; "vòng X/Y";
+// nút trên thẻ; "← để sau" dưới; pill đếm theo loại. LOGIC giữ nguyên: compose 3 nguồn
+// (admin/page.tsx, không thêm server action) + OPTIMISTIC bỏ thẻ + toast "Hoàn tác" 5s trước
+// khi commit. Actions dùng lại: bulkAssignTasks / updateTaskStatus / acceptClientRequest /
+// rejectClientRequest. Styling qua lớp `.mroot .m-*` (globals.css, scoped mobile — desktop
+// KHÔNG đổi). Dropdown content portaled ra ngoài .mroot nên giữ style repo.
 
 import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
@@ -20,8 +16,6 @@ import { Clock, UserPlus, ArrowLeftRight, Check, X, Inbox, ChevronRight } from '
 import { bulkAssignTasks } from '@/actions/bulk-task-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { acceptClientRequest, rejectClientRequest } from '@/actions/client-request-actions'
-import { getStatusInfo } from '@/lib/status-colors'
-import { EmptyState } from '@/components/ui/empty-state'
 import type { ClientRequestDTO } from '@/actions/client-request-actions'
 import {
     DropdownMenu,
@@ -57,6 +51,22 @@ function fmtDate(iso: string | null) {
     const d = new Date(iso)
     return isNaN(d.getTime()) ? null : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
 }
+function daysLate(iso: string | null): number | null {
+    if (!iso) return null
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return null
+    const ms = Date.now() - d.getTime()
+    return ms > 0 ? Math.floor(ms / 86400000) : null
+}
+function trim(s: string) {
+    return s.length > 28 ? `${s.slice(0, 27)}…` : s
+}
+function initials(label: string | null): string {
+    if (!label) return '?'
+    const clean = label.replace(/^@/, '').trim()
+    const parts = clean.split(/\s+/)
+    return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?'
+}
 
 export default function AdminTriageQueue({
     tasks,
@@ -76,6 +86,7 @@ export default function AdminTriageQueue({
         ...requests.map((req) => ({ t: 'req' as const, req })),
         ...tasks.map((task) => ({ t: 'task' as const, task })),
     ])
+    const [total] = useState(() => tasks.length + requests.length)
     // itemKey → pending 5s timer (undo window). Not yet committed to the server.
     const pending = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
@@ -106,8 +117,7 @@ export default function AdminTriageQueue({
                 label: 'Hoàn tác',
                 onClick: () => {
                     // [review-fix] If the 5s timer already fired, the commit is in flight / done —
-                    // the key was removed from `pending`. Do nothing: re-inserting here would desync
-                    // the UI and (with the server call already made) enable a double-commit.
+                    // do nothing: re-inserting would desync + enable a double-commit.
                     const tt = pending.current.get(k)
                     if (!tt) return
                     clearTimeout(tt)
@@ -126,207 +136,193 @@ export default function AdminTriageQueue({
         })
     }
 
+    // Segment counts (remaining, by triage type).
+    const nOverdue = items.filter((i) => i.t === 'task' && i.task.kind === 'overdue').length
+    const nReview = items.filter((i) => i.t === 'task' && i.task.kind === 'review').length
+    const nReq = items.filter((i) => i.t === 'req').length
+
     if (items.length === 0) {
         return (
-            <section>
-                <h2 className="mb-2 text-title font-semibold text-foreground">Hàng đợi xử lý</h2>
-                <EmptyState variant="cleared" title="Hàng đợi trống — không còn việc cần xử lý 🎉" />
+            <section className="mroot">
+                <div className="m-card m-scr flex flex-col items-center gap-2 px-4 py-10 text-center" style={{ background: 'var(--m-bg-2)' }}>
+                    <div className="grid h-12 w-12 place-items-center rounded-full" style={{ background: 'rgba(16,185,129,.12)', color: 'var(--m-success-fg)' }}>
+                        <Check className="h-6 w-6" />
+                    </div>
+                    <p className="text-[15px] font-bold" style={{ color: 'var(--m-fg-1)' }}>Hàng đợi trống 🎉</p>
+                    <p className="text-[12.5px]" style={{ color: 'var(--m-fg-4)' }}>Không còn việc cần xử lý ngay.</p>
+                </div>
             </section>
         )
     }
 
+    const front = items[0]
+    const ghosts = items.slice(1, 3)
+    const doneSoFar = total - items.length
+
     return (
-        <section>
-            <h2 className="mb-2 flex items-center gap-2 text-title font-semibold text-foreground">
-                Hàng đợi xử lý
-                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-caption font-bold text-primary-accent">{items.length}</span>
-            </h2>
-            <div className="flex flex-col gap-2.5">
-                {items.map((item) =>
-                    item.t === 'task' ? (
-                        <TaskCard
-                            key={keyOf(item)}
-                            task={item.task}
-                            users={users}
-                            workspaceId={workspaceId}
-                            onAssign={(uid, label) =>
-                                runWithUndo(item, label, () => bulkAssignTasks([item.task.id], uid, workspaceId))
-                            }
-                            onStatus={(status) =>
-                                runWithUndo(item, `Đã chuyển "${trim(item.task.title)}" → ${status}`, () =>
-                                    updateTaskStatus(item.task.id, status, workspaceId),
-                                )
-                            }
-                            onDefer={() => defer(item)}
-                        />
-                    ) : (
-                        <RequestCard
-                            key={keyOf(item)}
-                            req={item.req}
-                            onAccept={() =>
-                                runWithUndo(item, `Đã duyệt yêu cầu "${trim(item.req.title)}"`, () =>
-                                    acceptClientRequest(item.req.id, workspaceId),
-                                )
-                            }
-                            onReject={() =>
-                                runWithUndo(item, `Đã từ chối yêu cầu "${trim(item.req.title)}"`, () =>
-                                    rejectClientRequest(item.req.id, workspaceId),
-                                )
-                            }
-                            onDefer={() => defer(item)}
-                        />
-                    ),
+        <section className="mroot flex flex-col gap-2.5">
+            {/* deck header */}
+            <div className="m-row" style={{ fontSize: 12, color: 'var(--m-fg-4)' }}>
+                <span className="m-eb">Hàng đợi xử lý</span>
+                <span style={{ flex: 1 }} />
+                <span className="m-pill ind m-mono">vòng {Math.min(doneSoFar + 1, total)}/{total}</span>
+            </div>
+
+            {/* card DECK — front card + rotated ghosts behind */}
+            <div style={{ position: 'relative', minHeight: 340 }}>
+                {ghosts[1] && (
+                    <div className="m-card" style={{ position: 'absolute', inset: '20px -6px auto 14px', height: '86%', transform: 'rotate(2deg)', opacity: 0.45 }} />
                 )}
+                {ghosts[0] && (
+                    <div className="m-card" style={{ position: 'absolute', inset: '11px 2px auto 4px', height: '90%', transform: 'rotate(-1.2deg)', opacity: 0.7 }} />
+                )}
+                <FrontCard
+                    key={keyOf(front)}
+                    item={front}
+                    users={users}
+                    workspaceId={workspaceId}
+                    onAssign={(uid, label) => runWithUndo(front, label, () => bulkAssignTasks([(front as any).task.id], uid, workspaceId))}
+                    onStatus={(status) =>
+                        runWithUndo(front, `Đã chuyển "${trim((front as any).task.title)}" → ${status}`, () =>
+                            updateTaskStatus((front as any).task.id, status, workspaceId),
+                        )
+                    }
+                    onAccept={() => runWithUndo(front, `Đã duyệt yêu cầu "${trim((front as any).req.title)}"`, () => acceptClientRequest((front as any).req.id, workspaceId))}
+                    onReject={() => runWithUndo(front, `Đã từ chối yêu cầu "${trim((front as any).req.title)}"`, () => rejectClientRequest((front as any).req.id, workspaceId))}
+                />
+            </div>
+
+            {/* defer + hint */}
+            <div className="m-row" style={{ justifyContent: 'space-between', fontSize: 11, color: 'var(--m-fg-4)', padding: '0 2px' }}>
+                <button type="button" onClick={() => defer(front)} className="m-press" style={{ padding: '6px 8px', background: 'transparent', border: 0, color: 'var(--m-fg-4)', font: 'inherit' }}>
+                    ← để sau
+                </button>
+                <span style={{ color: 'var(--m-primary-fg)' }}>xử lý bằng nút trên thẻ</span>
+            </div>
+
+            {/* segment counts */}
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                <span className="m-pill dan">Quá hạn {nOverdue}</span>
+                <span className="m-pill ind">Duyệt {nReview}</span>
+                <span className="m-pill info">Yêu cầu {nReq}</span>
             </div>
         </section>
     )
 }
 
-function trim(s: string) {
-    return s.length > 28 ? `${s.slice(0, 27)}…` : s
-}
-
-function CardShell({ children }: { children: React.ReactNode }) {
-    return <div className="rounded-2xl border border-white/8 bg-zinc-950/60 p-3.5 backdrop-blur-md">{children}</div>
-}
-
-function DeferBtn({ onClick }: { onClick: () => void }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white/5 px-3 text-caption font-bold text-muted-foreground transition-colors active:bg-white/10"
-        >
-            <Clock className="h-3.5 w-3.5" /> Để sau
-        </button>
-    )
-}
-
-function TaskCard({
-    task,
+function FrontCard({
+    item,
     users,
     workspaceId,
     onAssign,
     onStatus,
-    onDefer,
+    onAccept,
+    onReject,
 }: {
-    task: TriageTask
+    item: Item
     users: TriageUser[]
     workspaceId: string
     onAssign: (uid: string, label: string) => void
     onStatus: (status: string) => void
-    onDefer: () => void
-}) {
-    const s = getStatusInfo(task.status)
-    const dl = fmtDate(task.deadline)
-    const overdue = task.kind === 'overdue'
-    return (
-        <CardShell>
-            <div className="flex items-start justify-between gap-2">
-                <span
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-bold"
-                    style={overdue ? { background: 'rgba(220,38,38,0.12)', color: '#F87171' } : { background: s.bg, color: s.color }}
-                >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: overdue ? '#DC2626' : s.color }} />
-                    {overdue ? 'Quá hạn' : 'Đang duyệt'}
-                </span>
-                {dl && <span className="shrink-0 font-mono text-caption text-muted-foreground">⏱ {dl}</span>}
-            </div>
-            <h3 className="mt-1.5 break-words text-body-sm font-semibold text-foreground line-clamp-2">{task.title}</h3>
-            <div className="mt-0.5 flex flex-wrap gap-x-2 text-caption text-muted-foreground">
-                {task.clientLabel && <span className="truncate">{task.clientLabel}</span>}
-                {task.assigneeLabel && <span>· {task.assigneeLabel}</span>}
-                {!task.assigneeLabel && <span>· Chưa giao</span>}
-            </div>
-            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                {/* Giao lại */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button className="inline-flex h-10 items-center gap-1.5 rounded-full bg-primary/15 px-3 text-caption font-bold text-primary-accent transition-colors active:bg-primary/25">
-                            <UserPlus className="h-3.5 w-3.5" /> Giao lại
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="max-h-[50vh] overflow-y-auto">
-                        <DropdownMenuLabel>Giao cho</DropdownMenuLabel>
-                        {users.map((u) => (
-                            <DropdownMenuItem key={u.id} onClick={() => onAssign(u.id, `Đã giao "${trim(task.title)}" cho ${userLabel(u)}`)}>
-                                {userLabel(u)}
-                            </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => onAssign('', `Đã trả "${trim(task.title)}" về kho`)}>Trả về kho đợi</DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                {/* Đổi trạng thái */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white/5 px-3 text-caption font-bold text-zinc-200 transition-colors active:bg-white/10">
-                            <ArrowLeftRight className="h-3.5 w-3.5" /> Trạng thái
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                        <DropdownMenuLabel>Chuyển sang</DropdownMenuLabel>
-                        {STATUS_OPTS.map((st) => (
-                            <DropdownMenuItem key={st} className={st === 'Đã hủy' ? 'text-red-400 focus:text-red-400' : ''} onClick={() => onStatus(st)}>
-                                {st}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                <DeferBtn onClick={onDefer} />
-                <Link
-                    href={`/${workspaceId}/task/${task.id}`}
-                    className="ml-auto inline-flex h-10 items-center gap-0.5 rounded-full px-2 text-caption font-bold text-muted-foreground transition-colors active:bg-white/10"
-                >
-                    Mở <ChevronRight className="h-4 w-4" />
-                </Link>
-            </div>
-        </CardShell>
-    )
-}
-
-function RequestCard({
-    req,
-    onAccept,
-    onReject,
-    onDefer,
-}: {
-    req: ClientRequestDTO
     onAccept: () => void
     onReject: () => void
-    onDefer: () => void
 }) {
-    const dl = fmtDate(req.desiredDeadline)
+    const isTask = item.t === 'task'
+    const overdue = isTask && item.task.kind === 'overdue'
+    const title = isTask ? item.task.title : item.req.title
+    const dl = fmtDate(isTask ? item.task.deadline : item.req.desiredDeadline)
+    const client = isTask ? item.task.clientLabel : item.req.clientName
+    const assignee = isTask ? item.task.assigneeLabel : null
+    const late = isTask ? daysLate(item.task.deadline) : null
+    const orbColor = overdue ? 'rgba(220,38,38,.12)' : item.t === 'req' ? 'rgba(6,182,212,.12)' : 'rgba(99,102,241,.12)'
+
     return (
-        <CardShell>
-            <div className="flex items-start justify-between gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-bold" style={{ background: 'rgba(6,182,212,0.12)', color: '#22D3EE' }}>
-                    <Inbox className="h-3 w-3" /> Yêu cầu khách
-                </span>
-                {dl && <span className="shrink-0 font-mono text-caption text-muted-foreground">⏱ {dl}</span>}
+        <div className="m-card m-scr" style={{ position: 'relative', display: 'flex', flexDirection: 'column', padding: 14, gap: 9, background: 'var(--m-bg-2)', overflow: 'hidden', minHeight: 300 }}>
+            <div className="m-orb" style={{ background: orbColor, top: -40, right: -40 }} />
+
+            {/* type pill */}
+            {overdue ? (
+                <span className="m-pill dan">Quá hạn{late ? ` · trễ ${late} ngày` : ''}</span>
+            ) : item.t === 'req' ? (
+                <span className="m-pill info"><Inbox className="h-3 w-3" /> Yêu cầu khách</span>
+            ) : (
+                <span className="m-pill ind">Đang duyệt · {item.task.status}</span>
+            )}
+
+            <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-.02em', lineHeight: 1.2 }}>{title}</div>
+
+            {/* meta row */}
+            <div className="m-row" style={{ fontSize: 12.5, color: 'var(--m-fg-3)', flexWrap: 'wrap' }}>
+                {isTask && assignee && (
+                    <>
+                        <span className="m-av" style={{ width: 20, height: 20, fontSize: 9 }}>{initials(assignee)}</span>
+                        <span>{assignee}</span>
+                    </>
+                )}
+                {isTask && !assignee && <span>Chưa giao</span>}
+                {client && <span>· {client}</span>}
+                {dl && <span>· deadline {dl}</span>}
             </div>
-            <h3 className="mt-1.5 break-words text-body-sm font-semibold text-foreground line-clamp-2">{req.title}</h3>
-            <div className="mt-0.5 flex flex-wrap gap-x-2 text-caption text-muted-foreground">
-                {req.clientName && <span className="truncate">{req.clientName}</span>}
-                {req.desiredType && <span>· {req.desiredType}</span>}
-            </div>
-            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                <button
-                    type="button"
-                    onClick={onAccept}
-                    className="inline-flex h-10 items-center gap-1.5 rounded-full bg-emerald-600 px-3.5 text-caption font-bold text-white transition-transform active:scale-95"
-                >
-                    <Check className="h-4 w-4" /> Chấp nhận
-                </button>
-                <button
-                    type="button"
-                    onClick={onReject}
-                    className="inline-flex h-10 items-center gap-1.5 rounded-full bg-red-500/15 px-3.5 text-caption font-bold text-red-400 transition-colors active:bg-red-500/25"
-                >
-                    <X className="h-4 w-4" /> Từ chối
-                </button>
-                <DeferBtn onClick={onDefer} />
-            </div>
-        </CardShell>
+
+            {/* note box */}
+            {overdue && (
+                <div className="m-note"><Clock className="h-3.5 w-3.5" style={{ flex: 'none' }} />Chưa có bản nộp — deadline đã qua{late ? ` ${late} ngày` : ''}</div>
+            )}
+            {item.t === 'req' && item.req.desiredType && (
+                <div className="m-note"><Inbox className="h-3.5 w-3.5" style={{ flex: 'none' }} />Loại: {item.req.desiredType}</div>
+            )}
+
+            <div style={{ flex: 1 }} />
+
+            {/* actions */}
+            {isTask ? (
+                <div style={{ display: 'flex', gap: 7 }}>
+                    <Link href={`/${workspaceId}/task/${item.task.id}`} className="m-btnG" style={{ flex: 1, textDecoration: 'none' }}>
+                        Mở task
+                    </Link>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button className="m-btnG" style={{ flex: 1 }}>
+                                <UserPlus className="h-3.5 w-3.5" /> Giao lại
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="max-h-[50vh] overflow-y-auto">
+                            <DropdownMenuLabel>Giao cho</DropdownMenuLabel>
+                            {users.map((u) => (
+                                <DropdownMenuItem key={u.id} onClick={() => onAssign(u.id, `Đã giao "${trim(item.task.title)}" cho ${userLabel(u)}`)}>
+                                    {userLabel(u)}
+                                </DropdownMenuItem>
+                            ))}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => onAssign('', `Đã trả "${trim(item.task.title)}" về kho`)}>Trả về kho đợi</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button className="m-btnP" style={{ flex: 1.1 }}>
+                                <ArrowLeftRight className="h-3.5 w-3.5" /> Trạng thái
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Chuyển sang</DropdownMenuLabel>
+                            {STATUS_OPTS.map((st) => (
+                                <DropdownMenuItem key={st} className={st === 'Đã hủy' ? 'text-red-400 focus:text-red-400' : ''} onClick={() => onStatus(st)}>
+                                    {st}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', gap: 7 }}>
+                    <button type="button" onClick={onReject} className="m-btnD" style={{ flex: 1 }}>
+                        <X className="h-4 w-4" /> Từ chối
+                    </button>
+                    <button type="button" onClick={onAccept} className="m-btnS" style={{ flex: 1.3 }}>
+                        <Check className="h-4 w-4" /> Chấp nhận
+                    </button>
+                </div>
+            )}
+        </div>
     )
 }

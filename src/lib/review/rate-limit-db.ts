@@ -43,7 +43,25 @@ export async function limitDb(
     }
 }
 
-/** First-hop client IP (Vercel sets x-forwarded-for). */
+/**
+ * Client IP for per-IP rate-limit keys. [G1] The LEFT tokens of a
+ * client-supplied `x-forwarded-for` are attacker-chosen, so keying limits on
+ * `x-forwarded-for[0]` let a caller defeat every guest throttle (incl. the
+ * pre-bcrypt cap on share /unlock) by rotating the header. On Vercel the
+ * platform sets `x-real-ip` / `x-vercel-forwarded-for` to the TRUE connecting
+ * client IP and overrides client-provided values, so we trust those first and
+ * only fall back to the RIGHT-most `x-forwarded-for` entry (the hop added by the
+ * closest trusted proxy), never the left-most one.
+ */
 export function getClientIp(req: Request): string {
-    return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const realIp = req.headers.get('x-real-ip')?.trim()
+    if (realIp) return realIp
+    const vercelFwd = req.headers.get('x-vercel-forwarded-for')?.split(',').pop()?.trim()
+    if (vercelFwd) return vercelFwd
+    const xff = req.headers.get('x-forwarded-for')
+    if (xff) {
+        const parts = xff.split(',').map((s) => s.trim()).filter(Boolean)
+        if (parts.length) return parts[parts.length - 1]
+    }
+    return 'unknown'
 }

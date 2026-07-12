@@ -15,6 +15,7 @@ import {
     HeadObjectCommand,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import type { Readable } from 'node:stream'
 
 let _client: S3Client | null = null
 
@@ -166,4 +167,24 @@ export async function headObject(key: string): Promise<{ size: number; etag?: st
 /** Delete an object (cleanup on abort / failed magic-byte). Idempotent. */
 export async function deleteObject(key: string): Promise<void> {
     await r2Client().send(new DeleteObjectCommand({ Bucket: r2Bucket(), Key: key }))
+}
+
+/** Read a WHOLE object into memory — server-side derivative generation (e.g. B1 image previews). */
+export async function getObjectBytes(key: string): Promise<Uint8Array> {
+    const out = await r2Client().send(new GetObjectCommand({ Bucket: r2Bucket(), Key: key }))
+    const body = out.Body as { transformToByteArray?: () => Promise<Uint8Array> } | undefined
+    if (!body?.transformToByteArray) throw new Error('[review/r2] GetObject body not a byte stream')
+    return body.transformToByteArray()
+}
+
+/** Upload bytes directly from the server (small server-generated objects like image previews). */
+export async function putObjectBytes(key: string, body: Uint8Array | Buffer, contentType: string): Promise<void> {
+    await r2Client().send(new PutObjectCommand({ Bucket: r2Bucket(), Key: key, Body: body, ContentType: contentType }))
+}
+
+/** A Node Readable of an object's body — server-side STREAMING (e.g. zip export of many files). */
+export async function getObjectStream(key: string): Promise<Readable> {
+    const out = await r2Client().send(new GetObjectCommand({ Bucket: r2Bucket(), Key: key }))
+    if (!out.Body) throw new Error('[review/r2] GetObject returned no body')
+    return out.Body as Readable
 }

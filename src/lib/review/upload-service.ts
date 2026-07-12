@@ -523,6 +523,19 @@ export async function completeUpload(
         fail(400, 'VALIDATION_ERROR', 'Chưa nhận được nội dung tệp trên kho lưu trữ.')
     }
 
+    // [C1] Enforce the size cap on the ACTUAL stored bytes. `initiate` only checked the CLIENT-declared
+    // sizeBytes and the presigned PUT/parts pin no Content-Length, so the real object can far exceed the
+    // cap (storage/cost DoS). Verify the real size and reject BEFORE promoting to READY — delete the
+    // object + mark the version FAILED so a retry must re-upload within the cap.
+    const stored = await headObject(session.r2Key)
+    if (stored && BigInt(stored.size) > capForKind(version.mediaKind)) {
+        await deleteObject(session.r2Key).catch(() => {})
+        await prisma.reviewVersion
+            .updateMany({ where: { id: version.id }, data: { pipelineStatus: ReviewPipelineStatus.FAILED, errorMessage: 'Tệp vượt quá dung lượng cho phép.' } })
+            .catch(() => {})
+        fail(413, 'FILE_TOO_LARGE', 'Tệp vượt quá dung lượng cho phép.', { maxBytes: capForKind(version.mediaKind).toString() })
+    }
+
     // R2 object is final — mark the session (bookkeeping + the gate driveCompletion relies on),
     // then drive the state machine. driveCompletion is idempotent, so a retry after a crash here
     // (session marked done, version still UPLOADED) self-heals on the next complete/poll call.

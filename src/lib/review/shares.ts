@@ -260,36 +260,45 @@ export async function getOrCreatePrimaryShareForAsset(
     const scope: Prisma.ShareLinkWhereInput = access.isAdmin
         ? {}
         : { OR: [{ createdById: access.userId }, ...(asset.taskId ? [{ taskId: asset.taskId }] : [])] }
-    const existing = await prisma.shareLink.findFirst({
-        where: {
-            revokedAt: null,
-            AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, scope],
-            items: { some: { assetId: asset.id } },
-        },
-        orderBy: { createdAt: 'asc' },
-        include: { items: true },
-    })
-    // A non-admin's task-scope reuse still requires the task to actually be assigned to
-    // them; the `taskId` filter above only narrows to the asset's task, so re-check.
-    if (existing && !access.isAdmin && existing.createdById !== access.userId) {
-        if (asset.taskId) {
-            const mine = await prisma.task.findFirst({
-                where: { id: asset.taskId, workspaceId: asset.workspaceId, assigneeId: access.userId },
-                select: { id: true },
-            })
-            if (!mine) {
-                const { share } = await createShareLink({ workspaceId: asset.workspaceId, items: [{ type: 'asset', id: asset.id }] })
-                return { share, created: true }
+
+    // [O2] Serialize get-or-create for THIS asset with a transaction-scoped advisory lock: two
+    // concurrent "Copy link khách" calls could both miss the existing-share check and each mint a
+    // duplicate ACTIVE share (the second becomes an orphan URL surviving a revoke of the "primary").
+    // The lock is held until this tx commits, by which point a share created below is visible to the
+    // next waiter, which reuses it instead of creating another.
+    return prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${asset.id}, 0))`
+        const existing = await tx.shareLink.findFirst({
+            where: {
+                revokedAt: null,
+                AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, scope],
+                items: { some: { assetId: asset.id } },
+            },
+            orderBy: { createdAt: 'asc' },
+            include: { items: true },
+        })
+        // A non-admin's task-scope reuse still requires the task to actually be assigned to
+        // them; the `taskId` filter above only narrows to the asset's task, so re-check.
+        if (existing && !access.isAdmin && existing.createdById !== access.userId) {
+            if (asset.taskId) {
+                const mine = await tx.task.findFirst({
+                    where: { id: asset.taskId, workspaceId: asset.workspaceId, assigneeId: access.userId },
+                    select: { id: true },
+                })
+                if (!mine) {
+                    const { share } = await createShareLink({ workspaceId: asset.workspaceId, items: [{ type: 'asset', id: asset.id }] })
+                    return { share, created: true }
+                }
             }
         }
-    }
-    if (existing) return { share: await serializeShare(existing), created: false }
+        if (existing) return { share: await serializeShare(existing), created: false }
 
-    const { share } = await createShareLink({
-        workspaceId: asset.workspaceId,
-        items: [{ type: 'asset', id: asset.id }],
+        const { share } = await createShareLink({
+            workspaceId: asset.workspaceId,
+            items: [{ type: 'asset', id: asset.id }],
+        })
+        return { share, created: true }
     })
-    return { share, created: true }
 }
 
 /**

@@ -672,6 +672,24 @@ export const reviewShareDecision = inngest.createFunction(
             )
             syncApplied = !!res?.applied
             syncTarget = res?.to
+        } else if (data.decision === 'approve') {
+            // [M1/R2] Approve on /r/ AUTO-flips no task STATUS (approve only proposes — the banner
+            // comes from asset.statusId="Hoàn tất"), but it MUST settle the client-facing signal so the
+            // portal stops nagging "Awaiting your review" / "In revision" after the client already
+            // decided. Mirror the request_changes path (which writes clientReview). Scoped to tasks that
+            // were actually sent to the client (clientReview AWAITING, or a stale CHANGES from an earlier
+            // flip-flop) — never a task that was never client-exposed. Idempotent under Inngest retry.
+            await step.run('settle-client-review', async () => {
+                const res = await prisma.task.updateMany({
+                    where: {
+                        id: data.taskId!,
+                        workspaceId: data.workspaceId,
+                        clientReview: { in: ['AWAITING', 'CHANGES'] },
+                    },
+                    data: { clientReview: 'APPROVED', clientReviewedAt: new Date() },
+                })
+                return { settled: res.count }
+            })
         }
 
         // Task feed event — the drawer's "Bình luận & hoạt động" merges AuditLog rows;

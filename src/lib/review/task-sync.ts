@@ -15,7 +15,7 @@ import { recordActivity, REVIEW_ACTIVITY, type RecordActivityInput } from './act
 import { REVIEW_STATUS_MAP } from './status-map'
 import { updateTaskStatus } from '@/actions/task-actions'
 import { reviewLog } from './logger'
-import { isValidStatus, canAutoTransition, STATUS_TRANSITIONS } from '@/lib/task-statuses'
+import { isValidStatus, canAutoTransition, STATUS_TRANSITIONS, isTerminalStatus, clientVisibleLabel } from '@/lib/task-statuses'
 import { STATUS_REQUIRES_NULL_DEADLINE } from '@/lib/task-invariants'
 import { notifyManagerOfReviewFlip } from './notify'
 // [P4/BR-05 bridge] portal link-up + guest E1 — imported lazily-safe (all server libs).
@@ -43,12 +43,12 @@ export async function confirmTaskHoanTat(taskId: string): Promise<{ ok: true; ta
         throw apiError(forbidden ? 403 : 409, forbidden ? 'FORBIDDEN' : 'STATE_INVALID', msg)
     }
 
-    await prisma.$transaction(async (tx) => {
+    const clientExposed = await prisma.$transaction(async (tx) => {
         // [P4/R3] Settle the portal VIEW: a task completed out of the client-review phase must not
         // stay stuck on Task.clientReview='AWAITING' (→ deriveClientStatus "Awaiting your review" +
         // needsYou=true forever). Only settle tasks that were actually in the client flow
         // (clientReview not null); a purely-internal completion keeps clientReview null.
-        await tx.task.updateMany({
+        const res = await tx.task.updateMany({
             where: { id: taskId, workspaceId: asset.workspaceId, clientReview: { not: null } },
             data: { clientReview: 'APPROVED', clientReviewedAt: new Date() },
         })
@@ -60,7 +60,16 @@ export async function confirmTaskHoanTat(taskId: string): Promise<{ ok: true; ta
             actorUserId: access.userId,
             meta: { status: REVIEW_STATUS_MAP.approved },
         })
+        return res.count > 0
     })
+    // [Q1] status_update email (T4) — wired end-to-end but NO producer ever fired it. When a
+    // CLIENT-exposed task is completed, tell the client's /r/ subscribers + portal notify email that
+    // the deliverable reached its terminal client-visible label ("Completed"). Gated on client-exposure
+    // (res.count>0) so a purely-internal completion never emails the client. Fire-and-forget.
+    if (clientExposed) {
+        const label = clientVisibleLabel(REVIEW_STATUS_MAP.approved)
+        if (label) void notifyGuestsOfAsset({ assetId: asset.id, event: 'status_update', statusLabel: label }).catch(() => {})
+    }
     return { ok: true, taskId, status: REVIEW_STATUS_MAP.approved }
 }
 
@@ -96,8 +105,12 @@ export async function syncTaskFromReviewEvent(
         reviewLog('warn', 'task_sync.task_missing', { taskId, workspaceId })
         return { applied: false }
     }
-    if (task.isArchived || task.status === 'Đã hủy') {
-        reviewLog('info', 'task_sync.skipped_archived', { taskId, from: task.status })
+    if (task.isArchived || isTerminalStatus(task.status)) {
+        // [E1/J1] Terminal = 'Hoàn tất' (completed, already paid) OR 'Đã hủy' (cancelled). A review
+        // event — e.g. a guest firing "request changes" on a still-live /r/ link AFTER the admin
+        // completed the task — must NOT silently re-open it (which would flip payroll back to pending
+        // and leave clientReview stuck APPROVED). Only an explicit manual staff status change re-opens.
+        reviewLog('info', 'task_sync.skipped_terminal', { taskId, from: task.status })
         return { applied: false, from: task.status }
     }
     if (task.status === target) return { applied: false, from: task.status, to: target } // already there

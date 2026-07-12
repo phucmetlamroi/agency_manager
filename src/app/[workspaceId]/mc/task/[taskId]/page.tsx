@@ -73,7 +73,7 @@ export default async function MissionControlTaskDrawerPage({ params }: { params:
 
     const detail: McTaskDetail = {
         id: t.id,
-        code: `TASK · ${String(t.id).slice(-6).toUpperCase()}`,
+        code: `TASK #${String(t.id).slice(-6).toUpperCase()}`,
         title: t.title || 'Untitled',
         type: t.type || '—',
         tags: (t.taskTags || []).map((tt: any) => tt.tagCategory?.name).filter(Boolean),

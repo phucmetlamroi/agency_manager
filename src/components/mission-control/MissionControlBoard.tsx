@@ -37,6 +37,7 @@ export interface McColumn {
 export interface McLeader { name: string; initials: string; avatar: string; sub: string; rank: string; rankColor: string; top?: boolean }
 export interface McData {
     greetingName: string
+    greeting?: string
     workspaceName: string
     backHref: string
     workspaceId: string
@@ -67,6 +68,20 @@ const RAIL: { icon: LucideIcon; active?: boolean; divider?: boolean; title?: str
 ]
 
 function fmtVND(n: number): string { return Math.round(n).toLocaleString('vi-VN') }
+// Lighten a #rrggbb toward white (frame uses lighter tints for pill/count text).
+function lighten(hex: string, amt: number): string {
+    const h = hex.replace('#', '')
+    if (h.length !== 6) return hex
+    const mix = (c: number) => Math.round(c + (255 - c) * amt)
+    const to2 = (n: number) => n.toString(16).padStart(2, '0')
+    return `#${to2(mix(parseInt(h.slice(0, 2), 16)))}${to2(mix(parseInt(h.slice(2, 4), 16)))}${to2(mix(parseInt(h.slice(4, 6), 16)))}`
+}
+// Per-client dot color (frame gives each client a distinct hue).
+const CLIENT_DOTS = [
+    'linear-gradient(135deg,#F43F5E,#EC4899)', 'linear-gradient(135deg,#06B6D4,#3B82F6)', 'linear-gradient(135deg,#F59E0B,#EAB308)',
+    'linear-gradient(135deg,#10B981,#06B6D4)', 'linear-gradient(135deg,#A855F7,#EC4899)', 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+]
+function clientDot(seed: string): string { let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0; return CLIENT_DOTS[h % CLIENT_DOTS.length] }
 function sparkPaths(vals: number[]): { line: string; area: string } {
     const n = vals.length
     if (n < 2) return { line: '', area: '' }
@@ -86,9 +101,9 @@ function RailIcon({ icon: Icon, active, title }: { icon: LucideIcon; active?: bo
 
 function TaskCard({ t }: { t: McTask }) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, borderRadius: 12, background: card, backdropFilter: 'blur(12px)', border: t.danger ? '1px solid rgba(239,68,68,0.25)' : cardBorder, padding: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, borderRadius: 12, background: card, backdropFilter: 'blur(12px)', border: t.danger ? '1px solid rgba(220,38,38,0.35)' : cardBorder, boxShadow: t.danger ? '0 0 20px rgba(220,38,38,0.12)' : undefined, padding: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.35 }}>{t.title}</span>
-            <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${t.dot}1a`, color: t.dot, border: `1px solid ${t.dot}4d`, whiteSpace: 'nowrap' }}>
+            <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${t.dot}1a`, color: lighten(t.dot, 0.4), border: `1px solid ${t.dot}4d`, whiteSpace: 'nowrap' }}>
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: t.dot }} />{t.statusLabel}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -111,7 +126,7 @@ function Column({ col, workspaceId }: { col: McColumn; workspaceId: string }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 999, background: col.hue, boxShadow: `0 0 8px ${col.hue}99` }} />
                 <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: col.accent === 'danger' ? '#FCA5A5' : '#D4D4D8', whiteSpace: 'nowrap' }}>{col.label}</span>
-                <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 8px', borderRadius: 999, background: `${col.hue}1f`, color: col.hue, border: `1px solid ${col.hue}4d` }}>{col.count}</span>
+                <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 8px', borderRadius: 999, background: `${col.hue}1f`, color: lighten(col.hue, 0.35), border: `1px solid ${col.hue}4d` }}>{col.count}</span>
             </div>
             {col.tasks.length === 0 && <div style={{ textAlign: 'center', fontSize: 11, color: '#52525B', padding: '10px 4px' }}>Trống</div>}
             {/* [M3] Click a card → the Mission-Control task drawer (/mc/task/[id], server-sanitized). */}
@@ -174,7 +189,7 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 10, letterSpacing: '0.16em', color: '#71717A' }}>WORKSPACE / DASHBOARD</span>
-                        <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#F4F4F5' }}>Chào {data.greetingName}.</span>
+                        <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#F4F4F5' }}>{data.greeting || 'Chào'}, {data.greetingName}.</span>
                     </div>
                     <div style={{ flex: 1 }} />
                     {/* [M1 interactivity] Client cluster: ⌘K palette + Add Task modal. */}
@@ -204,7 +219,7 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                         )}
                     </div>
                     <Kpi label="Total Tasks"><span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{kpi.totalTasks}</span>{kpi.totalTasksDelta > 0 && <span style={{ fontSize: 11, color: '#71717A', whiteSpace: 'nowrap' }}>+{kpi.totalTasksDelta} tháng này</span>}</Kpi>
-                    <Kpi label="Đang chạy"><span style={{ fontSize: 18, fontWeight: 800, color: '#FBBF24' }}>{kpi.running}</span>{kpi.overdue > 0 && <span style={{ fontSize: 11, color: '#F87171', whiteSpace: 'nowrap' }}>{kpi.overdue} quá hạn</span>}</Kpi>
+                    <Kpi label="Đang chạy"><span style={{ fontSize: 18, fontWeight: 800, color: '#FBBF24' }}>{kpi.running}</span>{kpi.overdue > 0 && <span style={{ fontSize: 11, color: '#71717A', whiteSpace: 'nowrap' }}>{kpi.overdue} quá hạn</span>}</Kpi>
                     <Kpi label="Hoàn tất"><span style={{ fontSize: 18, fontWeight: 800, color: '#34D399' }}>{kpi.completed}</span><span style={{ fontSize: 11, color: '#71717A', whiteSpace: 'nowrap' }}>tháng này</span></Kpi>
                     <Kpi label="Total Clients"><span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{kpi.totalClients}</span>{kpi.clientsNew > 0 && <span style={{ fontSize: 11, fontWeight: 800, color: '#34D399' }}>▲ +{kpi.clientsNew}</span>}</Kpi>
                     <div style={{ flex: 1 }} />
@@ -266,7 +281,7 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#71717A' }}>Clients · {data.clientsTotal}</span><Link href={`/${data.workspaceId}/admin/crm`} style={{ fontSize: 11, color: '#A5B4FC' }}>Quản lý</Link></div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {data.clients.map((c, i) => (
-                            <span key={c + i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#D4D4D8' }}><span style={{ width: 13, height: 13, borderRadius: 999, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)' }} />{c}</span>
+                            <span key={c + i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#D4D4D8' }}><span style={{ width: 13, height: 13, borderRadius: 999, background: clientDot(c) }} />{c}</span>
                         ))}
                         {data.clientsTotal > data.clients.length && <span style={{ padding: '4px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.12)', fontSize: 11, color: '#71717A' }}>+{data.clientsTotal - data.clients.length}</span>}
                     </div>

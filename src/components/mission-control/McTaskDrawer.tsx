@@ -49,6 +49,12 @@ const STEPS = [
 ]
 
 function fmtVND(n: number): string { return Math.round(n).toLocaleString("vi-VN") }
+// Per-client dot color (frame gives the client meta row a colored swatch).
+const CLIENT_DOTS = [
+    "linear-gradient(135deg,#F43F5E,#EC4899)", "linear-gradient(135deg,#06B6D4,#3B82F6)", "linear-gradient(135deg,#F59E0B,#EAB308)",
+    "linear-gradient(135deg,#10B981,#06B6D4)", "linear-gradient(135deg,#A855F7,#EC4899)", "linear-gradient(135deg,#6366F1,#8B5CF6)",
+]
+function clientDot(seed: string): string { let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0; return CLIENT_DOTS[h % CLIENT_DOTS.length] }
 
 export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { detail: McTaskDetail; workspaceId: string; fullEditHref: string }) {
     const router = useRouter()
@@ -123,12 +129,18 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
                         const color = done ? "#34D399" : active ? "#A5B4FC" : "#71717A"
                         const bg = done ? "rgba(16,185,129,0.15)" : active ? "rgba(99,102,241,0.22)" : "rgba(255,255,255,0.03)"
                         const bd = done ? "1px solid rgba(16,185,129,0.4)" : active ? "1px solid rgba(99,102,241,0.55)" : "1px solid rgba(255,255,255,0.10)"
+                        // "Quá hạn" is an exception branch — render it red/dashed with a caption when not reached.
+                        const overdueStep = s.label === "Quá hạn" && !done && !active
+                        const nodeColor = overdueStep ? "#F87171" : color
+                        const nodeBg = overdueStep ? "rgba(220,38,38,0.10)" : bg
+                        const nodeBd = overdueStep ? "1.5px dashed rgba(220,38,38,0.45)" : bd
                         return (
                             <div key={s.label} style={{ display: "contents" }}>
                                 {i > 0 && <div style={{ flex: 1, height: 2, background: detail.phaseIndex >= i ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.08)" }} />}
                                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 92 }}>
-                                    <span style={{ width: active ? 30 : 24, height: active ? 30 : 24, borderRadius: 999, background: bg, border: bd, display: "flex", alignItems: "center", justifyContent: "center", color, boxShadow: active ? "0 0 18px rgba(99,102,241,0.35)" : "none" }}><Icon style={{ width: active ? 14 : 12, height: active ? 14 : 12 }} /></span>
-                                    <span style={{ fontSize: 10, fontWeight: active ? 800 : 700, color, whiteSpace: "nowrap" }}>{s.label}</span>
+                                    <span style={{ width: active ? 30 : 24, height: active ? 30 : 24, borderRadius: 999, background: nodeBg, border: nodeBd, display: "flex", alignItems: "center", justifyContent: "center", color: nodeColor, boxShadow: active ? "0 0 18px rgba(99,102,241,0.35)" : "none" }}><Icon style={{ width: active ? 14 : 12, height: active ? 14 : 12 }} /></span>
+                                    <span style={{ fontSize: 10, fontWeight: active ? 800 : 700, color: nodeColor, whiteSpace: "nowrap" }}>{s.label}</span>
+                                    {overdueStep && <span style={{ fontSize: 8, color: "#71717A", whiteSpace: "nowrap" }}>khi trễ deadline</span>}
                                 </div>
                             </div>
                         )
@@ -172,7 +184,7 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
                     {/* Right */}
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 10, borderRadius: 14, background: "rgba(24,24,27,0.50)", border: "1px solid rgba(255,255,255,0.06)", padding: 14 }}>
-                            {detail.client && <Row label="Client">{detail.client}</Row>}
+                            {detail.client && <Row label="Client"><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 13, height: 13, borderRadius: 999, background: clientDot(detail.client), flexShrink: 0 }} />{detail.client}</span></Row>}
                             <Row label="Người làm">
                                 {detail.assignee ? (
                                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -195,7 +207,8 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
 
                         {/* Status action card */}
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, borderRadius: 14, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.20)", padding: 14, position: "relative" }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#A5B4FC" }}>Chuyển trạng thái</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#A5B4FC" }}>{inInternalReview ? "Việc của bạn bây giờ" : "Chuyển trạng thái"}</span>
+                            {inInternalReview && <span style={{ fontSize: 11, color: "#A1A1AA", lineHeight: 1.4 }}>Xem bản dựng rồi quyết định: gửi khách hay yêu cầu sửa thêm vòng nữa.</span>}
                             {inInternalReview && (
                                 <>
                                     <button type="button" disabled={pending} onClick={() => changeStatus("Đã gửi video (khách)")} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 10, borderRadius: 10, background: "#6366F1", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", boxShadow: "0 0 24px rgba(99,102,241,0.35)", cursor: pending ? "wait" : "pointer" }}><Send style={{ width: 15, height: 15 }} />Duyệt & gửi khách</button>

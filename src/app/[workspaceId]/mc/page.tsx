@@ -103,6 +103,9 @@ export default async function MissionControlPage({ params }: { params: Promise<{
     }
 
     const now = new Date()
+    // Time-of-day greeting in Vietnam time (UTC+7) — matches the design's "Chào buổi tối, …".
+    const vnHour = (now.getUTCHours() + 7) % 24
+    const greeting = vnHour < 11 ? 'Chào buổi sáng' : vnHour < 13 ? 'Chào buổi trưa' : vnHour < 18 ? 'Chào buổi chiều' : vnHour < 22 ? 'Chào buổi tối' : 'Chào buổi khuya'
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
@@ -184,6 +187,7 @@ export default async function MissionControlPage({ params }: { params: Promise<{
     return (
         <MissionControlBoard data={{
             greetingName: getDisplayName(currentUser, { fallback: 'bạn' }),
+            greeting,
             workspaceName: workspace?.name || 'Workspace',
             backHref: `/${workspaceId}/admin`,
             workspaceId,

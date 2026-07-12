@@ -46,6 +46,7 @@ const RAIL: { icon: typeof ListTodo; active?: boolean; href?: string; badge?: nu
 function fmtVND(n: number): string { return Math.round(n).toLocaleString("vi-VN") }
 
 function barColor(pct: number): string { return pct < 60 ? "#34D399" : pct < 85 ? "#FBBF24" : "#F87171" }
+function loadLabel(pct: number): string { return pct < 40 ? "còn rảnh" : pct < 85 ? "bình thường" : "gần đầy tải" }
 
 export default function McQueueBoard({ data }: { data: McQueueData }) {
     const router = useRouter()
@@ -152,7 +153,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                         <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: 999, background: "rgba(168,85,247,0.07)", filter: "blur(30px)", pointerEvents: "none" }} />
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ width: 8, height: 8, borderRadius: 999, background: "#A855F7", boxShadow: "0 0 8px rgba(168,85,247,0.6)" }} />
-                            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#D4D4D8" }}>Chờ giao</span>
+                            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#D4D4D8" }}>Chờ giao — mở rộng</span>
                             <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 8px", borderRadius: 999, background: "rgba(168,85,247,0.15)", color: "#C084FC", border: "1px solid rgba(168,85,247,0.30)" }}>{data.waitingTotal}</span>
                             <div style={{ flex: 1 }} />
                             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "#71717A" }}><Filter style={{ width: 12, height: 12 }} />chọn task → giao</span>
@@ -223,7 +224,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                                     <span style={{ fontSize: 12, fontWeight: 700, color: "#F4F4F5" }}>{e.name}</span>
                                                     {e.rank && <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 9, fontWeight: 800, color: e.rankColor, border: `1px solid ${e.rankColor}66`, borderRadius: 4, padding: "0 4px" }}>{e.rank}</span>}
                                                 </div>
-                                                <div style={{ fontSize: 10, color: "#A1A1AA" }}>{e.blocked ? "Rank D — bị chặn giao" : `${e.workingCount} đang làm`}</div>
+                                                <div style={{ fontSize: 10, color: "#A1A1AA" }}>{e.blocked ? "Rank D — bị chặn giao" : `${e.workingCount} đang làm · ${loadLabel(e.workloadPct)}`}</div>
                                             </div>
                                             <div style={{ width: 54, height: 4, borderRadius: 999, background: "rgba(255,255,255,0.08)", flexShrink: 0 }}>
                                                 <div style={{ width: `${e.workloadPct}%`, height: "100%", borderRadius: 999, background: barColor(e.workloadPct) }} />
@@ -242,6 +243,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 9, color: "#A1A1AA", fontSize: 11, fontWeight: 600, background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
                                     <UserX style={{ width: 13, height: 13 }} />Đóng
                                 </button>
+                                <div style={{ fontSize: 10, color: "#52525B", lineHeight: 1.5, padding: "0 4px" }}>Giao xong → task chuyển “Nhận task”, editor nhận thông báo. Server chặn giao cho Rank D “thẻ đỏ” + người ngoài tổ chức.</div>
                                 {mktOpen && (
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: "1px dashed rgba(16,185,129,0.35)", color: "#34D399" }}>
                                         <Store style={{ width: 14, height: 14 }} /><span style={{ fontSize: 11, fontWeight: 600 }}>Marketplace đang mở — editor cũng có thể tự nhận</span>

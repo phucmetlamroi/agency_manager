@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
     LayoutDashboard, ListTodo, Inbox, Clapperboard, CalendarDays, Wallet, Building2,
-    FileSpreadsheet, CalendarDays as CalIcon, Hourglass, Calculator, CheckCircle2, RotateCcw, ExternalLink,
+    FileSpreadsheet, CalendarDays as CalIcon, Hourglass, Calculator, CheckCircle2, RotateCcw, ExternalLink, ChevronDown,
 } from "lucide-react"
 import { confirmPayment, revertPayment } from "@/actions/payroll-actions"
 import McBackLink from "./McBackLink"
@@ -141,7 +141,8 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                     {/* Period pill */}
                     <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }} title="Kỳ = tháng của workspace (parse từ tên 'MM/YYYY')">
                         <CalIcon style={{ width: 14, height: 14, color: "#A5B4FC" }} />
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "#F4F4F5" }}>{data.periodLabel}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#F4F4F5" }}>{data.periodLabel} — workspace</span>
+                        <ChevronDown style={{ width: 13, height: 13, color: "#71717A" }} />
                     </div>
                     {/* Currency toggle */}
                     <div style={{ display: "flex", padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -173,7 +174,7 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, borderRadius: 20, background: "rgba(24,24,27,0.45)", border: "1px solid rgba(255,255,255,0.05)", padding: "14px 18px" }}>
                             <span style={{ fontSize: 10, fontWeight: 700, color: "#71717A", textTransform: "uppercase", letterSpacing: "0.08em" }}>Nhân sự</span>
                             <span style={{ fontSize: 22, fontWeight: 800, color: "#F4F4F5" }}>{data.kpi.people}</span>
-                            <span style={{ fontSize: 10, color: "#52525B" }}>{data.kpi.paidCount} đã trả · {data.kpi.people - data.kpi.paidCount} chưa</span>
+                            <span style={{ fontSize: 10, color: "#52525B" }}>đang hoạt động</span>
                         </div>
                         {/* Task hoàn tất */}
                         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, borderRadius: 20, background: "rgba(24,24,27,0.45)", border: "1px solid rgba(255,255,255,0.05)", padding: "14px 18px" }}>

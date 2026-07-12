@@ -40,7 +40,7 @@ export interface McQueueData {
 
 const RAIL: { icon: typeof ListTodo; active?: boolean; href?: string; badge?: number; divider?: boolean }[] = [
     { icon: LayoutDashboard, href: "MC" }, { icon: ListTodo, active: true }, { icon: Inbox, href: "REQ" },
-    { icon: Clapperboard }, { icon: CalendarDays }, { icon: Wallet, divider: true }, { icon: Building2 },
+    { icon: Clapperboard }, { icon: CalendarDays }, { icon: Wallet, href: "TIEN", divider: true }, { icon: Building2 },
 ]
 
 function fmtVND(n: number): string { return Math.round(n).toLocaleString("vi-VN") }

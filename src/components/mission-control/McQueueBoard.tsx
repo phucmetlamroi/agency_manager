@@ -90,7 +90,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
 
     const railHref = (h?: string) =>
         h === "MC" ? `/${data.workspaceId}/mc`
-            : h === "REQ" ? `/${data.workspaceId}/admin/requests`
+            : h === "REQ" ? `/${data.workspaceId}/mc/requests`
                 : h === "TIEN" ? `/${data.workspaceId}/mc/tien`
                     : h === "LICH" ? `/${data.workspaceId}/mc/lich` : undefined
 

@@ -92,7 +92,7 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
     const railHref = (h?: string) =>
         h === "MC" ? `/${data.workspaceId}/mc`
             : h === "QUEUE" ? `/${data.workspaceId}/mc/queue`
-                : h === "REQ" ? `/${data.workspaceId}/admin/requests`
+                : h === "REQ" ? `/${data.workspaceId}/mc/requests`
                     : h === "LICH" ? `/${data.workspaceId}/mc/lich` : undefined
 
     return (

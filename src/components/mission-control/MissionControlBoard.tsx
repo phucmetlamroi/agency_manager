@@ -163,7 +163,7 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                 </div>
                 {RAIL.map((r, i) => {
                     const href = r.nav === 'queue' ? `/${data.workspaceId}/mc/queue`
-                        : r.nav === 'requests' ? `/${data.workspaceId}/admin/requests`
+                        : r.nav === 'requests' ? `/${data.workspaceId}/mc/requests`
                             : r.nav === 'tien' ? `/${data.workspaceId}/mc/tien`
                                 : r.nav === 'lich' ? `/${data.workspaceId}/mc/lich` : undefined
                     const icon = <RailIcon icon={r.icon} active={r.active} title={r.title} />

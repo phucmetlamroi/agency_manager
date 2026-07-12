@@ -75,7 +75,7 @@ export default function McFinanceBoard({ data }: { data: McFinanceData }) {
     const dCost = data.projected.wageVND - data.actual.wageVND
 
     const railHref = (h?: string) =>
-        h === "MC" ? `/${data.workspaceId}/mc` : h === "QUEUE" ? `/${data.workspaceId}/mc/queue` : h === "REQ" ? `/${data.workspaceId}/admin/requests` : h === "LICH" ? `/${data.workspaceId}/mc/lich` : undefined
+        h === "MC" ? `/${data.workspaceId}/mc` : h === "QUEUE" ? `/${data.workspaceId}/mc/queue` : h === "REQ" ? `/${data.workspaceId}/mc/requests` : h === "LICH" ? `/${data.workspaceId}/mc/lich` : undefined
 
     return (
         <div style={{ minHeight: "100dvh", background: "#050505", color: "#F4F4F5", display: "flex", position: "relative", fontFamily: '"Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif' }}>

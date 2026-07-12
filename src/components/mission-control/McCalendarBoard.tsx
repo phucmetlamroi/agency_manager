@@ -81,7 +81,7 @@ export default function McCalendarBoard({ data }: { data: McCalData }) {
         : `${dm(weekKeys[0])} – ${dm(weekKeys[6])}`
 
     const railHref = (h?: string) =>
-        h === "MC" ? `/${data.workspaceId}/mc` : h === "QUEUE" ? `/${data.workspaceId}/mc/queue` : h === "REQ" ? `/${data.workspaceId}/admin/requests` : h === "TIEN" ? `/${data.workspaceId}/mc/tien` : undefined
+        h === "MC" ? `/${data.workspaceId}/mc` : h === "QUEUE" ? `/${data.workspaceId}/mc/queue` : h === "REQ" ? `/${data.workspaceId}/mc/requests` : h === "TIEN" ? `/${data.workspaceId}/mc/tien` : undefined
 
     return (
         <div style={{ minHeight: "100dvh", background: "#050505", color: "#F4F4F5", display: "flex", position: "relative", fontFamily: '"Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif' }}>

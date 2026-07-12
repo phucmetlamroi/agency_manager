@@ -114,10 +114,9 @@ function Column({ col, workspaceId }: { col: McColumn; workspaceId: string }) {
                 <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 8px', borderRadius: 999, background: `${col.hue}1f`, color: col.hue, border: `1px solid ${col.hue}4d` }}>{col.count}</span>
             </div>
             {col.tasks.length === 0 && <div style={{ textAlign: 'center', fontSize: 11, color: '#52525B', padding: '10px 4px' }}>Trống</div>}
-            {/* [M1 interactivity] Click a card → the existing intercepting task-detail modal
-                (@modal/(.)task/[taskId] on the shared [workspaceId] layout). Server-sanitized. */}
+            {/* [M3] Click a card → the Mission-Control task drawer (/mc/task/[id], server-sanitized). */}
             {col.tasks.map((t) => (
-                <Link key={t.id} href={`/${workspaceId}/task/${t.id}`} scroll={false} style={{ textDecoration: 'none', display: 'block' }}>
+                <Link key={t.id} href={`/${workspaceId}/mc/task/${t.id}`} style={{ textDecoration: 'none', display: 'block' }}>
                     <TaskCard t={t} />
                 </Link>
             ))}

@@ -168,7 +168,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                                             <GripVertical style={{ width: 14, height: 14, color: "#52525B", marginTop: 2, flexShrink: 0 }} />
                                             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                                                <span style={{ fontSize: 14, fontWeight: 700, color: "#F4F4F5" }}>{t.title}</span>
+                                                <Link href={`/${data.workspaceId}/mc/task/${t.id}`} style={{ fontSize: 14, fontWeight: 700, color: "#F4F4F5", textDecoration: "none" }} title="Mở chi tiết task">{t.title}</Link>
                                                 {t.desc && <span style={{ fontSize: 11, color: "#A1A1AA", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" } as CSSProperties}>{t.desc}</span>}
                                             </div>
                                             <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: `${t.typeHue}1a`, color: t.typeHue, whiteSpace: "nowrap" }}>{t.type}</span>

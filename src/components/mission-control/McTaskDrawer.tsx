@@ -1,0 +1,260 @@
+"use client"
+
+// [Giao diện 2 · Mission Control · M3 Task Drawer] MC-styled task detail drawer.
+// Ported from design "MÀN 3 — TASK DRAWER". Rendered by /[workspaceId]/mc/task/[taskId]
+// over a static blurred backdrop (the design itself shows a blurred skeleton board behind).
+// Data comes from loadTaskDetail (server-sanitized, money stripped for non-admins; MC is
+// admin-gated anyway). Status changes reuse the real updateTaskStatus (admin FSM is open).
+// Full editing bridges to the Giao diện 1 drawer (/[workspaceId]/task/[id]) until M19 exists.
+import { useState, useTransition, type ReactNode } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import {
+    Pencil, X, ChevronLeft, ChevronRight, Check, Send, SearchCheck, AlarmClock, Flag,
+    Package, CheckCircle2, Calendar, Link2, Undo2, ArrowRightLeft, Archive, Play, Maximize2, ChevronDown,
+} from "lucide-react"
+import { updateTaskStatus } from "@/actions/task-actions"
+
+export interface McTaskDetail {
+    id: string; code: string; title: string; type: string; tags: string[]
+    status: string; statusHex: string; statusLabel: string; phaseIndex: number
+    client: string | null
+    assignee: { name: string; initials: string; avatar: string; rank?: string; rankColor?: string } | null
+    managerName: string | null
+    assignedByName: string | null
+    deadline: string | null
+    wageVND: number
+    productLink: string | null
+    rawFootageLink: string | null
+    createdAt: string; updatedAt: string
+}
+
+const STATUS_HEX: Record<string, string> = {
+    'Đang đợi giao': '#A855F7', 'Nhận task': '#3B82F6', 'Đã nhận task': '#3B82F6', 'Đang thực hiện': '#EAB308',
+    'Đã nộp video (nội bộ)': '#6366F1', 'Đang sửa feedback (nội bộ)': '#F59E0B', 'Đã sửa feedback (nội bộ)': '#14B8A6', 'Revision': '#EF4444',
+    'Đã gửi video (khách)': '#06B6D4', 'Đã nhận feedback (khách)': '#EF4444', 'Đã sửa feedback (khách)': '#8B5CF6',
+    'Quá hạn': '#DC2626', 'Hoàn tất': '#10B981', 'Đã hủy': '#52525B',
+}
+const STATUS_LABEL: Record<string, string> = { Revision: 'Sửa lại' }
+const STATUS_GROUPS: { phase: string; items: string[] }[] = [
+    { phase: 'Sản xuất', items: ['Đang đợi giao', 'Nhận task', 'Đã nhận task', 'Đang thực hiện'] },
+    { phase: 'Duyệt nội bộ', items: ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Revision'] },
+    { phase: 'Khách duyệt', items: ['Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)'] },
+    { phase: 'Kết thúc', items: ['Quá hạn', 'Hoàn tất', 'Đã hủy'] },
+]
+const STEPS = [
+    { label: 'Đã giao task', icon: Check }, { label: 'Đang làm', icon: Check }, { label: 'Duyệt nội bộ', icon: SearchCheck },
+    { label: 'Khách duyệt', icon: Send }, { label: 'Quá hạn', icon: AlarmClock }, { label: 'Hoàn tất', icon: Flag },
+]
+
+function fmtVND(n: number): string { return Math.round(n).toLocaleString("vi-VN") }
+
+export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { detail: McTaskDetail; workspaceId: string; fullEditHref: string }) {
+    const router = useRouter()
+    const [pending, startTransition] = useTransition()
+    const [statusMenu, setStatusMenu] = useState(false)
+
+    const close = () => router.back()
+    const changeStatus = (newStatus: string) => {
+        if (newStatus === detail.status) { setStatusMenu(false); return }
+        startTransition(async () => {
+            const res = await updateTaskStatus(detail.id, newStatus, workspaceId)
+            if (res?.error) { toast.error(res.error); return }
+            toast.success(`Đã chuyển sang “${STATUS_LABEL[newStatus] || newStatus}”`)
+            setStatusMenu(false)
+            router.refresh()
+        })
+    }
+
+    const inInternalReview = detail.phaseIndex === 2
+    const Row = ({ label, children }: { label: string; children: ReactNode }) => (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 11, color: "#71717A" }}>{label}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#D4D4D8", textAlign: "right", minWidth: 0 }}>{children}</span>
+        </div>
+    )
+
+    return (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "#050505", color: "#F4F4F5", fontFamily: '"Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif' }}>
+            {/* Blurred skeleton backdrop (design-faithful) + click-to-close */}
+            <button type="button" onClick={close} aria-label="Đóng" style={{ position: "absolute", inset: 0, border: "none", cursor: "pointer", padding: 0,
+                background: "radial-gradient(900px 600px at 12% -10%, rgba(99,102,241,0.10), transparent 60%),radial-gradient(800px 600px at 100% 110%, rgba(168,85,247,0.10), transparent 60%)" }}>
+                <div style={{ position: "absolute", inset: 0, display: "flex", gap: 12, padding: "80px 24px 24px 88px", opacity: 0.22, filter: "blur(2px)", pointerEvents: "none" }}>
+                    {[0, 1, 2].map((i) => (
+                        <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div style={{ height: 10, borderRadius: 5, background: "rgba(255,255,255,0.08)", width: "55%" }} />
+                            <div style={{ height: 64, borderRadius: 12, background: "rgba(24,24,27,0.6)", border: "1px solid rgba(255,255,255,0.06)" }} />
+                            <div style={{ height: 64, borderRadius: 12, background: "rgba(24,24,27,0.6)", border: "1px solid rgba(255,255,255,0.06)" }} />
+                        </div>
+                    ))}
+                </div>
+            </button>
+
+            {/* Drawer */}
+            <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 780, maxWidth: "100%", background: "rgba(10,10,10,0.94)", backdropFilter: "blur(24px)", borderLeft: "1px solid rgba(255,255,255,0.10)", boxShadow: "-24px 0 60px rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: 999, background: "rgba(99,102,241,0.07)", filter: "blur(40px)", pointerEvents: "none" }} />
+
+                {/* Header */}
+                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "18px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 }}>
+                        <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 10, letterSpacing: "0.16em", color: "#71717A" }}>{detail.code} · {detail.type.toUpperCase()}</span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                            <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", color: "#FFFFFF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{detail.title}</span>
+                            <Link href={fullEditHref} title="Sửa đầy đủ"><Pencil style={{ width: 13, height: 13, color: "#52525B" }} /></Link>
+                        </span>
+                    </div>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: `${detail.statusHex}1a`, color: detail.statusHex, border: `1px solid ${detail.statusHex}4d`, whiteSpace: "nowrap" }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 999, background: detail.statusHex }} />{detail.statusLabel}
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#71717A" }}>
+                        <span style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.5 }}><ChevronLeft style={{ width: 14, height: 14 }} /></span>
+                        <span style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.5 }}><ChevronRight style={{ width: 14, height: 14 }} /></span>
+                        <button type="button" onClick={close} title="Đóng (Esc)" style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", color: "#A1A1AA", cursor: "pointer" }}><X style={{ width: 14, height: 14 }} /></button>
+                    </div>
+                </div>
+
+                {/* Stepper */}
+                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                    {STEPS.map((s, i) => {
+                        const done = detail.phaseIndex > i
+                        const active = detail.phaseIndex === i
+                        const Icon = s.icon
+                        const color = done ? "#34D399" : active ? "#A5B4FC" : "#71717A"
+                        const bg = done ? "rgba(16,185,129,0.15)" : active ? "rgba(99,102,241,0.22)" : "rgba(255,255,255,0.03)"
+                        const bd = done ? "1px solid rgba(16,185,129,0.4)" : active ? "1px solid rgba(99,102,241,0.55)" : "1px solid rgba(255,255,255,0.10)"
+                        return (
+                            <div key={s.label} style={{ display: "contents" }}>
+                                {i > 0 && <div style={{ flex: 1, height: 2, background: detail.phaseIndex >= i ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.08)" }} />}
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 92 }}>
+                                    <span style={{ width: active ? 30 : 24, height: active ? 30 : 24, borderRadius: 999, background: bg, border: bd, display: "flex", alignItems: "center", justifyContent: "center", color, boxShadow: active ? "0 0 18px rgba(99,102,241,0.35)" : "none" }}><Icon style={{ width: active ? 14 : 12, height: active ? 14 : 12 }} /></span>
+                                    <span style={{ fontSize: 10, fontWeight: active ? 800 : 700, color, whiteSpace: "nowrap" }}>{s.label}</span>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+
+                {/* Body */}
+                <div style={{ flex: 1, display: "flex", gap: 20, padding: "20px 24px", minHeight: 0, overflowY: "auto" }}>
+                    {/* Left */}
+                    <div style={{ flex: 1.35, display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+                        <div style={{ position: "relative", aspectRatio: "16/9", borderRadius: 14, background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(300px 200px at 50% 50%, rgba(99,102,241,0.12), transparent 70%)" }} />
+                            <span style={{ width: 52, height: 52, borderRadius: 999, background: "rgba(99,102,241,0.9)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 0 32px rgba(99,102,241,0.5)" }}><Play style={{ width: 22, height: 22 }} /></span>
+                            <span style={{ position: "absolute", top: 10, right: 12, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, color: "#C7D2FE", background: "rgba(99,102,241,0.20)", border: "1px solid rgba(99,102,241,0.40)", padding: "4px 10px", borderRadius: 999 }}><Maximize2 style={{ width: 11, height: 11 }} />Trình xem review — sắp có (M11)</span>
+                        </div>
+                        {(detail.productLink || detail.rawFootageLink) && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6, borderRadius: 12, background: "rgba(24,24,27,0.50)", border: "1px solid rgba(255,255,255,0.06)", padding: "10px 12px" }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#71717A" }}>Bàn giao & tài nguyên</span>
+                                {detail.productLink && (
+                                    <a href={detail.productLink} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 9, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", textDecoration: "none" }}>
+                                        <Package style={{ width: 12, height: 12, color: "#A5B4FC" }} />
+                                        <span style={{ flex: 1, fontSize: 11, color: "#D4D4D8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{detail.productLink}</span>
+                                    </a>
+                                )}
+                                {detail.rawFootageLink && (
+                                    <a href={detail.rawFootageLink} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 9, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", textDecoration: "none" }}>
+                                        <Link2 style={{ width: 12, height: 12, color: "#A5B4FC" }} />
+                                        <span style={{ flex: 1, fontSize: 11, color: "#D4D4D8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Raw footage · {detail.rawFootageLink}</span>
+                                    </a>
+                                )}
+                            </div>
+                        )}
+                        {/* Discussion bridge (full thread + composer live in the Giao diện 1 editor for now) */}
+                        <Link href={fullEditHref} style={{ display: "flex", alignItems: "center", gap: 8, borderRadius: 14, background: "rgba(24,24,27,0.50)", border: "1px solid rgba(255,255,255,0.06)", padding: "14px", textDecoration: "none", color: "#A5B4FC", fontSize: 12, fontWeight: 600 }}>
+                            <CheckCircle2 style={{ width: 15, height: 15 }} />
+                            <span style={{ flex: 1 }}>Thảo luận, feedback theo timecode & nộp bản dựng</span>
+                            <span style={{ fontSize: 11, color: "#71717A" }}>mở đầy đủ ▸</span>
+                        </Link>
+                    </div>
+
+                    {/* Right */}
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10, borderRadius: 14, background: "rgba(24,24,27,0.50)", border: "1px solid rgba(255,255,255,0.06)", padding: 14 }}>
+                            {detail.client && <Row label="Client">{detail.client}</Row>}
+                            <Row label="Người làm">
+                                {detail.assignee ? (
+                                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                        <span style={{ width: 18, height: 18, borderRadius: 999, background: detail.assignee.avatar, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 800, color: "#fff" }}>{detail.assignee.initials}</span>
+                                        {detail.assignee.name}
+                                        {detail.assignee.rank && <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 9, fontWeight: 800, color: detail.assignee.rankColor, border: `1px solid ${detail.assignee.rankColor}66`, borderRadius: 4, padding: "0 4px" }}>{detail.assignee.rank}</span>}
+                                    </span>
+                                ) : <span style={{ color: "#71717A" }}>Chưa giao</span>}
+                            </Row>
+                            {detail.managerName && <Row label="Người quản lý">{detail.managerName}</Row>}
+                            <Row label="Deadline"><span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar style={{ width: 12, height: 12, color: "#71717A" }} />{detail.deadline || "—"}</span></Row>
+                            <Row label="Giá task"><span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontWeight: 700, color: "#F4F4F5" }}>{detail.wageVND > 0 ? `${fmtVND(detail.wageVND)} đ` : "—"}</span></Row>
+                            <Row label="Type · Tags">
+                                <span style={{ display: "inline-flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(56,189,248,0.10)", color: "#38BDF8" }}>{detail.type}</span>
+                                    {detail.tags.map((t) => <span key={t} style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.04)", color: "#A1A1AA", border: "1px solid rgba(255,255,255,0.08)" }}>{t}</span>)}
+                                </span>
+                            </Row>
+                        </div>
+
+                        {/* Status action card */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, borderRadius: 14, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.20)", padding: 14, position: "relative" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#A5B4FC" }}>Chuyển trạng thái</span>
+                            {inInternalReview && (
+                                <>
+                                    <button type="button" disabled={pending} onClick={() => changeStatus("Đã gửi video (khách)")} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 10, borderRadius: 10, background: "#6366F1", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", boxShadow: "0 0 24px rgba(99,102,241,0.35)", cursor: pending ? "wait" : "pointer" }}><Send style={{ width: 15, height: 15 }} />Duyệt & gửi khách</button>
+                                    <button type="button" disabled={pending} onClick={() => changeStatus("Đang sửa feedback (nội bộ)")} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#D4D4D8", fontSize: 13, fontWeight: 700, cursor: pending ? "wait" : "pointer" }}><Undo2 style={{ width: 15, height: 15 }} />Yêu cầu sửa (nội bộ)</button>
+                                </>
+                            )}
+                            {/* Full status dropdown */}
+                            <button type="button" onClick={() => setStatusMenu((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 10px", borderRadius: 9, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "#A1A1AA", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                                Chọn trạng thái khác<ChevronDown style={{ width: 13, height: 13, transform: statusMenu ? "rotate(180deg)" : "none" }} />
+                            </button>
+                            {statusMenu && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 2 }}>
+                                    {STATUS_GROUPS.map((g) => (
+                                        <div key={g.phase} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#52525B" }}>{g.phase}</span>
+                                            {g.items.map((s) => {
+                                                const hex = STATUS_HEX[s] || "#A1A1AA"
+                                                const cur = s === detail.status
+                                                return (
+                                                    <button key={s} type="button" disabled={pending || cur} onClick={() => changeStatus(s)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 8, textAlign: "left", background: cur ? "rgba(99,102,241,0.12)" : "transparent", border: cur ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", color: "#D4D4D8", fontSize: 11, fontWeight: 600, cursor: cur ? "default" : "pointer" }}>
+                                                        <span style={{ width: 7, height: 7, borderRadius: 999, background: hex, flexShrink: 0 }} />
+                                                        {STATUS_LABEL[s] || s}
+                                                        {cur && <Check style={{ width: 12, height: 12, marginLeft: "auto", color: "#A5B4FC" }} />}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Mini history */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, borderRadius: 14, background: "rgba(24,24,27,0.50)", border: "1px solid rgba(255,255,255,0.06)", padding: 14 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#71717A" }}>Mốc thời gian</span>
+                            {detail.assignedByName && <HistRow hex="#3B82F6"><b style={{ color: "#D4D4D8" }}>{detail.assignedByName}</b> giao task</HistRow>}
+                            <HistRow hex="#6366F1">Cập nhật gần nhất · {detail.updatedAt}</HistRow>
+                            <HistRow hex="#52525B">Tạo lúc · {detail.createdAt}</HistRow>
+                        </div>
+
+                        {/* Footer actions */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: "auto" }}>
+                            <Link href={fullEditHref} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, color: "#A5B4FC", padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.30)", background: "rgba(99,102,241,0.08)", textDecoration: "none" }}><Pencil style={{ width: 12, height: 12 }} />Sửa đầy đủ</Link>
+                            <Link href={fullEditHref} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, color: "#71717A", padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)", textDecoration: "none" }}><ArrowRightLeft style={{ width: 12, height: 12 }} />Giao lại</Link>
+                            <div style={{ flex: 1 }} />
+                            <Link href={fullEditHref} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, color: "#F87171", padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.20)", textDecoration: "none" }}><Archive style={{ width: 12, height: 12 }} />Hủy / lưu trữ</Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function HistRow({ hex, children }: { hex: string; children: ReactNode }) {
+    return (
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <span style={{ width: 6, height: 6, borderRadius: 999, background: hex, marginTop: 5, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: "#A1A1AA", lineHeight: 1.5 }}>{children}</span>
+        </div>
+    )
+}

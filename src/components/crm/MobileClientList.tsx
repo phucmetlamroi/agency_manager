@@ -6,7 +6,7 @@
 // mắc + card list + "Tải thêm" + EmptyState. State search/sort/filter client-side.
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, ArrowDownUp, ChevronDown, Check, AlertTriangle, Users, Share2, Wallet } from 'lucide-react'
+import { Search, ChevronDown, AlertTriangle, Users, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import CreateClientButton from '@/components/crm/CreateClientButton'
 import MobileClientCard, { computeClientMetrics, type ClientNode, type ClientMetrics } from './MobileClientCard'
@@ -16,12 +16,6 @@ import SwipeableCard from '@/components/mobile/SwipeableCard'
 import { EmptyState } from '@/components/ui/empty-state'
 import { createClientShareLink } from '@/actions/share-link-actions'
 import { formatCompactVNDWithUnit } from '@/lib/format-compact'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -31,10 +25,10 @@ import { cn } from '@/lib/utils'
 
 type SortKey = 'revenue' | 'name' | 'tasks'
 
-const SORT_LABELS: Record<SortKey, string> = {
-    revenue: 'Doanh thu ↓',
-    name: 'Tên A–Z',
-    tasks: 'Nhiều task nhất',
+const SORT_PILL: Record<SortKey, string> = {
+    revenue: 'Theo tiền',
+    name: 'A-Z',
+    tasks: 'Nhiều task',
 }
 
 const PAGE_SIZE = 30
@@ -205,26 +199,28 @@ export default function MobileClientList({ clients, workspaceId }: { clients: Cl
         )
     }
 
+    const activeCount = clients.filter((c) => (metricsById[c.id]?.revenueVND ?? 0) > 0 || (metricsById[c.id]?.taskCount ?? 0) > 0).length
+
     return (
-        <div className="flex flex-col gap-3">
-            {/* ── Header: title + count + "+ Thêm khách" (cùng hàng flex, min-w-0) ── */}
-            <div className="flex items-center justify-between gap-3">
-                <h1 className="min-w-0 truncate text-page font-bold text-foreground">
-                    Khách hàng <span className="font-normal text-muted-foreground">({clients.length})</span>
-                </h1>
-                <div className="shrink-0">
-                    <CreateClientButton partners={clients as never} workspaceId={workspaceId} />
-                </div>
+        <div className="mroot m-scr flex flex-col gap-2.5">
+            {/* ── Header: title + kỳ pill + thêm khách ── */}
+            <div className="m-row" style={{ padding: '2px 0' }}>
+                <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--m-fg-1)' }}>Khách hàng</span>
+                <span style={{ flex: 1 }} />
+                {/* kỳ pill — static (dữ liệu all-time, chưa lọc theo tháng ở server). */}
+                <span className="m-pill" style={{ marginRight: 6 }}>Tháng 7 <ChevronDown style={{ width: 13, height: 13, opacity: 0.7 }} /></span>
+                <div className="shrink-0"><CreateClientButton partners={clients as never} workspaceId={workspaceId} /></div>
             </div>
 
-            {/* ── Money-first: tổng doanh thu ── */}
+            {/* ── Gross-Revenue hero ── */}
             {totalRevenue > 0 && (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.06] px-3 py-2.5">
-                    <Wallet className="h-4 w-4 shrink-0 text-emerald-400" />
-                    <span className="text-body-sm text-muted-foreground">Tổng doanh thu</span>
-                    <span className="ml-auto whitespace-nowrap font-mono text-[15px] font-bold text-emerald-400">
-                        {formatCompactVNDWithUnit(totalRevenue)}
-                    </span>
+                <div className="m-card" style={{ background: 'var(--m-bg-2)', padding: '14px 16px', overflow: 'hidden' }}>
+                    <div className="m-orb" style={{ background: 'rgba(139,92,246,.10)', top: -46, right: -36 }} />
+                    <div className="m-eb">Gross Revenue — kỳ này</div>
+                    <div className="m-row" style={{ gap: 8, marginTop: 4 }}>
+                        <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em', whiteSpace: 'nowrap', color: 'var(--m-fg-1)' }}>{formatCompactVNDWithUnit(totalRevenue)}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--m-fg-4)', marginTop: 2 }}>{activeCount} khách hoạt động · {clients.length} tổng</div>
                 </div>
             )}
 
@@ -236,54 +232,37 @@ export default function MobileClientList({ clients, workspaceId }: { clients: Cl
                     value={searchQuery}
                     onChange={(e) => { setSearchQuery(e.target.value); resetPaging() }}
                     placeholder="Tìm khách hàng…"
-                    className="h-12 w-full rounded-xl border border-white/8 bg-zinc-900/60 pl-10 pr-3 text-body text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary/40"
+                    className="h-12 w-full rounded-xl border border-white/8 bg-zinc-900/60 pl-10 pr-3 text-body text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-white/20"
                 />
             </div>
 
-            {/* ── Sort dropdown + chip lọc nhanh ── */}
-            <div className="flex items-center gap-2">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+            {/* ── Sort pills (Theo tiền active) + lọc vướng mắc ── */}
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {(['revenue', 'name', 'tasks'] as SortKey[]).map((k) => {
+                    const on = sortKey === k
+                    return (
                         <button
+                            key={k}
                             type="button"
-                            className="inline-flex h-11 items-center gap-1.5 rounded-lg glass-1 px-3 text-body-sm text-foreground transition-transform active:scale-[0.98]"
+                            onClick={() => { setSortKey(k); resetPaging() }}
+                            className="m-pill m-press"
+                            style={on
+                                ? { background: 'var(--m-primary)', color: '#fff', border: '1px solid var(--m-primary)', boxShadow: '0 0 16px var(--m-primary-glow)', cursor: 'pointer' }
+                                : { cursor: 'pointer' }}
                         >
-                            <ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span>Sắp xếp: {SORT_LABELS[sortKey]}</span>
-                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            {SORT_PILL[k]}
                         </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                        align="start"
-                        className="z-popover min-w-[200px] rounded-xl border border-white/10 bg-zinc-950/95 p-1.5 text-foreground shadow-2xl shadow-black/60 backdrop-blur-xl"
-                    >
-                        {(['revenue', 'tasks', 'name'] as SortKey[]).map((k) => (
-                            <DropdownMenuItem
-                                key={k}
-                                onClick={() => setSortKey(k)}
-                                className="cursor-pointer gap-2 rounded-lg py-2.5 text-body-sm"
-                            >
-                                <span>{SORT_LABELS[k]}</span>
-                                {sortKey === k && <Check className="ml-auto h-4 w-4 text-primary-accent" />}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-
+                    )
+                })}
                 {frictionCount > 0 && (
                     <button
                         type="button"
                         onClick={() => { setFrictionFilter((v) => !v); resetPaging() }}
                         aria-pressed={frictionFilter}
-                        className={cn(
-                            'inline-flex h-11 items-center gap-1.5 rounded-lg border px-3 text-body-sm transition-transform active:scale-[0.98]',
-                            frictionFilter
-                                ? 'border-warning/30 bg-warning/15 text-warning'
-                                : 'border-white/8 bg-zinc-900/60 text-muted-foreground',
-                        )}
+                        className={cn('m-pill m-press', frictionFilter && 'warn')}
+                        style={{ cursor: 'pointer' }}
                     >
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        <span>Vướng mắc · {frictionCount}</span>
+                        <AlertTriangle className="h-3 w-3" /> Vướng mắc · {frictionCount}
                     </button>
                 )}
             </div>

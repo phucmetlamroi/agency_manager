@@ -8,7 +8,6 @@
 // là trang admin/finance-gated, desktop đã hiển thị chính con số này (getClients trả
 // cùng payload). M7/DoD: desktop hiện "$107.500.000" (tiền tố "$" là lỗi f_0078) →
 // mobile nén thành "107,5 Tr ₫" — CÙNG con số, chỉ đổi định dạng (nén + ký hiệu ₫).
-import { AlertTriangle } from 'lucide-react'
 import { formatCompactVNDWithUnit } from '@/lib/format-compact'
 import { cn } from '@/lib/utils'
 
@@ -106,49 +105,37 @@ export default function MobileClientCard({
     maxRevenue: number
     onOpen: (client: ClientNode) => void
 }) {
-    // [Mobile design-handoff 2c] Money-first: bề rộng thanh ∝ doanh thu / max (≥4% để luôn thấy).
+    // [visual-parity 2c] Money-first bar: bề rộng ∝ doanh thu / max (≥4% để luôn thấy);
+    // hàng doanh thu cao nhất được glow. Lean row (không card chrome) đúng prototype.
     const barPct = maxRevenue > 0 && metrics.revenueVND > 0
         ? Math.max(4, Math.round((metrics.revenueVND / maxRevenue) * 100))
         : 0
+    const isMax = maxRevenue > 0 && metrics.revenueVND === maxRevenue
+    const subs = client.subsidiaries?.length ?? 0
     return (
         <button
             type="button"
             onClick={() => onOpen(client)}
-            className="flex w-full flex-col gap-1 rounded-xl border border-white/5 bg-zinc-900/90 p-3 text-left transition-transform active:scale-[0.98]"
+            className="m-press flex w-full flex-col gap-1 text-left"
+            style={{ padding: '2px 2px' }}
         >
-            {/* Dòng 1: tên (truncate) + StatusBadge */}
-            <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-foreground">{client.name}</span>
-                <ClientStatusBadge status={metrics.status} className="shrink-0" />
-            </div>
-
-            {/* Dòng 2: doanh thu NỔI BẬT (money-first, không wrap) · số task */}
-            <div className="flex items-baseline justify-between gap-2">
-                <span className="whitespace-nowrap font-mono text-[15px] font-bold text-emerald-400">
+            {/* Dòng 1: tên · brand con · vướng mắc — doanh thu (mono, phải) */}
+            <span className="m-row" style={{ fontSize: 13 }}>
+                <span style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--m-fg-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{client.name}</span>
+                    {subs > 0 && <span style={{ fontSize: 10.5, color: 'var(--m-fg-4)', whiteSpace: 'nowrap', flexShrink: 0 }}>· {subs} brand con</span>}
+                    {metrics.hasFriction && <span className="m-pill warn" style={{ padding: '1px 7px', fontSize: 9.5, flexShrink: 0 }}>vướng mắc</span>}
+                </span>
+                <span style={{ flex: 1 }} />
+                <span className="m-mono" style={{ fontSize: 12, color: 'var(--m-fg-1)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {formatCompactVNDWithUnit(metrics.revenueVND)}
                 </span>
-                <span className="shrink-0 text-caption text-muted-foreground">{metrics.taskCount} task</span>
+            </span>
+
+            {/* Dòng 2: thanh doanh thu indigo */}
+            <div style={{ height: 10, width: '100%', borderRadius: 99, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', marginTop: 2, overflow: 'hidden' }} aria-hidden>
+                <div style={{ width: `${barPct}%`, height: '100%', borderRadius: 99, background: 'rgba(99,102,241,.40)', boxShadow: isMax ? '0 0 12px rgba(99,102,241,.25)' : 'none' }} />
             </div>
-
-            {/* Thanh doanh thu tương đối (money-first bar) */}
-            {barPct > 0 && (
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5" aria-hidden>
-                    <div
-                        className="h-full rounded-full"
-                        style={{ width: `${barPct}%`, background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary-accent)))' }}
-                    />
-                </div>
-            )}
-
-            {/* Dòng 3: vướng mắc (chỉ khi friction cao) */}
-            {metrics.hasFriction && (
-                <div className="flex items-start gap-1.5 text-body-sm text-warning">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="min-w-0 break-words line-clamp-2">
-                        {metrics.incompleteCount}/{metrics.taskCount} task chưa hoàn tất · {metrics.friction}%
-                    </span>
-                </div>
-            )}
         </button>
     )
 }

@@ -17,6 +17,11 @@ import { buildWeekAndAgenda, type AgendaTask } from '@/lib/agenda'
 import { formatCompactVNDWithUnit, formatCompactCount } from '@/lib/format-compact'
 import type { ClientRequestDTO } from '@/actions/client-request-actions'
 
+function initials(name: string): string {
+    const parts = name.replace(/^@/, '').trim().split(/\s+/)
+    return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?'
+}
+
 export type AdminMobileHomeProps = {
     workspaceId: string
     greetingName: string
@@ -66,32 +71,36 @@ export default function AdminMobileHome({
     const hasAttention = attentionRows.some((r) => r.count > 0)
 
     return (
-        <div className="flex flex-col gap-6 pb-10">
-            {/* ── Greeting + period ─────────────────────────────── */}
-            <div className="flex items-center justify-between gap-3">
-                <p className="min-w-0 truncate text-body text-muted-foreground">
-                    Chào <span className="font-semibold text-foreground">{greetingName}</span> 👋
-                </p>
-                {/* [Owner review 2026-07-11] "Tháng = workspace" — chevron trước đây là affordance
-                    GIẢ (span tĩnh, bấm không sổ). Nay badge dẫn thẳng tới trang đổi workspace/kỳ
-                    (đúng ý "đổi tháng" của chủ dự án). */}
-                <Link
-                    href="/api/profile/select"
-                    aria-label="Đổi kỳ / workspace"
-                    className="inline-flex h-11 shrink-0 items-center gap-1 rounded-lg glass-1 px-3 text-body-sm text-foreground transition-colors active:bg-white/10"
-                >
+        <div className="mroot flex flex-col gap-5 pb-10">
+            {/* ── Header (prototype): avatar + greeting + kỳ pill ─── */}
+            <div className="m-row" style={{ paddingTop: 2 }}>
+                <span className="m-av" style={{ width: 26, height: 26, fontSize: 10 }}>{initials(greetingName)}</span>
+                <b style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em' }}>Chào {greetingName}</b>
+                <span style={{ flex: 1 }} />
+                {/* "Tháng = workspace": badge dẫn thẳng tới trang đổi workspace/kỳ. */}
+                <Link href="/api/profile/select" aria-label="Đổi kỳ / workspace" className="m-pill ind m-mono" style={{ textDecoration: 'none' }}>
                     {periodLabel}
-                    <ChevronDown size={16} className="text-muted-foreground" />
+                    <ChevronDown size={13} style={{ opacity: 0.7 }} />
                 </Link>
             </div>
 
-            {/* ── Hàng đợi triage (hero — thay chỗ hero cũ) ─────── */}
+            {/* ── Revenue meta line (prototype) ─────────────────── */}
+            <div className="m-row" style={{ fontSize: 12, color: 'var(--m-fg-4)', marginTop: -8, flexWrap: 'wrap' }}>
+                <span className="m-mono" style={{ color: 'var(--m-fg-2)', fontWeight: 600 }}>{formatCompactVNDWithUnit(kpi.revenueVND)}</span>
+                kỳ này · {formatCompactCount(kpi.running)} chạy · {formatCompactCount(kpi.waitingAssign)} chờ giao
+            </div>
+
+            {/* ── Hàng đợi triage (deck — hero) ─────────────────── */}
             <AdminTriageQueue
                 tasks={triage.tasks}
                 requests={triage.requests}
                 users={triage.users}
                 workspaceId={workspaceId}
             />
+
+            {/* [visual-parity redo] Prototype home = triage-only. Các mục Tổng quan / Cần chú ý /
+                Deadline / Xếp hạng dưới đây GIỮ tạm để không mất chức năng — sẽ re-skin sang lớp
+                `.m-*` khi làm màn Phân tích/Lịch. Đánh dấu để owner biết đây là phần chưa parity. */}
 
             {/* ── KPI ───────────────────────────────────────────── */}
             <div className="flex flex-col gap-3">

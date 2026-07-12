@@ -411,11 +411,15 @@ export async function deleteGuestComment(
                   })
               ).map((r) => r.id)
         const allIds = [comment.id, ...replyIds]
-        await tx.reviewComment.updateMany({ where: { id: { in: allIds } }, data: { deletedAt: now } })
-        await tx.reviewVersion.update({
-            where: { id: comment.versionId },
-            data: { commentCount: { decrement: allIds.length } },
-        })
+        // [CC1] Guard on deletedAt:null and decrement by the rows actually changed — a concurrent
+        // double-delete would otherwise re-match the id-only WHERE and decrement commentCount twice.
+        const { count } = await tx.reviewComment.updateMany({ where: { id: { in: allIds }, deletedAt: null }, data: { deletedAt: now } })
+        if (count > 0) {
+            await tx.reviewVersion.update({
+                where: { id: comment.versionId },
+                data: { commentCount: { decrement: count } },
+            })
+        }
     })
     return { deleted: true }
 }
@@ -429,6 +433,12 @@ export async function toggleGuestReaction(
     emoji: string,
     add: boolean,
 ): Promise<{ reactions: CommentReactionDto[] }> {
+    // [O1] Reactions are a comment interaction → honour the same allowComments gate as
+    // createGuestComment / initiateGuestAttachment (which both 403 when comments are off). Without
+    // this a guest could keep reacting on a share the agency deliberately froze (allowComments=false).
+    if (!share.allowComments) {
+        throw apiError(403, 'FORBIDDEN', 'Comments are turned off for this link.')
+    }
     const comment = await prisma.reviewComment.findFirst({
         where: { id: commentId, deletedAt: null, isInternal: false },
     })

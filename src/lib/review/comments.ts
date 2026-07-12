@@ -24,6 +24,7 @@ import {
     type UserRef,
 } from './dto'
 import { notifyReview, reviewPlayerUrl } from './notify'
+import { notifyGuestsOfAsset } from './guest-notify'
 
 const MAX_BODY = 5000
 const MAX_ATTACHMENTS = 6
@@ -234,6 +235,9 @@ export async function listComments(versionId: string, opts: ListCommentsOpts = {
     let deletedIds: string[] | undefined
     if (opts.since) {
         const since = new Date(opts.since)
+        // [CC4] Reject an unparseable ?since with 400 (mirror listGuestComments) — otherwise Invalid
+        // Date flows into the Prisma DateTime filter and throws a 500 that masks the real client bug.
+        if (Number.isNaN(since.getTime())) throw apiError(400, 'VALIDATION_ERROR', 'Invalid since timestamp.')
         // delta poll: rows created/updated after the mark that are still live…
         filterWhere.updatedAt = { gt: since }
         filterWhere.deletedAt = null
@@ -411,6 +415,21 @@ export async function createComment(versionId: string, input: CreateCommentInput
         }
     }
 
+    // [Q2] comment_reply email (T3) — wired end-to-end but NO producer ever fired it. When STAFF post
+    // a PUBLIC reply to a comment a GUEST authored, notify the /r/ subscribers so the guest learns the
+    // team replied without re-opening the link. Only public replies to guest-authored public comments.
+    if (input.parentId && !isInternal) {
+        void (async () => {
+            const parent = await prisma.reviewComment.findUnique({
+                where: { id: input.parentId! },
+                select: { guestSessionId: true, isInternal: true },
+            })
+            if (parent && parent.guestSessionId && !parent.isInternal) {
+                await notifyGuestsOfAsset({ assetId: asset.id, event: 'comment_reply' }).catch(() => {})
+            }
+        })()
+    }
+
     const [dto] = await serializeComments([created], version, access.userId)
     return { comment: dto }
 }
@@ -446,11 +465,16 @@ export async function deleteComment(commentId: string): Promise<{ deleted: true 
             ? []
             : (await tx.reviewComment.findMany({ where: { parentId: commentId, deletedAt: null }, select: { id: true } })).map((r) => r.id)
         const allIds = [commentId, ...replyIds]
-        await tx.reviewComment.updateMany({ where: { id: { in: allIds } }, data: { deletedAt: now } })
-        await tx.reviewVersion.update({
-            where: { id: comment.versionId },
-            data: { commentCount: { decrement: allIds.length } },
-        })
+        // [CC1] Guard on deletedAt:null and decrement by the rows we ACTUALLY changed — a concurrent
+        // double-delete of the same comment would otherwise re-match the id-only WHERE and decrement
+        // commentCount a second time (drifting the badge below the true live count, possibly negative).
+        const { count } = await tx.reviewComment.updateMany({ where: { id: { in: allIds }, deletedAt: null }, data: { deletedAt: now } })
+        if (count > 0) {
+            await tx.reviewVersion.update({
+                where: { id: comment.versionId },
+                data: { commentCount: { decrement: count } },
+            })
+        }
         await recordActivity(tx, {
             type: 'comment.deleted',
             workspaceId: asset.workspaceId,
@@ -458,7 +482,7 @@ export async function deleteComment(commentId: string): Promise<{ deleted: true 
             versionId: comment.versionId,
             commentId,
             actorUserId: access.userId,
-            meta: { removed: allIds.length },
+            meta: { removed: count },
         })
     })
     return { deleted: true }
@@ -502,6 +526,8 @@ export async function addReaction(commentId: string, emoji: string): Promise<{ r
         // Unique (commentId, reactorKey, emoji) → duplicate is a no-op (idempotent POST).
         if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')) throw e
     }
+    // [CC3] Bump the comment's updatedAt so a delta poll (?since) re-fetches it with the new reaction.
+    await prisma.$executeRaw`UPDATE "ReviewComment" SET "updatedAt" = now() WHERE "id" = ${commentId}`
     const [dto] = await serializeComments([comment], version, access.userId)
     return { reactions: dto.reactions }
 }
@@ -509,6 +535,8 @@ export async function addReaction(commentId: string, emoji: string): Promise<{ r
 export async function removeReaction(commentId: string, emoji: string): Promise<{ reactions: CommentReactionDto[] }> {
     const { comment, version, access } = await resolveCommentCtx(commentId)
     await prisma.commentReaction.deleteMany({ where: { commentId, reactorKey: `u:${access.userId}`, emoji } })
+    // [CC3] Bump updatedAt so a delta poll (?since) re-fetches the comment with the reaction removed.
+    await prisma.$executeRaw`UPDATE "ReviewComment" SET "updatedAt" = now() WHERE "id" = ${commentId}`
     const [dto] = await serializeComments([comment], version, access.userId)
     return { reactions: dto.reactions }
 }

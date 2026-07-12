@@ -56,9 +56,25 @@ export async function setAssetStatus(
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-        const u = await tx.reviewAsset.update({
-            where: { id: assetId },
+        // [E2] Fold the rowVersion predicate INTO the write so check+update is atomic. The read/compare
+        // above then update-by-id lets a concurrent writer that ALSO passed the compare silently clobber
+        // this one (lost update). Only enforced when the caller opted into optimistic locking
+        // (expectedRowVersion provided); otherwise it stays last-write-wins as before.
+        const res = await tx.reviewAsset.updateMany({
+            where: {
+                id: assetId,
+                deletedAt: null,
+                ...(input.expectedRowVersion !== undefined ? { rowVersion: input.expectedRowVersion } : {}),
+            },
             data: { statusId, rowVersion: { increment: 1 } },
+        })
+        if (res.count === 0) {
+            throw apiError(409, 'ROW_VERSION_MISMATCH', 'Asset đã bị thay đổi. Tải lại rồi thử lại.', {
+                current: { id: asset.id },
+            })
+        }
+        const u = await tx.reviewAsset.findUniqueOrThrow({
+            where: { id: assetId },
             select: { id: true, statusId: true, rowVersion: true },
         })
         await recordActivity(tx, {

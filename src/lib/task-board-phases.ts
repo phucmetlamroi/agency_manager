@@ -10,7 +10,7 @@
 //   client_review   (A5/A6/A7)                   → "Khách duyệt"
 // so a video task is never "lost" from the board.
 
-export type BoardPhaseId = 'all' | 'progress' | 'internal' | 'client' | 'overdue' | 'done'
+export type BoardPhaseId = 'pool' | 'all' | 'progress' | 'internal' | 'client' | 'overdue' | 'done'
 
 export interface BoardPhase {
     id: BoardPhaseId
@@ -29,6 +29,11 @@ export interface BoardPhase {
 }
 
 export const BOARD_PHASES: BoardPhase[] = [
+    // [review-fix] MOBILE-ONLY extra phase: the mobile Task tab shows ALL tasks (owner "Cách A"),
+    // so the unassigned pool ('Đang đợi giao') needs its OWN bucket — without it, FAB-created or
+    // returned-to-pool tasks fell into no phase and vanished (board falsely read "đã xử lý hết").
+    // Desktop TaskWorkflowTabs surfaces the pool as a separate "Kho Task Đợi" list, not a tab.
+    { id: 'pool', label: 'Chờ giao', statuses: ['Đang đợi giao'], color: 'hsl(var(--status-waiting))', targetStatus: 'Đang đợi giao' },
     { id: 'all', label: 'Đã giao task', statuses: ['Nhận task', 'Đã nhận task'], color: 'hsl(var(--primary))', targetStatus: null },
     { id: 'progress', label: 'Đang làm', statuses: ['Đang thực hiện'], color: 'hsl(var(--status-doing))', targetStatus: 'Đang thực hiện' },
     { id: 'internal', label: 'Duyệt nội bộ', statuses: ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Revision'], color: 'hsl(var(--status-review))', targetStatus: 'Đã nộp video (nội bộ)' },

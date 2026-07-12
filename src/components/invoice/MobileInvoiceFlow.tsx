@@ -483,12 +483,12 @@ export default function MobileInvoiceFlow({ open, onClose, clientId, clientName,
                                                 </div>
                                                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                                                     <span className="whitespace-nowrap font-mono text-body-sm font-bold text-foreground">{currency}{item.amount.toFixed(2)}</span>
-                                                    <div className="flex items-center gap-1">
-                                                        <button type="button" onClick={() => handleEditItem(item)} aria-label="Sửa" className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-accent active:bg-white/5">
+                                                    <div className="flex items-center gap-2">
+                                                        <button type="button" onClick={() => handleEditItem(item)} aria-label="Sửa" className="flex h-10 w-10 items-center justify-center rounded-lg text-primary-accent active:bg-white/5">
                                                             <Pencil className="h-4 w-4" />
                                                         </button>
                                                         {item.isManual && (
-                                                            <button type="button" onClick={() => setManualItems((prev) => prev.filter((m) => m.id !== item.id))} aria-label="Xóa" className="flex h-8 w-8 items-center justify-center rounded-lg text-red-400 active:bg-white/5">
+                                                            <button type="button" onClick={() => setManualItems((prev) => prev.filter((m) => m.id !== item.id))} aria-label="Xóa" className="flex h-10 w-10 items-center justify-center rounded-lg text-red-400 active:bg-white/5">
                                                                 <Trash2 className="h-4 w-4" />
                                                             </button>
                                                         )}

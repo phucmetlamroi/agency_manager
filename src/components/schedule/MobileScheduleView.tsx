@@ -134,7 +134,7 @@ export default function MobileScheduleView({
                                                         type="button"
                                                         disabled={n === 0}
                                                         onClick={() => setCell({ staff: s, day: d })}
-                                                        className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg px-2 font-bold transition-transform active:scale-95 disabled:cursor-default ${tone}`}
+                                                        className={`inline-flex h-10 min-w-10 items-center justify-center rounded-lg px-2 font-bold transition-transform active:scale-95 disabled:cursor-default ${tone}`}
                                                     >
                                                         {n || '·'}
                                                     </button>

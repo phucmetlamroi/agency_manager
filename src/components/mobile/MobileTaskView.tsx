@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { TaskWithUser } from '@/types/admin'
 import { deleteTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
-import { bulkAssignTasks, bulkUpdateStatus } from '@/actions/bulk-task-actions'
+import { bulkAssignTasks, bulkUpdateStatus, bulkUpdateTaskStatus } from '@/actions/bulk-task-actions'
 import MobileTaskCard from './MobileTaskCard'
 import MobileTaskCardSkeleton from './MobileTaskCardSkeleton'
 import SwipeableCard, { SwipeAction } from './SwipeableCard'
@@ -174,7 +174,9 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
     // ── Long-press → selection ─────────────────────────────────────
     const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
     const touchStart = useRef<{ x: number; y: number } | null>(null)
-    const suppressClickRef = useRef(0)
+    // [review-fix] Boolean (not a time window): a long hold of any duration must suppress the
+    // trailing synthetic click, else releasing after >500ms toggled the just-selected card off.
+    const longPressFiredRef = useRef(false)
 
     const clearLongPress = () => {
         if (longPressTimer.current) {
@@ -186,6 +188,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
         if (!isAdmin) return
         const t = e.touches[0]
         touchStart.current = { x: t.clientX, y: t.clientY }
+        longPressFiredRef.current = false
         clearLongPress()
         longPressTimer.current = setTimeout(() => {
             setSelectionMode(true)
@@ -194,7 +197,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                 next.add(task.id)
                 return next
             })
-            suppressClickRef.current = Date.now()
+            longPressFiredRef.current = true
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(25)
         }, 450)
     }
@@ -225,8 +228,8 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
 
     const handleAction = (task: TaskWithUser) => {
         // A long-press just fired → swallow the trailing click so it doesn't re-toggle.
-        if (Date.now() - suppressClickRef.current < 500) {
-            suppressClickRef.current = 0
+        if (longPressFiredRef.current) {
+            longPressFiredRef.current = false
             return
         }
         if (selectionMode) {
@@ -334,7 +337,13 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
         const ids = [...selectedIds]
         if (!ids.length) return
         try {
-            const res: any = await bulkUpdateStatus(ids, status, workspaceId)
+            // [review-fix] 'Đã hủy' MUST archive (isArchived=true) so cancelled tasks leave the board
+            // AND land in the restorable trash. bulkUpdateStatus (drag-drop) skips archiving → ghosts;
+            // bulkUpdateTaskStatus mirrors updateTaskStatus (archives). Other targets keep the
+            // permissive board-move path.
+            const res: any = status === 'Đã hủy'
+                ? await bulkUpdateTaskStatus(ids, status, workspaceId)
+                : await bulkUpdateStatus(ids, status, workspaceId)
             if (res?.error) { toast.error(res.error); return }
             toast.success(`Đã chuyển ${res?.count ?? ids.length} task → "${status}"`)
             exitSelection()

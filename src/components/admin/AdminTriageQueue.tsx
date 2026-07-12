@@ -105,8 +105,12 @@ export default function AdminTriageQueue({
             action: {
                 label: 'Hoàn tác',
                 onClick: () => {
+                    // [review-fix] If the 5s timer already fired, the commit is in flight / done —
+                    // the key was removed from `pending`. Do nothing: re-inserting here would desync
+                    // the UI and (with the server call already made) enable a double-commit.
                     const tt = pending.current.get(k)
-                    if (tt) clearTimeout(tt)
+                    if (!tt) return
+                    clearTimeout(tt)
                     pending.current.delete(k)
                     setItems((prev) => (prev.some((i) => keyOf(i) === k) ? prev : [item, ...prev]))
                 },

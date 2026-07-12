@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useMemo, useTransition } from 'react'
+import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { TaskWithUser } from '@/types/admin'
 import { deleteTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
+import { bulkAssignTasks, bulkUpdateStatus, bulkUpdateTaskStatus } from '@/actions/bulk-task-actions'
 import MobileTaskCard from './MobileTaskCard'
 import MobileTaskCardSkeleton from './MobileTaskCardSkeleton'
 import SwipeableCard, { SwipeAction } from './SwipeableCard'
@@ -15,37 +16,28 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { TaskDrawer } from '@/components/mobile/TaskDrawer'
 import { PreStartBlockModal } from '@/components/tasks/PreStartBlockModal'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Pause, CheckCircle2, Send, Play } from 'lucide-react'
+import { Pause, CheckCircle2, Send, Play, Check, UserPlus, ArrowLeftRight, X as XIcon } from 'lucide-react'
 import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
+import { BOARD_PHASES, type BoardPhaseId, countTasksInPhase, pickInitialPhase } from '@/lib/task-board-phases'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
-type TabKey = 'DOING' | 'ASSIGNED' | 'REVISE' | 'OVERDUE' | 'ALL'
-
-// Tab labels match desktop NewDesktopTaskTable (English labels, Vietnamese
-// status badge values bên trong card). Đồng nhất với PC.
-const TAB_LABELS: Record<TabKey, string> = {
-    DOING: 'Đang làm',
-    ASSIGNED: 'Nhận task',
-    REVISE: 'Cần sửa',
-    OVERDUE: 'Quá hạn',
-    ALL: 'Tất cả',
-}
-
-const TAB_ORDER: TabKey[] = ['DOING', 'ASSIGNED', 'REVISE', 'OVERDUE', 'ALL']
-
-// Count tasks for a given tab (shared by the badge counts + initial-tab picker).
-function countForTab(tasks: TaskWithUser[], tab: TabKey): number {
-    if (tab === 'ASSIGNED') return tasks.filter(t => t.status === 'Nhận task').length
-    if (tab === 'DOING') return tasks.filter(t => t.status === 'Đang thực hiện').length
-    if (tab === 'REVISE') return tasks.filter(t => t.status === 'Revision').length
-    if (tab === 'OVERDUE') return tasks.filter(t => t.status === 'Quá hạn').length
-    return tasks.length
-}
-
-// [FR-D2] Default tab = first tab (in TAB_ORDER) that actually has data; fall back
-// to ALL when every bucket is empty. Prevents landing on an empty "Đang làm" tab.
-function pickInitialTab(tasks: TaskWithUser[]): TabKey {
-    return TAB_ORDER.find(tab => countForTab(tasks, tab) > 0) ?? 'ALL'
-}
+// [Mobile P2 §2b] Bulk "Chuyển…" targets — the FSM-meaningful moves an admin makes on a
+// multi-select. Mirrors the desktop board's droppable phase targets + the two universal
+// escape hatches (return-to-pool / cancel). bulkUpdateStatus re-validates server-side.
+const BULK_STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: 'Đang thực hiện', label: 'Đang làm' },
+    { value: 'Đã nộp video (nội bộ)', label: 'Duyệt nội bộ' },
+    { value: 'Hoàn tất', label: 'Hoàn tất' },
+    { value: 'Đang đợi giao', label: 'Trả về kho đợi' },
+    { value: 'Đã hủy', label: 'Huỷ task' },
+]
 
 /**
  * Build swipe actions per task based on FSM-valid transitions.
@@ -117,20 +109,19 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
     const [preStartTask, setPreStartTask] = useState<TaskWithUser | null>(null)
     const [isHydrating, setIsHydrating] = useState(true)
 
-    // Filter State
-    const [filteredTasks, setFilteredTasks] = useState<TaskWithUser[]>([])
-    // [FR-D2] Initialise to the first non-empty tab so the default view has data.
-    const [activeTab, setActiveTab] = useState<TabKey>(() => pickInitialTab(tasks))
+    // [Mobile P2 §2b] Board phase (kanban 6 phase) — replaces the old 5 ad-hoc filter tabs.
+    // Single source of truth = BOARD_PHASES (mirrors desktop TaskWorkflowTabs).
+    const [activePhase, setActivePhase] = useState<BoardPhaseId>(() => pickInitialPhase(tasks))
+
+    // [Mobile P2 §2b] Long-press multi-select → bulk giao lại / đổi trạng thái (admin only).
+    const [selectionMode, setSelectionMode] = useState(false)
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
 
     // [FR-H2] Optimistic UI — cập nhật status NGAY khi bấm, chờ server xác nhận.
-    // Map taskId → status ghi đè lạc quan (xoá khi server bắt kịp hoặc rollback khi lỗi).
-    // target = status lạc quan hiển thị; base = status server TRƯỚC khi ghi đè (để reconcile).
     const [optimisticStatus, setOptimisticStatus] = useState<Record<string, { target: string; base: string }>>({})
-    // Các task đang có request status bay trên đường — khoá control để chặn double-submit.
     const [pendingStatusIds, setPendingStatusIds] = useState<Set<string>>(() => new Set())
 
-    // Danh sách task "hiệu dụng" = tasks server + ghi đè lạc quan → badge/filter/count
-    // đều phản chiếu status mới ngay lập tức, khớp đúng kết quả sau router.refresh().
+    // Danh sách task "hiệu dụng" = tasks server + ghi đè lạc quan.
     const effectiveTasks = useMemo<TaskWithUser[]>(
         () => tasks.map(t => (optimisticStatus[t.id] != null ? { ...t, status: optimisticStatus[t.id].target } : t)),
         [tasks, optimisticStatus],
@@ -143,7 +134,7 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
     }, [])
 
     // [FR-H2] Reconcile: khi dữ liệu server mới về (sau refresh), bỏ các ghi đè lạc quan
-    // đã được server xác nhận (status khớp) hoặc task không còn — tránh badge cũ bị kẹt.
+    // đã được server xác nhận (status khớp) hoặc task không còn.
     useEffect(() => {
         setOptimisticStatus(prev => {
             const ids = Object.keys(prev)
@@ -152,9 +143,6 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
             let changed = false
             for (const id of ids) {
                 const serverTask = tasks.find(t => t.id === id)
-                // Bỏ ghi đè NGAY khi server đã DỜI khỏi baseline (refetch đã về → server là chân lý),
-                // dù server dừng ở target của ta HAY một status khác (đổi nền/đồng thời → server thắng,
-                // không kẹt badge cũ). Chỉ giữ peek khi server vẫn ở baseline (refetch chưa phản ánh).
                 if (!serverTask || serverTask.status !== prev[id].base) {
                     changed = true
                     continue
@@ -165,23 +153,89 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
         })
     }, [tasks])
 
-    // Filter Logic — lọc trên danh sách hiệu dụng (đã áp status lạc quan)
+    // Danh sách đã lọc theo phase đang chọn.
+    const activePhaseObj = BOARD_PHASES.find(p => p.id === activePhase) ?? BOARD_PHASES[0]
+    const filteredTasks = useMemo(
+        () => effectiveTasks.filter(t => activePhaseObj.statuses.includes(t.status)),
+        [effectiveTasks, activePhaseObj],
+    )
+
+    const phaseCount = (id: BoardPhaseId): number => {
+        const p = BOARD_PHASES.find(x => x.id === id)
+        return p ? countTasksInPhase(effectiveTasks, p) : 0
+    }
+
+    // ── Rail: center the active phase pill ─────────────────────────
+    const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({})
     useEffect(() => {
-        let res = effectiveTasks
-        if (activeTab === 'ASSIGNED') res = effectiveTasks.filter(t => t.status === 'Nhận task')
-        if (activeTab === 'DOING') res = effectiveTasks.filter(t => t.status === 'Đang thực hiện')
-        if (activeTab === 'REVISE') res = effectiveTasks.filter(t => t.status === 'Revision')
-        if (activeTab === 'OVERDUE') res = effectiveTasks.filter(t => t.status === 'Quá hạn')
-        setFilteredTasks(res)
-    }, [effectiveTasks, activeTab])
+        btnRefs.current[activePhase]?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+    }, [activePhase])
 
-    const tabCount = (tab: TabKey): number => countForTab(effectiveTasks, tab)
+    // ── Long-press → selection ─────────────────────────────────────
+    const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const touchStart = useRef<{ x: number; y: number } | null>(null)
+    // [review-fix] Boolean (not a time window): a long hold of any duration must suppress the
+    // trailing synthetic click, else releasing after >500ms toggled the just-selected card off.
+    const longPressFiredRef = useRef(false)
 
-    // [Sprint P audit-fix] handleTaskClick is dead code — MobileTaskCard
-    // actually calls handleAction (line ~263 below: onAction={handleAction}).
-    // Gate moved to handleAction so mobile actually enforces PreStartBlockModal.
+    const clearLongPress = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current)
+            longPressTimer.current = null
+        }
+    }
+    const handleTouchStart = (task: TaskWithUser) => (e: React.TouchEvent) => {
+        if (!isAdmin) return
+        const t = e.touches[0]
+        touchStart.current = { x: t.clientX, y: t.clientY }
+        longPressFiredRef.current = false
+        clearLongPress()
+        longPressTimer.current = setTimeout(() => {
+            setSelectionMode(true)
+            setSelectedIds(prev => {
+                const next = new Set(prev)
+                next.add(task.id)
+                return next
+            })
+            longPressFiredRef.current = true
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(25)
+        }, 450)
+    }
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!touchStart.current || !longPressTimer.current) return
+        const t = e.touches[0]
+        if (Math.abs(t.clientX - touchStart.current.x) > 12 || Math.abs(t.clientY - touchStart.current.y) > 12) {
+            clearLongPress()
+        }
+    }
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+    // Leaving selection empty exits selection mode.
+    useEffect(() => {
+        if (selectionMode && selectedIds.size === 0) setSelectionMode(false)
+    }, [selectionMode, selectedIds])
+    const exitSelection = () => {
+        setSelectionMode(false)
+        setSelectedIds(new Set())
+    }
 
     const handleAction = (task: TaskWithUser) => {
+        // A long-press just fired → swallow the trailing click so it doesn't re-toggle.
+        if (longPressFiredRef.current) {
+            longPressFiredRef.current = false
+            return
+        }
+        if (selectionMode) {
+            toggleSelect(task.id)
+            return
+        }
         // [Sprint P GĐ2] Non-admin click task ở status 'Nhận task' / 'Đã nhận task'
         // → mở PreStartBlockModal (BLOCKING popup) thay vì TaskDrawer.
         if (!isAdmin && (task.status === 'Nhận task' || task.status === 'Đã nhận task')) {
@@ -193,16 +247,9 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
     }
 
     // [FR-H2] Optimistic status change with rollback.
-    // 1) Ghi đè status ngay (badge/filter cập nhật tức thì) + khoá control (pending).
-    // 2) Gọi server. Lỗi/exception → gỡ ghi đè (khôi phục ĐÚNG status server trước đó) + toast.
-    //    Thành công → giữ ghi đè, refresh; reconcile effect sẽ dọn khi server bắt kịp.
-    // Không dùng cho DELETE (delete phải chờ server xác nhận).
     const performStatusChange = async (taskId: string, status: string): Promise<boolean> => {
-        // Chặn double-submit (bấm/swipe/popover cùng lúc trên 1 task đang bay).
         if (pendingStatusIds.has(taskId)) return false
 
-        // Baseline = status server hiện tại (trước khi ghi đè) — reconcile nhường server bất cứ khi
-        // nào nó dời khỏi baseline (kể cả dời sang status KHÁC target, do đổi nền/đồng thời).
         const baseStatus = tasks.find(t => t.id === taskId)?.status ?? status
         setOptimisticStatus(prev => ({ ...prev, [taskId]: { target: status, base: baseStatus } }))
         setPendingStatusIds(prev => {
@@ -228,7 +275,6 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
             } else {
                 ok = true
                 toast.success(`Đã chuyển trạng thái sang "${status}"`)
-                // Server data will catch up; reconcile effect clears the override.
                 startTransition(() => router.refresh())
             }
         } catch {
@@ -273,20 +319,50 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
         }
     }
 
+    // ── Bulk actions (admin, selection mode) ───────────────────────
+    const runBulkAssign = async (assigneeId: string | null) => {
+        const ids = [...selectedIds]
+        if (!ids.length) return
+        try {
+            const res: any = await bulkAssignTasks(ids, assigneeId, workspaceId)
+            if (res?.error) { toast.error(res.error); return }
+            toast.success(assigneeId ? `Đã giao ${res?.count ?? ids.length} task` : `Đã trả ${res?.count ?? ids.length} task về kho`)
+            exitSelection()
+            startTransition(() => router.refresh())
+        } catch {
+            toast.error('Giao task thất bại. Vui lòng thử lại.')
+        }
+    }
+    const runBulkStatus = async (status: string) => {
+        const ids = [...selectedIds]
+        if (!ids.length) return
+        try {
+            // [review-fix] 'Đã hủy' MUST archive (isArchived=true) so cancelled tasks leave the board
+            // AND land in the restorable trash. bulkUpdateStatus (drag-drop) skips archiving → ghosts;
+            // bulkUpdateTaskStatus mirrors updateTaskStatus (archives). Other targets keep the
+            // permissive board-move path.
+            const res: any = status === 'Đã hủy'
+                ? await bulkUpdateTaskStatus(ids, status, workspaceId)
+                : await bulkUpdateStatus(ids, status, workspaceId)
+            if (res?.error) { toast.error(res.error); return }
+            toast.success(`Đã chuyển ${res?.count ?? ids.length} task → "${status}"`)
+            exitSelection()
+            startTransition(() => router.refresh())
+        } catch {
+            toast.error('Đổi trạng thái thất bại. Vui lòng thử lại.')
+        }
+    }
+
     const handleRefresh = async () => {
         await new Promise<void>((resolve) => {
             startTransition(() => {
                 router.refresh()
-                // Give Next a beat to fetch
                 setTimeout(resolve, 600)
             })
         })
     }
 
-    // [FR-H4 / Pattern 9] Empty state cho tab đang lọc rỗng.
-    //  • cả list rỗng → 'first-use' ("Chưa có task nào").
-    //  • tab này rỗng nhưng tab khác còn task → 'no-results' + deep-link sang tab đó.
-    //  • hết task ở bộ lọc (không có tab gợi ý) → 'cleared' + lối về "Tất cả".
+    // [FR-H4 / Pattern 9] Empty state cho phase đang lọc rỗng.
     const renderEmptyState = () => {
         if (effectiveTasks.length === 0) {
             return (
@@ -297,19 +373,17 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                 />
             )
         }
-        const suggestion = TAB_ORDER.find(
-            t => t !== activeTab && t !== 'ALL' && countForTab(effectiveTasks, t) > 0,
-        )
+        const suggestion = BOARD_PHASES.find(p => p.id !== activePhase && countTasksInPhase(effectiveTasks, p) > 0)
         if (suggestion) {
-            const n = countForTab(effectiveTasks, suggestion)
+            const n = countTasksInPhase(effectiveTasks, suggestion)
             return (
                 <EmptyState
                     variant="no-results"
-                    title="Không có task ở bộ lọc này"
-                    description={`Có ${n} task ở "${TAB_LABELS[suggestion]}".`}
+                    title="Không có task ở giai đoạn này"
+                    description={`Có ${n} task ở "${suggestion.label}".`}
                     cta={{
-                        label: `Xem ${n} task ${TAB_LABELS[suggestion]}`,
-                        onClick: () => setActiveTab(suggestion),
+                        label: `Xem ${n} task ${suggestion.label}`,
+                        onClick: () => setActivePhase(suggestion.id),
                     }}
                 />
             )
@@ -318,41 +392,64 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
             <EmptyState
                 variant="cleared"
                 title="Đã xử lý hết task"
-                description="Không còn task nào ở bộ lọc này."
-                cta={activeTab !== 'ALL' ? { label: 'Xem tất cả task', onClick: () => setActiveTab('ALL') } : undefined}
+                description="Không còn task nào ở giai đoạn này."
             />
         )
     }
 
     return (
-        <div className="flex flex-col gap-3 pb-24 relative min-h-dvh">
-            {/* Mobile Tabs - Sticky */}
-            <div className="flex gap-2 overflow-x-auto pb-3 pt-2 px-2 no-scrollbar sticky top-[calc(52px+env(safe-area-inset-top))] bg-zinc-950/85 backdrop-blur-xl z-10 border-b border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
-                {TAB_ORDER.map(tab => {
-                    const count = tabCount(tab)
-                    const isActive = activeTab === tab
-                    return (
-                        <motion.button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            whileTap={{ scale: 0.94 }}
-                            className={`relative px-3.5 py-2 rounded-full text-xs font-bold uppercase whitespace-nowrap transition-colors border ${isActive
-                                ? 'bg-white text-black border-white shadow-md shadow-white/10'
-                                : 'bg-zinc-900/70 text-zinc-400 border-white/8 hover:text-zinc-200'
-                                }`}
-                        >
-                            <span className="flex items-center gap-1.5">
-                                {TAB_LABELS[tab]}
+        <div className="relative flex min-h-dvh flex-col gap-3 pb-24">
+            {/* ── Phase rail (kanban 6 phase) — horizontal snap, active centered ── */}
+            <div className="sticky top-[calc(52px+env(safe-area-inset-top))] z-10 border-b border-white/5 bg-zinc-950/85 pb-2 pt-2 shadow-[0_4px_20px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+                <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-3">
+                    {BOARD_PHASES.map(phase => {
+                        const count = phaseCount(phase.id)
+                        const isActive = activePhase === phase.id
+                        return (
+                            <motion.button
+                                key={phase.id}
+                                ref={el => { btnRefs.current[phase.id] = el }}
+                                onClick={() => setActivePhase(phase.id)}
+                                whileTap={{ scale: 0.94 }}
+                                className={`relative flex shrink-0 snap-center items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-bold transition-colors ${isActive
+                                    ? 'border-white bg-white text-black shadow-md shadow-white/10'
+                                    : 'border-white/8 bg-zinc-900/70 text-zinc-400 hover:text-zinc-200'
+                                    }`}
+                            >
+                                <span
+                                    className="h-2 w-2 shrink-0 rounded-full"
+                                    style={{ background: isActive ? '#000' : phase.color, opacity: isActive ? 0.85 : 1 }}
+                                />
+                                {phase.label}
                                 {count > 0 && (
-                                    <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] flex items-center justify-center ${isActive ? 'bg-zinc-900 text-white' : 'bg-white/10 text-zinc-300'
+                                    <span className={`flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] ${isActive ? 'bg-zinc-900 text-white' : 'bg-white/10 text-zinc-300'
                                         }`}>
                                         {count}
                                     </span>
                                 )}
-                            </span>
-                        </motion.button>
-                    )
-                })}
+                            </motion.button>
+                        )
+                    })}
+                </div>
+                {/* Position dots — 6 phase indicator */}
+                <div className="mt-2 flex items-center justify-center gap-1.5">
+                    {BOARD_PHASES.map(phase => {
+                        const isActive = activePhase === phase.id
+                        return (
+                            <button
+                                key={phase.id}
+                                aria-label={phase.label}
+                                onClick={() => setActivePhase(phase.id)}
+                                className="rounded-full transition-all"
+                                style={{
+                                    width: isActive ? 18 : 6,
+                                    height: 6,
+                                    background: isActive ? phase.color : 'rgba(255,255,255,0.18)',
+                                }}
+                            />
+                        )
+                    })}
+                </div>
             </div>
 
             {/* Main scrollable list with pull-to-refresh */}
@@ -367,9 +464,20 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                     ) : (
                         <AnimatePresence mode="popLayout">
                             {filteredTasks.map((task, idx) => {
-                                const swipe = buildSwipeActions(task, isAdmin, (status) => handleQuickStatusChange(task, status))
+                                const isSelected = selectedIds.has(task.id)
+                                const swipe = selectionMode
+                                    ? {}
+                                    : buildSwipeActions(task, isAdmin, (status) => handleQuickStatusChange(task, status))
                                 return (
-                                    <motion.div key={task.id} layout>
+                                    <motion.div
+                                        key={task.id}
+                                        layout
+                                        onTouchStart={handleTouchStart(task)}
+                                        onTouchMove={handleTouchMove}
+                                        onTouchEnd={clearLongPress}
+                                        onTouchCancel={clearLongPress}
+                                        className={`relative rounded-2xl ${isSelected ? 'outline outline-2 outline-primary' : ''}`}
+                                    >
                                         <SwipeableCard
                                             rightAction={swipe.right}
                                             leftAction={swipe.left}
@@ -384,6 +492,14 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                                                 minimal={minimal}
                                             />
                                         </SwipeableCard>
+                                        {selectionMode && (
+                                            <span
+                                                className={`pointer-events-none absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 ${isSelected ? 'border-primary bg-primary text-white' : 'border-white/40 bg-zinc-900/70'
+                                                    }`}
+                                            >
+                                                {isSelected && <Check className="h-3.5 w-3.5" />}
+                                            </span>
+                                        )}
                                     </motion.div>
                                 )
                             })}
@@ -402,6 +518,73 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                     )}
                 </div>
             </PullToRefresh>
+
+            {/* ── Bulk action bar (admin, selection mode) ─────────────── */}
+            <AnimatePresence>
+                {isAdmin && selectionMode && selectedIds.size > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        className="fixed inset-x-3 bottom-[calc(64px+env(safe-area-inset-bottom)+8px)] z-[45] flex items-center justify-between gap-2 rounded-2xl border border-primary/30 bg-zinc-950/95 px-3 py-2.5 shadow-2xl shadow-black/60 backdrop-blur-xl"
+                    >
+                        <span className="text-[13px] font-semibold text-white">
+                            Đã chọn <strong>{selectedIds.size}</strong>
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                            {/* Giao lại */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-primary/15 px-3 text-xs font-bold text-primary-accent transition-colors active:bg-primary/25">
+                                        <UserPlus className="h-4 w-4" /> Giao
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="max-h-[50vh] overflow-y-auto">
+                                    <DropdownMenuLabel>Giao cho</DropdownMenuLabel>
+                                    {(users ?? []).map(u => (
+                                        <DropdownMenuItem key={u.id} onClick={() => runBulkAssign(u.id)}>
+                                            {u.displayName?.trim() || u.nickname?.trim() || `@${u.username}`}
+                                        </DropdownMenuItem>
+                                    ))}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => runBulkAssign(null)}>
+                                        Trả về kho đợi
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            {/* Đổi trạng thái */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-white/5 px-3 text-xs font-bold text-zinc-200 transition-colors active:bg-white/10">
+                                        <ArrowLeftRight className="h-4 w-4" /> Chuyển
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Chuyển sang</DropdownMenuLabel>
+                                    {BULK_STATUS_OPTIONS.map(opt => (
+                                        <DropdownMenuItem
+                                            key={opt.value}
+                                            className={opt.value === 'Đã hủy' ? 'text-red-400 focus:text-red-400' : ''}
+                                            onClick={() => runBulkStatus(opt.value)}
+                                        >
+                                            {opt.label}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            {/* Bỏ chọn */}
+                            <button
+                                onClick={exitSelection}
+                                aria-label="Bỏ chọn"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-400 transition-colors active:bg-white/10"
+                            >
+                                <XIcon className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <TaskDrawer
                 open={isDrawerOpen}

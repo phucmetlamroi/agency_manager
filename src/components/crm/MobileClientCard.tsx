@@ -97,12 +97,19 @@ export function ClientStatusBadge({ status, className }: { status: ClientStatus;
 export default function MobileClientCard({
     client,
     metrics,
+    maxRevenue,
     onOpen,
 }: {
     client: ClientNode
     metrics: ClientMetrics
+    /** Doanh thu lớn nhất trong danh sách hiển thị → chuẩn hoá bề rộng thanh (money-first). */
+    maxRevenue: number
     onOpen: (client: ClientNode) => void
 }) {
+    // [Mobile design-handoff 2c] Money-first: bề rộng thanh ∝ doanh thu / max (≥4% để luôn thấy).
+    const barPct = maxRevenue > 0 && metrics.revenueVND > 0
+        ? Math.max(4, Math.round((metrics.revenueVND / maxRevenue) * 100))
+        : 0
     return (
         <button
             type="button"
@@ -115,10 +122,23 @@ export default function MobileClientCard({
                 <ClientStatusBadge status={metrics.status} className="shrink-0" />
             </div>
 
-            {/* Dòng 2: doanh thu compact (VND) · số task */}
-            <div className="text-body-sm text-muted-foreground">
-                {formatCompactVNDWithUnit(metrics.revenueVND)} · {metrics.taskCount} task
+            {/* Dòng 2: doanh thu NỔI BẬT (money-first, không wrap) · số task */}
+            <div className="flex items-baseline justify-between gap-2">
+                <span className="whitespace-nowrap font-mono text-[15px] font-bold text-emerald-400">
+                    {formatCompactVNDWithUnit(metrics.revenueVND)}
+                </span>
+                <span className="shrink-0 text-caption text-muted-foreground">{metrics.taskCount} task</span>
             </div>
+
+            {/* Thanh doanh thu tương đối (money-first bar) */}
+            {barPct > 0 && (
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5" aria-hidden>
+                    <div
+                        className="h-full rounded-full"
+                        style={{ width: `${barPct}%`, background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary-accent)))' }}
+                    />
+                </div>
+            )}
 
             {/* Dòng 3: vướng mắc (chỉ khi friction cao) */}
             {metrics.hasFriction && (

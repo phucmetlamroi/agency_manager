@@ -169,6 +169,11 @@ function ReviewPlayerShellInner({
     [data, currentVersionId],
   );
   const isVideo = asset?.mediaKind === "video";
+  // [Mobile PR#8 §4] Adaptive aspect (dọc⇄ngang): a portrait (9:16) video takes a TALLER
+  // stage + a peek panel; a landscape (16:9) video gets a shorter stage + a wider panel.
+  // Ratio comes from the Mux metadata (version.width/height); desktop layout is unaffected.
+  const isPortraitMedia =
+    isVideo && !!version?.width && !!version?.height && version.height > version.width;
 
   // [Download] Fetch a short-lived presigned R2 GET of the ORIGINAL file (byte-identical to the
   // uploaded file — not a Mux rendition) and let the browser save it. Member route re-guards
@@ -931,7 +936,11 @@ function ReviewPlayerShellInner({
 
         {/* Review panel can collapse for distraction-free playback, like Frame.io's panel controls. */}
         {panelOpen && (
-          <aside className="flex h-[42vh] shrink-0 flex-col border-t border-white/[0.12] bg-[#121417] shadow-[-16px_0_32px_rgba(0,0,0,0.18)] lg:h-auto lg:w-[380px] lg:border-l lg:border-t-0">
+          <aside
+            className={`flex shrink-0 flex-col border-t border-white/[0.12] bg-[#121417] shadow-[-16px_0_32px_rgba(0,0,0,0.18)] lg:h-auto lg:w-[380px] lg:border-l lg:border-t-0 ${
+              isPortraitMedia ? "h-[32vh]" : "h-[46vh]"
+            }`}
+          >
             <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.10] bg-[#16191d] px-3">
               <TabBtn
                 active={tab === "comments"}

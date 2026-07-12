@@ -137,7 +137,8 @@ function RadialSegmentItem({
                         exit={{ opacity: 0, scale: 0.8 }}
                         transition={{ duration: 0.15 }}
                         style={{
-                            background: `radial-gradient(circle, rgba(124,58,237,0.4) 0%, transparent 70%)`,
+                            // [design-handoff parity] indigo #6366F1 (portaled outside .mroot → hardcoded).
+                            background: `radial-gradient(circle, rgba(99,102,241,0.4) 0%, transparent 70%)`,
                         }}
                     />
                 )}
@@ -233,7 +234,7 @@ export function RadialMenu({
                         top: origin.y - 200,
                         width: 400,
                         height: 400,
-                        background: 'radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)',
                         borderRadius: '50%',
                     }}
                 />
@@ -251,7 +252,7 @@ export function RadialMenu({
                 animate="visible"
                 exit="exit"
             >
-                <div className="absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-violet-500/80 shadow-lg shadow-violet-500/50 blur-[1px]" />
+                <div className="absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-indigo-500/80 shadow-lg shadow-indigo-500/50 blur-[1px]" />
                 <div className="absolute -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white/90" />
             </motion.div>
 

@@ -267,7 +267,7 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                         {/* Footer → Finance / M5 */}
                         <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.10)" }}>
                             <Building2 style={{ width: 14, height: 14, color: "#71717A" }} />
-                            <span style={{ fontSize: 11, color: "#71717A" }}>Tab <b style={{ color: "#A1A1AA" }}>Finance</b> — Revenue Overview + công nợ theo khách (cùng kỳ, cùng đơn vị tiền). Bản Giao diện 2 (M5) đang dựng — tạm xem ở <Link href={data.financeHref} style={{ color: "#A5B4FC", textDecoration: "none" }}>Giao diện 1 · Tài chính ↗</Link>.</span>
+                            <span style={{ fontSize: 11, color: "#71717A" }}>Tab <b style={{ color: "#A1A1AA" }}>Finance</b> — Thực tế vs Dự kiến (Doanh thu/Chi phí/Lợi nhuận) + nhật ký giao dịch, cùng kỳ + cùng đơn vị tiền. <Link href={data.financeHref} style={{ color: "#A5B4FC", textDecoration: "none" }}>Mở tab Tài chính ▸</Link></span>
                         </div>
                     </div>
                 </div>

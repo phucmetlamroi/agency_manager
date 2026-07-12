@@ -138,7 +138,7 @@ export default async function MissionControlPayrollPage({ params }: { params: Pr
         exportUrl: monthParam
             ? `/api/exports/monthly-tasks-xlsx?workspaceId=${workspaceId}&month=${monthParam}`
             : `/api/exports/monthly-tasks-xlsx?workspaceId=${workspaceId}`,
-        financeHref: `/${workspaceId}/admin/finance`,
+        financeHref: `/${workspaceId}/mc/finance`,
         payrollBridgeHref: `/${workspaceId}/admin/payroll`,
     }
 

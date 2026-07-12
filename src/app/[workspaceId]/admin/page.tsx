@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { XCircle } from 'lucide-react'
 import { getSession } from '@/lib/auth'
@@ -38,6 +39,15 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
     // board can never scope to the wrong profile and appear wiped — see resolveActiveProfileId.
     const profileId = await resolveActiveProfileId(session.user.id, workspaceId, (session.user as any).sessionProfileId)
     if (!profileId) redirect('/login')
+
+    // [Giao diện 2] Auto-land admins who opted into Mission Control (desktop only).
+    // Gated on `ui-pref === 'mc'` so anyone who never toggled is byte-for-byte
+    // unaffected; the MC "← Giao diện 1" control clears the cookie, so this never
+    // loops. Kept out of admin/layout.tsx so /admin/* sub-pages still render.
+    const uiPref = (await cookies()).get('ui-pref')?.value
+    if (uiPref === 'mc' && !(await isMobileDevice())) {
+        redirect(`/${workspaceId}/mc`)
+    }
 
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 

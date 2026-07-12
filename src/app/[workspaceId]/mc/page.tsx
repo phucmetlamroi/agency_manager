@@ -12,6 +12,7 @@ import { computeWorkspaceFinance } from '@/lib/finance-helpers'
 import { checkOverdueTasks } from '@/actions/reputation-actions'
 import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS, isReviewPhaseStatus } from '@/lib/task-statuses'
 import { getDisplayName } from '@/lib/display-name'
+import { dedupeClientsByPath } from '@/lib/client-dedupe'
 import MissionControlBoard, { type McColumn, type McTask, type McLeader } from '@/components/mission-control/MissionControlBoard'
 
 export const dynamic = 'force-dynamic'
@@ -61,7 +62,7 @@ export default async function MissionControlPage({ params }: { params: Promise<{
 
     await checkOverdueTasks(workspaceId)
 
-    const [currentUser, workspace, tasks, users, cancelledCount, finance] = await Promise.all([
+    const [currentUser, workspace, tasks, users, cancelledCount, finance, allClientsRaw, pricingRulesRaw] = await Promise.all([
         wp.user.findUnique({ where: { id: session.user.id }, select: { username: true, nickname: true, displayName: true } }),
         prisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }),
         wp.task.findMany({
@@ -78,7 +79,28 @@ export default async function MissionControlPage({ params }: { params: Promise<{
         }),
         wp.task.count({ where: { isArchived: true } }),
         computeWorkspaceFinance(workspaceId, profileId),
+        // [M1 interactivity] Add-Task modal data — same sources as /admin/page.tsx.
+        wp.client.findMany({
+            where: { status: 'ACTIVE' },
+            select: { id: true, name: true, parentId: true, parent: { select: { name: true } } },
+            orderBy: { name: 'asc' },
+        }),
+        prisma.pricingRule.findMany({
+            where: { workspaceId },
+            select: { id: true, name: true, clientId: true, ruleType: true, config: true, isDefault: true },
+            orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
+        }),
     ])
+
+    // [M1 interactivity] Shape the Add-Task modal props exactly like /admin does
+    // (dedupe duplicate Client rows; stringify ids; pass pricing rules + exchange rate).
+    const allClients = dedupeClientsByPath(allClientsRaw)
+    const addTaskData = {
+        clients: allClients.map((c) => ({ ...c, id: String(c.id), parentId: c.parentId ? String(c.parentId) : null })),
+        users: users.map((u: any) => ({ id: u.id, username: u.username, nickname: u.nickname, displayName: u.displayName })),
+        pricingRules: pricingRulesRaw.map((r) => ({ id: r.id, name: r.name, clientId: r.clientId, ruleType: r.ruleType, config: r.config, isDefault: r.isDefault })),
+        exchangeRate: finance.exchangeRate,
+    }
 
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -172,6 +194,8 @@ export default async function MissionControlPage({ params }: { params: Promise<{
             clientsTotal: totalClients,
             cancelledCount,
             waitingCount,
+            addTask: addTaskData,
+            userRole: session.user.role,
         }} />
     )
 }

@@ -7,9 +7,11 @@ import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import {
     LayoutDashboard, ListTodo, Inbox, Clapperboard, CalendarDays, Wallet, Building2,
-    UsersRound, Trash2, Activity, ScrollText, Settings, LayoutGrid, Search, Store, Plus,
-    Maximize2, Archive, Trophy, Users, ChevronsRight, Crown, ArrowLeftRight,
+    UsersRound, Trash2, Activity, ScrollText, Settings, LayoutGrid,
+    Maximize2, Archive, Trophy, Users, ChevronsRight, Crown,
 } from 'lucide-react'
+import McTopbarActions, { type McAddTaskData } from './McTopbarActions'
+import McBackLink from './McBackLink'
 
 export interface McTask {
     id: string
@@ -51,6 +53,9 @@ export interface McData {
     clientsTotal: number
     cancelledCount: number
     waitingCount: number
+    /** [M1 interactivity] Props for the reused AddTaskModal (fetched like /admin does). */
+    addTask: McAddTaskData
+    userRole: string
 }
 
 const card = 'rgba(24,24,27,0.60)'
@@ -97,7 +102,7 @@ function TaskCard({ t }: { t: McTask }) {
     )
 }
 
-function Column({ col }: { col: McColumn }) {
+function Column({ col, workspaceId }: { col: McColumn; workspaceId: string }) {
     const bg = col.accent === 'danger' ? 'rgba(220,38,38,0.03)' : col.accent === 'success' ? 'rgba(16,185,129,0.02)' : 'rgba(255,255,255,0.02)'
     const border = col.accent === 'danger' ? '1px solid rgba(220,38,38,0.18)' : col.accent === 'success' ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(255,255,255,0.05)'
     return (
@@ -109,7 +114,13 @@ function Column({ col }: { col: McColumn }) {
                 <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 8px', borderRadius: 999, background: `${col.hue}1f`, color: col.hue, border: `1px solid ${col.hue}4d` }}>{col.count}</span>
             </div>
             {col.tasks.length === 0 && <div style={{ textAlign: 'center', fontSize: 11, color: '#52525B', padding: '10px 4px' }}>Trống</div>}
-            {col.tasks.map((t) => <TaskCard key={t.id} t={t} />)}
+            {/* [M1 interactivity] Click a card → the existing intercepting task-detail modal
+                (@modal/(.)task/[taskId] on the shared [workspaceId] layout). Server-sanitized. */}
+            {col.tasks.map((t) => (
+                <Link key={t.id} href={`/${workspaceId}/task/${t.id}`} scroll={false} style={{ textDecoration: 'none', display: 'block' }}>
+                    <TaskCard t={t} />
+                </Link>
+            ))}
             {col.moreText && <div style={{ textAlign: 'center', fontSize: 11, color: '#71717A', padding: 4 }}>{col.moreText}</div>}
         </div>
     )
@@ -143,9 +154,8 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                     </div>
                 ))}
                 <div style={{ flex: 1 }} />
-                <Link href={data.backHref} title="Về Giao diện 1" style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A5B4FC', background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)' }}>
-                    <ArrowLeftRight style={{ width: 17, height: 17 }} />
-                </Link>
+                {/* [M1 interactivity] Back to Giao diện 1 — clears the ui-pref cookie first. */}
+                <McBackLink backHref={data.backHref} />
                 <RailIcon icon={Settings} />
             </div>
 
@@ -162,17 +172,13 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                         <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#F4F4F5' }}>Chào {data.greetingName}.</span>
                     </div>
                     <div style={{ flex: 1 }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', width: 260 }}>
-                        <Search style={{ width: 14, height: 14, color: '#71717A' }} />
-                        <span style={{ fontSize: 12, color: '#71717A', flex: 1 }}>Tìm task, khách, người…</span>
-                        <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 10, background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: 4, color: '#A1A1AA' }}>⌘K</span>
-                    </div>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A1A1AA' }}>
-                        <Store style={{ width: 17, height: 17 }} />
-                    </div>
-                    <Link href={`/${data.workspaceId}/admin`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 10, background: '#6366F1', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 0 24px rgba(99,102,241,0.40)' }}>
-                        <Plus style={{ width: 15, height: 15 }} /><span>Add Task</span>
-                    </Link>
+                    {/* [M1 interactivity] Client cluster: ⌘K palette + Add Task modal. */}
+                    <McTopbarActions
+                        workspaceId={data.workspaceId}
+                        backHref={data.backHref}
+                        addTask={data.addTask}
+                        userRole={data.userRole}
+                    />
                 </div>
 
                 {/* KPI ribbon */}
@@ -204,7 +210,7 @@ export default function MissionControlBoard({ data }: { data: McData }) {
 
                 {/* Board */}
                 <div style={{ flex: 1, display: 'flex', gap: 10, padding: '16px 24px 8px', minHeight: 0 }}>
-                    {data.columns.map((col) => <Column key={col.label} col={col} />)}
+                    {data.columns.map((col) => <Column key={col.label} col={col} workspaceId={data.workspaceId} />)}
                 </div>
 
                 {/* Board footer */}

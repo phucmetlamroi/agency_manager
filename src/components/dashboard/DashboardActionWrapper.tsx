@@ -42,6 +42,15 @@ interface DashboardActionWrapperProps {
   /** [Quick Create] Current exchange rate snapshot */
   exchangeRate?: number
   onTaskCreated?: () => void
+  /** [Giao diện 2] Hide the default DashboardActionBar (workspace picker + "Thêm task mới").
+   *  Mission Control supplies its OWN trigger (topbar button + ⌘K) and only needs the modal.
+   *  Default false → /admin renders the bar exactly as before. */
+  hideBar?: boolean
+  /** [Giao diện 2] Controlled open state. When `onOpenChange` is provided the host owns the
+   *  modal's open/close; otherwise the wrapper keeps its own internal state (unchanged /admin
+   *  behavior). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 // [QA R1 — user decision] A Multi-Hook Map can't fan out across a batch — attach it to
@@ -78,8 +87,20 @@ export default function DashboardActionWrapper({
   canCreateWorkspace = false,
   pricingRules = [],
   exchangeRate = 26300,
+  hideBar = false,
+  open,
+  onOpenChange,
 }: DashboardActionWrapperProps) {
-  const [modalOpen, setModalOpen] = useState(false)
+  // [Giao diện 2] Controlled vs uncontrolled open. When the host passes `onOpenChange`
+  // it owns the state (Mission Control); otherwise the wrapper keeps its own — /admin
+  // behavior is byte-identical because neither prop is passed there.
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = onOpenChange !== undefined
+  const modalOpen = isControlled ? !!open : uncontrolledOpen
+  const setModalOpen = (v: boolean) => {
+    if (isControlled) onOpenChange!(v)
+    else setUncontrolledOpen(v)
+  }
   const router = useRouter()
   const [, startTransition] = useTransition()
 
@@ -396,13 +417,15 @@ export default function DashboardActionWrapper({
 
   return (
     <>
-      <DashboardActionBar
-        workspaceId={workspaceId}
-        onAddTask={() => setModalOpen(true)}
-        workspaces={workspaces}
-        userRole={userRole}
-        canCreateWorkspace={canCreateWorkspace}
-      />
+      {!hideBar && (
+        <DashboardActionBar
+          workspaceId={workspaceId}
+          onAddTask={() => setModalOpen(true)}
+          workspaces={workspaces}
+          userRole={userRole}
+          canCreateWorkspace={canCreateWorkspace}
+        />
+      )}
       <AddTaskModal
         open={modalOpen}
         onClose={closeModal}

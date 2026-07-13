@@ -32,7 +32,7 @@ export interface McFinanceData {
 
 const RAIL: { icon: typeof ListTodo; active?: boolean; href?: string; divider?: boolean }[] = [
     { icon: LayoutDashboard, href: "MC" }, { icon: ListTodo, href: "QUEUE" }, { icon: Inbox, href: "REQ" },
-    { icon: Clapperboard }, { icon: CalendarDays, href: "LICH" }, { icon: Wallet, active: true, divider: true }, { icon: Building2 },
+    { icon: Clapperboard, href: "TEP" }, { icon: CalendarDays, href: "LICH" }, { icon: Wallet, active: true, divider: true }, { icon: Building2 },
 ]
 
 type Cur = "VND" | "USD"
@@ -75,7 +75,7 @@ export default function McFinanceBoard({ data }: { data: McFinanceData }) {
     const dCost = data.projected.wageVND - data.actual.wageVND
 
     const railHref = (h?: string) =>
-        h === "MC" ? `/${data.workspaceId}/mc` : h === "QUEUE" ? `/${data.workspaceId}/mc/queue` : h === "REQ" ? `/${data.workspaceId}/mc/requests` : h === "LICH" ? `/${data.workspaceId}/mc/lich` : undefined
+        h === "MC" ? `/${data.workspaceId}/mc` : h === "QUEUE" ? `/${data.workspaceId}/mc/queue` : h === "REQ" ? `/${data.workspaceId}/mc/requests` : h === "LICH" ? `/${data.workspaceId}/mc/lich` : h === "TEP" ? `/${data.workspaceId}/mc/tep` : undefined
 
     return (
         <div style={{ minHeight: "100dvh", background: "#050505", color: "#F4F4F5", display: "flex", position: "relative", fontFamily: '"Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif' }}>

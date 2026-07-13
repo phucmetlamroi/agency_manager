@@ -155,11 +155,15 @@ export function TeamBrowser({
     initialFolderId,
     currentUserId,
     isAdmin,
+    chromeless = false,
 }: {
     workspaceId: string
     initialFolderId: string | null
     currentUserId: string
     isAdmin: boolean
+    // [Giao diện 2 · MC M8] Ẩn tiêu đề module nội bộ khi nhúng trong vỏ Mission Control
+    // (vỏ MC tự vẽ header "Tệp"). Mặc định false → GĐ1 /team giữ nguyên byte-identical.
+    chromeless?: boolean
 }) {
     const [folderId, setFolderId] = useState<string | null>(initialFolderId)
     const [data, setData] = useState<ChildrenResult | null>(null)
@@ -1192,23 +1196,25 @@ export function TeamBrowser({
                 {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
             />
 
-            {/* ── module title ── */}
-            <div className="mb-4 flex items-center gap-3">
-                <div
-                    className="flex items-center justify-center rounded-xl"
-                    style={{ width: 40, height: 40, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)' }}
-                >
-                    <Clapperboard className="h-5 w-5" style={{ color: '#C4B5FD' }} />
+            {/* ── module title (ẩn khi chromeless — vỏ MC M8 tự vẽ header) ── */}
+            {!chromeless && (
+                <div className="mb-4 flex items-center gap-3">
+                    <div
+                        className="flex items-center justify-center rounded-xl"
+                        style={{ width: 40, height: 40, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)' }}
+                    >
+                        <Clapperboard className="h-5 w-5" style={{ color: '#C4B5FD' }} />
+                    </div>
+                    <div>
+                        <h1 className="font-extrabold tracking-tight text-white" style={{ fontSize: 20 }}>
+                            {REVIEW_MODULE_LABEL}
+                        </h1>
+                        <p className="mt-px text-muted-foreground" style={{ fontSize: 12 }}>
+                            Trình duyệt bản dựng video — khách duyệt qua link, đồng bộ trạng thái task.
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="font-extrabold tracking-tight text-white" style={{ fontSize: 20 }}>
-                        {REVIEW_MODULE_LABEL}
-                    </h1>
-                    <p className="mt-px text-muted-foreground" style={{ fontSize: 12 }}>
-                        Trình duyệt bản dựng video — khách duyệt qua link, đồng bộ trạng thái task.
-                    </p>
-                </div>
-            </div>
+            )}
 
             {/* ── module body (2 columns) ── */}
             <div className="flex overflow-hidden rounded-2xl border border-white/5 bg-zinc-950/60 shadow-xl shadow-black/40 backdrop-blur-xl">

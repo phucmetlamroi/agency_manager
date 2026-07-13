@@ -40,7 +40,7 @@ export interface McQueueData {
 
 const RAIL: { icon: typeof ListTodo; active?: boolean; href?: string; badge?: number; divider?: boolean }[] = [
     { icon: LayoutDashboard, href: "MC" }, { icon: ListTodo, active: true }, { icon: Inbox, href: "REQ" },
-    { icon: Clapperboard }, { icon: CalendarDays, href: "LICH" }, { icon: Wallet, href: "TIEN", divider: true }, { icon: Building2 },
+    { icon: Clapperboard, href: "TEP" }, { icon: CalendarDays, href: "LICH" }, { icon: Wallet, href: "TIEN", divider: true }, { icon: Building2 },
 ]
 
 function fmtVND(n: number): string { return Math.round(n).toLocaleString("vi-VN") }
@@ -92,7 +92,8 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
         h === "MC" ? `/${data.workspaceId}/mc`
             : h === "REQ" ? `/${data.workspaceId}/mc/requests`
                 : h === "TIEN" ? `/${data.workspaceId}/mc/tien`
-                    : h === "LICH" ? `/${data.workspaceId}/mc/lich` : undefined
+                    : h === "LICH" ? `/${data.workspaceId}/mc/lich`
+                        : h === "TEP" ? `/${data.workspaceId}/mc/tep` : undefined
 
     return (
         <div style={{ minHeight: "100dvh", background: "#050505", color: "#F4F4F5", display: "flex", position: "relative", fontFamily: '"Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif' }}>

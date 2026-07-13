@@ -9,6 +9,13 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M8 — Tệp / Review]
+- **Reuse toàn bộ `TeamBrowser`** (module Video Review 3-pane có sẵn) trong vỏ MC, KHÔNG dựng lại. Frame M8 chính là bản vẽ lại của `TeamBrowser` (folder tree + asset list + status pill + InfoPanel "Gửi khách duyệt"/share/tải). Đúng pattern M7 (bọc component sẵn có). Nhanh + trung thực + 0 rủi ro logic.
+- **Thêm prop `chromeless?: boolean` (mặc định false)** vào `TeamBrowser` — chỉ ẩn khối tiêu-đề-module nội bộ (Clapperboard + "Review" h1) để header MC không nhân đôi. Thuần presentational, defaulted off → GĐ1 `/team` + `/team/folder/[id]` giữ **byte-identical**. Reversible.
+- **Admin-gate fail-closed** (`verifyProfileAdminAccess` → redirect dashboard) như mọi route `/mc/*`, **dù** module này không có field tiền và ở GĐ1 chỉ cần membership. Lý do: nhất quán namespace MC (cockpit admin) + fail-closed an toàn nhất; editor vẫn dùng `/team` GĐ1 nên không mất quyền. `isAdmin={true}` (đã qua cổng admin).
+- **Rail `clapperboard` active** (đúng frame M8 line 1627). Repoint slot Clapperboard → `/mc/tep` trên toàn bộ 6 màn MC đã dựng (M1 nav `tep`, M2/M5/M6/M4 railHref `"TEP"`, M7 href tuyệt đối).
+- **Money-safety**: xác nhận `AssetDto`/`FolderDto`/`VersionDto`/`ShareDto` KHÔNG mang `jobPriceUSD`/wage (comment trong `folders.ts:5` khẳng định) → reuse verbatim, 0 rò rỉ.
+
 ## [M6 — Lịch]
 - **2 chế độ**: **Nhân sự (rảnh/bận)** reuse `getAdminAvailabilityWeek` READ-ONLY (week matrix staff×7 ngày, đếm ca rảnh/ngày) + **Deadline** data-wired từ Task (assignee+deadline+status), week + month. Đúng brainstorm #1 (2 chế độ).
 - **KHÔNG rebuild editor rảnh/bận** (ScheduleRule/ScheduleException + AdminAvailability* đã có, phức tạp) → sửa lịch rảnh/bận **bắc cầu sang Giao diện 1**. Lý do: dangerous-op (không đụng schema/không đoán format slot), an toàn, reversible.

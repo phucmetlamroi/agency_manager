@@ -89,6 +89,13 @@ interface ReviewPlayerShellProps {
   /** [F6/P5] LIVE ?cmp=<left>.<right> from the URL (NOT a seed) — drives Compare mode.
    *  Live so browser Back (which drops cmp + re-runs this force-dynamic page) exits compare. */
   compareParam: string | null;
+  /** [Giao diện 2 · MC M23/M11] Prefix cho URL asset khi shell tự điều hướng (vào so-sánh,
+   *  đổi version, viết ?cmp). Mặc định `/[ws]/team/asset` → GĐ1 byte-identical; MC truyền
+   *  `/[ws]/mc/asset` để chế độ so sánh + đổi version Ở LẠI namespace Mission Control. */
+  assetBasePath?: string;
+  /** [Giao diện 2 · MC M11] Đích nút thoát player về trình duyệt Tệp. Mặc định folder-aware
+   *  `/[ws]/team/folder/[id]` | `/[ws]/team`; MC truyền `/[ws]/mc/tep`. */
+  browserHref?: string;
 }
 
 /** P5.3: the internal shell provides the INTERNAL PlayerEnv (VN copy, /api/review/*,
@@ -118,6 +125,8 @@ function ReviewPlayerShellInner({
   initialVersionId,
   initialCommentId,
   compareParam,
+  assetBasePath,
+  browserHref,
 }: ReviewPlayerShellProps) {
   const router = useRouter();
   const [data, setData] = useState<AssetVersions | null>(null);
@@ -263,7 +272,7 @@ function ReviewPlayerShellInner({
     ],
   );
 
-  const compareBase = `/${workspaceId}/team/asset/${assetId}`;
+  const compareBase = `${assetBasePath ?? `/${workspaceId}/team/asset`}/${assetId}`;
   // Enter: default pairing = left is the version adjacent to current (older neighbor, else newer),
   // right is the current version. push() = new history entry so Back exits compare.
   const enterCompare = useCallback(() => {
@@ -467,9 +476,11 @@ function ReviewPlayerShellInner({
 
   const goBack = useCallback(async () => {
     const folderId = asset?.folderId;
-    const dest = folderId
-      ? `/${workspaceId}/team/folder/${folderId}`
-      : `/${workspaceId}/team`;
+    const dest = browserHref
+      ? browserHref
+      : folderId
+        ? `/${workspaceId}/team/folder/${folderId}`
+        : `/${workspaceId}/team`;
     // [FR-08] Leaving an OPEN feedback session (admin · task "Đã nộp video (nội bộ)" · ≥1 comment):
     // offer to close it on the way out. OK = chốt phiên (flip → A3 + notify editor) rồi thoát;
     // Cancel = thoát mà chưa chốt. Comments are already persisted on Enter — this only flips state.

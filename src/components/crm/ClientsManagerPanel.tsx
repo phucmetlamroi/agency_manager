@@ -38,10 +38,19 @@ export default function ClientsManagerPanel({
     clients,
     workspaceId,
     onViewChange,
+    missionControl = false,
 }: {
     clients: any[]
     workspaceId: string
     onViewChange?: (v: View) => void
+    /**
+     * [MC M25] Mission Control cockpit variant (/mc/crm). Defaulted OFF so GĐ1
+     * (/admin/crm, DashboardClientsRow) stays byte-identical. When ON it enables
+     * the design-approved CRM-tiền refinements on the SHARED children:
+     *   - RecordPaymentModal: confirm before hard-deleting a recorded payment.
+     *   - ClientList: clarified status pill ("Đã xong hết" vs misleading "Chờ xử lý").
+     */
+    missionControl?: boolean
 }) {
     const [view, setView] = useState<View>('list')
     const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -229,7 +238,7 @@ export default function ClientsManagerPanel({
                     className={view === 'invoice' ? '' : 'custom-scrollbar'}
                 >
                     {view === 'list' && (
-                        <ClientList clients={clients} workspaceId={workspaceId} onOpenClient={openClient} />
+                        <ClientList clients={clients} workspaceId={workspaceId} onOpenClient={openClient} clarifyStatus={missionControl} />
                     )}
 
                     {view === 'payments' && (
@@ -299,6 +308,7 @@ export default function ClientsManagerPanel({
                     workspaceId={workspaceId}
                     onClose={() => setRecordTarget(null)}
                     onSaved={loadLedger}
+                    confirmOnDelete={missionControl}
                 />
             )}
         </div>

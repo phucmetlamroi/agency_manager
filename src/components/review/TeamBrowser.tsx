@@ -155,11 +155,26 @@ export function TeamBrowser({
     initialFolderId,
     currentUserId,
     isAdmin,
+    chromeless = false,
+    playerBase,
+    sharesHref,
+    trashHref,
 }: {
     workspaceId: string
     initialFolderId: string | null
     currentUserId: string
     isAdmin: boolean
+    // [Giao diện 2 · MC M8] Ẩn tiêu đề module nội bộ khi nhúng trong vỏ Mission Control
+    // (vỏ MC tự vẽ header "Tệp"). Mặc định false → GĐ1 /team giữ nguyên byte-identical.
+    chromeless?: boolean
+    // [Giao diện 2 · MC M11] Prefix route mở player asset. Mặc định `/team/asset` (GĐ1
+    // byte-identical); MC truyền `/[ws]/mc/asset` để mở player trong namespace Mission Control.
+    playerBase?: string
+    // [Giao diện 2 · MC M21/M22] Đích 2 nút toolbar "Link chia sẻ" / "Thùng rác". Mặc định
+    // `/[ws]/team/shares` + `/[ws]/team/trash` (GĐ1 byte-identical); MC truyền bản /mc để ở
+    // lại namespace Mission Control.
+    sharesHref?: string
+    trashHref?: string
 }) {
     const [folderId, setFolderId] = useState<string | null>(initialFolderId)
     const [data, setData] = useState<ChildrenResult | null>(null)
@@ -429,10 +444,11 @@ export function TeamBrowser({
     const openAsset = useCallback(
         (asset: AssetDto) => {
             if (typeof window !== 'undefined') {
-                window.location.assign(`/${workspaceId}/team/asset/${asset.id}`)
+                const base = playerBase ?? `/${workspaceId}/team/asset`
+                window.location.assign(`${base}/${asset.id}`)
             }
         },
-        [workspaceId],
+        [workspaceId, playerBase],
     )
 
     /* ---- P2.4: upload + new folder ---- */
@@ -1204,23 +1220,25 @@ export function TeamBrowser({
                 {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
             />
 
-            {/* ── module title ── */}
-            <div className="mb-4 flex items-center gap-3">
-                <div
-                    className="flex items-center justify-center rounded-xl"
-                    style={{ width: 40, height: 40, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)' }}
-                >
-                    <Clapperboard className="h-5 w-5" style={{ color: '#C4B5FD' }} />
+            {/* ── module title (ẩn khi chromeless — vỏ MC M8 tự vẽ header) ── */}
+            {!chromeless && (
+                <div className="mb-4 flex items-center gap-3">
+                    <div
+                        className="flex items-center justify-center rounded-xl"
+                        style={{ width: 40, height: 40, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)' }}
+                    >
+                        <Clapperboard className="h-5 w-5" style={{ color: '#C4B5FD' }} />
+                    </div>
+                    <div>
+                        <h1 className="font-extrabold tracking-tight text-white" style={{ fontSize: 20 }}>
+                            {REVIEW_MODULE_LABEL}
+                        </h1>
+                        <p className="mt-px text-muted-foreground" style={{ fontSize: 12 }}>
+                            Trình duyệt bản dựng video — khách duyệt qua link, đồng bộ trạng thái task.
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="font-extrabold tracking-tight text-white" style={{ fontSize: 20 }}>
-                        {REVIEW_MODULE_LABEL}
-                    </h1>
-                    <p className="mt-px text-muted-foreground" style={{ fontSize: 12 }}>
-                        Trình duyệt bản dựng video — khách duyệt qua link, đồng bộ trạng thái task.
-                    </p>
-                </div>
-            </div>
+            )}
 
             {/* ── module body (2 columns) ── */}
             <div className="flex overflow-hidden rounded-2xl border border-white/5 bg-zinc-950/60 shadow-xl shadow-black/40 backdrop-blur-xl">
@@ -1272,14 +1290,14 @@ export function TeamBrowser({
                         </div>
                         <div className="flex items-center gap-1.5">
                             <a
-                                href={`/${workspaceId}/team/shares`}
+                                href={sharesHref ?? `/${workspaceId}/team/shares`}
                                 title="Link chia sẻ"
                                 className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
                             >
                                 <Share2 size={15} />
                             </a>
                             <a
-                                href={`/${workspaceId}/team/trash`}
+                                href={trashHref ?? `/${workspaceId}/team/trash`}
                                 title="Thùng rác"
                                 className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
                             >

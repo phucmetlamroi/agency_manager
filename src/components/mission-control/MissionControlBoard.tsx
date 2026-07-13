@@ -7,9 +7,12 @@ import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import {
     LayoutDashboard, ListTodo, Inbox, Clapperboard, CalendarDays, Wallet, Building2,
-    UsersRound, Trash2, Activity, ScrollText, Settings, LayoutGrid, Search, Store, Plus,
-    Maximize2, Archive, Trophy, Users, ChevronsRight, Crown, ArrowLeftRight,
+    UsersRound, Trash2, Activity, ScrollText, Settings, LayoutGrid,
+    Maximize2, Archive, Trophy, Users, ChevronsRight, Crown,
 } from 'lucide-react'
+import McTopbarActions, { type McAddTaskData } from './McTopbarActions'
+import McBackLink from './McBackLink'
+import { Pressable, HoverCard, Reveal, RevealGroup, RevealItem } from './motion-kit'
 
 export interface McTask {
     id: string
@@ -35,6 +38,7 @@ export interface McColumn {
 export interface McLeader { name: string; initials: string; avatar: string; sub: string; rank: string; rankColor: string; top?: boolean }
 export interface McData {
     greetingName: string
+    greeting?: string
     workspaceName: string
     backHref: string
     workspaceId: string
@@ -51,17 +55,34 @@ export interface McData {
     clientsTotal: number
     cancelledCount: number
     waitingCount: number
+    /** [M1 interactivity] Props for the reused AddTaskModal (fetched like /admin does). */
+    addTask: McAddTaskData
+    userRole: string
 }
 
 const card = 'rgba(24,24,27,0.60)'
 const cardBorder = '1px solid rgba(255,255,255,0.06)'
-const RAIL: { icon: LucideIcon; active?: boolean; divider?: boolean; title?: string }[] = [
-    { icon: LayoutDashboard, active: true }, { icon: ListTodo }, { icon: Inbox }, { icon: Clapperboard },
-    { icon: CalendarDays }, { icon: Wallet, divider: true }, { icon: Building2 },
-    { icon: UsersRound, divider: true }, { icon: Trash2 }, { icon: Activity, title: 'Phân tích' }, { icon: ScrollText, title: 'Nhật ký hoạt động' },
+const RAIL: { icon: LucideIcon; active?: boolean; divider?: boolean; title?: string; nav?: 'queue' | 'requests' | 'tien' | 'lich' | 'tep' | 'members' }[] = [
+    { icon: LayoutDashboard, active: true }, { icon: ListTodo, nav: 'queue', title: 'Kho Task Đợi' }, { icon: Inbox, nav: 'requests', title: 'Hộp thư yêu cầu' }, { icon: Clapperboard, nav: 'tep', title: 'Tệp — Review' },
+    { icon: CalendarDays, nav: 'lich', title: 'Lịch' }, { icon: Wallet, nav: 'tien', title: 'Tiền — Payroll', divider: true }, { icon: Building2 },
+    { icon: UsersRound, nav: 'members', title: 'Thành viên', divider: true }, { icon: Trash2 }, { icon: Activity, title: 'Phân tích' }, { icon: ScrollText, title: 'Nhật ký hoạt động' },
 ]
 
 function fmtVND(n: number): string { return Math.round(n).toLocaleString('vi-VN') }
+// Lighten a #rrggbb toward white (frame uses lighter tints for pill/count text).
+function lighten(hex: string, amt: number): string {
+    const h = hex.replace('#', '')
+    if (h.length !== 6) return hex
+    const mix = (c: number) => Math.round(c + (255 - c) * amt)
+    const to2 = (n: number) => n.toString(16).padStart(2, '0')
+    return `#${to2(mix(parseInt(h.slice(0, 2), 16)))}${to2(mix(parseInt(h.slice(2, 4), 16)))}${to2(mix(parseInt(h.slice(4, 6), 16)))}`
+}
+// Per-client dot color (frame gives each client a distinct hue).
+const CLIENT_DOTS = [
+    'linear-gradient(135deg,#F43F5E,#EC4899)', 'linear-gradient(135deg,#06B6D4,#3B82F6)', 'linear-gradient(135deg,#F59E0B,#EAB308)',
+    'linear-gradient(135deg,#10B981,#06B6D4)', 'linear-gradient(135deg,#A855F7,#EC4899)', 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+]
+function clientDot(seed: string): string { let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0; return CLIENT_DOTS[h % CLIENT_DOTS.length] }
 function sparkPaths(vals: number[]): { line: string; area: string } {
     const n = vals.length
     if (n < 2) return { line: '', area: '' }
@@ -73,17 +94,17 @@ function sparkPaths(vals: number[]): { line: string; area: string } {
 
 function RailIcon({ icon: Icon, active, title }: { icon: LucideIcon; active?: boolean; title?: string }) {
     return (
-        <div title={title} style={{ position: 'relative', width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: active ? '#A5B4FC' : '#A1A1AA', background: active ? 'rgba(99,102,241,0.18)' : 'transparent', border: active ? '1px solid rgba(99,102,241,0.30)' : '1px solid transparent', boxShadow: active ? '0 4px 16px rgba(99,102,241,0.15)' : 'none' }}>
+        <Pressable as="div" title={title} style={{ position: 'relative', width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: active ? '#A5B4FC' : '#A1A1AA', background: active ? 'rgba(99,102,241,0.18)' : 'transparent', border: active ? '1px solid rgba(99,102,241,0.30)' : '1px solid transparent', boxShadow: active ? '0 4px 16px rgba(99,102,241,0.15)' : 'none' }}>
             <Icon style={{ width: 18, height: 18 }} />
-        </div>
+        </Pressable>
     )
 }
 
 function TaskCard({ t }: { t: McTask }) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, borderRadius: 12, background: card, backdropFilter: 'blur(12px)', border: t.danger ? '1px solid rgba(239,68,68,0.25)' : cardBorder, padding: 10 }}>
+        <HoverCard style={{ display: 'flex', flexDirection: 'column', gap: 7, borderRadius: 12, background: card, backdropFilter: 'blur(12px)', border: t.danger ? '1px solid rgba(220,38,38,0.35)' : cardBorder, boxShadow: t.danger ? '0 0 20px rgba(220,38,38,0.12)' : undefined, padding: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.35 }}>{t.title}</span>
-            <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${t.dot}1a`, color: t.dot, border: `1px solid ${t.dot}4d`, whiteSpace: 'nowrap' }}>
+            <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${t.dot}1a`, color: lighten(t.dot, 0.4), border: `1px solid ${t.dot}4d`, whiteSpace: 'nowrap' }}>
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: t.dot }} />{t.statusLabel}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -93,25 +114,36 @@ function TaskCard({ t }: { t: McTask }) {
                 <div style={{ flex: 1 }} />
                 <span style={{ fontSize: 10, fontWeight: t.meta.startsWith('Trễ') ? 700 : 400, color: t.meta.startsWith('Trễ') ? '#F87171' : '#A1A1AA', whiteSpace: 'nowrap' }}>{t.meta}</span>
             </div>
-        </div>
+        </HoverCard>
     )
 }
 
-function Column({ col }: { col: McColumn }) {
+function Column({ col, workspaceId }: { col: McColumn; workspaceId: string }) {
     const bg = col.accent === 'danger' ? 'rgba(220,38,38,0.03)' : col.accent === 'success' ? 'rgba(16,185,129,0.02)' : 'rgba(255,255,255,0.02)'
     const border = col.accent === 'danger' ? '1px solid rgba(220,38,38,0.18)' : col.accent === 'success' ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(255,255,255,0.05)'
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, background: bg, border, borderRadius: 16, padding: 10, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
+        <RevealItem style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, background: bg, border, borderRadius: 16, padding: 10, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: -40, right: -40, width: 120, height: 120, borderRadius: 999, background: `${col.hue}12`, filter: 'blur(28px)', pointerEvents: 'none' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 999, background: col.hue, boxShadow: `0 0 8px ${col.hue}99` }} />
                 <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: col.accent === 'danger' ? '#FCA5A5' : '#D4D4D8', whiteSpace: 'nowrap' }}>{col.label}</span>
-                <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 8px', borderRadius: 999, background: `${col.hue}1f`, color: col.hue, border: `1px solid ${col.hue}4d` }}>{col.count}</span>
+                <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 8px', borderRadius: 999, background: `${col.hue}1f`, color: lighten(col.hue, 0.35), border: `1px solid ${col.hue}4d` }}>{col.count}</span>
             </div>
             {col.tasks.length === 0 && <div style={{ textAlign: 'center', fontSize: 11, color: '#52525B', padding: '10px 4px' }}>Trống</div>}
-            {col.tasks.map((t) => <TaskCard key={t.id} t={t} />)}
-            {col.moreText && <div style={{ textAlign: 'center', fontSize: 11, color: '#71717A', padding: 4 }}>{col.moreText}</div>}
-        </div>
+            {/* [M3] Click a card → the Mission-Control task drawer (/mc/task/[id], server-sanitized). */}
+            {col.tasks.map((t) => (
+                <Link key={t.id} href={`/${workspaceId}/mc/task/${t.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                    <TaskCard t={t} />
+                </Link>
+            ))}
+            {/* [M16] "+N nữa" → the full operational board (Vận hành bảng task) where every status
+                dropdown / ⋯ menu / bulk action lives; the dashboard columns are read-only previews. */}
+            {col.moreText && (
+                <Link href={`/${workspaceId}/mc/board`} title="Mở bảng vận hành đầy đủ" style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#818CF8', padding: 4, textDecoration: 'none' }}>
+                    {col.moreText} →
+                </Link>
+            )}
+        </RevealItem>
     )
 }
 
@@ -136,44 +168,48 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 18px rgba(139,92,246,0.40)', marginBottom: 12 }}>
                     <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>H</span>
                 </div>
-                {RAIL.map((r, i) => (
-                    <div key={i} style={{ display: 'contents' }}>
-                        {r.divider && <div style={{ width: 28, height: 1, background: 'rgba(255,255,255,0.08)', margin: '8px 0' }} />}
-                        <RailIcon icon={r.icon} active={r.active} title={r.title} />
-                    </div>
-                ))}
+                {RAIL.map((r, i) => {
+                    const href = r.nav === 'queue' ? `/${data.workspaceId}/mc/queue`
+                        : r.nav === 'requests' ? `/${data.workspaceId}/mc/requests`
+                            : r.nav === 'tien' ? `/${data.workspaceId}/mc/tien`
+                                : r.nav === 'lich' ? `/${data.workspaceId}/mc/lich`
+                                    : r.nav === 'tep' ? `/${data.workspaceId}/mc/tep`
+                                        : r.nav === 'members' ? `/${data.workspaceId}/mc/members` : undefined
+                    const icon = <RailIcon icon={r.icon} active={r.active} title={r.title} />
+                    return (
+                        <div key={i} style={{ display: 'contents' }}>
+                            {r.divider && <div style={{ width: 28, height: 1, background: 'rgba(255,255,255,0.08)', margin: '8px 0' }} />}
+                            {href ? <Link href={href}>{icon}</Link> : icon}
+                        </div>
+                    )
+                })}
                 <div style={{ flex: 1 }} />
-                <Link href={data.backHref} title="Về Giao diện 1" style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A5B4FC', background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)' }}>
-                    <ArrowLeftRight style={{ width: 17, height: 17 }} />
-                </Link>
+                {/* [M1 interactivity] Back to Giao diện 1 — clears the ui-pref cookie first. */}
+                <McBackLink backHref={data.backHref} />
                 <RailIcon icon={Settings} />
             </div>
 
             {/* Main */}
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 {/* Top bar */}
-                <div style={{ position: 'relative', zIndex: 60, height: 64, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(10,10,10,0.50)', backdropFilter: 'blur(10px)' }}>
+                <Reveal style={{ position: 'relative', zIndex: 60, height: 64, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(10,10,10,0.50)', backdropFilter: 'blur(10px)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 10, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.35)' }}>
                         <LayoutGrid style={{ width: 14, height: 14, color: '#A5B4FC' }} />
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F5', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.workspaceName}</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 10, letterSpacing: '0.16em', color: '#71717A' }}>WORKSPACE / DASHBOARD</span>
-                        <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#F4F4F5' }}>Chào {data.greetingName}.</span>
+                        <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#F4F4F5' }}>{data.greeting || 'Chào'}, {data.greetingName}.</span>
                     </div>
                     <div style={{ flex: 1 }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', width: 260 }}>
-                        <Search style={{ width: 14, height: 14, color: '#71717A' }} />
-                        <span style={{ fontSize: 12, color: '#71717A', flex: 1 }}>Tìm task, khách, người…</span>
-                        <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 10, background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: 4, color: '#A1A1AA' }}>⌘K</span>
-                    </div>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A1A1AA' }}>
-                        <Store style={{ width: 17, height: 17 }} />
-                    </div>
-                    <Link href={`/${data.workspaceId}/admin`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 10, background: '#6366F1', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 0 24px rgba(99,102,241,0.40)' }}>
-                        <Plus style={{ width: 15, height: 15 }} /><span>Add Task</span>
-                    </Link>
-                </div>
+                    {/* [M1 interactivity] Client cluster: ⌘K palette + Add Task modal. */}
+                    <McTopbarActions
+                        workspaceId={data.workspaceId}
+                        backHref={data.backHref}
+                        addTask={data.addTask}
+                        userRole={data.userRole}
+                    />
+                </Reveal>
 
                 {/* KPI ribbon */}
                 <div style={{ flexShrink: 0, display: 'flex', alignItems: 'stretch', gap: 10, padding: '14px 24px 0' }}>
@@ -193,7 +229,7 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                         )}
                     </div>
                     <Kpi label="Total Tasks"><span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{kpi.totalTasks}</span>{kpi.totalTasksDelta > 0 && <span style={{ fontSize: 11, color: '#71717A', whiteSpace: 'nowrap' }}>+{kpi.totalTasksDelta} tháng này</span>}</Kpi>
-                    <Kpi label="Đang chạy"><span style={{ fontSize: 18, fontWeight: 800, color: '#FBBF24' }}>{kpi.running}</span>{kpi.overdue > 0 && <span style={{ fontSize: 11, color: '#F87171', whiteSpace: 'nowrap' }}>{kpi.overdue} quá hạn</span>}</Kpi>
+                    <Kpi label="Đang chạy"><span style={{ fontSize: 18, fontWeight: 800, color: '#FBBF24' }}>{kpi.running}</span>{kpi.overdue > 0 && <span style={{ fontSize: 11, color: '#71717A', whiteSpace: 'nowrap' }}>{kpi.overdue} quá hạn</span>}</Kpi>
                     <Kpi label="Hoàn tất"><span style={{ fontSize: 18, fontWeight: 800, color: '#34D399' }}>{kpi.completed}</span><span style={{ fontSize: 11, color: '#71717A', whiteSpace: 'nowrap' }}>tháng này</span></Kpi>
                     <Kpi label="Total Clients"><span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{kpi.totalClients}</span>{kpi.clientsNew > 0 && <span style={{ fontSize: 11, fontWeight: 800, color: '#34D399' }}>▲ +{kpi.clientsNew}</span>}</Kpi>
                     <div style={{ flex: 1 }} />
@@ -203,9 +239,9 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                 </div>
 
                 {/* Board */}
-                <div style={{ flex: 1, display: 'flex', gap: 10, padding: '16px 24px 8px', minHeight: 0 }}>
-                    {data.columns.map((col) => <Column key={col.label} col={col} />)}
-                </div>
+                <RevealGroup style={{ flex: 1, display: 'flex', gap: 10, padding: '16px 24px 8px', minHeight: 0 }}>
+                    {data.columns.map((col) => <Column key={col.label} col={col} workspaceId={data.workspaceId} />)}
+                </RevealGroup>
 
                 {/* Board footer */}
                 <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '8px 24px 14px' }}>
@@ -255,7 +291,7 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#71717A' }}>Clients · {data.clientsTotal}</span><Link href={`/${data.workspaceId}/admin/crm`} style={{ fontSize: 11, color: '#A5B4FC' }}>Quản lý</Link></div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {data.clients.map((c, i) => (
-                            <span key={c + i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#D4D4D8' }}><span style={{ width: 13, height: 13, borderRadius: 999, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)' }} />{c}</span>
+                            <span key={c + i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#D4D4D8' }}><span style={{ width: 13, height: 13, borderRadius: 999, background: clientDot(c) }} />{c}</span>
                         ))}
                         {data.clientsTotal > data.clients.length && <span style={{ padding: '4px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.12)', fontSize: 11, color: '#71717A' }}>+{data.clientsTotal - data.clients.length}</span>}
                     </div>

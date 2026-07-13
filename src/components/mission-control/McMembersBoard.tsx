@@ -11,6 +11,7 @@ import {
     UsersRound, Trash2, Activity, ScrollText, UserPlus, MoreHorizontal, type LucideIcon,
 } from 'lucide-react'
 import InviteToProfileModal from '@/components/profile/InviteToProfileModal'
+import ProfileMembersPanel from '@/components/profile/ProfileMembersPanel'
 import McBackLink from './McBackLink'
 
 export type McMember = {
@@ -43,6 +44,14 @@ export type McMembersData = {
     backHref: string
     trashHref: string
     members: McMember[]
+    // [M31] "Cài đặt Tổ chức" tab (OWNER-only). Optional → when absent the board is the M9
+    // roster-only screen byte-identical. `orgMembers` = raw getProfileMembers rows for the
+    // reused ProfileMembersPanel (transfer-ownership · invite PENDING/14d · brand+color · org
+    // soft-delete · per-member kebab); currentUserRole gates whether the tab even shows.
+    currentUserId?: string
+    currentUserRole?: string
+    orgMembers?: any[]
+    profileSettings?: { name: string; bannerUrl: string | null; logoUrl: string | null; portalAccent?: string | null }
 }
 
 const RAIL: { icon: LucideIcon; href?: string; active?: boolean; divider?: boolean; title?: string }[] = [
@@ -58,7 +67,12 @@ function fmtVND(n: number): string { return `${Math.round(n).toLocaleString('vi-
 export default function McMembersBoard({ data }: { data: McMembersData }) {
     const router = useRouter()
     const [inviteOpen, setInviteOpen] = useState(false)
+    const [tab, setTab] = useState<'members' | 'org'>('members')
     const { workspaceId } = data
+    // [M31] The org-settings tab is OWNER-only (design "chỉ CHỦ SỞ HỮU"). getProfileMembers +
+    // every org action re-verify OWNER server-side, so this is UX gating on top of a hard gate.
+    const isOwner = data.currentUserRole === 'OWNER' && !!data.orgMembers
+    const onOrgTab = tab === 'org' && isOwner
 
     const railHref = (h?: string) =>
         h === 'MC' ? `/${workspaceId}/mc`
@@ -105,16 +119,44 @@ export default function McMembersBoard({ data }: { data: McMembersData }) {
                         <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 10, letterSpacing: '0.16em', color: '#71717A' }}>ORGANIZATION / MEMBERS</span>
                         <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', color: '#F4F4F5' }}>Thành viên · {data.members.length}</span>
                     </div>
+                    {/* [M31] Tab toggle — "Cài đặt Tổ chức" chỉ hiện với CHỦ SỞ HỮU (design duyệt) */}
+                    {isOwner && (
+                        <div style={{ display: 'flex', padding: 3, borderRadius: 999, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', marginLeft: 8 }}>
+                            {([['members', 'Thành viên'], ['org', 'Cài đặt Tổ chức']] as const).map(([k, label]) => {
+                                const on = tab === k
+                                return (
+                                    <button key={k} type="button" onClick={() => setTab(k)} style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: on ? 'rgba(99,102,241,0.20)' : 'transparent', color: on ? '#C7D2FE' : '#71717A', transition: 'color .15s, background .15s' }}>{label}</button>
+                                )
+                            })}
+                        </div>
+                    )}
                     <div style={{ flex: 1 }} />
-                    <Link href={data.trashHref} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, fontWeight: 600, color: '#A1A1AA', textDecoration: 'none' }}>
-                        <Trash2 style={{ width: 13, height: 13 }} />Thùng rác tổ chức
-                    </Link>
-                    <button type="button" onClick={() => setInviteOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 10, background: '#6366F1', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 0 24px rgba(99,102,241,0.40)', border: 'none', cursor: 'pointer' }}>
-                        <UserPlus style={{ width: 15, height: 15 }} /><span>Mời thành viên</span>
-                    </button>
+                    {!onOrgTab && (
+                        <>
+                            <Link href={data.trashHref} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, fontWeight: 600, color: '#A1A1AA', textDecoration: 'none' }}>
+                                <Trash2 style={{ width: 13, height: 13 }} />Thùng rác tổ chức
+                            </Link>
+                            <button type="button" onClick={() => setInviteOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 10, background: '#6366F1', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 0 24px rgba(99,102,241,0.40)', border: 'none', cursor: 'pointer' }}>
+                                <UserPlus style={{ width: 15, height: 15 }} /><span>Mời thành viên</span>
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', minHeight: 0 }}>
+                    {onOrgTab ? (
+                        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+                            <ProfileMembersPanel
+                                profileId={data.profileId}
+                                profileName={data.profileName}
+                                workspaceId={workspaceId}
+                                members={(data.orgMembers ?? []) as any}
+                                currentUserId={data.currentUserId ?? ''}
+                                currentUserRole={(data.currentUserRole ?? 'OWNER') as any}
+                                profileSettings={data.profileSettings}
+                            />
+                        </div>
+                    ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
                         {data.members.map((m) => (
                             <div key={m.id} style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 20, background: 'rgba(24,24,27,0.60)', backdropFilter: 'blur(12px)', border: m.rank === 'S' ? '1px solid rgba(250,204,21,0.20)' : '1px solid rgba(255,255,255,0.06)', boxShadow: '0 12px 32px rgba(0,0,0,0.55)', padding: 18 }}>
@@ -170,6 +212,7 @@ export default function McMembersBoard({ data }: { data: McMembersData }) {
                             <span style={{ fontSize: 11, color: '#71717A' }}>qua email hoặc link mời</span>
                         </button>
                     </div>
+                    )}
                 </div>
             </div>
 

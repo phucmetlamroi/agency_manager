@@ -63,20 +63,22 @@ export default function McTopbarActions({
         return () => document.removeEventListener("keydown", onKey)
     }, [])
 
-    // Workspace-scoped nav targets — all verified to exist under /[workspaceId]/admin/*.
+    // [M27] Workspace-scoped nav — repointed to the /mc/* cockpit equivalents (all now built:
+    // M5–M31) so ⌘K keeps navigation INSIDE Mission Control instead of jumping back to GĐ1 /admin
+    // (design M27: "giữ đúng ngữ cảnh"). "Task đã hủy" → /mc/trash (its tab 3, Thùng rác gộp M26).
     const NAV: { label: string; href: string; icon: LucideIcon }[] = [
         { label: "Tổng quan (Mission Control)", href: `/${workspaceId}/mc`, icon: LayoutDashboard },
-        { label: "Kho Task đợi", href: `/${workspaceId}/admin/queue`, icon: ListTodo },
-        { label: "Tài chính", href: `/${workspaceId}/admin/finance`, icon: Wallet },
-        { label: "Bảng lương", href: `/${workspaceId}/admin/payroll`, icon: Wallet },
-        { label: "CRM · Khách hàng", href: `/${workspaceId}/admin/crm`, icon: Building2 },
-        { label: "Thành viên", href: `/${workspaceId}/admin/members`, icon: UsersRound },
-        { label: "Hộp thư yêu cầu", href: `/${workspaceId}/admin/requests`, icon: Inbox },
-        { label: "Lịch", href: `/${workspaceId}/admin/schedule`, icon: CalendarDays },
-        { label: "Phân tích", href: `/${workspaceId}/admin/analytics`, icon: Activity },
-        { label: "Nhật ký hoạt động", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText },
-        { label: "Task đã hủy / lưu trữ", href: `/${workspaceId}/admin/cancelled`, icon: Trash2 },
-        { label: "Cài đặt", href: `/${workspaceId}/admin/settings`, icon: Settings },
+        { label: "Vận hành bảng task", href: `/${workspaceId}/mc/board`, icon: ListTodo },
+        { label: "Tài chính", href: `/${workspaceId}/mc/finance`, icon: Wallet },
+        { label: "Bảng lương", href: `/${workspaceId}/mc/tien`, icon: Wallet },
+        { label: "CRM · Khách hàng", href: `/${workspaceId}/mc/crm`, icon: Building2 },
+        { label: "Thành viên", href: `/${workspaceId}/mc/members`, icon: UsersRound },
+        { label: "Hộp thư yêu cầu", href: `/${workspaceId}/mc/requests`, icon: Inbox },
+        { label: "Lịch", href: `/${workspaceId}/mc/lich`, icon: CalendarDays },
+        { label: "Phân tích hiệu suất", href: `/${workspaceId}/mc/analytics`, icon: Activity },
+        { label: "Nhật ký hoạt động", href: `/${workspaceId}/mc/audit`, icon: ScrollText },
+        { label: "Thùng rác (Tệp · Khách · Task hủy · Tổ chức)", href: `/${workspaceId}/mc/trash`, icon: Trash2 },
+        { label: "Cài đặt Workspace", href: `/${workspaceId}/mc/settings`, icon: Settings },
     ]
 
     const go = (href: string) => { setPaletteOpen(false); router.push(href) }

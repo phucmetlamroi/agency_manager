@@ -10,6 +10,7 @@ import { resolveActiveProfileId, getWorkspacePrisma } from '@/lib/prisma-workspa
 import { prisma } from '@/lib/db'
 import { SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
 import { getProfileMembers } from '@/actions/profile-member-actions'
+import { getProfileRole } from '@/lib/profile-permissions'
 import { getDisplayName } from '@/lib/display-name'
 import { roleLabel } from '@/lib/display-labels'
 import McMembersBoard, { type McMembersData, type McMember } from '@/components/mission-control/McMembersBoard'
@@ -52,9 +53,14 @@ export default async function MissionControlMembersPage({ params }: { params: Pr
     if (!profileId) redirect('/login')
     const wp = getWorkspacePrisma(workspaceId, profileId)
 
-    const [profile, roster] = await Promise.all([
-        prisma.profile.findUnique({ where: { id: profileId }, select: { name: true } }),
+    const [profile, roster, currentUserRole] = await Promise.all([
+        prisma.profile.findUnique({
+            where: { id: profileId },
+            // [M31] bannerUrl/logoUrl/settings feed the reused ProfileMembersPanel org-settings tab.
+            select: { name: true, bannerUrl: true, logoUrl: true, settings: true } as any,
+        }) as any,
         getProfileMembers(profileId),
+        getProfileRole(session.user.id, profileId),
     ])
     const members = roster.members ?? []
     const userIds = members.map((m) => m.userId)
@@ -123,6 +129,18 @@ export default async function MissionControlMembersPage({ params }: { params: Pr
         }
     })
 
+    // [M31] Org-settings tab data (OWNER-only — board hides the tab for non-owners; every org
+    // action re-verifies OWNER server-side). Reuses the SAME getProfileMembers roster (raw rows).
+    const profileSettings = {
+        name: profile?.name || 'Tổ chức',
+        bannerUrl: profile?.bannerUrl ?? null,
+        logoUrl: profile?.logoUrl ?? null,
+        portalAccent:
+            profile?.settings && typeof profile.settings === 'object' && !Array.isArray(profile.settings)
+                ? ((profile.settings as any).portalAccent ?? null)
+                : null,
+    }
+
     const data: McMembersData = {
         workspaceId,
         profileId,
@@ -130,6 +148,10 @@ export default async function MissionControlMembersPage({ params }: { params: Pr
         backHref: `/${workspaceId}/admin`,
         trashHref: `/${workspaceId}/admin/profile-trash`,
         members: cards,
+        currentUserId: session.user.id,
+        currentUserRole: currentUserRole ?? undefined,
+        orgMembers: members,
+        profileSettings,
     }
 
     return <McMembersBoard data={data} />

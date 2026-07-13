@@ -9,6 +9,12 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M14 — Quản lý hồ sơ thanh toán]
+- **M14 vốn là MODAL** ("mở khi bấm 'Quản lý hồ sơ' ở Màn 13" — frame vẽ M13 mờ phía sau) = `BillingProfileManager`, ĐÃ mount sẵn trong `InvoiceModal` → **đã sống ở /mc/hoa-don** (M13). Không dựng lại form (đụng bank info — nhạy cảm).
+- **Thêm entry độc lập `/mc/ho-so-thanh-toan`** để quản lý hồ sơ TT trực tiếp (không cần chọn khách + tạo hóa đơn — hữu ích khi set-up trước). Reuse nguyên `BillingProfileManager`.
+- **Thêm props defaulted-off `open`/`onOpenChange`/`hideTrigger`** vào `BillingProfileManager` (controlled-open + ẩn nút trigger) — cùng pattern `chromeless`/`playerBase` đã dùng cho TeamBrowser. Bỏ trống = hành vi cũ (dialog tự quản + trigger) → InvoiceModal (M13) + mọi caller GĐ1 **byte-identical**. Reversible.
+- **Money-safety**: BillingProfile = bank wiring (beneficiary/account/swift/currency), KHÔNG có jobPriceUSD. Route cổng `verifyProfileAdminAccess` fail-closed; getBillingProfiles cổng `verifyFinanceAccess`, CRUD cổng ADMIN. Đóng modal → /mc/hoa-don.
+
 ## [M13 — Tạo hóa đơn]
 - **Reuse nguyên `InvoiceModal` (embedded)** — frame M13 CHÍNH LÀ layout của InvoiceModal (trái task-picker + thuế/trả trước/hồ sơ TT · phải live PDF preview, sửa inline). Embedded mode fill `w-full h-full`, caller tự lo chrome quay-lại → khớp hoàn hảo. InvoiceModal tự hydrate `getUnbilledTasks`+`getBillingProfiles`+giá (jobPriceUSD) qua server action → chỉ cần bơm `{clientId, clientName, depositBalance, workspaceId}`. KHÔNG dựng lại luồng hóa đơn (persist tx + PDF).
 - **Full-bleed, KHÔNG rail** — đúng frame M13 (chỉ 2 panel, không có rail 64px); màn tác vụ tập trung như M10 Add Task. Top bar mỏng: nút ← về /mc/crm + tiêu đề + "Đổi khách".

@@ -28,13 +28,24 @@ type BillingProfile = {
 export default function BillingProfileManager({
     onProfileSelect,
     currentProfileId,
-    workspaceId
+    workspaceId,
+    open,
+    onOpenChange,
+    hideTrigger,
 }: {
     onProfileSelect?: (profile: BillingProfile) => void
     currentProfileId?: string
     workspaceId?: string
+    // [MC · M14] Optional controlled-open + ẩn trigger → cho phép mount như 1 màn độc lập
+    // (/mc/ho-so-thanh-toan). Bỏ trống = hành vi cũ (dialog tự quản + nút trigger) → GĐ1 byte-identical.
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+    hideTrigger?: boolean
 }) {
-    const [isOpen, setIsOpen] = useState(false)
+    const [internalOpen, setInternalOpen] = useState(false)
+    const isControlled = open !== undefined
+    const isOpen = isControlled ? open : internalOpen
+    const setIsOpen = (next: boolean) => { if (isControlled) onOpenChange?.(next); else setInternalOpen(next) }
     const [profiles, setProfiles] = useState<BillingProfile[]>([])
     const [loading, setLoading] = useState(false)
 
@@ -130,11 +141,13 @@ export default function BillingProfileManager({
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 text-gray-400 border-gray-700 hover:text-white hover:bg-white/5">
-                    <Settings size={14} /> Quản lý hồ sơ
-                </Button>
-            </DialogTrigger>
+            {!hideTrigger && (
+                <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2 text-gray-400 border-gray-700 hover:text-white hover:bg-white/5">
+                        <Settings size={14} /> Quản lý hồ sơ
+                    </Button>
+                </DialogTrigger>
+            )}
             <DialogContent className="max-w-2xl bg-gray-900 border-gray-800 text-white max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{isEditing ? (editingId ? 'Sửa hồ sơ' : 'Hồ sơ mới') : 'Quản lý hồ sơ thanh toán'}</DialogTitle>

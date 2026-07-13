@@ -157,6 +157,8 @@ export function TeamBrowser({
     isAdmin,
     chromeless = false,
     playerBase,
+    sharesHref,
+    trashHref,
 }: {
     workspaceId: string
     initialFolderId: string | null
@@ -168,6 +170,11 @@ export function TeamBrowser({
     // [Giao diện 2 · MC M11] Prefix route mở player asset. Mặc định `/team/asset` (GĐ1
     // byte-identical); MC truyền `/[ws]/mc/asset` để mở player trong namespace Mission Control.
     playerBase?: string
+    // [Giao diện 2 · MC M21/M22] Đích 2 nút toolbar "Link chia sẻ" / "Thùng rác". Mặc định
+    // `/[ws]/team/shares` + `/[ws]/team/trash` (GĐ1 byte-identical); MC truyền bản /mc để ở
+    // lại namespace Mission Control.
+    sharesHref?: string
+    trashHref?: string
 }) {
     const [folderId, setFolderId] = useState<string | null>(initialFolderId)
     const [data, setData] = useState<ChildrenResult | null>(null)
@@ -1271,14 +1278,14 @@ export function TeamBrowser({
                         </div>
                         <div className="flex items-center gap-1.5">
                             <a
-                                href={`/${workspaceId}/team/shares`}
+                                href={sharesHref ?? `/${workspaceId}/team/shares`}
                                 title="Link chia sẻ"
                                 className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
                             >
                                 <Share2 size={15} />
                             </a>
                             <a
-                                href={`/${workspaceId}/team/trash`}
+                                href={trashHref ?? `/${workspaceId}/team/trash`}
                                 title="Thùng rác"
                                 className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
                             >

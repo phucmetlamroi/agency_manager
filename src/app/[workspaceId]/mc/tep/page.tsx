@@ -67,7 +67,7 @@ export default async function MissionControlTepPage({ params }: { params: Promis
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', minHeight: 0 }}>
-                    <TeamBrowser workspaceId={workspaceId} initialFolderId={null} currentUserId={currentUserId} isAdmin chromeless playerBase={`/${workspaceId}/mc/asset`} />
+                    <TeamBrowser workspaceId={workspaceId} initialFolderId={null} currentUserId={currentUserId} isAdmin chromeless playerBase={`/${workspaceId}/mc/asset`} sharesHref={`/${workspaceId}/mc/shares`} />
                 </div>
             </div>
         </div>

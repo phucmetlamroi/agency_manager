@@ -9,6 +9,13 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M15 — Hồ sơ cá nhân]
+- **MIRROR nguyên composition `/dashboard/profile`** (đã có sẵn, self-service hoàn chỉnh) trong vỏ MC — reuse `AvatarUpload` + `ProfileForm` (nickname/email/phone + đổi mật khẩu) + `NotificationSettings` + `PaymentQrUpload` (tài khoản nhận lương + QR — khớp section "Tài khoản nhận lương" của frame). KHÔNG dựng lại form (đụng mật khẩu/bank — nhạy cảm). Server action tự-phục-vụ đã hardened IDOR (bám `session.user.id`, bỏ qua userId client gửi) → 0 rủi ro account-takeover.
+- **User là bản ghi GLOBAL** (bypassModels, không workspace-scope) → đọc bằng `prisma` global `findUnique({ id })`, KHÔNG cần getWorkspacePrisma cho hồ sơ. Chỉ KPI (task count + MonthlyRank) mới dùng `getWorkspacePrisma` (như M9).
+- **Dải "Chỉ số cá nhân" READ-ONLY, DỮ LIỆU THẬT**: task hoàn tất (count `SALARY_COMPLETED_STATUS`) + rank + errorRate (MonthlyRank kỳ mới nhất). BỎ "đúng hạn %" và "#2 leaderboard" của frame — không tính được đáng tin từ dữ liệu hiện có → **thà hiển thị tập-con trung thực còn hơn bịa số**. Rank ẩn khi UNRANKED/chưa có (`—`), khớp bất biến M9.
+- **Admin-gate fail-closed** dù là hồ sơ cá nhân — nhất quán constraint "mọi route /mc/* admin-gated"; hồ sơ hiện là của CHÍNH admin (0 rò rỉ), non-admin dùng `/dashboard/profile` GĐ1. Đóng → /mc (M15 mở "từ menu avatar", không thuộc rail → back thẳng MC).
+- Không sửa các component profile GĐ1 → `/dashboard/profile` **byte-identical**.
+
 ## [M14 — Quản lý hồ sơ thanh toán]
 - **M14 vốn là MODAL** ("mở khi bấm 'Quản lý hồ sơ' ở Màn 13" — frame vẽ M13 mờ phía sau) = `BillingProfileManager`, ĐÃ mount sẵn trong `InvoiceModal` → **đã sống ở /mc/hoa-don** (M13). Không dựng lại form (đụng bank info — nhạy cảm).
 - **Thêm entry độc lập `/mc/ho-so-thanh-toan`** để quản lý hồ sơ TT trực tiếp (không cần chọn khách + tạo hóa đơn — hữu ích khi set-up trước). Reuse nguyên `BillingProfileManager`.

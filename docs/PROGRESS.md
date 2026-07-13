@@ -23,4 +23,4 @@ Done trước autoloop: M1–M4 + cosmetic pass (`7eb4a4d`).
 - [ ] M21 Shares · M22 Trash+Versions · M23 Compare · M24 Payroll thưởng · M25 CRM tiền · M26 Thùng rác gộp
 - [ ] M27–M31 (stubs — bám spec DAC-TA-CHUC-NANG-ADMIN.md)
 
-Kế tiếp: build M5 → tsc+build → commit → M6.
+Kế tiếp: **M21 Shares** (chia sẻ review link) → M22 Trash+Versions → M23 Compare → M24 Payroll thưởng → M25 CRM tiền → M26 Thùng rác gộp → M27–M31. Mỗi màn: đọc frame → map surface (reuse-first) → build data-wired money-safe admin-gated → tsc+build → commit → docs.

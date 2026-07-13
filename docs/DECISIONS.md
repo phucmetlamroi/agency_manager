@@ -9,6 +9,12 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M18 — Phiên Chợ Task]
+- **Modal `TaskMarketplace` ĐÃ mount toàn cục** ở `[workspaceId]/layout.tsx` (`MarketplaceProvider triggerMode="event"`) → có sẵn trên MỌI trang `/mc/*`. Mở bằng `window.dispatchEvent(new CustomEvent('open-marketplace'))`; nó tự fetch (`getMarketplaceTasks`) + claim atomic (`claimTask`) + kéo-thả nhận + trả-lại-10-phút. → M18 KHÔNG dựng modal mới; chỉ **wire trigger**.
+- **Wire nút Store** trong `McTopbarActions` (trước ghi "presentational for now"): `<div>` → `<button onClick={openMarketplace}>`. Thêm badge đếm live (nghe sự kiện `'marketplace-task-count'` do provider broadcast) + item ⌘K "Phiên Chợ Task" (đúng ghi chú thiết kế "thêm nút thường cho accessibility"). Không đụng `TaskMarketplace`/`MarketplaceProvider`/layout → GĐ1 byte-identical.
+- **Money-safety CÓ SẴN**: `getMarketplaceTasks` (claim-actions.ts:67) có guard **[Security P0]** — payload chỉ `wageVND`, cấm jobPriceUSD/exchangeRate/profitVND (chợ editor-facing). Khớp chính xác note thiết kế "chỉ hiện thù lao ₫ — giá khách $ giấu". Wire trigger → 0 rủi ro tiền mới.
+- **KHÔNG route riêng** — chợ là modal-overlay đúng thiết kế M18 ("mở từ nút Store"); đã reachable từ topbar M1 (và mọi màn MC có McTopbarActions). Admin mở để giám sát/nhận; claim re-check server-side.
+
 ## [M17 — Sửa hàng loạt] (delivered-via-M16)
 - **Frame M17 = `BulkEditTaskModal` sẵn có** — kiểm chứng khớp 1-1: 4 tab `workflow|main|assets|notes` (= Quy trình/Chính/Tài nguyên/Ghi chú), **dirty-tracking** đúng semantics thiết kế (không đụng field = giữ nguyên · gõ rồi xóa rỗng = CLEAR trên mọi task · set = UPDATE), gọi `bulkUpdateTaskStatus`/`bulkUpdateTaskDetails`. Modal ĐÃ mount trong thanh bulk của `TaskWorkflowTabs` → **đã sống ở /mc/board** (M16) khi bấm "Sửa hàng loạt".
 - **KHÔNG route độc lập** — khác M14 (billing profile set-up-trước hợp lý không cần khách): bulk-edit **bắt buộc** có selection task từ 1 bảng → route `/mc/bulk` rỗng-selection là vô nghĩa. Vào bulk-edit chỉ qua tick task trên /mc/board (đúng luồng thật). "Giao hàng loạt" (bulkAssignTasks) = AssigneeCell trên cùng bảng (đã có).

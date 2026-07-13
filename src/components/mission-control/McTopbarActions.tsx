@@ -37,6 +37,19 @@ export default function McTopbarActions({
     const router = useRouter()
     const [paletteOpen, setPaletteOpen] = useState(false)
     const [addOpen, setAddOpen] = useState(false)
+    const [mktCount, setMktCount] = useState(0)
+
+    // [M18] Live open-task count for the Store badge — broadcast by MarketplaceProvider,
+    // which is mounted globally in [workspaceId]/layout.tsx (triggerMode="event").
+    useEffect(() => {
+        const onCount = (e: Event) => setMktCount((e as CustomEvent<number>).detail ?? 0)
+        window.addEventListener("marketplace-task-count", onCount as EventListener)
+        return () => window.removeEventListener("marketplace-task-count", onCount as EventListener)
+    }, [])
+
+    // [M18] Open the real TaskMarketplace modal (Phiên Chợ Task) — self-fetching, atomic claim,
+    // VND wage only (client $ hidden). No new modal built; just fire the global open event.
+    const openMarketplace = () => window.dispatchEvent(new CustomEvent("open-marketplace"))
 
     // Global ⌘K / Ctrl+K to toggle the palette (mirrors the admin CommandMenu).
     useEffect(() => {
@@ -85,10 +98,19 @@ export default function McTopbarActions({
                 <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 10, background: "rgba(0,0,0,0.4)", padding: "2px 6px", borderRadius: 4, color: "#A1A1AA" }}>⌘K</span>
             </button>
 
-            {/* Store (marketplace) — presentational for now, out of M1 scope */}
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#A1A1AA" }}>
+            {/* [M18] Store → Phiên Chợ Task (real TaskMarketplace modal, mounted globally in the
+                workspace layout). Opens via the 'open-marketplace' event; badge = live open count. */}
+            <button
+                type="button"
+                onClick={openMarketplace}
+                title="Phiên Chợ Task — task chưa giao"
+                style={{ position: "relative", width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#A1A1AA", cursor: "pointer" }}
+            >
                 <Store style={{ width: 17, height: 17 }} />
-            </div>
+                {mktCount > 0 && (
+                    <span style={{ position: "absolute", top: -5, right: -5, minWidth: 17, height: 17, padding: "0 4px", borderRadius: 999, background: "#10B981", color: "#fff", fontSize: 9.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 8px rgba(16,185,129,0.6)" }}>{mktCount}</span>
+                )}
+            </button>
 
             {/* Add Task → real AddTaskModal */}
             <button
@@ -108,6 +130,10 @@ export default function McTopbarActions({
                         <CommandItem onSelect={() => { setPaletteOpen(false); setAddOpen(true) }}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             <span>Tạo task mới</span>
+                        </CommandItem>
+                        <CommandItem onSelect={() => { setPaletteOpen(false); openMarketplace() }}>
+                            <Store className="mr-2 h-4 w-4" />
+                            <span>Phiên Chợ Task{mktCount > 0 ? ` · ${mktCount} task` : ""}</span>
                         </CommandItem>
                         <CommandItem
                             onSelect={async () => {

@@ -12,7 +12,8 @@ Done trước autoloop: M1–M4 + cosmetic pass (`7eb4a4d`).
 - [x] **M10 Add Task** ✅ — `/mc/add` + `McAddScreen`; reuse `AddTaskModal` qua `DashboardActionWrapper` (controlled+hideBar, money-safe submit routing) trên backdrop MC; đóng → /mc. tsc+build xanh.
 - [x] **M11 Player** ✅ — `/mc/asset/[assetId]` mirror của player GĐ1 (reuse `ReviewPlayerShell` full-bleed); thêm prop `playerBase` cho `TeamBrowser` → /mc/tep mở player MC-namespace. tsc+build xanh.
 - [x] **M12 CRM** ✅ — `/mc/crm` = MC-shell (rail đầy đủ, Building2 active) bọc `ClientsManagerPanel` (reuse toàn bộ orchestrator: danh sách ↔ chi tiết ↔ tạo hóa đơn ↔ sổ thu tiền · kéo-gộp brand con · tách ra · ghi nhận thu · link chia sẻ). Panel tự mang header/breadcrumb khớp M12 → không thêm header MC. Admin-gated fail-closed; getClients cổng verifyFinanceAccess. tsc+build xanh, route trong tree.
-- [ ] M13 Hóa đơn · M14 Hồ sơ TT · M15 Hồ sơ cá nhân
+- [x] **M13 Tạo hóa đơn** ✅ — `/mc/hoa-don` (full-bleed, không rail — màn tác vụ tập trung như M10) = `McInvoiceBoard` bọc `InvoiceModal` (embedded): trái task-picker + thuế/trả trước/hồ sơ TT, phải live PDF preview. InvoiceModal tự hydrate task chưa xuất + billing profiles + giá. Cần 1 clientId → picker khách khi vào thẳng, hoặc `?clientId=X` (từ nút CRM). Đóng → /mc/crm. Admin-gated fail-closed; DTO khách chỉ id/name/depositBalance (không jobPriceUSD). tsc+build xanh.
+- [ ] M14 Hồ sơ TT · M15 Hồ sơ cá nhân
 - [ ] M16 Vận hành bảng · M17 Bulk · M18 Phiên Chợ · M19 Sửa task · M20 Velox+HookMap
 - [ ] M21 Shares · M22 Trash+Versions · M23 Compare · M24 Payroll thưởng · M25 CRM tiền · M26 Thùng rác gộp
 - [ ] M27–M31 (stubs — bám spec DAC-TA-CHUC-NANG-ADMIN.md)

@@ -9,6 +9,13 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M13 — Tạo hóa đơn]
+- **Reuse nguyên `InvoiceModal` (embedded)** — frame M13 CHÍNH LÀ layout của InvoiceModal (trái task-picker + thuế/trả trước/hồ sơ TT · phải live PDF preview, sửa inline). Embedded mode fill `w-full h-full`, caller tự lo chrome quay-lại → khớp hoàn hảo. InvoiceModal tự hydrate `getUnbilledTasks`+`getBillingProfiles`+giá (jobPriceUSD) qua server action → chỉ cần bơm `{clientId, clientName, depositBalance, workspaceId}`. KHÔNG dựng lại luồng hóa đơn (persist tx + PDF).
+- **Full-bleed, KHÔNG rail** — đúng frame M13 (chỉ 2 panel, không có rail 64px); màn tác vụ tập trung như M10 Add Task. Top bar mỏng: nút ← về /mc/crm + tiêu đề + "Đổi khách".
+- **Cần 1 clientId** (InvoiceModal client-scoped) + **KHÔNG có invoice-list admin toàn workspace** (chỉ có `getClientInvoices` per-client + portal InvoicesSurface). → `/mc/hoa-don` không clientId thì hiện **picker khách** (search, phẳng parent+brand con vì getUnbilledTasks gộp cả sub); có `?clientId=X` thì mở thẳng (khớp nút "Tạo hóa đơn ▸ Màn 13" của CRM detail).
+- **Money-safety**: route cổng `verifyProfileAdminAccess` fail-closed; mọi action hóa đơn cổng `verifyFinanceAccess`/`recordPayment` cổng ADMIN. DTO khách bơm xuống client **chỉ id/name/depositBalance** (map thủ công) — KHÔNG mang mảng task/`jobPriceUSD` thô. USD chỉ sống trong InvoiceModal (admin).
+- **KHÔNG sửa `ClientsManagerPanel`** (M12) để trỏ sang M13 — panel mở invoice IN-PLACE (embedded, đã byte-identical GĐ1). M13 là entry standalone song song; hai lối cùng tồn tại, không đụng panel (an toàn).
+
 ## [M12 — Quản lý khách hàng (CRM)]
 - **Reuse nguyên `ClientsManagerPanel`** (orchestrator CRM đã có: điều hướng in-place danh sách→chi tiết→hóa đơn→sổ thu tiền, bọc `ClientList`/`ClientAnalytics`/`PaymentLedger`/`RecordPaymentModal`/`InvoiceModal`/`ShareLinkSection`/`CreateClientButton`) — đúng pattern M7/M8 (bọc component thật). Panel đã được `DashboardClientsRow` tái dùng ở path ≠ /admin/crm → refresh/merge/mutation chạy tốt ngoài route admin. Nhanh + trung thực + 0 rủi ro logic.
 - **KHÔNG thêm header MC** — panel TỰ mang header/breadcrumb (Building2 + "Quản lý khách hàng" + count + Sổ thu tiền + nút Khách hàng) khớp **chính xác** thiết kế M12 (line 2404-2417). Thêm header MC sẽ nhân đôi (như bài toán `chromeless` của TeamBrowser) → chỉ cấp vỏ MC = rail + vùng chính chứa panel full-height. Không sửa panel (an toàn tối đa, reversible).

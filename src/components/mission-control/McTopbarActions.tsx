@@ -167,6 +167,7 @@ export default function McTopbarActions({
             {/* The real Add-Task modal — reuses /admin's money-safe submit routing. */}
             <DashboardActionWrapper
                 hideBar
+                portalToBody
                 open={addOpen}
                 onOpenChange={setAddOpen}
                 workspaceId={workspaceId}

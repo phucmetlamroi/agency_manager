@@ -58,6 +58,10 @@ interface DashboardActionWrapperProps {
    * byte-identical because it never passes this prop.
    */
   variant?: 'bar' | 'fab'
+  /** [Giao diện 2] Portal the AddTaskModal to <body> — needed when the host sits inside a
+   *  `backdrop-filter` container (the MC topbar), which would otherwise trap the modal's
+   *  `fixed inset-0` scrim in that box. Default false → /admin renders inline, unchanged. */
+  portalToBody?: boolean
 }
 
 // [QA R1 — user decision] A Multi-Hook Map can't fan out across a batch — attach it to
@@ -98,6 +102,7 @@ export default function DashboardActionWrapper({
   open,
   onOpenChange,
   variant = 'bar',
+  portalToBody = false,
 }: DashboardActionWrapperProps) {
   // [Giao diện 2] Controlled vs uncontrolled open. When the host passes `onOpenChange`
   // it owns the state (Mission Control); otherwise the wrapper keeps its own — /admin
@@ -459,6 +464,7 @@ export default function DashboardActionWrapper({
         exchangeRate={exchangeRate}
         veloxInitialFolderUrl={seed?.folder}
         veloxInitialClientId={seed?.clientId}
+        portalToBody={portalToBody}
       />
     </>
   )

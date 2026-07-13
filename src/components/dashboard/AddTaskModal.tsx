@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import {
@@ -112,6 +113,12 @@ interface AddTaskModalProps {
     veloxInitialFolderUrl?: string
     /** [Client Task Submission v2] Seed the client from the request. */
     veloxInitialClientId?: number
+    /** [Giao diện 2 · Mission Control] Render the modal through a portal to document.body.
+     *  The MC topbar wrapper has `backdrop-filter`, which turns it into a containing block
+     *  for `position: fixed`, so the modal's `fixed inset-0` scrim collapses to the 64px
+     *  topbar box (board shows through). Portaling to <body> escapes that. Default false →
+     *  /admin renders inline exactly as before (byte-identical). */
+    portalToBody?: boolean
 }
 
 /* ------------------------------------------------------------------ */
@@ -425,7 +432,12 @@ export default function AddTaskModal({
     exchangeRate = 26300,
     veloxInitialFolderUrl,
     veloxInitialClientId,
+    portalToBody = false,
 }: AddTaskModalProps) {
+    // [Giao diện 2] Portal target only exists on the client — gate on mount so the
+    // first client render matches the server (both inline) before flipping to the portal.
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => { setMounted(true) }, [])
     const [step, setStep] = useState(0)
     const [form, setForm] = useState<TaskFormData>({ ...INITIAL_FORM })
     const [submitted, setSubmitted] = useState(false)
@@ -1507,7 +1519,7 @@ export default function AddTaskModal({
     /*  Render                                                           */
     /* ================================================================ */
 
-    return (
+    const modalTree = (
         <AnimatePresence>
             {open && (
                 <motion.div
@@ -1722,4 +1734,9 @@ export default function AddTaskModal({
             />
         </AnimatePresence>
     )
+
+    // [Giao diện 2] When hosted inside a `backdrop-filter` ancestor (the MC topbar),
+    // portal to <body> so the `fixed inset-0` scrim covers the whole viewport instead
+    // of collapsing to the topbar box. /admin passes nothing → inline, byte-identical.
+    return portalToBody && mounted ? createPortal(modalTree, document.body) : modalTree
 }

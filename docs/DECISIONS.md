@@ -9,6 +9,11 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [POLISH — ngôn ngữ chuyển động MC (hover/press/reveal)]
+- **Mục tiêu owner**: "nâng tầm trải nghiệm", thêm animation thú vị — tự quyết design. Chốt **1 ngôn ngữ chuyển động thống nhất** (không lố): rê=nhấc+sáng, bấm=lún nảy lò xo (spring 420/30), mở màn=thẻ hiện so le (stagger). Tôn trọng `prefers-reduced-motion` (Framer `useReducedMotion` → tắt transform).
+- **Kiến trúc**: file mới `src/components/mission-control/motion-kit.tsx` = 5 primitive (Pressable/HoverCard/Reveal/RevealGroup/RevealItem), forward mọi prop → **0 đổi handler/logic**. CHỈ MC-folder import → GĐ1 byte-identical. Áp lên 12 component (rail icon+nút+tab→Pressable; grid/list→RevealGroup/Item stagger+hover-lift; header→Reveal). McAddScreen/McBillingProfilesScreen = backdrop bọc modal reused → **cố ý không đụng**.
+- **Cách chạy**: 1 workflow 13-agent (mỗi file 1 agent, spec chặt: chỉ đổi tag-name, giữ nguyên attr/handler/style, `as="div"` trong Link). McPayrollBoard (nhạy tiền) TỰ TAY làm (giữ nguyên setPayTarget/doRevert). **Verify sau**: tsc+build xanh + grep đối chiếu MỌI handler tới hạn (setPayTarget/doRevert/setAddOpen/openMarketplace/onSelect palette/assign/updateTaskStatus/setInviteOpen/setSelectedId) còn nguyên. Sửa 4 slip agent (onMouseEnter/Leave thừa trên Pressable ở McInvoiceBoard — Pressable đã tự lo hover). Commit `d03bd30`.
+
 ## [M24-QR — follow-up: wire PaymentModal (đã GỠ HOÃN)]
 - **Đã làm phần M24 hoãn** (owner "làm tiếp M24 QR đi"). Nút "Đánh dấu đã trả" ở `McPayrollBoard` giờ mở **PaymentModal thật** của /admin (số TK + mã QR quét được + "Xác nhận đã chuyển khoản") thay strip 2-bước inline tạm.
 - **Money-safe — logic tiền KHÔNG đổi:** PaymentModal tự gọi **cùng `confirmPayment`** với **cùng `{totalAmount, baseSalary, bonus}`** mà `doPay` cũ truyền; `confirmPayment` vẫn re-derive kỳ server-side (AUDIT R5) + gate ADMIN. Luồng `revertPayment` (hàng Đã-trả) nguyên. **KHÔNG sửa PaymentModal** → /admin/payroll byte-identical. Editor chưa có QR/bank vẫn trả được ("Chưa cập nhật QR"/"---").

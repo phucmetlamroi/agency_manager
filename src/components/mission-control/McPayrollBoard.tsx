@@ -8,7 +8,10 @@
 //   • "Đánh dấu đã trả" reuses confirmPayment (2-step confirm) · "Hoàn tác" = revertPayment
 //     (surfaces PAYROLL_LOCKED). Both server actions re-derive the cycle + gate ADMIN.
 //   • VND/USD toggle = pure client display (payroll is ₫-native, USD = ÷ exchangeRate)
-// Deep controls (tính thưởng / khóa sổ / per-task breakdown) bridge to Giao diện 1 payroll.
+// [M24] Tính thưởng / khóa sổ is now NATIVE via the vetted BonusCalculator (drop-in, self-fetches
+// lock status, gates the destructive+auto-locking calculateMonthlyBonus behind ConfirmModal — the
+// ConfirmProvider lives in the root layout so it works under /mc too). Per-task breakdown still bridges
+// to Giao diện 1. No payroll/bonus/lock logic is rebuilt here — all money math stays server-side.
 import { useState, useTransition, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -18,6 +21,7 @@ import {
     FileSpreadsheet, CalendarDays as CalIcon, Hourglass, Calculator, CheckCircle2, RotateCcw, ExternalLink, ChevronDown,
 } from "lucide-react"
 import { confirmPayment, revertPayment } from "@/actions/payroll-actions"
+import BonusCalculator from "@/app/[workspaceId]/admin/payroll/BonusCalculator"
 import McBackLink from "./McBackLink"
 
 export interface McPayrollEditor {
@@ -139,6 +143,10 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                             <FileSpreadsheet style={{ width: 13, height: 13 }} />Xuất XLSX
                         </a>
                     )}
+                    {/* [M24] Native "Tính Thưởng Tháng Này / ĐÃ KHÓA SỔ · Hoàn tác & Tính lại" + ⚙ config.
+                        Self-contained: fetches lock on mount, confirm-gates the auto-locking calc, then
+                        router.refresh() re-runs this server page so new bonuses land in Thực nhận. */}
+                    <BonusCalculator workspaceId={data.workspaceId} />
                     <div style={{ flex: 1 }} />
                     {/* Period pill */}
                     <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }} title="Kỳ = tháng của workspace (parse từ tên 'MM/YYYY')">

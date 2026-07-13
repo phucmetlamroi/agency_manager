@@ -9,6 +9,11 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M17 — Sửa hàng loạt] (delivered-via-M16)
+- **Frame M17 = `BulkEditTaskModal` sẵn có** — kiểm chứng khớp 1-1: 4 tab `workflow|main|assets|notes` (= Quy trình/Chính/Tài nguyên/Ghi chú), **dirty-tracking** đúng semantics thiết kế (không đụng field = giữ nguyên · gõ rồi xóa rỗng = CLEAR trên mọi task · set = UPDATE), gọi `bulkUpdateTaskStatus`/`bulkUpdateTaskDetails`. Modal ĐÃ mount trong thanh bulk của `TaskWorkflowTabs` → **đã sống ở /mc/board** (M16) khi bấm "Sửa hàng loạt".
+- **KHÔNG route độc lập** — khác M14 (billing profile set-up-trước hợp lý không cần khách): bulk-edit **bắt buộc** có selection task từ 1 bảng → route `/mc/bulk` rỗng-selection là vô nghĩa. Vào bulk-edit chỉ qua tick task trên /mc/board (đúng luồng thật). "Giao hàng loạt" (bulkAssignTasks) = AssigneeCell trên cùng bảng (đã có).
+- **0 code mới** cho M17 (chỉ ghi nhận). KHÔNG sửa `BulkEditTaskModal` → `/admin` **byte-identical**. Commit docs-only đánh dấu delivered.
+
 ## [M16 — Vận hành bảng task]
 - **Reuse nguyên `TaskWorkflowTabs`** (bảng admin THẬT ở `/admin`) trong vỏ MC — đúng pattern bọc-component-vetted (M7 RequestsInbox / M8 TeamBrowser / M12 ClientsManagerPanel). Frame M16 chỉ ANNOTATE 4 tác vụ (popup dropdown status / dialog Revision / menu ⋯ / thanh bulk) — CẢ 4 đã wire sẵn bên trong TaskWorkflowTabs (StatusCell = dropdown-nhóm-phase + dialog "Phân loại Revision" Khách/Nội bộ; ⋯ menu = Sao chép ID/Sửa chi tiết/Trả lại/Xoá cứng; bulk bar = Sửa hàng loạt→BulkEditTaskModal + Xoá; Giao hàng loạt = AssigneeCell). Bọc lại = có hết, 0 rebuild logic (FSM/mutation/pagination/selection). KHÔNG dựng bảng mới.
 - **Route mới `/mc/board`** — phân biệt rõ 3 surface: `/mc` = tổng quan read-only (6 cột, MissionControlBoard), `/mc/queue` = triage việc-chờ-giao (McQueueBoard), `/mc/board` = **bảng vận hành đầy đủ mọi status** (nơi thao tác thật). TaskWorkflowTabs props-driven (KHÔNG self-fetch) → page bơm đúng shape fetch của /admin.

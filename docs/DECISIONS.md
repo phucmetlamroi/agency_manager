@@ -9,6 +9,13 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M12 — Quản lý khách hàng (CRM)]
+- **Reuse nguyên `ClientsManagerPanel`** (orchestrator CRM đã có: điều hướng in-place danh sách→chi tiết→hóa đơn→sổ thu tiền, bọc `ClientList`/`ClientAnalytics`/`PaymentLedger`/`RecordPaymentModal`/`InvoiceModal`/`ShareLinkSection`/`CreateClientButton`) — đúng pattern M7/M8 (bọc component thật). Panel đã được `DashboardClientsRow` tái dùng ở path ≠ /admin/crm → refresh/merge/mutation chạy tốt ngoài route admin. Nhanh + trung thực + 0 rủi ro logic.
+- **KHÔNG thêm header MC** — panel TỰ mang header/breadcrumb (Building2 + "Quản lý khách hàng" + count + Sổ thu tiền + nút Khách hàng) khớp **chính xác** thiết kế M12 (line 2404-2417). Thêm header MC sẽ nhân đôi (như bài toán `chromeless` của TeamBrowser) → chỉ cấp vỏ MC = rail + vùng chính chứa panel full-height. Không sửa panel (an toàn tối đa, reversible).
+- **Money-safety**: DTO `getClients` mang `jobPriceUSD`/`wageVND`/`profitVND` (nested tasks, không `select`) NHƯNG đây là cockpit **admin** — đồng nhất GĐ1 `/admin/crm`. Cổng 2 lớp: `verifyProfileAdminAccess` (fail-closed → redirect dashboard) ở route + `getClients` cổng `verifyFinanceAccess` + mọi mutation cổng `verifyWorkspaceAccess ADMIN`. USD chỉ tới admin — đúng bất biến jobPriceUSD-leak-discipline (admin được phép).
+- **Rail đầy đủ 11 icon** khớp frame M12 (Building2 active), railHref khớp M9: wire `UsersRound → /mc/members`. **Bỏ "ledger strip"** (dải "Còn nợ $1,056 / Đã thu $4,480" ở đầu frame) — panel không có sẵn, dựng lại sẽ phải tự tính tổng nợ/thu toàn KH ngoài component đã vetted (rủi ro money-math); "Sổ thu tiền" trong panel đã cho đủ số liệu chi tiết. An toàn > trang trí.
+- **Rail `Trash2` để title-only** (không href) — nhất quán M9 (placeholder tới M26 "Thùng rác gộp"); client-trash vẫn tới được qua GĐ1 `/admin/client-trash`. Không bịa/không lệch rail giữa các màn.
+
 ## [M11 — Review Player]
 - **Reuse nguyên `ReviewPlayerShell`** (player full-bleed frame.io-parity đã build sẵn) — player namespace-agnostic. Tạo `/mc/asset/[assetId]` = bản mirror của `/team/asset/[assetId]` (cùng props), admin-gated fail-closed.
 - **Cho `/mc/tep` mở player trong namespace MC**: thêm prop **`playerBase?: string`** vào `TeamBrowser` (mặc định `/[ws]/team/asset` → GĐ1 byte-identical); `/mc/tep` truyền `/[ws]/mc/asset`. Chỉ đổi ĐÍCH điều hướng của `openAsset`, không đụng logic khác. → M8→M11 liền mạch trong MC.

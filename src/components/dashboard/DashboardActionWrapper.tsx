@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Plus } from "lucide-react"
 import DashboardActionBar from "./DashboardActionBar"
 import AddTaskModal from "./AddTaskModal"
+import McAddTaskModal from "@/components/mission-control/McAddTaskModal"
 import { toast } from "sonner"
 import { createTask } from "@/actions/admin-actions"
 import { markRequestAccepted } from "@/actions/client-request-actions"
@@ -62,6 +63,10 @@ interface DashboardActionWrapperProps {
    *  `backdrop-filter` container (the MC topbar), which would otherwise trap the modal's
    *  `fixed inset-0` scrim in that box. Default false → /admin renders inline, unchanged. */
   portalToBody?: boolean
+  /** [Giao diện 2 · M10] 'wizard' (default) = the /admin 5-step AddTaskModal — byte-identical.
+   *  'mc' = the faithful single-screen 3-column "Thêm Task mới" (McAddTaskModal), submitting
+   *  through the SAME money-safe handleSubmit. Deep Velox bridges back to the wizard. */
+  layout?: 'wizard' | 'mc'
 }
 
 // [QA R1 — user decision] A Multi-Hook Map can't fan out across a batch — attach it to
@@ -103,7 +108,10 @@ export default function DashboardActionWrapper({
   onOpenChange,
   variant = 'bar',
   portalToBody = false,
+  layout = 'wizard',
 }: DashboardActionWrapperProps) {
+  // [M10] Deep-Velox bridge: the MC screen hands off folder scanning to the vetted wizard.
+  const [mcVelox, setMcVelox] = useState(false)
   // [Giao diện 2] Controlled vs uncontrolled open. When the host passes `onOpenChange`
   // it owns the state (Mission Control); otherwise the wrapper keeps its own — /admin
   // behavior is byte-identical because neither prop is passed there.
@@ -135,7 +143,7 @@ export default function DashboardActionWrapper({
   const clearSeed = () => {
     if (seed) { setSeed(null); router.replace(`/${workspaceId}/admin`) }
   }
-  const closeModal = () => { setModalOpen(false); clearSeed() }
+  const closeModal = () => { setModalOpen(false); setMcVelox(false); clearSeed() }
 
   const handleSubmit = async (
     data: {
@@ -453,19 +461,34 @@ export default function DashboardActionWrapper({
             canCreateWorkspace={canCreateWorkspace}
           />
         ))}
-      <AddTaskModal
-        open={modalOpen}
-        onClose={closeModal}
-        workspaceId={workspaceId}
-        clients={clients}
-        users={users}
-        onSubmit={handleSubmitWrapped}
-        pricingRules={pricingRules}
-        exchangeRate={exchangeRate}
-        veloxInitialFolderUrl={seed?.folder}
-        veloxInitialClientId={seed?.clientId}
-        portalToBody={portalToBody}
-      />
+      {layout === 'mc' && !mcVelox ? (
+        <McAddTaskModal
+          open={modalOpen}
+          onClose={closeModal}
+          workspaceId={workspaceId}
+          clients={clients}
+          users={users}
+          onSubmit={handleSubmitWrapped}
+          pricingRules={pricingRules}
+          exchangeRate={exchangeRate}
+          portalToBody={portalToBody}
+          onOpenVelox={() => setMcVelox(true)}
+        />
+      ) : (
+        <AddTaskModal
+          open={modalOpen}
+          onClose={closeModal}
+          workspaceId={workspaceId}
+          clients={clients}
+          users={users}
+          onSubmit={handleSubmitWrapped}
+          pricingRules={pricingRules}
+          exchangeRate={exchangeRate}
+          veloxInitialFolderUrl={seed?.folder}
+          veloxInitialClientId={seed?.clientId}
+          portalToBody={portalToBody}
+        />
+      )}
     </>
   )
 }

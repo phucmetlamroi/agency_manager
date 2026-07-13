@@ -39,6 +39,7 @@ export default function McAddScreen({
             <DashboardActionWrapper
                 hideBar
                 portalToBody
+                layout="mc"
                 open={open}
                 onOpenChange={(o: boolean) => { if (!o) close() }}
                 workspaceId={workspaceId}

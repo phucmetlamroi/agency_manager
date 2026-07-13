@@ -168,6 +168,7 @@ export default function McTopbarActions({
             <DashboardActionWrapper
                 hideBar
                 portalToBody
+                layout="mc"
                 open={addOpen}
                 onOpenChange={setAddOpen}
                 workspaceId={workspaceId}

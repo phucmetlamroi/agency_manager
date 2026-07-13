@@ -9,6 +9,11 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M24-QR — follow-up: wire PaymentModal (đã GỠ HOÃN)]
+- **Đã làm phần M24 hoãn** (owner "làm tiếp M24 QR đi"). Nút "Đánh dấu đã trả" ở `McPayrollBoard` giờ mở **PaymentModal thật** của /admin (số TK + mã QR quét được + "Xác nhận đã chuyển khoản") thay strip 2-bước inline tạm.
+- **Money-safe — logic tiền KHÔNG đổi:** PaymentModal tự gọi **cùng `confirmPayment`** với **cùng `{totalAmount, baseSalary, bonus}`** mà `doPay` cũ truyền; `confirmPayment` vẫn re-derive kỳ server-side (AUDIT R5) + gate ADMIN. Luồng `revertPayment` (hàng Đã-trả) nguyên. **KHÔNG sửa PaymentModal** → /admin/payroll byte-identical. Editor chưa có QR/bank vẫn trả được ("Chưa cập nhật QR"/"---").
+- **DTO**: thêm `nickname/paymentBankName/paymentAccountNum/paymentQrUrl` vào McPayrollEditor — là **bank/QR của CHÍNH editor** (người nhận lương) hiện cho admin trả tiền trên màn admin-gated; `findMany` đã trả sẵn scalar; KHÔNG jobPriceUSD, KHÔNG tiền khách. Cùng dữ liệu /admin/payroll đã cho admin thấy. Verify tên field khớp schema (nickname/paymentAccountNum/paymentBankName/paymentQrUrl). tsc+build xanh. Commit `49a0374`.
+
 ## [M27–M31 — Hệ thống chung · Phân tích · Nhật ký · Cài đặt Workspace · Cài đặt Tổ chức]
 - **MAP bằng 2 Explore song song + đọc McTopbarActions** — cả 5 màn là reuse-wrap surface admin SẴN CÓ (đều embeddable panel, chrome ở page). Frame M27–M31 là STUB ngắn + nhiều note "bàn giao dev" = bug backend GĐ1, KHÔNG phải việc port MC.
 - **`McShell` mới (server component)** — rail 64px + backdrop + main slot dùng CHUNG cho 3 page mới (M28/M29/M30). File mới → KHÔNG đụng rail inline của page MC cũ (byte-identical). Rail: 11 icon chính + gear Cài đặt ở đáy (active='settings') + McBackLink. Tránh copy-paste rail 3 lần.

@@ -9,6 +9,12 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M10 — Add Task (Velox)]
+- **Reuse nguyên `AddTaskModal` qua `DashboardActionWrapper`** (controlled + `hideBar`) — ĐÚNG pattern đã có sẵn ở `McTopbarActions`. KHÔNG mount modal thô (sẽ phải viết lại ~280 dòng handleSubmit money-safe: single/batch/Velox V1+V3/Multi-Hook Map/accept-request). Tất cả submit đi qua server action `createTask/…` (re-check ADMIN).
+- **Route riêng `/mc/add`** (đúng design M10 = modal-as-screen). Server page fetch đúng khối add-task của `mc/page.tsx` (clients dedupe + users + pricingRules + exchangeRate) + role. Client `McAddScreen` vẽ backdrop MC mờ (skeleton board như frame) + mở modal; đóng modal → `router.push('/mc')`.
+- **Velox**: giữ nguyên (toggle nội bộ modal); không cần prop — nếu sau này cần mở thẳng Velox thì truyền `veloxInitialFolderUrl` (đã có sẵn đường forward).
+- **Money-safety**: admin-gate fail-closed ở route + `createTask` verify ADMIN server-side; đây là form TẠO (không đọc ngược giá cũ) → không rò rỉ USD.
+
 ## [M9 — Thành viên]
 - **Roster = `getProfileMembers(profileId)`** (vai trò tổ chức OWNER/ADMIN/USER; CLIENT đã bị lọc) + **hydrate metric** từ `wp.user.findMany` (tasks 'Hoàn tất' → lương, bonuses, monthlyRanks rank+errorRate, presence, isTreasurer) — đúng pattern `mc/tien`. Join theo `userId`.
 - **Money-safety**: `salaryVND` được **tính gộp 1 số VND server-side** (Σ task.value 'Hoàn tất' + bonusAmount) → DTO KHÔNG mang `jobPriceUSD`/mảng task value thô. Admin-gate fail-closed (lương chỉ admin).

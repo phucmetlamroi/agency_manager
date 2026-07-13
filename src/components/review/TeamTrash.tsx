@@ -94,7 +94,9 @@ async function fetchTrash(workspaceId: string, cursor: string | null): Promise<T
 }
 
 // [Giao diện 2 · MC M22] `backHref` = đích nút ← (mặc định /team → GĐ1 byte-identical); MC truyền /mc/tep.
-export function TeamTrash({ workspaceId, isAdmin = false, backHref }: { workspaceId: string; isAdmin?: boolean; backHref?: string }) {
+// [MC M26] `chromeless` ẩn tiêu đề H1 "Thùng rác" + nút ← (khi nhúng trong shell Thùng-rác-gộp 4 tab
+// đã tự mang header + tab bar) — defaulted OFF → /team/trash + /mc/trash-standalone (M22) byte-identical.
+export function TeamTrash({ workspaceId, isAdmin = false, backHref, chromeless = false }: { workspaceId: string; isAdmin?: boolean; backHref?: string; chromeless?: boolean }) {
     const [data, setData] = useState<TrashResult | null>(null) // items ACCUMULATE across pages
     const [loading, setLoading] = useState(true)
     const [loadingMore, setLoadingMore] = useState(false)
@@ -246,33 +248,37 @@ export function TeamTrash({ workspaceId, isAdmin = false, backHref }: { workspac
     return (
         <div className="flex flex-col animate-fade-in" style={{ fontFamily: "var(--font-sans), 'Plus Jakarta Sans', sans-serif" }}>
             {/* title */}
-            <div className="mb-4 flex items-center gap-3">
-                <div
-                    className="flex items-center justify-center rounded-xl"
-                    style={{ width: 40, height: 40, background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.22)' }}
-                >
-                    <Trash2 className="h-5 w-5" style={{ color: '#FDA4AF' }} />
+            {!chromeless && (
+                <div className="mb-4 flex items-center gap-3">
+                    <div
+                        className="flex items-center justify-center rounded-xl"
+                        style={{ width: 40, height: 40, background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.22)' }}
+                    >
+                        <Trash2 className="h-5 w-5" style={{ color: '#FDA4AF' }} />
+                    </div>
+                    <div className="min-w-0">
+                        <h1 className="font-extrabold tracking-tight text-white" style={{ fontSize: 20 }}>
+                            Thùng rác
+                        </h1>
+                        <p className="mt-px text-muted-foreground" style={{ fontSize: 12 }}>
+                            Mục đã xóa gần đây — khôi phục về vị trí cũ bất cứ lúc nào.
+                        </p>
+                    </div>
                 </div>
-                <div className="min-w-0">
-                    <h1 className="font-extrabold tracking-tight text-white" style={{ fontSize: 20 }}>
-                        Thùng rác
-                    </h1>
-                    <p className="mt-px text-muted-foreground" style={{ fontSize: 12 }}>
-                        Mục đã xóa gần đây — khôi phục về vị trí cũ bất cứ lúc nào.
-                    </p>
-                </div>
-            </div>
+            )}
 
             <div className="overflow-hidden rounded-2xl border border-white/5 bg-zinc-950/60 shadow-xl shadow-black/40 backdrop-blur-xl">
                 {/* header row: back + count + refresh + bulk restore */}
                 <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
                     <div className="flex items-center gap-2">
-                        <a
-                            href={teamHref}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[12.5px] text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
-                        >
-                            <ChevronLeft size={15} /> {REVIEW_MODULE_LABEL}
-                        </a>
+                        {!chromeless && (
+                            <a
+                                href={teamHref}
+                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[12.5px] text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100"
+                            >
+                                <ChevronLeft size={15} /> {REVIEW_MODULE_LABEL}
+                            </a>
+                        )}
                         {data && (
                             <span className="text-[11px] text-muted-foreground">
                                 {data.total} mục{data.total > items.length ? ` (đã tải ${items.length})` : ''}

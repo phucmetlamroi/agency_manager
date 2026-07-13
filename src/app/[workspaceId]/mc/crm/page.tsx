@@ -38,7 +38,7 @@ export default async function MissionControlCrmPage({ params }: { params: Promis
         { icon: Wallet, href: `/${workspaceId}/mc/tien`, divider: true },
         { icon: Building2, active: true, title: 'Quản lý khách hàng' },
         { icon: UsersRound, href: `/${workspaceId}/mc/members`, divider: true, title: 'Thành viên' },
-        { icon: Trash2, title: 'Thùng rác' },
+        { icon: Trash2, href: `/${workspaceId}/mc/trash`, title: 'Thùng rác' },
         { icon: Activity, title: 'Phân tích — Màn 28' },
         { icon: ScrollText, title: 'Nhật ký hoạt động — Màn 29' },
     ]

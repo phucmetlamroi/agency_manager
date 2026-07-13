@@ -82,7 +82,7 @@ export default async function MissionControlBoardPage({ params }: { params: Prom
         { icon: Wallet, href: `/${workspaceId}/mc/tien`, divider: true, title: 'Tiền — Payroll' },
         { icon: Building2, href: `/${workspaceId}/mc/crm`, title: 'Quản lý khách hàng' },
         { icon: UsersRound, href: `/${workspaceId}/mc/members`, divider: true, title: 'Thành viên' },
-        { icon: Trash2, title: 'Thùng rác' },
+        { icon: Trash2, href: `/${workspaceId}/mc/trash`, title: 'Thùng rác' },
         { icon: Activity, title: 'Phân tích — Màn 28' },
         { icon: ScrollText, title: 'Nhật ký hoạt động — Màn 29' },
     ]

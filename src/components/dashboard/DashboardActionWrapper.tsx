@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { Plus } from "lucide-react"
 import DashboardActionBar from "./DashboardActionBar"
 import AddTaskModal from "./AddTaskModal"
 import { toast } from "sonner"
@@ -51,6 +52,12 @@ interface DashboardActionWrapperProps {
    *  behavior). */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /**
+   * [Mobile P2 §2b] 'bar' (default) = the desktop DashboardActionBar; 'fab' = a floating
+   * "+" button (mobile Task tab) that opens the SAME AddTaskModal + submit flow. Desktop is
+   * byte-identical because it never passes this prop.
+   */
+  variant?: 'bar' | 'fab'
 }
 
 // [QA R1 — user decision] A Multi-Hook Map can't fan out across a batch — attach it to
@@ -90,6 +97,7 @@ export default function DashboardActionWrapper({
   hideBar = false,
   open,
   onOpenChange,
+  variant = 'bar',
 }: DashboardActionWrapperProps) {
   // [Giao diện 2] Controlled vs uncontrolled open. When the host passes `onOpenChange`
   // it owns the state (Mission Control); otherwise the wrapper keeps its own — /admin
@@ -417,15 +425,29 @@ export default function DashboardActionWrapper({
 
   return (
     <>
-      {!hideBar && (
-        <DashboardActionBar
-          workspaceId={workspaceId}
-          onAddTask={() => setModalOpen(true)}
-          workspaces={workspaces}
-          userRole={userRole}
-          canCreateWorkspace={canCreateWorkspace}
-        />
-      )}
+      {/* [Merge] Mission Control hides the trigger entirely (hideBar → supplies its own
+          topbar/⌘K); otherwise the mobile Task tab shows a floating "+" (variant='fab') and
+          the desktop /admin shows the DashboardActionBar (default). */}
+      {!hideBar &&
+        (variant === 'fab' ? (
+          // [Mobile P2 §2b] Floating "+" — thumb-zone, above the bottom tab bar + safe-area.
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            aria-label="Tạo task"
+            className="fixed right-4 bottom-[calc(64px+env(safe-area-inset-bottom)+16px)] z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/30 transition-transform active:scale-95"
+          >
+            <Plus className="h-6 w-6" strokeWidth={2.5} />
+          </button>
+        ) : (
+          <DashboardActionBar
+            workspaceId={workspaceId}
+            onAddTask={() => setModalOpen(true)}
+            workspaces={workspaces}
+            userRole={userRole}
+            canCreateWorkspace={canCreateWorkspace}
+          />
+        ))}
       <AddTaskModal
         open={modalOpen}
         onClose={closeModal}

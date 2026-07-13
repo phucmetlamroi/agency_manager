@@ -9,6 +9,10 @@ import { Inbox, Sparkles, UserPlus, ListChecks, Filter, Clock } from 'lucide-rea
 import { MarketplaceToggle } from '@/components/marketplace/MarketplaceToggle'
 import { prisma } from '@/lib/db'
 import { isMobileDevice } from '@/lib/device'
+import DashboardActionWrapper from '@/components/dashboard/DashboardActionWrapper'
+import { dedupeClientsByPath } from '@/lib/client-dedupe'
+import { computeWorkspaceFinance } from '@/lib/finance-helpers'
+import { isProfileOwner } from '@/lib/profile-permissions'
 
 export default async function TaskQueuePage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -73,14 +77,48 @@ export default async function TaskQueuePage({ params }: { params: Promise<{ work
     // (TẤT CẢ task theo status, thẻ tối giản) thay vì chỉ hàng chờ giao — đây là "theo dõi tiến độ"
     // chủ dự án tìm mãi không thấy. Desktop giữ nguyên trang hàng chờ giao bên dưới (không đụng).
     if (await isMobileDevice()) {
+        // [Mobile P2 §2b] FAB → Add Task: reuse DashboardActionWrapper (variant="fab") + its
+        // AddTaskModal/submit flow. Fetch the same props admin/page.tsx feeds it — no new action.
+        const canCreateWorkspace = await isProfileOwner(session.user.id, profileId)
+        const allClientsRaw = await workspacePrisma.client.findMany({
+            where: { status: 'ACTIVE' },
+            select: { id: true, name: true, parentId: true, parent: { select: { name: true } } },
+            orderBy: { name: 'asc' },
+        })
+        const allClients = dedupeClientsByPath(allClientsRaw)
+        const pricingRulesRaw = await prisma.pricingRule.findMany({
+            where: { workspaceId },
+            select: { id: true, name: true, clientId: true, ruleType: true, config: true, isDefault: true },
+            orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
+        })
+        const finance = await computeWorkspaceFinance(workspaceId, profileId)
+        const workspacesForProfile = await prisma.workspace.findMany({
+            where: { profileId },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, name: true, description: true },
+        })
+
         return (
-            <MobileTaskView
-                tasks={serializeDecimal(tasks) as any}
-                isAdmin={true}
-                users={users}
-                workspaceId={workspaceId}
-                minimal
-            />
+            <>
+                <MobileTaskView
+                    tasks={serializeDecimal(tasks) as any}
+                    isAdmin={true}
+                    users={users}
+                    workspaceId={workspaceId}
+                    minimal
+                />
+                <DashboardActionWrapper
+                    variant="fab"
+                    workspaceId={workspaceId}
+                    clients={allClients.map((c) => ({ ...c, id: String(c.id), parentId: c.parentId ? String(c.parentId) : null }))}
+                    users={users.map((u) => ({ id: u.id, username: u.username, nickname: u.nickname, displayName: u.displayName }))}
+                    workspaces={workspacesForProfile}
+                    userRole={session.user.role}
+                    canCreateWorkspace={canCreateWorkspace}
+                    pricingRules={pricingRulesRaw.map((r) => ({ id: r.id, name: r.name, clientId: r.clientId, ruleType: r.ruleType, config: r.config, isDefault: r.isDefault }))}
+                    exchangeRate={finance.exchangeRate}
+                />
+            </>
         )
     }
 

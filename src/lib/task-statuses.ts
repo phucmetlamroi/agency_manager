@@ -144,6 +144,30 @@ export function isReviewPhaseStatus(status: string | null | undefined): boolean 
     return !!status && REVIEW_PHASE_STATUSES.includes(status)
 }
 
+/** Terminal statuses ('Hoàn tất' completed / 'Đã hủy' cancelled) — DERIVED from meta. */
+export const TERMINAL_STATUSES: string[] = TASK_STATUS_META.filter((m) => m.terminal).map((m) => m.value)
+
+/**
+ * True when a task's status is terminal. [E1/J1] Auto-transitions triggered by review
+ * events (Inngest / Mux webhook / a guest decision) must NEVER flip a terminal task — a
+ * completed ('Hoàn tất', already paid via payroll) or cancelled task can only be re-opened
+ * by an explicit manual staff status change, not by a late guest "request changes".
+ */
+export function isTerminalStatus(status: string | null | undefined): boolean {
+    return !!status && TERMINAL_STATUSES.includes(status)
+}
+
+/**
+ * [Q1] The CLIENT-FACING label to email/show for a status, or null when the status is internal-only
+ * (the client must never be told a raw internal status). Used to gate + label the guest `status_update`
+ * email so an `internalOnly` transition never notifies the client.
+ */
+export function clientVisibleLabel(status: string | null | undefined): string | null {
+    const meta = TASK_STATUS_META.find((m) => m.value === status)
+    if (!meta || meta.internalOnly) return null
+    return meta.clientLabel
+}
+
 /** Lifecycle phase → the EN label a client sees for any internalOnly status in it. */
 export const PHASE_CLIENT_LABEL: Record<TaskStatusPhase, string> = {
     production: 'In progress',
@@ -165,7 +189,11 @@ export const STATUS_TRANSITIONS: Record<string, string[]> = {
     // the internal round loops BACK into review (STATUS-MACHINE §3.1 diagram "A4 → …READY→ về A2" +
     // §3.3 predecessor "A1 lần đầu HOẶC A4 vòng lặp"). Without it a re-upload at A4 would strand the
     // task at A4 with the only forward auto-path being F10→client, pushing an un-reviewed cut out.
-    'Đã nộp video (nội bộ)':      ['Đang thực hiện', 'Revision', 'Đã sửa feedback (nội bộ)'], // F7
+    // F7 — Mux READY. Includes A5 'Đã gửi video (khách)' so a NEW cut re-uploaded AFTER the task
+    // was already sent to the client loops BACK into internal review (R1): revokeClientExposureOnNewVersion
+    // has already revoked the share + nulled clientReview, and A5→A2 here un-sticks the task so the admin
+    // can F10 re-send. Without it the task stranded at A5 with dead links and every review-module button 409'd.
+    'Đã nộp video (nội bộ)':      ['Đang thực hiện', 'Revision', 'Đã sửa feedback (nội bộ)', 'Đã gửi video (khách)'], // F7
     // F8 — admin closes/opens an internal feedback session. A2 = round 1 (right after upload);
     // A4 = RE-OPEN a NEW round after the editor already confirmed a prior fix (multi-round loop —
     // feedback-flow spec §Giai đoạn 4). The prior round's comments are already resolved, so the

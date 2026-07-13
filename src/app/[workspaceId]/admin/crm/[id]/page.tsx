@@ -4,6 +4,8 @@ import { prisma as globalPrisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import ClientAnalytics from '@/components/crm/ClientAnalytics'
 import CreateSubClientButton from '@/components/crm/CreateSubClientButton'
+import MobileClientDetail from '@/components/crm/MobileClientDetail'
+import { isMobileDevice } from '@/lib/device'
 import { notFound, redirect } from 'next/navigation'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string, workspaceId: string }> }) {
@@ -75,6 +77,18 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         })).filter(d => d.value > 0)
     } else {
         distribution = [{ name: 'Task trực tiếp', value: client.tasks.length }]
+    }
+
+    // [Mobile 3j] Dispatcher — desktop bento (return below) untouched. Mobile gets a compact
+    // stacked layout composed from the SAME data (client + tasks + invoices + ratings).
+    if (await isMobileDevice()) {
+        return (
+            <MobileClientDetail
+                client={serializeDecimal(client) as any}
+                ratings={serializeDecimal(ratings) as any}
+                workspaceId={workspaceId}
+            />
+        )
     }
 
     return (

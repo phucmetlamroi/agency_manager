@@ -3,6 +3,8 @@ import { getSession } from '@/lib/auth'
 import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { redirect } from 'next/navigation'
 import { OptimisticGrid, GridUser, ScheduleItem } from '@/components/schedule/OptimisticGrid'
+import MobileScheduleView from '@/components/schedule/MobileScheduleView'
+import { isMobileDevice } from '@/lib/device'
 import { startOfWeek, endOfWeek, eachDayOfInterval, format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
@@ -112,6 +114,50 @@ export default async function AdminSchedulePage({
       items
     }
   })
+
+  // [Mobile 2d] Dispatcher — desktop grid (return below) untouched. Mobile adds the "Theo người"
+  // load matrix beside the availability grid (segmented). Fetch this week's assigned deadlines.
+  if (await isMobileDevice()) {
+    const weekTasks = await workspacePrisma.task.findMany({
+      where: { deadline: { gte: weekStart, lte: weekEnd }, assigneeId: { in: staffIds } },
+      select: { id: true, title: true, assigneeId: true, deadline: true, status: true },
+    })
+    const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+    const VN = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+    const days = weekDays.map((d) => ({ key: dayKey(d), label: `${VN[d.getDay()]} ${format(d, 'dd/MM')}` }))
+    const staff = staffMembers.map((s) => ({ id: s.id, name: s.displayName || s.nickname || s.username }))
+    const schedTasks = weekTasks
+      .filter((t) => t.deadline)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        assigneeId: t.assigneeId,
+        deadline: (t.deadline as Date).toISOString(),
+        status: t.status,
+        dayKey: dayKey(new Date(t.deadline as Date)),
+      }))
+    return (
+      <div className="flex-1 space-y-4 p-3 pt-4">
+        <div>
+          <h2 className="text-xl font-extrabold tracking-tight">Lịch điều phối</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Lịch rảnh/bận + tải deadline theo người</p>
+        </div>
+        <MobileScheduleView
+          availabilitySlot={
+            gridUsers.length === 0 ? (
+              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Chưa có nhân sự nào trong profile này.</div>
+            ) : (
+              <OptimisticGrid workspaceId={workspaceId} profileId={profileId} dateStr={format(baseDate, 'yyyy-MM-dd')} users={gridUsers} readOnly={true} />
+            )
+          }
+          staff={staff}
+          days={days}
+          tasks={schedTasks}
+          workspaceId={workspaceId}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="flex-1 space-y-4 p-3 pt-4 sm:p-6">

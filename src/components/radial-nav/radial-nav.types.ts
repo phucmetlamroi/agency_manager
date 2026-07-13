@@ -21,11 +21,13 @@ export type RadialNavContextValue = {
     resetConfig: () => void
     isConfigOpen: boolean
     setConfigOpen: (open: boolean) => void
+    /** [Mobile PR#6] Open the radial imperatively (long-press the Menu tab) at a screen origin. */
+    openMenu: (origin: { x: number; y: number }) => void
 }
 
 export type MenuState =
     | { open: false }
-    | { open: true; origin: { x: number; y: number } }
+    | { open: true; origin: { x: number; y: number }; dismissable?: boolean }
 
 export type GestureState = 'IDLE' | 'ARMED' | 'MENU_OPEN'
 

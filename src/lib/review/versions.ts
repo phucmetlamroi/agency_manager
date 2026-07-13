@@ -143,10 +143,18 @@ export async function deleteVersion(
     // [FR-03] editor chỉ xóa version của asset trong phạm vi được giao.
     await assertAssetInScope(await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }), asset.id, 'write')
 
-    const liveCount = await prisma.reviewVersion.count({ where: { assetId: asset.id, deletedAt: null } })
     const now = new Date()
 
     return prisma.$transaction(async (tx) => {
+        // [K1] Serialize deletes on the SAME asset: reading liveCount + the head pointer OUTSIDE the
+        // tx let two racers both observe liveCount=2, both take the non-last branch, and strand a live
+        // asset with 0 live versions (violates I2). Lock, then read liveCount/head INSIDE the tx so a
+        // second concurrent delete correctly sees liveCount=1 and trashes the whole stack instead.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${asset.id}, 0))`
+        const stillLive = await tx.reviewVersion.findFirst({ where: { id: versionId, deletedAt: null }, select: { id: true } })
+        if (!stillLive) throw apiError(409, 'STATE_INVALID', 'Phiên bản đã bị xóa.', { reason: 'already_deleted' })
+        const liveCount = await tx.reviewVersion.count({ where: { assetId: asset.id, deletedAt: null } })
+        const current = await tx.reviewAsset.findUnique({ where: { id: asset.id }, select: { currentVersionId: true } })
         const folder = await tx.reviewFolder.findUnique({ where: { id: asset.folderId }, select: { path: true } })
 
         if (liveCount <= 1) {
@@ -170,8 +178,8 @@ export async function deleteVersion(
 
         // Soft-delete just this version; re-point head if it was current.
         await tx.reviewVersion.update({ where: { id: versionId }, data: { deletedAt: now, deletedById: access.userId } })
-        let currentVersionId = asset.currentVersionId
-        if (asset.currentVersionId === versionId) {
+        let currentVersionId = current?.currentVersionId ?? null
+        if (current?.currentVersionId === versionId) {
             const head = await highestLiveVersion(tx, asset.id, versionId)
             currentVersionId = head?.id ?? null
             await tx.reviewAsset.update({ where: { id: asset.id }, data: { currentVersionId } })
@@ -207,12 +215,18 @@ export async function removeFromStack(versionId: string): Promise<{ newAssetId: 
     // [FR-03] editor chỉ tách version của asset trong phạm vi được giao.
     await assertAssetInScope(await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }), asset.id, 'write')
 
-    const liveCount = await prisma.reviewVersion.count({ where: { assetId: asset.id, deletedAt: null } })
-    if (liveCount <= 1) {
-        throw apiError(400, 'STATE_INVALID', 'Không thể tách phiên bản cuối cùng — hãy dùng Xóa asset.', { reason: 'last_version' })
-    }
-
     return prisma.$transaction(async (tx) => {
+        // [K1] Lock the asset + read liveCount INSIDE the tx: two concurrent detaches of different
+        // versions of a 2-version stack would both pass a pre-tx liveCount>1 check and each split one
+        // out, leaving the source asset live with 0 versions (violates I2).
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${asset.id}, 0))`
+        const stillLive = await tx.reviewVersion.findFirst({ where: { id: versionId, deletedAt: null }, select: { id: true } })
+        if (!stillLive) throw apiError(409, 'STATE_INVALID', 'Phiên bản đã bị xóa.', { reason: 'already_deleted' })
+        const liveCount = await tx.reviewVersion.count({ where: { assetId: asset.id, deletedAt: null } })
+        if (liveCount <= 1) {
+            throw apiError(400, 'STATE_INVALID', 'Không thể tách phiên bản cuối cùng — hãy dùng Xóa asset.', { reason: 'last_version' })
+        }
+        const current = await tx.reviewAsset.findUnique({ where: { id: asset.id }, select: { currentVersionId: true } })
         const newAssetId = randomUUID()
         // New standalone asset, same folder; head = the moved version.
         await tx.reviewAsset.create({
@@ -234,7 +248,7 @@ export async function removeFromStack(versionId: string): Promise<{ newAssetId: 
         // → two rows share the same non-null currentVersionId → Postgres P2002 → the generic
         // "Lỗi hệ thống" the user hit when detaching the TOP/current version. versionId has
         // already moved out (above), so highestLiveVersion(old) returns the next head (liveCount>1).
-        if (asset.currentVersionId === versionId) {
+        if (current?.currentVersionId === versionId) {
             const head = await highestLiveVersion(tx, asset.id)
             await tx.reviewAsset.update({ where: { id: asset.id }, data: { currentVersionId: head?.id ?? null } })
         }

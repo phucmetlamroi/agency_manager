@@ -165,10 +165,16 @@ export function RadialNavProvider({ children }: { children: React.ReactNode }) {
         }
     }, [visibleConfig.segments, resolvePath, router])
 
-    const handleOpen = useCallback((origin: { x: number; y: number }) => {
-        setMenuState({ open: true, origin })
+    const handleOpen = useCallback((origin: { x: number; y: number }, dismissable = false) => {
+        setMenuState({ open: true, origin, dismissable })
         setHoveredIndex(null)
     }, [])
+
+    // [Mobile PR#6] Imperative open (long-press Menu tab) — dismissable so a tap outside closes
+    // it (touch has no mouseup-to-close like the desktop drag gesture).
+    const openMenu = useCallback((origin: { x: number; y: number }) => {
+        handleOpen(origin, true)
+    }, [handleOpen])
 
     const handleClose = useCallback(() => {
         setMenuState({ open: false })
@@ -210,6 +216,7 @@ export function RadialNavProvider({ children }: { children: React.ReactNode }) {
         resetConfig,
         isConfigOpen,
         setConfigOpen,
+        openMenu,
     }
 
     return (
@@ -223,6 +230,7 @@ export function RadialNavProvider({ children }: { children: React.ReactNode }) {
                         segments={visibleConfig.segments}
                         origin={menuState.origin}
                         hoveredIndex={hoveredIndex}
+                        dismissable={menuState.dismissable}
                         onSelect={(i) => { handleSelect(i); handleClose() }}
                         onClose={handleClose}
                         onOpenConfig={() => setConfigOpen(true)}

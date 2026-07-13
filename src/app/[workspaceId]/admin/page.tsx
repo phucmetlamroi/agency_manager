@@ -28,6 +28,7 @@ import { isProfileOwner } from '@/lib/profile-permissions'
 import AdminMobileHome from '@/components/admin/AdminMobileHome'
 import { getLeaderboardData } from '@/components/dashboard/Leaderboard'
 import { getDisplayName } from '@/lib/display-name'
+import { getClientRequests } from '@/actions/client-request-actions'
 
 export default async function AdminDashboard({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -271,6 +272,35 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 assigneeAvatarUrl: null,
             }))
 
+        // [PR#4] Triage queue — compose 3 sources (no new server action): overdue + review-phase
+        // tasks + open client requests. Disjoint by construction (review-phase excluded from overdue).
+        const clientLabelOf = (t: any) =>
+            t.client ? (t.client.parent ? `${t.client.parent.name} / ${t.client.name}` : t.client.name) : null
+        const toTriage = (t: any, kind: 'overdue' | 'review') => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            clientLabel: clientLabelOf(t),
+            assigneeLabel: t.assignee ? getDisplayName(t.assignee) : null,
+            deadline: t.deadline ? new Date(t.deadline).toISOString() : null,
+            kind,
+        })
+        const overdueTriage = tasks.filter(
+            (t: any) =>
+                t.status === 'Quá hạn' ||
+                (t.deadline &&
+                    new Date(t.deadline) < now &&
+                    !isReviewPhaseStatus(t.status) &&
+                    t.status !== 'Hoàn tất' &&
+                    t.status !== 'Đã hủy'),
+        )
+        const reviewTriage = tasks.filter((t: any) => isReviewPhaseStatus(t.status))
+        const triageTasks = [
+            ...overdueTriage.map((t: any) => toTriage(t, 'overdue')),
+            ...reviewTriage.map((t: any) => toTriage(t, 'review')),
+        ]
+        const clientRequests = await getClientRequests(workspaceId)
+
         return (
             <AdminMobileHome
                 workspaceId={workspaceId}
@@ -293,6 +323,11 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
                 }}
                 agendaTasks={agendaTasks}
                 leaderboard={leaderboardEntries}
+                triage={{
+                    tasks: triageTasks,
+                    requests: clientRequests,
+                    users: users.map((u: any) => ({ id: u.id, username: u.username, nickname: u.nickname, displayName: u.displayName })),
+                }}
             />
         )
     }

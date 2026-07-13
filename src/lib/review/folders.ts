@@ -648,6 +648,11 @@ export async function moveItems(input: {
     if (resolvedTargetId == null) resolvedTargetId = (await ensureWorkspaceRoot(workspaceId)).id
 
     return prisma.$transaction(async (tx) => {
+        // [P3] Serialize concurrent moves in this workspace: two reciprocal moves (A→B ‖ B→A) must
+        // not both pass the cycle guard on stale pre-tx paths. With the lock held one move fully
+        // commits before the other reads, and we RE-READ the rows below so the guard + rowVersion
+        // checks run against CURRENT data, never the pre-tx snapshot.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${workspaceId}, 0))`
         const target = await tx.reviewFolder.findFirst({
             where: { id: resolvedTargetId!, deletedAt: null },
             select: { id: true, path: true, depth: true, workspaceId: true },
@@ -657,12 +662,33 @@ export async function moveItems(input: {
         // [FR-03] đích cũng phải nằm trong phạm vi được giao.
         assertFolderPathMutable(scope, target.path)
 
+        // [P3] Re-read moved rows under the lock (paths/rowVersions may have changed since the pre-tx
+        // snapshot). [P1] Then drop any selected folder nested under another selected folder: the
+        // ancestor's move relocates the whole subtree, so re-processing a descendant rewrites its path
+        // against a now-stale row (parentId ends up at target while path stays under the ancestor).
+        const freshFolders = folderIds.length
+            ? await tx.reviewFolder.findMany({ where: { id: { in: folderIds }, deletedAt: null } })
+            : []
+        if (freshFolders.length !== folderIds.length) throw apiError(404, 'NOT_FOUND', 'Một hoặc nhiều mục không tồn tại.')
+        const freshAssets = assetIds.length
+            ? await tx.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: null }, include: { folder: { select: { path: true } } } })
+            : []
+        if (freshAssets.length !== assetIds.length) throw apiError(404, 'NOT_FOUND', 'Một hoặc nhiều mục không tồn tại.')
+        const nestedFolderIds = new Set(
+            freshFolders.filter((f) => freshFolders.some((o) => o.id !== f.id && f.path.startsWith(o.path))).map((f) => f.id),
+        )
+
         const moved: { type: ItemType; id: string; rowVersion: number }[] = []
 
-        for (const folder of folderRows) {
+        for (const folder of freshFolders) {
             const item = input.items.find((i) => i.type === 'folder' && i.id === folder.id)!
             if (folder.rowVersion !== item.expectedRowVersion) {
                 throw apiError(409, 'ROW_VERSION_MISMATCH', 'Thư mục đã thay đổi.', { failedItemId: folder.id, current: folder.rowVersion })
+            }
+            if (nestedFolderIds.has(folder.id)) {
+                // [P1] Rides along with its selected ancestor's subtree move — acknowledge, don't re-move.
+                moved.push({ type: 'folder', id: folder.id, rowVersion: folder.rowVersion })
+                continue
             }
             if (folder.parentId === target.id) {
                 moved.push({ type: 'folder', id: folder.id, rowVersion: folder.rowVersion })
@@ -691,7 +717,7 @@ export async function moveItems(input: {
             moved.push({ type: 'folder', id: folder.id, rowVersion: updated.rowVersion })
         }
 
-        for (const asset of assetRows) {
+        for (const asset of freshAssets) {
             const item = input.items.find((i) => i.type === 'asset' && i.id === asset.id)!
             if (asset.rowVersion !== item.expectedRowVersion) {
                 throw apiError(409, 'ROW_VERSION_MISMATCH', 'Asset đã thay đổi.', { failedItemId: asset.id, current: asset.rowVersion })
@@ -752,9 +778,22 @@ export async function deleteItems(input: {
     const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
     assertFolderPathsMutable(scope, [...folderRows.map((f) => f.path), ...assetRows.map((a) => a.folder.path)])
 
+    // [P1/P2] When the selection contains a folder AND something nested under it, the ancestor's
+    // subtree sweep already soft-deletes the descendant with the ANCESTOR's deleteBatchId. Processing
+    // the descendant again would give it a SECOND batchId (so a restore of the ancestor leaves it
+    // orphaned in trash) and, for folders, an extra itemCount/byte decrement. Skip descendants of a
+    // selected folder — they ride along with the ancestor's sweep.
+    const nestedFolderIds = new Set(
+        folderRows.filter((f) => folderRows.some((o) => o.id !== f.id && f.path.startsWith(o.path))).map((f) => f.id),
+    )
+    const coveredAssetIds = new Set(
+        assetRows.filter((a) => folderRows.some((f) => a.folder.path.startsWith(f.path))).map((a) => a.id),
+    )
+
     const now = new Date()
     await prisma.$transaction(async (tx) => {
         for (const folder of folderRows) {
+            if (nestedFolderIds.has(folder.id)) continue // covered by its selected ancestor's subtree sweep
             const batchId = randomUUID()
             const del = { deletedAt: now, deletedById: access.userId, deleteBatchId: batchId }
             // Subtree folder ids (incl. self) via materialized-path prefix.
@@ -779,6 +818,7 @@ export async function deleteItems(input: {
         }
 
         for (const asset of assetRows) {
+            if (coveredAssetIds.has(asset.id)) continue // covered by a selected ancestor folder's subtree sweep
             const batchId = randomUUID()
             const bytes = await liveStackBytes(tx, asset.id)
             const del = { deletedAt: now, deletedById: access.userId, deleteBatchId: batchId }
@@ -864,7 +904,15 @@ export async function listTrash(input: {
     all.sort((x, y) => (x.deletedAt < y.deletedAt ? 1 : x.deletedAt > y.deletedAt ? -1 : 0)) // deletedAt desc
 
     const total = all.length
-    const start = input.cursor ? all.findIndex((i) => i.id === input.cursor) + 1 : 0
+    // [CC2] A cursor whose item left the trash (restored / nightly-purged between the client's page
+    // requests) makes findIndex return -1, and -1 + 1 = 0 would silently restart at page 1 (the client
+    // appends duplicate rows). Treat an unresolvable cursor as end-of-list instead.
+    let start = 0
+    if (input.cursor) {
+        const idx = all.findIndex((i) => i.id === input.cursor)
+        if (idx === -1) return { items: [], total, nextCursor: null }
+        start = idx + 1
+    }
     const page = all.slice(start, start + limit)
     const nextCursor = start + limit < total ? page[page.length - 1]?.id ?? null : null
     return { items: page, total, nextCursor }

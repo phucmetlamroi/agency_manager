@@ -1,9 +1,10 @@
 // [Review module P5.3] GET /api/r/:slug/versions/:versionId/view-url — DISPLAY
-// URL for an IMAGE asset (the image twin of the video playback token). This is
-// NOT the download route: it serves inline (no attachment disposition) and is
-// NOT gated by allowDownload — viewing the shared image IS the product, exactly
-// like HLS playback for a video. Videos 404 here (their original stays behind
-// the download gate).
+// URL for an IMAGE asset (the image twin of the video playback token). It serves
+// inline (no attachment disposition) so the guest can review the image. [B1] It
+// serves a DOWNSCALED + watermarked PREVIEW derivative, NOT the original master —
+// the full-res original stays behind the gated download-url route, so a share's
+// allowDownload / downloadOnlyWhenApproved controls can't be bypassed via viewing.
+// (Video is unaffected: guests only ever see the transcoded HLS.) Videos 404 here.
 
 import { NextRequest } from 'next/server'
 import { apiError, apiJson } from '@/lib/review/errors'
@@ -12,6 +13,7 @@ import { getClientIp, limitDb } from '@/lib/review/rate-limit-db'
 import { requireShare } from '@/lib/review/share-auth'
 import { assertVersionInShare } from '@/lib/review/share-guest'
 import { presignGetObject } from '@/lib/review/r2'
+import { getOrCreateImagePreview } from '@/lib/review/image-preview'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,6 +32,9 @@ export const GET = withShareRoute<Ctx>(async (req: NextRequest, { params }) => {
     if (version.pipelineStatus !== 'READY' || !version.r2Key) {
         throw apiError(409, 'STATE_INVALID', 'This file is not ready yet.')
     }
-    const url = await presignGetObject(version.r2Key, { expiresIn: 15 * 60 })
+    // [B1] Presign the downscaled/watermarked preview (generated + cached on first view), never the
+    // original master r2Key — the original is reachable only through the gated download-url route.
+    const previewKey = await getOrCreateImagePreview({ id: versionId, r2Key: version.r2Key })
+    const url = await presignGetObject(previewKey, { expiresIn: 15 * 60 })
     return apiJson({ url, expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() })
 })

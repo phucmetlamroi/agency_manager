@@ -225,46 +225,19 @@ function triggerDownload(url: string, fileName?: string): void {
     a.remove()
 }
 
-export interface FolderDownloadResult {
-    total: number
-    done: number
-    truncated: boolean
-}
-
 /**
- * Recursively download a folder's originals: fetch the manifest, then download each file
- * sequentially (small gap so the browser doesn't drop rapid-fire downloads). `onProgress`
- * fires after each file. Best-effort per file — one failure doesn't abort the rest.
+ * Bulk .zip download of Team "Tệp" items — navigates to the server zip stream, which bundles every
+ * resolved file (a folder = its whole subtree with relative paths preserved; assets = their current
+ * version) into ONE download. Same-origin anchor click sends cookies so requireReviewAccess passes;
+ * the browser saves the streamed .zip via Content-Disposition. Bundling is lossless (STORE method) —
+ * it never reduces video quality, it just replaces "download 10 files one-by-one" with one file.
+ * Replaces the old per-file `downloadFolder` loop.
  */
-export async function downloadFolder(
-    folderId: string,
-    onProgress?: (done: number, total: number) => void,
-): Promise<FolderDownloadResult> {
-    const res = await fetch(`/api/review/folders/${encodeURIComponent(folderId)}/manifest`, {
-        credentials: 'same-origin',
-        cache: 'no-store',
-    })
-    if (!res.ok) throw new Error(await errMessage(res))
-    const { files, truncated } = (await res.json()) as {
-        files: { versionId: string; fileName: string; relPath: string }[]
-        truncated: boolean
-    }
-    let done = 0
-    for (const f of files) {
-        try {
-            await downloadVersion(f.versionId)
-        } catch {
-            /* skip this file; keep going */
-        }
-        done += 1
-        onProgress?.(done, files.length)
-        if (done < files.length) await sleep(350)
-    }
-    return { total: files.length, done, truncated }
-}
-
-function sleep(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms))
+export function downloadZip(input: { folders: string[]; assets: string[] }): void {
+    const qs = new URLSearchParams()
+    if (input.folders.length) qs.set('folders', input.folders.join(','))
+    if (input.assets.length) qs.set('assets', input.assets.join(','))
+    triggerDownload(`/api/review/download-zip?${qs.toString()}`)
 }
 
 /* ── deep-links + clipboard ──────────────────────────────────────────────────── */

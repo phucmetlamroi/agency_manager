@@ -72,7 +72,7 @@ import {
     apiSetAssetStatus,
     apiMergeStacks,
     downloadVersion,
-    downloadFolder,
+    downloadZip,
     teamFolderUrl,
     teamAssetUrl,
     copyToClipboard,
@@ -691,30 +691,42 @@ export function TeamBrowser({
     const doDownload = useCallback(
         async (items: ItemRef[]) => {
             if (items.length === 0) return
-            const assetItems = items.filter((i) => i.type === 'asset')
             const folderItems = items.filter((i) => i.type === 'folder')
+            const assetItems = items.filter((i) => i.type === 'asset')
+            // Assets that actually have a READY current version to download.
+            const readyAssets = assetItems
+                .map((it) => assetById.get(it.id))
+                .filter((a): a is NonNullable<typeof a> => !!a && a.currentVersion?.uploadStatus === 'ready' && !!a.currentVersionId)
+            const notReady = assetItems.length - readyAssets.length
+
+            // Download rule (owner): a folder → the WHOLE folder as ONE .zip. Assets only → 3+ videos
+            // bundle into a .zip; 1–2 download as separate individual files. (A single video → direct.)
+            const useZip = folderItems.length > 0 || readyAssets.length >= 3
             const tid = toast.loading('Đang chuẩn bị tải xuống…')
             try {
-                let count = 0
-                let notReady = 0
-                for (const it of assetItems) {
-                    const a = assetById.get(it.id)
-                    if (a?.currentVersion?.uploadStatus === 'ready' && a.currentVersionId) {
-                        await downloadVersion(a.currentVersionId)
-                        count += 1
-                    } else {
-                        notReady += 1
+                if (useZip) {
+                    const folders = folderItems.map((i) => i.id)
+                    const assets = readyAssets.map((a) => a.id)
+                    if (folders.length === 0 && assets.length === 0) {
+                        toast.error('Không có tệp nào sẵn sàng để tải.', { id: tid })
+                        return
                     }
+                    downloadZip({ folders, assets }) // one streamed .zip via the browser download
+                    toast.success(`Đang tải xuống dạng .zip${notReady ? ` (bỏ qua ${notReady} chưa xử lý xong)` : ''}.`, { id: tid })
+                } else {
+                    if (readyAssets.length === 0) {
+                        toast.error('Không có tệp nào sẵn sàng để tải.', { id: tid })
+                        return
+                    }
+                    let count = 0
+                    for (const a of readyAssets) {
+                        await downloadVersion(a.currentVersionId!)
+                        count += 1
+                        // stagger the (at most 2) downloads so the browser doesn't drop the second one.
+                        if (count < readyAssets.length) await new Promise((r) => setTimeout(r, 400))
+                    }
+                    toast.success(`Đã bắt đầu tải ${count} tệp${notReady ? ` (bỏ qua ${notReady} chưa xử lý xong)` : ''}.`, { id: tid })
                 }
-                for (const it of folderItems) {
-                    const r = await downloadFolder(it.id, (done, total) =>
-                        toast.loading(`Đang tải thư mục… ${done}/${total}`, { id: tid }),
-                    )
-                    count += r.done
-                    if (r.truncated) toast(`Thư mục lớn — chỉ tải ${r.total} tệp đầu tiên.`)
-                }
-                if (count === 0) toast.error('Không có tệp nào sẵn sàng để tải.', { id: tid })
-                else toast.success(`Đã bắt đầu tải ${count} tệp${notReady ? ` (bỏ qua ${notReady} chưa xử lý xong)` : ''}.`, { id: tid })
             } catch (e) {
                 toast.error(e instanceof Error ? e.message : 'Tải xuống thất bại.', { id: tid })
             }

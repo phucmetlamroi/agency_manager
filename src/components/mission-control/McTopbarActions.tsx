@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/command"
 import DashboardActionWrapper from "@/components/dashboard/DashboardActionWrapper"
 import { setUiPref } from "@/actions/ui-actions"
+import { Pressable } from "./motion-kit"
 
 export interface McAddTaskData {
     clients: Array<{ id: string; name: string; parentId?: string | null; parent?: { name: string } | null }>
@@ -86,7 +87,7 @@ export default function McTopbarActions({
     return (
         <>
             {/* ⌘K search chip → open palette */}
-            <button
+            <Pressable
                 type="button"
                 onClick={() => setPaletteOpen(true)}
                 style={{
@@ -98,11 +99,11 @@ export default function McTopbarActions({
                 <Search style={{ width: 14, height: 14, color: "#71717A" }} />
                 <span style={{ fontSize: 12, color: "#71717A", flex: 1 }}>Tìm task, khách, người…</span>
                 <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 10, background: "rgba(0,0,0,0.4)", padding: "2px 6px", borderRadius: 4, color: "#A1A1AA" }}>⌘K</span>
-            </button>
+            </Pressable>
 
             {/* [M18] Store → Phiên Chợ Task (real TaskMarketplace modal, mounted globally in the
                 workspace layout). Opens via the 'open-marketplace' event; badge = live open count. */}
-            <button
+            <Pressable
                 type="button"
                 onClick={openMarketplace}
                 title="Phiên Chợ Task — task chưa giao"
@@ -112,16 +113,16 @@ export default function McTopbarActions({
                 {mktCount > 0 && (
                     <span style={{ position: "absolute", top: -5, right: -5, minWidth: 17, height: 17, padding: "0 4px", borderRadius: 999, background: "#10B981", color: "#fff", fontSize: 9.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 8px rgba(16,185,129,0.6)" }}>{mktCount}</span>
                 )}
-            </button>
+            </Pressable>
 
             {/* Add Task → real AddTaskModal */}
-            <button
+            <Pressable
                 type="button"
                 onClick={() => setAddOpen(true)}
                 style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", borderRadius: 10, background: "#6366F1", color: "#fff", fontSize: 13, fontWeight: 700, boxShadow: "0 0 24px rgba(99,102,241,0.40)", cursor: "pointer" }}
             >
                 <Plus style={{ width: 15, height: 15 }} /><span>Add Task</span>
-            </button>
+            </Pressable>
 
             {/* ⌘K command palette */}
             <CommandDialog open={paletteOpen} onOpenChange={setPaletteOpen}>

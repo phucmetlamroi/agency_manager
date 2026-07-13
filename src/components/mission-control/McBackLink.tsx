@@ -8,11 +8,12 @@
 import { useState } from "react"
 import { ArrowLeftRight } from "lucide-react"
 import { setUiPref } from "@/actions/ui-actions"
+import { Pressable } from "./motion-kit"
 
 export default function McBackLink({ backHref }: { backHref: string }) {
     const [pending, setPending] = useState(false)
     return (
-        <button
+        <Pressable
             type="button"
             title="Về Giao diện 1"
             disabled={pending}
@@ -29,6 +30,6 @@ export default function McBackLink({ backHref }: { backHref: string }) {
             }}
         >
             <ArrowLeftRight style={{ width: 17, height: 17 }} />
-        </button>
+        </Pressable>
     )
 }

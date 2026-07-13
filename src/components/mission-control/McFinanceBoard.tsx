@@ -13,6 +13,7 @@ import {
     CalendarDays as CalIcon, ChevronDown, TrendingUp, Sigma, Search, ChevronLeft, ChevronRight,
 } from "lucide-react"
 import McBackLink from "./McBackLink"
+import { Pressable, Reveal, RevealGroup, RevealItem } from "./motion-kit"
 
 export interface McFinanceTxn {
     id: string; title: string; status: string; statusHex: string; statusLabel: string
@@ -90,9 +91,9 @@ export default function McFinanceBoard({ data }: { data: McFinanceData }) {
                     const Icon = r.icon
                     const href = railHref(r.href)
                     const inner = (
-                        <div style={{ position: "relative", width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: r.active ? "#A5B4FC" : "#A1A1AA", background: r.active ? "rgba(99,102,241,0.18)" : "transparent", border: r.active ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", boxShadow: r.active ? "0 4px 16px rgba(99,102,241,0.15)" : "none" }}>
+                        <Pressable as="div" style={{ position: "relative", width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: r.active ? "#A5B4FC" : "#A1A1AA", background: r.active ? "rgba(99,102,241,0.18)" : "transparent", border: r.active ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", boxShadow: r.active ? "0 4px 16px rgba(99,102,241,0.15)" : "none" }}>
                             <Icon style={{ width: 18, height: 18 }} />
-                        </div>
+                        </Pressable>
                     )
                     return (
                         <div key={i} style={{ display: "contents" }}>
@@ -108,7 +109,7 @@ export default function McFinanceBoard({ data }: { data: McFinanceData }) {
             {/* Main */}
             <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
                 {/* Header */}
-                <div style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(10,10,10,0.50)", backdropFilter: "blur(10px)" }}>
+                <Reveal style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(10,10,10,0.50)", backdropFilter: "blur(10px)" }}>
                     <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                         <Link href={data.payrollHref} style={{ fontSize: 12, fontWeight: 700, padding: "7px 16px", borderRadius: 9, color: "#A1A1AA", whiteSpace: "nowrap", textDecoration: "none" }}>Payroll — Bảng lương</Link>
                         <span style={{ fontSize: 12, fontWeight: 700, padding: "7px 16px", borderRadius: 9, background: "rgba(99,102,241,0.20)", border: "1px solid rgba(99,102,241,0.35)", color: "#C7D2FE", whiteSpace: "nowrap" }}>Finance — Tài chính</span>
@@ -121,12 +122,12 @@ export default function McFinanceBoard({ data }: { data: McFinanceData }) {
                     </div>
                     <div style={{ display: "flex", padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                         {(["VND", "USD"] as Cur[]).map((c) => (
-                            <button key={c} type="button" onClick={() => setCur(c)}
-                                style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 999, cursor: "pointer", border: "none", background: cur === c ? "rgba(99,102,241,0.20)" : "transparent", color: cur === c ? "#C7D2FE" : "#71717A" }}>{c}</button>
+                            <Pressable key={c} type="button" onClick={() => setCur(c)}
+                                style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 999, cursor: "pointer", border: "none", background: cur === c ? "rgba(99,102,241,0.20)" : "transparent", color: cur === c ? "#C7D2FE" : "#71717A" }}>{c}</Pressable>
                         ))}
                     </div>
                     <div style={{ width: 34, height: 34, borderRadius: 999, background: "linear-gradient(135deg,#A855F7,#6366F1)", border: "2px solid rgba(99,102,241,0.6)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 12 }}>{data.currentUserInitials}</div>
-                </div>
+                </Reveal>
 
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14, padding: "18px 24px", minHeight: 0, overflow: "hidden" }}>
                     {/* THỰC TẾ */}
@@ -160,8 +161,8 @@ export default function McFinanceBoard({ data }: { data: McFinanceData }) {
                             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717A" }}>Nhật ký giao dịch — per task</span>
                             <div style={{ display: "flex", padding: 2, borderRadius: 999, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                                 {([["all", `Tất cả · ${data.txns.length}`], ["done", `Hoàn tất · ${data.actual.count}`], ["pending", `Đang chờ · ${data.txns.length - data.actual.count}`]] as const).map(([k, lbl]) => (
-                                    <button key={k} type="button" onClick={() => { setFilter(k); setPage(0) }}
-                                        style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 999, cursor: "pointer", border: "none", background: filter === k ? "rgba(99,102,241,0.20)" : "transparent", color: filter === k ? "#C7D2FE" : "#71717A" }}>{lbl}</button>
+                                    <Pressable key={k} type="button" onClick={() => { setFilter(k); setPage(0) }}
+                                        style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 999, cursor: "pointer", border: "none", background: filter === k ? "rgba(99,102,241,0.20)" : "transparent", color: filter === k ? "#C7D2FE" : "#71717A" }}>{lbl}</Pressable>
                                 ))}
                             </div>
                             <div style={{ flex: 1 }} />
@@ -179,10 +180,11 @@ export default function McFinanceBoard({ data }: { data: McFinanceData }) {
                             <span style={{ width: 110, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#71717A", textAlign: "right" }}>Thù lao</span>
                             <span style={{ width: 110, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#71717A", textAlign: "right" }}>Lợi nhuận</span>
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", minHeight: 0 }}>
+                        <RevealGroup style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", minHeight: 0 }}>
                             {rows.length === 0 && <div style={{ textAlign: "center", fontSize: 12, color: "#52525B", padding: "24px 8px" }}>Không có giao dịch khớp.</div>}
                             {rows.map((t) => (
-                                <Link key={t.id} href={`/${data.workspaceId}/mc/task/${t.id}`} title="Mở chi tiết task"
+                                <RevealItem key={t.id} whileHover={{ y: -4 }}>
+                                <Link href={`/${data.workspaceId}/mc/task/${t.id}`} title="Mở chi tiết task"
                                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderRadius: 13, background: "rgba(24,24,27,0.60)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.06)", textDecoration: "none", opacity: t.isCompleted ? 1 : 0.85 }}>
                                     <span style={{ flex: 1.6, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                                         <span style={{ fontSize: 12.5, fontWeight: 700, color: "#F4F4F5", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.title}</span>
@@ -196,13 +198,14 @@ export default function McFinanceBoard({ data }: { data: McFinanceData }) {
                                     <span style={{ width: 110, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12, color: t.isCompleted ? "#D4D4D8" : "#A1A1AA", textAlign: "right" }}>{fmt(t.wageVND)}</span>
                                     <span style={{ width: 110, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12, fontWeight: 700, color: t.isCompleted ? "#34D399" : "#71717A", textAlign: "right" }}>{t.isCompleted ? `+${fmt(t.profitVND)}` : "dự kiến"}</span>
                                 </Link>
+                                </RevealItem>
                             ))}
-                        </div>
+                        </RevealGroup>
                         <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10, padding: "8px 16px" }}>
                             <span style={{ fontSize: 11, color: "#71717A" }}>Hiển thị <b style={{ color: "#A1A1AA" }}>{filtered.length === 0 ? 0 : curPage * PAGE + 1}–{Math.min(curPage * PAGE + PAGE, filtered.length)}</b> / {filtered.length} giao dịch</span>
                             <div style={{ flex: 1 }} />
-                            <button type="button" disabled={curPage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} style={{ width: 26, height: 26, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: curPage === 0 ? "#52525B" : "#A1A1AA", background: "transparent", cursor: curPage === 0 ? "default" : "pointer" }}><ChevronLeft style={{ width: 13, height: 13 }} /></button>
-                            <button type="button" disabled={curPage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} style={{ width: 26, height: 26, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: curPage >= pageCount - 1 ? "#52525B" : "#A1A1AA", background: "transparent", cursor: curPage >= pageCount - 1 ? "default" : "pointer" }}><ChevronRight style={{ width: 13, height: 13 }} /></button>
+                            <Pressable type="button" disabled={curPage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} style={{ width: 26, height: 26, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: curPage === 0 ? "#52525B" : "#A1A1AA", background: "transparent", cursor: curPage === 0 ? "default" : "pointer" }}><ChevronLeft style={{ width: 13, height: 13 }} /></Pressable>
+                            <Pressable type="button" disabled={curPage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} style={{ width: 26, height: 26, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: curPage >= pageCount - 1 ? "#52525B" : "#A1A1AA", background: "transparent", cursor: curPage >= pageCount - 1 ? "default" : "pointer" }}><ChevronRight style={{ width: 13, height: 13 }} /></Pressable>
                         </div>
                     </div>
                 </div>

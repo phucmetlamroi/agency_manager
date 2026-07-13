@@ -18,6 +18,7 @@ import {
 import { assignTask } from "@/actions/task-management-actions"
 import { toggleMarketplace } from "@/actions/claim-actions"
 import McBackLink from "./McBackLink"
+import { Pressable, Reveal, RevealGroup, RevealItem } from "./motion-kit"
 
 export interface McQueueEditor {
     id: string; name: string; initials: string; avatar: string
@@ -108,9 +109,9 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                     const Icon = r.icon
                     const href = railHref(r.href)
                     const inner = (
-                        <div style={{ position: "relative", width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: r.active ? "#A5B4FC" : "#A1A1AA", background: r.active ? "rgba(99,102,241,0.18)" : "transparent", border: r.active ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", boxShadow: r.active ? "0 4px 16px rgba(99,102,241,0.15)" : "none" }}>
+                        <Pressable as="div" style={{ position: "relative", width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: r.active ? "#A5B4FC" : "#A1A1AA", background: r.active ? "rgba(99,102,241,0.18)" : "transparent", border: r.active ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", boxShadow: r.active ? "0 4px 16px rgba(99,102,241,0.15)" : "none" }}>
                             <Icon style={{ width: 18, height: 18 }} />
-                        </div>
+                        </Pressable>
                     )
                     return (
                         <div key={i} style={{ display: "contents" }}>
@@ -126,7 +127,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
             {/* Main */}
             <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
                 {/* Header */}
-                <div style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(10,10,10,0.50)", backdropFilter: "blur(10px)" }}>
+                <Reveal style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(10,10,10,0.50)", backdropFilter: "blur(10px)" }}>
                     <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <Inbox style={{ width: 18, height: 18, color: "#A5B4FC" }} />
                     </div>
@@ -139,7 +140,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                     {data.counts.long > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: "rgba(139,92,246,0.10)", color: "#A78BFA" }}>Long form · {data.counts.long}</span>}
                     {data.counts.trial > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: "rgba(245,158,11,0.10)", color: "#FBBF24" }}>Trial · {data.counts.trial}</span>}
                     {/* Marketplace pill */}
-                    <button type="button" onClick={doToggleMarket} disabled={pending}
+                    <Pressable type="button" onClick={doToggleMarket} disabled={pending}
                         style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", borderRadius: 999, cursor: pending ? "wait" : "pointer",
                             background: mktOpen ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.03)", border: mktOpen ? "1px solid rgba(16,185,129,0.30)" : "1px solid rgba(255,255,255,0.08)" }}>
                         <Store style={{ width: 14, height: 14, color: mktOpen ? "#34D399" : "#71717A" }} />
@@ -147,8 +148,8 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                         <span style={{ width: 30, height: 16, borderRadius: 999, background: mktOpen ? "rgba(16,185,129,0.35)" : "rgba(255,255,255,0.10)", position: "relative" }}>
                             <span style={{ position: "absolute", top: 2, [mktOpen ? "right" : "left"]: 2, width: 12, height: 12, borderRadius: 999, background: mktOpen ? "#34D399" : "#71717A", boxShadow: mktOpen ? "0 0 8px rgba(16,185,129,0.6)" : "none" } as CSSProperties} />
                         </span>
-                    </button>
-                </div>
+                    </Pressable>
+                </Reveal>
 
                 {/* Body — 3 columns */}
                 <div style={{ flex: 1, display: "flex", gap: 12, padding: "16px 24px", minHeight: 0 }}>
@@ -162,14 +163,14 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                             <div style={{ flex: 1 }} />
                             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "#71717A" }}><Filter style={{ width: 12, height: 12 }} />chọn task → giao</span>
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", minHeight: 0 }}>
+                        <RevealGroup style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", minHeight: 0 }}>
                             {data.waiting.length === 0 && (
                                 <div style={{ textAlign: "center", fontSize: 12, color: "#52525B", padding: "28px 8px" }}>Kho trống — mọi task đã được giao.</div>
                             )}
                             {data.waiting.map((t) => {
                                 const active = assigningId === t.id
                                 return (
-                                    <div key={t.id} style={{ display: "flex", flexDirection: "column", gap: 8, borderRadius: 12, background: active ? "rgba(24,24,27,0.85)" : "rgba(24,24,27,0.60)", backdropFilter: "blur(12px)", border: active ? "1px solid rgba(99,102,241,0.55)" : "1px solid rgba(255,255,255,0.06)", padding: 14, boxShadow: active ? "0 12px 32px rgba(0,0,0,0.55), 0 0 24px rgba(99,102,241,0.20)" : "none" }}>
+                                    <RevealItem key={t.id} whileHover={{ y: -4 }} style={{ display: "flex", flexDirection: "column", gap: 8, borderRadius: 12, background: active ? "rgba(24,24,27,0.85)" : "rgba(24,24,27,0.60)", backdropFilter: "blur(12px)", border: active ? "1px solid rgba(99,102,241,0.55)" : "1px solid rgba(255,255,255,0.06)", padding: 14, boxShadow: active ? "0 12px 32px rgba(0,0,0,0.55), 0 0 24px rgba(99,102,241,0.20)" : "none" }}>
                                         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                                             <GripVertical style={{ width: 14, height: 14, color: "#52525B", marginTop: 2, flexShrink: 0 }} />
                                             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
@@ -183,16 +184,16 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                             {t.hasRaw && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#A1A1AA" }}><Link2 style={{ width: 12, height: 12 }} />Raw footage</span>}
                                             <div style={{ flex: 1 }} />
                                             <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12, fontWeight: 700, color: t.priceVND > 0 ? "#F4F4F5" : "#71717A" }}>{t.priceVND > 0 ? `${fmtVND(t.priceVND)} đ` : "—"}</span>
-                                            <button type="button" onClick={() => { setAssigningId(active ? null : t.id); setSearch("") }}
+                                            <Pressable type="button" onClick={() => { setAssigningId(active ? null : t.id); setSearch("") }}
                                                 style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "5px 11px", borderRadius: 999, cursor: "pointer",
                                                     background: active ? "#6366F1" : "rgba(99,102,241,0.12)", color: active ? "#fff" : "#A5B4FC", border: active ? "1px solid #6366F1" : "1px solid rgba(99,102,241,0.30)" }}>
                                                 <UserPlus style={{ width: 12, height: 12 }} />{active ? "Đang giao…" : "Giao"}
-                                            </button>
+                                            </Pressable>
                                         </div>
-                                    </div>
+                                    </RevealItem>
                                 )
                             })}
-                        </div>
+                        </RevealGroup>
                     </div>
 
                     {/* Sản xuất + popover giao */}
@@ -219,7 +220,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                 <div style={{ display: "flex", flexDirection: "column", gap: 6, overflowY: "auto", maxHeight: 260 }}>
                                     {filteredEditors.length === 0 && <span style={{ fontSize: 11, color: "#52525B", padding: "8px 4px", textAlign: "center" }}>Không có editor khớp.</span>}
                                     {filteredEditors.map((e) => (
-                                        <button key={e.id} type="button" disabled={pending || e.blocked} onClick={() => doAssign(assigningTask.id, e.id, e.name)}
+                                        <Pressable key={e.id} type="button" disabled={pending || e.blocked} onClick={() => doAssign(assigningTask.id, e.id, e.name)}
                                             style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, textAlign: "left", cursor: e.blocked ? "not-allowed" : "pointer", opacity: e.blocked ? 0.45 : 1,
                                                 background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
                                             <span style={{ width: 28, height: 28, borderRadius: 999, background: e.avatar, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff", flexShrink: 0 }}>{e.initials}</span>
@@ -233,20 +234,20 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                             <div style={{ width: 54, height: 4, borderRadius: 999, background: "rgba(255,255,255,0.08)", flexShrink: 0 }}>
                                                 <div style={{ width: `${e.workloadPct}%`, height: "100%", borderRadius: 999, background: barColor(e.workloadPct) }} />
                                             </div>
-                                        </button>
+                                        </Pressable>
                                     ))}
                                 </div>
                                 <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "2px 4px" }} />
                                 {assigningTask.hasAssignee && (
-                                    <button type="button" disabled={pending} onClick={() => doAssign(assigningTask.id, "sys:revoke")}
+                                    <Pressable type="button" disabled={pending} onClick={() => doAssign(assigningTask.id, "sys:revoke")}
                                         style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 9, color: "#FBBF24", fontSize: 11, fontWeight: 600, background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
                                         <ShieldOff style={{ width: 13, height: 13 }} />Thu hồi về System<span style={{ marginLeft: "auto", fontSize: 9, color: "#52525B" }}>gỡ người + xóa deadline</span>
-                                    </button>
+                                    </Pressable>
                                 )}
-                                <button type="button" onClick={() => { setAssigningId(null); setSearch("") }}
+                                <Pressable type="button" onClick={() => { setAssigningId(null); setSearch("") }}
                                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 9, color: "#A1A1AA", fontSize: 11, fontWeight: 600, background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
                                     <UserX style={{ width: 13, height: 13 }} />Đóng
-                                </button>
+                                </Pressable>
                                 <div style={{ fontSize: 10, color: "#52525B", lineHeight: 1.5, padding: "0 4px" }}>Giao xong → task chuyển “Nhận task”, editor nhận thông báo. Server chặn giao cho Rank D “thẻ đỏ” + người ngoài tổ chức.</div>
                                 {mktOpen && (
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: "1px dashed rgba(16,185,129,0.35)", color: "#34D399" }}>

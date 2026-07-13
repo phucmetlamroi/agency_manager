@@ -12,6 +12,7 @@ import {
     Users, CalendarClock, ChevronLeft, ChevronRight, Pencil,
 } from "lucide-react"
 import McBackLink from "./McBackLink"
+import { Pressable, Reveal, RevealGroup, RevealItem } from "./motion-kit"
 
 export interface McCalTask {
     id: string; title: string; client: string | null
@@ -96,9 +97,9 @@ export default function McCalendarBoard({ data }: { data: McCalData }) {
                     const Icon = r.icon
                     const href = railHref(r.href)
                     const inner = (
-                        <div style={{ position: "relative", width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: r.active ? "#A5B4FC" : "#A1A1AA", background: r.active ? "rgba(99,102,241,0.18)" : "transparent", border: r.active ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", boxShadow: r.active ? "0 4px 16px rgba(99,102,241,0.15)" : "none" }}>
+                        <Pressable as="div" style={{ position: "relative", width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: r.active ? "#A5B4FC" : "#A1A1AA", background: r.active ? "rgba(99,102,241,0.18)" : "transparent", border: r.active ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", boxShadow: r.active ? "0 4px 16px rgba(99,102,241,0.15)" : "none" }}>
                             <Icon style={{ width: 18, height: 18 }} />
-                        </div>
+                        </Pressable>
                     )
                     return (
                         <div key={i} style={{ display: "contents" }}>
@@ -114,21 +115,21 @@ export default function McCalendarBoard({ data }: { data: McCalData }) {
             {/* Main */}
             <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
                 {/* Header */}
-                <div style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(10,10,10,0.50)", backdropFilter: "blur(10px)" }}>
+                <Reveal style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(10,10,10,0.50)", backdropFilter: "blur(10px)" }}>
                     {/* mode */}
                     <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                         {([["staff", "Nhân sự (rảnh/bận)", Users], ["deadline", "Deadline", CalendarClock]] as const).map(([k, lbl, Ic]) => (
-                            <button key={k} type="button" onClick={() => { setMode(k); setOffset(0) }}
+                            <Pressable key={k} type="button" onClick={() => { setMode(k); setOffset(0) }}
                                 style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 9, cursor: "pointer", border: mode === k ? "1px solid rgba(99,102,241,0.35)" : "1px solid transparent", background: mode === k ? "rgba(99,102,241,0.20)" : "transparent", color: mode === k ? "#C7D2FE" : "#A1A1AA", whiteSpace: "nowrap" }}>
                                 <Ic style={{ width: 13, height: 13 }} />{lbl}
-                            </button>
+                            </Pressable>
                         ))}
                     </div>
                     {mode === "deadline" && (
                         <div style={{ display: "flex", padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                             {(["week", "month"] as const).map((v) => (
-                                <button key={v} type="button" onClick={() => setView(v)}
-                                    style={{ fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 999, cursor: "pointer", border: "none", background: view === v ? "rgba(99,102,241,0.20)" : "transparent", color: view === v ? "#C7D2FE" : "#71717A" }}>{v === "week" ? "Tuần" : "Tháng"}</button>
+                                <Pressable key={v} type="button" onClick={() => setView(v)}
+                                    style={{ fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 999, cursor: "pointer", border: "none", background: view === v ? "rgba(99,102,241,0.20)" : "transparent", color: view === v ? "#C7D2FE" : "#71717A" }}>{v === "week" ? "Tuần" : "Tháng"}</Pressable>
                             ))}
                         </div>
                     )}
@@ -136,12 +137,12 @@ export default function McCalendarBoard({ data }: { data: McCalData }) {
                     <span style={{ fontSize: 13, fontWeight: 700, color: "#F4F4F5" }}>{rangeLabel}</span>
                     {(mode === "deadline" || offset !== 0) && (
                         <div style={{ display: "flex", gap: 4 }}>
-                            <button type="button" onClick={() => setOffset((o) => o - 1)} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#A1A1AA", background: "transparent", cursor: "pointer" }}><ChevronLeft style={{ width: 14, height: 14 }} /></button>
-                            <button type="button" onClick={() => setOffset(0)} style={{ fontSize: 11, fontWeight: 700, padding: "0 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", color: offset === 0 ? "#71717A" : "#A5B4FC", background: "transparent", cursor: "pointer" }}>Hôm nay</button>
-                            <button type="button" onClick={() => setOffset((o) => o + 1)} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#A1A1AA", background: "transparent", cursor: "pointer" }}><ChevronRight style={{ width: 14, height: 14 }} /></button>
+                            <Pressable type="button" onClick={() => setOffset((o) => o - 1)} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#A1A1AA", background: "transparent", cursor: "pointer" }}><ChevronLeft style={{ width: 14, height: 14 }} /></Pressable>
+                            <Pressable type="button" onClick={() => setOffset(0)} style={{ fontSize: 11, fontWeight: 700, padding: "0 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", color: offset === 0 ? "#71717A" : "#A5B4FC", background: "transparent", cursor: "pointer" }}>Hôm nay</Pressable>
+                            <Pressable type="button" onClick={() => setOffset((o) => o + 1)} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#A1A1AA", background: "transparent", cursor: "pointer" }}><ChevronRight style={{ width: 14, height: 14 }} /></Pressable>
                         </div>
                     )}
-                </div>
+                </Reveal>
 
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, padding: "18px 24px", minHeight: 0, overflow: "hidden" }}>
                     {mode === "staff" ? (
@@ -152,7 +153,7 @@ export default function McCalendarBoard({ data }: { data: McCalData }) {
                                 {offset !== 0 && <span style={{ fontSize: 11, color: "#71717A" }}>· dữ liệu rảnh/bận chỉ hiển thị tuần hiện tại — bấm “Hôm nay”.</span>}
                             </div>
                             {/* Matrix */}
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6, overflowY: "auto", minHeight: 0 }}>
+                            <RevealGroup style={{ display: "flex", flexDirection: "column", gap: 6, overflowY: "auto", minHeight: 0 }}>
                                 <div style={{ display: "flex", gap: 8, padding: "0 8px" }}>
                                     <span style={{ width: 180, flexShrink: 0 }} />
                                     {data.weekDays.map((k) => (
@@ -161,7 +162,7 @@ export default function McCalendarBoard({ data }: { data: McCalData }) {
                                 </div>
                                 {data.staff.length === 0 && <div style={{ textAlign: "center", fontSize: 12, color: "#52525B", padding: "24px 8px" }}>Chưa có nhân sự.</div>}
                                 {data.staff.map((s) => (
-                                    <div key={s.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 8px", borderRadius: 12, background: "rgba(24,24,27,0.45)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                                    <RevealItem key={s.id} whileHover={{ y: -4 }} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 8px", borderRadius: 12, background: "rgba(24,24,27,0.45)", border: "1px solid rgba(255,255,255,0.05)" }}>
                                         <div style={{ width: 180, flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
                                             <span style={{ width: 28, height: 28, borderRadius: 999, background: s.avatar, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff", flexShrink: 0 }}>{s.initials}</span>
                                             <span style={{ fontSize: 12.5, fontWeight: 700, color: "#F4F4F5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
@@ -172,9 +173,9 @@ export default function McCalendarBoard({ data }: { data: McCalData }) {
                                                 <div key={k} style={{ flex: 1, height: 34, borderRadius: 8, background: heat(n, maxSlots), border: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: heatText(n, maxSlots) }} title={`${n} ca rảnh`}>{n > 0 ? `${n} ca` : "bận"}</div>
                                             )
                                         })}
-                                    </div>
+                                    </RevealItem>
                                 ))}
-                            </div>
+                            </RevealGroup>
                         </>
                     ) : view === "week" ? (
                         /* Deadline — week */

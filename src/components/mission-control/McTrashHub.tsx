@@ -20,6 +20,7 @@ import { TeamTrash } from '@/components/review/TeamTrash'
 import ClientTrashClient from '@/components/crm/ClientTrashClient'
 import CancelledTasksClient from '@/components/tasks/CancelledTasksClient'
 import ProfileTrashClient from '@/components/profile/ProfileTrashClient'
+import { Pressable, Reveal } from './motion-kit'
 
 type ClientRow = { id: number; name: string; deletedAt: string | null; taskCount: number; subCount: number; invoiceCount: number }
 type TabKey = 'tep' | 'khach' | 'task' | 'to-chuc'
@@ -52,7 +53,7 @@ export default function McTrashHub({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Header: icon + title + tab bar + per-tab hint */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <Reveal style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <div style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Trash2 style={{ width: 18, height: 18, color: '#F87171' }} />
                 </div>
@@ -62,7 +63,7 @@ export default function McTrashHub({
                     {tabs.map((t) => {
                         const on = t.key === tab
                         return (
-                            <button
+                            <Pressable
                                 key={t.key}
                                 type="button"
                                 onClick={() => setTab(t.key)}
@@ -74,13 +75,13 @@ export default function McTrashHub({
                                 }}
                             >
                                 {t.label}{t.count != null ? ` · ${t.count}` : ''}
-                            </button>
+                            </Pressable>
                         )
                     })}
                 </div>
 
                 <span style={{ marginLeft: 'auto', fontSize: 10.5, color: '#52525B', maxWidth: 380, textAlign: 'right', lineHeight: 1.4 }}>{active.hint}</span>
-            </div>
+            </Reveal>
 
             {/* Active tab — only the active surface is mounted */}
             <div>

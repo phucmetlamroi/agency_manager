@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Search, FileText, ChevronRight } from 'lucide-react'
 import { InvoiceModal } from '@/components/invoice/InvoiceModal'
+import { Pressable, Reveal } from './motion-kit'
 
 export type McInvoiceClient = { id: number; name: string; depositBalance: number; parentName?: string }
 
@@ -45,16 +46,14 @@ export default function McInvoiceBoard({
             <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(900px 600px at 12% -10%, rgba(99,102,241,0.10), transparent 60%),radial-gradient(800px 600px at 100% 110%, rgba(168,85,247,0.10), transparent 60%)', pointerEvents: 'none' }} />
 
             {/* Top bar */}
-            <div style={{ position: 'relative', height: 56, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(10,10,10,0.60)', backdropFilter: 'blur(10px)' }}>
-                <button
+            <Reveal style={{ position: 'relative', height: 56, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(10,10,10,0.60)', backdropFilter: 'blur(10px)' }}>
+                <Pressable
                     onClick={back}
                     title="Về Quản lý khách hàng"
                     style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#D4D4D8', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
                 >
                     <ArrowLeft style={{ width: 16, height: 16 }} />
-                </button>
+                </Pressable>
                 <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <FileText style={{ width: 17, height: 17, color: '#C4B5FD' }} />
                 </div>
@@ -66,14 +65,14 @@ export default function McInvoiceBoard({
                 </div>
                 <div style={{ flex: 1 }} />
                 {selected && (
-                    <button
+                    <Pressable
                         onClick={() => { setSelectedId(null); setQ('') }}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.30)', color: '#A5B4FC', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}
                     >
                         Đổi khách
-                    </button>
+                    </Pressable>
                 )}
-            </div>
+            </Reveal>
 
             {/* Body */}
             <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
@@ -89,7 +88,7 @@ export default function McInvoiceBoard({
                     />
                 ) : (
                     <div style={{ height: '100%', overflowY: 'auto', padding: '30px 24px', display: 'flex', justifyContent: 'center' }}>
-                        <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <Reveal delay={0.05} style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 14 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(39,39,42,0.60)', border: '1px solid rgba(255,255,255,0.08)' }}>
                                 <Search style={{ width: 15, height: 15, color: '#71717A', flexShrink: 0 }} />
                                 <input
@@ -108,12 +107,10 @@ export default function McInvoiceBoard({
                                     </div>
                                 ) : (
                                     filtered.map((c, i) => (
-                                        <button
+                                        <Pressable
                                             key={c.id}
                                             onClick={() => setSelectedId(c.id)}
                                             style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'transparent', border: 'none', borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', width: '100%' }}
-                                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)' }}
-                                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                                         >
                                             <span style={{ width: 32, height: 32, borderRadius: 999, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
                                                 {initials(c.name)}
@@ -126,14 +123,14 @@ export default function McInvoiceBoard({
                                                 </span>
                                             </span>
                                             <ChevronRight style={{ width: 15, height: 15, color: '#52525B', flexShrink: 0 }} />
-                                        </button>
+                                        </Pressable>
                                     ))
                                 )}
                             </div>
                             <span style={{ fontSize: 10.5, color: '#52525B', textAlign: 'center' }}>
                                 Hóa đơn gộp mọi task <b style={{ color: '#71717A' }}>chưa xuất</b> của khách (kể cả brand con) · xuất PDF &amp; lưu vào hệ thống.
                             </span>
-                        </div>
+                        </Reveal>
                     </div>
                 )}
             </div>

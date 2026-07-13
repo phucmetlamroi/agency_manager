@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import McBackLink from './McBackLink'
+import { Pressable } from './motion-kit'
 
 type RailKey =
     | 'dashboard' | 'board' | 'requests' | 'tep' | 'lich' | 'tien'
@@ -38,9 +39,9 @@ export default function McShell({
     ]
 
     const dot = (isActive: boolean, Icon: LucideIcon, title: string) => (
-        <div title={title} style={{ position: 'relative', width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive ? '#A5B4FC' : '#A1A1AA', background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent', border: isActive ? '1px solid rgba(99,102,241,0.30)' : '1px solid transparent', boxShadow: isActive ? '0 4px 16px rgba(99,102,241,0.15)' : 'none' }}>
+        <Pressable as="div" title={title} style={{ position: 'relative', width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive ? '#A5B4FC' : '#A1A1AA', background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent', border: isActive ? '1px solid rgba(99,102,241,0.30)' : '1px solid transparent', boxShadow: isActive ? '0 4px 16px rgba(99,102,241,0.15)' : 'none' }}>
             <Icon style={{ width: 18, height: 18 }} />
-        </div>
+        </Pressable>
     )
 
     return (

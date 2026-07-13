@@ -24,6 +24,7 @@ import { revertPayment } from "@/actions/payroll-actions"
 import BonusCalculator from "@/app/[workspaceId]/admin/payroll/BonusCalculator"
 import PaymentModal from "@/components/admin/PaymentModal"
 import McBackLink from "./McBackLink"
+import { Pressable, Reveal, RevealGroup, RevealItem } from "./motion-kit"
 
 export interface McPayrollEditor {
     id: string; name: string; initials: string; avatar: string
@@ -110,9 +111,9 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                     const Icon = r.icon
                     const href = railHref(r.href)
                     const inner = (
-                        <div style={{ position: "relative", width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: r.active ? "#A5B4FC" : "#A1A1AA", background: r.active ? "rgba(99,102,241,0.18)" : "transparent", border: r.active ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", boxShadow: r.active ? "0 4px 16px rgba(99,102,241,0.15)" : "none" }}>
+                        <Pressable as="div" style={{ position: "relative", width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: r.active ? "#A5B4FC" : "#A1A1AA", background: r.active ? "rgba(99,102,241,0.18)" : "transparent", border: r.active ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", boxShadow: r.active ? "0 4px 16px rgba(99,102,241,0.15)" : "none" }}>
                             <Icon style={{ width: 18, height: 18 }} />
-                        </div>
+                        </Pressable>
                     )
                     return (
                         <div key={i} style={{ display: "contents" }}>
@@ -154,11 +155,11 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                     {/* Currency toggle */}
                     <div style={{ display: "flex", padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                         {(["VND", "USD"] as Cur[]).map((c) => (
-                            <button key={c} type="button" onClick={() => setCur(c)}
+                            <Pressable key={c} type="button" onClick={() => setCur(c)}
                                 style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 999, cursor: "pointer", border: "none",
                                     background: cur === c ? "rgba(99,102,241,0.20)" : "transparent", color: cur === c ? "#C7D2FE" : "#71717A" }}>
                                 {c}
-                            </button>
+                            </Pressable>
                         ))}
                     </div>
                     <div style={{ width: 34, height: 34, borderRadius: 999, background: "linear-gradient(135deg,#A855F7,#6366F1)", border: "2px solid rgba(99,102,241,0.6)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 12 }}>{data.currentUserInitials}</div>
@@ -166,7 +167,7 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
 
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, padding: "20px 24px", minHeight: 0, overflow: "hidden" }}>
                     {/* KPI strip */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+                    <Reveal style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
                         {/* Tổng chi kỳ này */}
                         <KpiBig glow="rgba(99,102,241,0.08)" icon={<Wallet style={{ width: 15, height: 15 }} />} iconBg="rgba(99,102,241,0.13)" iconBd="rgba(99,102,241,0.2)" iconCol="#A5B4FC"
                             label="Tổng chi kỳ này" value={fmt(data.kpi.netVND)} sub={`${data.kpi.doneCount} task đã chốt · ${data.kpi.people} editor`} />
@@ -191,7 +192,7 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                                 <div style={{ width: `${data.kpi.doneCount + data.kpi.pendingTaskCount > 0 ? Math.round((data.kpi.doneCount / (data.kpi.doneCount + data.kpi.pendingTaskCount)) * 100) : 0}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#10B981,#34D399)" }} />
                             </div>
                         </div>
-                    </div>
+                    </Reveal>
 
                     {/* Payroll rows */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minHeight: 0 }}>
@@ -203,13 +204,13 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                             <span style={{ width: 168 }} />
                         </div>
 
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", minHeight: 0 }}>
+                        <RevealGroup style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", minHeight: 0 }}>
                             {data.editors.length === 0 && (
                                 <div style={{ textAlign: "center", fontSize: 12, color: "#52525B", padding: "28px 8px" }}>Chưa có dữ liệu lương trong kỳ này.</div>
                             )}
                             {data.editors.map((e) => {
                                 return (
-                                    <div key={e.id} style={{ display: "flex", flexDirection: "column", borderRadius: 14, background: "rgba(24,24,27,0.60)", backdropFilter: "blur(12px)", border: e.isPaid ? "1px solid rgba(16,185,129,0.22)" : "1px solid rgba(255,255,255,0.06)" }}>
+                                    <RevealItem key={e.id} whileHover={{ y: -2 }} style={{ display: "flex", flexDirection: "column", borderRadius: 14, background: "rgba(24,24,27,0.60)", backdropFilter: "blur(12px)", border: e.isPaid ? "1px solid rgba(16,185,129,0.22)" : "1px solid rgba(255,255,255,0.06)" }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
                                             <div style={{ width: 220, display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                                                 <span style={{ width: 34, height: 34, borderRadius: 999, background: e.avatar, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "#fff", flexShrink: 0 }}>{e.initials}</span>
@@ -231,23 +232,23 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                                                 {e.isPaid ? (
                                                     <>
                                                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#34D399", padding: "5px 10px", borderRadius: 8, background: "rgba(16,185,129,0.10)", border: "1px solid rgba(16,185,129,0.30)" }}><CheckCircle2 style={{ width: 12, height: 12 }} />Đã trả</span>
-                                                        <button type="button" disabled={pending} onClick={() => doRevert(e)} title="Hoàn tác thanh toán (bị chặn nếu kỳ đã khóa)"
+                                                        <Pressable type="button" disabled={pending} onClick={() => doRevert(e)} title="Hoàn tác thanh toán (bị chặn nếu kỳ đã khóa)"
                                                             style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 8, cursor: pending ? "wait" : "pointer", background: "transparent", border: "1px solid rgba(255,255,255,0.10)", color: "#A1A1AA" }}>
                                                             <RotateCcw style={{ width: 13, height: 13 }} />
-                                                        </button>
+                                                        </Pressable>
                                                     </>
                                                 ) : (
-                                                    <button type="button" disabled={pending} onClick={() => setPayTarget(e)} title="Mở bảng thanh toán (QR + số tài khoản) rồi xác nhận đã chuyển khoản"
+                                                    <Pressable type="button" disabled={pending} onClick={() => setPayTarget(e)} title="Mở bảng thanh toán (QR + số tài khoản) rồi xác nhận đã chuyển khoản"
                                                         style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "#A5B4FC", padding: "6px 12px", borderRadius: 8, cursor: pending ? "wait" : "pointer", background: "transparent", border: "1px solid rgba(99,102,241,0.3)" }}>
                                                         <CreditCard style={{ width: 12, height: 12 }} />Đánh dấu đã trả
-                                                    </button>
+                                                    </Pressable>
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
+                                    </RevealItem>
                                 )
                             })}
-                        </div>
+                        </RevealGroup>
 
                         {/* Footer → Finance / M5 */}
                         <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.10)" }}>

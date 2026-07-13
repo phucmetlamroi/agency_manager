@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import McTopbarActions, { type McAddTaskData } from './McTopbarActions'
 import McBackLink from './McBackLink'
+import { Pressable, HoverCard, Reveal, RevealGroup, RevealItem } from './motion-kit'
 
 export interface McTask {
     id: string
@@ -93,15 +94,15 @@ function sparkPaths(vals: number[]): { line: string; area: string } {
 
 function RailIcon({ icon: Icon, active, title }: { icon: LucideIcon; active?: boolean; title?: string }) {
     return (
-        <div title={title} style={{ position: 'relative', width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: active ? '#A5B4FC' : '#A1A1AA', background: active ? 'rgba(99,102,241,0.18)' : 'transparent', border: active ? '1px solid rgba(99,102,241,0.30)' : '1px solid transparent', boxShadow: active ? '0 4px 16px rgba(99,102,241,0.15)' : 'none' }}>
+        <Pressable as="div" title={title} style={{ position: 'relative', width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: active ? '#A5B4FC' : '#A1A1AA', background: active ? 'rgba(99,102,241,0.18)' : 'transparent', border: active ? '1px solid rgba(99,102,241,0.30)' : '1px solid transparent', boxShadow: active ? '0 4px 16px rgba(99,102,241,0.15)' : 'none' }}>
             <Icon style={{ width: 18, height: 18 }} />
-        </div>
+        </Pressable>
     )
 }
 
 function TaskCard({ t }: { t: McTask }) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, borderRadius: 12, background: card, backdropFilter: 'blur(12px)', border: t.danger ? '1px solid rgba(220,38,38,0.35)' : cardBorder, boxShadow: t.danger ? '0 0 20px rgba(220,38,38,0.12)' : undefined, padding: 10 }}>
+        <HoverCard style={{ display: 'flex', flexDirection: 'column', gap: 7, borderRadius: 12, background: card, backdropFilter: 'blur(12px)', border: t.danger ? '1px solid rgba(220,38,38,0.35)' : cardBorder, boxShadow: t.danger ? '0 0 20px rgba(220,38,38,0.12)' : undefined, padding: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.35 }}>{t.title}</span>
             <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${t.dot}1a`, color: lighten(t.dot, 0.4), border: `1px solid ${t.dot}4d`, whiteSpace: 'nowrap' }}>
                 <span style={{ width: 5, height: 5, borderRadius: 999, background: t.dot }} />{t.statusLabel}
@@ -113,7 +114,7 @@ function TaskCard({ t }: { t: McTask }) {
                 <div style={{ flex: 1 }} />
                 <span style={{ fontSize: 10, fontWeight: t.meta.startsWith('Trễ') ? 700 : 400, color: t.meta.startsWith('Trễ') ? '#F87171' : '#A1A1AA', whiteSpace: 'nowrap' }}>{t.meta}</span>
             </div>
-        </div>
+        </HoverCard>
     )
 }
 
@@ -121,7 +122,7 @@ function Column({ col, workspaceId }: { col: McColumn; workspaceId: string }) {
     const bg = col.accent === 'danger' ? 'rgba(220,38,38,0.03)' : col.accent === 'success' ? 'rgba(16,185,129,0.02)' : 'rgba(255,255,255,0.02)'
     const border = col.accent === 'danger' ? '1px solid rgba(220,38,38,0.18)' : col.accent === 'success' ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(255,255,255,0.05)'
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, background: bg, border, borderRadius: 16, padding: 10, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
+        <RevealItem style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, background: bg, border, borderRadius: 16, padding: 10, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: -40, right: -40, width: 120, height: 120, borderRadius: 999, background: `${col.hue}12`, filter: 'blur(28px)', pointerEvents: 'none' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 999, background: col.hue, boxShadow: `0 0 8px ${col.hue}99` }} />
@@ -142,7 +143,7 @@ function Column({ col, workspaceId }: { col: McColumn; workspaceId: string }) {
                     {col.moreText} →
                 </Link>
             )}
-        </div>
+        </RevealItem>
     )
 }
 
@@ -191,7 +192,7 @@ export default function MissionControlBoard({ data }: { data: McData }) {
             {/* Main */}
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 {/* Top bar */}
-                <div style={{ position: 'relative', zIndex: 60, height: 64, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(10,10,10,0.50)', backdropFilter: 'blur(10px)' }}>
+                <Reveal style={{ position: 'relative', zIndex: 60, height: 64, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(10,10,10,0.50)', backdropFilter: 'blur(10px)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 10, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.35)' }}>
                         <LayoutGrid style={{ width: 14, height: 14, color: '#A5B4FC' }} />
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F5', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.workspaceName}</span>
@@ -208,7 +209,7 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                         addTask={data.addTask}
                         userRole={data.userRole}
                     />
-                </div>
+                </Reveal>
 
                 {/* KPI ribbon */}
                 <div style={{ flexShrink: 0, display: 'flex', alignItems: 'stretch', gap: 10, padding: '14px 24px 0' }}>
@@ -238,9 +239,9 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                 </div>
 
                 {/* Board */}
-                <div style={{ flex: 1, display: 'flex', gap: 10, padding: '16px 24px 8px', minHeight: 0 }}>
+                <RevealGroup style={{ flex: 1, display: 'flex', gap: 10, padding: '16px 24px 8px', minHeight: 0 }}>
                     {data.columns.map((col) => <Column key={col.label} col={col} workspaceId={data.workspaceId} />)}
-                </div>
+                </RevealGroup>
 
                 {/* Board footer */}
                 <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '8px 24px 14px' }}>

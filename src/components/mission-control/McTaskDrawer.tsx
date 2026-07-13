@@ -20,6 +20,7 @@ import {
     PanelsTopLeft, ArrowRight,
 } from "lucide-react"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { Pressable, Reveal } from "./motion-kit"
 
 export interface McTaskDetail {
     id: string; code: string; title: string; type: string; tags: string[]
@@ -107,7 +108,7 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
                 <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: 999, background: "rgba(99,102,241,0.07)", filter: "blur(40px)", pointerEvents: "none" }} />
 
                 {/* Header */}
-                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "18px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <Reveal style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "18px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 }}>
                         <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 10, letterSpacing: "0.16em", color: "#71717A" }}>{detail.code} · {detail.type.toUpperCase()}</span>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -121,9 +122,9 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
                     <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#71717A" }}>
                         <span style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.5 }}><ChevronLeft style={{ width: 14, height: 14 }} /></span>
                         <span style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.5 }}><ChevronRight style={{ width: 14, height: 14 }} /></span>
-                        <button type="button" onClick={close} title="Đóng (Esc)" style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", color: "#A1A1AA", cursor: "pointer" }}><X style={{ width: 14, height: 14 }} /></button>
+                        <Pressable type="button" onClick={close} title="Đóng (Esc)" style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", color: "#A1A1AA", cursor: "pointer" }}><X style={{ width: 14, height: 14 }} /></Pressable>
                     </div>
-                </div>
+                </Reveal>
 
                 {/* Stepper */}
                 <div style={{ flexShrink: 0, display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -228,14 +229,14 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
                             {inInternalReview && <span style={{ fontSize: 11, color: "#A1A1AA", lineHeight: 1.4 }}>Xem bản dựng rồi quyết định: gửi khách hay yêu cầu sửa thêm vòng nữa.</span>}
                             {inInternalReview && (
                                 <>
-                                    <button type="button" disabled={pending} onClick={() => changeStatus("Đã gửi video (khách)")} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 10, borderRadius: 10, background: "#6366F1", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", boxShadow: "0 0 24px rgba(99,102,241,0.35)", cursor: pending ? "wait" : "pointer" }}><Send style={{ width: 15, height: 15 }} />Duyệt & gửi khách</button>
-                                    <button type="button" disabled={pending} onClick={() => changeStatus("Đang sửa feedback (nội bộ)")} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#D4D4D8", fontSize: 13, fontWeight: 700, cursor: pending ? "wait" : "pointer" }}><Undo2 style={{ width: 15, height: 15 }} />Yêu cầu sửa (nội bộ)</button>
+                                    <Pressable type="button" disabled={pending} onClick={() => changeStatus("Đã gửi video (khách)")} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 10, borderRadius: 10, background: "#6366F1", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", boxShadow: "0 0 24px rgba(99,102,241,0.35)", cursor: pending ? "wait" : "pointer" }}><Send style={{ width: 15, height: 15 }} />Duyệt & gửi khách</Pressable>
+                                    <Pressable type="button" disabled={pending} onClick={() => changeStatus("Đang sửa feedback (nội bộ)")} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#D4D4D8", fontSize: 13, fontWeight: 700, cursor: pending ? "wait" : "pointer" }}><Undo2 style={{ width: 15, height: 15 }} />Yêu cầu sửa (nội bộ)</Pressable>
                                 </>
                             )}
                             {/* Full status dropdown */}
-                            <button type="button" onClick={() => setStatusMenu((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 10px", borderRadius: 9, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "#A1A1AA", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                            <Pressable type="button" onClick={() => setStatusMenu((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 10px", borderRadius: 9, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "#A1A1AA", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                                 Chọn trạng thái khác<ChevronDown style={{ width: 13, height: 13, transform: statusMenu ? "rotate(180deg)" : "none" }} />
-                            </button>
+                            </Pressable>
                             {statusMenu && (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 2 }}>
                                     {STATUS_GROUPS.map((g) => (
@@ -245,11 +246,11 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
                                                 const hex = STATUS_HEX[s] || "#A1A1AA"
                                                 const cur = s === detail.status
                                                 return (
-                                                    <button key={s} type="button" disabled={pending || cur} onClick={() => changeStatus(s)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 8, textAlign: "left", background: cur ? "rgba(99,102,241,0.12)" : "transparent", border: cur ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", color: "#D4D4D8", fontSize: 11, fontWeight: 600, cursor: cur ? "default" : "pointer" }}>
+                                                    <Pressable key={s} type="button" disabled={pending || cur} onClick={() => changeStatus(s)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 8, textAlign: "left", background: cur ? "rgba(99,102,241,0.12)" : "transparent", border: cur ? "1px solid rgba(99,102,241,0.30)" : "1px solid transparent", color: "#D4D4D8", fontSize: 11, fontWeight: 600, cursor: cur ? "default" : "pointer" }}>
                                                         <span style={{ width: 7, height: 7, borderRadius: 999, background: hex, flexShrink: 0 }} />
                                                         {STATUS_LABEL[s] || s}
                                                         {cur && <Check style={{ width: 12, height: 12, marginLeft: "auto", color: "#A5B4FC" }} />}
-                                                    </button>
+                                                    </Pressable>
                                                 )
                                             })}
                                         </div>

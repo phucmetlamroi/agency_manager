@@ -5,7 +5,11 @@
 // over a static blurred backdrop (the design itself shows a blurred skeleton board behind).
 // Data comes from loadTaskDetail (server-sanitized, money stripped for non-admins; MC is
 // admin-gated anyway). Status changes reuse the real updateTaskStatus (admin FSM is open).
-// Full editing bridges to the Giao diện 1 drawer (/[workspaceId]/task/[id]) until M19 exists.
+// [M19 Sửa task — hướng kết hợp] Quick status-change lives IN this drawer (below); full field
+// editing (deadline, người làm, Giá khách $, Thù lao ₫, loại, người quản lý, brief, tài nguyên,
+// Hook Map, ghi chú) reuses the vetted full editor at /[workspaceId]/task/[taskId] (TaskDetailRoute)
+// via fullEditHref — that surface ALONE enforces money-sanitize + payroll-field lock + audit log, so
+// money editing is never rebuilt here. A prominent "Sửa đầy đủ" CTA opens it with data prefilled.
 import { useState, useTransition, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -13,6 +17,7 @@ import { toast } from "sonner"
 import {
     Pencil, X, ChevronLeft, ChevronRight, Check, Send, SearchCheck, AlarmClock, Flag,
     Package, CheckCircle2, Calendar, Link2, Undo2, ArrowRightLeft, Archive, Play, Maximize2, ChevronDown,
+    PanelsTopLeft, ArrowRight,
 } from "lucide-react"
 import { updateTaskStatus } from "@/actions/task-actions"
 
@@ -204,6 +209,18 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
                                 </span>
                             </Row>
                         </div>
+
+                        {/* [M19] Prominent "Sửa đầy đủ" — opens the vetted full editor (TaskDetailRoute)
+                            with data prefilled. All field edits — incl. the money fields shown above as
+                            read-only — happen there, where money-sanitize / payroll-lock / audit are enforced. */}
+                        <Link href={fullEditHref} title="Mở form đầy đủ với dữ liệu điền sẵn" style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 12, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.20)", textDecoration: "none" }}>
+                            <PanelsTopLeft style={{ width: 15, height: 15, color: "#A5B4FC", flexShrink: 0 }} />
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: "#C7D2FE" }}>Sửa đầy đủ — deadline, người làm, giá, brief, tài nguyên, Hook Map</span>
+                                <span style={{ fontSize: 10, color: "#71717A" }}>mở form lớn với dữ liệu điền sẵn · mọi thay đổi ghi Nhật ký hoạt động</span>
+                            </div>
+                            <ArrowRight style={{ width: 14, height: 14, color: "#A5B4FC", flexShrink: 0 }} />
+                        </Link>
 
                         {/* Status action card */}
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, borderRadius: 14, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.20)", padding: 14, position: "relative" }}>

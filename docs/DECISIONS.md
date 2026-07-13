@@ -9,6 +9,12 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M22 — Thùng rác Tệp + Quản lý phiên bản]
+- **Thùng rác = reuse `TeamTrash`** (P2.6+P6.2, `/team/trash`) trong `/mc/trash` — cùng pattern M8/M21. TeamTrash tự fetch /api/review/trash + /restore + /purge (mỗi cái re-verify membership; **purge re-verify workspace ADMIN**). Đầy đủ: danh sách 30 ngày · khôi phục theo lô · Xóa vĩnh viễn ADMIN (ConfirmModal) · badge "Còn N ngày" · state "gốc đã mất — không khôi phục" · cap 200/lần. KHÔNG dựng lại.
+- **Prop `backHref`** (TeamTrash, mặc định /team → GĐ1 byte-identical) + truyền `trashHref=/mc/trash` cho TeamBrowser toolbar (prop đã thêm ở M21). `/mc/trash` admin-gated fail-closed (nhất quán MC + là điều kiện của nút "Xóa vĩnh viễn") → truyền `isAdmin`.
+- **Quản lý phiên bản (ManageVersionsModal) = delivered-via-M8/M11** — modal stack append-only (click row→player ?v=, menu Tải xuống/Tách khỏi stack/Xóa phiên bản; deleteVersion/removeFromStack có advisory-lock K1) sống TRONG TeamBrowser + player → đã reachable ở `/mc/tep` (M8) + `/mc/asset` (M11). Không route/màn riêng.
+- **Money-safe hiển nhiên**: module review 0 field tiền. Editor không-admin vẫn dùng GĐ1 /team/trash (không có nút purge vì isAdmin=false server-side).
+
 ## [M21 — Shares (Link chia sẻ)]
 - **Reuse nguyên `SharesTable`** (P5.5, `/team/shares`) trong route `/mc/shares` — cùng pattern bọc-component-vetted (M8 TeamBrowser). SharesTable tự fetch `/api/review/shares` (server ADMIN thấy HẾT · USER chỉ link của mình + task được giao; Sao chép/Chỉnh sửa=`ShareLinkModal`/Tắt-Bật/Xóa=ADMIN). Toàn bộ modal (toggle comment/download/download-gated/all-versions + password + expiry chip + create-then-copy + rowVersion) đã có. KHÔNG dựng lại.
 - **SharesTable tự mang layout đầy đủ** (`min-h-dvh bg-zinc-950` + header "Link chia sẻ" + back ←) → page `/mc/shares` chỉ cần admin-gate + render (không thêm rail/header MC — như frame M21 "← Tệp", full-width, không rail). Đổi đích back qua prop.

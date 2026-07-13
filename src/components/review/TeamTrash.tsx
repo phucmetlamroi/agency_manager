@@ -93,7 +93,8 @@ async function fetchTrash(workspaceId: string, cursor: string | null): Promise<T
     return (await res.json()) as TrashResult
 }
 
-export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: string; isAdmin?: boolean }) {
+// [Giao diện 2 · MC M22] `backHref` = đích nút ← (mặc định /team → GĐ1 byte-identical); MC truyền /mc/tep.
+export function TeamTrash({ workspaceId, isAdmin = false, backHref }: { workspaceId: string; isAdmin?: boolean; backHref?: string }) {
     const [data, setData] = useState<TrashResult | null>(null) // items ACCUMULATE across pages
     const [loading, setLoading] = useState(true)
     const [loadingMore, setLoadingMore] = useState(false)
@@ -105,7 +106,7 @@ export function TeamTrash({ workspaceId, isAdmin = false }: { workspaceId: strin
     const [purgingKey, setPurgingKey] = useState<string | null>(null) // item id | PURGE_BULK_KEY | null
     const [purgeConfirm, setPurgeConfirm] = useState<{ refs: ItemRef[]; label: string; key: string } | null>(null)
 
-    const teamHref = `/${workspaceId}/team`
+    const teamHref = backHref ?? `/${workspaceId}/team`
 
     // initial load (+ manual reload) — replaces the accumulated list with page 1.
     useEffect(() => {

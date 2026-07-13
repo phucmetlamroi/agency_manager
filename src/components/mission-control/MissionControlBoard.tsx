@@ -135,7 +135,13 @@ function Column({ col, workspaceId }: { col: McColumn; workspaceId: string }) {
                     <TaskCard t={t} />
                 </Link>
             ))}
-            {col.moreText && <div style={{ textAlign: 'center', fontSize: 11, color: '#71717A', padding: 4 }}>{col.moreText}</div>}
+            {/* [M16] "+N nữa" → the full operational board (Vận hành bảng task) where every status
+                dropdown / ⋯ menu / bulk action lives; the dashboard columns are read-only previews. */}
+            {col.moreText && (
+                <Link href={`/${workspaceId}/mc/board`} title="Mở bảng vận hành đầy đủ" style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#818CF8', padding: 4, textDecoration: 'none' }}>
+                    {col.moreText} →
+                </Link>
+            )}
         </div>
     )
 }

@@ -101,6 +101,12 @@ export default async function MissionControlPayrollPage({ params }: { params: Pr
             progressPct: totalTasks > 0 ? Math.round((completed.length / totalTasks) * 100) : 0,
             taskIncomeVND: taskIncome, bonusVND: bonusAmount, totalVND: total,
             isPaid: u.payrolls?.[0]?.status === 'PAID',
+            // [M24 QR] Payee payout details for the PaymentModal (editor's OWN bank/QR, admin-only —
+            // findMany returns all User scalars; no jobPriceUSD / client money here).
+            nickname: u.nickname ?? null,
+            paymentQrUrl: u.paymentQrUrl ?? null,
+            paymentBankName: u.paymentBankName ?? null,
+            paymentAccountNum: u.paymentAccountNum ?? null,
         }
     })
 

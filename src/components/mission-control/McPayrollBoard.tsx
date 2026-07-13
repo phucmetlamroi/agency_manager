@@ -18,10 +18,11 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
     LayoutDashboard, ListTodo, Inbox, Clapperboard, CalendarDays, Wallet, Building2,
-    FileSpreadsheet, CalendarDays as CalIcon, Hourglass, Calculator, CheckCircle2, RotateCcw, ExternalLink, ChevronDown,
+    FileSpreadsheet, CalendarDays as CalIcon, Hourglass, Calculator, CheckCircle2, RotateCcw, ExternalLink, ChevronDown, CreditCard,
 } from "lucide-react"
-import { confirmPayment, revertPayment } from "@/actions/payroll-actions"
+import { revertPayment } from "@/actions/payroll-actions"
 import BonusCalculator from "@/app/[workspaceId]/admin/payroll/BonusCalculator"
+import PaymentModal from "@/components/admin/PaymentModal"
 import McBackLink from "./McBackLink"
 
 export interface McPayrollEditor {
@@ -30,6 +31,13 @@ export interface McPayrollEditor {
     completedCount: number; pendingCount: number; progressPct: number
     taskIncomeVND: number; bonusVND: number; totalVND: number
     isPaid: boolean
+    // [M24 QR] Payee payout details for the QR PaymentModal. This is the EDITOR's OWN bank/QR,
+    // shown only to the paying admin on an admin-gated screen — NOT client money, NOT jobPriceUSD.
+    // Same data /admin/payroll's PaymentModal already surfaces to admins.
+    nickname?: string | null
+    paymentQrUrl?: string | null
+    paymentBankName?: string | null
+    paymentAccountNum?: string | null
 }
 export interface McPayrollData {
     workspaceId: string; backHref: string
@@ -60,8 +68,9 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
     const router = useRouter()
     const [pending, startTransition] = useTransition()
     const [cur, setCur] = useState<Cur>("VND")
-    // Which editor row is in the "confirm mark-paid" state.
-    const [confirmingId, setConfirmingId] = useState<string | null>(null)
+    // [M24 QR] The editor being paid — opens the vetted PaymentModal (QR + bank + "Xác nhận đã
+    // chuyển khoản"). The modal itself calls confirmPayment (same money action as before).
+    const [payTarget, setPayTarget] = useState<McPayrollEditor | null>(null)
 
     const fmt = (vnd: number): string => {
         if (cur === "USD") {
@@ -69,19 +78,6 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
             return `$${usd.toLocaleString("en-US", { maximumFractionDigits: usd >= 100 ? 0 : 1 })}`
         }
         return `${Math.round(vnd).toLocaleString("vi-VN")} đ`
-    }
-
-    const doPay = (e: McPayrollEditor) => {
-        startTransition(async () => {
-            const res = await confirmPayment(
-                { userId: e.id, month: data.cycle.month, year: data.cycle.year, baseSalary: e.taskIncomeVND, bonus: e.bonusVND, totalAmount: e.totalVND },
-                data.workspaceId,
-            )
-            if ((res as any)?.error) { toast.error((res as any).error); return }
-            toast.success(`Đã đánh dấu trả lương ${e.name}`)
-            setConfirmingId(null)
-            router.refresh()
-        })
     }
 
     const doRevert = (e: McPayrollEditor) => {
@@ -101,6 +97,7 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                         : h === "TEP" ? `/${data.workspaceId}/mc/tep` : undefined
 
     return (
+        <>
         <div style={{ minHeight: "100dvh", background: "#050505", color: "#F4F4F5", display: "flex", position: "relative", fontFamily: '"Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif' }}>
             <div style={{ position: "absolute", inset: 0, background: "radial-gradient(900px 600px at 12% -10%, rgba(99,102,241,0.10), transparent 60%),radial-gradient(800px 600px at 100% 110%, rgba(168,85,247,0.10), transparent 60%)", pointerEvents: "none" }} />
 
@@ -211,7 +208,6 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                                 <div style={{ textAlign: "center", fontSize: 12, color: "#52525B", padding: "28px 8px" }}>Chưa có dữ liệu lương trong kỳ này.</div>
                             )}
                             {data.editors.map((e) => {
-                                const confirming = confirmingId === e.id
                                 return (
                                     <div key={e.id} style={{ display: "flex", flexDirection: "column", borderRadius: 14, background: "rgba(24,24,27,0.60)", backdropFilter: "blur(12px)", border: e.isPaid ? "1px solid rgba(16,185,129,0.22)" : "1px solid rgba(255,255,255,0.06)" }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
@@ -241,34 +237,13 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                                                         </button>
                                                     </>
                                                 ) : (
-                                                    <button type="button" disabled={pending} onClick={() => setConfirmingId(confirming ? null : e.id)}
-                                                        style={{ fontSize: 11, fontWeight: 700, color: confirming ? "#fff" : "#A5B4FC", padding: "6px 12px", borderRadius: 8, cursor: pending ? "wait" : "pointer",
-                                                            background: confirming ? "#6366F1" : "transparent", border: confirming ? "1px solid #6366F1" : "1px solid rgba(99,102,241,0.3)" }}>
-                                                        {confirming ? "Đang chọn…" : "Đánh dấu đã trả"}
+                                                    <button type="button" disabled={pending} onClick={() => setPayTarget(e)} title="Mở bảng thanh toán (QR + số tài khoản) rồi xác nhận đã chuyển khoản"
+                                                        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "#A5B4FC", padding: "6px 12px", borderRadius: 8, cursor: pending ? "wait" : "pointer", background: "transparent", border: "1px solid rgba(99,102,241,0.3)" }}>
+                                                        <CreditCard style={{ width: 12, height: 12 }} />Đánh dấu đã trả
                                                     </button>
                                                 )}
                                             </div>
                                         </div>
-
-                                        {/* 2-step confirm strip */}
-                                        {confirming && !e.isPaid && (
-                                            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderTop: "1px solid rgba(99,102,241,0.20)", background: "rgba(99,102,241,0.06)" }}>
-                                                <span style={{ fontSize: 11, color: "#A1A1AA" }}>
-                                                    Trả lương <b style={{ color: "#F4F4F5" }}>{e.name}</b> kỳ <b style={{ color: "#C7D2FE" }}>{data.periodLabel}</b>:
-                                                    <span style={{ fontFamily: "ui-monospace,Menlo,monospace", color: "#F4F4F5" }}> {fmt(e.taskIncomeVND)}</span> lương
-                                                    {e.bonusVND > 0 && <span style={{ fontFamily: "ui-monospace,Menlo,monospace", color: "#34D399" }}> + {fmt(e.bonusVND)} thưởng</span>}
-                                                    <span style={{ fontFamily: "ui-monospace,Menlo,monospace", color: "#fff", fontWeight: 800 }}> = {fmt(e.totalVND)}</span>
-                                                </span>
-                                                <span style={{ flex: 1 }} />
-                                                <Link href={data.payrollBridgeHref} style={{ fontSize: 11, color: "#71717A", textDecoration: "none" }} title="Xem chi tiết từng task + khóa sổ ở Giao diện 1">Chi tiết ↗</Link>
-                                                <button type="button" disabled={pending} onClick={() => setConfirmingId(null)}
-                                                    style={{ fontSize: 11, fontWeight: 600, color: "#A1A1AA", padding: "6px 12px", borderRadius: 8, background: "transparent", border: "1px solid rgba(255,255,255,0.10)", cursor: "pointer" }}>Hủy</button>
-                                                <button type="button" disabled={pending} onClick={() => doPay(e)}
-                                                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "#fff", padding: "6px 14px", borderRadius: 8, background: "#10B981", border: "1px solid #10B981", cursor: pending ? "wait" : "pointer" }}>
-                                                    <CheckCircle2 style={{ width: 13, height: 13 }} />Xác nhận trả {fmt(e.totalVND)}
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
                                 )
                             })}
@@ -283,6 +258,33 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                 </div>
             </div>
         </div>
+
+        {/* [M24 QR] Payment modal — the vetted /admin PaymentModal (bank + static QR + "Xác nhận đã
+            chuyển khoản"). It calls confirmPayment itself (identical money action); we just refresh
+            the board on close so the row flips to "Đã trả". Degrades gracefully if the editor has no
+            QR/bank ("Chưa cập nhật QR" / "---") — payment still confirmable. */}
+        {payTarget && (
+            <PaymentModal
+                isOpen
+                onClose={() => { setPayTarget(null); router.refresh() }}
+                user={{
+                    id: payTarget.id,
+                    nickname: payTarget.nickname ?? payTarget.name,
+                    paymentQrUrl: payTarget.paymentQrUrl ?? null,
+                    paymentBankName: payTarget.paymentBankName ?? null,
+                    paymentAccountNum: payTarget.paymentAccountNum ?? null,
+                }}
+                payrollData={{
+                    month: data.cycle.month,
+                    year: data.cycle.year,
+                    totalAmount: payTarget.totalVND,
+                    baseSalary: payTarget.taskIncomeVND,
+                    bonus: payTarget.bonusVND,
+                }}
+                workspaceId={data.workspaceId}
+            />
+        )}
+        </>
     )
 }
 

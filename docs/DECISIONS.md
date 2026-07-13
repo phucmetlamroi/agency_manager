@@ -9,6 +9,11 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M20 — Velox Quick Create + Hook Map] (delivered-via-M10)
+- **Velox = mode nội bộ của `AddTaskModal`** (không phải màn độc lập) — kiểm chứng: AddTaskModal import `QuickCreateMode`, `VeloxConflictDialog`, `VeloxRawFootagesModal`, `HookGraphEditor` (Multi-Hook Map) + `veloxMapToHookGraph` + V4 types; frame M20 tự ghi "bước riêng CỦA Thêm Task". Toàn bộ engine (quét folder Dropbox/Drive, 11 toggle tự-động-hóa ⚙, danh sách video preview, đặt tên/áp giá/deadline, Hook Map, conflict dialog, brief banner, nháp-tự-lưu-3-phút) đã build sẵn.
+- **Đã reuse ở /mc/add (M10)** — `McAddScreen` mount `AddTaskModal` qua `DashboardActionWrapper` (controlled + hideBar), submit routing y hệt /admin (createTask / batch / Velox V1+V3 / Multi-Hook Map). → bật toggle Velox trong /mc/add là chạy full M20. AddTaskModal có sẵn prop seed "mở thẳng Velox với client folder link" (dùng bởi luồng inbox "Quét bằng Velox") → đường forward nếu sau muốn entry Velox trực tiếp.
+- **KHÔNG route/màn riêng, 0 code mới** — Velox reachable qua Add Task (M10) đúng như thiết kế. KHÔNG sửa AddTaskModal/QuickCreateMode/HookGraphEditor → `/admin` byte-identical. Commit docs-only đánh dấu delivered.
+
 ## [M19 — Sửa task]
 - **Hướng kết hợp = sửa-nhanh-trong-drawer + full-edit** — "sửa nhanh" (đổi trạng thái) ĐÃ sống trong `McTaskDrawer` (M3): dropdown status nhóm-phase + `updateTaskStatus`. M19 thêm **CTA "Sửa đầy đủ" nổi bật** (khớp frame 3327-3334) → mở editor đầy đủ.
 - **Full-edit = reuse `TaskDetailRoute`** (`/[ws]/task/[taskId]`, đã bridge sẵn qua `fullEditHref`). Nguồn dữ liệu `loadTaskDetail` (money-sanitize + fail-closed + isAdmin). Đây là editor vetted có sẵn của toàn field: deadline, người làm, Giá khách $, Thù lao ₫, loại, người quản lý, brief, 6 tài nguyên, Hook Map, ghi chú — kèm **khóa field tiền khi kỳ lương đã trả** + **audit before/after**.

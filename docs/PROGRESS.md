@@ -26,4 +26,6 @@ Done trước autoloop: M1–M4 + cosmetic pass (`7eb4a4d`).
 - [ ] M24 Payroll thưởng · M25 CRM tiền · M26 Thùng rác gộp
 - [ ] M27–M31 (stubs — bám spec DAC-TA-CHUC-NANG-ADMIN.md)
 
-Kế tiếp: **M21 Shares** (chia sẻ review link) → M22 Trash+Versions → M23 Compare → M24 Payroll thưởng → M25 CRM tiền → M26 Thùng rác gộp → M27–M31. Mỗi màn: đọc frame → map surface (reuse-first) → build data-wired money-safe admin-gated → tsc+build → commit → docs.
+Kế tiếp: **M24 Bảng lương thưởng+khóa sổ+thanh toán** (MONEY-CRITICAL) → M25 CRM tiền → M26 Thùng rác gộp → M27–M31.
+**M24 resume-note (đã map):** `/mc/tien` + `McPayrollBoard` ĐÃ có sẵn = board data-wired (Thực nhận Σ Hoàn tất+bonus, `confirmPayment`/`revertPayment` 2-step, admin-gated, money DTO server-side). M24 CẦN THÊM lên board đó, tái dùng component GĐ1 vetted (KHÔNG rebuild logic tiền): **BonusCalculator** ("Tính Thưởng Tháng Này" → `calculateMonthlyBonus` TỰ KHÓA kỳ = PayrollLock) + **BonusConfigModal** (⚙ % top theo tổ chức, đã có schema+actions #133-135) + **PaymentModal** (QR tĩnh + bank + "Xác nhận đã chuyển khoản") + chỉ báo **khóa sổ** (revert bị chặn khi locked). Map `src/components/payroll/*` (BonusCalculator, BonusConfigModal, PaymentModal, PayrollCard) trước — reuse controlled-open như M14/M10. Money-safe tuyệt đối: chỉ admin, không rò jobPriceUSD, calculateMonthlyBonus/lock chỉ TRIGGER qua action vetted (không tái tính tay).
+Mỗi màn: đọc frame → map surface (reuse-first) → build data-wired money-safe admin-gated → tsc+build → commit → docs.

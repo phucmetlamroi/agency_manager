@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { X, Loader2, Wallet, Trash2, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/ConfirmModal'
 import { recordPayment, getClientPayments, deletePayment } from '@/actions/payment-actions'
 
 type PaymentRow = { id: string; amount: number; paidAt: string; method: string | null; note: string | null; invoiceId: string | null; recordedBy: string | null }
@@ -11,7 +12,7 @@ const usd = (n: number) => '$' + (Math.round((n || 0) * 100) / 100).toLocaleStri
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
-export default function RecordPaymentModal({ clientId, clientName, owed, paid, workspaceId, onClose, onSaved }: {
+export default function RecordPaymentModal({ clientId, clientName, owed, paid, workspaceId, onClose, onSaved, confirmOnDelete = false }: {
     clientId: number
     clientName: string
     owed: number
@@ -19,7 +20,15 @@ export default function RecordPaymentModal({ clientId, clientName, owed, paid, w
     workspaceId: string
     onClose: () => void
     onSaved: () => void
+    /**
+     * [MC M25] Gate the delete-a-recorded-payment action behind a confirm dialog.
+     * Defaulted OFF → GĐ1 (/admin/crm) keeps its exact current behavior (no
+     * confirm). Mission Control (/mc/crm) turns it ON — the design flags the
+     * old "xóa thẳng" as a data-loss footgun on a hard-delete.
+     */
+    confirmOnDelete?: boolean
 }) {
+    const { confirm } = useConfirm()
     const remaining = Math.max(0, owed - paid)
     const [amount, setAmount] = useState<string>(remaining > 0 ? String(Math.round(remaining * 100) / 100) : '')
     const [paidAt, setPaidAt] = useState(today())
@@ -57,6 +66,17 @@ export default function RecordPaymentModal({ clientId, clientName, owed, paid, w
     }
 
     const remove = async (id: string) => {
+        if (confirmOnDelete) {
+            const row = history.find((h) => h.id === id)
+            const ok = await confirm({
+                title: 'Xoá bản ghi thu tiền?',
+                message: `Xoá khoản đã ghi nhận${row ? ` ${usd(row.amount)} · ${fmtDate(row.paidAt)}` : ''}? Bản ghi bị xoá vĩnh viễn (vẫn lưu nhật ký kiểm toán) và tổng "đã thu" sẽ được tính lại.`,
+                type: 'warning',
+                confirmText: 'Xoá bản ghi',
+                cancelText: 'Giữ lại',
+            })
+            if (!ok) return
+        }
         const res = await deletePayment(id, workspaceId)
         if (res.success) { toast.success('Đã xoá bản ghi.'); await loadHistory(); onSaved() }
         else toast.error(res.error || 'Không xoá được.')

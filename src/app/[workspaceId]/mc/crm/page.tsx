@@ -73,7 +73,7 @@ export default async function MissionControlCrmPage({ params }: { params: Promis
             {/* Main — panel mang header/breadcrumb riêng (khớp thiết kế M12), MC chỉ cấp vỏ + rail */}
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: '16px 20px' }}>
                 <div style={{ flex: 1, minHeight: 0 }}>
-                    <ClientsManagerPanel clients={serializeDecimal(clients) as any} workspaceId={workspaceId} />
+                    <ClientsManagerPanel clients={serializeDecimal(clients) as any} workspaceId={workspaceId} missionControl />
                 </div>
             </div>
         </div>

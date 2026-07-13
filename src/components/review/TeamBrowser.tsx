@@ -156,6 +156,7 @@ export function TeamBrowser({
     currentUserId,
     isAdmin,
     chromeless = false,
+    playerBase,
 }: {
     workspaceId: string
     initialFolderId: string | null
@@ -164,6 +165,9 @@ export function TeamBrowser({
     // [Giao diện 2 · MC M8] Ẩn tiêu đề module nội bộ khi nhúng trong vỏ Mission Control
     // (vỏ MC tự vẽ header "Tệp"). Mặc định false → GĐ1 /team giữ nguyên byte-identical.
     chromeless?: boolean
+    // [Giao diện 2 · MC M11] Prefix route mở player asset. Mặc định `/team/asset` (GĐ1
+    // byte-identical); MC truyền `/[ws]/mc/asset` để mở player trong namespace Mission Control.
+    playerBase?: string
 }) {
     const [folderId, setFolderId] = useState<string | null>(initialFolderId)
     const [data, setData] = useState<ChildrenResult | null>(null)
@@ -433,10 +437,11 @@ export function TeamBrowser({
     const openAsset = useCallback(
         (asset: AssetDto) => {
             if (typeof window !== 'undefined') {
-                window.location.assign(`/${workspaceId}/team/asset/${asset.id}`)
+                const base = playerBase ?? `/${workspaceId}/team/asset`
+                window.location.assign(`${base}/${asset.id}`)
             }
         },
-        [workspaceId],
+        [workspaceId, playerBase],
     )
 
     /* ---- P2.4: upload + new folder ---- */

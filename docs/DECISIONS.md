@@ -9,6 +9,11 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M11 — Review Player]
+- **Reuse nguyên `ReviewPlayerShell`** (player full-bleed frame.io-parity đã build sẵn) — player namespace-agnostic. Tạo `/mc/asset/[assetId]` = bản mirror của `/team/asset/[assetId]` (cùng props), admin-gated fail-closed.
+- **Cho `/mc/tep` mở player trong namespace MC**: thêm prop **`playerBase?: string`** vào `TeamBrowser` (mặc định `/[ws]/team/asset` → GĐ1 byte-identical); `/mc/tep` truyền `/[ws]/mc/asset`. Chỉ đổi ĐÍCH điều hướng của `openAsset`, không đụng logic khác. → M8→M11 liền mạch trong MC.
+- Editor không-admin vẫn dùng player GĐ1 `/team/asset` (họ không vào namespace MC).
+
 ## [M10 — Add Task (Velox)]
 - **Reuse nguyên `AddTaskModal` qua `DashboardActionWrapper`** (controlled + `hideBar`) — ĐÚNG pattern đã có sẵn ở `McTopbarActions`. KHÔNG mount modal thô (sẽ phải viết lại ~280 dòng handleSubmit money-safe: single/batch/Velox V1+V3/Multi-Hook Map/accept-request). Tất cả submit đi qua server action `createTask/…` (re-check ADMIN).
 - **Route riêng `/mc/add`** (đúng design M10 = modal-as-screen). Server page fetch đúng khối add-task của `mc/page.tsx` (clients dedupe + users + pricingRules + exchangeRate) + role. Client `McAddScreen` vẽ backdrop MC mờ (skeleton board như frame) + mở modal; đóng modal → `router.push('/mc')`.

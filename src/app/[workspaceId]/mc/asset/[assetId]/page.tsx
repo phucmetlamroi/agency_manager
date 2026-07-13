@@ -34,6 +34,8 @@ export default async function MissionControlReviewPlayerPage({
             initialVersionId={sp.v ?? null}
             initialCommentId={sp.comment ?? null}
             compareParam={sp.cmp ?? null}
+            assetBasePath={`/${workspaceId}/mc/asset`}
+            browserHref={`/${workspaceId}/mc/tep`}
         />
     )
 }

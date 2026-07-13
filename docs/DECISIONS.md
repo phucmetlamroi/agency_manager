@@ -9,6 +9,12 @@ Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác
 - **Transaction rows**: compute `revenueVND/wageVND/profitVND` server-side, KHÔNG pass `jobPriceUSD`/`exchangeRate` thô xuống client → money-safety (strip jobPriceUSD như M1).
 - **M4 Finance tab** repoint `/admin/finance` → `/mc/finance` vì M5 đã có bản Giao diện 2.
 
+## [M23 — So sánh phiên bản]
+- **Chế độ compare đã có trong `ReviewPlayerShell`** — `CompareView` + `CompareSide` + `useSyncedTransport` (P5.1-P5.4): 2 player master-follower, bên active có tiếng + comment, `?cmp=<l>.<r>` LIVE là source-of-truth (Back drop cmp → force-dynamic re-run → thoát compare). M11 `/mc/asset` đã truyền `compareParam={sp.cmp}` → **CompareView render sẵn ở /mc/asset?cmp=**. Không rebuild.
+- **Vá điều hướng namespace (bug ẩn của M11)** — `compareBase` (line 261, viết ?cmp khi vào so-sánh + đổi version) và back-to-Tệp (`dest`, line 465) HARDCODE `/[ws]/team/...` → ở /mc/asset sẽ nhảy về GĐ1 /team. Thêm 2 prop defaulted-off vào ReviewPlayerShell: `assetBasePath` (mặc định `/[ws]/team/asset`) + `browserHref` (mặc định folder-aware `/team/folder/[id]`|`/team`). Bỏ trống = GĐ1 byte-identical. `/mc/asset` truyền `assetBasePath=/[ws]/mc/asset` + `browserHref=/[ws]/mc/tep`.
+- **browserHref = /mc/tep tĩnh** (không folder-deep) — vì MC chưa có route `/mc/folder/[id]` (chỉ /mc/tep = TeamBrowser root). Thoát player MC → về /mc/tep (mất context folder sâu, chấp nhận được; đúng frame M23 "Back = thoát"). Thêm /mc/folder/[id] là việc M8-completeness ngoài scope M23.
+- **Money-safe hiển nhiên**: player/compare 0 field tiền. Chỉ đổi ĐÍCH điều hướng, không đụng transport/comment/logic. Editor không-admin vẫn dùng GĐ1 /team/asset.
+
 ## [M22 — Thùng rác Tệp + Quản lý phiên bản]
 - **Thùng rác = reuse `TeamTrash`** (P2.6+P6.2, `/team/trash`) trong `/mc/trash` — cùng pattern M8/M21. TeamTrash tự fetch /api/review/trash + /restore + /purge (mỗi cái re-verify membership; **purge re-verify workspace ADMIN**). Đầy đủ: danh sách 30 ngày · khôi phục theo lô · Xóa vĩnh viễn ADMIN (ConfirmModal) · badge "Còn N ngày" · state "gốc đã mất — không khôi phục" · cap 200/lần. KHÔNG dựng lại.
 - **Prop `backHref`** (TeamTrash, mặc định /team → GĐ1 byte-identical) + truyền `trashHref=/mc/trash` cho TeamBrowser toolbar (prop đã thêm ở M21). `/mc/trash` admin-gated fail-closed (nhất quán MC + là điều kiện của nút "Xóa vĩnh viễn") → truyền `isAdmin`.

@@ -3,6 +3,13 @@
 Ghi mỗi quyết định tự-quyết khi chạy tự động. Format: **[Phase] câu hỏi → chọn → lý do**.
 Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác được. Commit-only, KHÔNG push.
 
+## [M10 — REBUILD trung thực theo frame · 2026-07-14]
+- **Bối cảnh:** chủ dự án đối chiếu thấy Add Task ở /mc VẪN là wizard 5 bước của /admin, KHÔNG phải màn "Thêm Task mới" 1-trang 3 cột trong file design đã import. (Bản gốc M10 cố ý mượn wizard để né viết lại ~280 dòng submit money-safe — đã ghi ở mục [M10 — Add Task (Velox)] bên dưới.) Yêu cầu: "lấy y chang design, đừng vẽ lại vì sẽ sai".
+- **File design `.dc.html` KHÔNG còn trên đĩa** (đã tìm Downloads/Desktop/repo — trống; nó là context import phiên trước). → dựng lại trung thực từ ẢNH chủ gửi + hợp đồng field đã đọc từ code.
+- **Cách làm an toàn tiền:** `McAddTaskModal` (mới) CHỈ thu thập input theo layout frame, rồi build payload y hệt `TaskFormData` cũ và gọi ĐÚNG `handleSubmitWrapped` (createTask/createBatchTasks/createTasksFromBatch — admin re-check server-side). KHÔNG tái tính tiền: doanh thu = USD×tỷ giá, %=VND÷doanh thu **chỉ hiển thị**. Reuse `AutocompleteInput` (editor/quản lý), `TiptapEditor` (ghi chú), `calculatePrice` (chip giá), `createClient` (tạo khách inline).
+- **Wiring:** `DashboardActionWrapper` thêm prop `layout?: 'wizard'|'mc'` (mặc định 'wizard' → /admin **byte-identical**; chỉ swap sang `McAddTaskModal` khi 'mc'). `layout="mc"` chỉ ở `McTopbarActions` + `McAddScreen`. "Đổ sẵn từ Velox" = cầu `onOpenVelox` → lật `mcVelox` render wizard Velox đã kiểm định (không mất tính năng deep-scan).
+- **Verify:** 3 reviewer phản biện song song (money-safety / correctness / regression) đều PASS 0 issue; tsc + next build xanh.
+
 ## [M5 — Finance]
 - **Route riêng `/mc/finance`** (không dùng `?tab=`) → theo pattern M2/M3/M4 (mỗi màn 1 route); tab Payroll/Finance trong header điều hướng qua lại. An toàn, nhất quán.
 - **Rail active = wallet** (cụm Tiền) thay vì `building-2` như frame → giữ mô hình rail của tôi (wallet = cụm Tiền gồm Payroll+Finance); `building-2` để dành CRM/Tổ chức. Nhất quán rail M1/M2/M4.

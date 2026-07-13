@@ -38,6 +38,8 @@ export default function McAddScreen({
             {/* The real Add-Task modal — reuses /admin's money-safe submit routing. */}
             <DashboardActionWrapper
                 hideBar
+                portalToBody
+                layout="mc"
                 open={open}
                 onOpenChange={(o: boolean) => { if (!o) close() }}
                 workspaceId={workspaceId}

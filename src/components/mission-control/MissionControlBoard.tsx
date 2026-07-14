@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import McTopbarActions, { type McAddTaskData } from './McTopbarActions'
 import McBackLink from './McBackLink'
+import McWorkspaceSwitcher from './McWorkspaceSwitcher'
 import { Pressable, HoverCard, Reveal, RevealGroup, RevealItem } from './motion-kit'
 
 export interface McTask {
@@ -193,10 +194,9 @@ export default function MissionControlBoard({ data }: { data: McData }) {
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 {/* Top bar */}
                 <Reveal style={{ position: 'relative', zIndex: 60, height: 64, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(10,10,10,0.50)', backdropFilter: 'blur(10px)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 10, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.35)' }}>
-                        <LayoutGrid style={{ width: 14, height: 14, color: '#A5B4FC' }} />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F5', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.workspaceName}</span>
-                    </div>
+                    {/* [Review 2026-07-14] "Tháng 7/2026" = workspace name (payroll cycle). Was a static
+                        chip → now a real switcher (dropdown → /{id}/mc) so the owner can change month. */}
+                    <McWorkspaceSwitcher workspaceId={data.workspaceId} workspaceName={data.workspaceName} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 10, letterSpacing: '0.16em', color: '#71717A' }}>WORKSPACE / DASHBOARD</span>
                         <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#F4F4F5' }}>{data.greeting || 'Chào'}, {data.greetingName}.</span>

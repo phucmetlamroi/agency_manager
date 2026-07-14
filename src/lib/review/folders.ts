@@ -199,6 +199,13 @@ export async function createFolder(input: {
     const access = await requireReviewAccess({ workspaceId: input.workspaceId })
     const name = validateName(input.name)
 
+    // [AUDIT L1] A non-admin editor may only create a subfolder under a folder in their WRITABLE
+    // scope (FR-03) — not under an arbitrary folder in another editor's subtree. Enforced only for an
+    // EXPLICIT parent; a null parent (→ workspace root) creates a benign top-level folder they own,
+    // consistent with initiateUpload's own folder handling.
+    const explicitParent = input.parentId != null
+    const scope = await getFolderScope({ userId: access.userId, workspaceId: input.workspaceId, isAdmin: access.isAdmin })
+
     // Resolve the parent id up front. Root is ensured OUTSIDE the mutation tx.
     let parentId = input.parentId
     if (parentId == null) {
@@ -212,6 +219,7 @@ export async function createFolder(input: {
             select: { id: true, path: true, depth: true },
         })
         if (!parent) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục cha.')
+        if (explicitParent) assertFolderPathMutable(scope, parent.path)
         if (parent.depth + 1 > MAX_DEPTH) {
             throw apiError(400, 'VALIDATION_ERROR', 'Vượt quá độ sâu thư mục tối đa.', { reason: 'max_depth' })
         }

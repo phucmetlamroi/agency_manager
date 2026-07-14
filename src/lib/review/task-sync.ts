@@ -91,6 +91,7 @@ export async function syncTaskFromReviewEvent(
     taskId: string,
     workspaceId: string,
     target: string,
+    opts: { preserveDeadline?: boolean } = {},
 ): Promise<{ applied: boolean; from?: string; to?: string }> {
     if (!isValidStatus(target)) {
         // Mapping points at a status this app no longer has — record-only fallback (FR-D02).
@@ -124,7 +125,11 @@ export async function syncTaskFromReviewEvent(
         data: {
             status: target,
             version: { increment: 1 },
-            ...(STATUS_REQUIRES_NULL_DEADLINE.includes(target as (typeof STATUS_REQUIRES_NULL_DEADLINE)[number])
+            // [AUDIT L2] `opts.preserveDeadline` keeps the existing deadline even for a
+            // STATUS_REQUIRES_NULL_DEADLINE target — used by the guest-triggered legacy 'Revision'
+            // fallback so a guest can't wipe a task's overdue-tracking deadline from the /r/ link.
+            ...(!opts.preserveDeadline &&
+            STATUS_REQUIRES_NULL_DEADLINE.includes(target as (typeof STATUS_REQUIRES_NULL_DEADLINE)[number])
                 ? { deadline: null }
                 : {}),
         },
@@ -173,8 +178,12 @@ export async function syncTaskOnChangesRequested(
     if (task.status === client || task.status === REVIEW_STATUS_MAP.clientFixDone) {
         return { applied: false, from: task.status, to: task.status }
     }
-    const target = canAutoTransition(task.status, client) ? client : legacy
-    const result = await syncTaskFromReviewEvent(taskId, workspaceId, target)
+    // [AUDIT L2] The legacy 'Revision' target is the "flip from anywhere" fallback (K6); when a GUEST
+    // triggers it, keep the deadline so they can't wipe overdue-tracking. The proper client-review
+    // transition (A5→A6) is unaffected.
+    const usingLegacy = !canAutoTransition(task.status, client)
+    const target = usingLegacy ? legacy : client
+    const result = await syncTaskFromReviewEvent(taskId, workspaceId, target, { preserveDeadline: usingLegacy })
     // [P4/R3] Reflect the guest's decision on the portal VIEW so it doesn't stay stuck on "Awaiting
     // your review". Only when we actually entered the CLIENT-review round (A6); the legacy internal
     // 'Revision' target is not a client-facing decision. Best-effort (the flip already committed).
@@ -412,18 +421,40 @@ export async function revokeClientExposureOnNewVersion(
     try {
         const task = await prisma.task.findFirst({
             where: { id: taskId, workspaceId },
-            select: { clientReview: true },
+            select: { clientReview: true, status: true },
         })
-        // Only act when the client currently holds a live link (was sent + not yet decided-terminal).
-        if (task?.clientReview !== 'AWAITING') return
+        // [AUDIT M1] Act whenever the client currently holds a LIVE link — 'AWAITING' (sent, not yet
+        // decided) OR 'CHANGES' (they requested changes and are still watching the same /r/ link). The
+        // original guard only covered 'AWAITING', so a fresh head landing AFTER a change-request would
+        // slip the un-re-approved cut straight to the client on the still-live 'CHANGES' link (R5 gap).
+        // 'APPROVED'/null are settled — nothing live to revoke.
+        if (task?.clientReview !== 'AWAITING' && task?.clientReview !== 'CHANGES') return
+
+        // [AUDIT M1-v2] Revoking the share + nulling clientReview is NOT enough: the client PORTAL derives
+        // exposure from the task STATUS (isClientFacingPhase substring-matches "khách", independent of
+        // clientReview), and — finding the old share revoked — RE-MINTS a fresh OPEN /r/ link to the head.
+        // For the 'CHANGES' case the F7 auto-flip A6→A2 is blocked by the predecessor guard, so the task
+        // is stuck in the client-facing phase (A5/A6/A7 all contain "khách"). Force it back to internal
+        // review (A2 'Đã nộp video (nội bộ)') so the new cut must pass admin re-approval (F10) before the
+        // client can ever see it again. Never touch a terminal task.
+        const clientPhase = [
+            REVIEW_STATUS_MAP.sentToClient,
+            REVIEW_STATUS_MAP.clientChangesRequested,
+            REVIEW_STATUS_MAP.clientFixDone,
+        ]
+        const resetStatus = !!task.status && (clientPhase as string[]).includes(task.status) && !isTerminalStatus(task.status)
         const sharesRevoked = await prisma.$transaction(async (tx) => {
             const r = await tx.shareLink.updateMany({
                 where: { items: { some: { assetId } }, revokedAt: null },
                 data: { revokedAt: new Date() },
             })
             await tx.task.updateMany({
-                where: { id: taskId, workspaceId, clientReview: 'AWAITING' },
-                data: { clientReview: null, clientReviewedAt: null },
+                where: { id: taskId, workspaceId, clientReview: { in: ['AWAITING', 'CHANGES'] } },
+                data: {
+                    clientReview: null,
+                    clientReviewedAt: null,
+                    ...(resetStatus ? { status: REVIEW_STATUS_MAP.submitted, version: { increment: 1 } } : {}),
+                },
             })
             return r.count
         })

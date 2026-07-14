@@ -16,8 +16,33 @@ import { requestGuestPin } from '@/lib/review/guest-subscribe'
 type Ctx = { params: Promise<{ slug: string }> }
 
 const schema = z
-    .object({ assetId: z.string().min(1).max(64), email: z.string().trim().email().max(254).optional() })
+    .object({
+        assetId: z.string().min(1).max(64),
+        email: z.string().trim().email().max(254).optional(),
+        // [AUDIT H2] Sign-off verification — force a fresh PIN so verify-pin stamps this session.
+        signoff: z.boolean().optional(),
+    })
     .strict()
+
+/**
+ * [AUDIT L3] Canonical INBOX key for the per-target-email cap. A raw-string cap is defeated by
+ * subaddressing — victim@gmail.com, victim+1@gmail.com, and v.i.c.t.i.m@gmail.com are different strings
+ * but the SAME physical inbox — so each variant would otherwise get its own daily budget. Strip the
+ * "+tag" (subaddressing, near-universal) and, for Gmail, the dots the provider ignores. Used ONLY to
+ * key the rate-limit; the PIN itself is still sent to the exact address the guest typed.
+ */
+function canonicalEmailKey(email: string): string {
+    const at = email.lastIndexOf('@')
+    if (at < 1) return email
+    let local = email.slice(0, at)
+    let domain = email.slice(at + 1)
+    const plus = local.indexOf('+')
+    if (plus >= 0) local = local.slice(0, plus)
+    // gmail.com and googlemail.com are the SAME Google inbox and both ignore dots — fold to one key.
+    if (domain === 'googlemail.com') domain = 'gmail.com'
+    if (domain === 'gmail.com') local = local.replace(/\./g, '')
+    return `${local}@${domain}`
+}
 
 export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => {
     const { slug } = await params
@@ -48,7 +73,12 @@ export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => 
     const cooldown = await limitDb(`r:notif:cd:${email}:${share.id}`, 1, 60)
     const burst = await limitDb(`r:notif:pin:${email}:${share.id}`, 3, 600)
     const perIp = await limitDb(`r:notif:ip:${ip}`, 10, 86_400)
-    if (!cooldown.success || !burst.success || !perIp.success) return neutral()
+    // [AUDIT L3] Global cap PER TARGET INBOX across ALL shares + IPs — the per-(email,share) burst let
+    // a botnet fan out to one victim address via many shares (email-bombing with the agency sender).
+    // Keyed on the CANONICAL inbox (subaddressing stripped) so +tag / gmail-dot variants share one
+    // 10/day budget instead of each getting its own.
+    const perEmail = await limitDb(`r:notif:email:${canonicalEmailKey(email)}`, 10, 86_400)
+    if (!cooldown.success || !burst.success || !perIp.success || !perEmail.success) return neutral()
 
     await requestGuestPin({
         share,
@@ -57,6 +87,7 @@ export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => 
         isOwnEmail,
         guestSessionId: guest?.id ?? null,
         ip,
+        alwaysSendCode: parsed.data.signoff === true,
     })
     return neutral()
 })

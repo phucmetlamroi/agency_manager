@@ -365,6 +365,12 @@ export async function createGuestComment(
 // ─────────────────────────── edit / delete (own comment, live session) ───────────────────────────
 
 async function resolveOwnGuestComment(share: ShareWithItems, guest: GuestSession, commentId: string) {
+    // [AUDIT M2] Once the agency turns comments OFF to FREEZE feedback, a guest must not be able to
+    // keep editing or deleting their earlier comments either — honour the same allowComments gate as
+    // create/react. Without this the "frozen" thread is still mutable by the client.
+    if (!share.allowComments) {
+        throw apiError(403, 'FORBIDDEN', 'Comments are turned off for this link.')
+    }
     const comment = await prisma.reviewComment.findFirst({
         where: { id: commentId, deletedAt: null, isInternal: false },
     })

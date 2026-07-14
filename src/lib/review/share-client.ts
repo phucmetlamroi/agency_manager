@@ -21,6 +21,34 @@ async function okJson<T>(res: Response): Promise<T> {
     if (!res.ok) throw new Error(await errMessage(res))
     return (await res.json()) as T
 }
+
+/** Error that preserves the API envelope's `code` so callers can branch on it (e.g. the decision
+ *  route's VERIFICATION_REQUIRED / DECISIONS_DISABLED gates — AUDIT H1/H2). */
+export class GuestApiError extends Error {
+    readonly status: number
+    readonly code?: string
+    constructor(message: string, status: number, code?: string) {
+        super(message)
+        this.name = 'GuestApiError'
+        this.status = status
+        this.code = code
+    }
+}
+async function okJsonCoded<T>(res: Response): Promise<T> {
+    if (!res.ok) {
+        let code: string | undefined
+        let message = `Error ${res.status}. Please try again.`
+        try {
+            const b = (await res.json()) as { error?: { message?: string; code?: string } }
+            if (b?.error?.code) code = b.error.code
+            if (b?.error?.message) message = b.error.message
+        } catch {
+            /* non-JSON */
+        }
+        throw new GuestApiError(message, res.status, code)
+    }
+    return (await res.json()) as T
+}
 function jsonInit(method: string, body?: unknown): RequestInit {
     return {
         method,
@@ -49,7 +77,7 @@ export function guestShareApi(slug: string) {
         unlock(password: string): Promise<{ unlocked: true }> {
             return fetch(`${base}/unlock`, jsonInit('POST', { password })).then((r) => okJson(r))
         },
-        identify(guest: GuestIdentityInput): Promise<{ guest: { name: string } }> {
+        identify(guest: GuestIdentityInput & { force?: boolean }): Promise<{ guest: { name: string } }> {
             return fetch(`${base}/identity`, jsonInit('POST', guest)).then((r) => okJson(r))
         },
         fetchPlaybackToken(versionId: string): Promise<PlaybackToken> {
@@ -99,7 +127,9 @@ export function guestShareApi(slug: string) {
             return fetch(`${base}/comment-attachments/initiate`, jsonInit('POST', input)).then((r) => okJson(r))
         },
         submitDecision(input: { versionId: string; decision: 'approve' | 'request_changes'; note?: string }): Promise<GuestDecisionResult> {
-            return fetch(`${base}/decision`, jsonInit('POST', input)).then((r) => okJson(r))
+            // okJsonCoded so the UI can catch GuestApiError.code === 'VERIFICATION_REQUIRED' /
+            // 'DECISIONS_DISABLED' and drive the sign-off verification step (AUDIT H1/H2).
+            return fetch(`${base}/decision`, jsonInit('POST', input)).then((r) => okJsonCoded(r))
         },
         fetchDownloadUrl(versionId: string): Promise<{ url: string; fileName: string; expiresAt: string }> {
             return fetchNoStore(`${base}/download-url?versionId=${encodeURIComponent(versionId)}`).then((r) => okJson(r))

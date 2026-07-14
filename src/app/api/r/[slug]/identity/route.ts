@@ -26,6 +26,9 @@ const schema = z
     .object({
         name: z.string().trim().min(1).max(120),
         email: z.string().trim().email().max(254),
+        // [AUDIT H2] A sign-off decision needs the decider's OWN identity — force:true replaces a prior
+        // session (e.g. the known-client auto-identity) with a fresh one instead of short-circuiting.
+        force: z.boolean().optional(),
     })
     .strict()
 
@@ -39,11 +42,15 @@ export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => 
     }
     const share = await requireShare(slug, req.cookies)
 
-    const existing = await getGuestSession(share, req.cookies)
-    if (existing) return apiJson({ guest: { name: existing.name } })
-
     const parsed = await parseBody(req, schema, 'en')
     if (!parsed.ok) return parsed.res
+
+    // Idempotent by default — a live cookie session wins. A sign-off (force:true) skips the
+    // short-circuit so the decider's own name+email replaces any prior session (AUDIT H2).
+    if (!parsed.data.force) {
+        const existing = await getGuestSession(share, req.cookies)
+        if (existing) return apiJson({ guest: { name: existing.name } })
+    }
 
     const { session, rawToken } = await createGuestSession(share, {
         name: parsed.data.name,

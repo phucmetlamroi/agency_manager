@@ -10,6 +10,7 @@ import type { GuestSession, ShareLink } from '@prisma/client'
 import { generateOtp, hashOtp, verifyOtp } from '@/lib/otp'
 import { sendEmail } from '@/lib/email'
 import { renderVerifyPinEmail } from './guest-emails/verify-pin'
+import { isSyntheticGuestEmail } from './share-auth'
 import { reviewLog } from './logger'
 
 const PIN_TTL_MS = 10 * 60 * 1000 // 10 minutes
@@ -75,13 +76,19 @@ export async function requestGuestPin(input: {
     isOwnEmail: boolean
     guestSessionId: string | null
     ip: string | null
+    /** [AUDIT H2] Sign-off flow: ALWAYS mint a fresh code (never take the own-email auto-subscribe
+     *  shortcut) so verify-pin actually runs and stamps emailVerifiedAt on THIS session — the only
+     *  signal the decision gate trusts. Without this a returning-but-already-verified client would be
+     *  auto-subscribed with no code sent, and could never satisfy the (fallback-free) sign-off gate. */
+    alwaysSendCode?: boolean
 }): Promise<void> {
     const email = normEmail(input.email)
     // Out-of-scope asset → do nothing (the route still answers a neutral pin_sent).
     if (!assetInShare(input.share, input.assetId)) return
 
-    // Skip-PIN / auto-subscribe is safe ONLY for the guest's own session email.
-    if (input.isOwnEmail) {
+    // Skip-PIN / auto-subscribe is safe ONLY for the guest's own session email — and never for a
+    // sign-off, which must earn a fresh code from the actual inbox.
+    if (!input.alwaysSendCode && input.isOwnEmail) {
         // Already subscribed to THIS asset → nothing to do.
         const existing = await prisma.guestSubscription.findUnique({
             where: { email_assetId: { email, assetId: input.assetId } },
@@ -122,7 +129,12 @@ export async function requestGuestPin(input: {
 
 export type VerifyPinResult =
     | { ok: true }
-    | { ok: false; reason: 'invalid' | 'expired' | 'locked' | 'no_pin' }
+    | { ok: false; reason: 'invalid' | 'expired' | 'locked' | 'no_pin' | 'reviewer_limit' }
+
+/** [Owner decision 2026-07-15] One reviewer email per share link. This bounds the notification
+ *  double-opt-in (request-pin → verify-pin): only the FIRST email to verify on a link can subscribe;
+ *  a different email hits `reviewer_limit`. Approval itself no longer uses a PIN (share-decision.ts). */
+export const MAX_REVIEWERS_PER_SHARE = 1
 
 /**
  * verify-pin: check the newest live code for (email, share), then create the subscription.
@@ -156,9 +168,35 @@ export async function verifyGuestPin(input: {
         return { ok: false, reason: bumped.attempts >= MAX_ATTEMPTS ? 'locked' : 'invalid' }
     }
 
-    // Correct: consume the code, create/reactivate the subscription, stamp the session verified.
+    // [AUDIT H2 — verified-email binding] The correct PIN proves control of `email`. We may ONLY
+    // stamp GuestSession.emailVerifiedAt when `email` is this session's OWN email — otherwise an
+    // attacker could self-declare a victim's email on the session, verify their OWN inbox with a
+    // foreign email, and have the (victim-emailed) session treated as proven. A foreign-email verify
+    // still creates/refreshes the subscription (updates notifications), it just never marks the
+    // session verified.
+    const stampsSession = !!input.guest && !input.guest.emailVerifiedAt && normEmail(input.guest.email) === email
+
+    // Correct: consume the code, refresh the subscription, and (own-email only) stamp the session
+    // verified — all in ONE transaction. When this would add a NEW verified reviewer, first take a
+    // per-share advisory lock and RE-COUNT distinct verified reviewer emails INSIDE the tx: a pre-tx
+    // count is a TOCTOU hole (two concurrent 4th-verifies could both read < 3 and both stamp, exceeding
+    // MAX_REVIEWERS_PER_SHARE). Synthetic known-client identities (@review.invalid) are excluded — they
+    // are never real reviewers and must not consume a slot nor block a real 3rd reviewer.
     try {
-        await prisma.$transaction(async (tx) => {
+        const outcome = await prisma.$transaction(async (tx) => {
+            if (stampsSession && input.guest) {
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${input.share.id}, 0))`
+                const verified = await tx.guestSession.findMany({
+                    where: { shareLinkId: input.share.id, emailVerifiedAt: { not: null } },
+                    select: { email: true },
+                })
+                const distinct = new Set(
+                    verified.map((v) => normEmail(v.email)).filter((e) => !isSyntheticGuestEmail(e)),
+                )
+                if (!distinct.has(email) && distinct.size >= MAX_REVIEWERS_PER_SHARE) {
+                    return 'reviewer_limit' as const
+                }
+            }
             await tx.guestEmailVerification.update({ where: { id: row.id }, data: { consumedAt: new Date() } })
             await tx.guestSubscription.upsert({
                 where: { email_assetId: { email, assetId: input.assetId } },
@@ -172,10 +210,12 @@ export async function verifyGuestPin(input: {
                 },
                 update: { shareLinkId: input.share.id, unsubscribedAt: null, guestSessionId: input.guest?.id ?? null },
             })
-            if (input.guest && !input.guest.emailVerifiedAt) {
+            if (stampsSession && input.guest) {
                 await tx.guestSession.update({ where: { id: input.guest.id }, data: { emailVerifiedAt: new Date() } })
             }
+            return 'ok' as const
         })
+        if (outcome === 'reviewer_limit') return { ok: false, reason: 'reviewer_limit' }
     } catch (e) {
         // Prisma upsert isn't atomic: a concurrent double-submit of the same valid PIN can both take
         // the create branch, so the loser hits P2002 (unique email_assetId). The winner already

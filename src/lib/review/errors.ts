@@ -25,6 +25,9 @@ export type ApiErrorCode =
     | 'FILE_TOO_LARGE'
     | 'UNSUPPORTED_MEDIA_TYPE'
     | 'RATE_LIMITED'
+    // [AUDIT H1/H2] Client sign-off gates on the guest decision route.
+    | 'DECISIONS_DISABLED'
+    | 'VERIFICATION_REQUIRED'
     | 'INTERNAL'
     | 'UPSTREAM_ERROR'
 

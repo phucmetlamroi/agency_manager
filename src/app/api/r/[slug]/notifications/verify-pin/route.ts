@@ -48,6 +48,11 @@ export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => 
         ip: getClientIp(req),
     })
     if (result.ok) return apiJson({ verified: true })
+    if (result.reason === 'reviewer_limit') {
+        return apiError(403, 'FORBIDDEN', 'This review link is already registered to another email. Ask the team for your own link.', {
+            reason: result.reason,
+        })
+    }
     const messages: Record<string, string> = {
         invalid: 'That code is incorrect. Please check and try again.',
         expired: 'That code has expired. Request a new one.',

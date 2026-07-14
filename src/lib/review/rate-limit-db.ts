@@ -18,6 +18,7 @@ export async function limitDb(
     key: string,
     max: number,
     windowSec: number,
+    opts: { failClosed?: boolean } = {},
 ): Promise<RateLimitResult> {
     const cutoff = new Date(Date.now() - windowSec * 1000)
     try {
@@ -39,7 +40,9 @@ export async function limitDb(
         // Fail-open for availability (guest reads), but log loudly — a broken
         // limiter must be visible, not silent.
         reviewLog('error', 'rate_limit.error', { key, error: String(e) })
-        return { success: true, remaining: 0, retryAfterSec: windowSec }
+        // [AUDIT M5] Brute-force-sensitive callers (e.g. the pre-bcrypt cap on share /unlock) pass
+        // failClosed:true so a limiter/DB outage can't silently disable throttling; reads stay fail-open.
+        return { success: !opts.failClosed, remaining: 0, retryAfterSec: windowSec }
     }
 }
 

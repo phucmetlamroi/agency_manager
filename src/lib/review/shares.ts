@@ -12,6 +12,7 @@ import { nanoid } from 'nanoid'
 import type { Prisma, ShareLink } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { requireReviewAccess } from './access'
+import { getFolderScope, assertAssetInScope, assertFolderPathMutable } from './folder-scope'
 import { apiError } from './errors'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { toUserRef, type ItemType, type UserRef } from './dto'
@@ -176,12 +177,22 @@ export async function createShareLink(input: CreateShareInput): Promise<{ share:
         folderIds.length
             ? prisma.reviewFolder.findMany({
                   where: { id: { in: folderIds }, workspaceId: input.workspaceId, deletedAt: null },
-                  select: { id: true },
+                  select: { id: true, path: true },
               })
             : [],
     ])
     if (assets.length !== assetIds.length || folders.length !== folderIds.length) {
         throw apiError(404, 'NOT_FOUND', 'Có mục không tồn tại hoặc đã nằm trong thùng rác.')
+    }
+
+    // [AUDIT M3] Enforce editor folder-scope (FR-03): a non-admin may only share assets/folders in
+    // their assigned (writable) subtree — never expose an arbitrary workspace asset (and flip on
+    // allowDownload of its master). Admin/owner = unrestricted (no behaviour change). Mirrors the
+    // scope re-check every other editor mutation (download/move/status) already performs.
+    const scope = await getFolderScope({ userId: access.userId, workspaceId: input.workspaceId, isAdmin: access.isAdmin })
+    if (!scope.unrestricted) {
+        for (const a of assets) await assertAssetInScope(scope, a.id, 'write')
+        for (const f of folders) assertFolderPathMutable(scope, f.path)
     }
 
     const expiresAt = parseExpiry(input.expiresAt)

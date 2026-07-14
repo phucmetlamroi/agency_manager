@@ -74,6 +74,22 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             }
         }
 
+        // [AUDIT H3 — video-review adversarial audit] Sign-off / payroll integrity, enforced
+        // INDEPENDENTLY of the (owner-disabled) FSM. Only a workspace-admin may move a task INTO a
+        // terminal status ('Hoàn tất' = completes + counts the editor's pay / 'Đã hủy' = closes it) or
+        // RE-OPEN a task OUT of a terminal status. A non-admin assignee keeps every non-terminal
+        // transition (start work, submit for review, confirm-fix). Without this, an assignee could
+        // self-complete their own task's payroll and re-open an already-paid task, since
+        // validateTransition() is disabled. See docs/AUDIT_VIDEO_REVIEW_ADVERSARIAL.md (H3).
+        if (!isWorkspaceAdmin) {
+            const { TERMINAL_STATUSES } = await import('@/lib/task-statuses')
+            const enteringTerminal = TERMINAL_STATUSES.includes(newStatus)
+            const leavingTerminal = TERMINAL_STATUSES.includes(task.status) && !TERMINAL_STATUSES.includes(newStatus)
+            if (enteringTerminal || leavingTerminal) {
+                return { error: 'Forbidden: Chỉ quản lý (admin) mới được đưa task sang Hoàn tất/Đã hủy hoặc mở lại task đã đóng.' }
+            }
+        }
+
         // --- FSM GUARD (Enterprise Logic) ---
         // Validate if this state transition is legal according to strict rules
         const transitionCheck = validateTransition(task.status, newStatus)

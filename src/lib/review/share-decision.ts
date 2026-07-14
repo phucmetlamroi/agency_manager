@@ -20,7 +20,8 @@ import { reviewStateToDto, type ReviewStateDto } from './dto'
 import { assertVersionInShare } from './share-guest'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { inngest, REVIEW_EVENTS } from './inngest'
-import type { ShareWithItems } from './share-auth'
+import { type ShareWithItems } from './share-auth'
+import { notifyReview, resolveTaskRecipients, reviewPlayerUrl } from './notify'
 import { isValidStatus } from '@/lib/task-statuses'
 
 const MAX_NOTE = 2000
@@ -52,7 +53,17 @@ async function persistDecisionNote(
     version: { id: string; versionNumber: number },
     asset: { id: string; workspaceId: string; taskId: string | null },
     note: string,
+    signerName: string,
+    signerEmail: string,
+    // [AUDIT M4] Fire the staff notify from callers where the decision's own inngest event does NOT run
+    // (the idempotent repeat / race-lost branches) — otherwise a 2nd "request changes" with a fresh note
+    // is silently dropped into the feed and staff never hear about the extra feedback.
+    notifyStaff: boolean,
 ): Promise<void> {
+    // [AUDIT M2] When the agency has FROZEN comments (allowComments=false) the change-request note must
+    // NOT appear as a new PUBLIC comment (that bypasses the freeze) — record it staff-INTERNAL instead,
+    // so the change reason still reaches the team without re-opening the public thread.
+    const isInternal = !share.allowComments
     const noteCommentId = randomUUID()
     await prisma.$transaction(async (tx) => {
         await tx.reviewComment.create({
@@ -60,10 +71,10 @@ async function persistDecisionNote(
                 id: noteCommentId,
                 versionId: version.id,
                 body: note,
-                isInternal: false,
+                isInternal,
                 authorId: null,
                 guestSessionId: guest.id,
-                guestName: guest.name,
+                guestName: signerName,
                 shareLinkId: share.id,
             },
         })
@@ -77,10 +88,34 @@ async function persistDecisionNote(
             commentId: noteCommentId,
             shareLinkId: share.id,
             guestSessionId: guest.id,
-            guestName: guest.name,
-            meta: { timecodeMs: null, isInternal: false, isReply: false, excerpt: note.slice(0, 120) },
+            guestName: signerName,
+            meta: { timecodeMs: null, isInternal, isReply: false, excerpt: note.slice(0, 120), signerEmail },
         })
     })
+
+    if (notifyStaff && asset.taskId) {
+        // Fire-and-forget: the note is durable regardless of whether the notify lands.
+        void (async () => {
+            try {
+                const rcpt = await resolveTaskRecipients(asset.taskId)
+                await notifyReview({
+                    recipientIds: [rcpt.assigneeId, ...rcpt.adminUserIds],
+                    type: 'VIDEO_COMMENT_NEW',
+                    title: `${signerName} đã gửi thêm yêu cầu chỉnh sửa (v${version.versionNumber})`,
+                    body: note.slice(0, 140),
+                    taskId: asset.taskId,
+                    deepLinkUrl: reviewPlayerUrl({
+                        workspaceId: asset.workspaceId,
+                        assetId: asset.id,
+                        versionId: version.id,
+                        commentId: noteCommentId,
+                    }),
+                })
+            } catch (e) {
+                reviewLog('error', 'share.decision.note_notify_failed', { assetId: asset.id, error: String(e) })
+            }
+        })()
+    }
 }
 
 export async function submitGuestDecision(
@@ -89,6 +124,32 @@ export async function submitGuestDecision(
     input: GuestDecisionInput,
 ): Promise<{ reviewState: ReviewStateDto; message: string }> {
     const { version, asset } = await assertVersionInShare(share, input.versionId)
+
+    // [AUDIT H1] A decision (approve / request changes) is a client SIGN-OFF; accept it ONLY on a
+    // share an admin actually SENT to the client — i.e. the asset's task is in the client-review flow
+    // (Task.clientReview set by approveInternalAndSendToClient / F10). A bare asset or Team share, or a
+    // task never sent, can be viewed & commented on but never decided. This realizes "allowDecisions =
+    // admin-sent shares only" from existing state, no schema flag.
+    if (!asset.taskId) {
+        throw apiError(403, 'DECISIONS_DISABLED', 'This link is not open for approval.')
+    }
+    const decisionTask = await prisma.task.findFirst({
+        where: { id: asset.taskId, workspaceId: asset.workspaceId },
+        select: { clientReview: true },
+    })
+    if (!decisionTask || decisionTask.clientReview == null) {
+        throw apiError(403, 'DECISIONS_DISABLED', 'This review is not open for approval yet.')
+    }
+
+    // [Owner decision 2026-07-15] Approval is a lightweight sign-off: anyone the client gave the link to
+    // may approve / request changes after adding a name + email — NO email PIN. The owner explicitly
+    // waived impersonation protection here ("mạo danh không quan trọng"), so a self-declared identity is
+    // accepted. This does NOT touch payroll: an editor still cannot move their OWN task to Hoàn tất — that
+    // stays admin-only (H3, task-actions.ts). Gate 1 above still limits decisions to shares an admin
+    // actually sent into the client-review flow. Attribution = the reviewer's self-declared name + email.
+    const signerName = guest.name
+    const signerEmail = guest.email
+
     if (version.pipelineStatus !== ReviewPipelineStatus.READY) {
         throw apiError(409, 'STATE_INVALID', 'This version is still processing — check back in a few minutes.')
     }
@@ -106,7 +167,7 @@ export async function submitGuestDecision(
     // → persist it even though the state flip is a no-op (else the second "Request
     // changes" note is silently lost while the UI toasts success).
     if (version.reviewState === target) {
-        if (note) await persistDecisionNote(share, guest, version, asset, note)
+        if (note) await persistDecisionNote(share, guest, version, asset, note, signerName, signerEmail, true)
         return { reviewState: reviewStateToDto(target), message: MESSAGE[input.decision] }
     }
     if (version.reviewState === ReviewState.DRAFT) {
@@ -148,8 +209,8 @@ export async function submitGuestDecision(
             versionId: version.id,
             shareLinkId: share.id,
             guestSessionId: guest.id,
-            guestName: guest.name,
-            meta: { versionNumber: version.versionNumber, decision: input.decision, old: reviewStateToDto(version.reviewState), isHead },
+            guestName: signerName,
+            meta: { versionNumber: version.versionNumber, decision: input.decision, old: reviewStateToDto(version.reviewState), isHead, signerEmail },
         })
         return true
     })
@@ -159,15 +220,16 @@ export async function submitGuestDecision(
         // success for this guest — but the note is new content, so persist it too.
         const now = await prisma.reviewVersion.findUnique({ where: { id: version.id }, select: { reviewState: true } })
         if (now?.reviewState === target) {
-            if (note) await persistDecisionNote(share, guest, version, asset, note)
+            if (note) await persistDecisionNote(share, guest, version, asset, note, signerName, signerEmail, true)
             return { reviewState: reviewStateToDto(target), message: MESSAGE[input.decision] }
         }
         throw apiError(409, 'STATE_INVALID', 'This version just changed — the page will refresh.')
     }
 
     // The flip committed → the note is durable content; persist it now (own tx) so a
-    // later inngest.send failure can't take it down with the 500.
-    if (note) await persistDecisionNote(share, guest, version, asset, note)
+    // later inngest.send failure can't take it down with the 500. notifyStaff:false here — the
+    // DECISION_RECORDED inngest event below already notifies staff of this (real) change request.
+    if (note) await persistDecisionNote(share, guest, version, asset, note, signerName, signerEmail, false)
 
     reviewLog('info', 'share.decision', { shareId: share.id, versionId: version.id, decision: input.decision, isHead })
 
@@ -187,7 +249,7 @@ export async function submitGuestDecision(
                     workspaceId: asset.workspaceId,
                     shareLinkId: share.id,
                     decision: input.decision,
-                    guestName: guest.name,
+                    guestName: signerName,
                     versionNumber: version.versionNumber,
                 },
             })

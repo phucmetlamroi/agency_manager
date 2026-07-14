@@ -49,6 +49,17 @@ function cookieSecret(): Uint8Array {
 
 const sha256hex = (s: string) => createHash('sha256').update(s).digest('hex')
 
+/**
+ * [AUDIT H2] Domain of the synthetic, non-routable address minted for the known-client
+ * auto-identity (createLinkClientGuestSession). A GuestSession on such an address has NOT proven
+ * control of a real inbox, so it must NEVER be treated as email-verified for a client SIGN-OFF
+ * decision — otherwise merely holding the slug lets a stranger approve UNDER the client's name.
+ */
+export const SYNTHETIC_CLIENT_EMAIL_DOMAIN = 'review.invalid'
+export function isSyntheticGuestEmail(email: string | null | undefined): boolean {
+    return !!email && email.toLowerCase().endsWith(`@${SYNTHETIC_CLIENT_EMAIL_DOMAIN}`)
+}
+
 // ─────────────────────────── resolve chain ───────────────────────────
 
 export type ShareGate =
@@ -229,7 +240,7 @@ export async function createLinkClientGuestSession(
             shareLinkId: share.id,
             tokenHash: sha256hex(rawToken),
             name: client.name,
-            email: `noreply+client-${client.id}@review.invalid`,
+            email: `noreply+client-${client.id}@${SYNTHETIC_CLIENT_EMAIL_DOMAIN}`,
             emailVerifiedAt: new Date(),
             userAgent: opts.userAgent ?? null,
         },

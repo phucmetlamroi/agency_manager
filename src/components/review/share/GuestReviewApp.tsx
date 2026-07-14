@@ -17,7 +17,7 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, FileVid
 import useSWR from 'swr'
 import type { Fps } from '@/lib/review/timecode'
 import type { AnnotationShape, CommentDto, CreateCommentInput } from '@/lib/review/comment-client'
-import { guestShareApi, type GuestShareContent, type GuestVersionView } from '@/lib/review/share-client'
+import { GuestApiError, guestShareApi, type GuestShareContent, type GuestVersionView } from '@/lib/review/share-client'
 import { useHlsPlayer } from '../player/useHlsPlayer'
 import { VideoStage } from '../player/VideoStage'
 import { useComments } from '../player/useComments'
@@ -336,9 +336,10 @@ function GuestStage({
     }
     const submitDecision = async (decision: 'approve' | 'request_changes', note?: string) => {
         if (!version) return
-        // A decision REQUIRES guest identity (server 401s otherwise). Gate on the modal
-        // the same way comments/reactions do — without this a brand-new guest who opens
-        // the link and clicks Approve dead-ends in a 401 loop (finding P5-R#1, blocker).
+        // A decision REQUIRES guest identity (server 401s otherwise). Gate on the identity modal
+        // the same way comments/reactions do — a brand-new guest who opens the link and clicks
+        // Approve gets the name+email modal, then the decision proceeds. NO email PIN: the owner
+        // waived impersonation protection on approvals; editor pay stays admin-only via H3.
         try {
             await ensureIdentity()
         } catch {
@@ -352,8 +353,14 @@ function GuestStage({
             refreshContent()
             if (note) feed.refresh()
         } catch (e) {
-            alert(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
-            refreshContent() // stale-state 409 → self-heal
+            // A share the team hasn't opened for approval yet returns DECISIONS_DISABLED (gate 1) — show
+            // a plain message; anything else is a stale-state 409 that self-heals on refresh.
+            if (e instanceof GuestApiError && e.code === 'DECISIONS_DISABLED') {
+                showToast('This review isn’t open for approval.')
+            } else {
+                alert(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+                refreshContent() // stale-state 409 → self-heal
+            }
         } finally {
             setDecisionBusy(false)
         }
@@ -694,6 +701,7 @@ function GuestStage({
                     onSend={(note) => void submitDecision('request_changes', note)}
                 />
             )}
+
         </div>
     )
 }

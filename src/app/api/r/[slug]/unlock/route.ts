@@ -20,7 +20,9 @@ const schema = z.object({ password: z.string().min(1).max(200) }).strict()
 
 export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => {
     const { slug } = await params
-    const rl = await limitDb(`r:unlock:${slug}:${getClientIp(req)}`, 5, 60)
+    // [AUDIT M5] failClosed: the password brute-force cap is the whole threat model here, so a
+    // limiter outage must DENY (429) rather than silently open the gate to unlimited bcrypt guesses.
+    const rl = await limitDb(`r:unlock:${slug}:${getClientIp(req)}`, 5, 60, { failClosed: true })
     if (!rl.success) {
         return apiError(429, 'RATE_LIMITED', 'Too many attempts. Please wait and try again.', {
             retryAfterSec: rl.retryAfterSec,

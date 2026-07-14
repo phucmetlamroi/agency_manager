@@ -3,6 +3,13 @@
 Ghi mỗi quyết định tự-quyết khi chạy tự động. Format: **[Phase] câu hỏi → chọn → lý do**.
 Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác được. Commit-only, KHÔNG push.
 
+## [Kéo-thả kanban M1 + auto trạng thái · 2026-07-14 (video review chủ dự án)]
+- **Yêu cầu từ video [05:07-06:53]:** kéo card TỰ DO giữa 6 cột trên bảng /mc; thả vào cột nào thì task tự nhận **trạng thái đầu vào** của cột đó. Luật chủ chốt (lời chủ dự án): vào "Đã giao task" = `Nhận task` (KHÔNG phải `Đang đợi giao` — sẽ văng sang Kho chờ); vào "Khách duyệt" = `Đã gửi video (khách)` (trạng thái đầu phase); vào "Hoàn tất" = `Hoàn tất` (không phải Quá hạn/Đã hủy). Luật chỉ áp cho KÉO TAY — luồng tự động giữ logic riêng.
+- **"Quá hạn" không nhận thả** — status do cron/deadline tự đánh; thả vào hiện toast giải thích (droppable vẫn ENABLED để dnd-kit báo `over` → toast bắn được; chặn bằng guard entryStatus=null).
+- **Money-safe bằng tái dùng:** drop gọi ĐÚNG `updateTaskStatus` (action mà dropdown admin dùng — canonical-status guard, RBAC workspace-ADMIN, invariant deadline/pool/archive, audit log). KHÔNG viết lại logic trạng thái; FSM `validateTransition` vốn đã bị chủ dự án tắt từ trước → kéo tự do hợp lệ.
+- **Optimistic UI:** card chuyển ngay; server lỗi → snap về + toast + `router.refresh()` re-sync (cả nhánh catch). Click thường (<8px) vẫn mở drawer /mc/task/[id]; click sau kéo bị nuốt bằng justDraggedRef (dnd-kit bắn dragEnd TRƯỚC click). HoverCard giữ hiệu ứng hover y:-4 như cũ.
+- **Verify:** 3 reviewer phản biện (status/money · dnd-correctness · regression) PASS; 4 góp ý low đã vá (toast reachable, refresh-on-revert, hover parity, import thừa). tsc+build xanh. Trade-off chấp nhận: card là div+router.push nên mất middle-click mở tab mới.
+
 ## [M10 — REBUILD trung thực theo frame · 2026-07-14]
 - **Bối cảnh:** chủ dự án đối chiếu thấy Add Task ở /mc VẪN là wizard 5 bước của /admin, KHÔNG phải màn "Thêm Task mới" 1-trang 3 cột trong file design đã import. (Bản gốc M10 cố ý mượn wizard để né viết lại ~280 dòng submit money-safe — đã ghi ở mục [M10 — Add Task (Velox)] bên dưới.) Yêu cầu: "lấy y chang design, đừng vẽ lại vì sẽ sai".
 - **File design `.dc.html` KHÔNG còn trên đĩa** (đã tìm Downloads/Desktop/repo — trống; nó là context import phiên trước). → dựng lại trung thực từ ẢNH chủ gửi + hợp đồng field đã đọc từ code.

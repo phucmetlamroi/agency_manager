@@ -262,12 +262,12 @@ export default function McAddTaskModal({
 
     // Resource fields: [label, value, setter, placeholder]
     const resourceFields: [string, string, (v: string) => void, string][] = [
-        ['Raw footage', rawFootage, setRawFootage, 'drive.google.com/…'],
-        ['B-roll', bRoll, setBRoll, 'Link folder…'],
-        ['Video tham khảo', references, setReferences, 'Shorts #12 — style caption'],
-        ['Kịch bản', script, setScript, 'Link docs…'],
-        ['File thu thập', collectFile, setCollectFile, 'Link Drive…'],
-        ['Nơi nộp file', submitFolder, setSubmitFolder, 'drive.google.com/…submit'],
+        ['Raw footage', rawFootage, setRawFootage, 'Dán link…'],
+        ['B-roll', bRoll, setBRoll, 'Dán link…'],
+        ['Video tham khảo', references, setReferences, 'Dán link…'],
+        ['Kịch bản', script, setScript, 'Dán link…'],
+        ['File thu thập', collectFile, setCollectFile, 'Dán link…'],
+        ['Nơi nộp file', submitFolder, setSubmitFolder, 'Dán link…'],
     ]
 
     const tree = (
@@ -312,7 +312,7 @@ export default function McAddTaskModal({
                             ) : (
                                 <>
                                     <div style={rowBox('rgba(99,102,241,0.35)')}>
-                                        <input value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Jac" style={BARE_INPUT} />
+                                        <input value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Nhập tên khách hàng…" style={BARE_INPUT} />
                                         <span style={{ fontSize: 10, color: '#71717A', whiteSpace: 'nowrap' }}>gõ tên — gợi ý bên dưới</span>
                                     </div>
                                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -403,7 +403,7 @@ export default function McAddTaskModal({
                             <span style={LABEL}>Tiền Job (USD)</span>
                             <div style={rowBox('rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)', '9px 12px')}>
                                 <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, fontWeight: 700, color: '#4ADE80' }}>$</span>
-                                <input type="number" value={jobPriceUSD} onChange={(e) => { setJobPriceUSD(e.target.value); setPricingRuleId('custom') }} placeholder="50.00" style={{ ...BARE_INPUT, fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, fontWeight: 700 }} />
+                                <input type="number" value={jobPriceUSD} onChange={(e) => { setJobPriceUSD(e.target.value); setPricingRuleId('custom') }} placeholder="Nhập giá USD…" style={{ ...BARE_INPUT, fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, fontWeight: 700 }} />
                             </div>
                         </div>
                         {/* VND */}
@@ -411,7 +411,7 @@ export default function McAddTaskModal({
                             <span style={LABEL}>Thù lao editor (VND)</span>
                             <div style={rowBox('rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)', '9px 12px')}>
                                 <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, fontWeight: 700, color: '#FBBF24' }}>₫</span>
-                                <input type="number" value={editorFee} onChange={(e) => { setEditorFee(e.target.value); setPricingRuleId('custom') }} placeholder="400.000" style={{ ...BARE_INPUT, fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, fontWeight: 700 }} />
+                                <input type="number" value={editorFee} onChange={(e) => { setEditorFee(e.target.value); setPricingRuleId('custom') }} placeholder="Nhập giá VND…" style={{ ...BARE_INPUT, fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, fontWeight: 700 }} />
                             </div>
                         </div>
 

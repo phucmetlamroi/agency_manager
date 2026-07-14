@@ -24,6 +24,8 @@ import {
 } from '@dnd-kit/core'
 import type { McColumn, McTask } from './MissionControlBoard'
 import { updateTaskStatus } from '@/actions/task-actions'
+import { loadMcTaskDrawer } from '@/actions/mc-task-drawer-actions'
+import McTaskDrawer, { type McTaskDetail } from './McTaskDrawer'
 import { RevealGroup, RevealItem, HoverCard } from './motion-kit'
 
 const card = 'rgba(24,24,27,0.60)'
@@ -56,11 +58,11 @@ function CardBody({ t, dragging }: { t: McTask; dragging?: boolean }) {
     )
 }
 
-function DraggableCard({ t, colIdx, workspaceId, activeId, justDraggedRef }: {
-    t: McTask; colIdx: number; workspaceId: string; activeId: string | null
+function DraggableCard({ t, colIdx, activeId, justDraggedRef, onOpen }: {
+    t: McTask; colIdx: number; activeId: string | null
     justDraggedRef: React.MutableRefObject<boolean>
+    onOpen: (taskId: string) => void
 }) {
-    const router = useRouter()
     const { attributes, listeners, setNodeRef } = useDraggable({ id: t.id, data: { task: t, from: colIdx } })
     const isActive = activeId === t.id
     return (
@@ -69,9 +71,9 @@ function DraggableCard({ t, colIdx, workspaceId, activeId, justDraggedRef }: {
             {...listeners}
             {...attributes}
             onClick={() => {
-                // Plain click (no drag) → open the MC task drawer, like before.
+                // Plain click (no drag) → the task drawer OVERLAYS the real board (no navigation).
                 if (justDraggedRef.current) return
-                router.push(`/${workspaceId}/mc/task/${t.id}`)
+                onOpen(t.id)
             }}
             style={{ opacity: isActive ? 0.3 : 1, touchAction: 'none', outline: 'none' }}
         >
@@ -119,6 +121,48 @@ export default function McKanban({ columns, workspaceId }: { columns: McColumn[]
     const justDraggedRef = useRef(false)
     // Re-sync from the server after router.refresh() delivers fresh columns.
     useEffect(() => { setCols(columns) }, [columns])
+
+    // [Review 2026-07-14] In-place task drawer — floats over the REAL board (dimmed behind)
+    // instead of navigating away; opens instantly with a shell + spinner while the action loads.
+    const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null)
+    const [drawerDetail, setDrawerDetail] = useState<McTaskDetail | null>(null)
+    // Latest-request token: stale responses (rapid A→B clicks, or a close while loading)
+    // are ignored instead of overwriting the drawer with the wrong task.
+    const drawerReqRef = useRef<string | null>(null)
+    const openDrawer = async (taskId: string) => {
+        drawerReqRef.current = taskId
+        setDrawerTaskId(taskId)
+        setDrawerDetail(null)
+        const res = await loadMcTaskDrawer(workspaceId, taskId)
+        if (drawerReqRef.current !== taskId) return // closed or retargeted meanwhile
+        if ('error' in res) {
+            toast.error(res.error === 'FORBIDDEN' ? 'Không có quyền xem task này.' : res.error)
+            drawerReqRef.current = null
+            setDrawerTaskId(null)
+            // Fallback to the deep-link route for transient errors only — FORBIDDEN would just
+            // bounce off that page's redirect and yank the user away for nothing.
+            if (res.error !== 'FORBIDDEN') router.push(`/${workspaceId}/mc/task/${taskId}`)
+            return
+        }
+        setDrawerDetail(res.detail)
+    }
+    const closeDrawer = () => { drawerReqRef.current = null; setDrawerTaskId(null); setDrawerDetail(null) }
+    // After a mutation inside the drawer (status change), silently re-fetch its data.
+    const refetchDrawer = async () => {
+        const taskId = drawerReqRef.current
+        if (!taskId) return
+        const res = await loadMcTaskDrawer(workspaceId, taskId)
+        if (drawerReqRef.current !== taskId) return
+        if (!('error' in res)) setDrawerDetail(res.detail)
+    }
+    // Esc while the LOADING shell is up (the mounted drawer handles Esc itself, menu-aware).
+    useEffect(() => {
+        if (!drawerTaskId || drawerDetail) return
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeDrawer() }
+        document.addEventListener('keydown', onKey)
+        return () => document.removeEventListener('keydown', onKey)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [drawerTaskId, drawerDetail])
 
     // 8px movement threshold → plain clicks still open the task drawer.
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -177,6 +221,7 @@ export default function McKanban({ columns, workspaceId }: { columns: McColumn[]
     }
 
     return (
+        <>
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={endDrag}>
             <RevealGroup style={{ flex: 1, display: 'flex', gap: 10, padding: '16px 24px 8px', minHeight: 0 }}>
                 {cols.map((col, idx) => (
@@ -184,7 +229,7 @@ export default function McKanban({ columns, workspaceId }: { columns: McColumn[]
                         {col.tasks.length === 0 && <div style={{ position: 'relative', textAlign: 'center', fontSize: 11, color: '#52525B', padding: '10px 4px' }}>Trống</div>}
                         {col.tasks.map((t) => (
                             <div key={t.id} style={{ position: 'relative' }}>
-                                <DraggableCard t={t} colIdx={idx} workspaceId={workspaceId} activeId={activeTask?.id ?? null} justDraggedRef={justDraggedRef} />
+                                <DraggableCard t={t} colIdx={idx} activeId={activeTask?.id ?? null} justDraggedRef={justDraggedRef} onOpen={openDrawer} />
                             </div>
                         ))}
                     </DroppableColumn>
@@ -194,5 +239,35 @@ export default function McKanban({ columns, workspaceId }: { columns: McColumn[]
                 {activeTask ? <div style={{ width: 220 }}><CardBody t={activeTask} dragging /></div> : null}
             </DragOverlay>
         </DndContext>
+
+        {/* In-place task drawer — the real board stays visible (dimmed) behind it. */}
+        {drawerTaskId && (
+            drawerDetail ? (
+                <McTaskDrawer
+                    detail={drawerDetail}
+                    workspaceId={workspaceId}
+                    fullEditHref={`/${workspaceId}/task/${drawerTaskId}`}
+                    overlay
+                    onClose={closeDrawer}
+                    onChanged={refetchDrawer}
+                />
+            ) : (
+                /* Instant open: dim + drawer shell + spinner while the server action loads. */
+                <div style={{ position: 'fixed', inset: 0, zIndex: 100 }}>
+                    <button type="button" onClick={closeDrawer} aria-label="Đóng" style={{ position: 'absolute', inset: 0, border: 'none', cursor: 'pointer', padding: 0, background: 'rgba(3,3,4,0.66)', backdropFilter: 'blur(4px)' }} />
+                    <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 780, maxWidth: '100%', background: 'rgba(10,10,10,0.94)', backdropFilter: 'blur(24px)', borderLeft: '1px solid rgba(255,255,255,0.10)', display: 'flex', flexDirection: 'column', gap: 16, padding: 24 }}>
+                        <div style={{ height: 14, width: 140, borderRadius: 7, background: 'rgba(255,255,255,0.07)' }} />
+                        <div style={{ height: 26, width: '70%', borderRadius: 8, background: 'rgba(255,255,255,0.09)' }} />
+                        <div style={{ height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.04)' }} />
+                        <div style={{ display: 'flex', gap: 16 }}>
+                            <div style={{ flex: 1.35, aspectRatio: '16/9', borderRadius: 14, background: 'rgba(255,255,255,0.05)' }} />
+                            <div style={{ flex: 1, height: 200, borderRadius: 14, background: 'rgba(255,255,255,0.04)' }} />
+                        </div>
+                        <span style={{ fontSize: 12, color: '#71717A' }}>Đang tải chi tiết task…</span>
+                    </div>
+                </div>
+            )
+        )}
+        </>
     )
 }

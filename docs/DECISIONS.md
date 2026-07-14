@@ -3,6 +3,13 @@
 Ghi mỗi quyết định tự-quyết khi chạy tự động. Format: **[Phase] câu hỏi → chọn → lý do**.
 Nguyên tắc: (1) đúng plan, (2) theo pattern repo, (3) an toàn & hoàn tác được. Commit-only, KHÔNG push.
 
+## [M3 drawer: player thật + overlay trên bảng · 2026-07-14 (video review chủ dự án)]
+- **Gốc rễ 2 lỗi video [04:10-04:18]+[07:29-07:48]:** khung player trong `McTaskDrawer` là MOCK TĨNH từ đợt port M3 (nút Play giả + badge "sắp có (M11)") — task chưa có video vẫn thấy "player", video có thật thì bấm không phát. Player thật M11 (`/mc/asset/[id]`) đã build mà drawer chưa nối.
+- **Fix:** nối `getTaskAssets(taskId)` (read-model vetted P1.10 — tự re-check review access + folder scope, 0 field tiền) vào payload drawer (`review[]`: assetId/name/versionNumber/ready/processing/posterUrl/unresolved). Drawer render 3 trạng thái thật: READY → poster Mux + Play → player M11; PROCESSING → spinner "đang xử lý"; CHƯA CÓ → ô nét-đứt "Tải video lên" → form đầy đủ (Upload Tray vetted). Task nhiều video → list phụ.
+- **Overlay trên bảng thật [03:52-04:10]:** click card KHÔNG điều hướng nữa — drawer overlay ngay trên bảng (nền mờ `rgba(3,3,4,0.66)+blur`, bảng thật vẫn thấy sau lưng, đúng lời chủ dự án "phải mờ cái bảng ra, không được mất"). Data qua server action mới `loadMcTaskDrawer` — gate `verifyProfileAdminAccess` fail-closed Y HỆT trang route; builder dùng chung `mc-task-drawer-data.ts` (route deep-link giữ nguyên backdrop tĩnh + có `loading.tsx`).
+- **Chậm:** mở tức thì với shell+spinner; Esc/click-nền đóng; đổi trạng thái trong drawer → refetch + bảng refresh.
+- **Verify:** 3 reviewer (authz/money · correctness · regression) PASS — cross-tenant chặn 2 lớp (getWorkspacePrisma inject workspaceId+profileId; getTaskAssets tự resolve workspace từ DB), payload không thêm field tiền nào (wageVND vốn có sau cổng admin). 6 góp ý low đã vá (request-token chống race, bỏ fallback-push khi FORBIDDEN, Esc ở shell chờ, Esc menu-aware). tsc+build xanh.
+
 ## [Kéo-thả kanban M1 + auto trạng thái · 2026-07-14 (video review chủ dự án)]
 - **Yêu cầu từ video [05:07-06:53]:** kéo card TỰ DO giữa 6 cột trên bảng /mc; thả vào cột nào thì task tự nhận **trạng thái đầu vào** của cột đó. Luật chủ chốt (lời chủ dự án): vào "Đã giao task" = `Nhận task` (KHÔNG phải `Đang đợi giao` — sẽ văng sang Kho chờ); vào "Khách duyệt" = `Đã gửi video (khách)` (trạng thái đầu phase); vào "Hoàn tất" = `Hoàn tất` (không phải Quá hạn/Đã hủy). Luật chỉ áp cho KÉO TAY — luồng tự động giữ logic riêng.
 - **"Quá hạn" không nhận thả** — status do cron/deadline tự đánh; thả vào hiện toast giải thích (droppable vẫn ENABLED để dnd-kit báo `over` → toast bắn được; chặn bằng guard entryStatus=null).

@@ -76,8 +76,11 @@ export async function getSession() {
 export async function createImpersonationSession(originalUser: any, targetUser: any) {
     const expires = new Date(Date.now() + 2 * 60 * 60 * 1000) // 2 hours for testing session
 
-    // Keep the original admin session safe
-    const originalSessionStr = await encrypt({ user: originalUser, expires })
+    // Keep the original admin session safe.
+    // [AUDIT HT-019 fix] Pass an explicit 2h TTL so the signed JWT's `exp` matches the 2h
+    // window. encrypt() defaults to a 1-WEEK exp, so without this the token stayed valid for a
+    // week even though the cookie expires in 2h — a copied token outlived the impersonation.
+    const originalSessionStr = await encrypt({ user: originalUser, expires }, '2h')
 
     // Create impersonated session với expiresAt claim → UI banner countdown
     // (audit finding #2.5: Impersonation TTL không enforce force-logout, không có
@@ -90,7 +93,7 @@ export async function createImpersonationSession(originalUser: any, targetUser: 
             impersonationExpiresAt: expires.toISOString(),
         },
         expires
-    })
+    }, '2h') // [AUDIT HT-019 fix] JWT exp = 2h to match the impersonation window (was 1-week default)
 
     const cookieStore = await cookies()
     

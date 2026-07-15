@@ -43,6 +43,36 @@ export async function startImpersonation(targetUserId: string, workspaceId: stri
     if (targetIsOwner) throw new Error('Không thể đóng vai chủ sở hữu Workspace.')
     if (targetIsAdmin && callerRole !== 'OWNER') throw new Error('Chỉ chủ sở hữu mới được đóng vai quản trị viên.')
 
+    // [AUDIT HT-003/004 fix] The impersonation session is GLOBAL — the cookie overrides the
+    // caller's identity EVERYWHERE, not only this workspace. So even when the target is merely a
+    // MEMBER here, impersonating them grants the caller ALL of the target's access in OTHER
+    // tenants — including any profile/workspace where the target is OWNER/ADMIN → cross-tenant
+    // takeover. Refuse to impersonate anyone elevated OUTSIDE the current profile.
+    const currentProfileId = ws?.profileId ?? null
+    const [otherProfileRoles, targetMemberships] = await Promise.all([
+        prisma.profileAccess.findMany({
+            where: currentProfileId
+                ? { userId: targetUserId, profileId: { not: currentProfileId } }
+                : { userId: targetUserId },
+            select: { role: true },
+        }),
+        prisma.workspaceMember.findMany({
+            where: { userId: targetUserId },
+            select: { role: true, workspace: { select: { profileId: true } } },
+        }),
+    ])
+    const elevatedElsewhere =
+        otherProfileRoles.some((r) => r.role === 'OWNER' || r.role === 'ADMIN') ||
+        targetMemberships.some(
+            (m) =>
+                (m.role === 'OWNER' || m.role === 'ADMIN') &&
+                m.workspace?.profileId != null &&
+                m.workspace.profileId !== currentProfileId,
+        )
+    if (elevatedElsewhere) {
+        throw new Error('Không thể đóng vai người dùng có quyền quản trị ở workspace/hồ sơ khác.')
+    }
+
     const targetUser = await prisma.user.findUnique({
         where: { id: targetUserId },
         select: {

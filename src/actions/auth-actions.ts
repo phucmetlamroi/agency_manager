@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from '@/lib/db'
-import { login, logout, loginWithProfile } from '@/lib/auth'
+import { login, logout, loginWithProfile, getSession } from '@/lib/auth'
 import { compare } from 'bcryptjs'
 import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
@@ -189,8 +189,17 @@ export async function loginAction(prevState: any, formData: FormData) {
     let userAgent: string | null = null
     try {
         const headersList = await headers()
-        ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim()
-            || headersList.get('x-real-ip')
+        // [AUDIT HT-002 fix] The LEFT tokens of a client-supplied x-forwarded-for are
+        // attacker-chosen — keying the per-IP login throttle on xff[0] lets a caller rotate the
+        // header to defeat it. Trust the platform headers Vercel sets to the TRUE client IP
+        // first, and only fall back to the RIGHT-most x-forwarded-for hop (closest trusted
+        // proxy), never the left-most one. Mirrors review getClientIp (rate-limit-db.ts).
+        const realIp = headersList.get('x-real-ip')?.trim()
+        const vercelFwd = headersList.get('x-vercel-forwarded-for')?.split(',').pop()?.trim()
+        const xffParts = headersList.get('x-forwarded-for')?.split(',').map((s) => s.trim()).filter(Boolean)
+        ip = realIp
+            || vercelFwd
+            || (xffParts && xffParts.length ? xffParts[xffParts.length - 1] : '')
             || 'unknown-ip'
         userAgent = headersList.get('user-agent')
     } catch { /* edge runtime */ }
@@ -393,6 +402,19 @@ export async function loginAction(prevState: any, formData: FormData) {
 }
 
 export async function logoutAction() {
+    // [AUDIT HT-018 fix] Bump sessionVersion so every OTHER outstanding JWT for this user
+    // (another device, or a copied token) is revoked at the DAL — clearing the cookie alone
+    // leaves a stolen token valid until its exp. Same mechanism as password-reset / email-migration.
+    try {
+        const session = await getSession()
+        const userId = (session?.user as any)?.id as string | undefined
+        if (userId) {
+            await prisma.user.update({
+                where: { id: userId },
+                data: { sessionVersion: { increment: 1 } },
+            })
+        }
+    } catch { /* best-effort — never block logout on a DB hiccup */ }
     await logout()
     redirect('/login')
 }

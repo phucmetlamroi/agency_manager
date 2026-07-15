@@ -82,11 +82,17 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         // self-complete their own task's payroll and re-open an already-paid task, since
         // validateTransition() is disabled. See docs/AUDIT_VIDEO_REVIEW_ADVERSARIAL.md (H3).
         if (!isWorkspaceAdmin) {
-            const { TERMINAL_STATUSES } = await import('@/lib/task-statuses')
+            const { TERMINAL_STATUSES, isClientFacingStatus } = await import('@/lib/task-statuses')
             const enteringTerminal = TERMINAL_STATUSES.includes(newStatus)
             const leavingTerminal = TERMINAL_STATUSES.includes(task.status) && !TERMINAL_STATUSES.includes(newStatus)
-            if (enteringTerminal || leavingTerminal) {
-                return { error: 'Forbidden: Chỉ quản lý (admin) mới được đưa task sang Hoàn tất/Đã hủy hoặc mở lại task đã đóng.' }
+            // [AUDIT HT-016 fix] Also block a non-admin assignee from setting a CLIENT-FACING status
+            // directly. Reaching the client phase publishes the (possibly unreviewed) build to the
+            // client — bypassing the admin send-to-client gate (R5). Editors only ever drive
+            // production / internal-review transitions; the client phase is entered by the admin
+            // approve flow or the review-module sync, never through the manual status dropdown.
+            const enteringClientPhase = isClientFacingStatus(newStatus) && !isClientFacingStatus(task.status)
+            if (enteringTerminal || leavingTerminal || enteringClientPhase) {
+                return { error: 'Forbidden: Chỉ quản lý (admin) mới được đưa task sang Hoàn tất/Đã hủy, mở lại task đã đóng, hoặc gửi bản dựng cho khách.' }
             }
         }
 

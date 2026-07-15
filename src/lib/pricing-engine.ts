@@ -163,10 +163,86 @@ function calculateTieredDuration(
 }
 
 /**
+ * Safe arithmetic evaluator — recursive-descent parser, NO eval()/Function().
+ * Grammar: numbers, + - * / %, unary +/-, parentheses, and functions
+ * ceil/floor/round/abs (1 arg), min/max (>=2 args). Any other identifier or
+ * character throws → caller rejects the formula. Cannot reach globals.
+ */
+function safeEvalArithmetic(input: string): number {
+  const src = input.trim()
+  const tokens: string[] = []
+  // Sticky tokenizer: number | identifier | single operator/paren/comma, skipping whitespace.
+  const re = /\s*([0-9]*\.?[0-9]+|[a-zA-Z_][a-zA-Z0-9_]*|[+\-*/%(),])/y
+  let pos = 0
+  while (pos < src.length) {
+    re.lastIndex = pos
+    const m = re.exec(src)
+    if (!m) throw new Error(`Unexpected character near "${src.slice(pos, pos + 8)}"`)
+    tokens.push(m[1])
+    pos = re.lastIndex
+  }
+
+  const FN1: Record<string, (x: number) => number> = {
+    ceil: Math.ceil, floor: Math.floor, round: Math.round, abs: Math.abs,
+  }
+  const FN_N: Record<string, (...a: number[]) => number> = { min: Math.min, max: Math.max }
+
+  let i = 0
+  const peek = () => tokens[i]
+  const eat = () => tokens[i++]
+  const expect = (t: string) => { if (eat() !== t) throw new Error(`Expected "${t}"`) }
+
+  function parseExpr(): number {
+    let v = parseTerm()
+    while (peek() === '+' || peek() === '-') {
+      const op = eat()
+      const r = parseTerm()
+      v = op === '+' ? v + r : v - r
+    }
+    return v
+  }
+  function parseTerm(): number {
+    let v = parseFactor()
+    while (peek() === '*' || peek() === '/' || peek() === '%') {
+      const op = eat()
+      const r = parseFactor()
+      v = op === '*' ? v * r : op === '/' ? v / r : v % r
+    }
+    return v
+  }
+  function parseFactor(): number {
+    const t = peek()
+    if (t === undefined) throw new Error('Unexpected end of formula')
+    if (t === '-') { eat(); return -parseFactor() }
+    if (t === '+') { eat(); return parseFactor() }
+    if (t === '(') { eat(); const v = parseExpr(); expect(')'); return v }
+    if (/^[0-9]*\.?[0-9]+$/.test(t)) { eat(); return parseFloat(t) }
+    if (/^[a-zA-Z_]/.test(t)) {
+      const name = eat()
+      expect('(')
+      const args: number[] = [parseExpr()]
+      while (peek() === ',') { eat(); args.push(parseExpr()) }
+      expect(')')
+      if (FN1[name]) {
+        if (args.length !== 1) throw new Error(`${name}() takes 1 argument`)
+        return FN1[name](args[0])
+      }
+      if (FN_N[name]) return FN_N[name](...args)
+      throw new Error(`Unknown function "${name}"`)
+    }
+    throw new Error(`Unexpected token "${t}"`)
+  }
+
+  const result = parseExpr()
+  if (i !== tokens.length) throw new Error(`Trailing tokens after "${tokens[i]}"`)
+  return result
+}
+
+/**
  * Custom — user-defined formula (advanced, future).
  * Config: { formula: "base + ceil(duration/60) * rate", variables: { base: 25, rate: 10 } }
  *
- * SECURITY: Formula evaluation uses a safe subset — only arithmetic + ceil/floor/round.
+ * SECURITY: Formula evaluation uses safeEvalArithmetic (recursive-descent parser).
  * No eval(), no Function(), no arbitrary code execution.
  */
 function calculateCustom(
@@ -187,24 +263,16 @@ function calculateCustom(
       expression = expression.replace(new RegExp(`\\b${key}\\b`, 'g'), String(value))
     }
 
-    // Safe evaluation: only allow digits, operators, parentheses, and math functions
-    // Replace math functions with their implementations
-    expression = expression.replace(/ceil\(/g, 'Math.ceil(')
-    expression = expression.replace(/floor\(/g, 'Math.floor(')
-    expression = expression.replace(/round\(/g, 'Math.round(')
-    expression = expression.replace(/min\(/g, 'Math.min(')
-    expression = expression.replace(/max\(/g, 'Math.max(')
-
-    // Validate: only allow safe characters (digits, operators, parentheses, dots, Math.*)
-    const safePattern = /^[\d\s+\-*/().,%Math\w]+$/
-    if (!safePattern.test(expression)) {
-      console.warn(`[pricing-engine] Unsafe custom formula rejected: "${formula}"`)
+    // Safe evaluation: parse arithmetic ourselves — NO eval()/Function().
+    // Only numbers, + - * / %, unary -, parentheses, ceil/floor/round/abs/min/max.
+    let numResult: number
+    try {
+      numResult = safeEvalArithmetic(expression)
+    } catch (evalErr) {
+      console.warn(`[pricing-engine] Unsafe/invalid custom formula rejected: "${formula}"`, evalErr)
       return { priceUSD: 0, wageVND: 0, ruleApplied: `${name} (unsafe formula)` }
     }
-
-    // Evaluate with Function (sandboxed — no access to globals beyond Math)
-    const result = new Function('Math', `"use strict"; return (${expression})`)(Math)
-    const numResult = typeof result === 'number' && isFinite(result) ? result : 0
+    if (typeof numResult !== 'number' || !isFinite(numResult)) numResult = 0
 
     return {
       priceUSD: Math.max(0, numResult),

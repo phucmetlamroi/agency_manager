@@ -495,6 +495,15 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
     if (task.status === 'Hoàn tất' || task.clientReview === 'APPROVED') {
         return { success: false, error: 'This deliverable has already been approved.' }
     }
+    // [AUDIT HT-014/HT-006 fix] A client may only approve a deliverable that is ACTUALLY in the
+    // client-facing phase — one an admin has sent to them. Without this, a valid share token could
+    // approve a task still in an INTERNAL phase, jumping it straight to 'Hoàn tất' (= editor payroll)
+    // and bypassing the whole review flow. Same gate the read path uses to decide whether to expose
+    // the deliverable at all, now enforced on the write path. (Owner decision Q1: client approve =
+    // complete — but only for a build genuinely delivered to the client.)
+    if (!isClientFacingPhase(task.status, task.clientReview)) {
+        return { success: false, error: 'This deliverable is not currently awaiting your review.' }
+    }
 
     await prisma.task.update({
         where: { id: taskId },
@@ -536,10 +545,16 @@ export async function requestChangesViaToken(token: string, taskId: string, feed
 
     const { scope, task } = await findScopedTask(token, taskId, {
         id: true, title: true, status: true, assigneeId: true, assignedById: true, workspaceId: true,
+        clientReview: true,
     })
     if (!scope || !task) return { success: false, error: 'This link is invalid or the deliverable no longer exists.' }
     if (task.status === 'Hoàn tất') {
         return { success: false, error: 'This deliverable is already completed — changes can no longer be requested.' }
+    }
+    // [AUDIT HT-014 fix] Same client-facing-phase gate as approve — a client can only request
+    // changes on a deliverable actually delivered to them, not on an internal-phase task.
+    if (!isClientFacingPhase(task.status, task.clientReview)) {
+        return { success: false, error: 'This deliverable is not currently awaiting your review.' }
     }
 
     await prisma.task.update({

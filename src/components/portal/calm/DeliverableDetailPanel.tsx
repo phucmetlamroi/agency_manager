@@ -10,6 +10,16 @@ import { fmtDate, relDeadline, fmtMoney } from './format'
 import PortalCommentSection from './PortalCommentSection'
 import type { Deliverable, ActivityItem, DeliverableActions } from './types'
 
+// [AUDIT HT-031 fix] Defense-in-depth on RENDER: never emit a non-http(s) href in the CLIENT
+// portal. productLink is now sanitized on write, but an OLD stored `javascript:`/`data:` value
+// would otherwise execute in the client's origin (portal session hijack / forged approval).
+function safeHref(raw: string | null | undefined): string {
+    const s = (raw || '').trim()
+    if (/^https?:\/\//i.test(s)) return s
+    if (/^[a-z][a-z0-9+.\-]*:/i.test(s)) return '#' // non-http scheme → neutralize
+    return s ? `https://${s}` : '#'
+}
+
 // [Canonical Clients] The panel is credential-agnostic: all server calls go
 // through the injected `actions` adapter (account-session OR share-token —
 // see DeliverableActions in types.ts). No direct server-action imports here.
@@ -93,7 +103,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                             </div>
                         </div>
                     ) : (
-                        <a href={d.reviewUrl || d.productLink!} target="_blank" rel="noopener noreferrer"
+                        <a href={safeHref(d.reviewUrl || d.productLink)} target="_blank" rel="noopener noreferrer"
                             onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.background = 'var(--accent-soft)' }}
                             onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.background = 'var(--surface-2)' }}
                             style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--line-2)', transition: 'border-color .15s, background .15s' }}>
@@ -167,7 +177,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                                 <CheckCircle2 size={17} style={{ color: 'var(--ok)' }} />
                                 <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--fg)' }}>Approved &amp; delivered{d.clientReviewedAt ? ' · ' + fmtDate(d.clientReviewedAt, false) : ''}</span>
                             </div>
-                            {d.productLink && <a href={d.productLink} target="_blank" rel="noopener noreferrer" className="pc-btn pc-btn-ghost" style={{ width: '100%', justifyContent: 'center' }}><Download size={15} /> Download files</a>}
+                            {d.productLink && <a href={safeHref(d.productLink)} target="_blank" rel="noopener noreferrer" className="pc-btn pc-btn-ghost" style={{ width: '100%', justifyContent: 'center' }}><Download size={15} /> Download files</a>}
                         </div>
                     )}
                     {!d.needsYou && !done && (

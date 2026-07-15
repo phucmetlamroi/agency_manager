@@ -7,6 +7,7 @@ import { validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
 import { isValidStatus, type TaskStatus } from './statuses.js'
+import { assertWorkspaceMember, assertClientInProfile } from './guards.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +59,13 @@ export async function createTask(
 
     if (!data.title || data.title.trim().length === 0) {
         throw new Error('Task title is required')
+    }
+    // [AUDIT HT-041 fix] The clientId must belong to THIS profile — otherwise a caller could
+    // attach a new task to a client from another tenant.
+    await assertClientInProfile(data.clientId)
+    // [AUDIT HT-036 fix] If an assignee is given, they must be a member of this workspace.
+    if (data.assigneeId) {
+        await assertWorkspaceMember(wsId, data.assigneeId)
     }
 
     const createData: Record<string, any> = {
@@ -256,6 +264,10 @@ export async function updateTaskDetails(
 
     // Assignee change
     if (data.assigneeId !== undefined) {
+        // [AUDIT HT-036 fix] A newly-set assignee must be a member of this workspace.
+        if (data.assigneeId) {
+            await assertWorkspaceMember(wsId, data.assigneeId)
+        }
         updateData.assigneeId = data.assigneeId || null
         enforceAssigneeStatusInvariant(updateData, currentTask)
     }

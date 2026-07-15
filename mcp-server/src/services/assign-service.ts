@@ -7,6 +7,7 @@ import { prisma } from '../prisma-client.js'
 import { validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
+import { assertWorkspaceMember } from './guards.js'
 
 // ---------------------------------------------------------------------------
 // assignTask
@@ -24,6 +25,9 @@ export async function assignTask(
     if (!assigneeId) {
         throw new Error('assigneeId is required for assignTask')
     }
+    // [AUDIT HT-036 fix] The assignee must be a member of THIS workspace — otherwise a caller
+    // could assign a task to a user from another workspace/tenant within the profile.
+    await assertWorkspaceMember(wsId, assigneeId)
 
     // Verify task exists
     const task = await wsPrisma.task.findUnique({
@@ -137,6 +141,8 @@ export async function bulkAssignTasks(
     if (!assigneeId) {
         throw new Error('assigneeId is required for bulkAssignTasks')
     }
+    // [AUDIT HT-036 fix] Verify the assignee belongs to this workspace once, up front.
+    await assertWorkspaceMember(wsId, assigneeId)
     if (!taskIds || taskIds.length === 0) {
         throw new Error('taskIds array must not be empty')
     }

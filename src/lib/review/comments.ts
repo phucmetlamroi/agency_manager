@@ -556,8 +556,11 @@ export async function initiateAttachment(input: {
     mimeType: string
 }): Promise<{ attachmentId: string; putUrl: string; expiresAt: string }> {
     const access = await requireReviewAccess()
-    if (!/^image\//.test(input.mimeType)) {
-        throw apiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ đính kèm được ảnh.')
+    // [AUDIT HT-020 fix] Accept raster images only. `image/svg+xml` passes the `image/` prefix
+    // but SVG can carry inline <script> → stored XSS when served/opened inline. Owner decision Q5:
+    // SVG is not needed for comment attachments, so reject it outright.
+    if (!/^image\//.test(input.mimeType) || /svg/i.test(input.mimeType)) {
+        throw apiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ đính kèm được ảnh (không hỗ trợ SVG).')
     }
     const size = Number(input.sizeBytes)
     if (!Number.isFinite(size) || size <= 0 || size > MAX_ATTACH_BYTES) {

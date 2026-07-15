@@ -35,6 +35,7 @@ import {
 } from '@/lib/cloud-scanner'
 import { classifyScan } from '@/lib/scan-classifier'
 import { refreshTokenIfNeeded } from '@/lib/integration-tokens'
+import { limitDb } from '@/lib/review/rate-limit-db'
 // [Velox v4] Multi-Hook Map deep-scan engine — runs side-by-side with v3,
 // opt-in via `?v=4`. See FEATURE_REQUIREMENTS_VELOX_MULTIHOOK_MAP_v4.md.
 import { runEngineV4 } from '@/lib/velox/v4-engine'
@@ -106,6 +107,18 @@ export async function POST(req: Request) {
             )
         }
         throw err
+    }
+
+    // ---------------------------------------------------------------------------
+    // 3b. Rate limit — [AUDIT HT-017 fix] this endpoint runs a 300s recursive provider scan
+    //     (expensive). Throttle per user+workspace so it can't be spammed to exhaust compute (DoS).
+    // ---------------------------------------------------------------------------
+    const scanRl = await limitDb(`scan-folder:${session.user.id}:${workspaceId}`, 10, 60)
+    if (!scanRl.success) {
+        return NextResponse.json(
+            { error: 'Quá nhiều yêu cầu quét. Vui lòng thử lại sau ít phút.' },
+            { status: 429, headers: { 'Retry-After': String(scanRl.retryAfterSec) } },
+        )
     }
 
     // ---------------------------------------------------------------------------

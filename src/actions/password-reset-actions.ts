@@ -113,11 +113,12 @@ export async function requestPasswordResetOtp(emailRaw: string) {
         orderBy: { createdAt: 'desc' },
     })
     if (recent) {
+        // [AUDIT HT-010 fix] Return the SAME neutral response as the not-found/locked branch above.
+        // A distinct "OTP sent recently / wait Ns" message revealed that this email EXISTS and had a
+        // recent request → an account-enumeration oracle. The cooldown still applies (no new OTP is
+        // created/sent below because we return here), we just no longer leak which branch we took.
         await paddingDelay()
-        return {
-            success: true,
-            message: `Mã OTP đã được gửi gần đây. Vui lòng kiểm tra hộp thư hoặc đợi ${OTP_COOLDOWN_SECONDS}s trước khi yêu cầu lại.`,
-        }
+        return GENERIC_OTP_RESPONSE
     }
 
     // Invalidate previous unconsumed PASSWORD_RESET OTPs for this user (purpose-scoped)

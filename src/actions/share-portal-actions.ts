@@ -23,6 +23,7 @@ import { getOrCreateClientReviewSlug } from '@/lib/review/shares'
 import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
+import { limitDb } from '@/lib/review/rate-limit-db'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
 import { generateOtp, hashOtp, verifyOtp, generateRandomToken } from '@/lib/otp'
 import { sendEmail } from '@/lib/email'
@@ -324,6 +325,14 @@ export async function requestPortalNotifyEmail(
     const email = (rawEmail || '').trim().toLowerCase()
     if (!NOTIFY_EMAIL_RX.test(email) || email.length > 200) {
         return { success: false, error: 'Please enter a valid email address.' }
+    }
+    // [AUDIT HT-015 fix] Cap verification emails PER TARGET INBOX with the PERSISTENT DB limiter
+    // (survives serverless cold-starts, unlike the in-memory rateLimit below). Without a per-inbox
+    // cap keyed on the destination address, the portal could be abused to email-bomb an arbitrary
+    // victim inbox (the per-link+ip cap doesn't bound how many distinct addresses one caller hits).
+    const inboxRl = await limitDb(`portal-notify-inbox:${email}`, 3, 60 * 60)
+    if (!inboxRl.success) {
+        return { success: false, error: 'Too many attempts for this email. Please try again later.' }
     }
     const ip = await getRequestIp()
     const rl = await rateLimit(`portal-notify-req:${scope.shareLinkId}:${ip}`, 5, 60 * 60 * 1000)

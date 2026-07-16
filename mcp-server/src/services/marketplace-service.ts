@@ -6,6 +6,7 @@ import { prisma } from '../prisma-client.js'
 import { validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
+import { assertWorkspaceMember } from './guards.js'
 
 // ---------------------------------------------------------------------------
 // toggleMarketplace
@@ -98,6 +99,8 @@ export async function claimTask(
     await validateWorkspaceAccess(wsId)
 
     if (!userId) throw new Error('userId is required to claim a task')
+    // [AUDIT HT-036 fix] The claiming user must be a member of this workspace.
+    await assertWorkspaceMember(wsId, userId)
 
     // Use raw prisma for the transaction (optimistic locking pattern)
     const result = await prisma.$transaction(async (tx) => {

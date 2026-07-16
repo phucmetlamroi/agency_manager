@@ -390,6 +390,7 @@ export async function createInvoiceRecord(data: {
                     dueDate: data.dueDate,
                     subtotalAmount: data.subtotalAmount,
                     depositDeducted: data.depositDeducted,
+                    clientDepositDeducted: 0, // [HT-030] set to the REAL balance-deducted amount after clamp (below)
                     taxPercent: data.taxPercent,
                     taxAmount: data.taxAmount,
                     totalDue: data.totalDue,
@@ -436,13 +437,20 @@ export async function createInvoiceRecord(data: {
                     select: { depositBalance: true }
                 })
                 const available = toSafeNumber(client?.depositBalance)
-                const deduct = Math.min(data.clientDepositDeducted, available)
+                const deduct = Math.max(0, Math.min(data.clientDepositDeducted, available))
                 if (deduct > 0) {
                     await tx.client.update({
                         where: { id: data.clientId },
                         data: {
                             depositBalance: { decrement: deduct }
                         }
+                    })
+                    // [AUDIT HT-030/024 fix] Record the amount ACTUALLY removed from depositBalance so
+                    // voidInvoice refunds exactly this (never customPrepaid — it's in depositDeducted but
+                    // never entered the balance). Non-deposit invoices keep clientDepositDeducted = 0.
+                    await tx.invoice.update({
+                        where: { id: invoice.id },
+                        data: { clientDepositDeducted: deduct }
                     })
                 }
             }
@@ -574,7 +582,20 @@ export async function voidInvoice(invoiceId: string, workspaceId: string) {
         if (invoice.status === 'VOID') return { error: 'Invoice is already void' }
 
         // Transaction: Void Invoice + Revert Tasks + Refund Deposit
+        // [AUDIT HT-005 fix] The status!=='VOID' check above is only a pre-tx fast-path — two
+        // concurrent voids can BOTH pass it (TOCTOU) and each refund the deposit → double credit.
+        // Serialize on the invoice id with an advisory lock and RE-READ the status inside the tx
+        // so the refund happens at most once (idempotent).
         await workspacePrisma.$transaction(async (tx) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${invoiceId}, 0))`
+
+            // Authoritative re-check UNDER the lock — a racer may already have voided it.
+            const fresh = await tx.invoice.findUnique({
+                where: { id: invoiceId },
+                select: { status: true, depositDeducted: true, clientDepositDeducted: true, clientId: true },
+            })
+            if (!fresh || fresh.status === 'VOID') return // already voided → no second refund
+
             // 1. Update Invoice Status
             await tx.invoice.update({
                 where: { id: invoiceId },
@@ -590,12 +611,18 @@ export async function voidInvoice(invoiceId: string, workspaceId: string) {
                 }
             })
 
-            // 3. Refund Deposit (if any was deducted)
-            if (Number(invoice.depositDeducted) > 0) {
+            // 3. Refund Deposit (if any was deducted) — use the LOCKED re-read, not the pre-tx copy.
+            // [AUDIT HT-030/024 fix] Refund ONLY the amount that actually left depositBalance
+            // (clientDepositDeducted), NOT depositDeducted — which also includes customPrepaid that
+            // never entered the balance (refunding it minted phantom deposit credit). Pre-migration
+            // invoices (clientDepositDeducted === null) fall back to depositDeducted so historical
+            // data behaves exactly as before.
+            const refundAmount = fresh.clientDepositDeducted != null ? fresh.clientDepositDeducted : fresh.depositDeducted
+            if (Number(refundAmount) > 0) {
                 await tx.client.update({
-                    where: { id: invoice.clientId },
+                    where: { id: fresh.clientId },
                     data: {
-                        depositBalance: { increment: invoice.depositDeducted }
+                        depositBalance: { increment: refundAmount }
                     }
                 })
             }

@@ -45,6 +45,14 @@ export async function updateTask(id: string, data: any, workspaceId: string) {
 
         if (!task) return { error: 'Not found' }
 
+        // [AUDIT HT-007 fix] Cross-tenant / identity fields are NEVER settable through the
+        // generic updateTask — for ANY caller, INCLUDING a workspace ADMIN. Writing a task's
+        // workspaceId/profileId moves it into another tenant (cross-tenant BOLA); `id` is the
+        // primary key. Admins keep editing status/value/assignee below — only tenancy is locked.
+        delete data.id
+        delete data.workspaceId
+        delete data.profileId
+
         // Security & Sanitization
         if (!isWorkspaceAdmin) {
             // Check Ownership

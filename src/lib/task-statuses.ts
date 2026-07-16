@@ -158,6 +158,18 @@ export function isTerminalStatus(status: string | null | undefined): boolean {
 }
 
 /**
+ * [HT-016] Statuses in the CLIENT-facing phase — reaching one of these publishes the build to
+ * the client (the read path mints/exposes the `/r` share for it). DERIVED from meta
+ * (phase === 'client_review'). A non-admin assignee must never set one directly; the client
+ * phase is entered only via the admin send-to-client flow or the review-module sync (R5).
+ */
+export const CLIENT_FACING_STATUSES: string[] = TASK_STATUS_META.filter((m) => m.phase === 'client_review').map((m) => m.value)
+
+export function isClientFacingStatus(status: string | null | undefined): boolean {
+    return !!status && CLIENT_FACING_STATUSES.includes(status)
+}
+
+/**
  * [Q1] The CLIENT-FACING label to email/show for a status, or null when the status is internal-only
  * (the client must never be told a raw internal status). Used to gate + label the guest `status_update`
  * email so an `internalOnly` transition never notifies the client.

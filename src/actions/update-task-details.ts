@@ -5,6 +5,20 @@ import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 
+// [AUDIT HT-031 fix] Neutralize dangerous URI schemes before storing productLink — it is later
+// rendered as an <a href> in the CLIENT portal (DeliverableDetailPanel) and the staff app. A
+// `javascript:`/`data:`/`vbscript:` value there is stored XSS: an editor (assignee) could hijack
+// the client's portal session or forge an approval. Accept only http(s); prepend https:// to a
+// bare domain; drop anything carrying another scheme.
+function sanitizeExternalUrl(raw: string | undefined): string | undefined {
+    if (raw === undefined) return undefined
+    const s = String(raw).trim()
+    if (!s) return ''
+    if (/^https?:\/\//i.test(s)) return s
+    if (/^[a-z][a-z0-9+.\-]*:/i.test(s)) return '' // non-http scheme (javascript:, data:, …) → drop
+    return `https://${s}`
+}
+
 export async function updateTaskDetails(id: string, data: {
     resources?: string
     references?: string
@@ -48,7 +62,7 @@ export async function updateTaskDetails(id: string, data: {
                 references: data.references,
                 title: data.title,
                 collectFilesLink: data.collectFilesLink,
-                productLink: data.productLink
+                productLink: sanitizeExternalUrl(data.productLink) // [HT-031]
             }
             if (data.notes !== undefined) updateData.notes_vi = data.notes
             if (data.notes_en !== undefined) updateData.notes_en = data.notes_en
@@ -61,7 +75,7 @@ export async function updateTaskDetails(id: string, data: {
                 return { error: 'Forbidden: Bạn chỉ được cập nhật Task của chính mình.' }
             }
             // Non-admins are ONLY allowed to update their delivery/translation fields
-            if (data.productLink !== undefined) updateData.productLink = data.productLink
+            if (data.productLink !== undefined) updateData.productLink = sanitizeExternalUrl(data.productLink) // [HT-031]
             if (data.notes_en !== undefined) updateData.notes_en = data.notes_en
         }
 

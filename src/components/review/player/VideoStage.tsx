@@ -23,6 +23,7 @@ export function VideoStage({
     overlay,
     timelineChildren,
     clickToggleDisabled = false,
+    onStageExit,
 }: {
     videoRef: React.RefObject<HTMLVideoElement | null>
     controller: PlayerController
@@ -36,6 +37,10 @@ export function VideoStage({
      *  video surface (the element now covers the letterbox bars too, which the
      *  editable SVG does not, so a bar click would start playback mid-draw). */
     clickToggleDisabled?: boolean
+    /** [Lỗi 1] Fired on a video-surface click BEFORE the play/pause toggle — the shell uses it to
+     *  leave range-loop mode ("click out to exit"), so playback then continues past the range. A
+     *  no-op when no range is active. */
+    onStageExit?: () => void
 }) {
     const containerRef = useRef<HTMLDivElement>(null)
     const env = usePlayerEnv()
@@ -118,7 +123,10 @@ export function VideoStage({
                             playsInline
                             className="h-full w-full object-contain"
                             onClick={() => {
-                                if (!clickToggleDisabled) controller.toggle()
+                                if (clickToggleDisabled) return
+                                // "Click out" of a range loop, then toggle: play continues past the range.
+                                onStageExit?.()
+                                controller.toggle()
                             }}
                         />
                         {!controller.ready && !controller.error && (

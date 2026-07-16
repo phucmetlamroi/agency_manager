@@ -267,7 +267,22 @@ export async function createTaskComment(taskId: string, workspaceId: string, inp
     // Notify @mentioned staff (never the author).
     const actor = await prisma.user.findUnique({ where: { id: userId }, select: { username: true, nickname: true, avatarUrl: true } }).catch(() => null)
     const actorName = actor?.nickname || actor?.username || 'Một thành viên'
-    for (const uid of mentions.filter((m) => m !== userId)) {
+    // [AUDIT HT-026 fix] An INTERNAL comment must NEVER reach a CLIENT account — not even through
+    // the @mention notification, which carries a full content preview. staffCtx blocks a client
+    // from READING the feed, but the notify channel bypassed that boundary. Drop CLIENT mention
+    // targets (portal users have User.clientId set; legacy clients have role='CLIENT') when INTERNAL.
+    let notifyTargets = mentions.filter((m) => m !== userId)
+    if (visibility === 'INTERNAL' && notifyTargets.length > 0) {
+        const rows = await prisma.user.findMany({
+            where: { id: { in: notifyTargets } },
+            select: { id: true, role: true, clientId: true },
+        })
+        const clientAccountIds = new Set(
+            rows.filter((r) => r.role === 'CLIENT' || r.clientId != null).map((r) => r.id),
+        )
+        notifyTargets = notifyTargets.filter((m) => !clientAccountIds.has(m))
+    }
+    for (const uid of notifyTargets) {
         try {
             const n = await createNotificationInternal({
                 userId: uid, type: 'TASK_COMMENT', title: 'Bạn được nhắc trong một bình luận',

@@ -200,7 +200,11 @@ export async function updateProfile(userId: string, data: {
             data: {
                 nickname: data.nickname || null,
                 phoneNumber: data.phoneNumber || null,
-                email: data.email || null,
+                // [AUDIT HT-013 fix] Email is intentionally NOT writable here. A direct write
+                // bypasses OTP verification, letting a user claim an arbitrary (even a victim's)
+                // email and hijack the email-based password-reset flow. Email changes must go
+                // through the dedicated email-migration OTP flow (email-migration-actions.ts),
+                // which verifies ownership and bumps sessionVersion.
                 // avatar: data.avatar
             }
         })

@@ -44,3 +44,21 @@ if (env.NODE_ENV === 'production' && !IS_BUILD_PHASE && env.JWT_SECRET === JWT_S
 if (env.DATABASE_URL === "placeholder_url_replace_me" && env.NODE_ENV === 'production') {
     console.error("❌ ERROR: No DATABASE_URL or POSTGRES_URL found in Vercel env!")
 }
+
+// [AUDIT P5-005] Fail CLOSED on an Inngest misconfiguration in production. A truthy INNGEST_DEV
+// puts the /api/inngest handler into dev mode, which SKIPS webhook signature verification — anyone
+// could then POST-invoke background functions (including the destructive review-janitor that hard-
+// deletes Mux assets / R2 objects / DB rows). It must never be set in prod. Mirrors the JWT_SECRET
+// fail-closed guard above. (Default = unset = cloud mode = signature required = safe.)
+if (env.NODE_ENV === 'production' && !IS_BUILD_PHASE) {
+    const inngestDev = (process.env.INNGEST_DEV || '').trim().toLowerCase()
+    if (inngestDev === '1' || inngestDev === 'true') {
+        throw new Error(
+            '[env] INNGEST_DEV is truthy in production — this disables Inngest webhook signature ' +
+            'verification. Unset it. Refusing to start (fail closed).'
+        )
+    }
+    if (!process.env.INNGEST_SIGNING_KEY) {
+        console.error('[env] INNGEST_SIGNING_KEY is not set in production — Inngest cloud mode requires it for signed webhooks.')
+    }
+}

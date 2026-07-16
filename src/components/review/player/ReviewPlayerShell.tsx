@@ -340,9 +340,24 @@ function ReviewPlayerShellInner({
     controller.pause,
     controller.isPlaying,
   );
-  // Turn the loop off the instant the range is cleared or collapsed to a point (✕ / composer close).
+  // The single range-loop (one loopRef in useRangePlayback) is shared by the COMPOSER's pending range
+  // AND a clicked comment's range. Track who armed the current loop so clearing the composer chip only
+  // tears down the COMPOSER's own loop — never a comment-loop the reviewer is still watching.
+  const loopIsComposerRef = useRef(false);
+  const onComposerPlayRange = useCallback(
+    (inFrame: number, outFrame: number) => {
+      loopIsComposerRef.current = true;
+      playRange(inFrame, outFrame);
+    },
+    [playRange],
+  );
+  // Turn the loop off the instant the COMPOSER range is cleared/collapsed (✕ / composer close) — but
+  // ONLY when the live loop is the composer's, so a comment-triggered loop is not clobbered.
   useEffect(() => {
-    if (!range.active || range.outFrame == null) stopRange();
+    if ((!range.active || range.outFrame == null) && loopIsComposerRef.current) {
+      loopIsComposerRef.current = false;
+      stopRange();
+    }
   }, [range.active, range.outFrame, stopRange]);
 
   // Annotation draw state (P4.4). Owned here because BOTH the overlay and the
@@ -391,6 +406,22 @@ function ReviewPlayerShellInner({
       setHighlightId(c.id);
     },
     [annoReset, ctlSeek, ctlPause],
+  );
+
+  // [Lỗi 1] Clicking a range comment PLAYS its [in,out] as a loop (play from the in-point, STOP at
+  // the out-point, replay within on the next play). Leaves any read-only drawing view + the draw tool
+  // first (mutually exclusive), and highlights the comment. `stopRange` (from useRangePlayback) is the
+  // "click out to exit" affordance — wired to a point-comment jump and to a click on the video surface.
+  const onCommentPlayRange = useCallback(
+    (c: CommentDto) => {
+      if (c.startFrame == null || c.endFrame == null || c.endFrame <= c.startFrame) return;
+      annoReset();
+      setViewAnno(null);
+      setHighlightId(c.id);
+      loopIsComposerRef.current = false; // this loop is comment-owned — the composer-clear effect must not stop it
+      playRange(c.startFrame, c.endFrame);
+    },
+    [annoReset, playRange],
   );
 
   // The read-only drawing is pinned to a frame → drop it once the video PLAYS.
@@ -909,6 +940,7 @@ function ReviewPlayerShellInner({
               posterUrl={posterUrl}
               overlay={annotationOverlay}
               clickToggleDisabled={annotation.active}
+              onStageExit={stopRange}
               timelineChildren={
                 <>
                   <TimelineMarkers
@@ -923,7 +955,7 @@ function ReviewPlayerShellInner({
                     fps={fps}
                     durationSec={controller.durationSec}
                     playheadFrame={controller.frame}
-                    onPlayRange={playRange}
+                    onPlayRange={onComposerPlayRange}
                     onScrubFrame={controller.seekToFrame}
                   />
                 </>
@@ -986,6 +1018,8 @@ function ReviewPlayerShellInner({
                     onPauseVideo={onPauseVideo}
                     onFocusPlayer={onFocusPlayer}
                     onViewAnnotation={onViewAnnotation}
+                    onPlayRangeComment={onCommentPlayRange}
+                    onExitRange={stopRange}
                     highlightId={highlightId}
                     onJumpToVersion={(vid) => setCurrentVersionId(vid)}
                   />

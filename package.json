@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate && prisma db push --accept-data-loss",
+    "postinstall": "prisma generate && prisma db push",
     "build:mcp": "cd mcp-server && npm run build",
     "build:electron": "cd electron && npm run build",
     "build:desktop": "cross-env ELECTRON_DESKTOP=1 next build && cd mcp-server && npm run build && cd ../electron && npm run build",

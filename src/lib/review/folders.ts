@@ -849,34 +849,46 @@ export async function listTrash(input: {
     limit?: number
     cursor?: string | null
 }): Promise<{ items: TrashItemDto[]; total: number; nextCursor: string | null }> {
-    await requireReviewAccess({ workspaceId: input.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: input.workspaceId })
     const limit = Math.min(Math.max(input.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT)
 
     // Fetch every deleted folder/asset in the workspace; batch roots are identified
     // in-memory (workspace trash is bounded; nightly purge caps growth).
+    // [AUDIT HT-028] `path` / `folder.path` are selected so a non-admin's view can be folder-scoped.
     const [delFolders, delAssets] = await Promise.all([
         prisma.reviewFolder.findMany({
             where: { workspaceId: input.workspaceId, deletedAt: { not: null } },
-            select: { id: true, name: true, parentId: true, deletedAt: true, deletedById: true, deleteBatchId: true, itemCount: true, totalSizeBytes: true, orphanedFromPurge: true },
+            select: { id: true, name: true, path: true, parentId: true, deletedAt: true, deletedById: true, deleteBatchId: true, itemCount: true, totalSizeBytes: true, orphanedFromPurge: true },
         }),
         prisma.reviewAsset.findMany({
             where: { workspaceId: input.workspaceId, deletedAt: { not: null } },
-            select: { id: true, name: true, folderId: true, deletedAt: true, deletedById: true, deleteBatchId: true },
+            select: { id: true, name: true, folderId: true, deletedAt: true, deletedById: true, deleteBatchId: true, folder: { select: { path: true } } },
         }),
     ])
 
     const folderById = new Map(delFolders.map((f) => [f.id, f]))
     // A deleted FOLDER is a batch root when its parent is NOT deleted in the same batch.
-    const rootFolders = delFolders.filter((f) => {
+    let rootFolders = delFolders.filter((f) => {
         if (!f.parentId) return true
         const parent = folderById.get(f.parentId)
         return !parent || parent.deleteBatchId !== f.deleteBatchId
     })
     // A deleted ASSET is a batch root when its folder is NOT deleted in the same batch.
-    const rootAssets = delAssets.filter((a) => {
+    let rootAssets = delAssets.filter((a) => {
         const folder = folderById.get(a.folderId)
         return !folder || folder.deleteBatchId !== a.deleteBatchId
     })
+
+    // [AUDIT HT-028 fix] FR-03: a non-admin editor must only SEE trash items inside their assigned
+    // subtree. Trash names + who-deleted are exactly the metadata listChildren/getFolderTree hide
+    // out-of-scope, so listTrash applies the same folder-scope filter.
+    if (!access.isAdmin) {
+        const scope = await getFolderScope({ userId: access.userId, workspaceId: input.workspaceId, isAdmin: access.isAdmin })
+        if (!scope.unrestricted) {
+            rootFolders = rootFolders.filter((f) => isPathVisible(scope, f.path))
+            rootAssets = rootAssets.filter((a) => isPathVisible(scope, a.folder?.path ?? ''))
+        }
+    }
 
     const rootAssetIds = rootAssets.map((a) => a.id)
     const vCounts = rootAssetIds.length
@@ -938,7 +950,7 @@ export async function restoreItems(input: {
     const assetIds = input.items.filter((i) => i.type === 'asset').map((i) => i.id)
     const [folderRows, assetRows] = await Promise.all([
         prisma.reviewFolder.findMany({ where: { id: { in: folderIds }, deletedAt: { not: null } } }),
-        prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: { not: null } } }),
+        prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: { not: null } }, include: { folder: { select: { path: true } } } }),
     ])
     if (folderRows.length !== folderIds.length || assetRows.length !== assetIds.length) {
         throw apiError(404, 'NOT_IN_TRASH', 'Một hoặc nhiều mục không nằm trong thùng rác.')
@@ -946,7 +958,22 @@ export async function restoreItems(input: {
     const workspaces = new Set([...folderRows.map((f) => f.workspaceId), ...assetRows.map((a) => a.workspaceId)])
     if (workspaces.size !== 1) throw apiError(400, 'CROSS_WORKSPACE', 'Các mục không cùng workspace.')
     const workspaceId = [...workspaces][0]
-    await requireReviewAccess({ workspaceId })
+    const access = await requireReviewAccess({ workspaceId })
+
+    // [AUDIT HT-027 fix] FR-B07 + FR-03 (mirror deleteItems): a non-admin editor may only restore
+    // FOLDERS they created, and only items within their assigned subtree. Without this an editor
+    // could restore ANY trashed item in the workspace — incl. another editor's out-of-scope items.
+    if (!access.isAdmin) {
+        const forbidden = folderRows.find((f) => f.createdById !== access.userId)
+        if (forbidden) {
+            throw apiError(403, 'FORBIDDEN', 'Chỉ người tạo hoặc quản trị được khôi phục thư mục này.', { failedItemId: forbidden.id })
+        }
+        const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
+        assertFolderPathsMutable(scope, [
+            ...folderRows.map((f) => f.path),
+            ...assetRows.map((a) => a.folder?.path).filter((p): p is string => !!p),
+        ])
+    }
 
     // Ensure the fallback root exists BEFORE the tx (re-home landing zone).
     const root = await ensureWorkspaceRoot(workspaceId)

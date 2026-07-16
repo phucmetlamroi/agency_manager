@@ -13,6 +13,19 @@ export async function getFrameAccount() {
     if (sess.status !== 'active') {
         return { account: '', password: '' }
     }
+    // [AUDIT HT-022 fix] Requiring merely an active session still let ANY authenticated user —
+    // including a self-signed-up USER in no workspace — read this SHARED plaintext credential.
+    // Restrict to privileged staff: a workspace OWNER/ADMIN (or treasurer). A normal user must
+    // never receive the shared Frame.io password.
+    const uid = (sess.session as any)?.user?.id as string | undefined
+    if (!uid) return { account: '', password: '' }
+    const adminMembership = await prisma.workspaceMember.findFirst({
+        where: { userId: uid, role: { in: ['OWNER', 'ADMIN'] } },
+        select: { id: true },
+    })
+    if (!adminMembership && !sess.isAdmin) {
+        return { account: '', password: '' }
+    }
     try {
         const frameTask = await prisma.task.findUnique({
             where: { id: GLOBAL_FRAME_TASK_ID }

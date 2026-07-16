@@ -23,6 +23,7 @@ import { getOrCreateClientReviewSlug } from '@/lib/review/shares'
 import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
+import { limitDb } from '@/lib/review/rate-limit-db'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
 import { generateOtp, hashOtp, verifyOtp, generateRandomToken } from '@/lib/otp'
 import { sendEmail } from '@/lib/email'
@@ -325,6 +326,14 @@ export async function requestPortalNotifyEmail(
     if (!NOTIFY_EMAIL_RX.test(email) || email.length > 200) {
         return { success: false, error: 'Please enter a valid email address.' }
     }
+    // [AUDIT HT-015 fix] Cap verification emails PER TARGET INBOX with the PERSISTENT DB limiter
+    // (survives serverless cold-starts, unlike the in-memory rateLimit below). Without a per-inbox
+    // cap keyed on the destination address, the portal could be abused to email-bomb an arbitrary
+    // victim inbox (the per-link+ip cap doesn't bound how many distinct addresses one caller hits).
+    const inboxRl = await limitDb(`portal-notify-inbox:${email}`, 3, 60 * 60)
+    if (!inboxRl.success) {
+        return { success: false, error: 'Too many attempts for this email. Please try again later.' }
+    }
     const ip = await getRequestIp()
     const rl = await rateLimit(`portal-notify-req:${scope.shareLinkId}:${ip}`, 5, 60 * 60 * 1000)
     if (!rl.success) return { success: false, error: 'Too many attempts. Please try again in an hour.' }
@@ -495,6 +504,15 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
     if (task.status === 'Hoàn tất' || task.clientReview === 'APPROVED') {
         return { success: false, error: 'This deliverable has already been approved.' }
     }
+    // [AUDIT HT-014/HT-006 fix] A client may only approve a deliverable that is ACTUALLY in the
+    // client-facing phase — one an admin has sent to them. Without this, a valid share token could
+    // approve a task still in an INTERNAL phase, jumping it straight to 'Hoàn tất' (= editor payroll)
+    // and bypassing the whole review flow. Same gate the read path uses to decide whether to expose
+    // the deliverable at all, now enforced on the write path. (Owner decision Q1: client approve =
+    // complete — but only for a build genuinely delivered to the client.)
+    if (!isClientFacingPhase(task.status, task.clientReview)) {
+        return { success: false, error: 'This deliverable is not currently awaiting your review.' }
+    }
 
     await prisma.task.update({
         where: { id: taskId },
@@ -536,10 +554,16 @@ export async function requestChangesViaToken(token: string, taskId: string, feed
 
     const { scope, task } = await findScopedTask(token, taskId, {
         id: true, title: true, status: true, assigneeId: true, assignedById: true, workspaceId: true,
+        clientReview: true,
     })
     if (!scope || !task) return { success: false, error: 'This link is invalid or the deliverable no longer exists.' }
     if (task.status === 'Hoàn tất') {
         return { success: false, error: 'This deliverable is already completed — changes can no longer be requested.' }
+    }
+    // [AUDIT HT-014 fix] Same client-facing-phase gate as approve — a client can only request
+    // changes on a deliverable actually delivered to them, not on an internal-phase task.
+    if (!isClientFacingPhase(task.status, task.clientReview)) {
+        return { success: false, error: 'This deliverable is not currently awaiting your review.' }
     }
 
     await prisma.task.update({

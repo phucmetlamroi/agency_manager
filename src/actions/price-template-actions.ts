@@ -69,9 +69,14 @@ export async function deleteTemplate(id: string, workspaceId: string) {
     try {
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
 
-        await prisma.priceTemplate.delete({
-            where: { id }
+        // [AUDIT HT-011/012 fix] Scope the delete to the workspace. Deleting by `id` alone let a
+        // workspace admin delete ANOTHER tenant's PriceTemplate (cross-tenant IDOR): they pass a
+        // foreign template id + their own workspaceId, which passes verifyWorkspaceAccess. deleteMany
+        // with the workspaceId predicate makes it atomic + tenant-safe.
+        const { count } = await prisma.priceTemplate.deleteMany({
+            where: { id, workspaceId }
         })
+        if (count === 0) return { error: 'Không tìm thấy mẫu giá trong workspace này.' }
 
         revalidatePath(`/${workspaceId}/admin`)
         return { success: true }

@@ -316,27 +316,89 @@ export async function calculateMonthlyBonus(workspaceId: string) {
 
 
         // ── 5. PERSISTENCE ───────────────────────────────────────────
-        // We do this in a single "pseudo-transaction" block: delete then create.
-        // If calculation reached here, it's safe to clear old records.
+        // [AUDIT HT-009 fix] Do delete → create bonuses/ranks → lock ATOMICALLY inside ONE
+        // interactive transaction, serialized by an advisory lock on the (workspace, month, year)
+        // key, and RE-CHECK the PayrollLock inside it. Two admins clicking "Tính thưởng" at once
+        // could otherwise both delete + re-create the bonuses (double work / inconsistent snapshot)
+        // because the initial isLocked check is far from this write. The lock is upserted LAST so a
+        // failure anywhere rolls the whole thing back and leaves the cycle unlocked.
         stage = 'persist-transaction'
-        
-        await prisma.$transaction([
-            // Clear old data for this month/workspace
-            prisma.monthlyBonus.deleteMany({
-                where: { month: currentMonth, year: currentYear, workspaceId }
-            }),
-            prisma.monthlyRank.deleteMany({
-                where: { month: currentMonth, year: currentYear, workspaceId }
-            }),
-            // Upsert the Lock
-            prisma.payrollLock.upsert({
-                where: {
-                    month_year_workspaceId: {
-                        month: currentMonth,
-                        year: currentYear,
-                        workspaceId
-                    }
-                } as any,
+
+        const awardedBonuses: Array<{
+            userId: string
+            username: string
+            rank: number
+            percent: number
+            bonusAmount: number
+        }> = []
+
+        const alreadyLocked = await prisma.$transaction(async (tx) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`bonus:${workspaceId}:${currentYear}-${currentMonth}`}, 0))`
+
+            // Re-check the lock UNDER the advisory lock — a racer may already have computed + locked it.
+            const existingLock = await tx.payrollLock.findUnique({
+                where: { month_year_workspaceId: { month: currentMonth, year: currentYear, workspaceId } } as any,
+                select: { isLocked: true },
+            })
+            if (existingLock?.isLocked) return true
+
+            // Clear old data for this month/workspace.
+            await tx.monthlyBonus.deleteMany({ where: { month: currentMonth, year: currentYear, workspaceId } })
+            await tx.monthlyRank.deleteMany({ where: { month: currentMonth, year: currentYear, workspaceId } })
+
+            // Create new bonuses.
+            if (eligibleForBonus.length > 0) {
+                for (let i = 0; i < Math.min(maxWinners, eligibleForBonus.length); i++) {
+                    const user = eligibleForBonus[i]
+                    const percent = tiers[i]
+                    // [Bonus Config] Thưởng = % × "Thực nhận" (tổng task.value Hoàn tất) của người đó.
+                    const bonusAmount = user.revenue * (percent / 100)
+
+                    await tx.monthlyBonus.create({
+                        data: {
+                            userId: user.userId,
+                            month: currentMonth,
+                            year: currentYear,
+                            workspaceId,
+                            profileId: workspace.profileId ?? null,
+                            rank: i + 1,
+                            revenue: user.revenue,
+                            executionTimeHours: 0,
+                            bonusPercent: percent,
+                            bonusAmount
+                        }
+                    })
+
+                    awardedBonuses.push({
+                        userId: user.userId,
+                        username: user.username,
+                        rank: i + 1,
+                        percent,
+                        bonusAmount
+                    })
+                }
+            }
+
+            // Create new ranks.
+            const monthlyRankData = rankings.map(user => ({
+                userId: user.userId,
+                month: currentMonth,
+                year: currentYear,
+                workspaceId,
+                profileId: workspace.profileId ?? null,
+                totalTasks: user.tasksCompleted,
+                totalPenalty: user.totalPenalty,
+                errorRate: user.errorRate,
+                rank: user.rankScore,
+                isLocked: true
+            }))
+            if (monthlyRankData.length > 0) {
+                await tx.monthlyRank.createMany({ data: monthlyRankData })
+            }
+
+            // Lock the cycle LAST — only after every write above succeeded.
+            await tx.payrollLock.upsert({
+                where: { month_year_workspaceId: { month: currentMonth, year: currentYear, workspaceId } } as any,
                 update: {
                     isLocked: true,
                     lockedAt: new Date(),
@@ -352,67 +414,11 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                     lockedBy: session.user.id
                 }
             })
-        ])
+            return false
+        })
 
-        const awardedBonuses: Array<{
-            userId: string
-            username: string
-            rank: number
-            percent: number
-            bonusAmount: number
-        }> = []
-
-        // Create new bonuses
-        if (eligibleForBonus.length > 0) {
-            stage = 'persist-create-bonuses'
-            for (let i = 0; i < Math.min(maxWinners, eligibleForBonus.length); i++) {
-                const user = eligibleForBonus[i]
-                const percent = tiers[i]
-                // [Bonus Config] Thưởng = % × "Thực nhận" (tổng task.value Hoàn tất) của người đó.
-                const bonusAmount = user.revenue * (percent / 100)
-
-                await prisma.monthlyBonus.create({
-                    data: {
-                        userId: user.userId,
-                        month: currentMonth,
-                        year: currentYear,
-                        workspaceId,
-                        profileId: workspace.profileId ?? null,
-                        rank: i + 1,
-                        revenue: user.revenue,
-                        executionTimeHours: 0,
-                        bonusPercent: percent,
-                        bonusAmount
-                    }
-                })
-
-                awardedBonuses.push({
-                    userId: user.userId,
-                    username: user.username,
-                    rank: i + 1,
-                    percent,
-                    bonusAmount
-                })
-            }
-        }
-
-        // Create new ranks
-        const monthlyRankData = rankings.map(user => ({
-            userId: user.userId,
-            month: currentMonth,
-            year: currentYear,
-            workspaceId,
-            profileId: workspace.profileId ?? null,
-            totalTasks: user.tasksCompleted,
-            totalPenalty: user.totalPenalty,
-            errorRate: user.errorRate,
-            rank: user.rankScore,
-            isLocked: true
-        }))
-
-        if (monthlyRankData.length > 0) {
-            stage = 'persist-create-ranks'
-            await prisma.monthlyRank.createMany({ data: monthlyRankData })
+        if (alreadyLocked) {
+            return { success: false, error: `Kỳ lương ${currentMonth}/${currentYear} đã được tính/khóa bởi một thao tác khác. Vui lòng tải lại.` }
         }
 
         // [Bonus Config] Audit: ghi snapshot cấu hình + kết quả (trước đây chưa ghi).

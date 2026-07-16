@@ -197,6 +197,12 @@ export async function removeCrossTeamAccess(userId: string, profileId: string, w
         if (targetAccess.role === 'OWNER') {
             return { success: false, error: 'Không thể gỡ quyền của chủ sở hữu (OWNER) profile.' }
         }
+        // [AUDIT HT-023 fix] Removing a peer ADMIN's access is OWNER-only, matching
+        // removeFromProfileAction / canRemoveMember ('Xóa member | OWNER ✅ | ADMIN ❌'). Without
+        // this a profile ADMIN could strip another ADMIN here. Self-removal stays allowed.
+        if (targetAccess.role === 'ADMIN' && callerRole !== 'OWNER' && callerId !== userId) {
+            return { success: false, error: 'Chỉ chủ sở hữu (OWNER) mới được gỡ quyền của quản trị viên (ADMIN).' }
+        }
 
         // [AUDIT OGS-1 — fix HIGH] ProfileAccess is NOT the only grant: task assignment mints a
         // real WorkspaceMember row (ensureWorkspaceMembership) for a du-học user, and

@@ -1,7 +1,16 @@
 
+import { escapeHtml } from '@/lib/notification-emails/shared/format'
+
 // Helper to format currency
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)
+}
+
+// [AUDIT HT-035] Only allow http(s) links in emails and escape them for safe attribute embedding,
+// so a crafted productLink cannot break out of the href and inject markup. Returns '' if not http(s).
+const safeEmailUrl = (raw: string | null | undefined): string => {
+    const s = (raw || '').trim()
+    return /^https?:\/\//i.test(s) ? escapeHtml(s) : ''
 }
 
 // Base Template Wrapper — HustlyTasker branded shell (operational/admin emails)
@@ -103,19 +112,25 @@ export const emailTemplates = {
     // Recipient: ONLY admin assignedBy. User KHÔNG nhận.
     taskDelivered: (userName: string, taskTitle: string, clientName: string, productLink: string) => {
         const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin`
-        const safeProductLink = productLink && productLink.trim() ? productLink : '(Không có link)'
+        // [AUDIT HT-035 fix] Escape every user-controlled value before embedding in the email HTML,
+        // and only emit productLink as an href when it is a real http(s) URL (escaped). A crafted
+        // value like `http://x">…<img src=…>` would otherwise break out of the attribute + inject.
+        const safeUser = escapeHtml(userName)
+        const safeTitle = escapeHtml(taskTitle)
+        const safeClient = escapeHtml(clientName)
+        const safeLink = safeEmailUrl(productLink)
 
         const content = `
             <p>Xin chào,</p>
-            <p><strong>${userName}</strong> vừa nộp video cho task <strong>${taskTitle}</strong> của khách hàng <strong>${clientName}</strong>.</p>
+            <p><strong>${safeUser}</strong> vừa nộp video cho task <strong>${safeTitle}</strong> của khách hàng <strong>${safeClient}</strong>.</p>
 
             <div class="card" style="border-left-color: #f59e0b; background-color: #fffbeb;">
-                <p><strong>Nhân viên:</strong> ${userName}</p>
-                <p><strong>Task:</strong> ${taskTitle}</p>
-                <p><strong>Khách hàng:</strong> ${clientName}</p>
-                <p><strong>Link delivery:</strong> ${productLink && productLink.startsWith('http')
-                    ? `<a href="${safeProductLink}" target="_blank" rel="noopener">${safeProductLink}</a>`
-                    : safeProductLink}</p>
+                <p><strong>Nhân viên:</strong> ${safeUser}</p>
+                <p><strong>Task:</strong> ${safeTitle}</p>
+                <p><strong>Khách hàng:</strong> ${safeClient}</p>
+                <p><strong>Link delivery:</strong> ${safeLink
+                    ? `<a href="${safeLink}" target="_blank" rel="noopener">${safeLink}</a>`
+                    : '(Không có link)'}</p>
             </div>
 
             <p>Vui lòng vào hệ thống để review.</p>
@@ -124,7 +139,7 @@ export const emailTemplates = {
                 <a href="${link}" class="btn" style="background-color: #f59e0b;">VÀO REVIEW NGAY</a>
             </div>
         `
-        return wrapTemplate(content, `[HustlyTasker] ${userName} đã nộp video cho task`)
+        return wrapTemplate(content, `[HustlyTasker] ${safeUser} đã nộp video cho task`)
     },
 
     // 4. Task Status Bulk Digest — [Sprint Q]

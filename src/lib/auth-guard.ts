@@ -33,6 +33,19 @@ export const getCurrentUser = cache(async (): Promise<AuthContext> => {
 
     if (!user) throw new Error('Unauthorized: User không tồn tại.')
 
+    // [AUDIT HT-033 fix] Central liveness gate for EVERY getCurrentUser() caller. Without it, a
+    // banned (LOCKED) account or a session revoked by "logout all devices" / password-reset /
+    // email-migration (which bump User.sessionVersion) could keep mutating through any action that
+    // authenticates via getCurrentUser until its JWT expires. One check here fixes all callers.
+    if (user.role === 'LOCKED') {
+        throw new Error('Unauthorized: Tài khoản đã bị khóa.')
+    }
+    const tokenVersion = ((session.user as any).sessionVersion ?? 0) as number
+    const dbVersion = ((user as any).sessionVersion ?? 0) as number
+    if (tokenVersion < dbVersion) {
+        throw new Error('Unauthorized: Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.')
+    }
+
     return {
         id: user.id,
         role: user.role as UserRole, // Ensure proper casting if needed or define Role explicitly

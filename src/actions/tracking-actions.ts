@@ -150,12 +150,27 @@ export async function pingHeartbeat(status: 'ONLINE' | 'AWAY' | 'BUSY' | 'OFFLIN
 /**
  * Get daily session counts for the line chart (last 24 hours/7 days)
  */
+// [AUDIT HT-034 fix] Shared guard for the internal-analytics actions below. A CLIENT account
+// (ProfileAccess.role='CLIENT', or a legacy User.role='CLIENT') can hold a valid sessionProfileId
+// for its agency's profile, so gating only on sessionProfileId let it read staff presence/roles/
+// activity logs/session trends. Returns true when the caller is a CLIENT (→ caller returns empty).
+async function callerIsClient(userId: string | undefined, profileId: string): Promise<boolean> {
+    if (!userId) return true
+    const [user, pa] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
+        prisma.profileAccess.findUnique({ where: { userId_profileId: { userId, profileId } }, select: { role: true } }),
+    ])
+    return user?.role === 'CLIENT' || pa?.role === 'CLIENT'
+}
+
 export async function getSessionTrends() {
     try {
         const authSession = await getSession();
         const profileId = (authSession?.user as any)?.sessionProfileId;
         // [Sprint Z] Super admin bypass removed. Reject if no profile context.
         if (!profileId) return [];
+        // [AUDIT HT-034 fix] Block CLIENT accounts — these analytics expose internal staff data.
+        if (await callerIsClient((authSession?.user as any)?.id, profileId)) return [];
 
         const now = new Date()
         const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -205,6 +220,8 @@ export async function getRecentEventLogs(limit = 20) {
         const profileId = (authSession?.user as any)?.sessionProfileId;
         // [Sprint Z] Super admin bypass removed. Reject if no profile context.
         if (!profileId) return [];
+        // [AUDIT HT-034 fix] Block CLIENT accounts — these analytics expose internal staff data.
+        if (await callerIsClient((authSession?.user as any)?.id, profileId)) return [];
 
         const logs = await prisma.event.findMany({
             take: limit,
@@ -246,6 +263,8 @@ export async function getFrictionData() {
         const profileId = (authSession?.user as any)?.sessionProfileId;
         // [Sprint Z] Super admin bypass removed. Reject if no profile context.
         if (!profileId) return [];
+        // [AUDIT HT-034 fix] Block CLIENT accounts — these analytics expose internal staff data.
+        if (await callerIsClient((authSession?.user as any)?.id, profileId)) return [];
 
         const now = new Date()
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -295,6 +314,8 @@ export async function getLivePresence() {
         const profileId = (authSession?.user as any)?.sessionProfileId;
         // [Sprint Z] Super admin bypass removed. Reject if no profile context.
         if (!profileId) return [];
+        // [AUDIT HT-034 fix] Block CLIENT accounts — these analytics expose internal staff data.
+        if (await callerIsClient((authSession?.user as any)?.id, profileId)) return [];
 
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
 

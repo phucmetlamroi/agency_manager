@@ -17,7 +17,7 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { canManageShareLinks } from '@/lib/profile-permissions'
+import { canManageShareLinks, isSessionLive } from '@/lib/profile-permissions'
 import { hashShareToken } from '@/lib/share-link-auth'
 import { audit } from '@/lib/audit-log'
 
@@ -25,6 +25,12 @@ import { audit } from '@/lib/audit-log'
 async function gateShareLinkAdmin(workspaceId: string) {
     const session = await getSession()
     if (!session?.user?.id) return { error: 'Unauthorized' as const }
+    // [AUDIT HT-025 fix] Re-assert session liveness — a LOCKED account or a revoked session
+    // (sessionVersion bumped by "logout all devices" / password reset) must not be able to mint
+    // or revoke public share links just because its JWT cookie hasn't expired yet.
+    if (!(await isSessionLive(session))) {
+        return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' as const }
+    }
     const ws = await prisma.workspace.findUnique({
         where: { id: workspaceId },
         select: { profileId: true },

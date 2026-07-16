@@ -40,6 +40,27 @@ export async function confirmPayment(data: {
         const ws = await workspacePrisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } })
         const { month, year } = extractPayrollCycle(ws?.name)
 
+        // [AUDIT HT-032 fix] Symmetric lock guard with revertPayment. Once calculateMonthlyBonus
+        // has LOCKED the cycle, admin/treasurer must NOT re-confirm/overwrite the salary amounts
+        // (baseSalary/bonus/totalAmount) — that would rewrite a settled, locked payroll. Also
+        // validate the amounts are non-negative and internally consistent.
+        const cycleLock = await workspacePrisma.payrollLock.findUnique({
+            where: { month_year_workspaceId: { month, year, workspaceId } } as any,
+            select: { isLocked: true },
+        })
+        if (cycleLock?.isLocked) {
+            return { error: `Kỳ lương ${month}/${year} đã bị KHÓA. Phải unlock (qua "Hoàn tác bonus") trước khi sửa/xác nhận thanh toán.`, code: 'PAYROLL_LOCKED' }
+        }
+        const base = Number(data.baseSalary) || 0
+        const bonusAmt = Number(data.bonus) || 0
+        const total = Number(data.totalAmount) || 0
+        if (base < 0 || bonusAmt < 0 || total < 0) {
+            return { error: 'Số tiền lương không hợp lệ (không được âm).' }
+        }
+        if (Math.abs(total - (base + bonusAmt)) > 1) {
+            return { error: 'Tổng thực nhận phải bằng lương cơ bản + thưởng.' }
+        }
+
         const payroll = await workspacePrisma.payroll.upsert({
             where: {
                 userId_month_year_workspaceId: {

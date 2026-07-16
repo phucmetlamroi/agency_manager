@@ -758,6 +758,11 @@ model Invoice {
   dueDate         DateTime?
   subtotalAmount  Decimal       @default(0)
   depositDeducted Decimal       @default(0)
+  // [AUDIT HT-030/024] The amount ACTUALLY removed from client.depositBalance at invoice time
+  // (post-clamp). depositDeducted above ALSO includes customPrepaid, which never entered
+  // depositBalance — so voidInvoice must refund THIS, not depositDeducted. Nullable on purpose:
+  // pre-migration rows are null and fall back to depositDeducted to preserve prior behavior.
+  clientDepositDeducted Decimal?
   taxPercent      Decimal       @default(0)
   taxAmount       Decimal       @default(0)
   totalDue        Decimal       @default(0)

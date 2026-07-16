@@ -36,6 +36,12 @@ export interface CommentActions {
     edit: (id: string, body: string) => void
     react: (id: string, emoji: string, add: boolean) => void
     viewAnnotation: (c: CommentDto) => void
+    /** [Lỗi 1] Engage the range LOOP for a comment that has an [in,out] span: play within the
+     *  range, stop at the out-point, replay within on the next play. Optional — surfaces without a
+     *  range-playback engine omit it and a range comment just seeks to its in-point. */
+    playRange?: (c: CommentDto) => void
+    /** [Lỗi 1] Leave range-loop mode (jumping to a point comment / a manual "click out"). */
+    exitRange?: () => void
 }
 
 function relTime(iso: string, L: PlayerL10n): string {
@@ -143,7 +149,27 @@ function SingleComment({
     const L = PLAYER_L10N[usePlayerEnv().lang]
     const authorName = comment.author?.name ?? comment.guest?.name ?? L.anonymous
     const hasTime = comment.startFrame != null
+    const hasRange =
+        hasTime && comment.endFrame != null && comment.endFrame > (comment.startFrame as number)
     const [lightbox, setLightbox] = useState<number | null>(null)
+
+    // One click on the timecode chip does the RIGHT thing for this comment (Lỗi 1 + Lỗi 2):
+    //  • has a drawing  → reveal it immediately (seek + pause + show), no 2nd chip click
+    //  • has a range    → play the [in,out] LOOP (stop at out, replay within on next play)
+    //  • plain point     → leave any range and jump to the frame.
+    const onTimecodeClick = () => {
+        if (comment.annotation) {
+            actions.exitRange?.()
+            actions.viewAnnotation(comment)
+            return
+        }
+        if (hasRange && actions.playRange) {
+            actions.playRange(comment)
+            return
+        }
+        actions.exitRange?.()
+        onSeekToFrame(comment.startFrame as number)
+    }
 
     return (
         <div className="group/comment">
@@ -166,8 +192,11 @@ function SingleComment({
                         <div className="mt-0.5 flex items-center gap-1.5">
                             {hasTime && (
                                 <button
-                                    onClick={() => onSeekToFrame(comment.startFrame as number)}
+                                    onClick={onTimecodeClick}
                                     className="flex items-center gap-1 rounded border border-violet-300/20 bg-violet-400/[0.12] px-1.5 py-0.5 font-mono text-[11px] text-violet-200 transition hover:bg-violet-400/[0.20]"
+                                    // A comment with a drawing reveals it on click (annotation wins over range),
+                                    // so only advertise "play the range" when there is NO drawing to show.
+                                    title={hasRange && !comment.annotation ? L.playRangeTitle : undefined}
                                 >
                                     <Clock className="h-3 w-3" />
                                     {fps ? frameToSmpte(comment.startFrame as number, fps) : comment.startFrame}

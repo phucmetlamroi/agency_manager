@@ -239,9 +239,23 @@ function GuestStage({
     // [FR-04] Pending timecode/range shared with the timeline; range-playback LOOPS [in,out] (frame.io).
     const range = useRangeSelection()
     const { playRange, stopRange } = useRangePlayback(controller.frame, controller.seekToFrame, controller.play, controller.pause, controller.isPlaying)
-    // Stop the loop the instant the range is cleared or collapsed to a point (✕ / composer close).
+    // The single loop is shared by the COMPOSER range and a clicked comment's range — track who armed it
+    // so clearing the composer chip only stops the composer's own loop, never a comment-loop in progress.
+    const loopIsComposerRef = useRef(false)
+    const onComposerPlayRange = useCallback(
+        (inFrame: number, outFrame: number) => {
+            loopIsComposerRef.current = true
+            playRange(inFrame, outFrame)
+        },
+        [playRange],
+    )
+    // Stop the loop the instant the COMPOSER range is cleared/collapsed (✕ / composer close) — but only
+    // when the live loop is the composer's.
     useEffect(() => {
-        if (!range.active || range.outFrame == null) stopRange()
+        if ((!range.active || range.outFrame == null) && loopIsComposerRef.current) {
+            loopIsComposerRef.current = false
+            stopRange()
+        }
     }, [range.active, range.outFrame, stopRange])
 
     // Annotation (guest can draw — public comments carry drawings too).
@@ -270,6 +284,20 @@ function GuestStage({
             setHighlightId(c.id)
         },
         [annoReset, ctlSeek, ctlPause],
+    )
+    // [Lỗi 1] Clicking a range comment plays its [in,out] as a loop (stop at the out-point, replay
+    // within on the next play). `stopRange` is the "click out to exit" affordance (video-surface click
+    // + point-comment jump). Mirrors the internal ReviewPlayerShell so guests behave the same.
+    const onCommentPlayRange = useCallback(
+        (c: CommentDto) => {
+            if (c.startFrame == null || c.endFrame == null || c.endFrame <= c.startFrame) return
+            annoReset()
+            setViewAnno(null)
+            setHighlightId(c.id)
+            loopIsComposerRef.current = false // comment-owned loop — composer-clear effect must not stop it
+            playRange(c.startFrame, c.endFrame)
+        },
+        [annoReset, playRange],
     )
     useEffect(() => {
         if (controller.isPlaying) setViewAnno(null)
@@ -582,6 +610,7 @@ function GuestStage({
                             posterUrl={version.media?.posterUrl ?? null}
                             overlay={annotationOverlay}
                             clickToggleDisabled={annotation.active}
+                            onStageExit={stopRange}
                             timelineChildren={
                                 <>
                                     <TimelineMarkers
@@ -638,6 +667,8 @@ function GuestStage({
                                     onPauseVideo={ctlPause}
                                     onFocusPlayer={onFocusPlayer}
                                     onViewAnnotation={onViewAnnotation}
+                                    onPlayRangeComment={onCommentPlayRange}
+                                    onExitRange={stopRange}
                                     highlightId={highlightId}
                                     onJumpToVersion={() => {}}
                                     // comments off → read-only: old public comments stay visible,

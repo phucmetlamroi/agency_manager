@@ -54,6 +54,8 @@ export function CommentsPanel({
     onPauseVideo,
     onFocusPlayer,
     onViewAnnotation,
+    onPlayRangeComment,
+    onExitRange,
     highlightId,
     onJumpToVersion,
     readOnly = false,
@@ -74,6 +76,11 @@ export function CommentsPanel({
     onPauseVideo: () => void
     onFocusPlayer: () => void
     onViewAnnotation: (c: CommentDto) => void
+    /** [Lỗi 1] Clicking a range comment plays its [in,out] loop. Omitted where there is no
+     *  range-playback engine (guest surfaces) → a range comment falls back to a plain seek. */
+    onPlayRangeComment?: (c: CommentDto) => void
+    /** [Lỗi 1] Leave range-loop mode (point-comment jump). */
+    onExitRange?: () => void
     highlightId: string | null
     onJumpToVersion: (versionId: string) => void
     /** P5.3 guest comments-off: render existing public comments but no composer/reply. */
@@ -140,8 +147,10 @@ export function CommentsPanel({
                 ;(add ? api.addReaction(id, emoji) : api.removeReaction(id, emoji)).catch(() => refresh())
             },
             viewAnnotation: onViewAnnotation,
+            playRange: onPlayRangeComment,
+            exitRange: onExitRange,
         }),
-        [patch, refresh, onViewAnnotation, api],
+        [patch, refresh, onViewAnnotation, onPlayRangeComment, onExitRange, api],
     )
 
     const onPosted = useCallback(

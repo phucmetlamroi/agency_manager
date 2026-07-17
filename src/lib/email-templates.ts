@@ -1,5 +1,5 @@
 
-import { escapeHtml } from '@/lib/notification-emails/shared/format'
+import { escapeHtml, formatVietnamDateTime } from '@/lib/notification-emails/shared/format'
 
 // Helper to format currency
 const formatCurrency = (amount: number) => {
@@ -52,7 +52,9 @@ const wrapTemplate = (content: string, title: string) => `<!DOCTYPE html>
 export const emailTemplates = {
     // 1. Task Assigned (To User)
     taskAssigned: (userName: string, taskTitle: string, deadline: Date | null, taskId: string) => {
-        const deadlineStr = deadline ? new Date(deadline).toLocaleString('vi-VN') : 'Không có hạn chót'
+        // [video-fix ①] toLocaleString('vi-VN') without a timeZone renders in the SERVER zone
+        // (UTC on Vercel) → shows +7h off. formatVietnamDateTime pins Asia/Ho_Chi_Minh.
+        const deadlineStr = deadline ? formatVietnamDateTime(deadline) : 'Không có hạn chót'
         const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`
         // Scenario 1
         const content = `
@@ -82,7 +84,8 @@ export const emailTemplates = {
     // Recipient: ONLY admin who created/assigned the task (task.assignedBy.email).
     // User KHÔNG nhận email này (bug cũ — task-actions.ts:164 hardcode env).
     taskStarted: (userName: string, taskTitle: string, clientName: string, startTime: Date) => {
-        const timeStr = new Date(startTime).toLocaleString('vi-VN')
+        // [video-fix ①] Render the start time in Vietnam time, not the server's UTC zone.
+        const timeStr = formatVietnamDateTime(startTime)
         const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin`
 
         const content = `

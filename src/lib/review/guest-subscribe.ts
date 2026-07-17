@@ -228,6 +228,29 @@ export async function verifyGuestPin(input: {
     return { ok: true }
 }
 
+/**
+ * [video-fix ③/⑤] Subscribe the SIGN-OFF email to this asset's guest notifications. The owner
+ * waived the PIN for sign-off ("mạo danh không quan trọng"), and explicitly wants the client emailed
+ * at the address they typed on /r/ — but createGuestSession only records a GuestSession, never a
+ * GuestSubscription, so notifyGuestsOfAsset (feedback ack, the A7 "revised" email) had no way to
+ * reach them. This upsert makes the deciding client a notification recipient. It does NOT stamp
+ * GuestSession.emailVerifiedAt (identity proof stays PIN-gated) and does NOT touch the reviewer cap —
+ * it only registers the notification target for the client who actually acted. Idempotent; never throws.
+ */
+export async function subscribeGuestOnDecision(input: {
+    email: string
+    assetId: string
+    shareLinkId: string
+    guestSessionId: string | null
+    ip: string | null
+}): Promise<void> {
+    try {
+        await ensureSubscription({ ...input, email: normEmail(input.email) })
+    } catch (e) {
+        reviewLog('error', 'guest.decision_subscribe_failed', { assetId: input.assetId, error: String(e) })
+    }
+}
+
 /** Current guest's subscription state for one asset (drives the gear/banner UI). */
 export async function guestSubscriptionStatus(input: {
     guest: GuestSession | null

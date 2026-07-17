@@ -334,6 +334,18 @@ export async function confirmFixDone(assetId: string): Promise<{ ok: true; taskI
         actorId: access.userId,
         alsoExcludeIds: [task.assigneeId],
     })
+    // [video-fix ⑤] Client round A6→A7: the editor confirmed the CLIENT's requested fix. The client
+    // registered their email on /r/ and MUST be told the changes were applied (owner requirement #5) —
+    // previously only the internal manager was notified. A7 is internalOnly so clientVisibleLabel()
+    // returns null; pass an explicit client-facing EN label instead of relying on that gate. The /r/
+    // decision path subscribes the sign-off email, so notifyGuestsOfAsset can reach it. Fire-and-forget.
+    if (target === REVIEW_STATUS_MAP.clientFixDone) {
+        void notifyGuestsOfAsset({
+            assetId: asset.id,
+            event: 'status_update',
+            statusLabel: 'Revised — pending final approval',
+        }).catch(() => {})
+    }
     await safeRecordActivity({
         type: REVIEW_ACTIVITY.TASK_FIX_CONFIRMED,
         workspaceId: asset.workspaceId,

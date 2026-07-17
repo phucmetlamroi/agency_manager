@@ -23,6 +23,11 @@ import { inngest, REVIEW_EVENTS } from './inngest'
 import { type ShareWithItems } from './share-auth'
 import { notifyReview, resolveTaskRecipients, reviewPlayerUrl } from './notify'
 import { isValidStatus } from '@/lib/task-statuses'
+// [video-fix ③④⑤] Run the task-side effects SYNCHRONOUSLY (below) instead of relying only on the
+// async Inngest fn, so the editor/manager notify + the A5→A6 status advance can't be silently dropped.
+import { syncTaskOnChangesRequested } from './task-sync'
+import { notifyGuestsOfAsset } from './guest-notify'
+import { subscribeGuestOnDecision } from './guest-subscribe'
 
 const MAX_NOTE = 2000
 
@@ -239,6 +244,85 @@ export async function submitGuestDecision(
     // side-effects can be reconciled — see IMPLEMENTATION-NOTES residual risk), not a
     // 500 that hides a committed decision.
     if (isHead) {
+        // [video-fix ③④⑤] The owner's QA video showed that on a client "Request changes" the EDITOR
+        // got NO email and the task status did NOT advance to A6 ('Đã nhận feedback (khách)'). Both of
+        // those effects previously lived ONLY inside the async Inngest fn (reviewShareDecision) — so if
+        // that fn never ran, both were silently lost while the comment (written above, synchronously)
+        // still showed up. Do the CRITICAL effects here, in the request that definitely runs. The
+        // decision is ALREADY committed, so a failure must never 500 the guest → whole block is caught.
+        try {
+            // (a) Register the sign-off email as a notification recipient, so the ack below + the
+            //     later A7 "revised" email reach the address the client actually typed on /r/.
+            await subscribeGuestOnDecision({
+                email: signerEmail,
+                assetId: asset.id,
+                shareLinkId: share.id,
+                guestSessionId: guest.id,
+                ip: null,
+            })
+
+            // (b) Advance the task: request_changes → A6 (or legacy 'Revision'); approve → settle the
+            //     client-review signal so the portal stops nagging "Awaiting your review".
+            let syncApplied = false
+            let syncTarget: string | undefined
+            if (input.decision === 'request_changes') {
+                const res = await syncTaskOnChangesRequested(asset.taskId, asset.workspaceId).catch(() => null)
+                syncApplied = !!res?.applied
+                syncTarget = res?.to
+            } else {
+                await prisma.task
+                    .updateMany({
+                        where: { id: asset.taskId, workspaceId: asset.workspaceId, clientReview: { in: ['AWAITING', 'CHANGES'] } },
+                        data: { clientReview: 'APPROVED', clientReviewedAt: new Date() },
+                    })
+                    .catch(() => {})
+            }
+
+            // (c) Notify the EDITOR (assignee) + the MANAGER (assignedById) — owner requirement #3.
+            const t = await prisma.task.findUnique({
+                where: { id: asset.taskId },
+                select: { title: true, assigneeId: true, assignedById: true },
+            })
+            const who = signerName || 'Khách'
+            const deepLinkUrl = reviewPlayerUrl({ workspaceId: asset.workspaceId, assetId: asset.id, versionId: version.id })
+            if (input.decision === 'request_changes') {
+                await notifyReview({
+                    recipientIds: [t?.assigneeId, t?.assignedById],
+                    type: 'VIDEO_CHANGES_REQUESTED',
+                    title: `${who} yêu cầu chỉnh sửa bản v${version.versionNumber}`,
+                    body: syncApplied
+                        ? `Task "${t?.title ?? ''}" đã tự chuyển sang "${syncTarget ?? REVIEW_STATUS_MAP.changesRequested}".`
+                        : `Task "${t?.title ?? ''}" — khách yêu cầu chỉnh sửa, kiểm tra trạng thái task.`,
+                    taskId: asset.taskId,
+                    deepLinkUrl,
+                    meta: { guestName: signerName, versionNumber: version.versionNumber },
+                })
+                // (d) Acknowledge the client — "we've received your feedback".
+                void notifyGuestsOfAsset({ assetId: asset.id, event: 'feedback_received' }).catch(() => {})
+            } else {
+                await notifyReview({
+                    recipientIds: [t?.assigneeId, t?.assignedById],
+                    type: 'VIDEO_REVIEW_APPROVED',
+                    title: `${who} đã duyệt bản v${version.versionNumber}`,
+                    body: `Task "${t?.title ?? ''}" — mở chi tiết task để xác nhận chuyển Hoàn tất.`,
+                    taskId: asset.taskId,
+                    deepLinkUrl,
+                    meta: { guestName: signerName, versionNumber: version.versionNumber },
+                })
+                void notifyGuestsOfAsset({ assetId: asset.id, event: 'approved' }).catch(() => {})
+            }
+        } catch (e) {
+            reviewLog('error', 'share.decision.sync_effects_failed', {
+                shareId: share.id,
+                versionId: version.id,
+                decision: input.decision,
+                error: e instanceof Error ? e.message : String(e),
+            })
+        }
+
+        // Inngest remains as an IDEMPOTENT backup: it re-runs the status sync (a no-op once the
+        // synchronous path above already advanced it) and writes the task-activity feed row. Its
+        // staff/client notifications were REMOVED (now done synchronously above) to avoid double-send.
         try {
             await inngest.send({
                 name: REVIEW_EVENTS.DECISION_RECORDED,

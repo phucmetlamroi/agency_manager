@@ -14,10 +14,8 @@ import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { expireInflightUpload, reconcileStuckUploadedVersion } from './upload-service'
 // P5.4 decision side-effects. P3-B: F7 auto-flip + manager notify.
 import { syncTaskOnChangesRequested, syncTaskFromReviewEvent, revokeClientExposureOnNewVersion } from './task-sync'
-import { notifyGuestsOfAsset } from './guest-notify'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { audit } from '@/lib/audit-log'
-import { createAndBroadcastNotifications } from '@/actions/notification-actions'
 // P6.1 notifications. P3-B: manager status-flip notify.
 import { notifyReview, reviewPlayerUrl, notifyManagerOfReviewFlip } from './notify'
 // P6.2 trash purge.
@@ -659,19 +657,14 @@ export const reviewShareDecision = inngest.createFunction(
 
         if (!data.taskId) return { ok: true, task: 'none' } // Team-only asset — nothing to sync
 
-        // FR-A05: request_changes AUTO-flips the task; approve only proposes (banner
-        // comes from asset.statusId = "Hoàn tất", set by the decision route).
-        let syncApplied = true
-        // [P3-B] The guest-change sync now retargets A5 → A6 ('Đã nhận feedback (khách)') when the
-        // task was already sent to the client, else keeps legacy 'Revision'. Capture the ACTUAL
-        // written status so the staff notification below states the real target, not an assumed one.
-        let syncTarget: string | undefined
+        // [video-fix ③④⑤] The staff/client NOTIFICATIONS + the primary A5→A6 status advance now run
+        // SYNCHRONOUSLY in submitGuestDecision (share-decision.ts) so they can't be silently dropped
+        // when this async fn fails to run. What remains here is an IDEMPOTENT backup: re-run the status
+        // sync (a no-op once the route already advanced it) + settle clientReview + write the feed row.
         if (data.decision === 'request_changes') {
-            const res = await step.run('sync-task-revision', () =>
+            await step.run('sync-task-revision', () =>
                 syncTaskOnChangesRequested(data.taskId!, data.workspaceId),
             )
-            syncApplied = !!res?.applied
-            syncTarget = res?.to
         } else if (data.decision === 'approve') {
             // [M1/R2] Approve on /r/ AUTO-flips no task STATUS (approve only proposes — the banner
             // comes from asset.statusId="Hoàn tất"), but it MUST settle the client-facing signal so the
@@ -708,54 +701,6 @@ export const reviewShareDecision = inngest.createFunction(
                     via: 'review-share',
                     shareLinkId: data.shareLinkId,
                 },
-            }),
-        )
-
-        await step.run('notify-staff', async () => {
-            const task = await prisma.task.findUnique({
-                where: { id: data.taskId! },
-                select: { title: true, assigneeId: true, assignedById: true },
-            })
-            if (!task) return { notified: 0 }
-            const userIds = Array.from(
-                new Set([task.assigneeId, task.assignedById].filter((x): x is string => !!x)),
-            )
-            if (!userIds.length) return { notified: 0 }
-            const who = data.guestName ?? 'Khách'
-            const rows = await createAndBroadcastNotifications(
-                userIds,
-                data.decision === 'approve'
-                    ? {
-                          type: 'VIDEO_REVIEW_APPROVED',
-                          title: `${who} đã duyệt bản v${data.versionNumber}`,
-                          body: `Task "${task.title}" — mở chi tiết task để xác nhận chuyển Hoàn tất.`,
-                          taskId: data.taskId,
-                          metadata: { guestName: data.guestName, versionNumber: data.versionNumber },
-                      }
-                    : {
-                          type: 'VIDEO_CHANGES_REQUESTED',
-                          title: `${who} yêu cầu chỉnh sửa bản v${data.versionNumber}`,
-                          // Only claim the task auto-flipped when it actually did — a
-                          // race-lost / archived / bad-map sync returns applied:false and
-                          // the task kept its status; a false "đã chuyển …" would mislead
-                          // staff (finding P5-R#16). State the REAL target (A6 or Revision).
-                          body: syncApplied
-                              ? `Task "${task.title}" đã tự chuyển sang "${syncTarget ?? REVIEW_STATUS_MAP.changesRequested}".`
-                              : `Task "${task.title}" — khách yêu cầu chỉnh sửa, kiểm tra trạng thái task.`,
-                          taskId: data.taskId,
-                          metadata: { guestName: data.guestName, versionNumber: data.versionNumber },
-                      },
-            )
-            return { notified: rows.length }
-        })
-
-        // [L-EMAIL-2] Acknowledge the CLIENT's decision by email (their own /r/ subscribers):
-        // approve → "thanks for approving", request_changes → "we've received your feedback".
-        // Fire-and-forget; notifyGuestsOfAsset never throws + only fans out to live subscribers.
-        await step.run('notify-client-confirm', () =>
-            notifyGuestsOfAsset({
-                assetId: data.assetId,
-                event: data.decision === 'approve' ? 'approved' : 'feedback_received',
             }),
         )
 

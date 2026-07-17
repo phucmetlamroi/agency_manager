@@ -182,6 +182,26 @@ export async function putObjectBytes(key: string, body: Uint8Array | Buffer, con
     await r2Client().send(new PutObjectCommand({ Bucket: r2Bucket(), Key: key, Body: body, ContentType: contentType }))
 }
 
+/** Upload a LOCAL file to R2 by streaming it (server-side derivatives too big to hold in memory,
+ *  e.g. the color-retagged Mux input). ContentLength is required for a stream Body on the S3 API. */
+export async function putObjectFromFile(
+    key: string,
+    filePath: string,
+    contentLength: number,
+    contentType: string,
+): Promise<void> {
+    const { createReadStream } = await import('node:fs')
+    await r2Client().send(
+        new PutObjectCommand({
+            Bucket: r2Bucket(),
+            Key: key,
+            Body: createReadStream(filePath),
+            ContentLength: contentLength,
+            ContentType: contentType,
+        }),
+    )
+}
+
 /** A Node Readable of an object's body — server-side STREAMING (e.g. zip export of many files). */
 export async function getObjectStream(key: string): Promise<Readable> {
     const out = await r2Client().send(new GetObjectCommand({ Bucket: r2Bucket(), Key: key }))

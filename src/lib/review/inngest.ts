@@ -7,7 +7,7 @@ import { ReviewMediaKind, ReviewPipelineStatus, ReviewState } from '@prisma/clie
 import { prisma } from '@/lib/db'
 import { reviewLog } from './logger'
 import { createMuxAsset, deleteMuxAsset, extractReadyMeta, getMuxAsset, MuxError, type MuxAsset } from './mux'
-import { presignGetObject, getObjectRange } from './r2'
+import { presignGetObject, getObjectRange, deleteObject } from './r2'
 import { looksLikeMedia } from './upload-helpers'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 // P1.6 janitor reconcile helpers (call-time-only cycle — see upload-service.ts note).
@@ -16,6 +16,8 @@ import { expireInflightUpload, reconcileStuckUploadedVersion } from './upload-se
 import { syncTaskOnChangesRequested, syncTaskFromReviewEvent, revokeClientExposureOnNewVersion } from './task-sync'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { audit } from '@/lib/audit-log'
+// [color-fix] Auto-tag untagged colorspace before Mux ingests, so the review preview matches VLC.
+import { ensureColorTaggedInput, retaggedKeyFor } from './color-retag'
 // P6.1 notifications. P3-B: manager status-flip notify.
 import { notifyReview, reviewPlayerUrl, notifyManagerOfReviewFlip } from './notify'
 // P6.2 trash purge.
@@ -111,6 +113,10 @@ async function applyMuxReady(
         return true
     })
     if (applied) {
+        // [color-fix] Mux has finished ingesting → the retagged sibling (if we made one) is no longer
+        // needed (Mux copied it; the ORIGINAL R2 object still backs downloads). Best-effort reclaim of
+        // the extra storage; a missing key is a no-op on R2. Runs once (guarded by the atomic flip).
+        if (version.r2Key) void deleteObject(retaggedKeyFor(version.r2Key)).catch(() => { /* best-effort */ })
         // FR-G02: tell the uploader their cut is ready to review (deep-link to the player).
         void notifyReview({
             recipientIds: [version.uploaderId],
@@ -391,12 +397,20 @@ export const reviewProcessUpload = inngest.createFunction(
             return { rejected: true }
         }
 
+        // [color-fix] BEFORE Mux ingests: if the source has NO colorspace tags (common for editors'
+        // talking-head exports → the review preview looked grayer/desaturated vs VLC), losslessly write
+        // BT.709 tags into a sibling R2 object and feed THAT to Mux. FAIL-SAFE: any error/timeout/too-big
+        // returns the original key, so Mux always gets a valid input and the upload never breaks.
+        const inputPlan = await step.run('ensure-color-tags', () =>
+            ensureColorTaggedInput(v.r2Key as string, versionId),
+        )
+
         // Create the Mux asset from a presigned R2 GET (24h). Memoized across THIS run's retries →
         // one asset per run. The pre-check narrows the (rare) concurrent-run double-create window.
         const created = await step.run('create-mux-asset', async () => {
             const cur = await prisma.reviewVersion.findUnique({ where: { id: versionId }, select: { muxAssetId: true } })
             if (cur?.muxAssetId) return { assetId: cur.muxAssetId, mine: false } // a concurrent run already made one
-            const inputUrl = await presignGetObject(v.r2Key as string, { expiresIn: 24 * 60 * 60 })
+            const inputUrl = await presignGetObject(inputPlan.inputKey, { expiresIn: 24 * 60 * 60 })
             const asset = await createMuxAsset({ inputUrl, passthrough: versionId })
             return { assetId: asset.id, mine: true }
         })

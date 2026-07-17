@@ -182,24 +182,49 @@ export async function putObjectBytes(key: string, body: Uint8Array | Buffer, con
     await r2Client().send(new PutObjectCommand({ Bucket: r2Bucket(), Key: key, Body: body, ContentType: contentType }))
 }
 
-/** Upload a LOCAL file to R2 by streaming it (server-side derivatives too big to hold in memory,
- *  e.g. the color-retagged Mux input). ContentLength is required for a stream Body on the S3 API. */
-export async function putObjectFromFile(
-    key: string,
-    filePath: string,
-    contentLength: number,
-    contentType: string,
-): Promise<void> {
-    const { createReadStream } = await import('node:fs')
-    await r2Client().send(
-        new PutObjectCommand({
-            Bucket: r2Bucket(),
-            Key: key,
-            Body: createReadStream(filePath),
-            ContentLength: contentLength,
-            ContentType: contentType,
-        }),
-    )
+/**
+ * Stream an UNKNOWN-length Node Readable up to R2 via hand-rolled multipart (no @aws-sdk/lib-storage
+ * dep). Buffers into ≥PART_SIZE chunks (S3 requires ≥5 MiB per part except the last); the `for await`
+ * applies backpressure so memory stays ~one part. Used by the color-retag pipeline to pipe ffmpeg's
+ * stdout straight to R2 with NO /tmp — so it handles arbitrarily large videos. If the source stream
+ * ERRORS (e.g. ffmpeg destroyed stdout on a non-zero exit / timeout), the in-flight multipart is
+ * ABORTED and the error re-thrown, so a truncated object can never be completed and reach Mux.
+ */
+export async function putObjectFromStream(key: string, body: Readable, contentType: string): Promise<void> {
+    const PART_SIZE = 8 * 1024 * 1024 // 8 MiB (min 5 MiB except the final part)
+    const uploadId = await createMultipart(key, contentType)
+    const parts: CompletedPart[] = []
+    let partNumber = 1
+    let pending: Buffer[] = []
+    let pendingLen = 0
+
+    const flush = async (): Promise<void> => {
+        if (pendingLen === 0) return
+        const data = Buffer.concat(pending, pendingLen)
+        pending = []
+        pendingLen = 0
+        const out = await r2Client().send(
+            new UploadPartCommand({ Bucket: r2Bucket(), Key: key, UploadId: uploadId, PartNumber: partNumber, Body: data }),
+        )
+        if (!out.ETag) throw new Error('[review/r2] UploadPart returned no ETag')
+        parts.push({ partNumber, etag: out.ETag })
+        partNumber++
+    }
+
+    try {
+        for await (const chunk of body as AsyncIterable<Buffer>) {
+            const c: Buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+            pending.push(c)
+            pendingLen += c.length
+            if (pendingLen >= PART_SIZE) await flush()
+        }
+        await flush() // final (possibly < PART_SIZE) part
+        if (parts.length === 0) throw new Error('[review/r2] empty stream — nothing uploaded')
+        await completeMultipart(key, uploadId, parts)
+    } catch (e) {
+        await abortMultipart(key, uploadId).catch(() => { /* best-effort */ })
+        throw e
+    }
 }
 
 /** A Node Readable of an object's body — server-side STREAMING (e.g. zip export of many files). */

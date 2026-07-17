@@ -8,33 +8,34 @@
 //
 // WHAT: for an UNTAGGED H.264/HEVC source we losslessly write BT.709 (limited-range) tags into the
 // bitstream via ffmpeg's `-c copy -bsf:v h264_metadata/hevc_metadata` (a header rewrite — NO
-// re-encode, same bitrate/size, milliseconds of CPU), upload the retagged copy to a sibling R2 key,
-// and hand THAT to Mux. The original object is left untouched (downloads still serve it).
+// re-encode, same bitrate, milliseconds of CPU), and hand the retagged copy to Mux. The original R2
+// object is left untouched (downloads still serve it).
 //
-// SAFETY (this sits on the core upload→Mux path, so it must NEVER break an upload):
-//   - Gated by size (REVIEW_RETAG_MAX_BYTES, default 600 MB) so /tmp + the step's wall-clock stay bounded.
-//   - Skips anything already tagged, or not H.264/HEVC.
-//   - A soft internal deadline kills a slow ffmpeg so the Inngest step can't hang the pipeline.
+// HOW (no /tmp → any size): ffmpeg reads the source straight from a presigned R2 GET URL (HTTP range
+// reads — it never lands the whole file on disk) and writes a fragmented MP4 to stdout, which we
+// stream to a sibling R2 key via multipart. Vercel's /tmp is capped at 500 MB, so a download-to-disk
+// approach would cap us at ~230 MB; streaming lifts that entirely (bounded only by the route's 800s).
+//
+// SAFETY (this sits on the core upload→Mux path, so it must NEVER break an upload or feed Mux a bad
+// file):
+//   - Skips anything already tagged, or not H.264/HEVC, or over a (generous) size guard.
+//   - A soft deadline SIGKILLs a stuck ffmpeg so the Inngest step can't hang the pipeline.
+//   - ffmpeg's stdout is destroyed-with-error on a non-zero exit → the multipart is ABORTED, so a
+//     truncated object is never completed. We ONLY use the retagged key when ffmpeg exited 0 AND a
+//     post-upload probe confirms it decodes.
 //   - EVERY failure path returns the ORIGINAL key → worst case === today (untagged original to Mux),
-//     never worse. The caller treats a thrown error the same way, but this fn is written not to throw.
+//     never worse. This fn is written not to throw.
 
-import { execFile } from 'node:child_process'
-import { createWriteStream } from 'node:fs'
-import { mkdtemp, rm, stat } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { pipeline } from 'node:stream/promises'
+import { spawn, execFile } from 'node:child_process'
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
-import { getObjectStream, headObject, putObjectFromFile } from './r2'
+import { headObject, presignGetObject, putObjectFromStream, deleteObject } from './r2'
 import { reviewLog } from './logger'
 
 const FFMPEG = ffmpegInstaller.path
-/** Only files at/under this size are retagged inline; larger ones fall back to the original
- *  (the download+ffmpeg+upload must fit in one Inngest step's wall-clock + /tmp). Tune per plan. */
-const MAX_BYTES = Number(process.env.REVIEW_RETAG_MAX_BYTES) || 600 * 1024 * 1024
-/** Soft deadline for the whole download+probe+retag+upload — well under the route maxDuration so a
- *  slow ffmpeg is abandoned (→ original key) instead of getting hard-killed by Vercel mid-step. */
-const SOFT_DEADLINE_MS = Number(process.env.REVIEW_RETAG_DEADLINE_MS) || 240_000
+/** Sanity ceiling (no /tmp limit anymore; this just bounds one step's wall-clock). Env-tunable. */
+const MAX_BYTES = Number(process.env.REVIEW_RETAG_MAX_BYTES) || 5 * 1024 * 1024 * 1024 // 5 GB
+/** Soft deadline for the whole probe+retag+verify, kept under the route's maxDuration (800s). */
+const SOFT_DEADLINE_MS = Number(process.env.REVIEW_RETAG_DEADLINE_MS) || 700_000
 
 /** The sibling R2 key holding the color-retagged Mux input for `key`. Derivable (no schema column),
  *  so the READY webhook can best-effort delete it once Mux has finished ingesting. */
@@ -47,10 +48,10 @@ interface ProbeResult {
     tagged: boolean // true when a real colorspace is already signalled
 }
 
-/** Parse `ffmpeg -i FILE` stderr (it prints stream info then exits non-zero for "no output"). */
-async function probeColor(file: string): Promise<ProbeResult> {
+/** Parse `ffmpeg -i URL` stderr (it prints stream info then exits non-zero for "no output file"). */
+async function probeColor(url: string): Promise<ProbeResult> {
     const stderr = await new Promise<string>((resolve) => {
-        execFile(FFMPEG, ['-hide_banner', '-i', file], { timeout: 30_000 }, (_err, _out, err) => {
+        execFile(FFMPEG, ['-hide_banner', '-i', url], { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 }, (_e, _o, err) => {
             resolve(err || '')
         })
     })
@@ -62,15 +63,52 @@ async function probeColor(file: string): Promise<ProbeResult> {
     return { codec, tagged }
 }
 
-/** Run ffmpeg with args; reject on non-zero exit. `killRef` lets the deadline abort it. */
-function runFfmpeg(args: string[], killRef: { child?: ReturnType<typeof execFile> }): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        const child = execFile(FFMPEG, args, { maxBuffer: 8 * 1024 * 1024 }, (err) => {
-            if (err) reject(err)
-            else resolve()
+/** Confirm an R2 object is a decodable MP4 (decode the first frame over its presigned URL). */
+async function decodesOk(url: string): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+        execFile(FFMPEG, ['-v', 'error', '-i', url, '-frames:v', '1', '-f', 'null', '-'], { timeout: 120_000 }, (err) => {
+            resolve(!err)
         })
-        killRef.child = child
     })
+}
+
+/**
+ * Stream-retag `srcUrl` → the R2 object `outKey` (ffmpeg URL-in → fragmented-mp4 stdout → multipart).
+ * Resolves only when ffmpeg exits 0 AND the upload completed; rejects (and the multipart is aborted)
+ * otherwise. A deadline SIGKILLs ffmpeg. Never leaves a completed truncated object.
+ */
+async function streamRetag(srcUrl: string, bsf: string, outKey: string): Promise<void> {
+    const child = spawn(FFMPEG, [
+        '-hide_banner', '-loglevel', 'error',
+        '-i', srcUrl,
+        '-map', '0:v:0', '-map', '0:a?', '-c', 'copy',
+        '-bsf:v', `${bsf}=video_full_range_flag=0:colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1`,
+        '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-f', 'mp4', 'pipe:1',
+    ])
+    let stderr = ''
+    child.stderr.on('data', (d) => { stderr += String(d) })
+
+    const timer = setTimeout(() => { try { child.kill('SIGKILL') } catch { /* ignore */ } }, SOFT_DEADLINE_MS)
+    // On a non-zero / killed exit, destroy stdout WITH an error so the multipart consumer throws +
+    // aborts instead of completing a truncated object. On success (code 0) stdout ends normally.
+    const exit = new Promise<void>((resolve, reject) => {
+        child.on('error', (e) => { try { child.stdout.destroy(e) } catch { /* ignore */ }; reject(e) })
+        child.on('close', (code) => {
+            if (code === 0) resolve()
+            else {
+                const e = new Error(`ffmpeg exited ${code}: ${stderr.slice(0, 500)}`)
+                try { child.stdout.destroy(e) } catch { /* ignore */ }
+                reject(e)
+            }
+        })
+    })
+
+    try {
+        // Both must succeed: the upload (drains stdout) AND a clean ffmpeg exit.
+        await Promise.all([putObjectFromStream(outKey, child.stdout, 'video/mp4'), exit])
+    } finally {
+        clearTimeout(timer)
+    }
 }
 
 /**
@@ -82,10 +120,6 @@ export async function ensureColorTaggedInput(
     versionId: string,
 ): Promise<{ inputKey: string; retagged: boolean; reason?: string }> {
     const original = { inputKey: r2Key, retagged: false as const }
-    let dir: string | null = null
-    const killRef: { child?: ReturnType<typeof execFile> } = {}
-    let timer: NodeJS.Timeout | null = null
-
     try {
         const head = await headObject(r2Key)
         if (!head) return { ...original, reason: 'no-head' }
@@ -94,60 +128,35 @@ export async function ensureColorTaggedInput(
             return { ...original, reason: 'too-large' }
         }
 
-        // Soft deadline: abandon (kill ffmpeg) and fall back to the original so the step can't hang.
-        const deadline = new Promise<'deadline'>((resolve) => {
-            timer = setTimeout(() => {
-                try { killRef.child?.kill('SIGKILL') } catch { /* ignore */ }
-                resolve('deadline')
-            }, SOFT_DEADLINE_MS)
-        })
-
-        const work = (async (): Promise<{ inputKey: string; retagged: boolean; reason?: string }> => {
-            dir = await mkdtemp(join(tmpdir(), 'review-retag-'))
-            const inFile = join(dir, 'in')
-            await pipeline(await getObjectStream(r2Key), createWriteStream(inFile))
-
-            const probe = await probeColor(inFile)
-            if (probe.tagged) return { ...original, reason: 'already-tagged' }
-            if (probe.codec !== 'h264' && probe.codec !== 'hevc') {
-                return { ...original, reason: `codec-${probe.codec || 'unknown'}` }
-            }
-
-            const bsf = probe.codec === 'hevc' ? 'hevc_metadata' : 'h264_metadata'
-            const outFile = join(dir, 'out.mp4')
-            // BT.709 + limited (studio) range — matches how VLC renders these files (i.e. the vivid,
-            // correct look). colour_primaries=1 transfer=1 matrix=1 => bt709; full_range_flag=0 => tv.
-            await runFfmpeg(
-                ['-y', '-loglevel', 'error', '-i', inFile, '-map', '0:v:0', '-map', '0:a?', '-c', 'copy',
-                 '-bsf:v', `${bsf}=video_full_range_flag=0:colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1`,
-                 outFile],
-                killRef,
-            )
-            // Verify the retagged file actually decodes (a corrupt output must NEVER reach Mux).
-            await runFfmpeg(['-v', 'error', '-i', outFile, '-frames:v', '1', '-f', 'null', '-'], killRef)
-            const outSize = (await stat(outFile)).size
-            if (outSize < head.size * 0.5) throw new Error(`retag output too small (${outSize} vs ${head.size})`)
-
-            const outKey = retaggedKeyFor(r2Key)
-            await putObjectFromFile(outKey, outFile, outSize, 'video/mp4')
-            reviewLog('info', 'retag.applied', { versionId, codec: probe.codec, size: head.size })
-            return { inputKey: outKey, retagged: true }
-        })()
-
-        // If the deadline wins the race, `work` is left pending and may reject later (killed ffmpeg /
-        // aborted upload) — swallow that so it can't surface as an unhandled rejection after we returned.
-        work.catch(() => { /* superseded by deadline */ })
-        const raced = await Promise.race([work, deadline])
-        if (raced === 'deadline') {
-            reviewLog('warn', 'retag.deadline', { versionId, size: head.size })
-            return { ...original, reason: 'deadline' }
+        const srcUrl = await presignGetObject(r2Key, { expiresIn: 6 * 60 * 60 })
+        const probe = await probeColor(srcUrl)
+        if (probe.tagged) return { ...original, reason: 'already-tagged' }
+        if (probe.codec !== 'h264' && probe.codec !== 'hevc') {
+            return { ...original, reason: `codec-${probe.codec || 'unknown'}` }
         }
-        return raced
+
+        const bsf = probe.codec === 'hevc' ? 'hevc_metadata' : 'h264_metadata'
+        const outKey = retaggedKeyFor(r2Key)
+        try {
+            await streamRetag(srcUrl, bsf, outKey)
+        } catch (e) {
+            reviewLog('warn', 'retag.stream_failed', { versionId, error: e instanceof Error ? e.message : String(e) })
+            await deleteObject(outKey).catch(() => { /* best-effort */ })
+            return { ...original, reason: 'stream-error' }
+        }
+
+        // ffmpeg exited 0 + upload completed → still confirm it decodes before trusting it with Mux.
+        const outUrl = await presignGetObject(outKey, { expiresIn: 6 * 60 * 60 })
+        if (!(await decodesOk(outUrl))) {
+            reviewLog('warn', 'retag.verify_failed', { versionId })
+            await deleteObject(outKey).catch(() => { /* best-effort */ })
+            return { ...original, reason: 'verify-failed' }
+        }
+
+        reviewLog('info', 'retag.applied', { versionId, codec: probe.codec, size: head.size })
+        return { inputKey: outKey, retagged: true }
     } catch (e) {
         reviewLog('error', 'retag.failed', { versionId, error: e instanceof Error ? e.message : String(e) })
         return { ...original, reason: 'error' }
-    } finally {
-        if (timer) clearTimeout(timer)
-        if (dir) await rm(dir, { recursive: true, force: true }).catch(() => { /* best-effort */ })
     }
 }

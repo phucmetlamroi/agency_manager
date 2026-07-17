@@ -7,16 +7,20 @@ import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import {
     LayoutDashboard, ListTodo, Inbox, Clapperboard, CalendarDays, Wallet, Building2,
-    UsersRound, Trash2, Activity, ScrollText, Settings, LayoutGrid,
+    UsersRound, Trash2, Activity, ScrollText, Settings,
     Maximize2, Archive, Trophy, Users, ChevronsRight, Crown,
 } from 'lucide-react'
 import McTopbarActions, { type McAddTaskData } from './McTopbarActions'
 import McBackLink from './McBackLink'
-import { Pressable, HoverCard, Reveal, RevealGroup, RevealItem } from './motion-kit'
+import McWorkspaceSwitcher from './McWorkspaceSwitcher'
+import McKanban from './McKanban'
+import { Pressable, Reveal } from './motion-kit'
 
 export interface McTask {
     id: string
     title: string
+    /** Raw task status (drives drag-drop no-op detection + optimistic updates). */
+    status: string
     statusLabel: string
     dot: string
     assignee: string
@@ -34,6 +38,9 @@ export interface McColumn {
     accent?: 'danger' | 'success'
     tasks: McTask[]
     moreText: string
+    /** [Kéo-thả] Status a task receives when DROPPED into this column (owner's rules);
+     *  null = column is not a valid drop target (e.g. "Quá hạn" is system-derived). */
+    entryStatus: string | null
 }
 export interface McLeader { name: string; initials: string; avatar: string; sub: string; rank: string; rankColor: string; top?: boolean }
 export interface McData {
@@ -69,14 +76,6 @@ const RAIL: { icon: LucideIcon; active?: boolean; divider?: boolean; title?: str
 ]
 
 function fmtVND(n: number): string { return Math.round(n).toLocaleString('vi-VN') }
-// Lighten a #rrggbb toward white (frame uses lighter tints for pill/count text).
-function lighten(hex: string, amt: number): string {
-    const h = hex.replace('#', '')
-    if (h.length !== 6) return hex
-    const mix = (c: number) => Math.round(c + (255 - c) * amt)
-    const to2 = (n: number) => n.toString(16).padStart(2, '0')
-    return `#${to2(mix(parseInt(h.slice(0, 2), 16)))}${to2(mix(parseInt(h.slice(2, 4), 16)))}${to2(mix(parseInt(h.slice(4, 6), 16)))}`
-}
 // Per-client dot color (frame gives each client a distinct hue).
 const CLIENT_DOTS = [
     'linear-gradient(135deg,#F43F5E,#EC4899)', 'linear-gradient(135deg,#06B6D4,#3B82F6)', 'linear-gradient(135deg,#F59E0B,#EAB308)',
@@ -100,52 +99,8 @@ function RailIcon({ icon: Icon, active, title }: { icon: LucideIcon; active?: bo
     )
 }
 
-function TaskCard({ t }: { t: McTask }) {
-    return (
-        <HoverCard style={{ display: 'flex', flexDirection: 'column', gap: 7, borderRadius: 12, background: card, backdropFilter: 'blur(12px)', border: t.danger ? '1px solid rgba(220,38,38,0.35)' : cardBorder, boxShadow: t.danger ? '0 0 20px rgba(220,38,38,0.12)' : undefined, padding: 10 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.35 }}>{t.title}</span>
-            <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${t.dot}1a`, color: lighten(t.dot, 0.4), border: `1px solid ${t.dot}4d`, whiteSpace: 'nowrap' }}>
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: t.dot }} />{t.statusLabel}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 20, height: 20, borderRadius: 999, background: t.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: '#fff', flexShrink: 0 }}>{t.initials}</span>
-                <span style={{ fontSize: 11, color: '#D4D4D8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.assignee}</span>
-                {t.rank && <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 9, fontWeight: 800, color: t.rankColor, border: `1px solid ${t.rankColor}66`, borderRadius: 4, padding: '0 4px', flexShrink: 0 }}>{t.rank}</span>}
-                <div style={{ flex: 1 }} />
-                <span style={{ fontSize: 10, fontWeight: t.meta.startsWith('Trễ') ? 700 : 400, color: t.meta.startsWith('Trễ') ? '#F87171' : '#A1A1AA', whiteSpace: 'nowrap' }}>{t.meta}</span>
-            </div>
-        </HoverCard>
-    )
-}
-
-function Column({ col, workspaceId }: { col: McColumn; workspaceId: string }) {
-    const bg = col.accent === 'danger' ? 'rgba(220,38,38,0.03)' : col.accent === 'success' ? 'rgba(16,185,129,0.02)' : 'rgba(255,255,255,0.02)'
-    const border = col.accent === 'danger' ? '1px solid rgba(220,38,38,0.18)' : col.accent === 'success' ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(255,255,255,0.05)'
-    return (
-        <RevealItem style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, background: bg, border, borderRadius: 16, padding: 10, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: -40, right: -40, width: 120, height: 120, borderRadius: 999, background: `${col.hue}12`, filter: 'blur(28px)', pointerEvents: 'none' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 999, background: col.hue, boxShadow: `0 0 8px ${col.hue}99` }} />
-                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: col.accent === 'danger' ? '#FCA5A5' : '#D4D4D8', whiteSpace: 'nowrap' }}>{col.label}</span>
-                <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 8px', borderRadius: 999, background: `${col.hue}1f`, color: lighten(col.hue, 0.35), border: `1px solid ${col.hue}4d` }}>{col.count}</span>
-            </div>
-            {col.tasks.length === 0 && <div style={{ textAlign: 'center', fontSize: 11, color: '#52525B', padding: '10px 4px' }}>Trống</div>}
-            {/* [M3] Click a card → the Mission-Control task drawer (/mc/task/[id], server-sanitized). */}
-            {col.tasks.map((t) => (
-                <Link key={t.id} href={`/${workspaceId}/mc/task/${t.id}`} style={{ textDecoration: 'none', display: 'block' }}>
-                    <TaskCard t={t} />
-                </Link>
-            ))}
-            {/* [M16] "+N nữa" → the full operational board (Vận hành bảng task) where every status
-                dropdown / ⋯ menu / bulk action lives; the dashboard columns are read-only previews. */}
-            {col.moreText && (
-                <Link href={`/${workspaceId}/mc/board`} title="Mở bảng vận hành đầy đủ" style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#818CF8', padding: 4, textDecoration: 'none' }}>
-                    {col.moreText} →
-                </Link>
-            )}
-        </RevealItem>
-    )
-}
+// [Kéo-thả 2026-07-14] TaskCard + Column moved into McKanban.tsx (client) — the board is now
+// draggable: drop a card into a column → auto entry-status via the vetted updateTaskStatus.
 
 function Kpi({ label, children }: { label: string; children: React.ReactNode }) {
     return (
@@ -193,10 +148,9 @@ export default function MissionControlBoard({ data }: { data: McData }) {
             <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 {/* Top bar */}
                 <Reveal style={{ position: 'relative', zIndex: 60, height: 64, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(10,10,10,0.50)', backdropFilter: 'blur(10px)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 10, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.35)' }}>
-                        <LayoutGrid style={{ width: 14, height: 14, color: '#A5B4FC' }} />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F5', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.workspaceName}</span>
-                    </div>
+                    {/* [Review 2026-07-14] "Tháng 7/2026" = workspace name (payroll cycle). Was a static
+                        chip → now a real switcher (dropdown → /{id}/mc) so the owner can change month. */}
+                    <McWorkspaceSwitcher workspaceId={data.workspaceId} workspaceName={data.workspaceName} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 10, letterSpacing: '0.16em', color: '#71717A' }}>WORKSPACE / DASHBOARD</span>
                         <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#F4F4F5' }}>{data.greeting || 'Chào'}, {data.greetingName}.</span>
@@ -238,10 +192,8 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                     </div>
                 </div>
 
-                {/* Board */}
-                <RevealGroup style={{ flex: 1, display: 'flex', gap: 10, padding: '16px 24px 8px', minHeight: 0 }}>
-                    {data.columns.map((col) => <Column key={col.label} col={col} workspaceId={data.workspaceId} />)}
-                </RevealGroup>
+                {/* Board — draggable kanban (click = drawer · drag = auto entry-status per column) */}
+                <McKanban columns={data.columns} workspaceId={data.workspaceId} />
 
                 {/* Board footer */}
                 <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '8px 24px 14px' }}>

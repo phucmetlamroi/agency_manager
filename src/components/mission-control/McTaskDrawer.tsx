@@ -10,17 +10,30 @@
 // Hook Map, ghi chú) reuses the vetted full editor at /[workspaceId]/task/[taskId] (TaskDetailRoute)
 // via fullEditHref — that surface ALONE enforces money-sanitize + payroll-field lock + audit log, so
 // money editing is never rebuilt here. A prominent "Sửa đầy đủ" CTA opens it with data prefilled.
-import { useState, useTransition, type ReactNode } from "react"
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
     Pencil, X, ChevronLeft, ChevronRight, Check, Send, SearchCheck, AlarmClock, Flag,
-    Package, CheckCircle2, Calendar, Link2, Undo2, ArrowRightLeft, Archive, Play, Maximize2, ChevronDown,
-    PanelsTopLeft, ArrowRight,
+    Package, CheckCircle2, Calendar, Link2, Undo2, ArrowRightLeft, Archive, Play, ChevronDown,
+    PanelsTopLeft, ArrowRight, UploadCloud, Loader2, Clapperboard, MessageSquare,
 } from "lucide-react"
 import { updateTaskStatus } from "@/actions/task-actions"
 import { Pressable, Reveal } from "./motion-kit"
+
+/** [Review 2026-07-14] Real deliverable state for the drawer's player area (was a static mock). */
+export interface McReviewAsset {
+    assetId: string
+    name: string
+    versionNumber: number | null
+    /** Head version is READY on Mux → playable in /mc/asset/[id]. */
+    ready: boolean
+    /** Head version still uploading/processing on Mux. */
+    processing: boolean
+    posterUrl: string | null
+    unresolved: number
+}
 
 export interface McTaskDetail {
     id: string; code: string; title: string; type: string; tags: string[]
@@ -34,6 +47,7 @@ export interface McTaskDetail {
     productLink: string | null
     rawFootageLink: string | null
     createdAt: string; updatedAt: string
+    review: McReviewAsset[]
 }
 
 const STATUS_HEX: Record<string, string> = {
@@ -62,12 +76,34 @@ const CLIENT_DOTS = [
 ]
 function clientDot(seed: string): string { let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0; return CLIENT_DOTS[h % CLIENT_DOTS.length] }
 
-export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { detail: McTaskDetail; workspaceId: string; fullEditHref: string }) {
+export default function McTaskDrawer({ detail, workspaceId, fullEditHref, overlay = false, onClose, onChanged }: {
+    detail: McTaskDetail; workspaceId: string; fullEditHref: string
+    /** [Review 2026-07-14] true = rendered in-place over the REAL board (dim backdrop, no fake
+     *  skeleton); false = the /mc/task/[id] deep-link page (keeps the design's static backdrop). */
+    overlay?: boolean
+    onClose?: () => void
+    /** Called after a successful mutation so an overlay host can re-fetch the drawer data. */
+    onChanged?: () => void
+}) {
     const router = useRouter()
     const [pending, startTransition] = useTransition()
     const [statusMenu, setStatusMenu] = useState(false)
 
-    const close = () => router.back()
+    const close = () => { if (onClose) onClose(); else router.back() }
+    // Esc closes — both overlay and deep-link modes. If the status dropdown is open,
+    // Esc dismisses just the menu first (mirror via ref so the listener stays stable).
+    const statusMenuRef = useRef(false)
+    useEffect(() => { statusMenuRef.current = statusMenu }, [statusMenu])
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return
+            if (statusMenuRef.current) { setStatusMenu(false); return }
+            close()
+        }
+        document.addEventListener('keydown', onKey)
+        return () => document.removeEventListener('keydown', onKey)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
     const changeStatus = (newStatus: string) => {
         if (newStatus === detail.status) { setStatusMenu(false); return }
         startTransition(async () => {
@@ -76,6 +112,7 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
             toast.success(`Đã chuyển sang “${STATUS_LABEL[newStatus] || newStatus}”`)
             setStatusMenu(false)
             router.refresh()
+            onChanged?.()
         })
     }
 
@@ -88,20 +125,25 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
     )
 
     return (
-        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "#050505", color: "#F4F4F5", fontFamily: '"Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif' }}>
-            {/* Blurred skeleton backdrop (design-faithful) + click-to-close */}
-            <button type="button" onClick={close} aria-label="Đóng" style={{ position: "absolute", inset: 0, border: "none", cursor: "pointer", padding: 0,
-                background: "radial-gradient(900px 600px at 12% -10%, rgba(99,102,241,0.10), transparent 60%),radial-gradient(800px 600px at 100% 110%, rgba(168,85,247,0.10), transparent 60%)" }}>
-                <div style={{ position: "absolute", inset: 0, display: "flex", gap: 12, padding: "80px 24px 24px 88px", opacity: 0.22, filter: "blur(2px)", pointerEvents: "none" }}>
-                    {[0, 1, 2].map((i) => (
-                        <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                            <div style={{ height: 10, borderRadius: 5, background: "rgba(255,255,255,0.08)", width: "55%" }} />
-                            <div style={{ height: 64, borderRadius: 12, background: "rgba(24,24,27,0.6)", border: "1px solid rgba(255,255,255,0.06)" }} />
-                            <div style={{ height: 64, borderRadius: 12, background: "rgba(24,24,27,0.6)", border: "1px solid rgba(255,255,255,0.06)" }} />
-                        </div>
-                    ))}
-                </div>
-            </button>
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: overlay ? "transparent" : "#050505", color: "#F4F4F5", fontFamily: '"Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif' }}>
+            {/* Backdrop: overlay mode dims the REAL board behind (owner's ask — the board must not
+                disappear); deep-link mode keeps the design's static skeleton. Click closes. */}
+            {overlay ? (
+                <button type="button" onClick={close} aria-label="Đóng" style={{ position: "absolute", inset: 0, border: "none", cursor: "pointer", padding: 0, background: "rgba(3,3,4,0.66)", backdropFilter: "blur(4px)" }} />
+            ) : (
+                <button type="button" onClick={close} aria-label="Đóng" style={{ position: "absolute", inset: 0, border: "none", cursor: "pointer", padding: 0,
+                    background: "radial-gradient(900px 600px at 12% -10%, rgba(99,102,241,0.10), transparent 60%),radial-gradient(800px 600px at 100% 110%, rgba(168,85,247,0.10), transparent 60%)" }}>
+                    <div style={{ position: "absolute", inset: 0, display: "flex", gap: 12, padding: "80px 24px 24px 88px", opacity: 0.22, filter: "blur(2px)", pointerEvents: "none" }}>
+                        {[0, 1, 2].map((i) => (
+                            <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                                <div style={{ height: 10, borderRadius: 5, background: "rgba(255,255,255,0.08)", width: "55%" }} />
+                                <div style={{ height: 64, borderRadius: 12, background: "rgba(24,24,27,0.6)", border: "1px solid rgba(255,255,255,0.06)" }} />
+                                <div style={{ height: 64, borderRadius: 12, background: "rgba(24,24,27,0.6)", border: "1px solid rgba(255,255,255,0.06)" }} />
+                            </div>
+                        ))}
+                    </div>
+                </button>
+            )}
 
             {/* Drawer */}
             <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 780, maxWidth: "100%", background: "rgba(10,10,10,0.94)", backdropFilter: "blur(24px)", borderLeft: "1px solid rgba(255,255,255,0.10)", boxShadow: "-24px 0 60px rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -157,11 +199,66 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref }: { de
                 <div style={{ flex: 1, display: "flex", gap: 20, padding: "20px 24px", minHeight: 0, overflowY: "auto" }}>
                     {/* Left */}
                     <div style={{ flex: 1.35, display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
-                        <div style={{ position: "relative", aspectRatio: "16/9", borderRadius: 14, background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(300px 200px at 50% 50%, rgba(99,102,241,0.12), transparent 70%)" }} />
-                            <span style={{ width: 52, height: 52, borderRadius: 999, background: "rgba(99,102,241,0.9)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 0 32px rgba(99,102,241,0.5)" }}><Play style={{ width: 22, height: 22 }} /></span>
-                            <span style={{ position: "absolute", top: 10, right: 12, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, color: "#C7D2FE", background: "rgba(99,102,241,0.20)", border: "1px solid rgba(99,102,241,0.40)", padding: "4px 10px", borderRadius: 999 }}><Maximize2 style={{ width: 11, height: 11 }} />Trình xem review — sắp có (M11)</span>
-                        </div>
+                        {/* [Review 2026-07-14] REAL review states (was a static mock with a fake Play):
+                            ready → poster + play → the real M11 player (/mc/asset/[id]);
+                            processing → notice; none → upload CTA (vetted upload tray in the full editor). */}
+                        {detail.review.length > 0 ? (() => {
+                            const a = detail.review[0]
+                            const playerHref = `/${workspaceId}/mc/asset/${a.assetId}`
+                            if (a.ready) {
+                                return (
+                                    <Link href={playerHref} title="Mở trình xem review" style={{ position: "relative", aspectRatio: "16/9", borderRadius: 14, background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", textDecoration: "none" }}>
+                                        {a.posterUrl
+                                            ? <img src={a.posterUrl} alt={a.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.85 }} />
+                                            : <div style={{ position: "absolute", inset: 0, background: "radial-gradient(300px 200px at 50% 50%, rgba(99,102,241,0.12), transparent 70%)" }} />}
+                                        <span style={{ position: "relative", width: 52, height: 52, borderRadius: 999, background: "rgba(99,102,241,0.92)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 0 32px rgba(99,102,241,0.55)" }}><Play style={{ width: 22, height: 22 }} /></span>
+                                        <span style={{ position: "absolute", top: 10, left: 12, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, color: "#C7D2FE", background: "rgba(10,10,10,0.65)", border: "1px solid rgba(99,102,241,0.40)", padding: "4px 10px", borderRadius: 999 }}>
+                                            <Clapperboard style={{ width: 11, height: 11 }} />{a.name}{a.versionNumber ? ` · V${a.versionNumber}` : ""}
+                                        </span>
+                                        {a.unresolved > 0 && (
+                                            <span style={{ position: "absolute", top: 10, right: 12, display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 800, color: "#FCD34D", background: "rgba(120,53,15,0.55)", border: "1px solid rgba(245,158,11,0.45)", padding: "4px 9px", borderRadius: 999 }}>
+                                                <MessageSquare style={{ width: 11, height: 11 }} />{a.unresolved} chưa xử lý
+                                            </span>
+                                        )}
+                                    </Link>
+                                )
+                            }
+                            if (a.processing) {
+                                return (
+                                    <div style={{ position: "relative", aspectRatio: "16/9", borderRadius: 14, background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: 8, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                                        <Loader2 style={{ width: 26, height: 26, color: "#A5B4FC", animation: "spin 1.2s linear infinite" }} />
+                                        <span style={{ fontSize: 12, fontWeight: 600, color: "#A1A1AA" }}>Đang xử lý video{a.versionNumber ? ` (V${a.versionNumber})` : ""}… vài phút nữa xem được.</span>
+                                        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                                    </div>
+                                )
+                            }
+                            return (
+                                <Link href={playerHref} style={{ position: "relative", aspectRatio: "16/9", borderRadius: 14, background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: 6, alignItems: "center", justifyContent: "center", overflow: "hidden", textDecoration: "none" }}>
+                                    <Clapperboard style={{ width: 24, height: 24, color: "#71717A" }} />
+                                    <span style={{ fontSize: 12, color: "#A1A1AA" }}>{a.name} — mở trang review để xem trạng thái</span>
+                                </Link>
+                            )
+                        })() : (
+                            /* Chưa có video — dropzone-style CTA về form đầy đủ (Upload Tray vetted ở đó). */
+                            <Link href={fullEditHref} title="Tải video review lên" style={{ position: "relative", aspectRatio: "16/9", borderRadius: 14, background: "rgba(99,102,241,0.03)", border: "1.5px dashed rgba(99,102,241,0.35)", display: "flex", flexDirection: "column", gap: 8, alignItems: "center", justifyContent: "center", overflow: "hidden", textDecoration: "none" }}>
+                                <span style={{ width: 46, height: 46, borderRadius: 999, background: "rgba(99,102,241,0.14)", border: "1px solid rgba(99,102,241,0.35)", display: "flex", alignItems: "center", justifyContent: "center", color: "#A5B4FC" }}><UploadCloud style={{ width: 20, height: 20 }} /></span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: "#C7D2FE" }}>Chưa có video review — Tải video lên</span>
+                                <span style={{ fontSize: 11, color: "#71717A" }}>mở form đầy đủ để kéo thả / tải bản dựng ▸</span>
+                            </Link>
+                        )}
+                        {/* Deliverable phụ (task nhiều video) */}
+                        {detail.review.length > 1 && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {detail.review.slice(1).map((a) => (
+                                    <Link key={a.assetId} href={`/${workspaceId}/mc/asset/${a.assetId}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", textDecoration: "none" }}>
+                                        <Play style={{ width: 12, height: 12, color: a.ready ? "#A5B4FC" : "#52525B", flexShrink: 0 }} />
+                                        <span style={{ flex: 1, fontSize: 11.5, color: "#D4D4D8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}{a.versionNumber ? ` · V${a.versionNumber}` : ""}</span>
+                                        {a.processing && <span style={{ fontSize: 10, color: "#FBBF24" }}>đang xử lý…</span>}
+                                        {a.unresolved > 0 && <span style={{ fontSize: 10, fontWeight: 800, color: "#FCD34D" }}>{a.unresolved}💬</span>}
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
                         {(detail.productLink || detail.rawFootageLink) && (
                             <div style={{ display: "flex", flexDirection: "column", gap: 6, borderRadius: 12, background: "rgba(24,24,27,0.50)", border: "1px solid rgba(255,255,255,0.06)", padding: "10px 12px" }}>
                                 <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#71717A" }}>Bàn giao & tài nguyên</span>

@@ -38,13 +38,17 @@ function initials(name: string): string {
     return (name.trim().slice(0, 2) || '?').toUpperCase()
 }
 // TABS mapping — identical to src/components/TaskWorkflowTabs.tsx (the real admin board's 6 columns).
-const TABS: { label: string; hue: string; statuses: string[]; accent?: 'danger' | 'success' }[] = [
-    { label: 'Đã giao task', hue: '#3B82F6', statuses: ['Nhận task', 'Đã nhận task'] },
-    { label: 'Đang làm', hue: '#EAB308', statuses: ['Đang thực hiện'] },
-    { label: 'Duyệt nội bộ', hue: '#6366F1', statuses: ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Revision'] },
-    { label: 'Khách duyệt', hue: '#06B6D4', statuses: ['Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)'] },
-    { label: 'Quá hạn', hue: '#DC2626', statuses: ['Quá hạn'], accent: 'danger' },
-    { label: 'Hoàn tất', hue: '#10B981', statuses: ['Hoàn tất'], accent: 'success' },
+// entryStatus = status a card receives when DRAG-DROPPED into the column (owner's 2026-07-14 rules):
+// vào "Đã giao task" = 'Nhận task' (KHÔNG phải 'Đang đợi giao' — sẽ rơi vào Kho chờ); vào "Khách duyệt"
+// = trạng thái đầu 'Đã gửi video (khách)'; vào "Hoàn tất" = 'Hoàn tất' (không phải Quá hạn/Đã hủy);
+// "Quá hạn" entryStatus=null → không cho thả (hệ thống tự đánh theo deadline).
+const TABS: { label: string; hue: string; statuses: string[]; entryStatus: string | null; accent?: 'danger' | 'success' }[] = [
+    { label: 'Đã giao task', hue: '#3B82F6', statuses: ['Nhận task', 'Đã nhận task'], entryStatus: 'Nhận task' },
+    { label: 'Đang làm', hue: '#EAB308', statuses: ['Đang thực hiện'], entryStatus: 'Đang thực hiện' },
+    { label: 'Duyệt nội bộ', hue: '#6366F1', statuses: ['Đã nộp video (nội bộ)', 'Đang sửa feedback (nội bộ)', 'Đã sửa feedback (nội bộ)', 'Revision'], entryStatus: 'Đã nộp video (nội bộ)' },
+    { label: 'Khách duyệt', hue: '#06B6D4', statuses: ['Đã gửi video (khách)', 'Đã nhận feedback (khách)', 'Đã sửa feedback (khách)'], entryStatus: 'Đã gửi video (khách)' },
+    { label: 'Quá hạn', hue: '#DC2626', statuses: ['Quá hạn'], entryStatus: null, accent: 'danger' },
+    { label: 'Hoàn tất', hue: '#10B981', statuses: ['Hoàn tất'], entryStatus: 'Hoàn tất', accent: 'success' },
 ]
 
 export default async function MissionControlPage({ params }: { params: Promise<{ workspaceId: string }> }) {
@@ -145,7 +149,7 @@ export default async function MissionControlPage({ params }: { params: Promise<{
         const name = t.assignee ? getDisplayName(t.assignee) : 'Chưa giao'
         const rank = t.assignee?.monthlyRanks?.[0]?.rank as string | undefined
         return {
-            id: t.id, title: t.title,
+            id: t.id, title: t.title, status: t.status,
             statusLabel: STATUS_LABEL[t.status] || t.status, dot: STATUS_HEX[t.status] || '#A1A1AA',
             assignee: name, initials: initials(name), avatar: grad(t.assigneeId || name),
             rank: rank || undefined, rankColor: rank ? (RANK_HEX[rank] || '#A1A1AA') : undefined,
@@ -156,7 +160,7 @@ export default async function MissionControlPage({ params }: { params: Promise<{
         const inTab = tasks.filter((t: any) => tab.statuses.includes(t.status))
         const shown = inTab.slice(0, 3)
         const rest = inTab.length - shown.length
-        return { label: tab.label, hue: tab.hue, accent: tab.accent, count: inTab.length, tasks: shown.map(toCard), moreText: rest > 0 ? `+ ${rest} task nữa` : '' }
+        return { label: tab.label, hue: tab.hue, accent: tab.accent, count: inTab.length, tasks: shown.map(toCard), moreText: rest > 0 ? `+ ${rest} task nữa` : '', entryStatus: tab.entryStatus }
     })
 
     // Leaderboard — top 3 by assigned-task count (from users + real ranks)

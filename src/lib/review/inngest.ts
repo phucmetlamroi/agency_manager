@@ -7,17 +7,17 @@ import { ReviewMediaKind, ReviewPipelineStatus, ReviewState } from '@prisma/clie
 import { prisma } from '@/lib/db'
 import { reviewLog } from './logger'
 import { createMuxAsset, deleteMuxAsset, extractReadyMeta, getMuxAsset, MuxError, type MuxAsset } from './mux'
-import { presignGetObject, getObjectRange } from './r2'
+import { presignGetObject, getObjectRange, deleteObject } from './r2'
 import { looksLikeMedia } from './upload-helpers'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 // P1.6 janitor reconcile helpers (call-time-only cycle — see upload-service.ts note).
 import { expireInflightUpload, reconcileStuckUploadedVersion } from './upload-service'
 // P5.4 decision side-effects. P3-B: F7 auto-flip + manager notify.
 import { syncTaskOnChangesRequested, syncTaskFromReviewEvent, revokeClientExposureOnNewVersion } from './task-sync'
-import { notifyGuestsOfAsset } from './guest-notify'
 import { REVIEW_STATUS_MAP } from './status-map'
 import { audit } from '@/lib/audit-log'
-import { createAndBroadcastNotifications } from '@/actions/notification-actions'
+// [color-fix] Auto-tag untagged colorspace before Mux ingests, so the review preview matches VLC.
+import { ensureColorTaggedInput, retaggedKeyFor } from './color-retag'
 // P6.1 notifications. P3-B: manager status-flip notify.
 import { notifyReview, reviewPlayerUrl, notifyManagerOfReviewFlip } from './notify'
 // P6.2 trash purge.
@@ -113,6 +113,10 @@ async function applyMuxReady(
         return true
     })
     if (applied) {
+        // [color-fix] Mux has finished ingesting → the retagged sibling (if we made one) is no longer
+        // needed (Mux copied it; the ORIGINAL R2 object still backs downloads). Best-effort reclaim of
+        // the extra storage; a missing key is a no-op on R2. Runs once (guarded by the atomic flip).
+        if (version.r2Key) void deleteObject(retaggedKeyFor(version.r2Key)).catch(() => { /* best-effort */ })
         // FR-G02: tell the uploader their cut is ready to review (deep-link to the player).
         void notifyReview({
             recipientIds: [version.uploaderId],
@@ -393,12 +397,20 @@ export const reviewProcessUpload = inngest.createFunction(
             return { rejected: true }
         }
 
+        // [color-fix] BEFORE Mux ingests: if the source has NO colorspace tags (common for editors'
+        // talking-head exports → the review preview looked grayer/desaturated vs VLC), losslessly write
+        // BT.709 tags into a sibling R2 object and feed THAT to Mux. FAIL-SAFE: any error/timeout/too-big
+        // returns the original key, so Mux always gets a valid input and the upload never breaks.
+        const inputPlan = await step.run('ensure-color-tags', () =>
+            ensureColorTaggedInput(v.r2Key as string, versionId),
+        )
+
         // Create the Mux asset from a presigned R2 GET (24h). Memoized across THIS run's retries →
         // one asset per run. The pre-check narrows the (rare) concurrent-run double-create window.
         const created = await step.run('create-mux-asset', async () => {
             const cur = await prisma.reviewVersion.findUnique({ where: { id: versionId }, select: { muxAssetId: true } })
             if (cur?.muxAssetId) return { assetId: cur.muxAssetId, mine: false } // a concurrent run already made one
-            const inputUrl = await presignGetObject(v.r2Key as string, { expiresIn: 24 * 60 * 60 })
+            const inputUrl = await presignGetObject(inputPlan.inputKey, { expiresIn: 24 * 60 * 60 })
             const asset = await createMuxAsset({ inputUrl, passthrough: versionId })
             return { assetId: asset.id, mine: true }
         })
@@ -659,19 +671,14 @@ export const reviewShareDecision = inngest.createFunction(
 
         if (!data.taskId) return { ok: true, task: 'none' } // Team-only asset — nothing to sync
 
-        // FR-A05: request_changes AUTO-flips the task; approve only proposes (banner
-        // comes from asset.statusId = "Hoàn tất", set by the decision route).
-        let syncApplied = true
-        // [P3-B] The guest-change sync now retargets A5 → A6 ('Đã nhận feedback (khách)') when the
-        // task was already sent to the client, else keeps legacy 'Revision'. Capture the ACTUAL
-        // written status so the staff notification below states the real target, not an assumed one.
-        let syncTarget: string | undefined
+        // [video-fix ③④⑤] The staff/client NOTIFICATIONS + the primary A5→A6 status advance now run
+        // SYNCHRONOUSLY in submitGuestDecision (share-decision.ts) so they can't be silently dropped
+        // when this async fn fails to run. What remains here is an IDEMPOTENT backup: re-run the status
+        // sync (a no-op once the route already advanced it) + settle clientReview + write the feed row.
         if (data.decision === 'request_changes') {
-            const res = await step.run('sync-task-revision', () =>
+            await step.run('sync-task-revision', () =>
                 syncTaskOnChangesRequested(data.taskId!, data.workspaceId),
             )
-            syncApplied = !!res?.applied
-            syncTarget = res?.to
         } else if (data.decision === 'approve') {
             // [M1/R2] Approve on /r/ AUTO-flips no task STATUS (approve only proposes — the banner
             // comes from asset.statusId="Hoàn tất"), but it MUST settle the client-facing signal so the
@@ -708,54 +715,6 @@ export const reviewShareDecision = inngest.createFunction(
                     via: 'review-share',
                     shareLinkId: data.shareLinkId,
                 },
-            }),
-        )
-
-        await step.run('notify-staff', async () => {
-            const task = await prisma.task.findUnique({
-                where: { id: data.taskId! },
-                select: { title: true, assigneeId: true, assignedById: true },
-            })
-            if (!task) return { notified: 0 }
-            const userIds = Array.from(
-                new Set([task.assigneeId, task.assignedById].filter((x): x is string => !!x)),
-            )
-            if (!userIds.length) return { notified: 0 }
-            const who = data.guestName ?? 'Khách'
-            const rows = await createAndBroadcastNotifications(
-                userIds,
-                data.decision === 'approve'
-                    ? {
-                          type: 'VIDEO_REVIEW_APPROVED',
-                          title: `${who} đã duyệt bản v${data.versionNumber}`,
-                          body: `Task "${task.title}" — mở chi tiết task để xác nhận chuyển Hoàn tất.`,
-                          taskId: data.taskId,
-                          metadata: { guestName: data.guestName, versionNumber: data.versionNumber },
-                      }
-                    : {
-                          type: 'VIDEO_CHANGES_REQUESTED',
-                          title: `${who} yêu cầu chỉnh sửa bản v${data.versionNumber}`,
-                          // Only claim the task auto-flipped when it actually did — a
-                          // race-lost / archived / bad-map sync returns applied:false and
-                          // the task kept its status; a false "đã chuyển …" would mislead
-                          // staff (finding P5-R#16). State the REAL target (A6 or Revision).
-                          body: syncApplied
-                              ? `Task "${task.title}" đã tự chuyển sang "${syncTarget ?? REVIEW_STATUS_MAP.changesRequested}".`
-                              : `Task "${task.title}" — khách yêu cầu chỉnh sửa, kiểm tra trạng thái task.`,
-                          taskId: data.taskId,
-                          metadata: { guestName: data.guestName, versionNumber: data.versionNumber },
-                      },
-            )
-            return { notified: rows.length }
-        })
-
-        // [L-EMAIL-2] Acknowledge the CLIENT's decision by email (their own /r/ subscribers):
-        // approve → "thanks for approving", request_changes → "we've received your feedback".
-        // Fire-and-forget; notifyGuestsOfAsset never throws + only fans out to live subscribers.
-        await step.run('notify-client-confirm', () =>
-            notifyGuestsOfAsset({
-                assetId: data.assetId,
-                event: data.decision === 'approve' ? 'approved' : 'feedback_received',
             }),
         )
 

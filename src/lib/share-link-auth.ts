@@ -32,7 +32,10 @@ export interface ShareLinkScope {
     workspaceIds: string[]
 }
 
-const TOKEN_RX = /^[A-Za-z0-9_-]{20,128}$/ // base64url of 32 bytes = 43 chars
+// [video-fix ②] Accept 10–128 chars: NEW links are a 12-char base64url (9 bytes, frame.io-style),
+// while OLD 43-char (32-byte) links minted before this change still validate — so existing shared
+// links keep working. Floor stays ≥10 so a truncated/garbage token is rejected before the DB lookup.
+const TOKEN_RX = /^[A-Za-z0-9_-]{10,128}$/
 
 export function hashShareToken(raw: string): string {
     return createHash('sha256').update(raw).digest('hex')

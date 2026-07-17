@@ -6,6 +6,9 @@ import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 // blacklist. Derived from TASK_STATUS_META.cronOverdueEligible, so the 6 video statuses
 // (eligible:false) are excluded → the cron never overwrites their lifecycle value (R3).
 import { OVERDUE_ELIGIBLE_STATUSES } from '@/lib/task-statuses'
+// [video-fix ①] Vietnam-timezone formatter — toLocaleString('vi-VN') alone renders in the
+// server zone (UTC on Vercel) and, worse, that wrong string is PERSISTED into Notification.body.
+import { formatVietnamDateTime } from '@/lib/notification-emails/shared/format'
 
 // Call this route via Cron Job (e.g. Vercel Cron) every hour
 export async function GET(request: Request) {
@@ -56,7 +59,7 @@ export async function GET(request: Request) {
             })
             if (existing) continue
 
-            const deadlineStr = task.deadline ? new Date(task.deadline).toLocaleString('vi-VN') : ''
+            const deadlineStr = task.deadline ? formatVietnamDateTime(task.deadline) : ''
             const notif = await createNotificationInternal({
                 userId: task.assignee.id,
                 type: 'TASK_DEADLINE_APPROACHING',
@@ -108,7 +111,7 @@ export async function GET(request: Request) {
             })
             if (existing) continue
 
-            const deadlineStr = task.deadline ? new Date(task.deadline).toLocaleString('vi-VN') : ''
+            const deadlineStr = task.deadline ? formatVietnamDateTime(task.deadline) : ''
             const notif = await createNotificationInternal({
                 userId: task.assignee.id,
                 type: 'TASK_DEADLINE_APPROACHING',

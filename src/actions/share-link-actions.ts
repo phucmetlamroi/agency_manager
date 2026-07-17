@@ -56,9 +56,10 @@ export async function createClientShareLink(clientId: number, workspaceId: strin
         return { success: false as const, error: 'Khách hàng không tồn tại trong profile này (hoặc đã bị xoá/gộp).' }
     }
 
-    // 32 random bytes → base64url (43 chars, 256-bit entropy). Raw token is
-    // returned once and NEVER persisted — only its hash.
-    const rawToken = randomBytes(32).toString('base64url')
+    // [video-fix ②] Short frame.io-style token: 9 random bytes → base64url (12 chars, 72-bit).
+    // The token IS the credential (hash-at-rest + per-IP rate limit + uniform-404), and 72 bits is
+    // infeasible to brute-force under the 30-req/60s limiter. Raw token returned once, never persisted.
+    const rawToken = randomBytes(9).toString('base64url')
     const link = await prisma.clientShareLink.create({
         data: {
             tokenHash: hashShareToken(rawToken),

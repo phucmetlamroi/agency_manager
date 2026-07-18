@@ -122,6 +122,35 @@ export interface Workspace {
     name: string
 }
 
+/**
+ * [The Desk] A client work-request row echoed back to the portal's
+ * Correspondence surface. Read-only, token-scoped, English — the studio's reply
+ * is `studioReply` (only on decline) / `linkedTaskId` (only on accept). Staff-only
+ * fields (reviewedById, finance, provenance) are never selected server-side.
+ */
+export interface ClientRequestPortalDTO {
+    id: string
+    title: string
+    status: 'pending' | 'reviewing' | 'accepted' | 'declined'
+    statusLabel: string
+    submittedAt: string
+    reviewedAt: string | null
+    desiredType: string | null
+    desiredDeadline: string | null
+    videoList: string | null
+    notes: string | null
+    rawFootage: string | null
+    collectFile: string | null
+    bRoll: string | null
+    refs: string | null
+    submitFolder: string | null
+    script: string | null
+    studioReply: string | null
+    linkedTaskId: string | null
+    brandName: string | null
+    periodName: string | null
+}
+
 /** A sub-brand / channel = a distinct Client among the user's data. */
 export interface Brand {
     id: number
@@ -205,6 +234,8 @@ export interface DeliverableActions {
     notifyRequest?: (email: string) => Promise<{ success: boolean; error?: string }>
     notifyVerify?: (code: string) => Promise<{ success: boolean; error?: string }>
     notifyRemove?: () => Promise<{ success: boolean; error?: string }>
+    /** [The Desk] Token-scoped read of the client's own work requests + studio reply (Correspondence). */
+    getRequests?: () => Promise<ClientRequestPortalDTO[] | null>
     /** Token-scoped client Document browser. Server re-checks client/workspace scope on every call. */
     documents?: () => Promise<DocumentsSnapshot | null>
     downloadDocuments?: (versionIds: string[]) => Promise<{

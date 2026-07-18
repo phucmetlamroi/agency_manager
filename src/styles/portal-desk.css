@@ -1,0 +1,503 @@
+/* ============================================================================
+   THE DESK — client portal theme (Editorial Atelier · Print Edition)
+   ----------------------------------------------------------------------------
+   A warm paper-and-ink studio room for the tokenized /share portal. Replaces
+   the former dark "calm" theme. Everything is scoped under `.portal-desk` so it
+   can never leak into the staff app.
+
+   Identity:
+     · Fraunces (display serif) — headlines, figures, the studio voice
+     · Hanken Grotesk (body) — working text
+     · Space Mono — numerics, kickers, timecodes, ledger rows
+     · one terracotta accent per view; status is typographic, not a rainbow
+     · the dark screening room lives under `.portal-desk[data-theme="dark"]`
+
+   Consumed by src/components/portal/desk/*. Font faces are wired via next/font
+   in src/app/share/[token]/layout.tsx (--font-fraunces / --font-hanken /
+   --font-space-mono).
+   ========================================================================== */
+
+.portal-desk {
+    /* — Fonts (next/font vars → semantic) — */
+    --font-display: var(--font-fraunces), 'Fraunces', ui-serif, Georgia, serif;
+    --font-body: var(--font-hanken), 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-space-mono), 'Space Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+    /* — Paper & ink (light) — */
+    --paper: #f7f2e9;
+    --paper-raised: #fcf9f2;
+    --paper-sunken: #efe8da;
+    --paper-tint: #f2ebdd;
+    --ink: #232019;
+    --ink-2: #57503f;
+    --ink-3: #8b8270;
+    --ink-invert: #f7f2e9;
+
+    /* — Hairlines — */
+    --hairline: rgba(35, 32, 25, 0.18);
+    --hairline-strong: rgba(35, 32, 25, 0.38);
+    --hairline-faint: rgba(35, 32, 25, 0.09);
+
+    /* — Accent (one terracotta) — */
+    --accent: #b0492a;
+    --accent-hover: #96371c;
+    --accent-tint: rgba(176, 73, 42, 0.09);
+    --accent-line: rgba(176, 73, 42, 0.32);
+    --on-accent: #fbf3ec;
+
+    /* — Earth register (status + charts) — */
+    --sage: #4e5a48;
+    --sage-tint: rgba(78, 90, 72, 0.12);
+    --ochre: #8a6c25;
+    --ochre-tint: rgba(138, 108, 37, 0.12);
+    --umber: #6f4a2a;
+    --umber-tint: rgba(111, 74, 42, 0.12);
+    --brick: #8e2011;
+    --brick-tint: rgba(142, 32, 17, 0.10);
+    --stone: #7c7461;
+    --stone-tint: rgba(124, 116, 97, 0.12);
+
+    /* — Radii — */
+    --radius-xs: 3px;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-pill: 999px;
+    --radius-card: 2px;
+
+    /* — Shadows — */
+    --shadow-pop: 0 1px 2px rgba(35, 32, 25, 0.06), 0 8px 24px -12px rgba(35, 32, 25, 0.30);
+    --shadow-modal: 0 24px 60px -20px rgba(35, 32, 25, 0.42), 0 2px 8px rgba(35, 32, 25, 0.10);
+    --shadow-lift: 0 2px 4px rgba(35, 32, 25, 0.05), 0 12px 30px -16px rgba(35, 32, 25, 0.28);
+
+    /* — Motion — */
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --t-fast: 0.15s;
+    --t-med: 0.28s;
+
+    /* — Type scale — */
+    --fs-kicker: 0.72rem;
+    --fs-body: 0.95rem;
+    --ls-kicker: 0.16em;
+
+    /* — Spacing — */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    --sp-6: 32px;
+    --sp-7: 48px;
+    --sp-8: 64px;
+    --sp-9: 96px;
+    --sp-10: 128px;
+    --control-h: 40px;
+    --control-h-sm: 32px;
+
+    /* — Semantic status aliases (typographic) — */
+    --st-review: var(--accent);         /* needs the client */
+    --st-review-tint: var(--accent-tint);
+    --st-progress: var(--ochre);         /* editing / in production */
+    --st-progress-tint: var(--ochre-tint);
+    --st-revision: var(--umber);         /* working through changes */
+    --st-revision-tint: var(--umber-tint);
+    --st-received: var(--stone);         /* queued / in review */
+    --st-received-tint: var(--stone-tint);
+    --st-done: var(--sage);              /* approved / paid */
+    --st-done-tint: var(--sage-tint);
+    --st-danger: var(--brick);           /* overdue */
+    --st-danger-tint: var(--brick-tint);
+
+    /* — Base surface — */
+    color: var(--ink);
+    background: var(--paper);
+    font-family: var(--font-body);
+    font-size: var(--fs-body);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    color-scheme: light;
+    height: 100%;
+}
+
+/* — The screening room: same tokens, dark. Matches the root OR any nested overlay
+     carrying data-theme="dark" (the in-portal screening room lives inside the light
+     shell). — */
+.portal-desk[data-theme='dark'],
+.portal-desk [data-theme='dark'] {
+    --paper: #09090b;
+    --paper-raised: #141416;
+    --paper-sunken: #050506;
+    --paper-tint: #1b1b1e;
+    --ink: #eae5d9;
+    --ink-2: #b4ad9c;
+    --ink-3: #7d776b;
+    --ink-invert: #141416;
+    --hairline: rgba(234, 229, 217, 0.16);
+    --hairline-strong: rgba(234, 229, 217, 0.34);
+    --hairline-faint: rgba(234, 229, 217, 0.08);
+    --accent: #ce6b49;
+    --accent-hover: #dd7f5e;
+    --accent-tint: rgba(206, 107, 73, 0.15);
+    --accent-line: rgba(206, 107, 73, 0.40);
+    --on-accent: #120c08;
+    --sage: #93ae87;
+    --sage-tint: rgba(147, 174, 135, 0.16);
+    --ochre: #c1a35a;
+    --ochre-tint: rgba(193, 163, 90, 0.16);
+    --umber: #c08a5e;
+    --umber-tint: rgba(192, 138, 94, 0.16);
+    --brick: #d05a48;
+    --brick-tint: rgba(208, 90, 72, 0.16);
+    --stone: #9c9481;
+    --stone-tint: rgba(156, 148, 129, 0.16);
+    --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+    --shadow-modal: 0 24px 60px -20px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5);
+    --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 30px -16px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+}
+
+/* ── Paper grain — a faint fibre so the background reads as stock, not screen ── */
+.portal-desk::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+}
+.portal-desk[data-theme='dark']::before { opacity: 0.7; }
+
+/* ── Reset within scope ── */
+.portal-desk *,
+.portal-desk *::before,
+.portal-desk *::after { box-sizing: border-box; }
+.portal-desk button { font-family: inherit; }
+.portal-desk :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+}
+.portal-desk ::selection { background: var(--accent-tint); }
+
+/* ── Typography primitives ── */
+.desk-display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.08;
+    color: var(--ink);
+}
+.desk-serif { font-family: var(--font-display); }
+.desk-mono { font-family: var(--font-mono); }
+.desk-num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.kicker {
+    font-family: var(--font-mono);
+    font-size: var(--fs-kicker);
+    font-weight: 400;
+    letter-spacing: var(--ls-kicker);
+    text-transform: uppercase;
+    color: var(--ink-3);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+.kicker--accent { color: var(--accent); }
+.kicker__index { color: var(--accent); font-weight: 700; }
+
+.hairline { border: 0; border-top: 1px solid var(--hairline); margin: 0; }
+
+/* ── Buttons ── */
+.desk-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    height: var(--control-h);
+    padding: 0 var(--sp-4);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--hairline);
+    background: var(--paper-raised);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease),
+        color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.desk-btn:hover { border-color: var(--hairline-strong); background: var(--paper-tint); }
+.desk-btn:active { transform: translateY(0.5px); }
+.desk-btn--sm { height: var(--control-h-sm); padding: 0 var(--sp-3); font-size: 0.84rem; }
+.desk-btn--primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+}
+.desk-btn--primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.desk-btn--ghost { background: transparent; border-color: transparent; }
+.desk-btn--ghost:hover { background: var(--paper-tint); border-color: var(--hairline-faint); }
+.desk-btn--quiet { background: transparent; border-color: var(--hairline); }
+.desk-btn--quiet:hover { background: var(--paper-tint); }
+.desk-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.desk-btn:disabled:hover { transform: none; background: var(--paper-raised); border-color: var(--hairline); }
+
+.desk-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h);
+    height: var(--control-h);
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+    position: relative;
+    transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.desk-iconbtn:hover { background: var(--paper-tint); color: var(--ink); }
+
+/* ── Status pill (typographic) ── */
+.desk-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px 3px 8px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--hairline);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: var(--paper-raised);
+    color: var(--ink-2);
+}
+.desk-pill__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+/* ── Cards ── */
+.desk-card {
+    position: relative;
+    background: var(--paper-raised);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-pop);
+}
+.desk-card--flat { box-shadow: none; }
+.desk-card--sunken { background: var(--paper-sunken); box-shadow: none; }
+
+/* ── Inputs ── */
+.desk-input {
+    width: 100%;
+    height: var(--control-h);
+    padding: 0 var(--sp-3);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--hairline);
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 0.92rem;
+    transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+.desk-input::placeholder { color: var(--ink-3); }
+.desk-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-tint);
+}
+textarea.desk-input { height: auto; padding: var(--sp-3); resize: vertical; line-height: 1.5; }
+
+/* ── Nav (left rail) ── */
+.desk-nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
+    padding: 8px var(--sp-3);
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink-2);
+    font-family: var(--font-body);
+    font-size: 0.92rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.desk-nav-item:hover { background: var(--paper-tint); color: var(--ink); }
+.desk-nav-item[data-active='true'] {
+    background: var(--paper-raised);
+    border-color: var(--hairline);
+    color: var(--ink);
+    box-shadow: var(--shadow-pop);
+}
+.desk-nav-item[data-active='true'] .desk-nav-item__icon { color: var(--accent); }
+.desk-nav-item__icon { display: inline-flex; color: var(--ink-3); flex-shrink: 0; }
+.desk-nav-item__badge {
+    margin-left: auto;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.desk-nav-item__badge--muted { background: var(--stone); color: var(--ink-invert); }
+
+/* ── Table (productions / statements) ── */
+.desk-table { width: 100%; border-collapse: collapse; }
+.desk-table th {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: left;
+    padding: var(--sp-2) var(--sp-3);
+    border-bottom: 1px solid var(--hairline);
+}
+.desk-table td { padding: var(--sp-3); border-bottom: 1px solid var(--hairline-faint); vertical-align: middle; }
+.desk-table tbody tr { transition: background var(--t-fast) var(--ease); }
+.desk-table tbody tr[data-clickable='true'] { cursor: pointer; }
+.desk-table tbody tr[data-clickable='true']:hover { background: var(--paper-tint); }
+
+/* ── Avatar cluster ── */
+.desk-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+    border: 1px solid var(--hairline);
+}
+
+/* ── Scrollbars — thin, inked ── */
+.portal-desk *::-webkit-scrollbar { width: 10px; height: 10px; }
+.portal-desk *::-webkit-scrollbar-thumb {
+    background: var(--hairline);
+    border-radius: var(--radius-pill);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+}
+.portal-desk *::-webkit-scrollbar-thumb:hover { background: var(--hairline-strong); background-clip: padding-box; }
+.portal-desk *::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Overlay + slide-over ── */
+.desk-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(35, 32, 25, 0.34);
+    backdrop-filter: blur(2px);
+    animation: desk-fade var(--t-med) var(--ease);
+}
+.portal-desk[data-theme='dark'] .desk-scrim { background: rgba(0, 0, 0, 0.62); }
+.desk-sheet {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(560px, 100vw);
+    z-index: 61;
+    background: var(--paper);
+    border-left: 1px solid var(--hairline);
+    box-shadow: var(--shadow-modal);
+    display: flex;
+    flex-direction: column;
+    animation: desk-slide-in var(--t-med) var(--ease);
+}
+
+/* ── Motion ── */
+@keyframes desk-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes desk-slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes desk-rise { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.desk-rise { animation: desk-rise var(--t-med) var(--ease) both; }
+@keyframes desk-spin { to { transform: rotate(360deg); } }
+.desk-spin { animation: desk-spin 0.9s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+    .portal-desk *,
+    .portal-desk *::before,
+    .portal-desk *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* ── Utility ── */
+.desk-stack { display: flex; flex-direction: column; }
+.desk-row { display: flex; align-items: center; }
+.desk-muted { color: var(--ink-3); }
+.desk-ink2 { color: var(--ink-2); }
+.desk-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Responsive — desktop-first. Everything below only fires under 900px, so the
+     ≥1024px "faithful" layout is untouched. The left rail becomes an off-canvas
+     drawer; two-column surfaces stack; the ledger sheds optional columns. ── */
+@media (max-width: 899px) {
+    /* Left rail → off-canvas drawer (slides over the shell; JS toggles data-open) */
+    .portal-desk .desk-nav-rail {
+        position: fixed !important;
+        top: 0; left: 0; bottom: 0;
+        z-index: 60;
+        width: 264px !important;
+        transform: translateX(-100%);
+        transition: transform var(--t-med) var(--ease);
+        box-shadow: var(--shadow-modal);
+    }
+    .portal-desk .desk-nav-rail[data-open='true'] { transform: translateX(0); }
+
+    /* Masthead wraps instead of overflowing; search flexes to fill its row */
+    .portal-desk .desk-masthead { flex-wrap: wrap; padding: 0 12px !important; gap: 8px !important; height: auto !important; min-height: 58px; }
+    .portal-desk .desk-search { width: auto !important; flex: 1 1 160px; min-width: 0; margin-left: 8px !important; }
+
+    /* Two-column surfaces collapse; asides stack below */
+    .portal-desk .desk-tray-grid,
+    .portal-desk .desk-st-grid { grid-template-columns: 1fr !important; }
+    .portal-desk .desk-tray-main,
+    .portal-desk .desk-st-main { border-right: none !important; min-height: 0 !important; }
+    .portal-desk .desk-tray-main { border-bottom: 1px solid var(--hairline); }
+    .portal-desk .desk-tray-aside { border-top: 1px solid var(--hairline); }
+}
+
+@media (max-width: 720px) {
+    /* Search collapses to an icon-only launcher (still opens the ⌘K palette) */
+    .portal-desk .desk-search__label,
+    .portal-desk .desk-search__kbd { display: none !important; }
+    .portal-desk .desk-search { flex: 0 0 auto; width: 40px !important; justify-content: center; padding: 0 !important; margin-left: auto !important; }
+}
+
+@media (max-width: 700px) {
+    /* Productions ledger sheds №, deadline, price — title + status carry it */
+    .portal-desk .desk-prod-grid { grid-template-columns: minmax(0, 1fr) auto !important; }
+    .portal-desk .desk-col-opt { display: none !important; }
+}
+
+@media (max-width: 560px) {
+    /* Tray cards wrap; thumbnail shrinks; CTA takes its own full-width line */
+    .portal-desk .desk-tray-card { flex-wrap: wrap; }
+    .portal-desk .desk-tray-thumb { width: 108px !important; height: 61px !important; }
+    .portal-desk .desk-tray-cta { flex: 1 0 100% !important; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+    /* Two-up form fields stack in the request sheet */
+    .portal-desk .desk-field-pair { grid-template-columns: 1fr !important; }
+}

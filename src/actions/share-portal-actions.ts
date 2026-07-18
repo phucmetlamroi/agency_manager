@@ -32,6 +32,7 @@ import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { isValidReaction } from '@/lib/comment-reactions'
 import { audit } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
+import type { ClientRequestPortalDTO } from '@/components/portal/calm/types'
 
 /* ───────────────────────────────────────────────────────────────────────────
    Reads
@@ -1237,4 +1238,77 @@ export async function toggleReactionViaToken(token: string, commentId: string, e
     }
     await prisma.taskCommentReaction.create({ data: { commentId, emoji, viaShareLinkId: scope.shareLinkId } })
     return { success: true, reacted: true }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   [The Desk] Correspondence — client's own work requests + the studio's reply.
+   READ-ONLY: only findMany, uniform null failure, no writes/revalidate/audit.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const REQUEST_STATUS_LABEL: Record<string, { status: ClientRequestPortalDTO['status']; label: string }> = {
+    NEW: { status: 'pending', label: 'Submitted' },
+    REVIEWING: { status: 'reviewing', label: 'Under review' },
+    ACCEPTED: { status: 'accepted', label: 'Accepted' },
+    REJECTED: { status: 'declined', label: 'Declined' },
+}
+
+/**
+ * The client's own ClientTaskRequest rows, most-recent first, scoped by the SAME
+ * dual-membership guard as every other token read (`clientId ∈ scope.clientIds`
+ * AND `workspaceId ∈ scope.workspaceIds`). A whitelist `select` never touches the
+ * staff-only columns (reviewedById, viaShareLinkId, profileId, submittedVia); the
+ * studio's decision note is exposed ONLY once a decision exists (rejectionNote on
+ * a decline, taskId on an accept). No finance/assignee fields exist on this model
+ * by design. Orphaned (clientId=null) rows fail the `in` and are excluded.
+ */
+export async function getClientRequestsViaToken(token: string): Promise<ClientRequestPortalDTO[] | null> {
+    const scope = await resolveShareToken(token)
+    if (!scope) return null
+
+    const rows = await prisma.clientTaskRequest.findMany({
+        where: { clientId: { in: scope.clientIds }, workspaceId: { in: scope.workspaceIds } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+            id: true, title: true, status: true,
+            desiredType: true, desiredDeadline: true, videoList: true, notes: true,
+            rawFootage: true, collectFile: true, bRoll: true, refs: true, submitFolder: true, script: true,
+            rejectionNote: true, taskId: true, createdAt: true, reviewedAt: true, workspaceId: true,
+            client: { select: { id: true, name: true, parent: { select: { name: true } } } },
+        },
+    })
+
+    // Batched period-label lookup (does not widen scope — ids come from the scoped rows).
+    const wsIds = Array.from(new Set(rows.map(r => r.workspaceId).filter(Boolean)))
+    const wsRows = wsIds.length
+        ? await prisma.workspace.findMany({ where: { id: { in: wsIds } }, select: { id: true, name: true } })
+        : []
+    const wsNameById = new Map(wsRows.map(w => [w.id, w.name]))
+    const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
+
+    return rows.map((r): ClientRequestPortalDTO => {
+        const m = REQUEST_STATUS_LABEL[r.status] ?? { status: 'pending' as const, label: 'Submitted' }
+        return {
+            id: r.id,
+            title: r.title,
+            status: m.status,
+            statusLabel: m.label,
+            submittedAt: r.createdAt.toISOString(),
+            reviewedAt: iso(r.reviewedAt),
+            desiredType: r.desiredType,
+            desiredDeadline: iso(r.desiredDeadline),
+            videoList: r.videoList,
+            notes: r.notes,
+            rawFootage: r.rawFootage,
+            collectFile: r.collectFile,
+            bRoll: r.bRoll,
+            refs: r.refs,
+            submitFolder: r.submitFolder,
+            script: r.script,
+            // Studio reply is surfaced ONLY after a decision — note on decline, task on accept.
+            studioReply: r.status === 'REJECTED' ? (r.rejectionNote ?? null) : null,
+            linkedTaskId: r.status === 'ACCEPTED' ? (r.taskId ?? null) : null,
+            brandName: r.client ? (r.client.parent ? `${r.client.parent.name} / ${r.client.name}` : r.client.name) : null,
+            periodName: wsNameById.get(r.workspaceId) ?? null,
+        }
+    })
 }

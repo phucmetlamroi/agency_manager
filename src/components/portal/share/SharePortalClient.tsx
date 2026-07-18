@@ -11,7 +11,7 @@
  */
 
 import { useMemo } from 'react'
-import PortalApp from '@/components/portal/calm/PortalApp'
+import DeskApp from '@/components/portal/desk/DeskApp'
 import {
     approveDeliverableViaToken,
     requestChangesViaToken,
@@ -19,6 +19,7 @@ import {
     getActivityViaToken,
     getSubmitOptionsViaToken,
     submitClientRequestViaToken,
+    getClientRequestsViaToken,
     createSubClientViaToken,
     getCommentFeedViaToken,
     postCommentViaToken,
@@ -49,6 +50,7 @@ export default function SharePortalClient({ token, clientName, profileName, bran
         activity: (taskId) => getActivityViaToken(token, taskId),
         getSubmitOptions: () => getSubmitOptionsViaToken(token),
         submitRequest: (input) => submitClientRequestViaToken(token, input),
+        getRequests: () => getClientRequestsViaToken(token),
         createSubClient: (input) => createSubClientViaToken(token, input),
         getCommentFeed: (taskId) => getCommentFeedViaToken(token, taskId),
         postComment: (taskId, body, parentId) => postCommentViaToken(token, taskId, body, parentId),
@@ -62,12 +64,10 @@ export default function SharePortalClient({ token, clientName, profileName, bran
     }), [token])
 
     return (
-        <PortalApp
+        <DeskApp
             mode="share"
             actions={actions}
-            workspaceId="" /* share link spans all workspaces — unused in share mode */
             locale="en"
-            currentUserId=""
             accountName={clientName}
             contactName={clientName}
             agencyName={profileName}

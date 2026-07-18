@@ -62,10 +62,6 @@ const nextConfig: NextConfig = {
               : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io; upgrade-insecure-requests;"
           },
           {
-            key: 'X-Frame-Options',
-            value: 'DENY'
-          },
-          {
             key: 'X-Content-Type-Options',
             value: 'nosniff'
           },
@@ -76,6 +72,38 @@ const nextConfig: NextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(self), microphone=(self), display-capture=(self), geolocation=()'
+          }
+        ]
+      },
+      // [The Desk] The client "/share" portal embeds the guest review player
+      // (/r/[slug]) as an in-portal "screening room" iframe. X-Frame-Options:DENY
+      // (formerly global) forbids ALL framing — even same-origin — so it is scoped
+      // OFF /r/ here (kept as DENY for every other route below) and /r/ instead gets
+      // SAMEORIGIN + `frame-ancestors 'self'`: ONLY our own same-origin portal may
+      // frame the review page; external sites still cannot (clickjacking stays
+      // blocked). /r/ keeps the global CSP (Mux/playback) from the '/(.*)' rule; this
+      // adds only the ancestor restriction. reviewUrl is same-origin (guestAppBaseUrl
+      // === portal origin in prod), so the rv_guest_/rv_unlock_ SameSite=Lax cookies
+      // keep flowing inside the frame.
+      {
+        source: '/((?!r/).*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY'
+          }
+        ]
+      },
+      {
+        source: '/r/:path*',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN'
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self';"
           }
         ]
       }

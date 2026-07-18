@@ -7,7 +7,7 @@
  * default. The 11 legacy labels are UNCHANGED (regression K3).
  */
 
-import { TASK_STATUS_META, PHASE_CLIENT_LABEL } from './task-statuses'
+import { TASK_STATUS_META, PHASE_CLIENT_LABEL, SALARY_COMPLETED_STATUS } from './task-statuses'
 
 const META_BY_VALUE = new Map(TASK_STATUS_META.map((m) => [m.value as string, m]))
 
@@ -76,4 +76,21 @@ export function needsClientAction(status: string): boolean {
  */
 export function isClientFacingPhase(status: string | null | undefined, clientReview: string | null | undefined): boolean {
     return clientReview != null || /khách/i.test(status || '')
+}
+
+/**
+ * [Files & masters] May the CLIENT see & download this task's DELIVERED originals?
+ * BROADER than {@link isClientFacingPhase} on purpose: the download library must also
+ * surface **completed** productions (status 'Hoàn tất' — delivered & accepted), whose
+ * clientReview is null and whose status has no "khách" marker, so the strict R5 gate
+ * drops them. Without this a client loses every finished month's files the instant the
+ * task is marked complete (QA 2026-07-18: 8 delivered May videos invisible in the portal).
+ *
+ * Still EXCLUDES pure internal WIP (production / internal-review phases with clientReview
+ * null) and CANCELLED tasks ('Đã hủy') — only client-facing OR completed. Do NOT reuse this
+ * for the /r review-board gate: that one stays {@link isClientFacingPhase} so an unreviewed
+ * new cut is never surfaced as a live review link (R5 / P4-R2 BLOCKER).
+ */
+export function isClientDeliveredPhase(status: string | null | undefined, clientReview: string | null | undefined): boolean {
+    return isClientFacingPhase(status, clientReview) || status === SALARY_COMPLETED_STATUS
 }

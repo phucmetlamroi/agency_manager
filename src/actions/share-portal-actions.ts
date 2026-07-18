@@ -184,6 +184,18 @@ export async function getShareSnapshot(token: string) {
     }
 
     const guestBase = guestAppBaseUrl()
+    // [QA 2026-07-18] Detect a link to OUR OWN review board (`/r/{slug}`) ROBUSTLY — by path + known
+    // host, not a brittle `startsWith(base)` that a host/scheme/www drift or a relative link would
+    // defeat (letting a revoked link slip through). External links (frame.io/Drive) never match.
+    const OWN_HOSTS = new Set<string>(['hustlytasker.xyz', 'www.hustlytasker.xyz'])
+    try { OWN_HOSTS.add(new URL(guestBase).host.toLowerCase()) } catch { /* base malformed → keep fallback hosts */ }
+    const isOwnReviewLink = (u: string | null): boolean => {
+        if (!u) return false
+        try {
+            const url = new URL(u, guestBase) // relative `/r/…` resolves against our own base
+            return url.pathname.startsWith('/r/') && OWN_HOSTS.has(url.host.toLowerCase())
+        } catch { return false }
+    }
     const mappedTasks = await Promise.all(tasks.map(async ({ assignedBy, ...task }) => {
         // R5 gate: only surface a review board when the task is in a CLIENT-facing phase.
         const asset = readyAssetByTask.get(task.id)
@@ -200,9 +212,18 @@ export async function getShareSnapshot(token: string) {
         // hasn't decided yet — drives the badge ('Awaiting your review') + needsYou. The REAL
         // task.clientReview (APPROVED/CHANGES) always wins the ?? and stays in the DTO.
         const effClientReview = task.clientReview ?? (reviewUrl ? 'AWAITING' : null)
-        const effProductLink = task.productLink ?? reviewUrl
+        // [QA 2026-07-18] Only ever hand the client OUR OWN review board through the freshly-minted,
+        // R5-gated, always-LIVE `reviewUrl` — never a stored `task.productLink` /r/ link. task-sync.ts
+        // stamps `productLink = reviewUrl` when a task is sent to the client; a later version revokes
+        // that share but the dead URL lingers, so a task whose reviewUrl is null (R5-gated OR a mint
+        // hiccup) shipped a "This link is no longer available" link. So touch ONLY our own /r/ links —
+        // swap them for the fresh reviewUrl, or drop them when there's none. EXTERNAL delivery/download
+        // links (frame.io / Drive) are ALWAYS preserved — they back the sheet's "Download files" button.
+        const clientProductLink = isOwnReviewLink(task.productLink) ? (reviewUrl ?? null) : task.productLink
+        const effProductLink = clientProductLink
         return {
         ...task,
+        productLink: clientProductLink,
         // [Trial P0 — isolation] The client must NEVER receive the editor's identity;
         // ship the Manager instead ("client làm việc với manager, không biết editor").
         assignee: null,

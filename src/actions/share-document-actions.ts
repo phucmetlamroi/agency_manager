@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/db'
 import { rateLimit } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit-log'
-import { clientLabelOf, isClientFacingPhase } from '@/lib/portal-derive'
+import { clientLabelOf, isClientDeliveredPhase } from '@/lib/portal-derive'
 import { buildMediaLinks } from '@/lib/review/media-links'
 import { presignGetObject } from '@/lib/review/r2'
 import { getOrCreateClientReviewSlug } from '@/lib/review/shares'
@@ -148,8 +148,13 @@ async function buildClientDocuments(
             clientId: true,
         },
     })
+    // [QA 2026-07-18] Files & masters = the client's library of DELIVERED originals, so it must
+    // include COMPLETED productions ('Hoàn tất'), not only tasks still in an active client-facing
+    // review. isClientDeliveredPhase = client-facing OR completed; without the completed branch a
+    // client lost every finished month's downloads (8 delivered May videos were invisible). Still
+    // excludes internal WIP + cancelled tasks. NOT the /r review-board gate (that stays R5-strict).
     const visibleTaskIds = scopedTasks
-        .filter((task) => isClientFacingPhase(task.status, task.clientReview))
+        .filter((task) => isClientDeliveredPhase(task.status, task.clientReview))
         .map((task) => task.id)
     const scopedTaskById = new Map(scopedTasks.map((task) => [task.id, task]))
 

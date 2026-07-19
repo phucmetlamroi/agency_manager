@@ -58,8 +58,26 @@ const nextConfig: NextConfig = {
               // (e.g. manifest-*.fastly.mux.com / chunk-*.fastly.mux.com), so connect-src and
               // media-src must allow https://*.mux.com (CSP wildcard covers nested subdomains)
               // or playback silently freezes at frame 0 after the manifest parses.
-              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io;"
-              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io; upgrade-insecure-requests;"
+              //
+              // NOTE (R2 images): img-src MUST list *.r2.cloudflarestorage.com. Two distinct sinks
+              // need it, so do NOT prune this token as "comment attachments only":
+              //   1. Comment attachments are fetched through a SAME-ORIGIN route
+              //      (/api/review/comment-attachments/:id/raw) that 302s to a presigned R2 URL.
+              //      CSP re-checks the *redirect target's* scheme+host (path matching is dropped
+              //      after a redirect, host matching is not), so 'self' alone is NOT enough — the
+              //      browser blocks the <img> with an img-src violation even though the upload
+              //      succeeded (connect-src already allowed R2). Symptom: the image uploads fine,
+              //      then renders as a broken thumbnail and the lightbox is blank.
+              //   2. IMAGE assets in the staff player (VideoStage) use a DIRECT cross-origin
+              //      presigned R2 URL — same directive, no redirect involved.
+              // Scope: this only takes effect on routes that actually receive this policy (staff
+              // routes + /share). It is inert on /r/[slug], whose own rule below REPLACES this
+              // header rather than adding to it — see the comment on that rule.
+              // The host is safe to wildcard because r2.ts pins the endpoint to
+              // https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com with no custom-domain/r2.dev
+              // escape hatch; revisit both img-src and connect-src if that ever changes.
+              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io;"
+              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io; upgrade-insecure-requests;"
           },
           {
             key: 'X-Content-Type-Options',
